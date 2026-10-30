@@ -31,7 +31,8 @@ const scriptPath = () => process.env.MAIPAI_HOST_TUNE_SCRIPT || join(repoRoot, "
 const platform = () => process.env.MAIPAI_HOST_TUNE_PLATFORM || process.platform;
 
 async function runScript(args: string[]): Promise<{ code: number; out: string; err: string }> {
-  const child = Bun.spawn(["bash", scriptPath(), "--json", "--data-dir", classDir("records"), "--models-dir", classDir("models"), ...args], {
+  const child = Bun.spawn(["bash", scriptPath(), "--json", "--data-dir", classDir("records"), "--models-dir", classDir("models"),
+    "--engines-dir", classDir("engines"), "--media-dir", classDir("people-files"), "--cache-dir", classDir("cache"), ...args], {
     stdout: "pipe", stderr: "pipe", stdin: "ignore", timeout: 60_000,
   });
   const [code, out, err] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);

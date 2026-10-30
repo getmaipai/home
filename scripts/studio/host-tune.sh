@@ -9,7 +9,8 @@
 #
 # Options: --json (machine output), --yes (really change things; without it
 # apply and revert only print what they would do), --dry-run (the default),
-# --data-dir <dir> and --models-dir <dir> (Home's folders for the two AUTO items).
+# --data-dir <dir> and --models-dir <dir> (Home's folders for the AUTO items), plus
+# --engines-dir, --media-dir and --cache-dir for the other three folders no-spotlight hides.
 #
 # Modes: auto (inside Home's folders, no administrator), consent (changes the
 # host, with permission), advice (never scripted, guidance only).
@@ -31,6 +32,9 @@ JSON=0
 DRY=1
 DATA_DIR="${MAIPAI_DATA_DIR:-}"
 MODELS_DIR="${MAIPAI_MODELS_DIR:-}"
+ENGINES_DIR="${MAIPAI_ENGINES_DIR:-}"
+MEDIA_DIR="${MAIPAI_MEDIA_DIR:-}"
+CACHE_DIR="${MAIPAI_CACHE_DIR:-}"
 WOULD=()
 
 IDS="no-spotlight no-timemachine-models power display-awake wired-limit no-auto-major-upgrade remote-login advice-accounts advice-radios advice-network advice-toolchains advice-login advice-screensaver"
@@ -62,6 +66,12 @@ write_file() { # write_file <path> <content>
 
 pmset_val() { pmset -g 2>/dev/null | awk -v k="$1" '$1==k{print $2; exit}'; }
 
+# The folders no-spotlight hides: name|path, empty paths left out.
+spotlight_folders() {
+  printf '%s|%s\n' data "$DATA_DIR" models "$MODELS_DIR" engines "$ENGINES_DIR" media "$MEDIA_DIR" cache "$CACHE_DIR" | grep -v '|$'
+}
+spotlight_dirs() { spotlight_folders | cut -d'|' -f2-; }
+
 # Current item fields, set by load_item.
 T_TITLE="" T_WHY="" T_MODE="" T_STATE="" T_CURRENT="" T_PROPOSED=""
 
@@ -70,13 +80,14 @@ load_item() {
   case "$1" in
     no-spotlight)
       T_TITLE="Keep Spotlight out of Home's files"; T_MODE=auto
-      T_WHY="Spotlight reads every file to build a search list. On big model files that wastes the Mac's time. This hides only Home's two folders from it."
-      T_PROPOSED="Home's data folder and models folder are not indexed"
+      T_WHY="Spotlight reads every file to build a search list. On big model files that wastes the Mac's time. This hides only Home's own folders from it."
+      T_PROPOSED="Home's data, models, engines, media and cache folders are not indexed"
       if [ -z "$DATA_DIR" ] || [ -z "$MODELS_DIR" ]; then T_CURRENT="Home's folders are not known to this script. Run it with --data-dir and --models-dir."; return; fi
-      local miss=""
-      [ -f "$DATA_DIR/.metadata_never_index" ] || miss="data"
-      [ -f "$MODELS_DIR/.metadata_never_index" ] || miss="${miss:+$miss and }models"
-      if [ -z "$miss" ]; then T_STATE=ok; T_CURRENT="Both folders are hidden from Spotlight"; else T_STATE=needs; T_CURRENT="Spotlight can still read the $miss folder"; fi ;;
+      local miss="" name dir
+      while IFS='|' read -r name dir; do
+        [ -n "$dir" ] && [ ! -f "$dir/.metadata_never_index" ] && miss="${miss:+$miss, }$name"
+      done < <(spotlight_folders)
+      if [ -z "$miss" ]; then T_STATE=ok; T_CURRENT="Home's folders are hidden from Spotlight"; else T_STATE=needs; T_CURRENT="Spotlight can still read these folders: $miss"; fi ;;
     no-timemachine-models)
       T_TITLE="Keep the AI models out of Time Machine"; T_MODE=auto
       T_WHY="The AI models are huge and can be downloaded again. Backing them up fills the backup drive. Home's own data stays in the backup."
@@ -211,8 +222,7 @@ do_apply() {
   case "$id" in
     no-spotlight)
       [ -n "$DATA_DIR" ] && [ -n "$MODELS_DIR" ] || die 2 no-folder "Home's folders are not known. Run again with --data-dir and --models-dir."
-      run mkdir -p "$DATA_DIR" "$MODELS_DIR"
-      run touch "$DATA_DIR/.metadata_never_index" "$MODELS_DIR/.metadata_never_index" ;;
+      while IFS= read -r k; do run mkdir -p "$k"; run touch "$k/.metadata_never_index"; done < <(spotlight_dirs) ;;
     no-timemachine-models)
       [ -n "$MODELS_DIR" ] || die 2 no-folder "Home's models folder is not known. Run again with --models-dir."
       run mkdir -p "$MODELS_DIR"
@@ -279,7 +289,7 @@ do_revert() {
   case "$id" in
     no-spotlight)
       [ -n "$DATA_DIR" ] && [ -n "$MODELS_DIR" ] || die 2 no-folder "Home's folders are not known. Run again with --data-dir and --models-dir."
-      run rm -f "$DATA_DIR/.metadata_never_index" "$MODELS_DIR/.metadata_never_index" ;;
+      while IFS= read -r k; do run rm -f "$k/.metadata_never_index"; done < <(spotlight_dirs) ;;
     no-timemachine-models)
       [ -n "$MODELS_DIR" ] || die 2 no-folder "Home's models folder is not known. Run again with --models-dir."
       run tmutil removeexclusion "$MODELS_DIR" ;;
@@ -326,6 +336,9 @@ while [ $# -gt 0 ]; do
     --yes) DRY=0 ;;
     --data-dir) shift; DATA_DIR="${1:-}" ;;
     --models-dir) shift; MODELS_DIR="${1:-}" ;;
+    --engines-dir) shift; ENGINES_DIR="${1:-}" ;;
+    --media-dir) shift; MEDIA_DIR="${1:-}" ;;
+    --cache-dir) shift; CACHE_DIR="${1:-}" ;;
     detect|apply|revert) CMD="$1" ;;
     -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) if [ -n "$CMD" ] && [ -z "$ARG" ] && [ "$CMD" != detect ]; then ARG="$1"; else die 2 usage "Unknown option '$1'. Use: host-tune.sh [--json] [--yes] detect | apply <id> | revert <id>."; fi ;;

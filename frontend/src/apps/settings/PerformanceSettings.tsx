@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { HostTuneSettings } from "@/apps/settings/HostTuneSettings";
 import { CloseAppsSettings } from "@/apps/settings/CloseAppsSettings";
 import { PerformanceCustomize } from "@/apps/settings/PerformanceCustomize";
 import { PRESET_IDS, PRESET_VALUES, currentPreset, specKey, type PresetId } from "@/apps/settings/performanceModel";
@@ -14,7 +15,7 @@ import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
 const PRESET_TITLES: Record<PresetId, string> = { chat_first: "Chat first", balanced: "Balanced", big_jobs_first: "Big jobs first" };
 
-export function PerformanceSettings(_props: SettingsViewProps) {
+export function PerformanceSettings({ person }: SettingsViewProps) {
   const { ready, value, write } = usePerformanceSettings();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function PerformanceSettings(_props: SettingsViewProps) {
         </CardContent>
       </Card>
       <CloseAppsSettings value={value} write={write} />
+      {person.role === "owner" ? <HostTuneSettings /> : null}
       <Collapsible open={customizeOpen} onOpenChange={setCustomizeOpen}>
         <CollapsibleTrigger render={<Button type="button" variant="outline" />}>{customizeOpen ? "Hide customize" : "Customize"}</CollapsibleTrigger>
         <CollapsibleContent><PerformanceCustomize value={value} write={onCustomize} /></CollapsibleContent>

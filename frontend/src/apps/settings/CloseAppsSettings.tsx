@@ -39,7 +39,8 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
       <ItemGroup variant="card">
         <Item size="setting">
           <ItemContent><ItemTitle>{title}</ItemTitle><ItemDescription clamp={false}>{blurb}</ItemDescription></ItemContent>
-          <ItemActions>
+        </Item>
+        <div className="flex flex-wrap gap-2 px-4 pb-3">
             {starterToAdd.length > 0 ? <Button variant="outline" onClick={() => save({ [LIST_KEYS[kind]]: JSON.stringify([...list, ...starterToAdd.map((app) => app.bundleId)]) }, kind === "always" ? "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on." : "The starter apps will always stay open.")}>Use the starter list</Button> : null}
             {addable.length > 0 ? (
               <Select value="" onValueChange={(id) => { if (id) void add(id); }}>
@@ -47,8 +48,7 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
                 <SelectContent>{addable.map((app) => <SelectItem key={app.bundleId} value={app.bundleId}>{app.name}</SelectItem>)}</SelectContent>
               </Select>
             ) : null}
-          </ItemActions>
-        </Item>
+        </div>
         {list.length === 0 ? <Item size="setting"><ItemContent><ItemDescription clamp={false}>{kind === "always" ? "No apps yet, so Home closes nothing." : "No apps added. The built-in protected apps are never closed either way."}</ItemDescription></ItemContent></Item> : null}
         {list.map((id) => (
           <Item key={id} size="setting">

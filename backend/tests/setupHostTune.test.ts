@@ -91,10 +91,24 @@ describe("setup host-tune routes", () => {
     expect((await post("apply", { id: "power" })).status).toBe(409);
   });
 
-  test("closed once setup is finished", async () => {
-    stub("exit 0");
+  test("passes all five Home folders to the script", async () => {
+    stub(`echo '{"supported":true,"items":[]}'`);
+    await new TestClient().get("/api/setup/host-tune");
+    const args = await argv();
+    for (const flag of ["--data-dir", "--models-dir", "--engines-dir", "--media-dir", "--cache-dir"]) expect(args).toContain(flag);
+  });
+
+  test("after setup the owner reaches the routes and everyone else is refused", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" });
     replaceSetupStep("done", { status: "done" } as never);
-    const response = await new TestClient().get("/api/setup/host-tune");
-    expect([409, 404]).toContain(response.status);
+    stub(`echo '{"supported":true,"items":[${JSON.stringify(item)}]}'`);
+    expect((await owner.get("/api/setup/host-tune")).status).toBe(200);
+    stub(`echo '{"item":${JSON.stringify({ ...item, state: "applied" })}}'`);
+    expect((await owner.post("/api/setup/host-tune/apply", { id: "power" })).status).toBe(200);
+    expect((await owner.post("/api/setup/host-tune/revert", { id: "power" })).status).toBe(200);
+    const stranger = new TestClient("192.0.2.41");
+    expect((await stranger.get("/api/setup/host-tune")).status).toBe(401);
+    expect((await stranger.post("/api/setup/host-tune/apply", { id: "power" })).status).toBe(401);
   });
 });

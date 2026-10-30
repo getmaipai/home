@@ -12,6 +12,9 @@ let bin: string;
 let sysroot: string;
 let data: string;
 let models: string;
+let engines: string;
+let media: string;
+let cache: string;
 
 function tool(name: string, body: string) {
   const file = join(bin, name);
@@ -22,6 +25,7 @@ function tool(name: string, body: string) {
 beforeEach(() => {
   fake = mkdtempSync(join(tmpdir(), "host-tune-"));
   bin = join(fake, "bin"); sysroot = join(fake, "root"); data = join(fake, "data"); models = join(fake, "models");
+  engines = join(fake, "engines"); media = join(fake, "media"); cache = join(fake, "cache");
   mkdirSync(bin); mkdirSync(sysroot); mkdirSync(data); mkdirSync(models);
   writeFileSync(join(fake, "pmset"), "sleep 1\ndisksleep 10\ndisplaysleep 10\nautorestart 0\nwomp 0\npowernap 1\n");
   writeFileSync(join(fake, "wired"), "0\n");
@@ -61,7 +65,7 @@ esac`);
 afterEach(() => rmSync(fake, { recursive: true, force: true }));
 
 async function host(args: string[], env: Record<string, string> = {}) {
-  const child = Bun.spawn(["bash", SCRIPT, "--data-dir", data, "--models-dir", models, ...args], {
+  const child = Bun.spawn(["bash", SCRIPT, "--data-dir", data, "--models-dir", models, "--engines-dir", engines, "--media-dir", media, "--cache-dir", cache, ...args], {
     env: { ...process.env, PATH: `${bin}:/usr/bin:/bin`, FAKE: fake, MAIPAI_HOST_TUNE_ROOT: sysroot, ...env },
     stdout: "pipe", stderr: "pipe",
   });
@@ -129,6 +133,19 @@ describe("host-tune.sh apply and revert", () => {
     const reverted = JSON.parse((await host(["--json", "--yes", "revert", "no-spotlight"], { FAKE_UID: "501" })).out);
     expect(reverted.item.state).toBe("needs");
     expect(existsSync(join(models, ".metadata_never_index"))).toBe(false);
+  });
+
+  test("no-spotlight covers all five folders, creates the missing ones and touches nothing else", async () => {
+    const outside = join(fake, "outside");
+    mkdirSync(outside);
+    expect(byId((await detect()).items, "no-spotlight").current).toContain("engines, media, cache");
+    await host(["--json", "--yes", "apply", "no-spotlight"], { FAKE_UID: "501" });
+    for (const dir of [data, models, engines, media, cache]) expect(existsSync(join(dir, ".metadata_never_index"))).toBe(true);
+    expect(existsSync(join(outside, ".metadata_never_index"))).toBe(false);
+    expect(existsSync(join(fake, ".metadata_never_index"))).toBe(false);
+    expect(byId((await detect()).items, "no-spotlight").state).toBe("ok");
+    await host(["--json", "--yes", "revert", "no-spotlight"], { FAKE_UID: "501" });
+    for (const dir of [data, models, engines, media, cache]) expect(existsSync(join(dir, ".metadata_never_index"))).toBe(false);
   });
 
   test("no-timemachine-models excludes only the models folder", async () => {
