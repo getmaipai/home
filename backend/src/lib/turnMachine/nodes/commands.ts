@@ -40,6 +40,9 @@ export type CommandsOutput =
       /** GENUI-05: the package's accepted answer blocks, as `block` events (a command match runs no tool round). */
       blockEvents?: import("@maipai/spec/stack/ts/turn-stream-event.js").TurnStreamEvent[] };
 
+const ALARM_UNKNOWN_SPEAKER = "I can't set an alarm because I can't tell who is asking. Ask me in the app, where you're signed in.";
+const ALARM_FAILED = "I couldn't set that alarm. Please try again.";
+
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
   // INITIATIVE-01: the answer to a robot offer comes first; the prepared text is the reply and no model runs.
   if (state.offer) {
@@ -115,8 +118,6 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     // model and `policy` normally; only the instant, un-confirmed path
     // here is closed to it.
     if (manifest.consequential) continue;
-    // Alarms are private to the identified person, even when a robot has a signed-in owner.
-    if (manifest.id === "alarm" && speakerIsAnonymous(state)) continue;
     // CHAT-PARITY-02's own guard (the old engine file ~2792), mirrored here:
     // a temporary chat may run an ordinary command, but never one that
     // declares memory:write - the same invariant `policy`'s own
@@ -167,7 +168,19 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
             expression: captured,
           }
         : captured ? { [firstArgName(manifest)]: captured } : {};
+      // An alarm is private to the identified person, even when a robot has a signed-in owner. The answer is a fixed line,
+      // never the model, which has no alarm tool and once claimed it would "set a reminder" when nothing was set.
+      if (id === "alarm" && speakerIsAnonymous(state)) {
+        const outcome = outcomeOf({ callId: `pattern:${id}`, packageId: id, status: "failed", via: "pattern", args, errorCode: "unknown_speaker", userMessage: ALARM_UNKNOWN_SPEAKER });
+        return { outcome: { ok: true }, output: { matched: true, text: ALARM_UNKNOWN_SPEAKER, outcome } };
+      }
       const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
+      // An alarm that could not be set answers in the alarm's own fixed words, so the model never explains or invents what happened.
+      if (id === "alarm" && !result.ok) {
+        const text = result.code === "invalid_input" && result.error ? result.error : ALARM_FAILED;
+        const outcome = outcomeOf({ callId: `pattern:${id}`, packageId: id, status: "failed", via: "pattern", args, errorCode: result.code, userMessage: text });
+        return { outcome: { ok: true }, output: { matched: true, text, outcome } };
+      }
       // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed
       // pattern outcome used to return `matched: true` with the raw
       // `result.error` as the reply text (an MCP error string, a

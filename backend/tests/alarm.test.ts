@@ -103,7 +103,22 @@ describe("alarm package", () => {
     const signal = classifyTurnSignal({ text: utterance, ageBand: "child", commandOpeners: commandOpeners(loadAllManifests()) });
     const state = { actor, surface: "robot", speakerEvidence: null, signal, temporary: false, turnId: "alarm-anonymous", conversationId: "alarm-anonymous" } as never;
     const { output } = await commandsNode(state, { utterance }, new AbortController().signal);
-    expect(output.matched).toBe(false);
+    // The answer is a fixed line, never a model that might claim an alarm was set.
+    expect(output.matched).toBe(true);
+    expect((output as { text?: string }).text).toContain("can't set an alarm");
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()).toHaveLength(0);
+  });
+
+  test("an alarm whose time cannot be read gets the alarm's own fixed answer, never the model", async () => {
+    const actor = await person("Sage");
+    const utterance = "set an alarm for whenever";
+    const signal = classifyTurnSignal({ text: utterance, ageBand: "adult", commandOpeners: commandOpeners(loadAllManifests()) });
+    const state = { actor, surface: "chat", speakerEvidence: null, signal, temporary: false, turnId: "alarm-unreadable", conversationId: "alarm-unreadable", outcomes: [] } as never;
+    const { output } = await commandsNode(state, { utterance }, new AbortController().signal);
+    expect(output.matched).toBe(true);
+    const text = (output as { text?: string }).text ?? "";
+    expect(text).toContain("alarm");
+    expect(text).toContain("8:17 pm");
     expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()).toHaveLength(0);
   });
 
@@ -214,7 +229,9 @@ describe("alarm package", () => {
     for (const utterance of ["what alarms do I have", "what reminders do I have", "cancel my alarm at 6:30", "cancel the reminder to call Nadia"]) {
       const state = { actor, surface: "robot", speakerEvidence: null, signal: classifyTurnSignal({ text: utterance, ageBand: "child", commandOpeners: commandOpeners(loadAllManifests()) }), temporary: false, turnId: "alarm-anonymous", conversationId: "alarm-anonymous" } as never;
       const { output } = await commandsNode(state, { utterance }, new AbortController().signal);
-      expect(output.matched).toBe(false);
+      // Only an alarm phrase is answered here, with the fixed line; "what reminders do I have" is not the alarm tool's own pattern
+      // when the speaker is unknown and the turn goes on to the model as before.
+      if (output.matched) expect((output as { text?: string }).text).toContain("can't set an alarm");
     }
     expect(db.select().from(scheduledJobs).all()).toHaveLength(0);
   });

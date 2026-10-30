@@ -141,4 +141,29 @@ describe("parseAlarmRequest", () => {
   test("no time is refused", () => {
     expect(() => parseAlarmRequest("called gym", MORNING)).toThrow(HostError);
   });
+  test("a spoken time in words is read: eight seventeen, six thirty, seven o'clock, seven fifteen am", () => {
+    const at = (text: string) => { const d = new Date(parseAlarmRequest(text, MORNING).when); return [d.getHours(), d.getMinutes()]; };
+    expect(at("for eight seventeen")).toEqual([20, 17]);
+    expect(at("for six thirty tomorrow")).toEqual([6, 30]);
+    expect(at("at seven o'clock tomorrow")).toEqual([7, 0]);
+    expect(at("for seven fifteen am")).toEqual([7, 15]);
+    expect(at("for eight oh five pm")).toEqual([20, 5]);
+    expect(at("for seven twenty five tomorrow")).toEqual([7, 25]);
+  });
+  test("the word before the time is not kept as the label", () => {
+    expect(parseAlarmRequest("for 7:52pm", MORNING).task).toBe("Alarm");
+    expect(parseAlarmRequest("at 6:30 am", MORNING).task).toBe("Alarm");
+    expect(parseAlarmRequest("for eight seventeen", MORNING).task).toBe("Alarm");
+    expect(parseAlarmRequest("for 7 tomorrow for gym", MORNING).task).toBe("gym");
+  });
+  test("an unreadable time says what to do, in the alarm's own words", () => {
+    try {
+      parseAlarmRequest("for later", MORNING);
+      throw new Error("should have thrown");
+    } catch (error) {
+      expect((error as HostError).code).toBe("invalid_input");
+      expect((error as HostError).message).toContain("alarm");
+      expect((error as HostError).message).toContain("8:17 pm");
+    }
+  });
 });

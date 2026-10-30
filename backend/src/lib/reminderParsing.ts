@@ -115,14 +115,53 @@ export function parseReminder(text: string, now: Date = new Date()): ParsedRemin
  * afternoon; otherwise the next time that hour comes round. The label defaults to "Alarm". */
 const BARE_HOUR = /\b(?:at|for)\s+(\d{1,2})(?::(\d{2}))?(?!\s*(?:[:\d]|am\b|pm\b|a\.m|p\.m|minutes?\b|mins?\b|hours?\b|hrs?\b|seconds?\b|secs?\b|st\b|nd\b|rd\b|th\b))/i;
 
+const HOUR_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+const UNITS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const TEENS: Record<string, number> = { ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50 };
+const HOUR_WORD = Object.keys(HOUR_WORDS).join("|");
+// A time said aloud ("eight seventeen", "six thirty", "seven oh five", "seven o'clock", "seven twenty five"): hour word, then
+// o'clock, "oh" and a unit, a teen, or a tens word with an optional unit.
+const SPOKEN_TIME = new RegExp(
+  `\\b(${HOUR_WORD})\\s+(?:(o'?clock)|oh\\s+(${Object.keys(UNITS).join("|")})|(${Object.keys(TEENS).join("|")})|(${Object.keys(TENS).join("|")})(?:[\\s-](${Object.keys(UNITS).join("|")}))?)\\b`,
+  "i",
+);
+const SPOKEN_HOUR_ONLY = new RegExp(`\\b(at|for)\\s+(${HOUR_WORD})\\b(?!\\s*(?:minutes?|mins?|hours?|hrs?|seconds?|secs?))`, "i");
+
+/** "eight seventeen" becomes "8:17", "for seven" becomes "for 7": the number words a speech transcript carries. */
+function numbersFromWords(text: string): string {
+  let out = text.replace(SPOKEN_TIME, (_all, hour: string, oclock?: string, ohUnit?: string, teen?: string, tens?: string, unit?: string) => {
+    const h = HOUR_WORDS[hour.toLowerCase()]!;
+    let minutes = 0;
+    if (oclock) minutes = 0;
+    else if (ohUnit) minutes = UNITS[ohUnit.toLowerCase()]!;
+    else if (teen) minutes = TEENS[teen.toLowerCase()]!;
+    else if (tens) minutes = TENS[tens.toLowerCase()]! + (unit ? UNITS[unit.toLowerCase()]! : 0);
+    return `${h}:${String(minutes).padStart(2, "0")}`;
+  });
+  out = out.replace(SPOKEN_HOUR_ONLY, (_all, prep: string, hour: string) => `${prep} ${HOUR_WORDS[hour.toLowerCase()]}`);
+  return out;
+}
+
+/** The words a person leaves in front of or behind a time that are not a label. */
+function alarmLabel(task: string): string {
+  let label = task.trim();
+  for (let guard = 0; guard < 4; guard++) {
+    const next = label.replace(/^(?:called|named|for|at|on|to|about|the|an?)\b[\s,]*/i, "").replace(/[\s,]*\b(?:for|at|on|to|called|named)$/i, "").trim();
+    if (next === label) break;
+    label = next;
+  }
+  return label;
+}
+
 export function parseAlarmRequest(text: string, now: Date = new Date()): ParsedReminder {
-  let request = text;
-  const bare = BARE_HOUR.exec(text);
+  let request = numbersFromWords(text);
+  const bare = BARE_HOUR.exec(request);
   if (bare && Number(bare[1]) >= 1 && Number(bare[1]) <= 12) {
     const hour = Number(bare[1]);
     const minute = Number(bare[2] ?? "0");
     let meridiem: "am" | "pm";
-    if (/\btomorrow\b/i.test(text)) {
+    if (/\btomorrow\b/i.test(request)) {
       meridiem = hour >= 4 && hour <= 11 ? "am" : "pm";
     } else {
       const at = (pm: boolean) => {
@@ -133,16 +172,17 @@ export function parseAlarmRequest(text: string, now: Date = new Date()): ParsedR
       const future = [false, true].filter((pm) => at(pm) > now.getTime());
       meridiem = future[0] === undefined || !future[0] ? "am" : "pm";
     }
-    request = text.replace(BARE_HOUR, `at ${hour}:${String(minute).padStart(2, "0")} ${meridiem}`);
+    request = request.replace(BARE_HOUR, `at ${hour}:${String(minute).padStart(2, "0")} ${meridiem}`);
   }
   let parsed: ParsedReminder;
   try {
     parsed = parseReminder(request, now);
   } catch (error) {
-    if (!(error instanceof HostError) || error.message !== "What should I remind you about?") throw error;
-    parsed = parseReminder(`${request} Alarm`, now);
+    if (!(error instanceof HostError)) throw error;
+    if (error.message === "What should I remind you about?") parsed = parseReminder(`${request} Alarm`, now);
+    else throw new HostError("invalid_input", `I couldn't read the time for that alarm. Tell me the time, like "set an alarm for 8:17 pm" or "wake me at 6:30 tomorrow".`);
   }
-  return { ...parsed, task: parsed.task.trim().replace(/^(called|named)\s+/i, "") || "Alarm" };
+  return { ...parsed, task: alarmLabel(parsed.task) || "Alarm" };
 }
 
 export interface ParsedTimer {
