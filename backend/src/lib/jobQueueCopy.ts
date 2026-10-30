@@ -5,6 +5,7 @@ export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
   | "paused_chat" | "coding_mode"
+  | "bigger_job_ahead" | "max_window" | "max_drain" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -51,6 +52,19 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     adult: "Home is in coding mode. Your job starts by itself when it is back to normal, or tap Cancel.",
     child: "Home is busy with a big job. Your job starts when it is done.",
   },
+  bigger_job_ahead: {
+    adult: "A bigger job is running. Yours is number N (about M minutes).",
+    child: "A big job is running. You are number N.",
+  },
+  max_window: {
+    adult: "Home is running a Max job and will be back to normal in about N minutes. Yours starts after it.",
+    child: "Home is busy with a big job. Yours starts after it.",
+  },
+  max_drain: {
+    adult: "Max starts when the jobs ahead finish (about N minutes). New jobs wait behind it.",
+    child: "Home is busy with a big job. Yours starts after it.",
+  },
+  still_running: { adult: "Still running, about N minutes more.", child: "Still running. It will be done soon." },
 };
 
 function estimateText(seconds: number): string {
@@ -82,6 +96,24 @@ export function jobQueueCopy(
   }
 
   const line = JOB_QUEUE_COPY[reason][audience];
+  if (reason === "bigger_job_ahead") {
+    const number = position === null ? "" : String(position);
+    const minutes = typeof estimateSeconds === "number" && Number.isFinite(estimateSeconds) ? String(Math.max(1, Math.round(estimateSeconds / 60))) : null;
+    if (audience === "child") return line.replace("N", number);
+    return line.replace("N", number).replace(minutes === null ? / \(about M minutes\)/ : "M", minutes === null ? "" : minutes);
+  }
+  if (reason === "max_window" && audience === "adult") {
+    if (typeof estimateSeconds !== "number" || !Number.isFinite(estimateSeconds)) return line.replace(" in about N minutes", "");
+    return line.replace("N", String(Math.max(1, Math.round(estimateSeconds / 60))));
+  }
+  if (reason === "max_drain" && audience === "adult") {
+    if (typeof estimateSeconds !== "number" || !Number.isFinite(estimateSeconds)) return line.replace(" (about N minutes)", "");
+    return line.replace("N", String(Math.max(1, Math.round(estimateSeconds / 60))));
+  }
+  if (reason === "still_running" && audience === "adult") {
+    if (typeof estimateSeconds !== "number" || !Number.isFinite(estimateSeconds)) return "Still running.";
+    return line.replace("N", String(Math.max(1, Math.round(estimateSeconds / 60))));
+  }
   if (state === "queued" && reason === "queue") {
     if (position === 1) return audience === "adult" && Number.isFinite(estimateSeconds) ? `${line} It starts when the job ahead finishes (${estimateText(estimateSeconds!)}).` : line;
     if (position !== null && position > 1) {

@@ -40,11 +40,27 @@ describe("job queue copy", () => {
       ["queued", "waiting_long"], ["queued", "behind_chat"], ["waiting_memory", "making_room"],
       ["waiting_memory", "memory_elsewhere"], ["waiting_memory", "requeued_memory"], ["started", "started"],
       ["paused_chat", "paused_chat"], ["held_coding", "coding_mode"],
+      ["queued", "bigger_job_ahead"], ["queued", "max_window"], ["queued", "max_drain"], ["started", "still_running"],
       ["never_fit", { kind: "never_fit", job: "picture", neededGb: 20, availableGb: 10 }],
     ];
     for (const [state, reason] of cases) for (const audience of ["adult", "child"] as const) {
       expect(jobQueueCopy(state, reason, 2, null, audience).length).toBeGreaterThan(0);
     }
+  });
+
+  test("tier wait copy uses position and optional estimates for adults and children", () => {
+    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, 360, "adult")).toBe("A bigger job is running. Yours is number 2 (about 6 minutes).");
+    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, null, "adult")).toBe("A bigger job is running. Yours is number 2.");
+    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, 360, "child")).toBe("A big job is running. You are number 2.");
+    expect(jobQueueCopy("queued", "max_window", 1, 720, "adult")).toBe("Home is running a Max job and will be back to normal in about 12 minutes. Yours starts after it.");
+    expect(jobQueueCopy("queued", "max_window", 1, null, "adult")).toBe("Home is running a Max job and will be back to normal. Yours starts after it.");
+    expect(jobQueueCopy("queued", "max_window", 1, 720, "child")).toBe("Home is busy with a big job. Yours starts after it.");
+    expect(jobQueueCopy("queued", "max_drain", 1, 60, "adult")).toBe("Max starts when the jobs ahead finish (about 1 minutes). New jobs wait behind it.");
+    expect(jobQueueCopy("queued", "max_drain", 1, null, "adult")).toBe("Max starts when the jobs ahead finish. New jobs wait behind it.");
+    expect(jobQueueCopy("queued", "max_drain", 1, null, "child")).toBe("Home is busy with a big job. Yours starts after it.");
+    expect(jobQueueCopy("started", "still_running", null, 120, "adult")).toBe("Still running, about 2 minutes more.");
+    expect(jobQueueCopy("started", "still_running", null, null, "adult")).toBe("Still running.");
+    expect(jobQueueCopy("started", "still_running", null, null, "child")).toBe("Still running. It will be done soon.");
   });
 });
 

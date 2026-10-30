@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { order, registerQueueProvider, releaseHouseholdQueue, writePositions, type QueueJob } from "../src/lib/jobs/householdQueue";
+import { admit, order, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 
 const now = Date.parse("2026-10-25T12:00:00.000Z");
+const emptyTierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
 function job(id: string, personId: string, jobClass: QueueJob["jobClass"], createdAt: number, extra: Partial<QueueJob> = {}): QueueJob {
   return { id, personId, jobClass, state: "queued", createdAt, ...extra };
 }
@@ -61,6 +62,67 @@ describe("household queue", () => {
     expect(order([picture, video], now).map((item) => item.id)).toEqual(["picture", "video"]);
     video.createdAt = now - 10 * 60_000;
     expect(order([picture, video], now).map((item) => item.id)).toEqual(["video", "picture"]);
+  });
+
+  test("ages a Max video up one class after ten minutes", () => {
+    const picture = job("picture", "A", "picture", now - 1000);
+    const maxVideo = job("max-video", "B", "video", now - 10 * 60_000, { tier: "max" });
+    expect(order([picture, maxVideo], now).map((item) => item.id)).toEqual(["max-video", "picture"]);
+  });
+
+  test("T1 permits only one running Boost or Max job, leaving Standard unaffected", () => {
+    const runningBoost = job("rb", "A", "other", now, { tier: "boost", state: "running" });
+    const queuedBoost = job("qb", "B", "picture", now, { tier: "boost" });
+    const standard = job("s", "C", "video", now, { tier: "standard" });
+    expect(admit([runningBoost, queuedBoost, standard], now, emptyTierState)).toEqual({ start: ["s"], holds: { qb: "heavy_slot" } });
+  });
+
+  test("T2 drains running work for the first Max and holds admissions behind it", () => {
+    const running = job("run", "A", "other", now, { state: "running" });
+    const max = job("max", "B", "video", now, { tier: "max" });
+    const after = job("after", "C", "other", now + 1);
+    expect(admit([running, max, after], now, emptyTierState)).toEqual({ start: [], holds: { max: "max_drain", after: "max_drain" } });
+  });
+
+  test("T3 open Max window holds every other queued job", () => {
+    const max = job("max", "A", "video", now, { state: "running", tier: "max" });
+    const standard = job("standard", "B", "picture", now);
+    expect(admit([max, standard], now, { ...emptyTierState, windowOpenFor: "max" })).toEqual({ start: [], holds: { standard: "max_window" } });
+  });
+
+  test("T4a Max does not jump queued jobs ahead of it", () => {
+    const ahead = job("ahead", "A", "picture", now);
+    const max = job("max", "B", "video", now, { tier: "max" });
+    expect(admit([ahead, max], now, emptyTierState)).toEqual({ start: ["ahead"], holds: { max: "max_drain" } });
+    const behind = job("behind", "C", "other", now + 1);
+    expect(admit([ahead, max, behind], now + 1, emptyTierState)).toEqual({ start: ["ahead"], holds: { max: "max_drain", behind: "max_drain" } });
+  });
+
+  test("T4b waits for other people's first queued non-Max jobs before another Max", () => {
+    const max = job("max", "A", "video", now, { tier: "max" });
+    const nonMax = job("other-job", "B", "picture", now + 1);
+    const state: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: "A" };
+    expect(admit([max, nonMax], now, state)).toEqual({ start: ["other-job"], holds: { max: "fairness_wait" } });
+  });
+
+  test("over-estimate running Max work does not cancel or alter other admissions", () => {
+    const max = job("max", "A", "other", now, { state: "running", tier: "max", remainingSeconds: 601 });
+    const standard = job("standard", "B", "picture", now);
+    expect(stillRunningMinutes(max)).toBe(11);
+    expect(admit([max, standard], now, emptyTierState)).toEqual({ start: ["standard"], holds: {} });
+    expect(max.state).toBe("running");
+  });
+
+  test("T5 requeues twice before low-memory failure", () => {
+    expect(requeueAfterCritical({ requeues: 0 })).toBe("requeue_head");
+    expect(requeueAfterCritical({ requeues: 1 })).toBe("requeue_head");
+    expect(requeueAfterCritical({ requeues: 2 })).toBe("fail_low_memory");
+  });
+
+  test("still running estimate is only shown for running jobs past their estimate", () => {
+    expect(stillRunningMinutes(job("queued", "A", "picture", now, { remainingSeconds: 61 }))).toBeNull();
+    expect(stillRunningMinutes(job("running", "A", "picture", now, { state: "running", remainingSeconds: 60 }))).toBe(1);
+    expect(stillRunningMinutes(job("no-estimate", "A", "picture", now, { state: "running" }))).toBeNull();
   });
 
   test("backfills a fitting picture beside a paused clip", () => {

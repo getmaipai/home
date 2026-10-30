@@ -6,6 +6,7 @@ export interface QueueJob {
   id: string;
   personId: string;
   jobClass: QueueClass;
+  tier?: "standard" | "boost" | "max";
   state: QueueState;
   createdAt: string | number;
   position?: number | null;
@@ -22,6 +23,12 @@ export interface QueueJob {
 }
 
 export interface QueuePosition { id: string; position: number }
+export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait";
+export interface TierState {
+  windowOpenFor: string | null;
+  startedSinceMax: readonly string[];
+  lastMaxPersonId: string | null;
+}
 export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void> }
 type QueueProvider = () => QueueStoreEntry[];
 
@@ -78,6 +85,62 @@ export function order(jobs: readonly QueueJob[], now: number): QueuePosition[] {
     }
   }
   return ordered.map((job, index) => ({ id: job.id, position: index + 1 }));
+}
+
+/** Applies tier admission rules without changing household order or cancelling work. */
+export function admit(jobs: readonly QueueJob[], now: number, state: TierState): { start: string[]; holds: Record<string, AdmissionHold> } {
+  const positions = order(jobs, now);
+  const queued = new Map(jobs.filter((job) => job.state === "queued" && !job.childDailyCapReached).map((job) => [job.id, job]));
+  const running = jobs.filter((job) => job.state === "running");
+  const openMax = state.windowOpenFor ? jobs.find((job) => job.id === state.windowOpenFor && job.state === "running" && job.tier === "max") : undefined;
+  const holds: Record<string, AdmissionHold> = {};
+  const start: string[] = [];
+  const ordered = positions.map(({ id }) => queued.get(id)!).filter(Boolean);
+
+  if (openMax) {
+    for (const job of ordered) holds[job.id] = "max_window";
+    return { start, holds };
+  }
+
+  const firstMaxIndex = ordered.findIndex((job) => job.tier === "max");
+  const firstMax = firstMaxIndex < 0 ? undefined : ordered[firstMaxIndex];
+  const otherWaitingPeople = new Set(ordered.filter((job) => job.tier !== "max" && job.personId !== firstMax?.personId)
+    .map((job) => job.personId).filter((personId) => !state.startedSinceMax.includes(personId)));
+  const fairnessApplies = !!firstMax && state.lastMaxPersonId !== null && otherWaitingPeople.size > 0;
+  const draining = !!firstMax && running.length > 0;
+  const heavyRunning = running.some((job) => job.tier === "boost" || job.tier === "max");
+
+  let maxWaiting = false;
+  for (let index = 0; index < ordered.length; index += 1) {
+    const job = ordered[index]!;
+    if (firstMax && job.id === firstMax.id) {
+      if (draining) holds[job.id] = "max_drain";
+      else if (fairnessApplies) holds[job.id] = "fairness_wait";
+      else if (index > 0) holds[job.id] = "max_drain";
+      else { start.push(job.id); break; }
+      maxWaiting = true;
+      continue;
+    }
+    if ((draining || maxWaiting) && index > firstMaxIndex) { holds[job.id] = "max_drain"; continue; }
+    if (fairnessApplies && otherWaitingPeople.has(job.personId)) {
+      // Only the first queued non-Max job for each waiting person is admitted.
+      if (!start.some((id) => queued.get(id)?.personId === job.personId)) start.push(job.id);
+      else holds[job.id] = "fairness_wait";
+      continue;
+    }
+    if ((job.tier === "boost" || job.tier === "max") && heavyRunning) { holds[job.id] = "heavy_slot"; continue; }
+    start.push(job.id);
+  }
+  return { start, holds };
+}
+
+export function requeueAfterCritical(job: { requeues: number }): "requeue_head" | "fail_low_memory" {
+  return job.requeues < 2 ? "requeue_head" : "fail_low_memory";
+}
+
+export function stillRunningMinutes(job: QueueJob): number | null {
+  if (job.state !== "running" || job.remainingSeconds === undefined || job.remainingSeconds <= 0) return null;
+  return Math.ceil(job.remainingSeconds / 60);
 }
 
 /** Updates only changed records. The caller supplies its own store writer. */
