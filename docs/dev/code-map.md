@@ -909,7 +909,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
 | `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome |
-| `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile |
+| `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile, cardMoon |
 | `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, hoursOf, outlookLine, factualLine, summaryFor |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs |
 | `backend/src/lib/wellFormed.ts` | visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit, flushThinkSplit |
