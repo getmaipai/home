@@ -59,6 +59,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const rows = states.data?.states ?? [];
   const required = rows.filter((row) => row.required), optional = rows.filter((row) => !row.required);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
+  // The first animation to finish plays in the preview at once, so the person can watch it while the rest are made; any later choice of theirs stays.
+  useEffect(() => { if (selectedId === null) { const first = states.data?.states.find((row) => row.approved); if (first) setSelectedId(first.id); } }, [states.data?.states, selectedId]);
   const rest = look.data?.versions.find((v) => v.id === look.data?.rest) ?? look.data?.versions[look.data.versions.length - 1] ?? null;
   const portrait = rest?.url ?? null;
   const sheet = useSheetWait(companionId, sheetJob, rest?.id ?? null);
@@ -80,9 +82,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   // Which Generate button started the work, so only that one reads as busy; the others stay as they are, disabled.
   const [group, setGroup] = useState<"required" | "optional" | "one" | null>(null);
-  const [requested, setRequested] = useState<ReadonlySet<string>>(new Set());
-  useEffect(() => { if (!running) { setGroup(null); setRequested(new Set()); } }, [running]);
-  const generate = (ids: string[], from: "required" | "optional" | "one") => { setGroup(from); setRequested(new Set(ids)); void states.start(() => api.generateCompanionStates(companionId, { states: ids, count: 1 })); };
+  useEffect(() => { if (!running) setGroup(null); }, [running]);
+  const generate = (ids: string[], from: "required" | "optional" | "one") => { setGroup(from); void states.start(() => api.generateCompanionStates(companionId, { states: ids, count: 1 })); };
   const stop = () => void states.stop();
   // Once the character is ready, the four required animations start by themselves, once.
   const autoStarted = useRef(false);
@@ -93,7 +94,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   }, [states.data?.sheet_ready, running, missingRequired.length, clips.disabled]);
   const toggle = (id: string, on: boolean) => setTicked((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
   const tile = (row: CompanionStateRow) => {
-    const base = tileWord(row), word = running && requested.has(row.id) && !made(row) && base === "No animation yet" ? "Waiting its turn" : base, src = keyframeSrc(row) ?? portrait;
+    const word = tileWord(row), src = keyframeSrc(row) ?? portrait;
     return {
       name: row.label, selected: selectedId === row.id, onSelect: () => setSelectedId(row.id),
       media: row.approved ? (reducedMotion ? <img src={row.approved.urls.still} alt="" draggable={false} className="size-full object-cover" /> : <StackedAlphaVideo key={row.approved.take_id} src={row.approved.urls.h264} loop label={`${row.label} animation`} />) : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
@@ -109,11 +110,13 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
     <>
     <DialogBody columns="two">
       <DialogSection title="Preview">
+        <div className="mx-auto w-full max-w-sm">
         <GenerationStage generating={generating} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1" caption={selected ? `${label} · ${selected.label}` : `${label} · Character`}>
           {selected?.approved
             ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><ClipPlayer key={selected.approved.take_id} urls={selected.approved.urls} label={`${label} ${selected.label}`} /></div>
             : previewImage ? <img src={previewImage} alt={`${label}, ${selected ? `${selected.label} keyframe` : "portrait"}`} draggable={false} className="absolute inset-0 size-full object-contain" /> : null}
         </GenerationStage>
+        </div>
         <div className="flex flex-wrap gap-3">
           <Button shape="pill" disabled={!selected || running || clips.disabled} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => selected && generate([selected.id], "one")}><Sparkles aria-hidden="true" />Make another</Button>
           <Button variant="outline" shape="pill" disabled={!selected || running || pictures.disabled} aria-describedby={pictures.reason ? reasonId : undefined} title={pictures.reason ?? undefined} onClick={() => setEditing(true)}><Pencil aria-hidden="true" />Edit keyframe</Button>

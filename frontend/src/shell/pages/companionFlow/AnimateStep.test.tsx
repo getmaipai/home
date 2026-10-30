@@ -90,10 +90,11 @@ test("Generate Required asks for the missing required animations", async () => {
 test("a tile click switches the preview caption; the clip plays, or its still shows under reduced motion", async () => {
   const { view } = open(() => states(["idle"], { idle: { keyframe: { url: "/kf/idle", edited_at: "2026-10-29T12:00:00Z" } } }));
   await view.findByRole("button", { name: "Idle" });
-  expect(view.getByText("Marlow · Character")).toBeTruthy();
-  fireEvent.click(btn(view, "Idle"));
-  expect(view.getByText("Marlow · Idle")).toBeTruthy();
+  // The first animation that is made plays in the preview by itself; the person's own choice after that stays.
+  await waitFor(() => expect(view.getByText("Marlow · Idle")).toBeTruthy());
   expect(document.querySelector("video")).not.toBeNull();
+  fireEvent.click(btn(view, "Listening"));
+  expect(view.getByText("Marlow · Listening")).toBeTruthy();
   cleanup();
   window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} })) as never;
   const reduced = open(() => states(["idle"]));
@@ -115,8 +116,7 @@ test("tiles use the keyframe picture, or the portrait dimmed until one exists", 
 test("Make another redoes the selected animation once", async () => {
   const { view, calls } = open(() => states(["idle"]));
   await view.findByRole("button", { name: "Idle" });
-  expect(btn(view, "Make another").disabled).toBe(true);
-  fireEvent.click(btn(view, "Idle"));
+  await waitFor(() => expect(view.getByText("Marlow · Idle")).toBeTruthy()); /* the made animation is already selected */
   await act(async () => { fireEvent.click(btn(view, "Make another")); });
   expect(calls.generate).toEqual([{ states: ["idle"], count: 1 }]);
 });
