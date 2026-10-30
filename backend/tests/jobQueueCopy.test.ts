@@ -36,7 +36,7 @@ describe("job queue copy", () => {
 
   test("the table covers each supported state and reason", () => {
     const cases: Array<[JobQueueState, JobQueueReason]> = [
-      ["queued", "queue"], ["queued", "higher_class"], ["queued", "other_person_first"], ["queued", "moved_up"],
+      ["queued", "queue"], ["queued", "higher_class"], ["queued", "other_person_first"], ["queued", "class_first"], ["queued", "aging_first"], ["queued", "fair_share_first"], ["queued", "boost_first"], ["queued", "moved_up"],
       ["queued", "waiting_long"], ["queued", "behind_chat"], ["waiting_memory", "making_room"],
       ["waiting_memory", "memory_elsewhere"], ["waiting_memory", "requeued_memory"], ["started", "started"],
       ["paused_chat", "paused_chat"], ["held_coding", "coding_mode"],
@@ -46,6 +46,17 @@ describe("job queue copy", () => {
     for (const [state, reason] of cases) for (const audience of ["adult", "child"] as const) {
       expect(jobQueueCopy(state, reason, 2, null, audience).length).toBeGreaterThan(0);
     }
+  });
+
+  test("score explanation copy includes position and never names a person", () => {
+    const reasons = ["class_first", "aging_first", "fair_share_first", "boost_first"] as const;
+    for (const reason of reasons) for (const audience of ["adult", "child"] as const) {
+      const copy = jobQueueCopy("queued", reason, 3, null, audience);
+      expect(copy).toContain(audience === "adult" ? "You are number 3 now." : "You are number 3 now.");
+      expect(copy).not.toContain("Known Person");
+      expect(copy).not.toContain("Heavy Name");
+    }
+    expect(JOB_QUEUE_COPY.class_first.adult).toBe("A faster kind of job goes first (pictures, then videos, then music).");
   });
 
   test("tier wait copy uses position and optional estimates for adults and children", () => {

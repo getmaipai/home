@@ -36,4 +36,12 @@ describe("job scoring", () => {
     scoreJobs(jobs, DEFAULT_POLICY, now, {});
     expect(jobs).toEqual(before);
   });
+  test("delays aging until the category wait threshold", () => {
+    const policy = { ...DEFAULT_POLICY, maxWaitBeforeAgingMinutes: { music: 10 } };
+    const video = job("v", "b", "video", now);
+    const music = job("m", "a", "music", now - 30 * 60_000);
+    expect(scoreJobs([music, video], policy, now, {}).map((item) => item.id)).toEqual(["m", "v"]);
+    const delayed = scoreJobs([job("m", "a", "music", now - 10 * 60_000), video], policy, now, {});
+    expect(delayed.find((item) => item.id === "m")!.terms.aging).toBe(0);
+  });
 });

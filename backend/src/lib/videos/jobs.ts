@@ -66,7 +66,7 @@ export interface VideoJob {
   phase: string | null;
   position: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | null;
+  riseReason?: QueueJob["riseReason"];
   prompt: string;
   request: VideoRequest;
   error: string | null;

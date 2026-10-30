@@ -2,7 +2,7 @@ export type JobQueueAudience = "adult" | "child";
 export type JobQueueState = "queued" | "waiting_memory" | "started" | "paused_chat" | "never_fit" | "held_coding" | "failed_memory";
 export type JobQueueKind = "picture" | "video" | "song";
 export type JobQueueReason =
-  | "queue" | "higher_class" | "other_person_first" | "moved_up" | "waiting_long"
+  | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
   | "paused_chat" | "coding_mode"
   | "bigger_job_ahead" | "max_window" | "max_drain" | "still_running"
@@ -21,6 +21,14 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     adult: "Someone else's job goes first because they have waited longer.",
     child: "Someone else's job goes first because they have waited longer.",
   },
+  class_first: { adult: "A faster kind of job goes first (pictures, then videos, then music).", child: "A quicker job goes first." },
+  aging_first: { adult: "A job that has waited longer goes first.", child: "A job that waited longer goes first." },
+  fair_share_first: { adult: "Ahead of you: a job from someone who has used less of the computer this hour.", child: "Someone who has not had a turn goes first." },
+  boost_first: { adult: "An admin moved a job to the front.", child: "A job goes first." },
+  class: { adult: "A faster kind of job goes first (pictures, then videos, then music).", child: "A quicker job goes first." },
+  aging: { adult: "A job that has waited longer goes first.", child: "A job that waited longer goes first." },
+  fair_share: { adult: "Ahead of you: a job from someone who has used less of the computer this hour.", child: "Someone who has not had a turn goes first." },
+  boost: { adult: "An admin moved a job to the front.", child: "A job goes first." },
   moved_up: { adult: "You moved up in line.", child: "You are next." },
   waiting_long: {
     adult: "Still waiting. It starts when the computer is free, or tap Cancel.",
@@ -122,7 +130,7 @@ export function jobQueueCopy(
       return `You are number ${position} in line${estimate}.`;
     }
   }
-  if (state === "queued" && (reason === "higher_class" || reason === "other_person_first")) {
+  if (state === "queued" && (reason === "higher_class" || reason === "other_person_first" || reason === "class" || reason === "aging" || reason === "fair_share" || reason === "boost" || reason === "class_first" || reason === "aging_first" || reason === "fair_share_first" || reason === "boost_first")) {
     const number = position === 1 ? "You are next." : position !== null ? `You are number ${position} now.` : "";
     if (audience === "adult") return `${number} ${line}`.trim();
     return `${line}${number ? ` ${number}` : ""}`;

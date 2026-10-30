@@ -5,6 +5,7 @@ export interface ScorePolicy {
   agingPerMinute: number;
   fairShareMax: number;
   maxConcurrentPerPerson: number;
+  maxWaitBeforeAgingMinutes?: Partial<Record<JobCategory, number>>;
 }
 export const DEFAULT_POLICY: ScorePolicy = {
   classWeights: { picture: 60, video: 40, music: 30, tools: 20, background: 5 },
@@ -29,7 +30,8 @@ export function scoreJobs(jobs: readonly ScoreJob[], policy: ScorePolicy, now: n
   const scored = queued.map((job) => {
     const classWeight = policy.classWeights[job.category];
     const next = Math.min(...weights.filter((weight) => weight > classWeight), Infinity);
-    const aging = next === Infinity ? 0 : Math.min(Math.max(0, now - job.createdAt) / 60_000 * policy.agingPerMinute, next - classWeight);
+    const waitMinutes = Math.max(0, now - job.createdAt) / 60_000 - (policy.maxWaitBeforeAgingMinutes?.[job.category] ?? 0);
+    const aging = next === Infinity ? 0 : Math.min(Math.max(0, waitMinutes) * policy.agingPerMinute, next - classWeight);
     const fairShare = maxUsage === 0 ? 0 : policy.fairShareMax * (1 - (usage[job.personId] ?? 0) / maxUsage);
     const boost = job.adminBoost ?? 0;
     const terms = { classWeight, aging, fairShare, boost };

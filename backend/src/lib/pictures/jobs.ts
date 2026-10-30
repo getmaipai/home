@@ -22,7 +22,7 @@ import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, St
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
 
-type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReason?: "higher_class" | "other_person_first" | null };
+type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReason?: QueueJob["riseReason"] };
 const queuedPictureSubmits = new Map<string, () => Promise<{ job: string; done: StackPic[] | null }>>();
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;

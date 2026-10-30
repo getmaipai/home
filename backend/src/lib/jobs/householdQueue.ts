@@ -1,4 +1,5 @@
 /** The shared household order for heavy jobs. This module has no database or notification dependency. */
+import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -11,7 +12,9 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | null;
+  category?: JobCategory;
+  adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
   backfillFits?: boolean;
   typicalSeconds?: number;
@@ -32,46 +35,47 @@ export interface TierState {
 export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void> }
 type QueueProvider = () => QueueStoreEntry[];
 
-const CLASS_RANK: Record<QueueClass, number> = { picture: 0, video: 1, other: 2 };
-const AGING_MS = 10 * 60_000;
+let queuePolicy: ScorePolicy = DEFAULT_POLICY;
+export function setQueuePolicy(policy: ScorePolicy): void { queuePolicy = policy; }
+export function getQueuePolicy(): ScorePolicy { return queuePolicy; }
+
+type UsageCredit = { personId: string; seconds: number; at: number };
+const usageCredits: UsageCredit[] = [];
+export function recordUsage(personId: string, runningSeconds: number, now: number): void {
+  if (runningSeconds > 0 && Number.isFinite(runningSeconds)) usageCredits.push({ personId, seconds: runningSeconds, at: now });
+}
+export function usageLastHour(now: number): Record<string, number> {
+  const cutoff = now - 3600_000;
+  while (usageCredits.length && usageCredits[0]!.at < cutoff) usageCredits.shift();
+  const usage: Record<string, number> = {};
+  for (const credit of usageCredits) if (credit.at >= cutoff && credit.at <= now) usage[credit.personId] = (usage[credit.personId] ?? 0) + credit.seconds;
+  return usage;
+}
+const lastAccrual = new Map<string, number>();
+function accrueRunningUsage(jobs: readonly QueueJob[], now: number): void {
+  const running = new Set(jobs.filter((job) => job.state === "running").map((job) => job.id));
+  for (const job of jobs) if (job.state === "running") {
+    const previous = lastAccrual.get(job.id);
+    if (previous !== undefined) recordUsage(job.personId, Math.min(120, Math.max(0, (now - previous) / 1000)), now);
+    lastAccrual.set(job.id, now);
+  }
+  for (const id of lastAccrual.keys()) if (!running.has(id)) lastAccrual.delete(id);
+}
 
 function createdAt(job: QueueJob): number {
   return typeof job.createdAt === "number" ? job.createdAt : Date.parse(job.createdAt);
 }
 
-function effectiveClass(job: QueueJob, now: number): number {
-  const base = CLASS_RANK[job.jobClass];
-  if (now - createdAt(job) < AGING_MS) return base;
-  return Math.max(0, base - 1);
-}
-
-function compare(a: QueueJob, b: QueueJob, now: number): number {
-  return effectiveClass(a, now) - effectiveClass(b, now) || createdAt(a) - createdAt(b) || a.id.localeCompare(b.id);
-}
+function category(job: QueueJob): JobCategory { return job.category ?? (job.jobClass === "picture" ? "picture" : job.jobClass === "video" ? "video" : "tools"); }
 
 /** Returns every waiting job in household start order, with one based positions. */
-export function order(jobs: readonly QueueJob[], now: number): QueuePosition[] {
+export function order(jobs: readonly QueueJob[], now: number, usage: Readonly<Record<string, number>> = {}): QueuePosition[] {
   const waiting = jobs.filter((job) => job.state === "queued" && !job.childDailyCapReached);
-  const classes = [...new Set(waiting.map((job) => effectiveClass(job, now)))].sort((a, b) => a - b);
-  const ordered: QueueJob[] = [];
-  for (const rank of classes) {
-    const inClass = waiting.filter((job) => effectiveClass(job, now) === rank);
-    const byPerson = new Map<string, QueueJob[]>();
-    for (const job of inClass.sort((a, b) => Number(!!b.headOfClass) - Number(!!a.headOfClass) || createdAt(a) - createdAt(b) || a.id.localeCompare(b.id))) {
-      const personJobs = byPerson.get(job.personId) ?? [];
-      personJobs.push(job);
-      byPerson.set(job.personId, personJobs);
-    }
-    const people = [...byPerson.keys()].sort((a, b) => Number(!!byPerson.get(b)![0]!.headOfClass) - Number(!!byPerson.get(a)![0]!.headOfClass) || createdAt(byPerson.get(a)![0]!) - createdAt(byPerson.get(b)![0]!) || a.localeCompare(b));
-    for (let round = 0; ; round += 1) {
-      let added = false;
-      for (const person of people) {
-        const job = byPerson.get(person)![round];
-        if (job) { ordered.push(job); added = true; }
-      }
-      if (!added) break;
-    }
-  }
+  const scoredJobs: ScoreJob[] = jobs.map((job) => ({ id: job.id, personId: job.personId, category: category(job), state: job.state === "running" ? "running" : "queued", createdAt: createdAt(job), adminBoost: job.adminBoost, childDailyCapReached: job.childDailyCapReached }));
+  const ranked = scoreJobs(scoredJobs, queuePolicy, now, usage);
+  const head = waiting.filter((job) => job.headOfClass).sort((a, b) => createdAt(a) - createdAt(b));
+  const headIds = new Set(head.map((job) => job.id));
+  const ordered = [...head, ...ranked.filter((item) => !headIds.has(item.id)).map((item) => waiting.find((job) => job.id === item.id)!).filter(Boolean)];
 
   // Backfill is only allowed beside a paused blocker and when its measured
   // typical time is shorter than the blocker's remaining wait.
@@ -89,7 +93,7 @@ export function order(jobs: readonly QueueJob[], now: number): QueuePosition[] {
 
 /** Applies tier admission rules without changing household order or cancelling work. */
 export function admit(jobs: readonly QueueJob[], now: number, state: TierState): { start: string[]; holds: Record<string, AdmissionHold> } {
-  const positions = order(jobs, now);
+  const positions = order(jobs, now, usageLastHour(now));
   const queued = new Map(jobs.filter((job) => job.state === "queued" && !job.childDailyCapReached).map((job) => [job.id, job]));
   const running = jobs.filter((job) => job.state === "running");
   const openMax = state.windowOpenFor ? jobs.find((job) => job.id === state.windowOpenFor && job.state === "running" && job.tier === "max") : undefined;
@@ -145,7 +149,7 @@ export function stillRunningMinutes(job: QueueJob): number | null {
 
 /** Updates only changed records. The caller supplies its own store writer. */
 export function writePositions<T extends QueueJob>(jobs: readonly T[], now: number, write: (job: T) => void): QueuePosition[] {
-  const positions = order(jobs, now);
+  const positions = order(jobs, now, usageLastHour(now));
   const byId = new Map(positions.map((item) => [item.id, item.position]));
   const previous = new Map(jobs.map((job) => [job.id, job.position ?? null]));
   for (const job of jobs) {
@@ -153,15 +157,26 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
     const old = previous.get(job.id) ?? null;
     let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" ? "requeued_memory" : null;
     if (next !== null && old !== null && next > old) {
-      const preceding = positions.filter((item) => item.position < next).map((item) => jobs.find((candidate) => candidate.id === item.id)!);
-      const higherClass = preceding.some((candidate) => effectiveClass(candidate, now) < effectiveClass(job, now));
-      riseReason = higherClass ? "higher_class" : "other_person_first";
+      const overtaker = positions.filter((item) => item.position < next && item.position < (previous.get(item.id) ?? Infinity)).sort((a, b) => b.position - a.position)[0];
+      if (overtaker) {
+        const pair = [job, jobs.find((candidate) => candidate.id === overtaker.id)!];
+        const usage = usageLastHour(now);
+        const scored = scoreJobs(pair.map((candidate) => ({ id: candidate.id, personId: candidate.personId, category: category(candidate), state: candidate.state === "running" ? "running" : "queued", createdAt: createdAt(candidate), adminBoost: candidate.adminBoost, childDailyCapReached: candidate.childDailyCapReached })), queuePolicy, now, usage);
+        const difference = (a: typeof scored[number], b: typeof scored[number]): ScoreReason | null => {
+          const diffs: [ScoreReason, number][] = [["class", a.terms.classWeight - b.terms.classWeight], ["aging", a.terms.aging - b.terms.aging], ["fair_share", a.terms.fairShare - b.terms.fairShare], ["boost", a.terms.boost - b.terms.boost]];
+          return diffs.filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "arrival";
+        };
+        const overtaking = scored.find((item) => item.id === overtaker.id)!;
+        const displaced = scored.find((item) => item.id === job.id)!;
+        const reason = difference(overtaking, displaced);
+        riseReason = reason === "arrival" ? "other_person_first" : reason;
+      }
     }
     const estimateSeconds = next === null ? null : estimate(jobs, positions, next);
     if (job.position !== next || job.estimateSeconds !== estimateSeconds || job.riseReason !== riseReason) {
       job.position = next;
       job.estimateSeconds = estimateSeconds;
-      job.riseReason = riseReason;
+      job.riseReason = riseReason as T["riseReason"];
       write(job);
     }
   }
@@ -192,6 +207,7 @@ export function registerQueueProvider(provider: QueueProvider): () => void {
 /** Recomputes the shared number after an existing job-store change. */
 export function refreshHouseholdQueue(now = Date.now()): QueuePosition[] {
   const entries = [...providers].flatMap((provider) => provider());
+  accrueRunningUsage(entries.map((entry) => entry.job), now);
   const positions = writePositions(entries.map((entry) => entry.job), now, (job) => entries.find((entry) => entry.job === job)?.save());
   void releaseHouseholdQueue();
   return positions;
@@ -206,7 +222,10 @@ export async function releaseHouseholdQueue(): Promise<void> {
       releaseAgain = false;
       const entries = [...providers].flatMap((provider) => provider());
       const jobs = entries.map((entry) => entry.job);
-      const positions = order(jobs, Date.now());
+      const now = Date.now();
+      accrueRunningUsage(jobs, now);
+      const usage = usageLastHour(now);
+      const positions = order(jobs, now, usage);
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));
       const runningPeople = new Set(entries.filter((entry) => entry.job.state === "running").map((entry) => entry.job.personId));

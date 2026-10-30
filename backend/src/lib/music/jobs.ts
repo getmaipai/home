@@ -32,7 +32,7 @@ registerQueueProvider(() => {
   for (const job of pendingMusicJobs()) if (!jobs.has(job.id)) jobs.set(job.id, job);
   return [...jobs.values()].map((job) => {
     const request = job.request as MusicRequest & { memoryRequeues?: number };
-    const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "other", state: job.state === "running" ? "running" : "queued", createdAt: job.createdAt,
+    const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "other", category: "music", state: job.state === "running" ? "running" : "queued", createdAt: job.createdAt,
       position: job.position, estimateSeconds: job.etaSeconds, typicalSeconds: 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       release: job.state === "queued" && !job.stackJob ? () => releaseMusic(job) : undefined,

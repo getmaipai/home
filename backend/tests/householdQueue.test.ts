@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { admit, order, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 
 const now = Date.parse("2026-10-25T12:00:00.000Z");
 const emptyTierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
@@ -10,12 +11,12 @@ function job(id: string, personId: string, jobClass: QueueJob["jobClass"], creat
 }
 
 describe("household queue", () => {
-  test("interleaves people within a class", () => {
+  test("orders by score and uses oldest-waiting round robin only for ties", () => {
     const jobs = [job("a1", "A", "picture", now - 4000), job("a2", "A", "picture", now - 3000), job("a3", "A", "picture", now - 2000), job("b1", "B", "picture", now - 1000)];
-    expect(order(jobs, now)).toEqual([{ id: "a1", position: 1 }, { id: "b1", position: 2 }, { id: "a2", position: 3 }, { id: "a3", position: 4 }]);
+    expect(order(jobs, now)).toEqual([{ id: "a1", position: 1 }, { id: "a2", position: 2 }, { id: "a3", position: 3 }, { id: "b1", position: 4 }]);
   });
 
-  test("releases Stack submissions in round-robin order, one unstarted job per kind", async () => {
+  test("releases Stack submissions in score order, one unstarted job per kind", async () => {
     const entries = [
       { job: job("a1", "A", "picture", now - 4000), waiting: false },
       { job: job("a2", "A", "picture", now - 3000), waiting: false },
@@ -56,18 +57,18 @@ describe("household queue", () => {
     finally { remove(); }
   });
 
-  test("promotes a video to picture class after ten minutes", () => {
+  test("smooth aging moves a video toward the next class weight", () => {
     const picture = job("picture", "A", "picture", now - 1000);
     const video = job("video", "B", "video", now - 10 * 60_000 + 1);
     expect(order([picture, video], now).map((item) => item.id)).toEqual(["picture", "video"]);
     video.createdAt = now - 10 * 60_000;
-    expect(order([picture, video], now).map((item) => item.id)).toEqual(["video", "picture"]);
+    expect(order([picture, video], now).map((item) => item.id)).toEqual(["picture", "video"]);
   });
 
-  test("ages a Max video up one class after ten minutes", () => {
+  test("ages a Max video smoothly without jumping the picture score", () => {
     const picture = job("picture", "A", "picture", now - 1000);
     const maxVideo = job("max-video", "B", "video", now - 10 * 60_000, { tier: "max" });
-    expect(order([picture, maxVideo], now).map((item) => item.id)).toEqual(["max-video", "picture"]);
+    expect(order([picture, maxVideo], now).map((item) => item.id)).toEqual(["picture", "max-video"]);
   });
 
   test("T1 permits only one running Boost or Max job, leaving Standard unaffected", () => {
@@ -130,13 +131,45 @@ describe("household queue", () => {
     const fitting = job("fitting", "B", "picture", now - 1000, { backfillFits: true, typicalSeconds: 20 });
     const tooLarge = job("large", "C", "picture", now - 500, { backfillFits: false, typicalSeconds: 90 });
     expect(order([clip, fitting], now).map((item) => item.id)).toEqual(["fitting", "clip"]);
-    expect(order([clip, tooLarge], now).map((item) => item.id)).toEqual(["clip", "large"]);
+    expect(order([clip, tooLarge], now).map((item) => item.id)).toEqual(["large", "clip"]);
   });
 
-  test("keeps other people's first request ahead of a person's later requests", () => {
+  test("score ties interleave people based on the oldest waiting job", () => {
     const jobs = Array.from({ length: 20 }, (_, index) => job(`a${index}`, "A", "picture", now - 20_000 + index))
       .concat(job("b1", "B", "picture", now - 1000));
-    expect(order(jobs, now)[1]).toEqual({ id: "b1", position: 2 });
+    expect(order(jobs, now)[1]).toEqual({ id: "a1", position: 2 });
+  });
+
+  test("class score lets a first picture or video pass a heavy user's repeated videos", () => {
+    const jobs = Array.from({ length: 6 }, (_, i) => job(`heavy-${i}`, "Heavy Name", "video", now - 6000 + i))
+      .concat(job("new-picture", "New Person", "picture", now), job("new-video", "New Person", "video", now));
+    expect(order(jobs, now, { "Heavy Name": DEFAULT_POLICY.fairShareMax * 5 }).map((item) => item.id)[0]).toBe("new-picture");
+    expect(order(jobs.filter((item) => item.id !== "new-picture"), now, { "Heavy Name": 100 }).map((item) => item.id)[0]).toBe("new-video");
+  });
+
+  test("same-score ties use the oldest waiting person", () => {
+    const jobs = [job("new", "B", "video", now - 1000), job("old", "A", "video", now - 2000)];
+    expect(order(jobs, now).map((item) => item.id)).toEqual(["old", "new"]);
+  });
+
+  test("music aging reaches the video weight gap exactly, and can be delayed", () => {
+    const music = job("music", "M", "other", now - 10 * 60_000, { category: "music" });
+    const video = job("video", "V", "video", now);
+    expect(order([video, music], now).map((item) => item.id)).toEqual(["music", "video"]);
+    expect(order([video, { ...music, createdAt: now - 9 * 60_000 }], now).map((item) => item.id)).toEqual(["video", "music"]);
+  });
+
+  test("head requeues stay first and capped children are excluded", () => {
+    const regular = job("regular", "A", "picture", now - 1000);
+    const head = job("head", "B", "other", now, { headOfClass: true });
+    const capped = job("capped", "C", "picture", now, { childDailyCapReached: true });
+    expect(order([regular, head, capped], now).map((item) => item.id)).toEqual(["head", "regular"]);
+  });
+
+  test("usage ledger drops credits older than an hour", () => {
+    recordUsage("ledger-person", 12, now - 3_600_001);
+    recordUsage("ledger-person", 5, now - 1000);
+    expect(usageLastHour(now)["ledger-person"]).toBe(5);
   });
 
   test("explains a number that rises when another person's first job joins the class", () => {
@@ -144,8 +177,22 @@ describe("household queue", () => {
     writePositions(jobs, now, () => undefined);
     const other = job("b1", "B", "picture", now);
     writePositions([...jobs, other], now, () => undefined);
-    expect(jobs[1]!.position).toBe(3);
-    expect(jobs[1]!.riseReason).toBe("other_person_first");
+    expect(jobs[1]!.position).toBe(2);
+    expect(jobs[1]!.riseReason).toBeNull();
+  });
+
+  test("explains score overtakes using the deciding generic reason", () => {
+    const classJobs = [job("v", "video-person", "video", now - 3000, { position: 1 }), job("m", "music-person", "other", now - 2000, { category: "music", position: 2 })];
+    const picture = job("p", "picture-person", "picture", now, { position: 2 });
+    writePositions([...classJobs, picture], now, () => undefined);
+    expect(classJobs[0]!.riseReason).toBe("class");
+
+    recordUsage("Known Person", 600, now);
+    recordUsage("Other Known", 300, now);
+    const fairJobs = [job("used", "Known Person", "video", now - 3000, { position: 1 }), job("plain", "Other Known", "video", now - 2000, { position: 2 })];
+    const lessUsed = job("fresh", "Fresh Name", "video", now, { position: 3 });
+    writePositions([...fairJobs, lessUsed], now, () => undefined);
+    expect(fairJobs[0]!.riseReason).toBe("fair_share");
   });
 
   test("writes live positions and a rise reason, then drops positions when the head starts", () => {
@@ -155,7 +202,7 @@ describe("household queue", () => {
     const picture = job("p1", "D", "picture", now);
     writePositions([...jobs, picture], now, (item) => undefined);
     expect(jobs[1]!.position).toBe(3);
-    expect(jobs[1]!.riseReason).toBe("higher_class");
+    expect(jobs[1]!.riseReason).toBe("class");
     jobs[0]!.state = "running";
     writePositions([...jobs, picture], now, (item) => undefined);
     expect(jobs.slice(1).map((item) => item.position)).toEqual([2, 3]);
