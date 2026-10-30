@@ -67,11 +67,13 @@ describe("TimersTab", () => {
     try {
       const view = renderWithQueryClient(<TimersTab />);
       await view.findByText("Deep work");
-      fireEvent.click(view.getByRole("button", { name: "Rename Tea steep" }));
+      fireEvent.pointerDown(view.getByRole("button", { name: "More options for Tea steep" }), { button: 0, ctrlKey: false });
+      fireEvent.click(await view.findByText("Rename"));
       fireEvent.change(view.getByLabelText("Name"), { target: { value: "Herbal tea" } });
       fireEvent.click(view.getByRole("button", { name: "Save" }));
       await waitFor(() => expect(api.calls.some((call) => call.method === "PATCH" && call.url.includes("/api/quick-timers/tea"))).toBe(true));
-      fireEvent.click(view.getByRole("button", { name: "Delete Deep work" }));
+      fireEvent.pointerDown(view.getByRole("button", { name: "More options for Deep work" }), { button: 0, ctrlKey: false });
+      fireEvent.click(await view.findByText("Delete"));
       await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE" && call.url.includes("/api/quick-timers/deep"))).toBe(true));
     } finally { api.restore(); }
   });

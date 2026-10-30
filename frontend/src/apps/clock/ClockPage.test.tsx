@@ -181,7 +181,9 @@ describe("ClockPage", () => {
       const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
       expect(await view.findByText("No alarms")).toBeInTheDocument();
       fireEvent.click(view.getByRole("tab", { name: "Timers" }));
-      expect(await view.findByText("No timers")).toBeInTheDocument();
+      // The ring is the Timers empty state: no separate "No timers" line.
+      expect(await view.findByText("Quick timers")).toBeInTheDocument();
+      expect(view.queryByText("No timers")).toBeNull();
     } finally { api.restore(); }
   });
 

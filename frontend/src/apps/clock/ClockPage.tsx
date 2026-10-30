@@ -17,10 +17,9 @@ const taglines: Record<ClockTab, string> = {
   stopwatch: "Every moment, counted.",
 };
 
-function ActiveTab({ tab, comingUp, loading }: { tab: ClockTab; comingUp: ComingUpItem[]; loading: boolean }) {
+function ActiveTab({ tab, comingUp }: { tab: ClockTab; comingUp: ComingUpItem[] }) {
   if (tab === "alarms") return <AlarmsTab />;
   if (tab === "timers") return <>
-    {comingUp.filter((item) => item.kind === "timer").length === 0 && !loading ? <p className="py-4 text-muted-foreground">No timers</p> : null}
     <TimersTab running={comingUp.filter((item) => item.kind === "timer")} />
   </>;
   if (tab === "world-clocks") return <WorldClocksTab />;
@@ -54,7 +53,7 @@ export function ClockPage() {
         {isPhone ? null : tabBar}
         <main className="min-h-0 flex-1 overflow-y-auto px-4">
           <p className="m-0 border-b py-4 text-sm text-muted-foreground">{taglines[tab]}</p>
-          <ActiveTab tab={tab} comingUp={comingUp} loading={query.isLoading} />
+          <ActiveTab tab={tab} comingUp={comingUp} />
         </main>
         {isPhone ? <div className="mt-auto">{tabBar}</div> : null}
       </div>

@@ -4,6 +4,7 @@ import { ProgressRing } from "@maipai/ui/src/ui/progress-ring";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { api, type ComingUpItem, type QuickTimerView } from "@/lib/api";
 import { ComingUpRow } from "@/apps/reminders/ComingUpRow";
@@ -155,11 +156,23 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
         {quickQuery.isError ? <p role="alert">Could not load quick timers.</p> : null}
         <ul className="m-0 list-none p-0">
           {quick.map((timer) => <li key={timer.id} className="flex items-center justify-between gap-3 border-b py-3">
-            <Button type="button" variant="ghost" align="start" width="full" aria-label={`Select ${timer.name}, ${timer.minutes} min`} onClick={() => setSelectedId(timer.id)}>
-              <span>{timer.name}</span><span className="text-muted-foreground">{timer.minutes} min</span>
-            </Button>
-            <Button type="button" variant="ghost" aria-label={`Rename ${timer.name}`} onClick={() => { setEditing(timer); setName(timer.name); setMinutes(String(timer.minutes)); setEditorOpen(true); }}>Rename</Button>
-            <Button type="button" variant="ghost" aria-label={`Delete ${timer.name}`} onClick={() => void api.deleteQuickTimer(timer.id).then(changed)}>Delete</Button>
+            <div className="min-w-0 flex-1">
+              <Button type="button" variant="ghost" align="start" width="full" aria-label={`Select ${timer.name}, ${timer.minutes} min`} onClick={() => setSelectedId(timer.id)}>
+                <span className="flex w-full items-center justify-between gap-3">
+                  <span>{timer.name}</span>
+                  <span className="text-muted-foreground">{timer.minutes} min</span>
+                </span>
+              </Button>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" aria-label={`More options for ${timer.name}`}>More</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => { setEditing(timer); setName(timer.name); setMinutes(String(timer.minutes)); setEditorOpen(true); }}>Rename</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void api.deleteQuickTimer(timer.id).then(changed)}>Delete</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>)}
         </ul>
       </div>
