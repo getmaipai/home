@@ -288,6 +288,8 @@ Recommendation: **voice stays at Standard when Reduced is engaged for chat.** Vo
 ~6 GB after chat is reduced, only between utterances (never in the middle of a spoken turn or a live session), and only for the speaking side
 first; listening stays on Parakeet unless memory demands it. The admin's confirm line names it ("Voices will sound plainer for about N
 minutes"). The slots are customizable like the rest (section 3a), so an admin can turn voice-in-Reduced off or pick a different light voice.
+**Measured 2026-10-30 ([tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md)):** Chatterbox Nano runs on MLX (after a three-line size fix to `mlx-audio` 0.6.3), peaks at 2.8 GB against Turbo's 4.6 GB, reads the same words and clones about as close by proxy; the ear check is Jesse's. Reduced chat on Qwen3-4B passes the measured parts (swap near zero because the judge model is resident). The next paragraph is the question as asked before the bench.
+
 **Why not Chatterbox Nano?** It was never evaluated for the Studio. The only repo mention (docs/dev.md, 2026-09-04) is a robot-side note: researched,
 not adopted, because it has no Hailo-10H path and no Pi-class benchmark. For a Reduced voice on the Mac it is the best idea on the table:
 same family as the Turbo voice we chose by ear, 110M parameters against Turbo's 350M, MIT, zero-shot cloning from a reference clip of about
@@ -470,6 +472,8 @@ most, first.
 | E6 | Music Boost and Max | Whether XL earns a slot | Audibly better than 1.7B turbo songs, fits the cap, MLX path works | ACE-Step 1.5 XL turbo; XL base or sft |
 | E7 | Stem splitting | The new feature's Standard and Boost models | Separation quality heard, licence clean, Apple path | Demucs htdemucs, htdemucs_ft, htdemucs_6s; a RoFormer only if its weights licence clears |
 | E8 | Listening side (stt) in Reduced | Whether stt ever drops | Word error acceptable in kitchen noise | Moonshine tiny against Parakeet v2 |
+
+Results so far (2026-10-30): E1 passes the measured parts, E2 recommends Nano for the p64 and p128 Reduced voice pending an ear check, E8 is no. Numbers and open items: [tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md).
 
 ## 15. Phases
 

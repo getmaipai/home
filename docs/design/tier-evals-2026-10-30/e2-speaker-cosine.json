@@ -1,0 +1,14 @@
+{
+ "nano-clone-medium": 0.877,
+ "nano-clone-short": 0.837,
+ "nano-default-medium": 0.573,
+ "nano-default-short": 0.503,
+ "nano-default-tags": 0.531,
+ "pocket-clone-medium": 0.889,
+ "pocket-clone-short": 0.89,
+ "turbo-clone-medium": 0.865,
+ "turbo-clone-short": 0.809,
+ "turbo-default-medium": 0.562,
+ "turbo-default-short": 0.489,
+ "turbo-default-tags": 0.572
+}

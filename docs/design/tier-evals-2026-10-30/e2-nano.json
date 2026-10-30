@@ -1,0 +1,47 @@
+{
+ "label": "nano",
+ "load_s": 3.34,
+ "sr": 24000,
+ "after_prime_peak_gb": 2.02,
+ "active_gb": 1.26,
+ "runs": {
+  "default_short": {
+   "ttfa_s": 0.22,
+   "total_s": 0.65,
+   "audio_s": 2.44,
+   "rtf": 0.27,
+   "chunks": 3
+  },
+  "default_medium": {
+   "ttfa_s": 0.42,
+   "total_s": 7.71,
+   "audio_s": 8.32,
+   "rtf": 0.93,
+   "chunks": 9
+  },
+  "default_tags": {
+   "ttfa_s": 0.72,
+   "total_s": 2.84,
+   "audio_s": 3.8,
+   "rtf": 0.75,
+   "chunks": 4
+  },
+  "clone_short": {
+   "ttfa_s": 0.65,
+   "total_s": 1.81,
+   "audio_s": 2.28,
+   "rtf": 0.79,
+   "chunks": 3
+  },
+  "clone_medium": {
+   "ttfa_s": 0.74,
+   "total_s": 11.58,
+   "audio_s": 8.52,
+   "rtf": 1.36,
+   "chunks": 9
+  }
+ },
+ "clone_prepare_s": 0.94,
+ "peak_gb": 2.77,
+ "process_peak_rss_gb": 1.54
+}

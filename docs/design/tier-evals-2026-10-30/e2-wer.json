@@ -1,0 +1,50 @@
+{
+ "nano-clone-medium": {
+  "heard": "Today we have a dentist visit at 4, then soccer practice. I packed your water bottle in the blue bag, so please do not forget it by the door.",
+  "wer": 0.03
+ },
+ "nano-clone-short": {
+  "heard": "Dinner is ready, come and wash your hands.",
+  "wer": 0.0
+ },
+ "nano-default-medium": {
+  "heard": "Today we have a dentist visit at 4, then soccer practice. I packed your water bottle in the blue bag, so please do not forget it by the door.",
+  "wer": 0.03
+ },
+ "nano-default-short": {
+  "heard": "Dinner is ready. Come and wash your hands.",
+  "wer": 0.0
+ },
+ "nano-default-tags": {
+  "heard": "Oh, that is so funny. I did not expect that at all.",
+  "wer": 0.0
+ },
+ "pocket-clone-medium": {
+  "heard": "Today we have a dentist visit at 4, then soccer practice. I packed your water bottle in the blue bag, so please do not forget it by the door.",
+  "wer": 0.03
+ },
+ "pocket-clone-short": {
+  "heard": "Dinner is ready, come and wash your hands.",
+  "wer": 0.0
+ },
+ "turbo-clone-medium": {
+  "heard": "Today we have a dentist visit at 4, then soccer practice. I packed your water bottle in the blue bag, so please do not forget it by the door.",
+  "wer": 0.03
+ },
+ "turbo-clone-short": {
+  "heard": "Dinner is ready. Come and wash your hands.",
+  "wer": 0.0
+ },
+ "turbo-default-medium": {
+  "heard": "Today we have a dentist visit at 4, then soccer practice. I packed your water bottle in the blue bag, so please do not forget it by the door.",
+  "wer": 0.03
+ },
+ "turbo-default-short": {
+  "heard": "Dinner is ready. Come and wash your hands.",
+  "wer": 0.0
+ },
+ "turbo-default-tags": {
+  "heard": "Oh, that is so funny. I did not expect that at all.",
+  "wer": 0.0
+ }
+}
