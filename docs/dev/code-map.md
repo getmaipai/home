@@ -496,7 +496,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
 | `backend/src/lib/jobs/admissionFit.ts` | setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission, admissionFitProfile, admissionFitAskLine |
-| `backend/src/lib/jobs/householdQueue.ts` | endMaxWindow, setQueuePolicy, getQueuePolicy, recordUsage, usageLastHour, order |
+| `backend/src/lib/jobs/householdQueue.ts` | activeProfileLine, resetActivePlanForTests, endMaxWindow, setQueuePolicy, getQueuePolicy, recordUsage |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
 | `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |
 | `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, appliedProfile, stagesFor, chatMayReturnBetweenStages |
