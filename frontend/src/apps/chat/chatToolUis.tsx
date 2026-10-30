@@ -6,6 +6,7 @@ import { useCallback, useContext, useEffect, useState, type MutableRefObject, ty
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { TierSegment } from "@maipai/ui/src/elements/tier-segment";
 import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
 import { ElicitationForm } from "@maipai/ui/src/elements/elicitation-form";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
@@ -555,8 +556,8 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
     }) : [];
     const qualityActions = card.switch_to && card.can_vary ? [{
       id: "switch-quality",
-      label: card.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick",
-      hint: making.reason ?? (card.switch_to === "detailed" ? "Slower, with finer detail" : "Faster, a few seconds"),
+      label: card.switch_to === "detailed" ? "Make it Boost" : "Make it Standard",
+      hint: making.reason ?? (card.switch_to === "detailed" ? "More detail, a little slower" : "Faster, a few seconds"),
       disabled: retrying || making.disabled,
       onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
     }] : [];
@@ -657,7 +658,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
         onShare: () => { void shareClip({ prepared: prepared.data, title: item.prompt, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) }); },
         // VIDEO-LTX-01: the on-the-fly choice, the same two words as pictures. A Quick video offers Detailed (with sound and speech); a Detailed one offers Quick. No model names.
         actions: [
-          ...(item.switch_to && card.can_make_another ? [<Button key="switch-quality" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? (item.switch_to === "detailed" ? "With sound and speech, up to 10 seconds" : "No sound, up to 5 seconds, can start from a picture")} onClick={() => { void videosApi.another(item.id, item.switch_to!).then(refresh).catch(refresh); }}>{item.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick"}</Button>] : []),
+          ...(item.switch_to && card.can_make_another ? [<TierSegment key="tier" label="Quality" value={item.quality === "detailed" ? "boost" : "standard"} tiers={[{ id: "standard", label: "Standard", hint: "No sound, up to 5 seconds, can start from a picture", ...(making.reason ? { disabledReason: making.reason } : {}) }, { id: "boost", label: "Boost", hint: "With sound and speech, up to 10 seconds", ...(making.reason ? { disabledReason: making.reason } : {}) }]} onValueChange={(tier) => { void videosApi.another(item.id, tier === "boost" ? "detailed" : "quick").then(refresh).catch(refresh); }} />] : []),
           ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? undefined} onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
           <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
         ],

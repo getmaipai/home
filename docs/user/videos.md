@@ -29,7 +29,7 @@ A Quick video is 5 seconds at 480p with no sound and takes about 2 minutes. A De
 
 If someone is chatting or talking to Home while a video is being made, the video pauses ("Paused while chat is working") and carries on after the reply, so chat is never slowed down. The wait is not counted against the video.
 
-When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words. **Make it Detailed** (or **Make it Quick**) makes the same words again as the other kind. A video made with a style cannot switch, because a style is made for one kind.
+When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words. The **Standard** and **Boost** buttons under the video make the same words again as the other kind (Boost adds sound and speech). A video made with a style cannot switch, because a style is made for one kind.
 
 ## Send a video in a text
 

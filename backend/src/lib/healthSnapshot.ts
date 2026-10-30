@@ -3,6 +3,7 @@ import { getEngineStatus } from "@/lib/llmSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 import { roleHealth, roleHealthEntry, localRoleHealthEntry } from "@/lib/roleHealth";
 import { composerNotice, makingNotice, type ChatPauseCause, type MakingCause } from "@/lib/failureCopy";
+import { reducedChatNotice, reducedChatState } from "@/lib/reducedChat";
 import { chatPausedByAdmin, chatPauseMessage } from "@/lib/chatPause";
 
 // CHAT-PAUSE-01: a Stack that stays unreachable for a minute is no longer
@@ -23,7 +24,7 @@ export async function collectHealth() {
   const chat = roleHealthEntry("chat", locals[0]!, states[0]!);
   if (chat.context_per_slot == null) chat.context_message = "I could not read how much the AI can hold, so I am using a safe small window";
   // CHAT-CALM-ERRORS-01d: the one composer line while chat cannot answer.
-  let cause: ChatPauseCause | null = chat.cause ?? null;
+  let cause: ChatPauseCause | null = chat.cause === "tier_reduced" ? null : chat.cause ?? null;
   if (cause === "restarting") {
     unreachableSince ??= Date.now();
     if (Date.now() - unreachableSince > RESTART_GRACE_MS) cause = "offline";
@@ -37,6 +38,7 @@ export async function collectHealth() {
   }
   const notice = composerNotice(chat.availability ?? "ready", cause, chatPauseMessage());
   if (notice) chat.notice = notice;
+  else if (chat.cause === "tier_reduced" && chat.availability === "ready") chat.notice = reducedChatNotice(reducedChatState()?.minutesLeft ?? null);
   const embed = roleHealthEntry("embed", locals[1]!, states[1]!);
   const background = roleHealthEntry("background", locals[2]!, states[2]!);
   const voice = roleHealthEntry("voice", locals[3]!, states[3]!);
@@ -45,7 +47,7 @@ export async function collectHealth() {
   // that cannot make videos is not an outage.
   const [image, video] = (["image", "video"] as const).map((role, index) => {
     const entry = roleHealthEntry(role, locals[4 + index]!, states[4 + index]!);
-    let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" ? entry.cause : null;
+    let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" && entry.cause !== "tier_reduced" ? entry.cause : null;
     if (makingCause === "restarting" && cause === "offline") { entry.availability = "unavailable"; entry.kind = "failed"; entry.alive = false; entry.cause = "offline"; makingCause = "offline"; }
     const line = makingNotice(role, entry.availability ?? "ready", makingCause);
     if (line) entry.notice = line;

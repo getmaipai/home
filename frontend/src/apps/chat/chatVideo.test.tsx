@@ -120,8 +120,9 @@ describe("VideoToolRender", () => {
     card = { ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", quality: "quick", switch_to: "detailed", clip })] };
     const view = mount();
     await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
-    const button = view.getByRole("button", { name: "Make it Detailed" });
-    expect(button.getAttribute("title")).toBe("With sound and speech, up to 10 seconds");
+    const button = view.getByRole("radio", { name: "Boost" });
+    expect(view.getByRole("radio", { name: "Standard" }).getAttribute("aria-checked")).toBe("true");
+    expect(view.getByText("No sound, up to 5 seconds, can start from a picture")).toBeTruthy();
     let body = "";
     const sending = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => { if (String(input).endsWith("/another")) body = String(init?.body ?? ""); return sending(input, init); }) as typeof fetch;
@@ -132,7 +133,7 @@ describe("VideoToolRender", () => {
     card = { ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", quality: "detailed", switch_to: "quick", clip: { ...clip, has_sound: true } })] };
     const detailed = mount();
     await waitFor(() => expect(detailed.container.querySelector("video")).not.toBeNull());
-    expect(detailed.getByRole("button", { name: "Make it Quick" })).toBeTruthy();
+    expect(detailed.getByRole("radio", { name: "Boost" }).getAttribute("aria-checked")).toBe("true");
     expect(detailed.container.textContent).not.toMatch(/LTX|Wan|Gemma/);
     cleanup();
     // While it is made, the line under the card says which kind it is, in the same words as pictures.

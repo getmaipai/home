@@ -72,6 +72,16 @@
         "grounded": false,
         "description": "Optional. Leave it out for almost every request: Home then uses the household's setting. Use detailed only when the person asks for the best quality, the finest detail, a photoreal or lifelike picture, or a custom look; it takes about 30 to 45 seconds instead of 15 to 25. Use quick for most requests; it draws words clearly and takes about 15 to 25 seconds. When you choose detailed, say so in one short sentence."
       },
+      "tier": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "boost",
+          "max"
+        ],
+        "grounded": false,
+        "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
+      },
       "change": {
         "type": "string",
         "maxLength": 40,

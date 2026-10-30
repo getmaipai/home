@@ -151,7 +151,7 @@ const EngineHealthSchema = z.object({
   // answer (failureCopy.ts); absent when the engine is ready.
   notice: z.object({ adult: z.string(), teen: z.string(), child: z.string(), repairs_link: z.string().nullable() }).nullable().optional(),
   // CHAT-PAUSE-01 and ENGINE-STATUS-MEDIA-01: why the role is not ready, when Home knows.
-  cause: z.enum(["restarting", "memory", "not_installed", "paused_by_admin", "mode_change", "offline"]).nullable().optional(),
+  cause: z.enum(["restarting", "memory", "not_installed", "paused_by_admin", "mode_change", "offline", "tier_reduced"]).nullable().optional(),
 });
 const HealthResponseSchema = z.object({
   brain: z.string(),

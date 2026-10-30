@@ -1,4 +1,5 @@
 
+import { reducedChatState } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
 import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
 import type { EngineHealthEntry } from "@/wire";
@@ -12,7 +13,7 @@ export const MAKING_ROLES: readonly MakingRole[] = ["image", "video"];
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "tier_reduced"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); }
 
@@ -46,6 +47,10 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   if (role === "image" || role === "video") return makingHealth(role);
+  if (role === "chat" && reducedChatState()) {
+    // TIER-HOME-03: simpler, not unavailable. Chat answers, so this stays "ready" and never holds Send.
+    return { availability: "ready", reason: null, cause: "tier_reduced" };
+  }
   if (role === "chat") {
     try {
       const mode = await getStackClient().getCodingMode();
@@ -155,5 +160,5 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
   const context = role === "chat" ? { context_length: state.contextLength ?? null, context_slots: state.slots ?? null, context_per_slot: state.contextPerSlot ?? null, context_scope: state.contextScope ?? null } : {};
   if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}), ...(state.cause ? { cause: state.cause } : {}) };
   if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null, ...(state.cause ? { cause: state.cause } : {}), ...(state.detail ? { detail: state.detail } : {}) };
-  return { ...local, ...context, alive: true, availability: "ready", reason: null };
+  return { ...local, ...context, alive: true, availability: "ready", reason: null, ...(state.cause === "tier_reduced" ? { cause: "tier_reduced" as const } : {}) };
 }

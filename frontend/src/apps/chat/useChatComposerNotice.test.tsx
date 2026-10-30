@@ -47,3 +47,21 @@ describe("useChatComposerNotice for a degraded Chat app", () => {
     expect(v.result.current).toBeNull();
   });
 });
+
+describe("useChatComposerNotice while chat is Reduced (TIER-HOME-03)", () => {
+  const reduced = { chat: { kind: "url", pid: null, alive: true, availability: "ready", cause: "tier_reduced", notice: { adult: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused.", teen: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused.", child: "Chat is a little simpler for a few minutes.", repairs_link: null } } };
+  function reducedView(person: { role: string; age_band: string }) {
+    globalThis.fetch = mock((url: string | URL | Request) => Promise.resolve(Response.json(String(url).includes("/api/status/apps") ? [] : { engines: reduced }))) as unknown as typeof fetch;
+    const client = createQueryClient();
+    return renderHook(() => useChatComposerNotice(person as never), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  }
+  test("an adult reads the simpler-chat line, with no Repairs link", async () => {
+    const v = reducedView({ role: "adult", age_band: "adult" });
+    await waitFor(() => expect(v.result.current?.text).toContain("Chat is simpler while a big job runs"));
+    expect(v.result.current?.repairsLink).toBeNull();
+  });
+  test("a child reads the child line", async () => {
+    const v = reducedView({ role: "child", age_band: "child" });
+    await waitFor(() => expect(v.result.current).toEqual({ text: "Chat is a little simpler for a few minutes.", repairsLink: null }));
+  });
+});

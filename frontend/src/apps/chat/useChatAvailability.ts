@@ -117,6 +117,11 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
       : (readiness.hubDown === "offline" ? "The AI isn't answering." : "The AI is restarting. Chat will start again by itself in a minute.");
     return { text, repairsLink: readiness.hubDown === "offline" && isOwnerOrAdminRole(person.role) ? "Check Repairs" : null };
   }
+  // TIER-HOME-03: chat is on its simpler model while a Max job runs. It still answers, so this is a line, never a hold on Send.
+  if (chatAvailability(health) === "ready" && (health?.cause as string | undefined) === "tier_reduced" && notice) {
+    const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : notice.adult;
+    return { text, repairsLink: null };
+  }
   if (chatAvailability(health) === "ready" && Array.isArray(apps)) {
     if (apps.some(isSearchLimitedChat)) return { text: "Searches may be limited right now.", repairsLink: null };
     // STATUS-REASON-01: chat answers, but one of its optional parts is not

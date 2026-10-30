@@ -69,6 +69,16 @@
         "grounded": false,
         "description": "Optional. Leave it out for almost every request: Home then uses the household's setting. Use detailed when the person wants the people in the video to talk or speak words, wants sound, music or a sound track, wants it longer than 5 seconds, or wants a custom look; it makes a sound track and speech and starts from words only. Use quick when they want it to start from a picture, or ask for a silent one. When you choose detailed, say so in one short sentence. Spoken words are clearest in a clip of 5 seconds or less, so for a spoken line keep seconds at 5 unless the person asks for longer."
       },
+      "tier": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "boost",
+          "max"
+        ],
+        "grounded": false,
+        "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
+      },
       "style": {
         "type": "string",
         "maxLength": 80,

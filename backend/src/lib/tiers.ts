@@ -103,3 +103,22 @@ export function allowedQuality(person: PersonRow, category: TierCategory, qualit
   if (quality === "quick") return quality;
   return authorizeTier({ person, category, requested: "boost", ...(band ? { band } : {}) }).tier === "standard" ? "quick" : "detailed";
 }
+
+export const MAX_NEEDS_ADMIN_LINE = "Max needs an admin's OK. Ask an admin.";
+export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this computer yet, so this one is made at Boost.";
+
+/**
+ * The typed `tier` argument of a generating tool (TIER-HOME-03): which quality it maps to and one sentence for the model to relay when the
+ * request was lowered. Max maps to Boost's maker until a Max slot exists on this computer (`maxAvailable`); a child or teen is lowered without
+ * a line, because they are never shown a Max control (resource-tiers section 8).
+ */
+export function tierArgument(input: { person: PersonRow; category: TierCategory; arg: unknown; band?: AgeBand; maxAvailable?: boolean }): { quality: "quick" | "detailed" | undefined; tier: Tier | undefined; line: string | null } {
+  if (!isTier(input.arg)) return { quality: undefined, tier: undefined, line: null };
+  const band = input.band ?? speakerAgeBand(input.person, new Date());
+  const choice = authorizeTier({ person: input.person, category: input.category, requested: input.arg, band });
+  let line: string | null = null;
+  if (choice.note === "max_not_granted" && band === "adult") line = MAX_NEEDS_ADMIN_LINE;
+  else if (choice.tier === "max" && !input.maxAvailable) line = MAX_NOT_ON_THIS_COMPUTER_LINE;
+  const effective: Tier = choice.tier === "max" && !input.maxAvailable ? "boost" : choice.tier;
+  return { quality: effective === "standard" ? "quick" : "detailed", tier: choice.tier, line };
+}

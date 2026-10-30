@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { people, settingsValues } from "@/db/schema";
 import { createGrant } from "@/lib/grants";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
-import { authorizeTier, allowedQuality, clampTier, readSlot, slotKey, slotOptionsFor, type TierCategory, type TierDeps } from "@/lib/tiers";
+import { MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE, tierArgument, authorizeTier, allowedQuality, clampTier, readSlot, slotKey, slotOptionsFor, type TierCategory, type TierDeps } from "@/lib/tiers";
 import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
 import type { AgeBand } from "@/lib/ageBand";
@@ -123,5 +123,31 @@ describe("Quick and Detailed migrate into the slots", () => {
     setHouseholdSettingValue("generation.picture_detailed.enabled", true);
     expect(householdDetailedEnabled()).toBe(true);
     expect(getHouseholdSettingValue(slotKey("image", "boost"))).toMatchObject({ model: "recommended" });
+  });
+});
+
+describe("tierArgument (the typed tier of a generating tool)", () => {
+  beforeEach(() => resetDb());
+
+  test("standard is Quick, boost is Detailed, and no value changes nothing", () => {
+    const adult = addPerson("person-adult001", "adult");
+    expect(tierArgument({ person: adult, category: "image", arg: "standard" })).toMatchObject({ quality: "quick", line: null });
+    expect(tierArgument({ person: adult, category: "image", arg: "boost" })).toMatchObject({ quality: "detailed", line: null });
+    expect(tierArgument({ person: adult, category: "image", arg: "loud" })).toEqual({ quality: undefined, tier: undefined, line: null });
+  });
+
+  test("Max without the grant says an admin must do it; with it, says Max is not here yet and makes Boost", () => {
+    const owner = addPerson("person-owner001", "owner");
+    const adult = addPerson("person-adult001", "adult");
+    expect(tierArgument({ person: adult, category: "video", arg: "max" })).toMatchObject({ tier: "boost", quality: "detailed", line: MAX_NEEDS_ADMIN_LINE });
+    expect(tierArgument({ person: owner, category: "video", arg: "max" })).toMatchObject({ tier: "max", quality: "detailed", line: MAX_NOT_ON_THIS_COMPUTER_LINE });
+    expect(tierArgument({ person: owner, category: "video", arg: "max", maxAvailable: true }).line).toBeNull();
+  });
+
+  test("a child or teen is lowered without a line about Max", () => {
+    const teen = addPerson("person-teen0001", "teen");
+    const child = addPerson("person-child001", "child");
+    expect(tierArgument({ person: teen, category: "chat", arg: "max" })).toEqual({ quality: "quick", tier: "standard", line: null });
+    expect(tierArgument({ person: child, category: "image", arg: "boost" })).toMatchObject({ quality: "quick", line: null });
   });
 });

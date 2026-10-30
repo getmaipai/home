@@ -76,19 +76,19 @@ describe("the picture card", () => {
     restore();
   });
 
-  test("IMGGEN-QUALITY-01: a Quick picture offers 'Make it Detailed' with a plain hint; pressing it asks for the Detailed version; a Detailed picture offers Quick; a styled one offers nothing", async () => {
+  test("IMGGEN-QUALITY-01: a Quick picture offers 'Make it Boost' with a plain hint; pressing it asks for the Detailed version; a Detailed picture offers Quick; a styled one offers nothing", async () => {
     const restore = stub(card({ state: "done", percent: 100, files: [FILE], can_vary: true, quality: "quick", switch_to: "detailed" }));
     const v = renderWithQueryClient(<PictureToolRender {...props} />);
-    await waitFor(() => expect(v.getByRole("button", { name: "Make it Detailed" })).toBeTruthy());
-    expect(v.getByText("Slower, with finer detail")).toBeTruthy();
+    await waitFor(() => expect(v.getByRole("button", { name: "Make it Boost" })).toBeTruthy());
+    expect(v.getByText("More detail, a little slower")).toBeTruthy();
     expect(v.container.textContent).not.toMatch(/z-image|klein/i);
-    fireEvent.click(v.getByRole("button", { name: "Make it Detailed" }));
+    fireEvent.click(v.getByRole("button", { name: "Make it Boost" }));
     await waitFor(() => expect(picturesApi.again).toHaveBeenCalledWith("pic-1", "detailed"));
     restore();
     cleanup();
     const restoreQuick = stub(card({ state: "done", percent: 100, files: [FILE], can_vary: true, quality: "detailed", switch_to: "quick" }));
     const d = renderWithQueryClient(<PictureToolRender {...props} />);
-    await waitFor(() => expect(d.getByRole("button", { name: "Make it Quick" })).toBeTruthy());
+    await waitFor(() => expect(d.getByRole("button", { name: "Make it Standard" })).toBeTruthy());
     restoreQuick();
     cleanup();
     const restoreStyled = stub(card({ state: "done", percent: 100, files: [FILE], can_vary: true, quality: "quick", switch_to: null }));

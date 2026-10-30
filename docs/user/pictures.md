@@ -20,7 +20,7 @@ If someone is chatting or talking to Home while a picture is being made, the car
 Home makes two kinds of picture. **Quick** is the usual one: a few seconds, clean and sharp, and good for words in a picture. **Detailed** takes about 15 to 30 seconds and has finer detail, skin and fur that look real, and many more styles to add. Detailed needs a bigger download and a computer with 128 GB of memory.
 
 - **In chat,** just ask. Say "as detailed as you can" or "photoreal" and chat makes a Detailed picture and tells you so in one line. A style made for Detailed pictures uses Detailed on its own.
-- **On a picture.** Press **Make it Detailed** under a Quick picture, or **Make it Quick** under a Detailed one, to make it again the other way. A picture made with a style has no button, because the style decides.
+- **On a picture.** Press **Make it Boost** under a Standard picture, or **Make it Standard** under a Boost one, to make it again the other way. A picture made with a style has no button, because the style decides.
 - **For everyone.** An owner or admin can choose which kind chat makes when nobody asks (below). It starts as Quick.
 - **Edit** always uses Quick.
 

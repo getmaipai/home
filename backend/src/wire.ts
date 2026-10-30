@@ -801,7 +801,7 @@ export interface EngineHealthEntry {
   /** CHAT-PAUSE-01: why chat cannot answer, when Home knows (additive):
    * the Stack is restarting, low on memory, not installed, or an admin
    * paused chat. Absent when ready or when the cause is unknown. */
-  cause?: "restarting" | "memory" | "not_installed" | "paused_by_admin" | "mode_change" | "offline" | null;
+  cause?: "restarting" | "memory" | "not_installed" | "paused_by_admin" | "mode_change" | "offline" | "tier_reduced" | null;
 }
 
 /** Mirrors lib/failureCopy.ts's ComposerNotice (that file stays import-free). */
