@@ -185,7 +185,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/NowPlayingStage.tsx` | clock, NowPlayingStage |
 | `frontend/src/shell/media/SleepMenu.tsx` | SleepMenu |
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
-| `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, MediaDockContext, useMediaDock, MediaHostProvider, MediaLinkRedirect |
+| `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, ListenStatusContext, MediaDockContext, useMediaDock, MediaHostProvider |
 | `frontend/src/shell/pageContext.tsx` | ambientPageContextForRoute, AmbientPageContextProvider, useAmbientPageContext, useSetPageContext |
 | `frontend/src/shell/pageHeaderTitle.tsx` | headerEntryFor, HeaderTitle, PageHeaderTitle, PageHeaderActions |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
