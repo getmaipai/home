@@ -184,6 +184,26 @@ export function quietSecondsFor(category: "chat" | "image" | "video" | "music", 
   return category === "chat" ? Math.max(20, config.quietSeconds) : 0;
 }
 
+/** Reads a tier the job's request asked for; anything else is Standard. */
+export function requestTier(request: unknown): "standard" | "boost" | "max" {
+  const tier = (request as { tier?: unknown } | null | undefined)?.tier;
+  return tier === "boost" || tier === "max" ? tier : "standard";
+}
+
+/** Counts a chat turn for the quiet window (turn time and in-flight count only) and undoes the in-flight count once, on the lease's own release. */
+export function trackChatLease<T extends { release(): void }>(personId: string, lease: T, now = Date.now()): T {
+  noteChatTurn(personId, now);
+  noteChatInFlight(1);
+  const release = lease.release.bind(lease);
+  let counted = true;
+  lease.release = () => { if (counted) { counted = false; noteChatInFlight(-1); noteChatTurn(personId, Date.now()); } release(); };
+  return lease;
+}
+
+/** The window, fairness and heavy-slot memory behind `admit`. Process memory only. */
+const tierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
+export function resetTierStateForTests(): void { tierState.windowOpenFor = null; tierState.startedSinceMax = []; tierState.lastMaxPersonId = null; }
+
 /** Updates only changed records. The caller supplies its own store writer. */
 export function writePositions<T extends QueueJob>(jobs: readonly T[], now: number, write: (job: T) => void): QueuePosition[] {
   const positions = order(jobs, now, usageLastHour(now));
@@ -263,13 +283,19 @@ export async function releaseHouseholdQueue(): Promise<void> {
       accrueRunningUsage(jobs, now);
       const usage = usageLastHour(now);
       const positions = order(jobs, now, usage);
+      const runningMax = jobs.find((job) => job.state === "running" && job.tier === "max");
+      tierState.windowOpenFor = runningMax?.id ?? null;
+      if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
+      const admitted = new Set(admit(jobs, now, tierState).start);
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));
       const runningPeople = new Set(entries.filter((entry) => entry.job.state === "running").map((entry) => entry.job.personId));
       for (const item of positions) {
         const entry = byId.get(item.id);
-        if (!entry?.release || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId)) continue;
+        if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId)) continue;
         blockedClasses.add(entry.job.jobClass);
+        if (entry.job.tier === "max") { tierState.startedSinceMax = []; tierState.lastMaxPersonId = entry.job.personId; }
+        else if (!tierState.startedSinceMax.includes(entry.job.personId)) tierState.startedSinceMax = [...tierState.startedSinceMax, entry.job.personId];
         try { await entry.release(); } catch { /* The job store records a submit failure; other kinds can proceed. */ }
       }
     } while (releaseAgain);

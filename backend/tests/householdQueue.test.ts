@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { requestTier, resetTierStateForTests, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 
 const now = Date.parse("2026-10-25T12:00:00.000Z");
@@ -262,6 +262,44 @@ describe("household queue", () => {
       expect(quietSecondsFor("video", DEFAULT_QUIET)).toBe(0);
       expect(mayRestoreNow({ reducedNow: true }, false)).toBe(false);
       expect(mayRestoreNow({ reducedNow: true }, true)).toBe(true);
+    });
+  });
+
+  describe("tier wiring", () => {
+    test("requestTier reads boost and max, everything else is standard", () => {
+      expect(requestTier({ tier: "max" })).toBe("max");
+      expect(requestTier({ tier: "boost" })).toBe("boost");
+      expect(requestTier({ tier: "gold" })).toBe("standard");
+      expect(requestTier(null)).toBe("standard");
+    });
+
+    test("trackChatLease counts the turn in flight and releases it once", () => {
+      resetChatActivityForTests();
+      let releases = 0;
+      const lease = trackChatLease("P", { release: () => { releases += 1; } }, now);
+      expect(chatActivity().inFlight).toBe(1);
+      expect(chatActivity().lastTurnAtByPerson.P).toBe(now);
+      lease.release(); lease.release();
+      expect(chatActivity().inFlight).toBe(0);
+      expect(releases).toBe(2);
+    });
+
+    test("releaseHouseholdQueue holds a Max job while another job runs and sends it once the household is idle", async () => {
+      resetTierStateForTests();
+      const running = job("run", "A", "picture", now - 5000, { state: "running" });
+      const max = job("max", "B", "video", now - 4000, { tier: "max" });
+      const behind = job("behind", "C", "picture", now - 3000);
+      const submitted: string[] = [];
+      const entries = [running, max, behind].map((j) => ({ job: j, sent: false }));
+      const remove = registerQueueProvider(() => entries.map((e) => ({ job: e.job, stackWaiting: false,
+        release: e.job.state === "queued" && !e.sent ? async () => { e.sent = true; submitted.push(e.job.id); } : undefined, save: () => undefined })));
+      try {
+        await releaseHouseholdQueue();
+        expect(submitted).toEqual([]);
+        running.state = "done";
+        await releaseHouseholdQueue();
+        expect(submitted).toEqual(["max"]);
+      } finally { remove(); resetTierStateForTests(); }
     });
   });
 });
