@@ -47834,6 +47834,26 @@
                                   "minItems": 2,
                                   "maxItems": 2,
                                   "description": "[start, end) of the first match in title, for highlighting."
+                                },
+                                "snippet": {
+                                  "type": "string",
+                                  "description": "Up to two lines of text under the title."
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "description": "Where the result lives, shown above the title."
+                                },
+                                "meta": {
+                                  "type": "string",
+                                  "description": "A line of facts under the snippet."
+                                },
+                                "thumbnail": {
+                                  "type": "string",
+                                  "description": "A same-origin picture URL for the end of the row."
+                                },
+                                "action": {
+                                  "type": "string",
+                                  "description": "The label of the button on the highlighted row."
                                 }
                               },
                               "required": [

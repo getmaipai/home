@@ -683,6 +683,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, receivedBackupFileExists, deleteReceivedBackupsForDevice |
 | `backend/src/lib/referenceLibrary.ts` | KIWIX_CATALOG_URL, resolveReferenceFlavour, removeInstalledReferenceFlavour, installReferenceFlavour, listInstalledReferenceFlavours, getReferenceUpdates |
 | `backend/src/lib/referencePresetEngine.ts` | __setReferenceCatalogUrlForTests, planReference, listReferenceCatalog, getReferenceState, applyReference, resumeReferenceJobsOnBoot |
+| `backend/src/lib/referenceSearch.ts` | searchReference |
 | `backend/src/lib/register.ts` | planFor, planLine, planLineForTurnMachine |
 | `backend/src/lib/relationships.ts` | createRelationship, listRelationships, calledAdminForOwnSettings, updateRelationship, promoteToStated, findRelationship |
 | `backend/src/lib/reminderParsing.ts` | parseReminder, parseAlarmRequest, parseTimerDuration |
