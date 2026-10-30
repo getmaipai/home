@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { people, scheduledJobs, notificationDeliveries } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { alarms as alarmsTable, people, scheduledJobs, notificationDeliveries } from "@/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
 import { TestClient } from "./client";
 import { createHost } from "@/lib/packageHost";
 import { runDueJobs, scheduleCoreJob, listJobs } from "@/lib/scheduler";
@@ -235,5 +235,32 @@ describe("alarm package", () => {
       if (output.matched) expect((output as { text?: string }).text).toContain("can't set an alarm");
     }
     expect(db.select().from(scheduledJobs).all()).toHaveLength(0);
+  });
+
+  test("a repeating alarm said in chat becomes an alarm record the Alarms tab and cancel can see", async () => {
+    registerAllPackageNotificationTypes();
+    const actor = await person("Sage");
+    const made = await runAlarm(actor, "set", "for 6:30 am on weekdays called gym");
+    expect(made.ok).toBe(true);
+    const records = db.select().from(alarmsTable).all();
+    expect(records).toHaveLength(1);
+    expect(JSON.parse(records[0]!.days)).toEqual([1, 2, 3, 4, 5]);
+    expect(records[0]!.time).toBe("06:30");
+    expect(records[0]!.label).toBe("gym");
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()).toHaveLength(1);
+    const listed = await runAlarm(actor, "list");
+    expect((listed as { value?: { reply?: { text?: string } } }).value?.reply?.text ?? JSON.stringify(listed)).toContain("gym");
+    const cancelled = await runAlarm(actor, "cancel", "gym");
+    expect(JSON.stringify(cancelled)).toContain("cancelled");
+    expect(db.select().from(alarmsTable).where(isNull(alarmsTable.deletedAt)).all()).toHaveLength(0);
+    expect(db.select().from(scheduledJobs).where(and(eq(scheduledJobs.job, "alarms.fire"), eq(scheduledJobs.status, "pending"))).all()).toHaveLength(0);
+  });
+
+  test("a one-time alarm said in chat still makes a plain job, not a record", async () => {
+    const actor = await person("Sage");
+    const made = await runAlarm(actor, "set", "for 6:30 am tomorrow called gym");
+    expect(made.ok).toBe(true);
+    expect(db.select().from(alarmsTable).all()).toHaveLength(0);
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()).toHaveLength(1);
   });
 });

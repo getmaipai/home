@@ -37,7 +37,7 @@ export function AlarmRecordRow({ alarm, now, onOpen, onToggleDay, onToggleEnable
           <span className="flex items-baseline gap-2 tabular-nums"><span className="text-4xl font-light tracking-tight">{time}</span><span className="text-sm text-muted-foreground">{period}</span></span>
         </Button>
         <div className="flex flex-wrap items-center gap-2 px-3 text-sm text-muted-foreground">
-          <span>{repeat}{sound ? ` · ${sound}` : ""}</span>
+          <span>{repeat}{sound || alarm.label ? ` · ${sound || alarm.label}` : ""}</span>
           {alarm.tag ? <Badge variant="secondary">{alarm.tag}</Badge> : null}
         </div>
       </div>

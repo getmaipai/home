@@ -172,14 +172,50 @@ function alarmLabel(task: string): string {
   return label;
 }
 
-export function parseAlarmRequest(text: string, now: Date = new Date()): ParsedReminder {
-  let request = numbersFromWords(text);
+export interface ParsedAlarm extends ParsedReminder {
+  /** ISO weekdays (Monday is 1); empty for a one-time alarm. */
+  days: number[];
+}
+
+const DAY_NAMES: Record<string, number> = {
+  mon: 1, monday: 1, tue: 2, tues: 2, tuesday: 2, wed: 3, wednesday: 3, thu: 4, thur: 4, thurs: 4, thursday: 4,
+  fri: 5, friday: 5, sat: 6, saturday: 6, sun: 7, sunday: 7,
+};
+const DAY_WORD = "(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)s?";
+const DAY_LIST = new RegExp(`\\b(?:(?:on|every)\\s+)?${DAY_WORD}(?:\\s*(?:,|and|&)\\s*${DAY_WORD})*\\b`, "i");
+
+/** Pulls a repeat phrase ("on weekdays", "every day", "every Monday and Wednesday") out of an alarm request. A repeat
+ * phrase must come out before chrono reads the time, which refuses anything that says "every". */
+function takeRepeatDays(text: string): { days: number[]; rest: string } {
+  const patterns: Array<[RegExp, number[]]> = [
+    [/\b(?:on\s+|every\s+)?weekdays?\b/i, [1, 2, 3, 4, 5]],
+    [/\b(?:on\s+|every\s+)?weekends?\b/i, [6, 7]],
+    [/\b(?:every\s*day|each\s+day|daily)\b/i, [1, 2, 3, 4, 5, 6, 7]],
+  ];
+  for (const [pattern, days] of patterns) {
+    if (pattern.test(text)) return { days, rest: text.replace(pattern, " ").replace(/\s{2,}/g, " ").trim() };
+  }
+  const named = DAY_LIST.exec(text);
+  // A bare day name ("Friday") is a date for chrono. It is a repeat only with "every" or in the plural ("Mondays").
+  if (named && (/\bevery\b/i.test(named[0]) || /days\b/i.test(named[0]))) {
+    const days = [...named[0].toLowerCase().matchAll(new RegExp(DAY_WORD, "gi"))]
+      .map((m) => DAY_NAMES[m[0].replace(/s$/, "")] ?? DAY_NAMES[m[0]])
+      .filter((day): day is number => day !== undefined);
+    if (days.length > 0) return { days: [...new Set(days)].sort(), rest: text.replace(DAY_LIST, " ").replace(/\s{2,}/g, " ").trim() };
+  }
+  return { days: [], rest: text };
+}
+
+export function parseAlarmRequest(text: string, now: Date = new Date()): ParsedAlarm {
+  const repeat = takeRepeatDays(text);
+  let request = numbersFromWords(repeat.rest);
   const bare = BARE_HOUR.exec(request);
   if (bare && Number(bare[1]) >= 1 && Number(bare[1]) <= 12) {
     const hour = Number(bare[1]);
     const minute = Number(bare[2] ?? "0");
     let meridiem: "am" | "pm";
-    if (/\btomorrow\b/i.test(request)) {
+    // A repeating alarm, like tomorrow's, is a morning for 4 to 11 and an afternoon for 12 to 3; "six thirty on weekdays" is not tonight.
+    if (/\btomorrow\b/i.test(request) || repeat.days.length > 0) {
       meridiem = hour >= 4 && hour <= 11 ? "am" : "pm";
     } else {
       const at = (pm: boolean) => {
@@ -200,7 +236,7 @@ export function parseAlarmRequest(text: string, now: Date = new Date()): ParsedR
     if (error.message === "What should I remind you about?") parsed = parseReminder(`${request} Alarm`, now);
     else throw new HostError("invalid_input", `I couldn't read the time for that alarm. Tell me the time, like "set an alarm for 8:17 pm" or "wake me at 6:30 tomorrow".`);
   }
-  return { ...parsed, task: alarmLabel(parsed.task) || "Alarm" };
+  return { ...parsed, task: alarmLabel(parsed.task) || "Alarm", days: repeat.days };
 }
 
 export interface ParsedTimer {

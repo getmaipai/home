@@ -53,15 +53,21 @@ export function blockEnvelope(kind: string, producer: string, alt: string, prove
   };
 }
 
-function scheduleCard(producer: string, provenance: string, verb: string, name: string | null, whenText: string | null): Record<string, unknown>[] {
+function scheduleCard(producer: string, provenance: string, verb: string, name: string | null, whenText: string | null, cadence = "Once"): Record<string, unknown>[] {
   if (!name || !whenText) return [];
   return [blockEnvelope(
     "schedule_card",
     producer,
     `${verb}: ${name} (${whenText}).`,
     provenance,
-    { name: clip(name, NAME_MAX), cadence: "Once", nextRun: whenText, enabled: true, history: [] },
+    { name: clip(name, NAME_MAX), cadence, nextRun: whenText, enabled: true, history: [] },
   )];
+}
+
+/** "weekdays at 6:30 AM" reads "Weekdays" on the card; a one-time alarm stays "Once". */
+function alarmCadence(whenText: string | null): string {
+  const repeat = whenText?.match(/^(weekdays|weekends|every day|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:, (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun))*) at /);
+  return repeat?.[1] ? `${repeat[1][0]!.toUpperCase()}${repeat[1].slice(1)}` : "Once";
 }
 
 function todoList(producer: string, provenance: string, items: readonly { id: string; text: string }[]): Record<string, unknown>[] {
@@ -286,7 +292,7 @@ export function blocksForRecipeRun(
     case "alarm":
       if (!allowed.includes("schedule_card")) return [];
       if (text(result.data?.action) === "list") return [];
-      return scheduleCard(manifest.id, provenance, text(result.data?.action) === "cancel" ? "Alarm or reminder cancelled" : "Alarm set", text(result.data?.schedule_task) || text(result.data?.task), text(result.data?.when_text));
+      return scheduleCard(manifest.id, provenance, text(result.data?.action) === "cancel" ? "Alarm or reminder cancelled" : "Alarm set", text(result.data?.schedule_task) || text(result.data?.task), text(result.data?.when_text), alarmCadence(text(result.data?.when_text)));
     case "timer":
       return allowed.includes("schedule_card")
         ? scheduleCard(manifest.id, provenance, "Timer set", text(result.data?.label), text(result.data?.when_text))

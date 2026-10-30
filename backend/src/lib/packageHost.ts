@@ -83,9 +83,10 @@ import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib
 import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
-import { scheduleJob, scheduleCoreJob, listJobs, cancelJob } from "@/lib/scheduler";
+import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
-import { parseAlarmRequest, parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
+import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
+import { handleAlarmChat } from "@/lib/alarmChat";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
 import { backoffSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
@@ -2538,48 +2539,11 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // `reminders.fire`), it never re-runs this recipe.
       set(text: string): { task: string; schedule_task?: string; when_text: string; action: string } {
         requirePermission("reminders:write");
-        if (manifest.id === "alarm") {
-          const parsedAction = text.match(/^(set|cancel|list)\s*(.*)$/i);
-          const action = parsedAction?.[1]?.toLowerCase() ?? "set";
-          const query = (parsedAction?.[2] ?? text).trim().replace(/^(to|about)\s+/i, "");
-          const jobs = listJobs(actor).filter((row) => row.personId === actor.id && row.kind === "core" && row.status === "pending" && (row.job === "alarms.fire" || row.job === "reminders.fire"));
-          const taskOf = (row: typeof jobs[number]) => {
-            try { return typeof (JSON.parse(row.inputs) as { task?: unknown }).task === "string" ? (JSON.parse(row.inputs) as { task: string }).task : ""; }
-            catch { return ""; }
-          };
-          const lineOf = (row: typeof jobs[number]) => `${row.job === "alarms.fire" ? "Alarm" : "Reminder"}: ${taskOf(row)} (${new Date(row.nextRunAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })})`;
-          if (action === "list") return { task: jobs.length ? jobs.map(lineOf).join("\n") : "You have no pending alarms or reminders.", when_text: "", action };
-          if (action === "cancel") {
-            const clock = query.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b/i);
-            const matches = jobs.filter((row) => {
-              const task = taskOf(row).toLocaleLowerCase();
-              const textMatch = query.length > 0 && task.includes(query.toLocaleLowerCase());
-              if (textMatch) return true;
-              if (!clock) return false;
-              let hour = Number(clock[1]);
-              const minute = Number(clock[2] ?? "0");
-              if (clock[3]) hour = hour % 12 + (/p/i.test(clock[3]) ? 12 : 0);
-              const when = new Date(row.nextRunAt);
-              return when.getHours() === hour && when.getMinutes() === minute;
-            });
-            if (matches.length === 0) return { task: "There is nothing matching that to cancel.", when_text: "", action };
-            if (matches.length > 1) return { task: `I found more than one match. Which one should I cancel?\n${matches.map(lineOf).join("\n")}`, when_text: "", action };
-            const target = matches[0]!;
-            const result = cancelJob(actor, target.id);
-            if (!result.ok) return { task: "There is nothing matching that to cancel.", when_text: "", action };
-            return { task: `${target.job === "alarms.fire" ? "Alarm" : "Reminder"} cancelled: ${taskOf(target)}.`, when_text: "", action };
-          }
-        }
-        const request = manifest.id === "alarm" ? text.replace(/^set\s*/i, "") : text;
-        const parsed = manifest.id === "alarm" ? parseAlarmRequest(request) : parseReminder(request);
-        const task = parsed.task;
-        // Recipe language has no alarm op yet; adding one needs a commons spec tag, so alarm reuses remind.
-        const job = manifest.id === "alarm" ? "alarms.fire" : "reminders.fire";
-        const result = scheduleCoreJob(actor, job, parsed.when, { task });
+        if (manifest.id === "alarm") return handleAlarmChat(actor, text);
+        const parsed = parseReminder(text);
+        const result = scheduleCoreJob(actor, "reminders.fire", parsed.when, { task: parsed.task });
         if (!result.ok) mapWriteFailure(result.status, result.error);
-        return manifest.id === "alarm"
-          ? { task: `Okay, alarm set: ${task} (${parsed.when_text}).`, schedule_task: task, when_text: parsed.when_text, action: "set" }
-          : { task, when_text: parsed.when_text, action: "set" };
+        return { task: parsed.task, when_text: parsed.when_text, action: "set" };
       },
     },
     timers: {

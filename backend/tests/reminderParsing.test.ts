@@ -167,3 +167,26 @@ describe("parseAlarmRequest", () => {
     }
   });
 });
+
+describe("parseAlarmRequest repeat days", () => {
+  const MORNING = new Date("2026-09-06T12:00:00");
+  const clock = (text: string) => { const r = parseAlarmRequest(text, MORNING); const d = new Date(r.when); return { days: r.days, task: r.task, h: d.getHours(), m: d.getMinutes() }; };
+  test("weekdays, weekends and every day", () => {
+    expect(clock("for 6:30 am on weekdays")).toEqual({ days: [1, 2, 3, 4, 5], task: "Alarm", h: 6, m: 30 });
+    expect(clock("weekends at 9 am")).toEqual({ days: [6, 7], task: "Alarm", h: 9, m: 0 });
+    expect(clock("at 7 am every day called gym").days).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(clock("at 7 am daily called gym").task).toBe("gym");
+  });
+  test("named days, singular and plural, with a list", () => {
+    expect(clock("at 8 am every Monday and Wednesday called gym")).toEqual({ days: [1, 3], task: "gym", h: 8, m: 0 });
+    expect(clock("at 8 am on tuesdays, thursdays").days).toEqual([2, 4]);
+    expect(clock("every friday at 5 pm").days).toEqual([5]);
+  });
+  test("no repeat words means a one-time alarm", () => {
+    expect(parseAlarmRequest("for 6:30 am tomorrow", MORNING).days).toEqual([]);
+  });
+  test("a bare hour on a repeating alarm is the morning, not tonight", () => {
+    expect(clock("for 6:30 on weekdays")).toMatchObject({ h: 6, m: 30 });
+    expect(clock("for six thirty on weekdays called gym")).toMatchObject({ h: 6, m: 30, task: "gym" });
+  });
+});
