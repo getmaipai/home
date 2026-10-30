@@ -7,11 +7,11 @@ these" list that includes the built-in Mac apps (browser, Maps, Messages, Music 
 
 ## 1. Answer
 
-1. **Yes, as an opt-in feature that is off until an admin turns it on.** It is the "Close apps for big jobs" setting with three modes: **Off**
-   (default), **Ask first** (the admin approves each time) and **Automatic** (only for apps on the Always close list).
+1. **Yes, as an opt-in feature that is off until an admin turns it on.** It is the "Close apps for big jobs" setting with two modes: **Off**
+   (default) and **Automatic** (only for apps on the Always close list). There is no approval step: the list is the pre-approval (owner, 2026-10-30:
+   a per-close approval would take too long).
 2. **The safe shape is a list of apps to close, not a list of exceptions.** Home closes only apps on the **Always close** list. A **Never close**
-   list wins over everything, and a built-in floor of apps can never be closed by any setting (section 4). "Close anything big except these" exists
-   only as an advanced option, and it is always Ask first.
+   list wins over everything, and a built-in floor of apps can never be closed by any setting (section 4). "Close anything big except these" does not exist.
 3. **Quit, never kill.** Home sends the app the same polite quit request the app's own Quit menu sends. An app with unsaved work shows its save
    prompt and stays open; Home leaves it and moves to the next step. There is no force quit, no `kill`, no signal, ever.
 4. **It is a step of the live fit, not a background cleaner.** It runs only when a job needs room that the cheaper steps cannot find, closes only
@@ -32,10 +32,9 @@ these" list that includes the built-in Mac apps (browser, Maps, Messages, Music 
    running app on the lists. (The Stack's `devProtection()` fires only for one outside process over 40 GB or a sum over 30 GB, so it cannot size a 9 GB browser.) If closing apps from the Always close list would cover the
    shortfall, the ladder takes this step; if it would not, nothing is closed (no closing apps for nothing).
 2. **Order in the ladder.** This step comes **before lowering chat** (it costs the Mac's own user an app, where lowering chat costs the whole
-   household), and after the free steps. It replaces the old R4 "ask the person to close it" when the mode is Automatic; in Ask first mode the approval is the `close_apps` approval of section 6.
+   household), and after the free steps. With the mode Automatic it replaces the old R4 "ask the person to close it"; with the mode Off R4 is unchanged.
 3. **Pick the smallest set.** Biggest listed apps first, only as many as cover the shortfall.
-4. **Never the app being used.** The frontmost app and any app the person used in the last 2 minutes are skipped in Automatic mode (Ask first can name
-   them). An app that is playing sound, recording or in a call is skipped if the system exposes that.
+4. **Never the app being used.** The frontmost app and any app the person used in the last 2 minutes are skipped. An app that is playing sound, recording or in a call is skipped if the system exposes that.
 5. **Quit politely, wait, report.** Send the quit request, wait up to 20 seconds per app. An app that is still running (a save prompt, or it refused)
    is left alone and reported: "Safari asked to save, so I left it open". Home then continues to the next step of the ladder.
 6. **Say what happened.** On the job's own card and the Status page for admins only: "Closed Safari and Music to make room (about 9 GB). They reopen
@@ -58,19 +57,17 @@ these" list that includes the built-in Mac apps (browser, Maps, Messages, Music 
   Podcasts, News, Books, Photos, Stocks, Home, FaceTime, Mail, Calendar, Notes, Reminders, Preview, Keynote, Pages, Numbers. The starter is a list the
   admin reviews and confirms; nothing is closed from it until the mode is Automatic.
 - **Precedence:** floor, then Never close, then Always close. An app on both lists is never closed.
-- **Advanced, off by default: "Also ask about other big apps."** Apps outside the lists using more than a size the admin sets are offered one at a
-  time in Ask first mode only. Never automatic.
 
 ## 5. Settings (very easy, on the Performance page)
 
-One card on the Performance page of the making-space note, admins only: a single three-way choice (**Off, Ask me first, Automatic**), and under it
+One card on the Performance page of the making-space note, admins only: a single two-way switch (**Off, Automatic**), and under it
 two plain lists, **Always close** and **Never close**, each with an "Add an app" picker and a one-tap "Use the starter list". Each app row has a
 **Reopen when done** switch. Every change shows its effect first ("Safari will be closed when a big video needs room, and reopened afterwards").
 Presets do not turn this on: the three presets leave it Off, because it touches the Mac's own user.
 
 **Setup wizard.** One question, only when the Mac looks like it is also used as a regular computer (a signed-in desktop session with a browser or
 other listed apps installed): "Is this Mac also used for other things? Home can quit apps like Safari when a big job needs room." Answers: Not now
-(default), Ask me first, Automatic with the starter list. A dedicated hub never sees the question. The wizard also asks for the one permission the
+(default) or Automatic with the starter list (shown for review and confirmed with one tap). A dedicated hub never sees the question. The wizard also asks for the one permission the
 helper needs, with a test on a harmless app, and keeps the feature off if the permission is refused.
 
 ## 6. Pieces
@@ -78,10 +75,7 @@ helper needs, with a test on a harmless app, and keeps the feature off if the pe
 - **Helper.** A small signed, non-sandboxed program installed with Home and run by a LaunchAgent in the logged-in person's session (a background
   service has no access to the person's apps). It is the **one reader of running apps** (names and sizes) and exposes only: list running apps with size, quit by bundle id, reopen by bundle id. Home's backend
   talks to it over a local socket owned by the same user. It refuses any request for a bundle id on the floor list, whatever the caller says.
-- **Home.** The setting (`resources.close_apps.mode`, `.always`, `.never`, `.reopen`), the ladder step, the Ask first approval, the copy.
-- **Ask first.** A new approval kind `close_apps` through the existing `requestApproval` in `backend/src/lib/approvals.ts` (added to `KNOWN_KINDS`), which
-  reaches the admin through the existing approvals notification (`lib/notifications.ts`) and is read and answered on the Status page row. No new card,
-  banner or countdown (S6). No answer within 60 seconds means no.
+- **Home.** The setting (`resources.close_apps.mode`, `.always`, `.never`, `.reopen`), the ladder step, the copy.
 
 ## 7. Proposed rows
 
@@ -91,7 +85,7 @@ helper needs, with a test on a harmless app, and keeps the feature off if the pe
 | MEM-SPACE-08 | The helper (list, quit, reopen) with the floor refusal and the socket | Tests: a floor app is refused; a refusing app is reported, never killed; no signal is ever sent |
 | MEM-SPACE-09 | Settings spec and the Performance card: mode, lists, starter, picker, Reopen switches | Screenshots opened and judged; every change states its effect |
 | MEM-SPACE-10 | The ladder step: smallest set, skip rules, wait 20 s, report, restore | Replay and live: a job short by 9 GB closes only a 9 GB app; a refusing app is skipped; apps reopen |
-| MEM-SPACE-11 | `close_apps` approval kind and the Status page admin line, built as the shared answer screen for every approval kind, not one just for `close_apps` | Approve and decline both tested through `requestApproval`; names admin only; job record holds counts only |
+| MEM-SPACE-11 | Status page admin line for what was closed, refused and reopened, read live | Names admin only; job record holds counts only; nothing to approve or answer |
 | MEM-SPACE-12 | Wizard question and permission test | Dedicated hub never sees it; refusal leaves the feature Off with a plain line |
 
 Order: 07 first (it can stop the rest); 08 and 09 together; 10 and 11 after the live-fit ladder (TIER-PRIO-07); 12 after SETUP-SIZE-01.
@@ -107,18 +101,19 @@ live-fit ladder, the settings registry and `SettingsShell`, SETUP-SIZE-01's wiza
 ## 9. Rules check
 
 Rule 6a: app names appear to admins only, on the Status page and the Performance card, never on another person's card. Rule 8: children and teens
-cannot reach the setting. S6: the existing approval and Status row only, no new card, banner or poller. S4: the setting sits in one card. Owner rules: never kill by broad
+cannot reach the setting. S6: the existing Status row only, no new card, banner or poller. S4: the setting sits in one card. Owner rules: never kill by broad
 pattern (this note quits by exact bundle id after the person's own opt-in, and sends no signals), never swap the chat model. Privacy: no app list leaves
 the Mac. Rule 11: no outside engine.
 
 ## Supersedes
 
+- Owner decision 2026-10-30: no Ask first mode and no approval kind; the explicit Always close list is the approval. (This note's first draft had one; it never shipped.)
 - Making-space note section 4 ("Home adds no process-list reader") and row MEM-SPACE-03 ("no new reader"): the helper becomes the one reader of
   running apps (names and sizes) once installed, and MEM-SPACE-03's Status line has one source per install state (the helper when installed, otherwise the Stack's `memory.dev-load` reading), never both computed; the Stack's `devProtection()` keeps its separate
   whole-machine threshold event. Row MEM-SPACE-03 is amended when this lands.
 - Making-space note section 9 (app names never stored): unchanged; this note keeps names in memory for the job's life and stores counts only.
 - Making-space note section 1 item 2 and its R4 ("we never close an app that is not ours; the list only asks the person") is changed by the owner's
   2026-10-30 decision: with the mode on, Home quits listed apps. With the mode Off (default) nothing changes.
-- Making-space note R3 and R4 order: with the mode Automatic, closing listed apps comes before lowering chat. In Off and Ask first modes the order is as before.
+- Making-space note R3 and R4 order: with the mode Automatic, closing listed apps comes before lowering chat. In the Off mode the order is as before.
 - The owner rule "stop only my own processes by recorded pid" (2026-10-21) concerned build sessions on the Studio, not the product. It stands for
   sessions; the product's close step is the opt-in feature here and sends a quit request by bundle id only.
