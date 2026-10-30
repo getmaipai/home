@@ -668,7 +668,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/promptPrefix.ts` | comparePrompt |
 | `backend/src/lib/promptSanitize.ts` | sanitizeForPrompt |
 | `backend/src/lib/quickConnect.ts` | createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode, __resetQuickConnectForTests |
-| `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, __setQuickReactionRunnerForTests, __resetQuickReactionForTests, cleanReaction, quickReaction |
+| `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, __setQuickReactionRunnerForTests, __resetQuickReactionForTests, parseQuickCue, cleanReaction, quickReaction |
 | `backend/src/lib/quickTimers.ts` | listQuickTimers, createQuickTimer, updateQuickTimer, deleteQuickTimer |
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
