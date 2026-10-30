@@ -2,6 +2,7 @@
 // and the Stack's own routes under /v1/videos and /stack/v1/video). One module, loopback only (the Stack's URL
 // setting already guarantees it). The prompt and the reference picture travel in bodies and are never logged or
 // put in an error message (rule 6a). A test replaces `fetch` with `__setVideosFetchForTests`.
+import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { getStackUrl } from "@/lib/stackEngine";
 import type { StackLiveFields } from "@/lib/genLive";
 
@@ -141,7 +142,7 @@ async function request(path: string, init: RequestInit & { timeoutMs?: number } 
 async function failure(res: Response): Promise<never> {
   let body: { error?: unknown; code?: unknown; job?: unknown } = {};
   try { body = await res.json() as typeof body; } catch { /* a body that is not JSON carries no detail */ }
-  const message = typeof body.error === "string" && body.error ? body.error : `The video engine answered ${res.status}.`;
+  const message = typeof body.error === "string" && body.error ? plainEngineLine(body.error) : `The video engine answered ${res.status}.`;
   throw new StackVideoError(res.status, typeof body.code === "string" ? body.code : `http_${res.status}`, message, typeof body.job === "string" ? body.job : undefined);
 }
 
@@ -174,7 +175,7 @@ export async function getVideoJob(job: string): Promise<StackVideoJob> {
     progress: typeof body.progress === "number" ? body.progress : 0,
     phase_progress: body.phase_progress ?? null,
     position: body.position ?? null,
-    error: body.error ?? null,
+    error: typeof body.error === "string" ? plainEngineLine(body.error) : null,
     code: body.code ?? null,
     data: Array.isArray(body.data) ? body.data : [],
     progress_fraction: body.progress_fraction ?? null, stage: body.stage ?? null, stage_label: body.stage_label ?? null, step: body.step ?? null, steps: body.steps ?? null,
