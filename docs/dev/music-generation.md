@@ -26,6 +26,15 @@ code map for working on it.
   anything it did not make).
 - The chat model writes the lyrics without a line count. `secondsForWords` allows 6 seconds per sung line plus 10 (at least 30); `hookOf` selects Quick through the first chorus. A squeezed ending triggers one retry at 30 percent longer, up to the Stack ceiling, through normal admission.
 
+## Stems (TIER-STEMS-01)
+
+`edit_music` with `change: "stems"` splits a song made in this chat into vocals, drums, bass and other (design: `docs/design/stem-splitting-2026-10-30.md`).
+It is a task of the existing tool, so the turn's tool count stays 16. Home sends the song to the Stack's `POST /v1/audio/stems` (the `stems` component,
+Demucs `htdemucs`, MIT; the pinned checkpoint and its sha256 are in the Stack's `modelCatalog.ts`), then `finishStems` in `lib/music/jobs.ts` stores each stem as a
+song with `provenance.parent_file_id`, so the commercial-use check follows the parent. One `music_jobs` row per stem (task `stems`, `request.stemsOf` is the
+split's job id); a stem is never a version of its song (`musicVersions`) and the card of a finished split steps through its stems. The song card's
+Edit popover has a Stems tab that calls `POST /api/music/jobs/{id}/stems`. Only songs made here are accepted; uploaded audio waits on MUSIC-GEN-14 (TIER-STEMS-02).
+
 ## Try it on a scratch Stack and Home
 
 Never against the live Stack (8770) or Home (3000). Take `mkdir /private/tmp/claude-501/bench.lock` for any model run and remove it after.

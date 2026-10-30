@@ -64,6 +64,15 @@ describe("music jobs and their private files", () => {
     expect(musicVersions(people.owner, song).map((v) => v.fileId)).toEqual([parent.fileId]);
     for (const job of jobs) expect(musicVersions(people.owner, getMusicJobFor(people.owner, job.id)!).map((v) => v.fileId)).toEqual([job.fileId]);
   });
+  test("stems follow the same audience gate as every other edit: a child, a spoken turn and a song from another chat never reach the Stack", async () => {
+    const state = musicState(people.owner); const parent = await generate(state);
+    fake.stems = true;
+    for (const [other, spoken] of [[musicState(people.child), false], [state, true], [{ ...state, conversationId: "conv-another-chat" }, false]] as const) {
+      const outcome = await runEditMusic({ state: other, args: { track: parent.fileId, change: "stems" }, callId: "s", spoken });
+      expect(outcome.result?.data).toMatchObject({ refused: expect.any(String) });
+    }
+    expect(db.select().from(musicJobs).where(eq(musicJobs.task, "stems")).all()).toHaveLength(0);
+  });
   test("the tool node returns at once, puts the job on the tool part, and stores unchanged AAC with prompt-free provenance", async () => {
     const state = musicState(people.owner);
     fake.pollsToFinish = 4;
