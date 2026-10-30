@@ -86,6 +86,7 @@ const PrivacyPage = lazyNamed(() => import("@/shell/pages/PrivacyPage"), "Privac
 const UsersPage = lazyNamed(() => import("@/shell/pages/UsersPage"), "UsersPage");
 const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage");
 const ReferencePage = lazyNamed(() => import("@/shell/pages/ReferencePage"), "ReferencePage");
+const WikipediaPage = lazyNamed(() => import("@/shell/pages/WikipediaPage"), "WikipediaPage");
 const NewsDiscussPage = lazyNamed(() => import("@/shell/pages/NewsDiscussPage"), "NewsDiscussPage");
 const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
 const MediaHomePage = lazyNamed(() => import("@/shell/pages/MediaHomePage"), "MediaHomePage");
@@ -446,6 +447,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />
+            <Route path="wikipedia/*" element={<WikipediaPage />} />
             <Route path="all-apps" element={<AllAppsPage person={person} />} />
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
             <Route path="media/:id" element={<MediaLinkRedirect />} />

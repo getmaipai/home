@@ -26,6 +26,7 @@ export const APP_CATALOG: readonly AppEntry[] = [
   { to: "/memory", icon: "brain", label: "Memories", description: "The details you want MaiPai to remember.", category: "Personal", keywords: ["remember", "saved", "memory"] },
   { to: "/companions", icon: "bot", label: "Companions", description: "Meet the companions and pick how your assistant sounds.", category: "Personal", keywords: ["personality", "persona", "voice", "character", "sprout", "nova", "riff"] },
   { to: "/people", icon: "users", label: "Family", description: "Everyone who shares your home.", category: "Personal", keywords: ["family", "household"] },
+  { to: "/wikipedia", icon: "book-open", label: "Wikipedia", description: "Read Wikipedia from your own library, no internet needed.", category: "Everyday", keywords: ["encyclopedia", "articles", "reference", "look up", "learn", "kiwix"] },
   { to: "/privacy", icon: "shield-check", label: "Privacy", description: "Understand and control what you share.", category: "System", keywords: ["data", "security"] },
   { to: "/settings", icon: "settings", label: "Settings", description: "Make MaiPai feel like yours.", category: "System", keywords: ["preferences", "voice", "models"] },
 ].map((app) => ({ ...app, ...NAV_ENTRIES.find((entry) => entry.to === app.to) }));
