@@ -129,6 +129,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
+| `frontend/src/apps/settings/HostTuneSettings.tsx` | HostTuneSettings |
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
@@ -155,6 +156,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
+| `frontend/src/apps/setup/CloseAppsStep.tsx` | openStarterApps, useCloseAppsQuestion, CloseAppsStep |
 | `frontend/src/apps/setup/HostTuneStep.tsx` | hostTuneFailure, useHostTuneSupported, HostTuneStep |
 | `frontend/src/apps/setup/PlanDiskSummary.tsx` | liveVerdict, PlanDiskSummary |
 | `frontend/src/apps/setup/PlanStep.tsx` | VRAM_CHOICES, PlanStep |
@@ -320,7 +322,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/answerImages/turn.ts` | SHOW_IMAGES_TOOL_ID, ANSWER_IMAGES_BUDGET_MS, SHOW_IMAGES_MAX_SUBJECTS, showImagesNames, showImagesResultLine, showImagesPendingResultLine |
 | `backend/src/lib/answerImages/wikimedia.ts` | wikimediaFetchJson, kindScore, wikimediaLiveBlocked, resolveWikimediaSubject, isUnder18, isNonPhotoFile |
 | `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldDiagnoseKey |
-| `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps |
+| `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps, askHelper |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
 | `backend/src/lib/apps.ts` | settingsAreaProblems, sidebarFor, appPackageProblems, appVisibleTo, pageMinRole, pageVisibleTo |
@@ -367,6 +369,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, renameClonedVoice, deleteClonedVoice, getClonedVoiceFile |
+| `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, transportRefusal, requestsPerMinute, rateRefusal |
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |
