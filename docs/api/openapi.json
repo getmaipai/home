@@ -37572,6 +37572,94 @@
                         "maxLength": 120,
                         "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
                       },
+                      "icon": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "cart"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "check"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "sparkle"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "briefcase"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "home"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "heart"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "book"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "star"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "gift"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "plane"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "leaf"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "sun"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
+                      },
                       "items": {
                         "type": "array",
                         "items": {
@@ -37788,6 +37876,94 @@
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
                     },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -37987,6 +38163,94 @@
                       "minLength": 1,
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
                     },
                     "items": {
                       "type": "array",
@@ -38201,6 +38465,94 @@
                       "minLength": 1,
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
                     },
                     "items": {
                       "type": "array",
@@ -38502,6 +38854,94 @@
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
                     },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -38744,6 +39184,94 @@
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
                     },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -38961,6 +39489,94 @@
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
                     },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -39161,6 +39777,94 @@
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
                     },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -39360,6 +40064,94 @@
                       "minLength": 1,
                       "maxLength": 120,
                       "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "check"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sparkle"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "briefcase"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "home"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "heart"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "book"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "star"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gift"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "plane"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "leaf"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sun"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
                     },
                     "items": {
                       "type": "array",
