@@ -80,7 +80,7 @@ export function SearchResults({ q, book, books, routeFor, onBook, onSearch }: Se
           getLabel={(hit) => hit.title}
           onSelect={(hit) => navigate(routeFor(hit.book, hit.path))}
           renderItem={(hit) => <ResultRow hit={hit} />}
-          emptyState={{ icon: "book-open", text: "No articles found." }}
+          emptyState={{ icon: "book", text: "No articles found." }}
         />
       ) : null}
       {relatedTitles.length ? (

@@ -123,6 +123,7 @@ export function WikipediaPage() {
     { id: "explore", label: "Explore", icon: "globe", href: "/wikipedia/explore", active: atSection && section === "explore", onClick: go("/wikipedia/explore") },
     { id: "saved", label: "Saved", icon: "bookmark", href: "/wikipedia/saved", active: atSection && section === "saved", onClick: go("/wikipedia/saved") },
     { id: "offline", label: "Offline", icon: "download", href: "/wikipedia/offline", active: atSection && section === "offline", onClick: go("/wikipedia/offline") },
+    ...(book ? [{ id: "random", label: "Random article", icon: "sparkles", onClick: (event: { preventDefault: () => void }) => { event.preventDefault(); random.mutate(); } }] : []),
   ];
 
   return (

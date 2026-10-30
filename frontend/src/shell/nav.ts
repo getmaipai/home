@@ -28,7 +28,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { to: "/", icon: "home", label: "Home" },
   { to: "/chat", icon: "message-circle", label: "Chat" },
   { to: "/people", icon: "users", label: "Family" },
-  { to: "/reference", icon: "book-open", label: "Reference" },
+  { to: "/reference", icon: "book", label: "Reference" },
   { to: "/privacy", icon: "shield-check", label: "Privacy" },
   { to: "/settings", icon: "settings", label: "Settings" },
 ] as const;
