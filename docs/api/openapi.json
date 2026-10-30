@@ -41453,6 +41453,63 @@
                           "level"
                         ]
                       }
+                    },
+                    "infobox": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "value"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "rows"
+                      ]
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "hatnote": {
+                      "type": "string"
+                    },
+                    "profile": {
+                      "type": "string",
+                      "enum": [
+                        "wikipedia",
+                        "generic"
+                      ]
+                    },
+                    "lead_image": {
+                      "type": "object",
+                      "properties": {
+                        "src": {
+                          "type": "string"
+                        },
+                        "alt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "src",
+                        "alt"
+                      ]
                     }
                   },
                   "required": [
@@ -41464,6 +41521,163 @@
                     "snapshot_date",
                     "blocks",
                     "toc"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Article not available.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/preview/{book}/{path}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Preview an offline article",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Article preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "thumbnail": {
+                      "type": "object",
+                      "properties": {
+                        "src": {
+                          "type": "string"
+                        },
+                        "alt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "src",
+                        "alt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Article not available.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/random/{book}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Choose a random offline article",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Random readable article.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "book": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "book",
+                    "path"
                   ]
                 }
               }

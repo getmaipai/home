@@ -16,6 +16,9 @@ import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 import { extractArticle, extractFullArticle } from "@/lib/retrieval/extractArticle";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { getPersonSettingValue } from "@/lib/settings";
+import { extractArticleImages } from "@/lib/retrieval/articleImages";
+import { sourceForBook } from "@/lib/retrieval/referenceSources";
+import { installed, libraryRequest } from "@/lib/kiwixClient";
 
 export const referenceRoutes = apiRouter();
 
@@ -24,20 +27,17 @@ const param = (name: string, max: number) => z.string().min(1).max(max).openapi(
 const booksResponse = z.array(z.object({ id: z.string(), source_label: z.string(), language: z.string().nullable(), size_bytes: z.number().nullable(), snapshot_date: z.string().nullable(), licence: z.string(), article_count: z.number().optional() }));
 const suggestResponse = z.array(z.object({ title: z.string(), book: z.string(), path: z.string() }));
 const searchResponse = z.array(z.object({ title: z.string(), snippet: z.string(), book: z.string(), path: z.string() }));
-const articleResponse = z.object({ title: z.string(), book: z.string(), path: z.string(), source_label: z.string(), licence: z.string(), snapshot_date: z.string().nullable(), blocks: z.array(z.record(z.string(), z.unknown())), toc: z.array(z.object({ id: z.string(), title: z.string(), level: z.number() })) });
+const articleResponse = z.object({ title: z.string(), book: z.string(), path: z.string(), source_label: z.string(), licence: z.string(), snapshot_date: z.string().nullable(), blocks: z.array(z.record(z.string(), z.unknown())), toc: z.array(z.object({ id: z.string(), title: z.string(), level: z.number() })), infobox: z.object({ title: z.string().optional(), rows: z.array(z.object({ label: z.string(), value: z.string() })) }).optional(), summary: z.string().optional(), hatnote: z.string().optional(), profile: z.enum(["wikipedia", "generic"]).optional(), lead_image: z.object({ src: z.string(), alt: z.string() }).optional() });
 const BOOKS_ROUTE = createRoute({ method: "get", path: "/books", tags: ["Sources"], summary: "Books available in the offline library", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: booksResponse } }, description: "Readable installed books." }, ...errorResponses({ 401: "Not signed in" }) } });
 const SUGGEST_ROUTE = createRoute({ method: "get", path: "/suggest", tags: ["Sources"], summary: "Suggest offline article titles", middleware: [requireAuth] as const, request: { query: z.object({ book: z.string().min(1).max(200), q: z.string().min(1).max(200) }) }, responses: { 200: { content: { "application/json": { schema: suggestResponse } }, description: "Title suggestions." }, ...errorResponses({ 401: "Not signed in" }) } });
 const SEARCH_ROUTE = createRoute({ method: "get", path: "/search", tags: ["Sources"], summary: "Search installed offline articles", middleware: [requireAuth] as const, request: { query: z.object({ q: z.string().min(1).max(200), book: z.string().max(200).optional() }) }, responses: { 200: { content: { "application/json": { schema: searchResponse } }, description: "Search hits." }, ...errorResponses({ 401: "Not signed in" }) } });
 const ARTICLE_ROUTE = createRoute({ method: "get", path: "/article/{book}/{path}", tags: ["Sources"], summary: "Read a cleaned offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: articleResponse } }, description: "Closed article blocks." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+const previewResponse = z.object({ title: z.string(), summary: z.string(), thumbnail: z.object({ src: z.string(), alt: z.string() }).optional() });
+const PREVIEW_ROUTE = createRoute({ method: "get", path: "/preview/{book}/{path}", tags: ["Sources"], summary: "Preview an offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: previewResponse } }, description: "Article preview." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+const RANDOM_ROUTE = createRoute({ method: "get", path: "/random/{book}", tags: ["Sources"], summary: "Choose a random offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200) }) }, responses: { 200: { content: { "application/json": { schema: z.object({ title: z.string(), book: z.string(), path: z.string() }) } }, description: "Random readable article." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 const MEDIA_ROUTE = createRoute({ method: "get", path: "/media/{book}/{path}", tags: ["Sources"], summary: "Read an allowed offline article image", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 1000) }) }, responses: { 200: { description: "Image bytes." }, 404: { description: "Image not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 
 const unavailable = (c: any) => { c.header("Content-Type", "text/plain; charset=utf-8"); c.header("X-Content-Type-Options", "nosniff"); return c.body(REFUSAL, 404); };
-const reqTimeout = 2500;
-async function libraryRequest(base: string, path: string): Promise<Response> { return fetch(`${base.replace(/\/+$/, "")}${path}`, { signal: AbortSignal.timeout(reqTimeout) }); }
-async function installed(base: string): Promise<string[]> {
-  const res = await libraryRequest(base, "/catalog/v2/entries?count=200"); if (!res.ok) return [];
-  const xml = await res.text(); return [...new Set([...xml.matchAll(/href="\/content\/([^"/?#]+)"/g)].map((m) => decodeURIComponent(m[1]!)))];
-}
 function snapshotDate(value: string): string | null { return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null; }
 async function dateFor(base: string, book: string): Promise<string | null> { try { const r = await libraryRequest(base, `/raw/${encodeURIComponent(book)}/meta/Date`); return r.ok ? snapshotDate(await r.text()) : null; } catch { return null; } }
 function bookRows(xml: string, band: ReturnType<typeof speakerAgeBand>) {
@@ -80,42 +80,93 @@ referenceRoutes.openapi(SEARCH_ROUTE, async (c) => {
       if (hits.length >= 20) break;
       const res = await libraryRequest(base, `/search?content=${encodeURIComponent(rb.book)}&pattern=${encodeURIComponent(q)}&count=20`); if (!res.ok) continue;
       const xml = await res.text();
+      const candidates: Array<{ title: string; snippet: string; path: string }> = [];
       for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
         const item = m[1]!; const title = /<title>([\s\S]*?)<\/title>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim(); const href = /<link>([^<]+)<\/link>/i.exec(item)?.[1]?.trim(); const snippet = /<description>([\s\S]*?)<\/description>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
         if (!title || !href) continue;
         let path = ""; try { path = new URL(href, base).pathname.split("/").slice(3).map(decodeURIComponent).join("/"); } catch { continue; }
         if (!path || path.split("/").includes("..")) continue;
-        const articleRes = await libraryRequest(base, `/content/${encodeURIComponent(rb.book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!articleRes.ok) continue;
-        const full = extractFullArticle(await articleRes.text(), { book: rb.book, allowedBooks: new Set(names), allowLinks: false, allowImages: false });
-        const plainText = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : []).join(" ");
-        if (band !== "adult" && tripsMinorFloor(`${title}. ${snippet}. ${plainText}`)) continue;
-        hits.push({ title, snippet: (snippet || plainText).slice(0, 240), book: rb.book, path }); if (hits.length >= 20) break;
+        candidates.push({ title, snippet, path }); if (candidates.length >= 20) break;
       }
+      if (band === "adult") hits.push(...candidates.map((hit) => ({ ...hit, book: rb.book })));
+      else {
+        for (let i = 0; i < candidates.length; i += 4) {
+          const batch = candidates.slice(i, i + 4);
+          const checked = await Promise.all(batch.map(async (hit) => {
+            const articleRes = await libraryRequest(base, `/content/${encodeURIComponent(rb.book)}/${hit.path.split("/").map(encodeURIComponent).join("/")}`); if (!articleRes.ok) return null;
+            const full = extractFullArticle(await articleRes.text(), { book: rb.book, allowedBooks: new Set(names), allowLinks: false, allowImages: false });
+            const plainText = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((entry) => entry.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((row) => [row.label, row.value]) : []).join(" ");
+            if (tripsMinorFloor(`${hit.title}. ${hit.snippet}. ${plainText}`)) return null;
+            return { title: hit.title, snippet: (hit.snippet || plainText).slice(0, 240), book: rb.book, path: hit.path };
+          }));
+          hits.push(...checked.filter((x): x is NonNullable<typeof x> => x !== null));
+        }
+      }
+      if (hits.length >= 20) hits.splice(20);
     }
     return c.json(hits, 200);
   } catch { return c.json([], 200); }
 });
 
-referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
-  const { book, path } = c.req.valid("param"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
-  if (!base || path.split("/").includes("..")) return unavailable(c);
+async function loadArticle(c: any, book: string, path: string) {
+  const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
+  if (!base || path.split("/").includes("..")) return null;
   try {
-    const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return unavailable(c);
-    const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return unavailable(c);
+    const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return null;
+    const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return null;
     const html = await res.text();
     const full = extractFullArticle(html, { book, allowedBooks: new Set(names), allowLinks: band === "adult", allowImages: getPersonSettingValue(person, "reference.images") === true });
     if (full.redirectTo) {
       const target = new URL(full.redirectTo, "http://kiwix.local").pathname.match(/^\/(?:content\/)?([^/]+)\/(.+)$/);
       if (target && decodeURIComponent(target[1]!) === book && !decodeURIComponent(target[2]!).split("/").includes("..")) {
-        return c.redirect(`/api/reference/article/${encodeURIComponent(book)}/${decodeURIComponent(target[2]!).split("/").map(encodeURIComponent).join("/")}`, 302);
+        return { redirect: `/api/reference/article/${encodeURIComponent(book)}/${decodeURIComponent(target[2]!).split("/").map(encodeURIComponent).join("/")}` };
       }
     }
     const fallback = extractArticle(html); const title = full.title || fallback.title || path;
-    const plain = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((r) => [r.label, r.value]) : []).join(" ");
-    if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}`)) return unavailable(c);
-    c.header("Cache-Control", "private, max-age=600"); c.header("X-Content-Type-Options", "nosniff");
-    return c.json({ title, book, path, source_label: rb.source.label, licence: licenceLabel(rb.source.licence), snapshot_date: await dateFor(base, book), blocks: full.blocks, toc: full.toc });
+    const plain = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((r) => [r.label, r.value]) : []).concat(full.summary ?? "", full.hatnote ?? "", full.infobox?.rows.flatMap((r) => [r.label, r.value]) ?? []).join(" ");
+    if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}`)) return null;
+    const imagesAllowed = getPersonSettingValue(person, "reference.images") === true;
+    const rewrite = (imagePath: string) => `/api/reference/media/${encodeURIComponent(book)}/${imagePath.split("/").map(encodeURIComponent).join("/")}`;
+    const leadImg = imagesAllowed ? extractArticleImages(html, { book, articlePath: path, limit: 1 }).find((image) => image.lead) : undefined;
+    const blocks = full.blocks.map((block) => {
+      if (block.type !== "figure") return block;
+      if (!imagesAllowed) return null;
+      const resolved = extractArticleImages(`<figure><img src="${block.src.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" alt=""></figure>`, { book, articlePath: path }).find((image) => image.imagePath);
+      return resolved ? { ...block, src: rewrite(resolved.imagePath) } : null;
+    }).filter((block): block is NonNullable<typeof block> => block !== null);
+    return { rb, title, full: { ...full, blocks }, ...(leadImg ? { lead_image: { src: rewrite(leadImg.imagePath), alt: leadImg.alt } } : {}), profile: sourceForBook(book)?.id.startsWith("wikipedia-") ? "wikipedia" : "generic" };
+  } catch { return null; }
+}
+
+referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
+  const { book, path } = c.req.valid("param"); const result = await loadArticle(c, book, path);
+  if (!result) return unavailable(c); if ("redirect" in result) return c.redirect(result.redirect!, 302);
+  const base = kiwixBaseUrl()!;
+  c.header("Cache-Control", "private, max-age=600"); c.header("X-Content-Type-Options", "nosniff");
+  return c.json({ title: result.title, book, path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: result.full.infobox } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}) }, 200);
+});
+
+referenceRoutes.openapi(PREVIEW_ROUTE, async (c) => {
+  const { book, path } = c.req.valid("param"); const result = await loadArticle(c, book, path);
+  if (!result || "redirect" in result || !result.full.summary) return unavailable(c);
+  return c.json({ title: result.title, summary: result.full.summary, ...(result.lead_image ? { thumbnail: result.lead_image } : {}) }, 200);
+});
+
+referenceRoutes.openapi(RANDOM_ROUTE, async (c) => {
+  const { book } = c.req.valid("param"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
+  if (!base) return unavailable(c);
+  try {
+    const names = await installed(base); if (!readableBooks(names, band).books.some((row) => row.book === book)) return unavailable(c);
+    for (let attempt = 0; attempt < (band === "adult" ? 1 : 5); attempt++) {
+      const res = await libraryRequest(base, `/random?content=${encodeURIComponent(book)}`, { redirect: "manual" }); const location = res.headers.get("location");
+      if (!location) continue;
+      const pathMatch = new URL(location, base).pathname.match(/^\/content\/[^/]+\/(.+)$/); if (!pathMatch) continue;
+      const path = pathMatch[1]!.split("/").map(decodeURIComponent).join("/");
+      const article = await loadArticle(c, book, path); if (!article || "redirect" in article) continue;
+      return c.json({ title: article.title, book, path }, 200);
+    }
   } catch { return unavailable(c); }
+  return unavailable(c);
 });
 
 referenceRoutes.openapi(MEDIA_ROUTE, async (c) => {

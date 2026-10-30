@@ -12,7 +12,7 @@ type Element = ReturnType<typeof parseHTML>["document"]["body"];
 type Node = Element;
 
 export const LEAD_MAX_CHARS = 2500;
-const INFOBOX_MAX_ROWS = 12;
+const INFOBOX_MAX_ROWS = 24;
 const INFOBOX_VALUE_MAX = 200;
 const DISAMBIGUATION_OPTIONS_MAX = 8;
 const FULL_ARTICLE_DROP = "references, .references, .reflist, .navbox, .mw-editsection, script, style, iframe, form, noscript, svg, .catlinks, .metadata, .sistersitebox, .portal, .mw-jump-link, .mw-references-wrap";
@@ -27,7 +27,7 @@ export type ArticleBlock =
   | { type: "figure"; src: string; alt: string; caption: string }
   | { type: "note"; text: string }
   | { type: "quote"; inlines: ArticleInline[]; cite?: string };
-export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; redirectTo?: string }
+export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; infobox?: { title?: string; rows: Array<{ label: string; value: string }> }; summary?: string; hatnote?: string; redirectTo?: string }
 
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
 
@@ -101,6 +101,20 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   const content = (news ? document.querySelector("article") : null) ?? document.querySelector(".mw-parser-output") ?? document.querySelector("main") ?? document.body ?? document.documentElement;
   const titleNode = content.querySelector("h1");
   if (titleNode) titleNode.remove();
+  const firstHeading = content.querySelector("h2,h3,h4");
+  const hatnoteEl = Array.from(content.querySelectorAll(".hatnote,[role=note]")).find((el: Element) => !firstHeading || Boolean(el.compareDocumentPosition(firstHeading) & 4));
+  const hatnote = hatnoteEl ? plain(hatnoteEl).slice(0, 200) : undefined;
+  if (hatnoteEl) (hatnoteEl as Element).remove();
+  const infoboxEl = content.querySelector("table.infobox,table.infobox_v2,table.infobox_v3");
+  let infobox: FullArticle["infobox"];
+  if (infoboxEl) {
+    const caption = infoboxEl.querySelector("caption") ?? infoboxEl.querySelector("tr th[colspan]");
+    const rows = (Array.from(infoboxEl.querySelectorAll("tr")) as Element[]).flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && plain(td); return label && value ? [{ label: label.slice(0, INFOBOX_VALUE_MAX), value: value.slice(0, INFOBOX_VALUE_MAX) }] : []; }).slice(0, INFOBOX_MAX_ROWS);
+    infobox = { ...(caption && plain(caption) ? { title: plain(caption).slice(0, INFOBOX_VALUE_MAX) } : {}), rows };
+    if (opts.mode !== "news") infoboxEl.remove();
+  }
+  const summaryParagraph = Array.from(content.querySelectorAll("p")).find((p: Element) => plain(p));
+  const summary = summaryParagraph ? cutAtSentence(plain(summaryParagraph), 400) : undefined;
   const inline = (root: Element): ArticleInline[] => {
     const out: ArticleInline[] = [];
     const walk = (node: any, style: "text" | "emphasis" | "strong" = "text") => {
@@ -152,7 +166,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   const dropped = new Set(["references", "see also", "external links", "notes", "further reading", "citations", "bibliography", "footnotes", "sources"]);
   let skip = false;
   for (const el of elements) {
-    if (el.closest(FULL_ARTICLE_DROP)) continue;
+    if (el.closest(FULL_ARTICLE_DROP) || el.closest("table.infobox,table.infobox_v2,table.infobox_v3")) continue;
     const tag = el.tagName.toLowerCase();
     if (/^h[2-4]$/.test(tag)) {
       const text = plain(el); skip = dropped.has(text.toLowerCase());
@@ -187,7 +201,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
     for (const child of children) { if (child.tagName === "DT") label = plain(child); else if (child.tagName === "DD" && label) { rows.push({ label, value: plain(child) }); label = ""; } }
     if (rows.length) blocks.push({ type: "rows", rows });
   }
-  return { title, blocks, toc, ...metadata, ...(redirectTo ? { redirectTo } : {}) };
+  return { title, blocks, toc, ...metadata, ...(infobox ? { infobox } : {}), ...(summary ? { summary } : {}), ...(hatnote ? { hatnote } : {}), ...(redirectTo ? { redirectTo } : {}) };
 }
 
 /** Section headings that are never kept (their text is not read either). */
@@ -232,6 +246,16 @@ function textOf(el: Element): string {
   return joined.replace(/(\s*,\s*)+/g, ", ").replace(/^,\s*|,\s*$/g, "").trim();
 }
 
+function cutAtSentence(text: string, max: number): string {
+  const firstEnd = /[.!?](?:["')\]]*)\s/.exec(text);
+  if (firstEnd) return text.slice(0, firstEnd.index + firstEnd[0].trimEnd().length).trim();
+  if (text.length <= max) return text;
+  const slice = text.slice(0, max);
+  const sentenceEnd = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("? "), slice.lastIndexOf("! "));
+  if (sentenceEnd > max * 0.5) return slice.slice(0, sentenceEnd + 1).trim();
+  const space = slice.lastIndexOf(" ");
+  return (space > 0 ? slice.slice(0, space) : slice).trim();
+}
 function cutAtBoundary(text: string, max: number): string {
   if (text.length <= max) return text;
   const slice = text.slice(0, max);

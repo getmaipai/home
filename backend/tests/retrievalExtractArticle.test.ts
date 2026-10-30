@@ -1,6 +1,6 @@
 // KS-01: the `extract_article` processor. Pure HTML in, a plain record out.
 import { describe, expect, test } from "bun:test";
-import { LEAD_MAX_CHARS, cleanText, extractArticle } from "@/lib/retrieval/extractArticle";
+import { LEAD_MAX_CHARS, cleanText, extractArticle, extractFullArticle } from "@/lib/retrieval/extractArticle";
 import { articleHtml } from "./support/fakeKiwix";
 
 describe("extractArticle", () => {
@@ -70,4 +70,15 @@ describe("cleanText", () => {
   test("drops inline CSS rules, template braces and edit links", () => {
     expect(cleanText(".mw-parser-output .hlist ul{margin:0} Born 1990 {{small|x}} [edit]")).toBe("Born 1990");
   });
+});
+
+test("full article lifts Wikipedia front matter", () => {
+  const html = `<div class="mw-parser-output"><h1>Example</h1><div class="hatnote" role="note">For other uses, see Example (disambiguation).</div><table class="infobox"><caption>Example facts</caption><tr><th>One</th><td>First</td></tr><tr><th>Two</th><td>Second</td></tr><tr><th>Three</th><td>Third</td></tr><tr><th colspan="2">Nested image</th></tr></table><p><b>Example</b> is a made up topic. Second sentence here.</p><h2>History</h2><p>History.</p><h2>Uses</h2><p>Uses.</p></div>`;
+  const result = extractFullArticle(html, { book: "wikipedia_en_all_mini_2026-09", allowedBooks: new Set(), allowLinks: false, allowImages: false });
+  expect(result.infobox?.title).toBe("Example facts");
+  expect(result.infobox?.rows).toEqual([{ label: "One", value: "First" }, { label: "Two", value: "Second" }, { label: "Three", value: "Third" }]);
+  expect(result.blocks.some((b) => b.type === "rows" && b.rows[0]?.label === "One")).toBe(false);
+  expect(result.summary).toBe("Example is a made up topic.");
+  expect(result.hatnote).toBe("For other uses, see Example (disambiguation).");
+  expect(result.blocks.filter((b) => b.type === "heading")).toHaveLength(2);
 });

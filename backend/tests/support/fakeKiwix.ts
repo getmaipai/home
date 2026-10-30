@@ -28,6 +28,7 @@ export interface FakeKiwix {
   requests: string[];
   /** Requests that named a given book (by /content/<id>, content= or /raw/<id>). */
   requestsFor(book: string): string[];
+  maxContentInFlight(): number;
   setBooks(books: FakeBook[]): void;
   stop(): void;
 }
@@ -39,6 +40,7 @@ function esc(s: string): string {
 export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
   let books = initial;
   const requests: string[] = [];
+  let contentInFlight = 0; let maxContent = 0; let randomOffset = 0;
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -69,11 +71,20 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
           .join("");
         return new Response(`<?xml version="1.0"?><rss><channel>${items}</channel></rss>`, { headers: { "content-type": "application/xml" } });
       }
+      if (url.pathname === "/random") {
+        const book = books.find((b) => b.id === url.searchParams.get("content"));
+        const paths = Object.keys(book?.articles ?? {}); if (!paths.length) return new Response("not found", { status: 404 });
+        const path = paths[randomOffset++ % paths.length]!;
+        return new Response(null, { status: 302, headers: { location: `/content/${book!.id}/${path}` } });
+      }
       const content = /^\/content\/([^/]+)\/(.+)$/.exec(url.pathname);
       if (content) {
+        contentInFlight++; maxContent = Math.max(maxContent, contentInFlight);
+        try {
         const book = books.find((b) => b.id === decodeURIComponent(content[1]!));
         const article = book?.articles[decodeURIComponent(content[2]!)];
         return article ? new Response(article.html, { headers: { "content-type": "text/html" } }) : new Response("not found", { status: 404 });
+        } finally { contentInFlight--; }
       }
       const raw = /^\/raw\/([^/]+)\/meta\/Date$/.exec(url.pathname);
       if (raw) {
@@ -93,6 +104,7 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
   return {
     baseUrl: `http://127.0.0.1:${server.port}`,
     requests,
+    maxContentInFlight: () => maxContent,
     requestsFor: (book) => requests.filter((r) => r.includes(`/${book}/`) || r.includes(`content=${book}`)),
     setBooks(next) {
       books = next;
