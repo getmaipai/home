@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { getIcon, iconNames } from "@maipai/ui/src/icons";
+import { getIcon } from "@maipai/ui/src/icons";
+import { iconNames } from "@maipai/ui/src/icons";
 
 // Package app pages publish their title and header action data here for the stable components
 // registered with useHeaderExtra. The shell header renders them beside the companion avatar.

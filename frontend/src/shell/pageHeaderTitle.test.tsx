@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { headerEntryFor } from "@/shell/pageHeaderTitle";
+import { PageHeaderActions, headerEntryFor } from "@/shell/pageHeaderTitle";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { makePerson } from "@/shell/pages/settings/settingsTestKit";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 const { PageHeaderTitle } = await import("@/shell/pageHeaderTitle");
 
@@ -82,5 +84,19 @@ describe("PageHeaderTitle", () => {
   test("a path in neither table renders nothing rather than crashing", () => {
     const view = renderAt("/some-future-page-nobody-mapped-yet");
     expect(view.container).toBeEmptyDOMElement();
+  });
+});
+
+describe("PageHeaderActions", () => {
+  function actionsAt(pathname: string, role: "owner" | "guest") {
+    return renderWithQueryClient(<MemoryRouter initialEntries={[pathname]}><WakeWordPersonContext.Provider value={makePerson(role)}><PageHeaderActions /></WakeWordPersonContext.Provider></MemoryRouter>);
+  }
+  test("Home carries its layout gear in the header for everyone but a guest", () => {
+    expect(actionsAt("/", "owner").getByRole("button", { name: "Home layout" })).toBeTruthy();
+    cleanup();
+    expect(actionsAt("/", "guest").queryByRole("button", { name: "Home layout" })).toBeNull();
+  });
+  test("a page with no settings draws no button", () => {
+    expect(actionsAt("/people", "owner").container).toBeEmptyDOMElement();
   });
 });

@@ -2484,13 +2484,12 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
     }
   });
 
-  test("COLUMN-02 chat settings: an icon link left of search opens Settings, Me, Chat", async () => {
+  test("chat settings sit in the header beside the companion, so the history column carries no settings link (owner, 2026-10-29)", async () => {
     const restore = stubFetch();
     try {
       const view = renderChat();
       await view.findByLabelText("Message input");
-      const link = within(column().querySelector('[data-slot="section-sidebar-header"]') as HTMLElement).getByRole("link", { name: "Chat settings" });
-      expect(link).toHaveAttribute("href", "/settings/chat");
+      expect(within(column().querySelector('[data-slot="section-sidebar-header"]') as HTMLElement).queryByRole("link", { name: "Chat settings" })).toBeNull();
     } finally {
       restore();
     }

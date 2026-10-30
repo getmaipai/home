@@ -76,6 +76,7 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (route.endsWith("/api/auth/sessions/away")) return Promise.resolve(Response.json([]));
     if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
+    if (route.endsWith("/api/search/web")) return Promise.resolve(Response.json({ address: "", works: null, stackOwned: false, sources: ["ddgs"], ddgsReady: true }));
     if (route.endsWith("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));
     if (route.endsWith("/api/engines")) return Promise.resolve(Response.json({ configured: false, roles: [], engines: [], budget: null }));
     if (url.includes("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 14, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));

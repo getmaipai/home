@@ -1,10 +1,8 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
-import { getIcon } from "@maipai/ui/src/icons";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -290,27 +288,11 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
   const framed = sidebarProps ? (
     <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
-      <SectionSidebar standalone density="compact" title={app?.label} headerActions={app ? <AppColumnActions label={app.label} settingsArea={app.settings_area?.id} /> : undefined} {...sidebarProps} />
+      <SectionSidebar standalone density="compact" title={app?.label} {...sidebarProps} />
       {content}
     </div>
   ) : content;
   return media && hubActive ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
-}
-
-/** COLUMN-UNIFY-01 (owner, 2026-10-19): the app's settings control sits in the column's header, after its title, the way Chat's
- * column carries Chat settings, so the page keeps one row of its own. Below the `lg` breakpoint the column is not drawn and the
- * toolbar keeps it. The favorites star is gone (owner, 2026-10-25): pinning an app is done from the rail. */
-function AppColumnActions({ label, settingsArea }: { label: string; settingsArea?: string }) {
-  const GearIcon = getIcon("settings");
-  return (
-    <>
-      {settingsArea ? (
-        <Button variant="ghost" size="icon" title={`${label} settings`} render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
-          <GearIcon aria-hidden="true" />
-        </Button>
-      ) : null}
-    </>
-  );
 }
 
 /** A page document without its search box: on a phone the sections bar's Search item takes its place. */

@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useIncognitoContext } from "@/shell/incognitoContext";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { getIcon } from "@maipai/ui/src/icons";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -14,9 +13,7 @@ import { GettingStarted } from "@/shell/pages/dashboard/GettingStarted";
 import { useTabItem } from "@/shell/tabIdentity";
 import { ContinueShelf, FamilyShelf, HomeMedia } from "@/shell/pages/dashboard/HomeShelves";
 import { homeBlocks, type HomeBlockId } from "@/shell/pages/dashboard/homeBlocks";
-import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 
-const GearIcon = getIcon("settings");
 
 /** Home (docs/design/home-page-2026-10-17.md, option C): the greeting, then the ask box, then a short
  * glance at the day. Every block is left out when it has nothing to show. First slice: Ask (01h),
@@ -58,7 +55,7 @@ export function DashboardPage({ person }: { person: Roster }) {
 
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <header className="flex items-center justify-end"><h1 className="sr-only">Home</h1>{person.role !== "guest" ? <Button variant="ghost" size="icon-lg" render={<Link to={settingsPath("appearance", "appearance", "ui.home_layout")} aria-label="Home layout" />}><GearIcon aria-hidden="true" /></Button> : null}</header>
+      <h1 className="sr-only">Home</h1>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
       {!widgets.data && !widgets.isError ? <div className="md:col-span-2 lg:col-span-12"><RouteSkeleton label="Loading Home" /></div> : null}
       {widgets.isError ? <p role="alert" className="md:col-span-2 lg:col-span-12 text-sm text-muted-foreground">Could not load Home cards. Refresh Home to try again.</p> : null}

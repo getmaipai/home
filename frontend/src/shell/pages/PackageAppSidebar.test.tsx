@@ -118,10 +118,13 @@ describe("an app that declares a sidebar", () => {
     await view.findByText("Today's stories");
     const side = await column(view);
     expect(side.getByRole("heading", { level: 2, name: "Demo news" })).toBeTruthy();
-    expect(side.getByRole("link", { name: "Demo news settings" }).getAttribute("href")).toBe("/settings/demo");
+    // Settings sit in the header row beside the companion, never a second time in the column (owner, 2026-10-29).
+    expect(side.queryByRole("link", { name: "Demo news settings" })).toBeNull();
     expect(side.queryByRole("button", { name: /favorites/ })).toBeNull();
     const headerRow = document.querySelector('[data-slot="rail-page-header"]');
-    expect(headerRow?.querySelector('h1')?.textContent).toBe("Today");
+    // The header row says the app (icon and name), never the page inside it (owner, 2026-10-29).
+    expect(headerRow?.querySelector('h1')?.textContent).toBe("Demo news");
+    expect(headerRow?.querySelector("h1")?.parentElement?.querySelector("svg")).not.toBeNull();
     expect(view.getByRole("button", { name: "Demo news settings" }).closest('[data-slot="rail-page-header"]')).toBe(headerRow);
   });
 

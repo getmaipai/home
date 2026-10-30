@@ -1066,6 +1066,12 @@ function ChatAmbientRing({ isSpeaking, voiceListening, wakeListening, person, co
   return null;
 }
 
+/** Chat settings sit in the header, left of the companion avatar, like every other section's settings. */
+function ChatHeaderActions() {
+  const navigate = useNavigate();
+  return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Chat settings" onClick={() => navigate(CHAT_SETTINGS_PATH)}><VoiceSettingsIcon aria-hidden="true" /></Button></>;
+}
+
 export function ChatPage({ person }: { person: Roster }) {
   const ambient = useAmbientCompanion(person);
   const retryWithCurrentCompanionRef = useRef(false);
@@ -1237,7 +1243,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // On a phone the conversation's title and actions sit in the shell's top bar, not in a second row under it.
   const phone = useIsPhoneLayout();
   const barOnPhone = phone && !companionShells;
-  useHeaderExtra(barOnPhone ? ChatHeaderBar : PageHeaderTitle);
+  useHeaderExtra(barOnPhone ? ChatHeaderBar : PageHeaderTitle, barOnPhone ? undefined : ChatHeaderActions);
   const callReady = useVoiceCallReady(false, chatAvailability === "ready" ? undefined : "Chat is unavailable");
   const openVoiceFromHeader = useCallback(() => closeAwareSetVoiceOpen(true), [closeAwareSetVoiceOpen]);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
@@ -1438,7 +1444,7 @@ export function ChatPage({ person }: { person: Roster }) {
       onCollapsedChange={(collapsed) => { if (mobile) setSheetOpen(!collapsed); else column.setCollapsedPreference(collapsed); }}
       collapseLabels={{ hide: "Hide conversations", show: "Show conversations", pin: "Keep conversations open" }}
       collapsedStyle="hidden"
-      headerActions={<TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>}
+      headerActions={mobile ? <TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton> : undefined}
       search={hasThreads ? { value: column.search, onChange: column.setSearch, onSubmit: openFirstSearchResult, label: "Search chats" } : undefined}
       primaryAction={newChatAction}
       collapseShortcut={{ label: chatColumnShortcutLabel(), keys: "Meta+B Control+B" }}

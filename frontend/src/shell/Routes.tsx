@@ -10,7 +10,7 @@ import { useLook } from "@/shell/useLook";
 import { useEase } from "@/shell/useEase";
 import { useAccent } from "@/shell/useAccent";
 import { useAppearance } from "@/shell/useAppearance";
-import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
+import { PageHeaderActions, PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
 import { ALL_APPS_PATH } from "@/shell/allAppsPath";
@@ -136,7 +136,7 @@ const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ def
 // cleanly for its own lifetime, the same pattern chat already proves.
 function PageHeaderLayout() {
   const { pathname } = useLocation();
-  useHeaderExtra(PageHeaderTitle);
+  useHeaderExtra(PageHeaderTitle, PageHeaderActions);
   const titleByPath: Record<string, string> = {
     "/people": "Family",
     "/storage": "Storage",

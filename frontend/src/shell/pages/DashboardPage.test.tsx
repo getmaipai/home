@@ -145,20 +145,13 @@ describe("DashboardPage (Home)", () => {
     } finally { restore(); }
   });
 
-  test("the Home layout gear links to the Appearance row for everyone except a guest", async () => {
-    for (const role of ["owner", "adult", "teen", "child"] as const) {
-      const { restore } = mockFetch();
-      try {
-        const view = renderHome(makePerson(role));
-        const gear = await view.findByRole("link", { name: "Home layout" });
-        expect(gear.getAttribute("href")).toContain("#ui.home_layout");
-      } finally { restore(); cleanup(); }
-    }
+  test("the Home layout gear sits in the header row (PageHeaderActions), not in the page body", async () => {
     const { restore } = mockFetch();
     try {
-      const view = renderHome(makePerson("guest"));
+      const view = renderHome(makePerson("owner"));
       await view.findByText(/Good/);
       expect(view.queryByRole("link", { name: "Home layout" })).toBeNull();
+      expect(view.queryByRole("button", { name: "Home layout" })).toBeNull();
     } finally { restore(); }
   });
 

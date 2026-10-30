@@ -17,7 +17,11 @@
 // instead (`EnginesIcon`, `SettingsIcon`, `PerformanceIcon`,
 // `UpdatesIcon`, `RepairsIcon`, `BackupsIcon`), imported here directly -
 // one definition, that page's own, not a copy of it.
-import { useLocation } from "react-router-dom";
+import { useContext } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import { getIcon } from "@maipai/ui/src/icons";
 import { isActiveNavPath } from "@maipai/ui/src/nav";
 import { APP_CATALOG, type AppEntry } from "@/shell/appCatalog";
@@ -108,4 +112,16 @@ export function PageHeaderTitle() {
   // A package app has no other page heading, so its title is the page's h1; shell pages carry their own (sr-only) one.
   const isApp = pathname.startsWith("/apps/");
   return entry ? <HeaderTitle entry={entry} hideInTopRow={isApp} heading={isApp} /> : null;
+}
+
+const GearIcon = getIcon("settings");
+
+/** The shell pages' header buttons, by route (a stable module-level reference, as `useHeaderExtra` requires). A section's settings
+ * button always sits on the header's right side, just left of the companion avatar: a page never draws its own. */
+export function PageHeaderActions() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const person = useContext(WakeWordPersonContext);
+  if (pathname !== "/" || !person || person.role === "guest") return null;
+  return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Home layout" onClick={() => navigate(settingsPath("appearance", "appearance", "ui.home_layout"))}><GearIcon aria-hidden="true" /></Button></>;
 }
