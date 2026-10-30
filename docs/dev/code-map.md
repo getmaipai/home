@@ -495,6 +495,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
 | `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |
 | `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, appliedProfile, stagesFor, chatMayReturnBetweenStages |
+| `backend/src/lib/jobs/profileSource.ts` | STUDIO_HARDWARE, rowsFromSetting, weightsFromPriority, profileSourceFromSettings |
 | `backend/src/lib/jobs/profileTable.ts` | validateProfileTable |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
 | `backend/src/lib/kiwixCatalog.ts` | KIWIX_BINARIES, KIWIX_READY_MARKER, selectKiwixBinary |
