@@ -29,7 +29,7 @@ export type WorldPlaceView = { id: string; name: string; country: string; zone: 
 export type AlarmView = Alarm & { next_at: string | null };
 import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
-import type { SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
+import type { SearchGroup, WebSearchResponse } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
 import type {
   Roster,
   TurnValue,
@@ -1288,6 +1288,8 @@ export const api = {
   // passed straight through, the kit's own render composing every
   // result into a real command item.
   search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
+  // WEB-TAB-03: one explicit web search for the palette's Web tab, run only when the person presses Enter on it.
+  searchWebResults: (q: string) => request<WebSearchResponse>(`/api/search/web-results?q=${encodeURIComponent(q)}`),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsCapabilities: () => request<{ robotsEnabled: boolean }>("/api/settings/capabilities"),
   codingAccess: () => request<{ allowed: boolean; can_create: boolean }>("/api/settings/coding-access"),

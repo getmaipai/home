@@ -306,7 +306,9 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const headerSearchOptions = useMemo(() => ({
     recents: (Array.isArray(recentChats.data) ? recentChats.data : []).slice(0, 5).map((c) => ({ kind: "conversation", id: c.id, title: c.title ?? "New Chat", href: `/chat?conversation=${encodeURIComponent(c.id)}` })),
     onAsk: ambient ? (text: string) => paneControlRef.current?.ask(text) : undefined,
-  }), [recentChats.data, ambient]);
+    // WEB-TAB-03: the Web tab, for everyone but a guest; the server applies the household's sources and the age rules.
+    webSearch: person.role === "guest" ? undefined : (text: string) => api.searchWebResults(text),
+  }), [recentChats.data, ambient, person.role]);
   const ambientRightPane = ambient ? <RightPane {...ambientPaneProps} /> : undefined;
   const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const locked = useSessionLocked();

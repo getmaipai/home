@@ -17,3 +17,16 @@ test("cancelTurn sends heard_chars only when given", async () => {
   expect(requests[0]?.body).toBeUndefined();
   expect(requests[1]?.body).toBe(JSON.stringify({ heard_chars: 37 }));
 });
+
+test("searchWebResults asks the Web tab's own route with the query encoded, and returns rows and the reason as sent", async () => {
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    return new Response(JSON.stringify({ results: [], note: "Web search is off for this household." }), { headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const answer = await api.searchWebResults("how to brew tea");
+
+  expect(urls).toEqual(["/api/search/web-results?q=how%20to%20brew%20tea"]);
+  expect(answer).toEqual({ results: [], note: "Web search is off for this household." });
+});
