@@ -82,3 +82,8 @@ test("full article lifts Wikipedia front matter", () => {
   expect(result.hatnote).toBe("For other uses, see Example (disambiguation).");
   expect(result.blocks.filter((b) => b.type === "heading")).toHaveLength(2);
 });
+
+test("full article captures the first visible category before dropping the category footer", () => {
+  const result = extractFullArticle(`<div class="mw-parser-output"><h1>Example</h1><p>First sentence. Another sentence follows.</p></div><div id="catlinks"><a>Hidden category</a><a>Nature and Earth</a></div>`, { book: "wiki", allowedBooks: new Set(), allowLinks: false, allowImages: false });
+  expect(result.kicker).toBe("Nature and Earth");
+});

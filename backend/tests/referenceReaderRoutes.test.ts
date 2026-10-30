@@ -56,6 +56,28 @@ describe("reference reader routes", () => {
     expect(data.infobox.rows).toHaveLength(3); expect(data.blocks.some((b: any) => b.type === "rows")).toBe(false);
     expect(data.lead_image.src).toMatch(/^\/api\/reference\/media\//);
   });
+  test("article exposes article-derived front matter and adult related links only", async () => {
+    const targets = ["Self", "A", "Broken", "C", "D", "E", "F", "G"];
+    const links = targets.map((name) => `<a href="/content/${SIMPLE}/${name}">${name}</a>`).join(" ");
+    const html = `<div class="mw-parser-output"><h1>Self</h1><table class="infobox"><tr><th>Population</th><td>12 people</td></tr><tr><td><div class="thumb"><div class="thumbinner"><img src="/content/${SIMPLE}/I/hero.jpg" alt="Hero"/><div class="thumbcaption">Hero image caption with extra words for truncation test</div></div></div></td></tr></table><p>The first sentence leads. The rest of the paragraph follows. ${links}</p></div><div class="catlinks" id="catlinks"><a>Nature · Earth</a></div>`;
+    const articles = Object.fromEntries(["Self", "A", "C", "D", "E", "F", "G"].map((name) => [name, { title: name, html: `<div class="mw-parser-output"><h1>${name}</h1><table class="infobox"><tr><td><img src="/content/${SIMPLE}/I/${name}.jpg" alt="${name}"/></td></tr></table><p>Related article.</p></div>` }]));
+    const fake = start([book(SIMPLE, { ...articles, Self: { title: "Self", html } })]);
+    const adult = await owner();
+    const { setValue } = await import("@/lib/settings"); const { db } = await import("@/db"); const { people } = await import("@/db/schema");
+    const self = db.select().from(people).get()!; setValue(self, `person:${self.id}`, "reference.images", true);
+    const data = await (await adult.get(articleUrl(SIMPLE, "Self"))).json() as any;
+    expect(data.lead).toBe("The first sentence leads."); expect(data.reading_minutes).toBeGreaterThanOrEqual(1);
+    expect(data.kicker).toBe("Nature · Earth"); expect(data.quick_fact).toBe("Population: 12 people"); expect(data.badge.length).toBeLessThanOrEqual(30);
+    expect(data.related).toHaveLength(5); expect(data.related.some((item: any) => item.path === "Self" || item.path === "Broken")).toBe(false);
+    expect(data.related.some((item: any) => item.thumbnail?.src.startsWith("/api/reference/media/"))).toBe(true);
+    expect(fake.requests.filter((item) => item.startsWith("/content/")).length).toBeLessThanOrEqual(10);
+    const childClient = await child(adult); const childData = await (await childClient.get(articleUrl(SIMPLE, "Self"))).json() as any;
+    expect(childData.related).toBeUndefined(); expect(childData.lead).toBeDefined(); expect(childData.reading_minutes).toBeGreaterThanOrEqual(1); expect(childData.kicker).toBeDefined();
+    const { setValue: setPersonValue } = await import("@/lib/settings");
+    const { db: imageDb } = await import("@/db"); const { people: imagePeople } = await import("@/db/schema"); const imageOwner = imageDb.select().from(imagePeople).get()!; setPersonValue(imageOwner, `person:${imageOwner.id}`, "reference.images", false); const noImages = await (await adult.get(articleUrl(SIMPLE, "Self"))).json() as any; expect(noImages.badge).toBeUndefined(); expect(noImages.related.every((item: any) => !item.thumbnail)).toBe(true);
+    const plainData = await (await adult.get(articleUrl(SIMPLE, "A"))).json() as any;
+    expect(plainData.related).toBeUndefined(); expect(plainData.kicker).toBeUndefined(); expect(plainData.quick_fact).toBeUndefined();
+  });
   test("preview shares article gates and random returns an allowed path", async () => {
     start([book(SIMPLE, { One: { title: "One", html: "<div class='mw-parser-output'><h1>One</h1><p>A short summary.</p></div>" } })]);
     const adult = await owner(); const preview = await adult.get(`/api/reference/preview/${SIMPLE}/One`);

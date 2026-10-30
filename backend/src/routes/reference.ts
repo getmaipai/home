@@ -13,7 +13,7 @@ import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
 import { licenceLabel } from "@/lib/retrieval/referenceSources";
 import { readableBooks } from "@/lib/retrieval/referenceSources";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
-import { extractArticle, extractFullArticle } from "@/lib/retrieval/extractArticle";
+import { extractArticle, extractFullArticle, cutAtSentence } from "@/lib/retrieval/extractArticle";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { getPersonSettingValue } from "@/lib/settings";
 import { extractArticleImages } from "@/lib/retrieval/articleImages";
@@ -27,7 +27,7 @@ const param = (name: string, max: number) => z.string().min(1).max(max).openapi(
 const booksResponse = z.array(z.object({ id: z.string(), source_label: z.string(), language: z.string().nullable(), size_bytes: z.number().nullable(), snapshot_date: z.string().nullable(), licence: z.string(), article_count: z.number().optional() }));
 const suggestResponse = z.array(z.object({ title: z.string(), book: z.string(), path: z.string() }));
 const searchResponse = z.array(z.object({ title: z.string(), snippet: z.string(), book: z.string(), path: z.string() }));
-const articleResponse = z.object({ title: z.string(), book: z.string(), path: z.string(), source_label: z.string(), licence: z.string(), snapshot_date: z.string().nullable(), blocks: z.array(z.record(z.string(), z.unknown())), toc: z.array(z.object({ id: z.string(), title: z.string(), level: z.number() })), infobox: z.object({ title: z.string().optional(), rows: z.array(z.object({ label: z.string(), value: z.string() })) }).optional(), summary: z.string().optional(), hatnote: z.string().optional(), profile: z.enum(["wikipedia", "generic"]).optional(), lead_image: z.object({ src: z.string(), alt: z.string() }).optional() });
+const articleResponse = z.object({ title: z.string(), book: z.string(), path: z.string(), source_label: z.string(), licence: z.string(), snapshot_date: z.string().nullable(), blocks: z.array(z.record(z.string(), z.unknown())), toc: z.array(z.object({ id: z.string(), title: z.string(), level: z.number() })), infobox: z.object({ title: z.string().optional(), rows: z.array(z.object({ label: z.string(), value: z.string() })) }).optional(), summary: z.string().optional(), hatnote: z.string().optional(), profile: z.enum(["wikipedia", "generic"]).optional(), lead_image: z.object({ src: z.string(), alt: z.string() }).optional(), lead: z.string().optional(), reading_minutes: z.number().int().optional(), kicker: z.string().optional(), quick_fact: z.string().optional(), badge: z.string().optional(), related: z.array(z.object({ book: z.string(), path: z.string(), title: z.string(), thumbnail: z.object({ src: z.string(), alt: z.string() }).optional() })).optional() });
 const BOOKS_ROUTE = createRoute({ method: "get", path: "/books", tags: ["Sources"], summary: "Books available in the offline library", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: booksResponse } }, description: "Readable installed books." }, ...errorResponses({ 401: "Not signed in" }) } });
 const SUGGEST_ROUTE = createRoute({ method: "get", path: "/suggest", tags: ["Sources"], summary: "Suggest offline article titles", middleware: [requireAuth] as const, request: { query: z.object({ book: z.string().min(1).max(200), q: z.string().min(1).max(200) }) }, responses: { 200: { content: { "application/json": { schema: suggestResponse } }, description: "Title suggestions." }, ...errorResponses({ 401: "Not signed in" }) } });
 const SEARCH_ROUTE = createRoute({ method: "get", path: "/search", tags: ["Sources"], summary: "Search installed offline articles", middleware: [requireAuth] as const, request: { query: z.object({ q: z.string().min(1).max(200), book: z.string().max(200).optional() }) }, responses: { 200: { content: { "application/json": { schema: searchResponse } }, description: "Search hits." }, ...errorResponses({ 401: "Not signed in" }) } });
@@ -115,7 +115,8 @@ async function loadArticle(c: any, book: string, path: string) {
     const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return null;
     const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return null;
     const html = await res.text();
-    const full = extractFullArticle(html, { book, allowedBooks: new Set(names), allowLinks: band === "adult", allowImages: getPersonSettingValue(person, "reference.images") === true });
+    const imagesAllowed = getPersonSettingValue(person, "reference.images") === true;
+    const full = extractFullArticle(html, { book, allowedBooks: new Set(names), allowLinks: band === "adult", allowImages: imagesAllowed });
     if (full.redirectTo) {
       const target = new URL(full.redirectTo, "http://kiwix.local").pathname.match(/^\/(?:content\/)?([^/]+)\/(.+)$/);
       if (target && decodeURIComponent(target[1]!) === book && !decodeURIComponent(target[2]!).split("/").includes("..")) {
@@ -124,8 +125,7 @@ async function loadArticle(c: any, book: string, path: string) {
     }
     const fallback = extractArticle(html); const title = full.title || fallback.title || path;
     const plain = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((r) => [r.label, r.value]) : []).concat(full.summary ?? "", full.hatnote ?? "", full.infobox?.rows.flatMap((r) => [r.label, r.value]) ?? []).join(" ");
-    if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}`)) return null;
-    const imagesAllowed = getPersonSettingValue(person, "reference.images") === true;
+    if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}. ${full.kicker ?? ""}. ${full.infobox?.rows[0]?.label ?? ""}. ${full.infobox?.rows[0]?.value ?? ""}`)) return null;
     const rewrite = (imagePath: string) => `/api/reference/media/${encodeURIComponent(book)}/${imagePath.split("/").map(encodeURIComponent).join("/")}`;
     const leadImg = imagesAllowed ? extractArticleImages(html, { book, articlePath: path, limit: 1 }).find((image) => image.lead) : undefined;
     const blocks = full.blocks.map((block) => {
@@ -134,7 +134,15 @@ async function loadArticle(c: any, book: string, path: string) {
       const resolved = extractArticleImages(`<figure><img src="${block.src.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" alt=""></figure>`, { book, articlePath: path }).find((image) => image.imagePath);
       return resolved ? { ...block, src: rewrite(resolved.imagePath) } : null;
     }).filter((block): block is NonNullable<typeof block> => block !== null);
-    return { rb, title, full: { ...full, blocks }, ...(leadImg ? { lead_image: { src: rewrite(leadImg.imagePath), alt: leadImg.alt } } : {}), profile: sourceForBook(book)?.id.startsWith("wikipedia-") ? "wikipedia" : "generic" };
+    const firstParagraph = full.blocks.find((block) => block.type === "paragraph");
+    const leadText = firstParagraph?.type === "paragraph" ? firstParagraph.inlines.map((inline) => inline.text).join("") : "";
+    const wordText = full.blocks.flatMap((block) => block.type === "paragraph" ? [block.inlines.map((inline) => inline.text).join("")] : block.type === "list" ? block.items.map((item) => item.map((inline) => inline.text).join("")) : block.type === "heading" ? [block.text] : []).join(" ");
+    const lead = leadText ? cutAtSentence(leadText, 300) : undefined;
+    const quickFactRow = full.infobox?.rows[0];
+    const quickFact = quickFactRow ? `${quickFactRow.label}: ${quickFactRow.value}`.slice(0, 160).trimEnd() : undefined;
+    const badge = imagesAllowed && leadImg?.caption ? leadImg.caption.length <= 30 ? leadImg.caption : leadImg.caption.slice(0, 30).replace(/\s+\S*$/, "").trim() : undefined;
+    const links = [...new Map(full.blocks.flatMap((block) => block.type === "paragraph" ? block.inlines : []).flatMap((inline) => inline.type === "link" && inline.target ? [`${inline.target.book}\0${inline.target.path}`] : []).map((key) => { const [linkBook, linkPath] = key.split("\0"); return [key, { book: linkBook!, path: linkPath! }] as const; })).values()].filter((target) => !(target.book === book && target.path === path) && target.book === book);
+    return { rb, title, full: { ...full, blocks }, lead, reading_minutes: Math.max(1, Math.ceil(wordText.trim().split(/\s+/).filter(Boolean).length / 200)), ...(full.kicker ? { kicker: full.kicker } : {}), ...(quickFact ? { quick_fact: quickFact } : {}), ...(badge ? { badge } : {}), relatedTargets: band === "adult" ? links : [], ...(leadImg ? { lead_image: { src: rewrite(leadImg.imagePath), alt: leadImg.alt } } : {}), profile: sourceForBook(book)?.id.startsWith("wikipedia-") ? "wikipedia" : "generic" };
   } catch { return null; }
 }
 
@@ -143,7 +151,16 @@ referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
   if (!result) return unavailable(c); if ("redirect" in result) return c.redirect(result.redirect!, 302);
   const base = kiwixBaseUrl()!;
   c.header("Cache-Control", "private, max-age=600"); c.header("X-Content-Type-Options", "nosniff");
-  return c.json({ title: result.title, book, path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: result.full.infobox } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}) }, 200);
+  let related: Array<{ book: string; path: string; title: string; thumbnail?: { src: string; alt: string } }> | undefined;
+  if (result.relatedTargets.length) {
+    related = [];
+    for (let i = 0; i < result.relatedTargets.length && related.length < 5; i += 4) {
+      const batch = result.relatedTargets.slice(i, i + 4);
+      const loaded = await Promise.all(batch.map(async (target: { book: string; path: string }) => { const article = await loadArticle(c, target.book, target.path); return !article || "redirect" in article ? null : { book: target.book, path: target.path, title: article.title, ...(article.lead_image ? { thumbnail: article.lead_image } : {}) }; }));
+      related.push(...loaded.filter((x): x is NonNullable<typeof x> => x !== null).slice(0, 5 - related.length));
+    }
+  }
+  return c.json({ title: result.title, book, path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: result.full.infobox } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}), ...(result.lead ? { lead: result.lead } : {}), reading_minutes: result.reading_minutes, ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.quick_fact ? { quick_fact: result.quick_fact } : {}), ...(result.badge ? { badge: result.badge } : {}), ...(related ? { related } : {}) }, 200);
 });
 
 referenceRoutes.openapi(PREVIEW_ROUTE, async (c) => {
