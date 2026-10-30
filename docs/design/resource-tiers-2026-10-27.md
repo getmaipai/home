@@ -202,8 +202,8 @@ chosen per conversation, and only Standard is resident.
 
 | Tier | Proposal | Memory | Speed | Confidence |
 |---|---|---|---|---|
-| Standard | Muse Glimmer 30B Q4 (resident today, dense). Faster alternative to bench through the normal vetting: Qwen3.6-35B-A3B (Apache-2.0, about 20 GB at 4-bit, 85 to 105 tok/s at 8-bit on this chip, stared benchmark) | 21 GB | 26 tok/s today | measured (Muse), verified benchmark (Qwen3.6) |
-| Boost | A stronger model loaded on demand for a conversation the person marks "think harder". Candidates: Qwen3.8-27B dense (Apache-2.0, about 16 GB; its 3.6 sibling does 17 to 18 tok/s, 30 to 32 with MTP; vendor card Terminal-Bench 2.1 73.0), or a mid-size MoE such as Gemma 4 26B-A4B or Nemotron-3 Nano (licences unchecked). Evicts the idle picture pool | 16 to 50 GB | 17 to 32 (27B) | verified speed for 3.6, card claims for 3.8 |
+| Standard | Muse Glimmer 30B Q4 (resident today, dense; measured 22 tok/s, 19 GB). **Replacement candidate (owner, 2026-10-30): Qwen3.6-35B-A3B Q4, measured 70 tok/s, 21 GB, first word 0.1 s, 9 of 9 tool searches, goes to MODEL-VET-01 with CHAT-AB-01 and KS-BENCH-01 before it replaces Muse** ([results](tier-evaluations-2026-10-30.md)). Faster alternative to bench through the normal vetting: Qwen3.6-35B-A3B (Apache-2.0, about 20 GB at 4-bit, 85 to 105 tok/s at 8-bit on this chip, stared benchmark) | 21 GB | 26 tok/s today | measured (Muse), verified benchmark (Qwen3.6) |
+| Boost | A stronger model loaded on demand for a conversation the person marks "think harder". Measured 2026-10-30 (reduced probe, no MTP): Qwen3.8-27B 23.5 tok/s, 16.6 GB, 3.4 s first word on a 4k-token history; Gemma 4 26B-A4B MLX 4-bit 42 tok/s, 13.7 GB. Candidates: Qwen3.8-27B dense (Apache-2.0, about 16 GB; its 3.6 sibling does 17 to 18 tok/s, 30 to 32 with MTP; vendor card Terminal-Bench 2.1 73.0), or a mid-size MoE such as Gemma 4 26B-A4B or Nemotron-3 Nano (licences unchecked). Evicts the idle picture pool | 16 to 50 GB | 17 to 32 (27B) | verified speed for 3.6, card claims for 3.8 |
 | Max | The largest local model for the whole family's conversation, replacing the resident one. Candidates: Ornith-1.5-122B (MIT, 68.7 GB, 34 to 41 tok/s mlx_lm, measured by us, coding-tuned); gpt-oss-120b (Apache-2.0, 62 GB MXFP4, about 53 to 64 tok/s on M4 Max in oMLX numbers, native function calling needs the harmony format); Qwen3.5-122B-A10B (Apache-2.0, about 70 GB, unmeasured); Mistral Small 4 119B (Apache-2.0, unmeasured). The general-chat winner is chosen by our own bench, not by cards | 62 to 85 GB, about 91 GB with voice and embed | see names | Ornith measured; others claimed |
 
 Research caveats: the stared benchmark covers this exact chip but only Qwen3.6 (35B and 27B) and DeepSeek-V4-Flash, which needs about 103 GB and is out. MTP speculative decoding is reported at +13 percent (MoE) and +78 percent (dense 27B) on llama.cpp, so a 27B with MTP at about 32 tok/s would beat today's Muse; Muse's licence was not checked. Tool-calling scores are vendor cards. Dense 120B-class models (Mistral Medium 3.5) would run near 8 tok/s and are rejected.
@@ -218,7 +218,7 @@ must earn its place by a measured general-chat bench before it is offered.
 |---|---|---|---|---|
 | Standard | ERNIE-Image-Turbo 8B, Klein 4B fallback (as today's Quick) | 18.8 GB (Klein 10.2) | 33 to 44 s (Klein 17 s) | measured |
 | Boost | Z-Image-Turbo, most photoreal (as today's Detailed) | 25.8 GB | 46 s | measured |
-| Max | Two real candidates to bench on our 22 prompts: ERNIE-Image base 8B (Apache-2.0, 50 steps with guidance, mflux Base variant, self-reported OneIG 0.575 and GenEval 0.886) and Qwen-Image 20B (Apache-2.0, mflux, about 40 GB at bf16, about 20 at 8-bit by estimate). Time per picture is unmeasured (estimate 3 minutes at 1024 px for ERNIE base) | 20 to 40 GB | minutes | licence verified, speed unverified |
+| Max | **Qwen-Image 20B (Apache-2.0, mflux Q8, 30 steps; owner's decision 2026-10-30: the Max picture slot, Max only), measured 181 to 212 s per 1024 picture, 37.4 GB peak at load 35 to 55, every text string right, the character prompt drawn correctly where Z-Image and ERNIE base missed.** ERNIE-Image base was dropped as a Max candidate (272 to 305 s, 18.8 GB, no margin over Z-Image-Turbo). Superseded text: two real candidates to bench on our 22 prompts: ERNIE-Image base 8B (Apache-2.0, 50 steps with guidance, mflux Base variant, self-reported OneIG 0.575 and GenEval 0.886) and Qwen-Image 20B (Apache-2.0, mflux, about 40 GB at bf16, about 20 at 8-bit by estimate). Time per picture is unmeasured (estimate 3 minutes at 1024 px for ERNIE base) | 37.4 GB (Qwen-Image) | 3 to 4 minutes | measured on 9 of 22 prompts; licence verified |
 
 Research reconciliation (2026-10-27): Qwen-Image 2.1 is research-licence on its card, matching our bakeoff; Qwen-Image 2.0 is API-only (the "Apache" claim in a search was wrong); the older Qwen-Image 20B and Qwen-Image-Edit-2511 are Apache-2.0. HiDream-O1-Image is MIT but its card documents CUDA only, so it does not qualify until a Mac path exists. Z-Image base is rated lower in look than Turbo on its own card (more diverse, not prettier), so it is not a Max. Honest read: undistilled models are not clearly better than our Turbo picks, so Max image is only offered if a bench shows a gain (rule in section 12, item 5). Max image may legitimately be "same model, 2K, more steps".
 
@@ -232,14 +232,14 @@ The two pins we have do not differ in memory (44 GB and 46 GB), so today's pair 
 |---|---|---|---|---|
 | Standard | Wan2.2 TI2V-5B FastWan, silent, 480p (today's Quick, 44 GB, fits beside the resting pool). A lighter variant (q8 weights, 61 frames, tiny decoder) is the way to make it truly "beside everything" | 44 GB (lighter: to measure) | 130 s | measured; lighter is to verify |
 | Boost | LTX-2.3 distilled with sound and spoken words, up to 10 s (today's Detailed), 768x448 | 46 GB | 42 to 49 s (10 s: 80 s) | measured |
-| Max | LTX-2.3 dev two-stage (non-distilled, with guidance) at higher resolution and longer clips on mlx-video. Memory and time unmeasured; Wan2.2 A14B (Apache-2.0) has no Mac path found and its card asks 80 GB, so it is out for now. LTX-2.5 (released 2026-08-11) has no MLX port found | 60 to 72 GB (guess) | 10 to 30 min (guess) | unverified: measure before cataloguing |
+| Max | LTX-2.3 dev two-stage (non-distilled, with guidance) at higher resolution and longer clips on mlx-video. Memory and time unmeasured; Wan2.2 A14B (Apache-2.0) has no Mac path found and its card asks 80 GB, so it is out for now. LTX-2.5 (released 2026-08-11) has no MLX port found | 60 to 72 GB (guess) | 10 to 30 min (guess) | not measured; **Max video stays empty for now (owner, 2026-10-30)**. Reference numbers measured 2026-10-30 at load 33 to 40: Standard Wan 5B 25.4 GB and 75 to 88 s per 2 s clip; Boost LTX-2.3 distilled 39.9 GB and 41 to 46 s with sound |
 
 Research (2026-10-27): a community 4-bit LTX-2.3 distilled build (`gajesh/ltx-2.3-mlx-q4`) claims 29.9 GB peak against 34.2 GB at FP16 for
 video only, which would make a sound-capable clip an Standard candidate; one author, one machine, and a user reported the package it names was not
 findable, so it is a vendor claim to reproduce, not a pick. Not checked: the dev two-stage memory, the tiny Wan decoder (VIDEO-GEN-11).
 
 Licence note: LTX is free under $10M yearly revenue and the admin accepts once (video note section 14.2). The 2.x text also has a
-no-competing-product clause and a same-terms rule for derivatives such as quantised builds and LoRAs; get a legal read before the product ships it.
+no-competing-product clause (item 20) and a same-terms rule for derivatives such as quantised builds and LoRAs. Read 2026-10-30 ([results](tier-evaluations-2026-10-30.md)); the owner ruled item 20 is fine and no question goes to Lightricks. Derivative builds still ship with the licence text.
 Max video stays admin-gated because it is the one job that can hold the machine for tens of minutes.
 
 ### 5.4 Music
@@ -247,8 +247,8 @@ Max video stays admin-gated because it is the one job that can hold the machine 
 | Tier | Proposal | Peak | Time | Confidence |
 |---|---|---|---|---|
 | Standard | ACE-Step 1.5 turbo 2B DiT with the 1.7B planner, as shipped on p128 (both Quick and Full songs use it, music note section 18.1a) | 33 GB admission, about 21 GB resting | 31 to 90 s for a full song | measured |
-| Boost | ACE-Step 1.5 XL turbo (4B DiT, 8 steps, MIT) if E6 shows it audibly better | 25 to 45 GB (card-based guess) | to measure | unverified |
-| Max | ACE-Step 1.5 XL base or sft (50 steps with guidance; XL released 2026-04-02). Card: 18.8 GB bf16 weights, 20 GB recommended, 24 GB for full quality with the 4B planner; its README does not say XL runs on MLX, and a community 8-bit MLX turbo build exists | 25 to 45 GB (card-based guess) | no Mac figures | unverified: measure |
+| Boost | ACE-Step 1.5 XL turbo (4B DiT, 8 steps, MIT): **no slot** (measured 2026-10-30: 26.7 GB, the same time as the shipped turbo, sung words no better) | 26.7 GB | 13 to 14 s per 40 s song | measured |
+| Max | ACE-Step 1.5 XL base or sft (50 steps with guidance; XL released 2026-04-02). Card: 18.8 GB bf16 weights, 20 GB recommended, 24 GB for full quality with the 4B planner; its README does not say XL runs on MLX, and a community 8-bit MLX turbo build exists | 26.7 to 27.0 GB | 26 to 35 s per 40 s song (50 steps, guidance 7) | measured on the Stack's MLX worker: XL runs as shipped; XL SFT sang the folk lyric with 3% word errors against 19% for the shipped model; Max candidate pending a listen |
 
 Quick and Full songs (how much of the lyric is sung, `generation.music.length`) are not tiers: they stay as the music note defines them, on whatever
 model the music slot holds. Stable Audio 3 Medium (open weights, up to 6:20) is rejected as a music tier slot: its community licence caps revenue at $1M and no Apple path was found. MUSIC-GEN-11 (beds and effects behind a licence gate) stays an open row of its own.
@@ -257,8 +257,8 @@ model the music slot holds. Stable Audio 3 Medium (open weights, up to 6:20) is 
 
 | Tier | Proposal | Confidence |
 |---|---|---|
-| Standard | Demucs htdemucs, 4 stems (MIT code; MLX weights `mlx-community/demucs-mlx`; the MLX port found is Swift, so the Stack would need a Python path or a Swift helper) | licence verified, speed and memory unpublished |
-| Boost | Demucs htdemucs_ft (fine-tuned) or htdemucs_6s (adds guitar and piano) | licence verified, no figures |
+| Standard | Demucs htdemucs, 4 stems (MIT code and weights; official `demucs` package on torch with MPS works: 1.2 GB, 2 to 5 s per 40 s song, measured 2026-10-30) | measured; separation heard is Jesse's check |
+| Boost | Demucs htdemucs_ft (1.75 GB, 7 to 8 s, only if a listen finds it cleaner) or htdemucs_6s (1.4 GB, adds guitar and piano as a feature choice) | measured; ear check pending |
 | Max | BS-RoFormer SW (6 stems) scores highest on MVSEP's own table (vocals 11.3 dB against about 8.3 for htdemucs_ft, vendor numbers), but its checkpoint licence is "unknown", the code README warns the MIT code is not a grant for the weights, and it has no Mac path (CPU and CUDA only). Not shippable until a permissive weights licence and an MLX or MPS path exist | vendor-claim; blocked |
 
 Until a RoFormer-class model clears licence and Apple path, stems have Standard and Boost only; the tier collapse rule (section 4) hides Max. ACE-Step
@@ -288,7 +288,7 @@ Recommendation: **voice stays at Standard when Reduced is engaged for chat.** Vo
 ~6 GB after chat is reduced, only between utterances (never in the middle of a spoken turn or a live session), and only for the speaking side
 first; listening stays on Parakeet unless memory demands it. The admin's confirm line names it ("Voices will sound plainer for about N
 minutes"). The slots are customizable like the rest (section 3a), so an admin can turn voice-in-Reduced off or pick a different light voice.
-**Measured 2026-10-30 ([tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md)):** Chatterbox Nano runs on MLX (after a three-line size fix to `mlx-audio` 0.6.3), peaks at 2.8 GB against Turbo's 4.6 GB, reads the same words and clones about as close by proxy; the ear check is Jesse's. Reduced chat on Qwen3-4B passes the measured parts (swap near zero because the judge model is resident). The next paragraph is the question as asked before the bench.
+**Owner ruling 2026-10-30: Chatterbox Nano is adopted as the recommended Reduced voice on p64 and p128, switchable in AI and models; Pocket TTS stays the p16 and p32 default and the fallback; Jesse listens later.** **Measured 2026-10-30 ([tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md)):** Chatterbox Nano runs on MLX (after a three-line size fix to `mlx-audio` 0.6.3), peaks at 2.8 GB against Turbo's 4.6 GB, reads the same words and clones about as close by proxy; the ear check is Jesse's. Reduced chat on Qwen3-4B passes the measured parts (swap near zero because the judge model is resident). The next paragraph is the question as asked before the bench.
 
 **Why not Chatterbox Nano?** It was never evaluated for the Studio. The only repo mention (docs/dev.md, 2026-09-04) is a robot-side note: researched,
 not adopted, because it has no Hailo-10H path and no Pi-class benchmark. For a Reduced voice on the Mac it is the best idea on the table:
@@ -473,7 +473,7 @@ most, first.
 | E7 | Stem splitting | The new feature's Standard and Boost models | Separation quality heard, licence clean, Apple path | Demucs htdemucs, htdemucs_ft, htdemucs_6s; a RoFormer only if its weights licence clears |
 | E8 | Listening side (stt) in Reduced | Whether stt ever drops | Word error acceptable in kitchen noise | Moonshine tiny against Parakeet v2 |
 
-Results so far (2026-10-30): E1 passes the measured parts, E2 recommends Nano for the p64 and p128 Reduced voice pending an ear check, E8 is no. Numbers and open items: [tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md).
+Results (2026-10-30): E1 passes the measured parts; E2 Nano adopted for p64 and p128 (owner); E3 Max video stays empty; E4 Qwen-Image 20B is the Max picture slot (owner); E5 Qwen3.6-35B-A3B goes to MODEL-VET-01 as the Muse replacement candidate (owner), the 120B class to be run in a quiet window with a swap; E6 XL turbo no slot, XL SFT a Max candidate; E7 htdemucs Standard; E8 is no. Numbers and open items: [tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md).
 
 ## 15. Phases
 

@@ -9,6 +9,14 @@ untouched: each bench ran its own process on its own port with its own scratch f
 not affected; every speed and latency figure is an upper bound and the order of two close models can flip. Rerun speed rows on a quiet machine
 before quoting them as a promise.
 
+## Owner rulings (2026-10-30, after the first pass)
+
+1. Chatterbox Nano is the recommended Reduced voice on p64 and p128, switchable in AI and models. Pocket TTS stays the p16 and p32 default and the fallback. Jesse will listen later.
+2. The 120B-class chat comparisons (gpt-oss-120b, Qwen3.5-122B-A10B, Mistral Small 4, Ornith) run in a quiet window: announce first, check `scripts/ship.sh status` and memory pressure,
+   swap the resident chat set out and restore the standard model after, through the existing unload and load transaction with rollback.
+3. LTX-2 licence item 20 is fine; no question goes to Lightricks. Max video stays empty for now.
+4. Qwen-Image 20B is the Max picture slot (Max only). Qwen3.6-35B-A3B goes to MODEL-VET-01 as the Muse replacement candidate.
+
 ## Status
 
 | Row | Result | State |
