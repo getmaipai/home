@@ -122,6 +122,18 @@ describe("tier candidates (TIER-HOME-04)", () => {
   });
 });
 
+describe("the Max window (TIER-HOME-03)", () => {
+  test("an admin reads that no Max job runs and Stop reports nothing to stop; an adult is refused", async () => {
+    const { client, actor } = await owner();
+    expect(await (await client.get("/api/ai/tier-window")).json()).toEqual({ open: false, minutes_left: null, line: null });
+    expect(await (await client.post("/api/ai/tier-window/stop", {})).json()).toEqual({ stopped: false });
+    db.update(people).set({ role: "adult" }).where(eq(people.id, actor.id)).run();
+    invalidateSessionCacheForPerson(actor.id);
+    expect((await client.get("/api/ai/tier-window")).status).toBe(403);
+    expect((await client.post("/api/ai/tier-window/stop", {})).status).toBe(403);
+  });
+});
+
 describe("the cards", () => {
   test("GET /api/ai/choices returns nine cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();
