@@ -7,7 +7,7 @@ import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { api, ApiError, isOwnerOrAdminRole, type EngineComputerStatus as EngineComputerStatusData, type HealthStatus, type Roster, type EngineHealthEntry, type StatusHistory } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, request, type EngineComputerStatus as EngineComputerStatusData, type HealthStatus, type Roster, type EngineHealthEntry, type StatusHistory } from "@/lib/api";
 import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryFormat";
 import "@/shell/pages/status/statusLegend.css";
 
@@ -68,6 +68,8 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
   const [restartingRole, setRestartingRole] = useState<EngineKey | null>(null);
   const [changingRole, setChangingRole] = useState<EngineKey | null>(null);
   const canRestart = isOwnerOrAdminRole(person.role);
+  // MEM-SPACE-03: other apps using memory, for admins only; one source per install state (the Mac app helper, else the Stack).
+  const otherApps = useQuery({ queryKey: ["performance-other-apps"], enabled: canRestart && Boolean(history?.memory_ledger), refetchInterval: 30_000, queryFn: () => request<{ source: string; apps: { name: string; bytes: number }[] }>("/api/performance/other-apps").catch(() => ({ source: "none", apps: [] })) });
 
   async function handleRestart() {
     if (!pendingRole) return;
@@ -135,6 +137,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
           </div>
         </div>
         {history.memory_ledger.chat_paged_out ? <p className="pl-8 text-sm text-attention-fg">Chat is being paged out to disk. Close big apps, or stop a big job.</p> : null}
+        {otherApps.data?.apps.map((app) => <p key={app.name} data-testid="other-app" className="pl-8 text-sm text-muted-foreground">{app.name} is using {gb(app.bytes)} GB. Closing it gives big jobs more room.</p>)}
       </div> : null}
     <AlertDialog open={pendingRole !== null} onOpenChange={(open) => { if (!open && restartingRole === null) setPendingRole(null); }}>
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restart {ENGINE_HEALTH_ROWS.find((row) => row.key === pendingRole)?.label ?? "part"}?</AlertDialogTitle><AlertDialogDescription>Anything using it will pause for a moment.{pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel><Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>{restartingRole !== null ? "Restarting…" : "Restart"}</Button></AlertDialogFooter></AlertDialogContent>

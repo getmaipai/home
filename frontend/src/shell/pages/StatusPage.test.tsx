@@ -29,6 +29,7 @@ function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_
       brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60,
       engines: { chat: { kind: "selection", pid: null, alive: true }, embed: { kind: "spawned", pid: null, alive: true }, background: { kind: "spawned", pid: null, alive: true }, voice: { kind: "spawned", pid: null, alive: true } }, sidecars: [],
     }));
+    if (url.includes("/api/performance/other-apps")) return Promise.resolve(Response.json({ source: "helper", apps: [{ name: "Safari", bytes: 9 * 1024 ** 3 }] }));
     if (url.includes("/api/status/history")) return Promise.resolve(Response.json(history));
     if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
     if (url.includes("/api/status/engine-computer")) return Promise.resolve(Response.json(engineComputer ?? { configured: false, state: "not_reachable", reason: null }));
@@ -207,6 +208,7 @@ describe("StatusPage app-first view", () => {
       expect(admin.getByText("Free for jobs: 36.5 GB")).toBeTruthy();
       expect(admin.getByText("Waiting in line: chat and voice 1, pictures and tools 2, big jobs 3")).toBeTruthy();
       expect(admin.getByText("Chat is being paged out to disk. Close big apps, or stop a big job.")).toBeTruthy();
+      expect((await admin.findByTestId("other-app")).textContent).toBe("Safari is using 9.0 GB. Closing it gives big jobs more room.");
       admin.unmount();
     } finally { adminMock.restore(); }
 
@@ -215,6 +217,8 @@ describe("StatusPage app-first view", () => {
       const member = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
       await member.findByText("Apps");
       expect(member.queryByTestId("memory-ledger")).toBeNull();
+      expect(member.queryByTestId("other-app")).toBeNull();
+      expect(memberMock.paths).not.toContain("/api/performance/other-apps");
       expect(member.queryByText(/Memory in use by chat and voice/)).toBeNull();
     } finally { memberMock.restore(); }
   });
