@@ -126,6 +126,6 @@ section says how the mockup maps onto it. The mockup's name "lore" is a placehol
 | Quick fact card, Related list with thumbnails (right rail) | `quick_fact` (one fact from the infobox's first row pair, as plain text) and `related` (up to 5 linked articles from the article's own links, each with `preview` thumbnail and title) in the rail, above the infobox and contents. `related` uses READER-02's preview route. `related` follows the article route's own link rule (`allowLinks: band === "adult"`, `backend/src/routes/reference.ts`): a child and a teen get none, as they get no links today. An adult's `related` is not floor-checked, the same as an adult's article (the adult rule blocks only CSAM). The rail is part of `ArticleView`'s own article layout (like the infobox and Key points), not a second pane beside the app. |
 | Dark look | Theme tokens only (no fixed colours); it is the dark theme when the person's theme is dark. |
 
-New slices: **READER-00b** (kit: `image.badge`, `lead`, `actionRow`, `quick_fact`, `related`; before the tag, so one tag carries
-READER-00 and 00b) and **READER-02b** (backend: `lead`, `reading_minutes`, `kicker` from the book's category when present,
+New slices: **READER-07** (kit: `image.badge`, `lead`, `actionRow`, `quick_fact`, `related`; before the tag, so one tag carries
+READER-00 and 00b) and **READER-08** (backend: `lead`, `reading_minutes`, `kicker` from the book's category when present,
 `quick_fact`, `related` on the article response, additive). READER-03 and 04 draw the mockup; READER-04 gains Explore and Offline.
