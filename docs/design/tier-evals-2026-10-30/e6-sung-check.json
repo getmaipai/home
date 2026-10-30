@@ -1,0 +1,26 @@
+{
+ "shipped-folk": {
+  "heard": "The river runs down past the old storm mound I carry your own name and I carry a steel Lead me home, lead me home Through the fields where the soft winds roll",
+  "wer": 0.19
+ },
+ "shipped-pop": {
+  "heard": "We walk home slow, evening light The porch lamp glows, and the stars come out Sing it loud, we are home tonight Sing it loud, nothing to worry about",
+  "wer": 0.06
+ },
+ "xl-sft-folk": {
+  "heard": "The river runs down past the old stone mill I carry your name and I carry still Lead me home Lead me home Through the fields where the soft winds roam",
+  "wer": 0.03
+ },
+ "xl-sft-pop": {
+  "heard": "We walk home slow in the evening light. The porch lamp glows and the stars come out. Sing it loud. We are home tonight. Sing it loud. Nothing to worry about. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight. We are home tonight.",
+  "wer": 1.81
+ },
+ "xl-turbo-folk": {
+  "heard": "The river runs down past the old stone moon I carry your name and I carry you still Lead me home, lead me home Through the fields where the song is wrong",
+  "wer": 0.16
+ },
+ "xl-turbo-pop": {
+  "heard": "Walk home slowly, evening light Forest land glows and the stars come now Singing loud to loud We are home tonight",
+  "wer": 0.58
+ }
+}

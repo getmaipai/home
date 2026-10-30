@@ -1,0 +1,47 @@
+[
+ [
+  "lofi",
+  {
+   "id": "lofi",
+   "ok": true,
+   "duration_s": 40.0,
+   "seed": 11,
+   "task": "text2music",
+   "lrc": null,
+   "ms": 84596,
+   "peak_bytes": 26738776904,
+   "wall_s": 85.0,
+   "peak_gb": 26.74
+  }
+ ],
+ [
+  "pop",
+  {
+   "id": "pop",
+   "ok": true,
+   "duration_s": 40.0,
+   "seed": 12,
+   "task": "text2music",
+   "lrc": null,
+   "ms": 25786,
+   "peak_bytes": 26738776916,
+   "wall_s": 26.0,
+   "peak_gb": 26.74
+  }
+ ],
+ [
+  "folk",
+  {
+   "id": "folk",
+   "ok": true,
+   "duration_s": 40.0,
+   "seed": 13,
+   "task": "text2music",
+   "lrc": null,
+   "ms": 34127,
+   "peak_bytes": 26978638676,
+   "wall_s": 34.6,
+   "peak_gb": 26.98
+  }
+ ]
+]

@@ -16,7 +16,8 @@ before quoting them as a promise.
 | TIER-EVAL-01 Reduced chat | Qwen3-4B passes the measured parts; two parts need the real build | measured, partly open |
 | TIER-EVAL-02 Reduced voice | Chatterbox Nano runs on MLX, half the memory of Turbo, same words and same voice closeness by proxy | measured; ear check is Jesse's |
 | TIER-EVAL-08 listening side | No, from the 2026-10-25 numbers; household audio needs real recordings | decided, see below |
-| TIER-EVAL-03 to 07 | not run; wait for a quiet window | see "Not run yet" |
+| TIER-EVAL-06 music Boost and Max | XL turbo: no slot; XL SFT: Max candidate pending a listen | measured; ear check is Jesse's |
+| TIER-EVAL-03, 04, 05, 07 | not run yet | see "Not run yet" |
 
 ## TIER-EVAL-01: Reduced chat
 
@@ -132,7 +133,43 @@ That gain does not pay for a hands-free voice that misses one word in eight in a
 re-run: the clip files of that bench are gone and a synthetic kitchen or child mix would not be evidence. If Jesse wants this row measured on real
 audio, ten short recordings of his own kitchen and a child reading a sentence would decide it.
 
-## Not run yet: TIER-EVAL-03 to 07, with download sizes
+## TIER-EVAL-06: music Boost and Max
+
+**Method.** The Stack's own music worker (`music_worker.py`, ACE-Step 1.5 through its MLX path, pin `ca1e85f`) driven by a harness that feeds it
+jobs, with one change in a copy: the worker's check for a single `model.safetensors` is relaxed, because the official XL checkpoints ship as four
+shards, and for the 50-step run the step count and guidance are set from the environment. Nothing in the live Stack changed. Same planner (the 1.7B
+LM the Stack ships), same VAE and text encoder, same three 40-second songs with fixed seeds: calm lofi (no vocals), an upbeat pop song with four
+lines of lyrics, and a gentle folk ballad with four lines. Three DiT variants: the shipped 2B turbo (8 steps), **XL turbo** (4B, 8 steps, official
+`ACE-Step/acestep-v15-xl-turbo`, 20 GB bf16), and **XL SFT** (4B, 50 steps with guidance 7, official `ACE-Step/acestep-v15-xl-sft`). The MLX build
+of XL turbo from a third party needs a different runtime (`mlx-serve`, a prebuilt binary) and was not run: executing an unreviewed binary needs
+Jesse's word. The sung-words check transcribes each sung song with Whisper large-v3 turbo and scores it against the lyrics.
+
+| | Shipped 2B turbo | XL turbo | XL SFT, 50 steps, guidance 7 |
+|---|---|---|---|
+| Runs on the MLX path as shipped | yes | **yes** | **yes** |
+| Peak memory (MLX) | 16.4 GB | 26.7 GB | 26.7 to 27.0 GB |
+| First song (includes model load), 40 s | 57 s | 62 s | 85 s |
+| Later songs, 40 s of music | 11.5 and 13.7 s | 14.3 and 13.1 s | 26.0 and 34.6 s |
+| Sung words wrong, pop / folk | 6% / 19% | 58% / 16% | see note / 3% |
+| Loudness of the lofi song | -16.8 LUFS | -16.7 LUFS | -11.6 LUFS |
+
+Note on the XL SFT pop song: the transcript has every lyric line right and then the chorus line repeating until the clip ends, which scores as 181%
+wrong. Whether the song genuinely loops the chorus or Whisper looped is an ear question. Loudness also differs by 5 LU, which makes a quick A/B
+listen favor the louder song, so levelling is needed before judging.
+
+Reading it, with the numbers only (the listening verdict is Jesse's):
+
+- **The "does MLX run XL at all" question is answered: yes**, on the Stack's current worker with no engine change beyond accepting sharded weights.
+- **XL turbo has no measured gain over the shipped turbo**: it needs 10 GB more memory, takes the same time, and sang fewer of the words on the pop
+  song (58% against 6% wrong). On these songs it fails the "audibly better" bar on the one thing that can be measured without ears; the Boost slot
+  stays empty unless a listen says otherwise.
+- **XL SFT is the only candidate with a visible gain**: the folk song's words were nearly all right (3% against 19%). It costs 10 GB more than the
+  shipped model and 2 to 3 times the time (26 to 35 s for 40 s of music at load average about 50, so a 3-minute song is on the order of 2 to 3
+  minutes). It fits the Max cap with room. It earns a Max slot only if the songs also sound better; three songs and one transcript is thin evidence.
+- **Verdict for the table:** shipped 2B turbo stays Standard. XL turbo: no slot. XL SFT: candidate for Max, pending Jesse's listen (songs in
+  the shared notes folder under `music-eval/`: `shipped-*`, `xl-turbo-*`, `xl-sft-*`) and a longer-song and more-songs check.
+
+## Not run yet: TIER-EVAL-03, 04, 05 and 07, with download sizes
 
 These rows judge peak memory and minutes per item, and at a load average of 50 both numbers would mislead, so they wait for a quiet window
 on the Studio. Sizes below are what the Hugging Face file lists showed on 2026-10-30 for the builds that have an Apple path; "on disk" means the Studio
