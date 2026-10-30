@@ -123,11 +123,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
+| `frontend/src/apps/settings/CapabilityTable.tsx` | capabilityWords, CapabilityTable |
 | `frontend/src/apps/settings/CloseAppsSettings.tsx` | CloseAppsSettings |
 | `frontend/src/apps/settings/CodingSettings.tsx` | selfTestState, homeModeSentence, CodingAdminSettings, CodingKeysSettings, AdminCodingAccessRow |
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
+| `frontend/src/apps/settings/FreeUpMemory.tsx` | FreeUpMemory |
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HostTuneSettings.tsx` | HostTuneSettings |
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
@@ -580,6 +582,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryId.ts` | newMemoryRecordId |
 | `backend/src/lib/memoryIngestion.ts` | canonicalKey, storeEmbeddingInTx, supersedeInTx, ingestMemory, supersedeMemory, drainPendingWork |
 | `backend/src/lib/memoryJudge.ts` | categoryToRecordKind, exampleDateFor, promptExampleTexts, nextMonthLabel, timeExampleText, possessiveExampleText |
+| `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | sha256OfFile, downloadUrl |
