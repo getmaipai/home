@@ -16193,6 +16193,223 @@
         }
       }
     },
+    "/api/performance/reclaim": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "What Free up memory would unload, for admins",
+        "responses": {
+          "200": {
+            "description": "How many idle models and about how many bytes. available is false on an older Stack.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "number"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "models",
+                    "bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "Unload idle models to free memory, for admins",
+        "responses": {
+          "200": {
+            "description": "Only Home-owned idle models are unloaded; chat, busy work and other apps are never touched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "unloaded": {
+                      "type": "number"
+                    },
+                    "freed_bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "unloaded",
+                    "freed_bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/performance/capabilities": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "What this computer can run, per category and tier, for admins",
+        "responses": {
+          "200": {
+            "description": "From the Stack's fits_ever. available is false on an older Stack.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "machine_class": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "image",
+                              "video",
+                              "music",
+                              "voice"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "cells": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "tier": {
+                                  "type": "string",
+                                  "enum": [
+                                    "standard",
+                                    "boost",
+                                    "max"
+                                  ]
+                                },
+                                "fits": {
+                                  "type": "boolean"
+                                },
+                                "needs_bytes": {
+                                  "type": "number",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "tier",
+                                "fits",
+                                "needs_bytes"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "label",
+                          "cells"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "machine_class",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/voices": {
       "get": {
         "tags": [
@@ -24026,6 +24243,147 @@
                   },
                   "required": [
                     "result"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Owner sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Setup is finished. The text says where to change this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/capabilities": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "What this computer can run, per category and tier, before anything is downloaded",
+        "responses": {
+          "200": {
+            "description": "From the Stack's fits_ever. available is false when the Stack is not running yet or is older.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "machine_class": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "image",
+                              "video",
+                              "music",
+                              "voice"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "cells": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "tier": {
+                                  "type": "string",
+                                  "enum": [
+                                    "standard",
+                                    "boost",
+                                    "max"
+                                  ]
+                                },
+                                "fits": {
+                                  "type": "boolean"
+                                },
+                                "needs_bytes": {
+                                  "type": "number",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "tier",
+                                "fits",
+                                "needs_bytes"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "label",
+                          "cells"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "machine_class",
+                    "rows"
                   ]
                 }
               }

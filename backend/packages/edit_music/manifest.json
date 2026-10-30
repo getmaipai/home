@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Song",
-  "description": "Change a song made here in this chat, keeping every version.",
+  "description": "Change a song made here in this chat, split it into stems, or keep every version.",
   "offer": {
     "mode": "conditional",
     "gate": "musicEditAllowed",
@@ -21,7 +21,8 @@
       "make it instrumental",
       "extend it by twenty seconds",
       "trim the first five seconds",
-      "give me another take"
+      "give me another take",
+      "split this into stems"
     ],
     "patterns": []
   },
@@ -86,7 +87,8 @@
           "fade",
           "loudness",
           "make_full",
-          "make_quick"
+          "make_quick",
+          "stems"
         ]
       },
       "section": {

@@ -42,6 +42,14 @@ export interface StackDevLoad {
   processes: { name: string; bytes: number }[];
 }
 
+/** GET /stack/v1/capabilities: what this computer can ever run, per category and tier (from the governor's fits_ever). */
+export interface StackCapabilityRow { category: "chat" | "image" | "video" | "music" | "voice"; tier: "standard" | "boost" | "max"; fits_ever: boolean; needs_bytes: number | null; cap_bytes: number; model: string | null }
+export interface StackCapabilities { machine_class: string; total_bytes: number; rows: StackCapabilityRow[] }
+
+/** GET /stack/v1/memory/reclaim lists idle models that can be unloaded; POST unloads them. Chat, busy items and generators are never listed. */
+export interface StackReclaimList { items: { id: string; kind: string; bytes: number }[]; total_bytes: number; held_for_grace_bytes: number }
+export interface StackReclaimResult { unloaded: number; freed_bytes: number }
+
 export interface StackVoice {
   id: string; name: string; description: string; language: string; country: string;
   gender: "female" | "male" | "neutral" | "unknown";

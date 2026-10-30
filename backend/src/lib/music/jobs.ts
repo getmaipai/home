@@ -8,7 +8,7 @@ import { attachmentFilePath, createAttachment, readAttachmentForConversation, re
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong } from "./stack";
+import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
 import { sungLyricsFromLrc } from "./sections";
@@ -45,16 +45,20 @@ async function releaseMusic(job: MusicJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
     const storedBody = (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody;
-    const submitted = await submitMusic({ ...(storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
+    const submitted = job.task === "stems"
+      ? { job: await submitStems(storedBody?.source ?? "", storedBody?.source_sha256 ?? ""), done: null }
+      : await submitMusic({ ...(storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
     if (job.state !== "queued" || !liveJobs.has(job.id)) { void cancelOrDeleteMusic(submitted.job); return; }
     job.stackJob = submitted.job; saveMusicJob(job);
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (!actor) { await cancelOrDeleteMusic(submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
     void watch(job, actor, submitted.done);
-    void startSongCover(actor, job).catch(() => {});
+    if (job.task !== "stems") void startSongCover(actor, job).catch(() => {});
   } catch (error) { fail(job, error instanceof StackMusicError ? error.code : "failed"); }
 }
 export function plainMusicFailure(code: string): string {
+  if (code === "stems_unavailable") return "The stems could not be made. Try again in a minute.";
+  if (code === "stems_failed") return "The stems could not be made. Try again in a minute.";
   const prefix = "I couldn't make that song.";
   switch (code) {
     case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
@@ -112,7 +116,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   finally { starting.delete(input.actor.id); }
 }
 
-function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = plainMusicFailure(code); saveMusicJob(job); }
+function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
 const stopped = (job: MusicJob): boolean => job.state === "cancelled";
 async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
@@ -122,7 +126,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
     if (early && await finish(job, actor, early, controller.signal) !== false) return;
     while (!controller.signal.aborted && Date.now() < deadline) {
       let status;
-      try { status = await getMusicJob(job.stackJob); }
+      try { status = job.task === "stems" ? await getStemsJob(job.stackJob) : await getMusicJob(job.stackJob); }
       catch (error) {
         if (controller.signal.aborted) return;
         if (error instanceof StackMusicError && error.status === 404) { fail(job, "lost_job"); return; }
@@ -159,6 +163,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
 }
 async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<false | void> {
   if (stopped(job)) return;
+  if (job.task === "stems") return finishStems(job, actor, songs as unknown as StackStem[], signal);
   const song = songs[0];
   if (!song || !Number.isFinite(song.duration_s) || !Number.isFinite(song.seed)) { fail(job, "bad_reply"); return; }
   if (!job.request.retried && ["text2music", "remake", "variation"].includes(job.task) && song.lrc
@@ -212,6 +217,37 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
   void startSongCover(actor, job).catch(() => {});
+}
+async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
+  if (!stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "bad_reply"); return; }
+  let turn = false;
+  for (let i = 0; i < 120 && !signal.aborted; i++) {
+    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, job.turnId!), eq(conversationTurns.personId, actor.id))).get()) { turn = true; break; }
+    await sleep(500, signal);
+  }
+  if (signal.aborted || stopped(job)) return;
+  if (!turn) { fail(job, "lost_turn"); return; }
+  const parent = job.parentFileId ? provenanceFor(job.parentFileId) : null;
+  if (!parent) { fail(job, "source_not_made_here"); return; }
+  for (let i = 0; i < stems.length; i++) {
+    const stem = stems[i]!; const bytes = await fetchStem(stem.url);
+    if (signal.aborted || stopped(job)) return;
+    if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
+    const target = i === 0 ? job : { ...job, id: newMusicJobId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), fileId: null, stackJob: null };
+    const provenance: GenerationProvenance = { ...parent, job_id: target.id, duration_s: job.request.seconds, parent_file_id: job.parentFileId, source_kind: "made_here", made_at: new Date().toISOString() };
+    if (job.temporary) {
+      target.fileId = newFileId(); temporarySongs.set(target.fileId, { bytes, jobId: target.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(target.createdAt), provenance });
+    } else {
+      const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "conversation" });
+      if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
+      target.fileId = made.value.id;
+    }
+    target.request = { ...job.request, title: `${job.request.title ?? "Song"} (${stem.stem})`, instrumental: stem.stem !== "vocals", seconds: job.request.seconds };
+    target.seed = parent.seed ?? job.seed ?? 0; target.durationS = job.request.seconds; target.state = "done"; target.stage = "ready"; target.progress = 1; target.etaSeconds = 0; target.errorCode = null; target.errorLine = null;
+    persistMusicJob(target);
+  }
+  job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
+  saveMusicJob(job);
 }
 export async function cancelMusicJob(actor: PersonRow, id: string): Promise<MusicJob | null> {
   const job = getMusicJobFor(actor, id);

@@ -123,11 +123,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
+| `frontend/src/apps/settings/CapabilityTable.tsx` | capabilityWords, CapabilityTable |
 | `frontend/src/apps/settings/CloseAppsSettings.tsx` | CloseAppsSettings |
 | `frontend/src/apps/settings/CodingSettings.tsx` | selfTestState, homeModeSentence, CodingAdminSettings, CodingKeysSettings, AdminCodingAccessRow |
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
+| `frontend/src/apps/settings/FreeUpMemory.tsx` | FreeUpMemory |
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HostTuneSettings.tsx` | HostTuneSettings |
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
@@ -494,7 +496,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
 | `backend/src/lib/jobs/admissionFit.ts` | setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission, admissionFitProfile, admissionFitAskLine |
-| `backend/src/lib/jobs/householdQueue.ts` | endMaxWindow, setQueuePolicy, getQueuePolicy, recordUsage, usageLastHour, order |
+| `backend/src/lib/jobs/householdQueue.ts` | activeProfileLine, resetActivePlanForTests, endMaxWindow, setQueuePolicy, getQueuePolicy, recordUsage |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
 | `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |
 | `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, appliedProfile, stagesFor, chatMayReturnBetweenStages |
@@ -580,6 +582,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryId.ts` | newMemoryRecordId |
 | `backend/src/lib/memoryIngestion.ts` | canonicalKey, storeEmbeddingInTx, supersedeInTx, ingestMemory, supersedeMemory, drainPendingWork |
 | `backend/src/lib/memoryJudge.ts` | categoryToRecordKind, exampleDateFor, promptExampleTexts, nextMonthLabel, timeExampleText, possessiveExampleText |
+| `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | sha256OfFile, downloadUrl |
@@ -591,7 +594,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
-| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, submitMusic, getMusicJob, fetchSong |
+| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic, getMusicJob |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/tool.ts` | GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs, musicRefusalFor |
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |

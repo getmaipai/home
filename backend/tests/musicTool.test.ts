@@ -43,6 +43,22 @@ async function edit(state: TurnState, change: string, args: Record<string, unkno
   return getMusicJobFor(people.owner, id!)!;
 }
 describe("music jobs and their private files", () => {
+  test("split stems writes a song file and completed job for each returned track", async () => {
+    const state = musicState(people.owner); const parent = await generate(state);
+    fake.stems = true;
+    const outcome = await runEditMusic({ state, args: { track: parent.fileId, change: "stems" }, callId: "s", spoken: false });
+    expect(outcome.result?.reply?.text).toBe("The stems are on the way.");
+    const id = musicForOutcomes([outcome])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const jobs = db.select().from(musicJobs).where(eq(musicJobs.task, "stems")).all();
+    expect(jobs).toHaveLength(2);
+    for (const job of jobs) {
+      expect(job).toMatchObject({ task: "stems", state: "done", parentFileId: parent.fileId });
+      const row = db.select().from(attachments).where(eq(attachments.id, job.fileId!)).get()!;
+      expect(generationOf(row.provenance)).toMatchObject({ task: "text2music", parent_file_id: parent.fileId, source_kind: "made_here" });
+      expect(row.provenance).toContain(parent.fileId!);
+    }
+  });
   test("the tool node returns at once, puts the job on the tool part, and stores unchanged AAC with prompt-free provenance", async () => {
     const state = musicState(people.owner);
     fake.pollsToFinish = 4;

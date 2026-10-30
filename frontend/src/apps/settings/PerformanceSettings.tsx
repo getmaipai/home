@@ -6,6 +6,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { CapabilityTable } from "@/apps/settings/CapabilityTable";
+import { FreeUpMemory } from "@/apps/settings/FreeUpMemory";
 import { HostTuneSettings } from "@/apps/settings/HostTuneSettings";
 import { CloseAppsSettings } from "@/apps/settings/CloseAppsSettings";
 import { PerformanceCustomize } from "@/apps/settings/PerformanceCustomize";
@@ -47,7 +49,9 @@ export function PerformanceSettings({ person }: SettingsViewProps) {
           <p>Turn Boost or Max on or off per job on the AI and models page.</p>
         </CardContent>
       </Card>
+      <FreeUpMemory />
       <CloseAppsSettings value={value} write={write} />
+      <CapabilityTable path="/api/performance/capabilities" framed />
       {person.role === "owner" ? <HostTuneSettings /> : null}
       <Collapsible open={customizeOpen} onOpenChange={setCustomizeOpen}>
         <CollapsibleTrigger render={<Button type="button" variant="outline" />}>{customizeOpen ? "Hide customize" : "Customize"}</CollapsibleTrigger>
