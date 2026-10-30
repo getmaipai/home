@@ -83,7 +83,7 @@ describe("Offline data settings", () => {
 
   test("a plan refusal explains itself and keeps Apply off", async () => {
     const view = mount({ plan: { refusal: "Keep at least 20 percent of the drive free." } });
-    fireEvent.click(await view.findByRole("switch", { name: "Wikipedia with pictures: off" }));
+    fireEvent.click(await view.findByRole("switch", { name: "Wikipedia: everything, with pictures: off" }));
     expect(await view.findByText("Keep at least 20 percent of the drive free.")).toBeTruthy();
     expect((view.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
     view.restore();
@@ -91,7 +91,7 @@ describe("Offline data settings", () => {
 
   test("a download in flight shows progress and pause, resume and cancel", async () => {
     const view = mount({ jobs: [job] });
-    expect(await view.findByRole("progressbar", { name: "Wikipedia Mini download progress" })).toBeTruthy();
+    expect(await view.findByRole("progressbar", { name: "Wikipedia: short introductions only download progress" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Pause" }));
     await waitFor(() => expect(view.calls).toContain("pause"));
     fireEvent.click(view.getByRole("button", { name: "Cancel" }));

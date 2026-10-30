@@ -42,6 +42,17 @@ const SOURCE_BLURB: Record<string, string> = {
 };
 const FLAVOUR_LABEL: Record<string, string> = { maxi: "Everything, with pictures", nopic: "Everything, no pictures", mini: "Short introductions only" };
 const FLAVOUR_ORDER = ["maxi", "nopic", "mini"];
+const SOURCE_LABEL: Record<string, string> = {
+  "wikipedia-en": "Wikipedia", "wikipedia-simple": "Simple English Wikipedia", vikidia: "Vikidia", "wiktionary-simple": "Simple English Wiktionary", "wiktionary-en": "Wiktionary",
+  medlineplus: "MedlinePlus", wikivoyage: "Wikivoyage", "world-factbook": "CIA World Factbook", wikibooks: "Wikibooks", stackexchange: "Stack Exchange",
+};
+/** A plain name for a row: the source's own name, and for a source with several versions which version it is. The catalogue's raw book name is only the fallback. */
+const titleOf = (set: { source: string; flavour: string; name: string }) => {
+  const label = SOURCE_LABEL[set.source];
+  if (!label) return set.name;
+  const flavour = FLAVOUR_LABEL[set.flavour];
+  return flavour ? `${label}: ${flavour.charAt(0).toLowerCase()}${flavour.slice(1)}` : label;
+};
 
 function topicGroups<T extends { source: string; flavour: string }>(sets: T[]): Array<{ topic: string; sets: T[] }> {
   const known = new Set(TOPICS.flatMap((t) => t.sources));
@@ -104,8 +115,8 @@ export function ReferenceLibrarySettings() {
 
   const apply = useMutation({
     mutationFn: async () => {
-      for (const set of removals) { setStep(`Removing ${set.name}…`); await api.referenceRemove(set.id); }
-      for (const set of additions) { setStep(`Starting ${set.name}…`); await api.referenceInstall(set.id); }
+      for (const set of removals) { setStep(`Removing ${titleOf(set)}…`); await api.referenceRemove(set.id); }
+      for (const set of additions) { setStep(`Starting ${titleOf(set)}…`); await api.referenceInstall(set.id); }
     },
     onSuccess: async () => { setStep(null); setStaged({}); setError(null); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
     onError: async (e) => { setStep(null); setError(messageOf(e, "Home could not change the offline books. Check the drive space and the Home connection, then try again.")); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
@@ -183,8 +194,8 @@ export function ReferenceLibrarySettings() {
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{removals.length === 1 ? `Remove ${removals[0]?.name}?` : `Remove ${removals.length} books?`}</AlertDialogTitle>
-            <AlertDialogDescription>{sizeGb(freedBytes)} will be freed. {kidsLose.length > 0 ? "Children and teens may lose access to " + kidsLose.map((set) => set.name).join(", ") + "." : "No book for children or teens is removed."} You can download them again later.</AlertDialogDescription>
+            <AlertDialogTitle>{removals.length === 1 ? `Remove ${removals[0] ? titleOf(removals[0]) : "this book"}?` : `Remove ${removals.length} books?`}</AlertDialogTitle>
+            <AlertDialogDescription>{sizeGb(freedBytes)} will be freed. {kidsLose.length > 0 ? "Children and teens may lose access to " + kidsLose.map((set) => titleOf(set)).join(", ") + "." : "No book for children or teens is removed."} You can download them again later.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -206,7 +217,7 @@ function rowOf({ set, on, job, onSwitch, onJob }: { set: ReferenceCatalogSet; on
     <Item key={set.id} data-testid={`offline-row-${set.id}`}>
       <ItemContent>
         <ItemTitle>
-          {set.name}
+          {titleOf(set)}
           {forKids ? <Badge variant="secondary">For children</Badge> : null}
           {pending ? <Badge variant="outline">{on ? "Will download" : "Will remove"}</Badge> : null}
         </ItemTitle>
@@ -214,14 +225,14 @@ function rowOf({ set, on, job, onSwitch, onJob }: { set: ReferenceCatalogSet; on
         <ItemDescription clamp={false}>{set.language} · {set.available ? sizeGb(set.sizeBytes) : "Size unavailable"} · Snapshot {set.snapshotDate ?? "date not listed"} · {status}{job ? ` · ${job.state}` : ""}{set.message ? ` · ${set.message}` : ""}</ItemDescription>
         {job ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Progress value={job.totalBytes ? Math.round(job.completedBytes / job.totalBytes * 100) : 0} aria-label={`${set.name} download progress`} />
+            <Progress value={job.totalBytes ? Math.round(job.completedBytes / job.totalBytes * 100) : 0} aria-label={`${titleOf(set)} download progress`} />
             <span className="text-base">{sizeGb(job.completedBytes)} of {sizeGb(job.totalBytes)}</span>
             <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, job.state === "paused" ? "resume" : "pause")}>{job.state === "paused" ? "Resume" : "Pause"}</Button>
             <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "cancel")}>Cancel</Button>
           </div>
         ) : null}
       </ItemContent>
-      <ItemActions><Switch checked={on} disabled={Boolean(job) || (!set.installed && !set.available)} onCheckedChange={onSwitch} aria-label={`${set.name}: ${on ? "on" : "off"}`} /></ItemActions>
+      <ItemActions><Switch checked={on} disabled={Boolean(job) || (!set.installed && !set.available)} onCheckedChange={onSwitch} aria-label={`${titleOf(set)}: ${on ? "on" : "off"}`} /></ItemActions>
     </Item>
   );
 }
