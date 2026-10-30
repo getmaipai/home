@@ -137,7 +137,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
 | `frontend/src/apps/settings/PicturesLibrary.tsx` | PicturesLibrary |
-| `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | ReferenceLibrarySettings |
+| `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RepairsSection.tsx` | RepairsSection |
 | `frontend/src/apps/settings/RobotBody.tsx` | bodyHealthText, didPutDownCountIncrease, RobotBody |
 | `frontend/src/apps/settings/RobotCards.tsx` | fetchFamilyBots, familyBotsQueryKey, RobotCards |

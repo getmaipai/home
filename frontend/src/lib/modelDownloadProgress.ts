@@ -1,5 +1,6 @@
-import { JobProgress, type JobProgressItem } from "@maipai/ui/src/elements/job-progress";
-import { useEffect, useState, type ComponentProps } from "react";
+import type { JobProgressItem } from "@maipai/ui/src/elements/job-progress";
+import { useEffect, useState } from "react";
+import { downloadProgress, type DownloadProgressProps } from "@/lib/downloadProgress";
 import { api, type HomeJobView } from "@/lib/api";
 
 const ACTIVE_STATES = new Set(["queued", "running", "paused", "stalled"]);
@@ -54,40 +55,26 @@ function itemList(value: unknown): JobProgressItem[] | undefined {
   });
 }
 
-export function modelDownloadProgress(job: HomeJobView): Omit<ComponentProps<typeof JobProgress>, "variant" | "onCancel"> {
+export function modelDownloadProgress(job: HomeJobView): DownloadProgressProps {
   const progress = job.progress ?? {};
-  const completedBytes = number(progress.completedBytes);
-  const totalBytes = number(progress.totalBytes);
-  const bytesPerSecond = number(progress.bytesPerSecond);
   const state = job.state === "done" || job.state === "ready" ? "done"
     : job.state === "failed" ? "failed"
       : job.state === "paused" ? "paused"
         : job.state === "stalled" ? "stalled"
-          : job.state === "queued" ? "queued" : "running";
+          : job.state === "queued" ? "queued"
+            : job.state === "cancelled" ? "cancelled" : "running";
   const status = typeof progress.status === "string" ? progress.status : typeof progress.phase === "string" ? progress.phase : job.state ?? "Downloading";
+  const items = itemList(progress.items);
+  const completedBytes = number(progress.completedBytes);
+  const totalBytes = number(progress.totalBytes);
+  const bytesPerSecond = number(progress.bytesPerSecond);
   const percent = number(progress.percent);
-  const stageProgress = totalBytes && completedBytes !== undefined ? Math.min(1, completedBytes / totalBytes) : (percent ?? 0) / 100;
-  const outcome = state === "done" ? { status: "success" as const }
-    : state === "failed" ? { status: "failed" as const, summary: status }
-      : job.state === "cancelled" ? { status: "cancelled" as const } : undefined;
-
-  return {
-    title: job.title || "AI model download",
-    stages: [{ name: "Download", weight: 1 }],
-    stageIndex: outcome ? 1 : 0,
-    stageProgress,
-    ...(outcome ? { outcome } : {}),
-    ...(completedBytes !== undefined && totalBytes !== undefined ? { completedBytes, totalBytes } : {}),
+  return downloadProgress({
+    title: job.title || "AI model download", state, status,
+    ...(completedBytes !== undefined ? { completedBytes } : {}),
+    ...(totalBytes !== undefined ? { totalBytes } : {}),
     ...(bytesPerSecond !== undefined ? { bytesPerSecond } : {}),
-    ...(bytesPerSecond && totalBytes !== undefined && completedBytes !== undefined
-      ? { etaSeconds: Math.max(0, (totalBytes - completedBytes) / bytesPerSecond) } : {}),
-    ...(itemList(progress.items) ? { items: itemList(progress.items) } : {}),
-    downloadState: state,
-    downloadStatus: status,
-    copy: {
-      stalled: "The download is having trouble. It will resume automatically.",
-      checksumFailed: "The file did not pass its checksum. Retry the download.",
-      outOfSpace: "Free up disk space, then retry the download.",
-    },
-  };
+    ...(percent !== undefined ? { percent } : {}),
+    ...(items ? { items } : {}),
+  });
 }

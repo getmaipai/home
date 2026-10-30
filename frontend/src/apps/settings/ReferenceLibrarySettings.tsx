@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
-import { Progress } from "@maipai/ui/src/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
 import { Switch } from "@maipai/ui/src/ui/switch";
@@ -17,6 +17,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle }
 import presetsData from "@maipai/spec/vocab/reference-presets.json";
 import { api, ApiError, type ReferenceCatalogSet, type ReferenceJob } from "@/lib/api";
 import { sizeGb } from "../../../../shared/diskPlanMath";
+import { downloadProgress, useByteRates, type DownloadSnapshot } from "@/lib/downloadProgress";
 
 const presets = presetsData.presets;
 const duration = (n: number | null) => n === null ? "Time estimate unavailable" : n < 60 ? `About ${n} seconds` : n < 3600 ? `About ${Math.ceil(n / 60)} minutes` : `About ${Math.ceil(n / 3600)} hours`;
@@ -71,6 +72,17 @@ function sourceRows(sets: ReferenceCatalogSet[]): Array<{ topic: string; rows: S
   return [...groups, { topic: "Other", rows: others }].filter((group) => group.rows.length > 0);
 }
 
+/** A book download in the shared progress card's words. Waiting for the nightly window reads as queued with the reason. */
+export function referenceDownload(job: ReferenceJob, title: string, bytesPerSecond?: number): DownloadSnapshot {
+  const state = job.state === "downloading" ? "running" : job.state === "waiting_window" ? "queued" : job.state;
+  const status = job.state === "waiting_window" ? "Waits for the nightly download window"
+    : job.state === "queued" ? "Starting soon"
+      : job.state === "paused" ? "Paused"
+        : job.state === "failed" ? job.message ?? "The download failed. Cancel it, then switch the book on again to retry."
+          : job.state === "downloading" ? "Downloading" : job.message ?? "";
+  return { title, state, status, completedBytes: job.completedBytes, totalBytes: job.totalBytes, ...(bytesPerSecond !== undefined && job.state === "downloading" ? { bytesPerSecond } : {}) };
+}
+
 const presetIds = (id: string): Set<string> => new Set((presets.find((p) => p.id === id)?.members ?? []).map((m) => `${m.source}:${m.flavour}`));
 
 export function ReferenceLibrarySettings() {
@@ -94,6 +106,7 @@ export function ReferenceLibrarySettings() {
   const addBytes = additions.reduce((sum, set) => sum + set.sizeBytes, 0);
   const freedBytes = removals.reduce((sum, set) => sum + set.sizeBytes, 0);
   const jobFor = (set: ReferenceCatalogSet): ReferenceJob | undefined => state.data?.jobs.find((job) => job.setId === set.id);
+  const rates = useByteRates((state.data?.jobs ?? []).map((job) => ({ id: job.id, completedBytes: job.completedBytes, running: job.state === "downloading" })));
 
   const choose = (source: string, id: string | null) => setStaged((previous) => {
     const next = { ...previous };
@@ -190,7 +203,7 @@ export function ReferenceLibrarySettings() {
         <section key={group.topic} aria-label={group.topic} className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">{group.topic}</h2>
           <ItemGroup variant="card" role="group" aria-label={group.topic}>
-            {group.rows.map((row) => rowOf({ row, wanted: wantedFor(row.source), installed: installedFor(row.source), jobFor, onChoose: (id) => choose(row.source, id), onJob: (job, action) => jobAction.mutate({ job, action }) }))}
+            {group.rows.map((row) => rowOf({ row, wanted: wantedFor(row.source), installed: installedFor(row.source), jobFor, rates, onChoose: (id) => choose(row.source, id), onJob: (job, action) => jobAction.mutate({ job, action }) }))}
           </ItemGroup>
         </section>
       ))}
@@ -226,14 +239,16 @@ export function ReferenceLibrarySettings() {
 
 /** One source as a plain function so no Home component has a kit Item as its root (rule 9). A source with one version gets a switch;
  * one with several gets a picker (Off, then each version with its size). */
-function rowOf({ row, wanted, installed, jobFor, onChoose, onJob }: { row: SourceRow; wanted: string | null; installed: string | null; jobFor: (set: ReferenceCatalogSet) => ReferenceJob | undefined; onChoose: (id: string | null) => void; onJob: (job: ReferenceJob, action: "pause" | "resume" | "cancel") => void }) {
+function rowOf({ row, wanted, installed, jobFor, rates, onChoose, onJob }: { row: SourceRow; wanted: string | null; installed: string | null; jobFor: (set: ReferenceCatalogSet) => ReferenceJob | undefined; rates: Record<string, number | undefined>; onChoose: (id: string | null) => void; onJob: (job: ReferenceJob, action: "pause" | "resume" | "cancel") => void }) {
   const multi = row.versions.length > 1;
   const current = row.versions.find((set) => set.id === wanted) ?? null;
   const shown = current ?? row.versions.find((set) => set.id === installed) ?? row.versions[0]!;
   const job = row.versions.map(jobFor).find(Boolean);
   const forKids = row.versions.some((set) => set.child);
   const pending = wanted !== installed;
-  const status = installed ? "Installed" : "Not installed";
+  const jobSet = job ? row.versions.find((set) => set.id === job.setId) : undefined;
+  const download = job ? referenceDownload(job, jobSet ? titleOf(jobSet) : row.label, rates[job.id]) : undefined;
+  const status = installed ? "Installed" : download ? download.status : "Not installed";
   const blocked = Boolean(job) || row.versions.every((set) => !set.installed && !set.available);
   return (
     <Item key={row.source} data-testid={`offline-row-${row.source}`}>
@@ -244,14 +259,13 @@ function rowOf({ row, wanted, installed, jobFor, onChoose, onJob }: { row: Sourc
           {pending ? <Badge variant="outline">{wanted ? "Will download" : "Will remove"}</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{SOURCE_BLURB[row.source]}</ItemDescription>
-        <ItemDescription clamp={false}>{multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : "Off") : sizeGb(shown.sizeBytes)} · Snapshot {shown.snapshotDate ?? "date not listed"} · {status}{job ? ` · ${job.state}` : ""}{shown.message ? ` · ${shown.message}` : ""}</ItemDescription>
-        {job ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Progress value={job.totalBytes ? Math.round(job.completedBytes / job.totalBytes * 100) : 0} aria-label={`${row.label} download progress`} />
-            <span className="text-base">{sizeGb(job.completedBytes)} of {sizeGb(job.totalBytes)}</span>
-            <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, job.state === "paused" ? "resume" : "pause")}>{job.state === "paused" ? "Resume" : "Pause"}</Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "cancel")}>Cancel</Button>
-          </div>
+        <ItemDescription clamp={false}>{multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : "Off") : sizeGb(shown.sizeBytes)} · Snapshot {shown.snapshotDate ?? "date not listed"} · {status}{shown.message ? ` · ${shown.message}` : ""}</ItemDescription>
+        {job && download ? (
+          <>
+            <JobProgress {...downloadProgress(download)} variant="full" cancelLabel={`Cancel the ${row.label} download`} onCancel={() => onJob(job, "cancel")} {...(job.state === "paused" ? { onResume: () => onJob(job, "resume") } : {})} />
+            {job.state === "downloading" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "pause")}>Pause</Button></div> : null}
+            {job.state === "waiting_window" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "resume")}>Start now</Button></div> : null}
+          </>
         ) : null}
       </ItemContent>
       <ItemActions>

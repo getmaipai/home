@@ -101,11 +101,19 @@ describe("Offline data settings", () => {
 
   test("a download in flight shows progress and pause, resume and cancel", async () => {
     const view = mount({ jobs: [job] });
-    expect(await view.findByRole("progressbar", { name: "Wikipedia download progress" })).toBeTruthy();
+    expect(await view.findByRole("progressbar", { name: "Wikipedia: short introductions only progress" })).toBeTruthy();
+    expect(view.getByText(/2\.5 GB/)).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Pause" }));
     await waitFor(() => expect(view.calls).toContain("pause"));
-    fireEvent.click(view.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(view.getByRole("button", { name: "Cancel the Wikipedia download" }));
     await waitFor(() => expect(view.calls).toContain("cancel"));
+    view.restore();
+  });
+  test("a download waiting for the nightly window says so and can start now", async () => {
+    const view = mount({ jobs: [{ ...job, state: "waiting_window", completedBytes: 0, message: "Waiting for the nightly download window." }] });
+    expect(await view.findByText(/Waits for the nightly download window/)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Start now" }));
+    await waitFor(() => expect(view.calls).toContain("resume"));
     view.restore();
   });
 });
