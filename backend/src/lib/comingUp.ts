@@ -32,7 +32,8 @@ export function doneComingUp(actor: PersonRow, id: string) {
 export function snoozeComingUp(actor: PersonRow, id: string, input: { minutes?: number; until?: "tomorrow_morning" }) {
   const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, id)).get();
   if (!row || row.personId !== actor.id || row.kind !== "core" || !(JOB_KINDS as readonly string[]).includes(row.job)) return { ok: false as const, status: row ? 403 : 404, error: "job not found" };
-  if (row.status !== "pending") return { ok: false as const, status: 400, error: `job ${id} is already ${row.status}, not pending` };
+  const firedAlarm = row.job === "alarms.fire" && row.status === "done";
+  if (row.status !== "pending" && !firedAlarm) return { ok: false as const, status: 400, error: "job is no longer pending" };
   let next: Date;
   if (input.minutes) next = new Date(Date.now() + input.minutes * 60_000);
   else {
@@ -47,6 +48,6 @@ export function snoozeComingUp(actor: PersonRow, id: string, input: { minutes?: 
     const offset = match ? (match[1] === "+" ? 1 : -1) * (Number(match[2]) * 60 + Number(match[3])) : 0;
     next = new Date(localTomorrow.getTime() - offset * 60_000);
   }
-  db.update(scheduledJobs).set({ nextRunAt: next.toISOString(), when: next.toISOString() }).where(and(eq(scheduledJobs.id, id), eq(scheduledJobs.personId, actor.id), eq(scheduledJobs.status, "pending"))).run();
+  db.update(scheduledJobs).set({ nextRunAt: next.toISOString(), when: next.toISOString(), status: "pending", ...(firedAlarm ? { lastRunAt: null } : {}) }).where(and(eq(scheduledJobs.id, id), eq(scheduledJobs.personId, actor.id), eq(scheduledJobs.status, row.status))).run();
   return { ok: true as const, value: true };
 }

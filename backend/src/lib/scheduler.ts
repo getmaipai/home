@@ -388,7 +388,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "alarms.fire": async (row) => {
     const { task } = JSON.parse(row.inputs) as { task: string };
-    await trigger("alarm.due", { task }, { personId: row.personId ?? undefined });
+    await trigger("alarm.due", { task }, { personId: row.personId ?? undefined, subjectJobId: row.id });
   },
   "timers.fire": async (row) => {
     const { label } = JSON.parse(row.inputs) as { label: string };

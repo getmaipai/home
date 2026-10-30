@@ -85,6 +85,7 @@ describe("alarm package", () => {
     expect(result.ran).toBe(1);
     expect(listPending(actor).filter((n) => n.typeId === "alarm.due")).toHaveLength(1);
     expect(db.select().from(notificationDeliveries).all().every((n) => n.recipientId === actor.id)).toBe(true);
+    expect(listPending(actor).find((n) => n.typeId === "alarm.due")?.subjectJobId).toBe(scheduled.value.id);
     expect((await runDueJobs(runPlugin)).ran).toBe(0);
     expect(listPending(actor).filter((n) => n.typeId === "alarm.due")).toHaveLength(1);
   });

@@ -39,6 +39,7 @@ import { AmbientRingProvider, ambientRingFromWake, effectiveAmbientRing, type Am
 import { ChatAvailabilityContext, useChatAvailability } from "@/apps/chat/useChatAvailability";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
+import { AlarmRinger } from "@/shell/AlarmRinger";
 import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
 import { LauncherBubble } from "@maipai/ui/src/elements/launcher-bubble";
 import { useStatusApps } from "@/shell/useStatusApps";
@@ -344,6 +345,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
+      <AlarmRinger person={person} />
       {/* When ambient mode is off, keep the docked launcher here; moving it to the top right is a later slice. */}
       {shellWake.indicator && !ambient ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />

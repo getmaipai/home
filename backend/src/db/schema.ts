@@ -1091,6 +1091,7 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   // turn should stay readable history, not get blocked by a constraint
   // or need its own cascade.
   subjectTurnId: text("subject_turn_id"),
+  subjectJobId: text("subject_job_id"),
   // The memory record ids remember()/supersede() actually wrote for
   // that turn (JSON string[], same encoding `channels` above already
   // uses) - chatMemoryChip.tsx's own "Memory updated" link needs real

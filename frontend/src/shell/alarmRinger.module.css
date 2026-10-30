@@ -1,0 +1,13 @@
+@keyframes alarm-ringer-swing {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+}
+
+.alarmRingerSwing {
+  animation: alarm-ringer-swing 0.8s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alarmRingerSwing { animation: none; }
+}

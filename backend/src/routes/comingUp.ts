@@ -16,7 +16,7 @@ comingUpRoutes.openapi(doneRoute, (c) => {
   return c.json({ error: result.error }, 403);
 });
 
-const snoozeRoute = createRoute({ method: "post", path: "/{id}/snooze", tags: ["Coming up"], summary: "Snooze my scheduled item", middleware: [requireAuth] as const, request: { params: idParamSchema("id"), body: { content: { "application/json": { schema: z.union([z.object({ minutes: z.union([z.literal(15), z.literal(60)]) }).strict(), z.object({ until: z.literal("tomorrow_morning") }).strict()]) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } }, description: "Rescheduled." }, ...errorResponses({ 400: "Invalid or no longer pending", 401: "Not signed in", 403: "Not yours", 404: "Not found" }) } });
+const snoozeRoute = createRoute({ method: "post", path: "/{id}/snooze", tags: ["Coming up"], summary: "Snooze my scheduled item", middleware: [requireAuth] as const, request: { params: idParamSchema("id"), body: { content: { "application/json": { schema: z.union([z.object({ minutes: z.union([z.literal(5), z.literal(10), z.literal(15), z.literal(30), z.literal(60)]) }).strict(), z.object({ until: z.literal("tomorrow_morning") }).strict()]) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } }, description: "Rescheduled." }, ...errorResponses({ 400: "Invalid or no longer pending", 401: "Not signed in", 403: "Not yours", 404: "Not found" }) } });
 comingUpRoutes.openapi(snoozeRoute, (c) => {
   const result = snoozeComingUp(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
   if (result.ok) return c.json({ ok: true as const }, 200);

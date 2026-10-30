@@ -7159,6 +7159,10 @@
                         "type": "string",
                         "nullable": true
                       },
+                      "subjectJobId": {
+                        "type": "string",
+                        "nullable": true
+                      },
                       "memoryIds": {
                         "type": "array",
                         "nullable": true,
@@ -7257,6 +7261,10 @@
                         "nullable": true
                       },
                       "subjectTurnId": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "subjectJobId": {
                         "type": "string",
                         "nullable": true
                       },
@@ -7367,6 +7375,10 @@
                       "nullable": true
                     },
                     "subjectTurnId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "subjectJobId": {
                       "type": "string",
                       "nullable": true
                     },
@@ -39635,7 +39647,25 @@
                           {
                             "type": "number",
                             "enum": [
+                              5
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              10
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
                               15
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              30
                             ]
                           },
                           {

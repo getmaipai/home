@@ -949,6 +949,7 @@ export interface NotificationDeliveryView {
   readAt: string | null;
   dismissedAt: string | null;
   subjectTurnId: string | null;
+  subjectJobId?: string | null;
   memoryIds: string[] | null;
   toast: boolean;
 }

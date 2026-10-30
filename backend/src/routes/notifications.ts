@@ -15,6 +15,7 @@ const NotificationSchema = z.object({
   readAt: z.string().nullable(),
   dismissedAt: z.string().nullable(),
   subjectTurnId: z.string().nullable(),
+  subjectJobId: z.string().nullable().optional(),
   memoryIds: z.array(z.string()).nullable(),
   toast: z.boolean(),
 });

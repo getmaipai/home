@@ -369,4 +369,17 @@ describe("NotificationBell", () => {
       restore();
     }
   });
+
+  test("alarm due notifications stay out of the courtesy toast", async () => {
+    const restore = stubFetch({ "/api/notifications": [] });
+    try {
+      const { queryByText, queryClient } = renderWithQueryClient(
+        <MemoryRouter><ToastProvider><NotificationToaster /></ToastProvider></MemoryRouter>,
+      );
+      await waitFor(() => expect(queryClient.getQueryData(["notifications"])).toBeDefined());
+      queryClient.setQueryData(["notifications"], [notification("alarm-n1", "Alarm: gym", { typeId: "alarm.due", toast: true })]);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(queryByText("Alarm: gym")).toBeNull();
+    } finally { restore(); }
+  });
 });

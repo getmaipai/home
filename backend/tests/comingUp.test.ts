@@ -69,6 +69,32 @@ describe("coming up", () => {
     expect((await client.post("/api/coming-up/other/snooze", { minutes: 15 })).status).toBe(403);
   });
 
+  test("snoozing a fired alarm returns its same job to pending", async () => {
+    const { client, id } = await ownerSession();
+    const otherId = await addPerson(client, "Marlow");
+    add("fired-alarm", id, "alarms.fire", "2026-10-29T08:00:00.000Z", { task: "Gym" }, "done");
+    add("other-fired-alarm", otherId, "alarms.fire", "2026-10-29T08:00:00.000Z", { task: "Private" }, "done");
+    expect((await client.post("/api/coming-up/fired-alarm/snooze", { minutes: 5 })).status).toBe(200);
+    expect((await client.post("/api/coming-up/other-fired-alarm/snooze", { minutes: 5 })).status).toBe(403);
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, "fired-alarm")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status).toBe("pending");
+    expect(Date.parse(rows[0]!.nextRunAt)).toBeGreaterThan(Date.now());
+  });
+
+  test("snooze accepts only the shared minute choices", async () => {
+    const { client, id } = await ownerSession();
+    for (const minutes of [5, 10, 15, 30, 60]) {
+      const jobId = `alarm-${minutes}`;
+      add(jobId, id, "alarms.fire", "2099-01-01T09:00:00.000Z", { task: "Gym" });
+      expect((await client.post(`/api/coming-up/${jobId}/snooze`, { minutes })).status).toBe(200);
+    }
+    add("alarm-invalid", id, "alarms.fire", "2099-01-01T09:00:00.000Z", { task: "Gym" });
+    expect((await client.post("/api/coming-up/alarm-invalid/snooze", { minutes: 7 })).status).toBe(400);
+    add("alarm-tomorrow", id, "alarms.fire", "2099-01-01T09:00:00.000Z", { task: "Gym" });
+    expect((await client.post("/api/coming-up/alarm-tomorrow/snooze", { until: "tomorrow_morning" })).status).toBe(200);
+  });
+
   test("a child sees only their own rows even though the owner created both people", async () => {
     const { client, id: ownerId } = await ownerSession();
     const childRes = await client.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" });

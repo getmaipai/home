@@ -3,8 +3,7 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { api, type ComingUpItem } from "@/lib/api";
-
-const snoozes = [{ label: "15 minutes", input: { minutes: 15 } }, { label: "An hour", input: { minutes: 60 } }, { label: "Tomorrow morning", input: { until: "tomorrow_morning" as const } }];
+import { SNOOZE_OPTIONS } from "@/lib/comingUp";
 
 function describeTime(date: Date) {
   return new Intl.DateTimeFormat(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" }).format(date);
@@ -41,7 +40,7 @@ export function ComingUpRow({ item, onChanged }: { item: ComingUpItem; onChanged
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="outline">Snooze</Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {snoozes.map((option) => <DropdownMenuItem key={option.label} onSelect={() => void snooze(option.input)}>{option.label}</DropdownMenuItem>)}
+          {SNOOZE_OPTIONS.map((option) => <DropdownMenuItem key={option.label} onSelect={() => void snooze(option.input)}>{option.label}</DropdownMenuItem>)}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

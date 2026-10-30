@@ -147,6 +147,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/StorageStep.tsx` | placementLine, StorageStep |
 | `frontend/src/apps/setup/WebSearchStep.tsx` | webSearchFailure, WebSearchStep |
 | `frontend/src/lib/media/micGate.tsx` | useMicGate, micDeviceSteps, micFixSteps, micHelp |
+| `frontend/src/shell/AlarmRinger.tsx` | AlarmRinger |
 | `frontend/src/shell/AliasRedirect.tsx` | AliasRedirect |
 | `frontend/src/shell/AmbientCompanionPane.tsx` | AMBIENT_QUICK_ACTIONS, ambientQuickActionsForApp, ambientQuickActionPrompt, readAmbientPaneState, isProtectedReply, ambientHistoryItems |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |

@@ -119,6 +119,7 @@ export interface TriggerOptions {
    * updated`'s own case) - lets a client correlate a delivery back to a
    * specific rendered message, the same reason subjectPersonId exists. */
   subjectTurnId?: string;
+  subjectJobId?: string;
   /** The memory record ids a `memory.updated` delivery is actually
    * about (what `remember()`/`supersede()` returned), so chatMemoryChip.tsx
    * has real ids to link to (`/memory?ids=...`) without a second query. */
@@ -254,6 +255,7 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
         createdAt: now.toISOString(),
         subjectPersonId: opts.subjectPersonId ?? null,
         subjectTurnId: opts.subjectTurnId ?? null,
+        subjectJobId: opts.subjectJobId ?? null,
         memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
         repeatKey: opts.repeatKey ?? null,
       })
@@ -323,6 +325,7 @@ export interface NotificationDeliveryView {
   readAt: string | null;
   dismissedAt: string | null;
   subjectTurnId: string | null;
+  subjectJobId?: string | null;
   memoryIds: string[] | null;
   /** Whether the shell's NotificationBell fires a Toast for this delivery,
    * declared once on NotificationType (lib/notificationTypes.ts) and
@@ -344,6 +347,7 @@ function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDe
     readAt: row.readAt,
     dismissedAt: row.dismissedAt,
     subjectTurnId: row.subjectTurnId,
+    ...(row.subjectJobId ? { subjectJobId: row.subjectJobId } : {}),
     memoryIds: row.memoryIds ? (JSON.parse(row.memoryIds) as string[]) : null,
     toast: getNotificationType(row.typeId)?.toast ?? true,
   };

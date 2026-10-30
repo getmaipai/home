@@ -29,12 +29,22 @@ function getContext(): AudioContextLike | undefined {
   return context;
 }
 
+export async function unlockAlarmAudio(): Promise<boolean> {
+  const audio = getContext();
+  if (!audio) return false;
+  if (audio.state === "suspended") {
+    if (typeof audio.resume !== "function") return false;
+    try { await audio.resume(); } catch { return false; }
+  }
+  return audio.state === "running";
+}
+
 export function playAlarmSound(id: AlarmSoundId, volume: AlarmVolume): AlarmPlayback {
   const audio = getContext();
   let stopped = false;
   const stopNodes: OscillatorNode[] = [];
   if (id === "none") return { blocked: false, stop() {} };
-  if (!audio || audio.state === "suspended") return { blocked: true, stop() {} };
+  if (!audio || audio.state === "suspended" || typeof audio.createOscillator !== "function" || typeof audio.createGain !== "function") return { blocked: true, stop() {} };
   const notes = alarmSoundNotes(id);
   const now = audio.currentTime;
   for (const note of notes) {
