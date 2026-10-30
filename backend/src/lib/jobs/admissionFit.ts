@@ -9,9 +9,10 @@ export interface ProfileSource {
   lowerWithoutAsking: Partial<Record<Category, boolean>>;
 }
 export interface BudgetNow { freeMemoryBytes: number; loaded: { class: string; peakBytes: number; pinned: boolean }[] }
-let source: ProfileSource | null = null;
-export function setProfileSource(next: ProfileSource | null): void { source = next; }
-export function getProfileSource(): ProfileSource | null { return source; }
+let source: ProfileSource | (() => ProfileSource | null) | null = null;
+/** A function is read at every admission, so a change on the Performance page applies to the next job. */
+export function setProfileSource(next: ProfileSource | (() => ProfileSource | null) | null): void { source = next; }
+export function getProfileSource(): ProfileSource | null { return typeof source === "function" ? source() : source; }
 
 export function memoryNowFromBudget(b: BudgetNow): MemoryNow {
   // GB uses decimal units: 1 GB = 1e9 bytes.
@@ -22,7 +23,7 @@ export function memoryNowFromBudget(b: BudgetNow): MemoryNow {
 }
 
 export async function fitForAdmission(job: { jobClass: "picture" | "video" | "other"; category?: string; tier: Tier }, readBudget: () => Promise<BudgetNow>): Promise<FitResult | null> {
-  const configured = source;
+  const configured = getProfileSource();
   if (!configured || job.tier === "standard") return null;
   const lead: Category = job.jobClass === "picture" ? "picture" : job.jobClass === "video" ? "video" : job.category === "music" ? "music" : "tools";
   const row = configured.table.find((item) => item.lead === lead && item.tier === job.tier);
