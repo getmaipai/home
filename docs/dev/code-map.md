@@ -105,10 +105,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/people/NewPersonForm.tsx` | NewPersonForm |
 | `frontend/src/apps/people/ProfileForm.tsx` | ProfileForm |
 | `frontend/src/apps/people/VoiceEnrollmentBody.tsx` | VoiceEnrollmentBody |
-| `frontend/src/apps/reminders/ComingUpPage.tsx` | ComingUpPage |
 | `frontend/src/apps/reminders/ComingUpRow.tsx` | TimerCountdown, ComingUpRow |
-| `frontend/src/apps/reminders/RemindersPage.tsx` | RemindersIcon, RemindersPage |
-| `frontend/src/apps/reminders/RemindersTabs.tsx` | RemindersTabs |
+| `frontend/src/apps/reminders/CreateListSheet.tsx` | CreateListSheet |
+| `frontend/src/apps/reminders/ListColumn.tsx` | ListColumn |
+| `frontend/src/apps/reminders/ListMain.tsx` | ListMain |
+| `frontend/src/apps/reminders/ListMenu.tsx` | ListMenu |
+| `frontend/src/apps/reminders/RemindersPage.tsx` | RemindersHeaderTitle, RemindersPage |
+| `frontend/src/apps/reminders/SmartListView.tsx` | SmartListView |
 | `frontend/src/apps/settings/AddChatModel.tsx` | AddChatModel |
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
@@ -686,7 +689,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/referenceSearch.ts` | searchReference |
 | `backend/src/lib/register.ts` | planFor, planLine, planLineForTurnMachine |
 | `backend/src/lib/relationships.ts` | createRelationship, listRelationships, calledAdminForOwnSettings, updateRelationship, promoteToStated, findRelationship |
-| `backend/src/lib/reminderParsing.ts` | parseReminder, parseAlarmRequest, parseTimerDuration |
+| `backend/src/lib/reminderParsing.ts` | parseReminder, parseQuickAddReminder, parseAlarmRequest, parseTimerDuration |
 | `backend/src/lib/remoteStackSettings.ts` | REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY, ENGINE_WHERE_KEY, REMOTE_ENGINE_ADDRESS_ERROR, REMOTE_ENGINE_TAILNET_ERROR, REMOTE_ENGINE_TAILNET_DISABLE_ERROR |
 | `backend/src/lib/replyConstraints.ts` | parseReplyConstraint, setReplyConstraint, constraintsFor, bannedPhrasesFor, clearReplyConstraints |
 | `backend/src/lib/replyParityJudge.ts` | judgeReplyParity |

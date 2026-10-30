@@ -1,124 +1,198 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import { Page } from "@maipai/ui/src/primitives/Page";
-import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Checkbox } from "@maipai/ui/src/ui/checkbox";
-import { Input } from "@maipai/ui/src/ui/input";
-import { api } from "@/lib/api";
-import { getIcon } from "@maipai/ui/src/icons";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
-import { RemindersTabs } from "@/apps/reminders/RemindersTabs";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
+import { api } from "@/lib/api";
+import { CreateListSheet } from "./CreateListSheet";
+import { RemindersIcon } from "./remindersIcon";
+import { ListColumn } from "./ListColumn";
+import { ListMain } from "./ListMain";
+import { SmartListView, type SmartItem } from "./SmartListView";
+import { labelFor, type ListIcon, type ReminderView } from "./reminderTypes";
 
-export const RemindersIcon = getIcon("layout-list");
 const LISTS_QUERY_KEY = ["household-lists"];
+const COMING_QUERY_KEY = ["household-coming-up"];
+
+export { RemindersIcon };
+
+export function RemindersHeaderTitle() {
+  return <div data-slot="header-title" className="min-w-0 flex-1 truncate text-base font-medium">Reminders</div>;
+}
+
+function RemindersHeaderAction() {
+  return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Create list" onClick={() => window.dispatchEvent(new Event("maipai:reminders-add-list"))}>+</Button></>;
+}
+
+function orderLists(input: ListRecord[]): ListRecord[] {
+  return input
+    .filter((list) => list.kind === "custom" || list.kind === "shopping" || list.kind === "todo")
+    .sort((a, b) => {
+      if (a.kind === b.kind) return labelFor(a).localeCompare(labelFor(b));
+      if (a.kind === "shopping") return -1;
+      if (b.kind === "shopping") return 1;
+      if (a.kind === "todo") return -1;
+      return 1;
+    });
+}
+
+function sameDay(value: string, today: string): boolean {
+  return new Date(value).toDateString() === today;
+}
 
 export function RemindersPage() {
+  useHeaderExtra(PageHeaderTitle, RemindersHeaderAction);
   const queryClient = useQueryClient();
-  const isPhone = useBreakpoint().tier === "phone";
+  const person = useContext(WakeWordPersonContext);
+  const isPhone = useBreakpoint().width < 640;
   const listsQuery = useQuery({ queryKey: LISTS_QUERY_KEY, queryFn: api.lists });
-  const lists = useMemo(() => (listsQuery.data ?? []).filter((list) => list.scope === "household" && (list.kind === "shopping" || list.kind === "todo")), [listsQuery.data]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [text, setText] = useState("");
-  const [showDone, setShowDone] = useState(false);
-  const selected = lists.find((list) => list.id === selectedId) ?? (isPhone ? undefined : lists.find((list) => list.kind === "shopping") ?? lists[0]);
-  const openItems = selected?.items.filter((item) => !item.done) ?? [];
-  const doneItems = selected?.items.filter((item) => item.done) ?? [];
-  useEffect(() => {
-    if (selectedId && !lists.some((list) => list.id === selectedId)) setSelectedId(null);
-  }, [lists, selectedId]);
+  const comingQuery = useQuery({ queryKey: COMING_QUERY_KEY, queryFn: api.comingUp });
+  const lists = useMemo(() => orderLists(listsQuery.data ?? []), [listsQuery.data]);
+  const [view, setView] = useState<ReminderView>({ kind: "list", id: "" });
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [phoneShowingList, setPhoneShowingList] = useState(false);
+  const selected = view.kind === "list"
+    ? lists.find((list) => list.id === view.id) ?? (view.id ? undefined : lists.find((list) => list.kind === "shopping") ?? lists[0])
+    : undefined;
 
-  async function addItem(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const value = text.trim();
-    if (!selected || !value) return;
-    setText("");
-    try {
-      await api.addListItem(selected.id, value);
-    } catch (error) {
-      setText(value);
-      throw error;
+  const jobs = useMemo(() => (comingQuery.data ?? [])
+    .filter((item) => item.kind === "reminder")
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at)), [comingQuery.data]);
+  const today = new Date().toDateString();
+  const todayJobs = jobs.filter((item) => sameDay(item.at, today));
+  const dueItems = lists.flatMap((list) => list.items
+    .filter((item) => !item.done && item.due_at)
+    .map((item) => ({ list, item })));
+  const todayItems = dueItems.filter(({ item }) => sameDay(item.due_at!, today));
+  const smartItems = useMemo<SmartItem[]>(() => {
+    const jobsToShow = view.kind === "today" ? todayJobs : jobs;
+    const itemsToShow = view.kind === "today" ? todayItems : dueItems;
+    return [
+      ...jobsToShow.map((item) => ({ id: item.id, label: "Reminder", text: item.text, at: item.at })),
+      ...itemsToShow.map(({ list, item }) => ({ id: item.id, label: labelFor(list), text: item.text, at: item.due_at!, list })),
+    ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  }, [dueItems, jobs, todayItems, todayJobs, view.kind]);
+
+  useEffect(() => {
+    if (!listsQuery.isFetching && view.kind === "list" && !view.id && lists[0]) {
+      setView({ kind: "list", id: lists[0].id });
     }
-    await queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+  }, [lists, listsQuery.isFetching, view]);
+
+  useEffect(() => {
+    const open = () => setSheetOpen(true);
+    window.addEventListener("maipai:reminders-add-list", open);
+    return () => window.removeEventListener("maipai:reminders-add-list", open);
+  }, []);
+
+  async function refresh() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: COMING_QUERY_KEY }),
+    ]);
+  }
+
+  async function addItem(text: string) {
+    if (!selected) return;
+    await api.addListItem(selected.id, text, selected.kind !== "shopping");
+    await refresh();
   }
 
   async function toggleItem(itemId: string, done: boolean) {
     if (!selected) return;
     await api.editListItem(selected.id, itemId, done);
-    await queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+    await refresh();
   }
 
   async function clearDone() {
     if (!selected) return;
     await api.clearDoneListItems(selected.id);
-    setShowDone(false);
-    await queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+    await refresh();
   }
 
-  return (
-    <Page title="Reminders" hideTitle>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <RemindersTabs value="lists" />
-        <div className="flex min-h-0 flex-1">
-        {!isPhone ? <aside className="hidden w-64 flex-col gap-2 p-3 md:flex" aria-label="Reminder lists">
-          <h2 className="px-3 py-2 text-lg font-semibold">Lists</h2>
-          {lists.map((list) => <Button key={list.id} variant={selected?.id === list.id ? "secondary" : "ghost"} onClick={() => { setSelectedId(list.id); setShowDone(false); }}>
-            {list.kind === "shopping" ? "Shopping" : "To-do"}
-            <Badge variant="secondary">{list.items.filter((item) => !item.done).length}</Badge>
-          </Button>)}
-        </aside> : null}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {selected ? (
-            <>
-              <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  {isPhone ? <Button variant="ghost" onClick={() => setSelectedId(null)}>Lists</Button> : null}
-                  <h2 className="truncate text-xl font-semibold">{selected.kind === "shopping" ? "Shopping" : "To-do"}</h2>
-                  <Badge variant="secondary">{openItems.length}</Badge>
-                </div>
-                {selected.kind === "shopping" && doneItems.length > 0 ? <Button variant="ghost" onClick={clearDone}>Clear done</Button> : null}
-              </header>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4">
-                <ul className="m-0 list-none p-0">
-                  {openItems.map((item) => (
-                    <li key={item.id} className="flex min-h-12 items-center gap-3 border-b py-2">
-                      <Checkbox checked={false} onCheckedChange={(checked) => void toggleItem(item.id, checked === true)} aria-label={item.text} />
-                      <span>{item.text}</span>
-                    </li>
-                  ))}
-                </ul>
-                {doneItems.length > 0 ? (
-                  <>
-                    <Button variant="ghost" onClick={() => setShowDone((value) => !value)} aria-expanded={showDone}>
-                      {showDone ? "Hide done" : `Done (${doneItems.length})`}
-                    </Button>
-                    {showDone ? <ul className="m-0 list-none p-0">{doneItems.map((item) => (
-                      <li key={item.id} data-done="true" className="flex min-h-12 items-center gap-3 border-b py-2 text-muted-foreground">
-                        <Checkbox checked onCheckedChange={(checked) => void toggleItem(item.id, checked === true)} aria-label={item.text} />
-                        <span className="line-through">{item.text}</span>
-                      </li>
-                    ))}</ul> : null}
-                  </>
-                ) : null}
-              </div>
-              <form className="flex items-center gap-2 border-t p-4" onSubmit={(event) => void addItem(event)}>
-                <Input aria-label="Add an item" placeholder="Add an item" value={text} onChange={(event) => setText(event.target.value)} />
-                <Button type="submit" disabled={!text.trim()}>Add</Button>
-              </form>
-            </>
-          ) : (
-            <section className="flex flex-1 flex-col gap-2 p-4 lg:hidden" aria-label="Reminder lists">
-              <h2 className="text-xl font-semibold">Lists</h2>
-              {lists.map((list) => <Button key={list.id} variant="outline" onClick={() => setSelectedId(list.id)}>
-                <span>{list.kind === "shopping" ? "Shopping" : "To-do"}</span>
-                <Badge variant="secondary">{list.items.filter((item) => !item.done).length}</Badge>
-              </Button>)}
-            </section>
-          )}
-          {listsQuery.isError ? <p role="alert" className="p-4 text-destructive">Could not load household lists.</p> : null}
-        </main>
-        </div>
-      </div>
-    </Page>
-  );
+  async function createList(title: string, icon: ListIcon) {
+    const created = await api.createList({ kind: "custom", scope: "person", title, icon });
+    setSheetOpen(false);
+    setView({ kind: "list", id: created.id });
+    setPhoneShowingList(true);
+    await refresh();
+  }
+
+  async function renameList(title: string) {
+    if (!selected) return;
+    await api.updateList(selected.id, { title });
+    await refresh();
+  }
+
+  async function changeIcon(icon: ListIcon) {
+    if (!selected) return;
+    await api.updateList(selected.id, { icon });
+    await refresh();
+  }
+
+  async function deleteSelected() {
+    if (!selected) return;
+    await api.deleteList(selected.id);
+    setConfirmDelete(false);
+    setView({ kind: "list", id: "" });
+    await refresh();
+  }
+
+  const canManage = selected?.kind === "custom" && person?.role !== "child";
+  const showColumn = !isPhone || !phoneShowingList;
+  const todayCount = todayJobs.length + todayItems.length;
+  const scheduledCount = jobs.length + dueItems.length;
+
+  return <Page title="Reminders" hideTitle>
+    <div className="flex min-h-0 flex-1">
+      {showColumn ? <ListColumn
+        lists={lists}
+        view={view}
+        todayCount={todayCount}
+        scheduledCount={scheduledCount}
+        onCreate={() => setSheetOpen(true)}
+        onSelect={(next) => {
+          setView(next);
+          setPhoneShowingList(true);
+        }}
+      /> : null}
+      {(!isPhone || phoneShowingList) && selected && view.kind === "list" ? <ListMain
+        list={selected}
+        isPhone={isPhone}
+        canManage={canManage}
+        onBack={() => setPhoneShowingList(false)}
+        onAdd={addItem}
+        onToggle={toggleItem}
+        onClearDone={clearDone}
+        onRename={renameList}
+        onChangeIcon={changeIcon}
+        onDelete={() => setConfirmDelete(true)}
+      /> : null}
+      {(!isPhone || phoneShowingList) && view.kind !== "list" ? <SmartListView
+        view={view}
+        items={smartItems}
+        onChanged={() => void comingQuery.refetch()}
+      /> : null}
+    </div>
+    <CreateListSheet open={sheetOpen} onOpenChange={setSheetOpen} onCreate={createList} isPhone={isPhone} />
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {selected ? labelFor(selected) : "list"}?</AlertDialogTitle>
+          <AlertDialogDescription>Its {selected?.items.length ?? 0} items go too.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => void deleteSelected()}>Delete list</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    {listsQuery.isError || comingQuery.isError ? <p role="alert" className="p-4 text-destructive">Could not load reminders.</p> : null}
+  </Page>;
 }

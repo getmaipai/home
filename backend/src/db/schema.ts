@@ -1765,6 +1765,7 @@ export const lists = sqliteTable("lists", {
   person: text("person").references(() => people.id),
   kind: text("kind").notNull(), // "shopping" | "todo" | "custom"
   title: text("title").notNull(),
+  icon: text("icon"),
   items: text("items").notNull().default("[]"), // JSON ListItem[]
   source: text("source").notNull(),
   createdAt: text("created_at").notNull(),

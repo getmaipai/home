@@ -38,7 +38,7 @@ import { CommandsIcon } from "@/shell/pages/CommandsPage";
 import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
-import { RemindersIcon } from "@/apps/reminders/RemindersPage";
+import { RemindersIcon } from "@/apps/reminders/remindersIcon";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 import { ClockHeaderTitle } from "@/apps/clock/ClockHeaderTitle";
 

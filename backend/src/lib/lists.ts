@@ -38,6 +38,7 @@ function toList(row: ListRow): ListT {
     person: row.person,
     kind: row.kind,
     title: row.title,
+    icon: row.icon ?? undefined,
     items: JSON.parse(row.items),
     source: row.source,
     created_at: row.createdAt,
@@ -54,6 +55,7 @@ function toRow(list: ListT) {
     person: list.person,
     kind: list.kind,
     title: list.title,
+    icon: list.icon ?? null,
     items: JSON.stringify(list.items),
     source: list.source,
     createdAt: list.created_at,
@@ -97,6 +99,7 @@ export interface ListCreate {
   title?: string;
   scope?: "household" | "person";
   person?: string | null;
+  icon?: ListT["icon"];
 }
 
 export function createList(actor: { id: string }, input: ListCreate): OpResult<ListT> {
@@ -110,6 +113,7 @@ export function createList(actor: { id: string }, input: ListCreate): OpResult<L
     person: input.scope === "person" ? (input.person ?? actor.id) : null,
     kind: input.kind,
     title,
+    icon: input.icon,
     items: [],
     source: "hub",
     created_at: now,
@@ -123,7 +127,11 @@ export function createList(actor: { id: string }, input: ListCreate): OpResult<L
   if (problems.length > 0) return { ok: false, status: 400, error: problems.join("; ") };
 
   if (candidate.data.person) {
-    const person = db.select({ id: people.id }).from(people).where(and(eq(people.id, candidate.data.person), isNull(people.deletedAt))).get();
+    const person = db
+      .select({ id: people.id })
+      .from(people)
+      .where(and(eq(people.id, candidate.data.person), isNull(people.deletedAt)))
+      .get();
     if (!person) return { ok: false, status: 400, error: "person does not name an existing person" };
   }
 
@@ -165,6 +173,7 @@ export function findOrCreateStandingList(kind: "shopping" | "todo"): ListRow {
 
 export interface ListEdit {
   title?: string;
+  icon?: ListT["icon"];
 }
 
 /** Deliberately narrow, the same call lib/entities.ts's updateEntity()
@@ -178,6 +187,7 @@ export function updateList(actor: { id: string; role: string }, id: string, edit
   const candidate = List.safeParse({
     ...target,
     title: edit.title ?? target.title,
+    icon: edit.icon ?? target.icon,
     updated_at: new Date().toISOString(),
     hlc: nextHlc(),
   });
@@ -295,7 +305,12 @@ export function clearDoneItems(actor: { id: string; role: string }, id: string):
   const existing = getList(actor, id);
   if (!existing.ok || !existing.value) return existing;
   const now = new Date().toISOString();
-  const candidate = List.parse({ ...existing.value, items: existing.value.items.filter((item) => !item.done), updated_at: now, hlc: nextHlc() });
+  const candidate = List.parse({
+    ...existing.value,
+    items: existing.value.items.filter((item) => !item.done),
+    updated_at: now,
+    hlc: nextHlc(),
+  });
   db.update(lists).set(toRow(candidate)).where(eq(lists.id, id)).run();
   return { ok: true, status: 200, value: candidate };
 }

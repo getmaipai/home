@@ -110,6 +110,24 @@ export function parseReminder(text: string, now: Date = new Date()): ParsedRemin
   return { task, when: date.toISOString(), when_text: formatWhenText(date) };
 }
 
+/** Quick add treats a bare hour on tomorrow's item as an afternoon time,
+ * matching the Lists composer example "milk tomorrow at 5". All other
+ * date extraction and refusal behavior stays on parseReminder. */
+export function parseQuickAddReminder(text: string, now: Date = new Date()): ParsedReminder {
+  const bareHour = BARE_HOUR.exec(text);
+  if (!bareHour || !/\btomorrow\b/i.test(text)) return parseReminder(text, now);
+
+  const hour = Number(bareHour[1]);
+  if (hour < 1 || hour > 12) return parseReminder(text, now);
+
+  const minute = Number(bareHour[2] ?? "0");
+  const normalized = text.replace(
+    BARE_HOUR,
+    `at ${hour}:${String(minute).padStart(2, "0")} pm`,
+  );
+  return parseReminder(normalized, now);
+}
+
 /** An alarm request is a reminder whose time is often a bare hour ("for 7 tomorrow called gym"), which chrono does
  * not read as a time. A bare hour gets an am or pm here: for tomorrow, 4 to 11 is the morning and 12 to 3 the
  * afternoon; otherwise the next time that hour comes round. The label defaults to "Alarm". */

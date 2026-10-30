@@ -105,7 +105,6 @@ const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), 
 // the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
 const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const RemindersPage = lazy(() => import("@/apps/reminders/RemindersPage").then((m) => ({ default: m.RemindersPage })));
-const ComingUpPage = lazy(() => import("@/apps/reminders/ComingUpPage").then((m) => ({ default: m.ComingUpPage })));
 const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ default: m.ClockPage })));
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
@@ -464,7 +463,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="household" element={<Navigate to="/reminders" replace />} />
             <Route path="household/coming-up" element={<Navigate to="/reminders" replace />} />
             <Route path="reminders" element={<Suspense fallback={null}><RemindersPage /></Suspense>} />
-            <Route path="reminders/coming-up" element={<Suspense fallback={null}><ComingUpPage /></Suspense>} />
+            <Route path="reminders/coming-up" element={<Navigate to="/reminders" replace />} />
             <Route path="clock" element={<Suspense fallback={null}><ClockPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
             <Route path="mic-test" element={<MicTestPage />} />

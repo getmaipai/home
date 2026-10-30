@@ -9,8 +9,21 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listLists, getList, createList, updateList, deleteList, addItem, editItem, removeItem, clearList, clearDoneItems, findOrCreateStandingList } from "@/lib/lists";
+import {
+  listLists,
+  getList,
+  createList,
+  updateList,
+  deleteList,
+  addItem,
+  editItem,
+  removeItem,
+  clearList,
+  clearDoneItems,
+  findOrCreateStandingList,
+} from "@/lib/lists";
 import { List } from "@maipai/spec/gen/ts/list.js";
+import { parseQuickAddReminder } from "@/lib/reminderParsing";
 
 export const listsRoutes = apiRouter();
 
@@ -62,7 +75,8 @@ const createRoute_ = createRoute({
   method: "post",
   path: "/",
   tags: ["Lists"],
-  summary: "Create a list - shopping/todo find-or-create their own standing one via chat instead; this is for a custom list, or an explicit household/person one",
+  summary:
+    "Create a list - shopping/todo find-or-create their own standing one via chat instead; this is for a custom list, or an explicit household/person one",
   middleware: [requireAuth] as const,
   request: {
     body: {
@@ -73,6 +87,7 @@ const createRoute_ = createRoute({
             title: z.string().min(1).max(120).optional(),
             scope: SCOPE.optional(),
             person: z.string().nullable().optional(),
+            icon: List.shape.icon,
           }),
         },
       },
@@ -94,11 +109,20 @@ const patchRoute = createRoute({
   method: "patch",
   path: "/{id}",
   tags: ["Lists"],
-  summary: "Rename a list",
+  summary: "Rename a list or change its icon",
   middleware: [requireAuth] as const,
   request: {
     params: idParamSchema("id", "list-a1b2c3"),
-    body: { content: { "application/json": { schema: z.object({ title: z.string().min(1).max(120).optional() }) } } },
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            title: z.string().min(1).max(120).optional(),
+            icon: List.shape.icon,
+          }),
+        },
+      },
+    },
   },
   responses: {
     200: { content: { "application/json": { schema: List } }, description: "Updated." },
@@ -143,7 +167,11 @@ const addItemRoute = createRoute({
     body: {
       content: {
         "application/json": {
-          schema: z.object({ text: z.string().min(1).max(500), due_at: z.string().nullable().optional() }),
+          schema: z.object({
+            text: z.string().min(1).max(500),
+            due_at: z.string().nullable().optional(),
+            parse_due: z.boolean().optional(),
+          }),
         },
       },
     },
@@ -156,7 +184,19 @@ const addItemRoute = createRoute({
 listsRoutes.openapi(addItemRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
-  const result = addItem(actor, id, c.req.valid("json"));
+  const input = c.req.valid("json");
+  let result;
+  if (input.parse_due && input.due_at === undefined) {
+    try {
+      const parsed = parseQuickAddReminder(input.text);
+      result = addItem(actor, id, { text: parsed.task, due_at: parsed.when });
+    } catch {
+      // Parsing is a convenience. Keep the original text and add without a due time.
+      result = addItem(actor, id, { text: input.text });
+    }
+  } else {
+    result = addItem(actor, id, input);
+  }
   if (!result.ok) return c.json({ error: result.error }, statusFor(result.status));
   return c.json(result.value, 200);
 });

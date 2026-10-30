@@ -37828,6 +37828,94 @@
                   "person": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "icon": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "cart"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "check"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "sparkle"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "briefcase"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "home"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "heart"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "book"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "star"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "gift"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "plane"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "leaf"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "sun"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "nullable": true,
+                        "enum": [
+                          null
+                        ]
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "default": null,
+                    "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
                   }
                 },
                 "required": [
@@ -38399,7 +38487,7 @@
         "tags": [
           "Lists"
         ],
-        "summary": "Rename a list",
+        "summary": "Rename a list or change its icon",
         "parameters": [
           {
             "schema": {
@@ -38421,6 +38509,94 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 120
+                  },
+                  "icon": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "cart"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "check"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "sparkle"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "briefcase"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "home"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "heart"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "book"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "star"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "gift"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "plane"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "leaf"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "sun"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "nullable": true,
+                        "enum": [
+                          null
+                        ]
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "default": null,
+                    "description": "A custom list takes one built-in icon from this set. Built-in lists have fixed icons."
                   }
                 }
               }
@@ -38806,6 +38982,9 @@
                   "due_at": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "parse_due": {
+                    "type": "boolean"
                   }
                 },
                 "required": [

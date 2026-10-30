@@ -9,6 +9,7 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { parseQuickAddReminder } from "@/lib/reminderParsing";
 
 beforeEach(() => resetDb());
 
@@ -43,6 +44,16 @@ describe("POST /api/lists", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as { title: string };
     expect(body.title).toBe("Books to Read");
+  });
+
+  test("creates a custom list with an icon and returns it on later reads", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/lists", { kind: "custom", title: "Work", scope: "person", icon: "briefcase" });
+    expect(created.status).toBe(201);
+    const list = (await created.json()) as { id: string; icon?: string };
+    expect(list.icon).toBe("briefcase");
+    const reread = await owner.get(`/api/lists/${list.id}`);
+    expect(((await reread.json()) as { icon?: string }).icon).toBe("briefcase");
   });
 
   test("a person-scoped list defaults to the creator's own person", async () => {
@@ -104,6 +115,22 @@ describe("PATCH and DELETE /api/lists/:id", () => {
     expect(body.title).toBe("Books to Read");
   });
 
+  test("updates a custom list title and icon", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/lists", { kind: "custom", title: "Work", scope: "person", icon: "sparkle" });
+    const list = (await created.json()) as { id: string };
+    const patched = await owner.request(`/api/lists/${list.id}`, { method: "PATCH", body: { title: "Projects", icon: "briefcase" } });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toMatchObject({ title: "Projects", icon: "briefcase" });
+  });
+
+  test("deletes an own custom list", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/lists", { kind: "custom", title: "Work", scope: "person" });
+    const list = (await created.json()) as { id: string };
+    expect((await owner.request(`/api/lists/${list.id}`, { method: "DELETE" })).status).toBe(200);
+  });
+
   test("deleting removes it from listing but is idempotent-safe against a second delete", async () => {
     const owner = await ownerSession();
     const created = await owner.post("/api/lists", { kind: "shopping" });
@@ -145,6 +172,29 @@ describe("items: POST/PATCH/DELETE /api/lists/:id/items[/:itemId]", () => {
     expect(body.items).toHaveLength(1);
     expect(body.items[0]!.text).toBe("milk");
     expect(body.items[0]!.done).toBe(false);
+  });
+
+  test("parse_due extracts tomorrow at 5 while plain text stays unchanged", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/lists", { kind: "todo", scope: "person", title: "Tasks" });
+    const list = (await created.json()) as { id: string };
+    const parsed = await owner.post(`/api/lists/${list.id}/items`, { text: "milk tomorrow at 5", parse_due: true });
+    expect(parsed.status).toBe(200);
+    const parsedBody = (await parsed.json()) as { items: Array<{ text: string; due_at: string | null }> };
+    expect(parsedBody.items[0]!.text).toBe("milk");
+    expect(typeof parsedBody.items[0]!.due_at).toBe("string");
+    expect(parseQuickAddReminder("milk tomorrow at 5", new Date("2026-10-29T12:00:00.000Z")).when_text).toContain("5:00 PM");
+    const plain = await owner.post(`/api/lists/${list.id}/items`, { text: "plain milk", parse_due: true });
+    expect(await plain.json()).toMatchObject({ items: [expect.anything(), expect.objectContaining({ text: "plain milk", due_at: null })] });
+  });
+
+  test("a refused parse still adds the full text", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/lists", { kind: "todo", scope: "person", title: "Tasks" });
+    const list = (await created.json()) as { id: string };
+    const response = await owner.post(`/api/lists/${list.id}/items`, { text: "every Friday milk", parse_due: true });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ items: [expect.objectContaining({ text: "every Friday milk", due_at: null })] });
   });
 
   test("a due_at is refused on a non-todo list item", async () => {
