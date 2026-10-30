@@ -3,7 +3,7 @@
 // The promises: every result comes from the band's release path (a teen never meets an adult-only story, a child searches the Kids'
 // lists only); a child's search has no chips, no Saved group and no recents; a person's recents are theirs alone and go with them;
 // a guest gets a 404; and no log line carries the query. Feeds and pictures are localhost fixtures, never a real address.
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, setSystemTime, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { newsSearchRecents, people } from "@/db/schema";
@@ -24,7 +24,13 @@ let feeds: { kids: string; household: string };
 beforeAll(async () => { publisher = await startPublisher(); });
 afterAll(() => publisher.stop());
 
+// The hub's clock is UTC here, and "Today" is the hub's calendar day: an item a few minutes old falls on yesterday for the first
+// minutes after 00:00 UTC (8 PM in New York), which turned the watcher red every night. A fixed midday instant makes every age below
+// mean the same thing whenever the suite runs.
+const MIDDAY = new Date("2026-10-17T16:00:00.000Z");
+
 beforeEach(() => {
+  setSystemTime(MIDDAY);
   resetDb();
   resetNewsState();
   __resetRateLimiterForTests();
@@ -33,7 +39,7 @@ beforeEach(() => {
   feeds = seedFeeds();
   publisher.attach();
 });
-afterEach(() => { publisher.detach(); removeNewsApp(); });
+afterEach(() => { publisher.detach(); removeNewsApp(); setSystemTime(); });
 
 interface Who { adult: TestClient; teen: TestClient; child: TestClient; guest: TestClient; childId: string; teenId: string; adultId: string }
 async function household(): Promise<Who> {
