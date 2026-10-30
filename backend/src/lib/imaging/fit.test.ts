@@ -45,6 +45,11 @@ describe("fitToFrame", () => {
     expect(zoomed.right - zoomed.left).toBeGreaterThan(normal.right - normal.left);
     const cut = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 0.95, y: 0.5 } }));
     expect(cut.right).toBe(99);
-    await expect(fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 3, y: 0.5 } })).resolves.toBeDefined();
+    // Far past the edge is refused in plain words; a large zoom and a push well below the frame still work, with no upper limit on the zoom.
+    await expect(fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 3, y: 0.5 } })).rejects.toThrow("moved out of the picture");
+    const down = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 0.5, y: 1.3 } }));
+    expect(down.top).toBeGreaterThan(normal.top);
+    const huge = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 100, x: 0.5, y: 0.5 } }));
+    expect([huge.left, huge.top, huge.right, huge.bottom]).toEqual([0, 0, 99, 99]);
   });
 });

@@ -3,10 +3,12 @@ import { DEFAULT_FRAME, type PictureFrame } from "@/shell/pages/companionFlow/Pr
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const KEY_STEP = 0.02;
+// The character can be pushed past an edge and zoomed as far as the person likes: the placed picture is cut by the frame.
+const POSITION_MIN = -1, POSITION_MAX = 2, ZOOM_MAX = 200;
 
 /**
  * The character picture inside the preview: drag it with a mouse or finger, move it with the arrow keys, zoom with the mouse wheel
- * (or + and -). `frame` is the placement the person wants (zoom 1 to 4, x and y the character's centre as 0 to 1 of the frame);
+ * (or + and -). `frame` is the placement the person wants (zoom 1 and up, x and y the character's centre as fractions of the frame, -1 to 2);
  * `baked` is the placement already drawn into `src`, so the live move is only the difference and the picture does not jump when Home
  * returns the placed version.
  */
@@ -25,7 +27,7 @@ export function DraggablePicture({ src, alt, frame, baked = DEFAULT_FRAME, disab
       const { frame: current, disabled: off, onFrameChange: change } = latest.current;
       event.preventDefault();
       if (off) return;
-      const zoom = Math.round(clamp(current.zoom - event.deltaY * 0.005, 1, 4) * 100) / 100;
+      const zoom = Math.round(clamp(current.zoom * Math.exp(-event.deltaY * 0.002), 1, ZOOM_MAX) * 100) / 100;
       if (zoom !== current.zoom) change({ ...current, zoom });
     };
     node.addEventListener("wheel", onWheel, { passive: false });
@@ -40,7 +42,7 @@ export function DraggablePicture({ src, alt, frame, baked = DEFAULT_FRAME, disab
   function move(event: ReactPointerEvent<HTMLDivElement>) {
     const start = drag.current; if (!start || disabled) return;
     const rect = box.current?.getBoundingClientRect(); if (!rect || rect.width === 0 || rect.height === 0) return;
-    onFrameChange({ ...start.from, x: clamp(start.from.x + (event.clientX - start.startX) / rect.width, 0, 1), y: clamp(start.from.y + (event.clientY - start.startY) / rect.height, 0, 1) });
+    onFrameChange({ ...start.from, x: clamp(start.from.x + (event.clientX - start.startX) / rect.width, POSITION_MIN, POSITION_MAX), y: clamp(start.from.y + (event.clientY - start.startY) / rect.height, POSITION_MIN, POSITION_MAX) });
   }
   function up(event: ReactPointerEvent<HTMLDivElement>) {
     drag.current = null;
@@ -49,9 +51,9 @@ export function DraggablePicture({ src, alt, frame, baked = DEFAULT_FRAME, disab
   function key(event: KeyboardEvent<HTMLDivElement>) {
     if (disabled) return;
     const move = { ArrowLeft: [-KEY_STEP, 0], ArrowRight: [KEY_STEP, 0], ArrowUp: [0, -KEY_STEP], ArrowDown: [0, KEY_STEP] }[event.key];
-    if (move) { event.preventDefault(); onFrameChange({ ...frame, x: clamp(Math.round((frame.x + move[0]!) * 100) / 100, 0, 1), y: clamp(Math.round((frame.y + move[1]!) * 100) / 100, 0, 1) }); return; }
+    if (move) { event.preventDefault(); onFrameChange({ ...frame, x: clamp(Math.round((frame.x + move[0]!) * 100) / 100, POSITION_MIN, POSITION_MAX), y: clamp(Math.round((frame.y + move[1]!) * 100) / 100, POSITION_MIN, POSITION_MAX) }); return; }
     if (event.key === "+" || event.key === "=" || event.key === "-") {
-      event.preventDefault(); onFrameChange({ ...frame, zoom: Math.round(clamp(frame.zoom + (event.key === "-" ? -0.1 : 0.1), 1, 4) * 100) / 100 });
+      event.preventDefault(); onFrameChange({ ...frame, zoom: Math.round(clamp(frame.zoom * (event.key === "-" ? 1 / 1.1 : 1.1), 1, ZOOM_MAX) * 100) / 100 });
     }
   }
 

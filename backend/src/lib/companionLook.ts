@@ -19,12 +19,14 @@ export type LookVersion = z.infer<typeof Version>;
 export type CompanionLook = z.infer<typeof LookSchema>;
 export type CompanionSheet = z.infer<typeof Sheet>;
 export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null, key: media.key.default, sheet: null };
+/** The longest description of a character Home accepts and sends on; the picture engine itself reads about this much and no more. */
+export const PROMPT_MAX_CHARS = 20_000;
 export const LOOK_LIMIT_LINE = "This companion already has 60 pictures. Delete some before adding another.";
 
 /** The generated character stays isolated on the companion's chosen key colour until Home removes it. */
 export function lookPromptFor(lookPrompt: string, keyHex: string, style?: LookStyleChoice, customStyle?: string): string {
   const keyName = keyHex.toUpperCase() === "#FF00FF" ? "magenta" : "green";
-  const subject = lookPrompt.trim().slice(0, 600);
+  const subject = lookPrompt.trim().slice(0, PROMPT_MAX_CHARS);
   const phrase = lookStylePhrase(style, customStyle);
   return `${subject}. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down.${phrase ? ` ${phrase}` : ""} Plain solid ${keyName} background, no shadow, no ground, no text, no other objects.`;
 }

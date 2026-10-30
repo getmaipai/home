@@ -135,7 +135,7 @@ test("the arrow keys move the character and the wheel zooms it", async () => {
   fireEvent.wheel(box, { deltaY: -100 });
   await waitFor(() => expect(calls.prepare.length).toBe(1), { timeout: 2000 });
   const sent = calls.prepare[0] as { frame: { zoom: number; x: number; y: number } };
-  expect(sent.frame.x).toBeCloseTo(0.54, 5); expect(sent.frame.y).toBeCloseTo(0.52, 5); expect(sent.frame.zoom).toBeCloseTo(1.5, 5);
+  expect(sent.frame.x).toBeCloseTo(0.54, 5); expect(sent.frame.y).toBeCloseTo(0.52, 5); expect(sent.frame.zoom).toBeCloseTo(1.22, 2); /* the wheel zooms by a fixed share per notch (no upper limit), 1.22 for 100 */
 });
 
 test("a running job disables Generate with a busy label and shows the percent and label as a progress bar", async () => {

@@ -23,8 +23,8 @@ export function PreviewControls({ frame, disabled, idPrefix = "character", posit
   );
   return (
     <div className="flex flex-col gap-4">
-      {slider("zoom", "Zoom", 1, 4, 0.1)}
-      {position ? <>{slider("x", "Left and right", 0, 1, 0.01)}{slider("y", "Up and down", 0, 1, 0.01)}</> : null}
+      {slider("zoom", "Zoom", 1, 20, 0.1)}
+      {position ? <>{slider("x", "Left and right", -1, 2, 0.01)}{slider("y", "Up and down", -1, 2, 0.01)}</> : null}
     </div>
   );
 }
