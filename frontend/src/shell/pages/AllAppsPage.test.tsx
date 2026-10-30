@@ -62,6 +62,17 @@ afterEach(() => {
 });
 
 describe("the All apps page with 60 apps", () => {
+  test("the page's one visible title is the header's icon and name; the directory's own heading is for screen readers only", async () => {
+    start();
+    const view = open("/all-apps");
+    await view.findByRole("searchbox", { name: "Search apps" });
+    const header = view.container.querySelector('[data-slot="rail-page-header"]') as HTMLElement;
+    expect(within(header).getByText("All apps")).toBeTruthy();
+    expect(header.querySelector("svg")).not.toBeNull();
+    const heading = page(view).getByRole("heading", { level: 1, name: "All apps" });
+    expect(heading.className).toContain("sr-only");
+  });
+
   test("the rail's grid button opens it, and it lists every app with the search box focused", async () => {
     start();
     const view = open("/");

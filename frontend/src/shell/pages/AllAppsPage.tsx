@@ -29,6 +29,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
   return (
     <AppDirectory
       apps={apps}
+      hideTitle
       favoritesLimit={RAIL_APPS_MAX}
       busy={isLoading || isSaving}
       onToggleFavorite={(app) => togglePin(app.to)}
