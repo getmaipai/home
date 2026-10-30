@@ -1,0 +1,55 @@
+{
+ "model": "htdemucs_6s",
+ "device": "mps",
+ "load_s": 1.9,
+ "sources": [
+  "drums",
+  "bass",
+  "other",
+  "vocals",
+  "guitar",
+  "piano"
+ ],
+ "songs": {
+  "pop": {
+   "seconds": 5.4,
+   "audio_s": 40.0,
+   "energy_share": {
+    "drums": 0.395,
+    "bass": 0.201,
+    "other": 0.066,
+    "vocals": 0.298,
+    "guitar": 0.04,
+    "piano": 0.0
+   },
+   "recon_err": 0.00534
+  },
+  "folk": {
+   "seconds": 1.6,
+   "audio_s": 40.0,
+   "energy_share": {
+    "drums": 0.0,
+    "bass": 0.005,
+    "other": 0.003,
+    "vocals": 0.633,
+    "guitar": 0.36,
+    "piano": 0.0
+   },
+   "recon_err": 0.00396
+  },
+  "lofi": {
+   "seconds": 2.4,
+   "audio_s": 40.0,
+   "energy_share": {
+    "drums": 0.766,
+    "bass": 0.104,
+    "other": 0.006,
+    "vocals": 0.0,
+    "guitar": 0.002,
+    "piano": 0.122
+   },
+   "recon_err": 0.00666
+  }
+ },
+ "peak_rss_gb": 1.37
+}

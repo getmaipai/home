@@ -17,7 +17,8 @@ before quoting them as a promise.
 | TIER-EVAL-02 Reduced voice | Chatterbox Nano runs on MLX, half the memory of Turbo, same words and same voice closeness by proxy | measured; ear check is Jesse's |
 | TIER-EVAL-08 listening side | No, from the 2026-10-25 numbers; household audio needs real recordings | decided, see below |
 | TIER-EVAL-06 music Boost and Max | XL turbo: no slot; XL SFT: Max candidate pending a listen | measured; ear check is Jesse's |
-| TIER-EVAL-03, 04, 05, 07 | not run yet | see "Not run yet" |
+| TIER-EVAL-07 stem splitting | htdemucs Standard; ft and 6s pending a listen; TIER-STEMS-01 can start | measured; ear check is Jesse's |
+| TIER-EVAL-03, 04, 05 | in progress | see "Not run yet" |
 
 ## TIER-EVAL-01: Reduced chat
 
@@ -169,7 +170,40 @@ Reading it, with the numbers only (the listening verdict is Jesse's):
 - **Verdict for the table:** shipped 2B turbo stays Standard. XL turbo: no slot. XL SFT: candidate for Max, pending Jesse's listen (songs in
   the shared notes folder under `music-eval/`: `shipped-*`, `xl-turbo-*`, `xl-sft-*`) and a longer-song and more-songs check.
 
-## Not run yet: TIER-EVAL-03, 04, 05 and 07, with download sizes
+## TIER-EVAL-07: stem splitting models
+
+**Method.** The official `demucs` 4.1.0 package (MIT code) on torch with the Apple GPU (MPS), the three pretrained models it ships, on the three
+40-second songs made in EVAL-06 (a lofi instrumental, a sung pop song, a sung folk ballad), converted to 44.1 kHz stereo. For each: time, process
+peak memory, the share of the total energy that landed in each stem, and how closely the stems add back up to the song (error as a fraction of the
+song's energy). The weights download from Meta's file server on first use; each model is 0.1 to 0.4 GB (the `ft` model is a bag of four).
+
+| | htdemucs (4 stems) | htdemucs_ft (4 stems, bag of 4) | htdemucs_6s (adds guitar and piano) |
+|---|---|---|---|
+| Process peak memory | 1.21 GB | 1.75 GB | 1.37 GB |
+| Time per 40 s song | 1.8 to 4.5 s | 6.6 to 8.3 s | 1.6 to 5.4 s |
+| Stems add back to the song, error | 0.01 to 0.07% | 0.1 to 1.0% | 0.4 to 0.7% |
+| Lofi (no singer): vocals stem energy | 0.0% | 0.0% | 0.0% |
+| Folk (no drums): drums stem energy | 0.0% | 0.0% | 0.0% |
+| Folk: where the guitar went | in "other" (38%) | in "other" (38%) | its own stem (36%) |
+| Lofi: where the piano went | in "other" (15%) | in "other" (17%) | its own stem (12%) |
+| Licence | MIT code and MIT weights | same | same |
+
+Reading it:
+
+- **All three run on the Mac with a Python path and are far faster than real time** (a 40 s song in 2 to 8 s on a busy machine) in under 2 GB. This
+  is a small, cheap feature: memory is not a constraint on any tier.
+- **The splits are plausible on the checks that need no ears**: the vocals stem is silent for an instrumental song and the drums stem is silent for
+  a song with no drums on every model. The 6-stem model separates guitar and piano, which the 4-stem models fold into "other".
+- **Which model sounds better is not decided here.** I cannot hear stems. The four-stem standard (`htdemucs`) is the cheapest and sums back to the song
+  most exactly; `htdemucs_ft` costs two to four times the time and 0.5 GB more memory for a fine-tuned bag of models; `htdemucs_6s` is the only one that
+  can offer guitar and piano as their own tracks. One set of stems (the pop song, all three models) is in the shared notes folder under `stem-eval/`.
+- **RoFormer-class models were not tried**: none has a clearly permissive weights licence with a Mac path in the lists searched.
+
+**Verdict.** TIER-STEMS-01 can start: the Standard slot is `htdemucs` (fast, small, MIT). Boost is `htdemucs_ft` if a listen finds it audibly cleaner
+than the standard; otherwise Boost collapses into Standard, per the tier collapse rule. `htdemucs_6s` is a feature choice (guitar and piano tracks),
+not a tier. Pending: a listen by Jesse, and a run on a real recorded song (these songs are AI-made and clean, so they flatter the separator).
+
+## Not run yet: TIER-EVAL-03, 04 and 05, with download sizes
 
 These rows judge peak memory and minutes per item, and at a load average of 50 both numbers would mislead, so they wait for a quiet window
 on the Studio. Sizes below are what the Hugging Face file lists showed on 2026-10-30 for the builds that have an Apple path; "on disk" means the Studio
