@@ -485,6 +485,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
 | `backend/src/lib/jobs/householdQueue.ts` | order, writePositions, registerQueueProvider, refreshHouseholdQueue, releaseHouseholdQueue |
+| `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
+| `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |
+| `backend/src/lib/jobs/profileTable.ts` | validateProfileTable |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
 | `backend/src/lib/kiwixCatalog.ts` | KIWIX_BINARIES, KIWIX_READY_MARKER, selectKiwixBinary |
 | `backend/src/lib/kiwixClient.ts` | KIWIX_REQUEST_TIMEOUT_MS, libraryRequest, installed |
