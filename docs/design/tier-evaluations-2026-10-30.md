@@ -132,8 +132,31 @@ That gain does not pay for a hands-free voice that misses one word in eight in a
 re-run: the clip files of that bench are gone and a synthetic kitchen or child mix would not be evidence. If Jesse wants this row measured on real
 audio, ten short recordings of his own kitchen and a child reading a sentence would decide it.
 
-## Not run
+## Not run yet: TIER-EVAL-03 to 07, with download sizes
 
-TIER-EVAL-03 (video), 04 (pictures), 05 (chat Boost and Max), 06 (music XL) and 07 (stem splitting) are not run in this session's first pass. They
-need 20 to 70 GB downloads each and a quiet machine, because their rows judge peak memory and minutes per item, and at load average 50 those numbers
-would mislead.
+These rows judge peak memory and minutes per item, and at a load average of 50 both numbers would mislead, so they wait for a quiet window
+on the Studio. Sizes below are what the Hugging Face file lists showed on 2026-10-30 for the builds that have an Apple path; "on disk" means the Studio
+already holds it. Downloads are approved, so these can start the moment a window is agreed.
+
+| Row | Candidate (Apple path) | Download | Notes |
+|---|---|---|---|
+| 03 video | LTX-2.3 distilled (mlx-video) | on disk | the reference for the Boost slot |
+| 03 | LTX-2.3 MLX q4 builds (`gajesh/LTX-2.3-mlx-q4`; `dgrauet/ltx-2.3-mlx-q4`) | 39.9 GB; 59.7 GB | the community 29.9 GB peak claim; licence is "other": the competing-product clause read comes first |
+| 03 | LTX-2.3 MLX q8 / full (`dgrauet`) | 87.5 GB; 139.7 GB | the dev two-stage run; only if q4 shows a gain |
+| 03 | Wan 5B (FastWan2.2 TI2V bf16) | on disk | VIDEO-GEN-09 and VIDEO-GEN-11 variants to bench |
+| 03 | Wan2.2 A14B | no Apple path found | stays out |
+| 04 pictures | ERNIE-Image base (`mflux-community/ernie-image-base-mflux-q8`) | 12.3 GB | against the Turbo on disk |
+| 04 | Qwen-Image 20B mflux | size to list when searched | Apache-2.0 |
+| 04 | Qwen-Image-Edit-2511 (`mflux-community/qwen-image-edit-2511-mflux-q4`) | 28.9 GB | edits |
+| 05 chat | Qwen3.6-35B-A3B Q4, Qwen3.8-27B (GGUF, MLX, MTP), Ornith-1.5-122B MLX 4-bit, Muse | on disk | Muse is the baseline |
+| 05 | gpt-oss-120b (`mlx-community/gpt-oss-120b-MXFP4-Q4`) | 62.3 GB | Apache-2.0 |
+| 05 | Gemma 4 26B-A4B (MLX 4-bit build to be named; the source is 51.6 GB) | about 15 GB | Apache-2.0 |
+| 05 | Qwen3.5-122B-A10B and Mistral Small 4 119B | no MLX 4-bit build found yet; sources are 250 GB and 242 GB | decide whether to quantise locally or drop |
+| 06 music | ACE-Step 1.5 XL turbo MLX (`ddalcu/ACE-Step-1.5-XL-Turbo-MLX-Serve-8bit`, `-4bit`) | 7.0 GB; 4.3 GB | MIT; XL base or sft has only 15 to 20 GB bf16 builds |
+| 07 stems | htdemucs MLX (`jasonvassallo/demucs-htdemucs-mlx`), htdemucs_ft MLX (`aufklarer/HTDemucs-FT-MLX`), htdemucs_6s Core ML (`GOVO/HTDemucs_6S_CoreML`) | 0.2 GB; 0.6 GB; 0.7 GB | small; needs three songs (the bench songs are not on disk) |
+
+Total for all the listed Apple-path downloads that are not on disk: about 230 to 330 GB, depending on how many LTX builds are kept.
+Disk free on the Studio is 787 GB.
+
+Also open: CHAT-AB-01 and KS-BENCH-01 are named by the E5 row but their harnesses are not in this repository; the chat comparison needs them
+brought over (or rewritten) first.
