@@ -63,4 +63,11 @@ describe("Reference library settings", () => {
     await waitFor(() => expect(view.calls).toEqual(["pause", "resume", "cancel"]));
     view.restore();
   });
+  test("groups books by topic and says in plain words what each version contains", async () => {
+    const view = mount({ installed: [], jobs: [], matchesPresets: [] });
+    expect(await view.findByRole("region", { name: "Encyclopedia" })).toBeTruthy();
+    expect(view.getByText(/Short introductions only \(smallest\)/)).toBeTruthy();
+    expect(view.getByText(/An encyclopedia written for children/)).toBeTruthy();
+    view.restore();
+  });
 });

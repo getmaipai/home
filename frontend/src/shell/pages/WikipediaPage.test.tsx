@@ -36,7 +36,7 @@ describe("Wikipedia app", () => {
     api.referenceBooks = async () => [book("vikidia_en_all_2026-09", "Vikidia")];
     const view = mount();
     expect(await view.findByText("Wikipedia is not in your library yet")).toBeTruthy();
-    expect(view.getByText(/Reference library/)).toBeTruthy();
+    expect(view.getByText(/Offline data/)).toBeTruthy();
     expect(view.queryByRole("search")).toBeNull();
   });
 
