@@ -7,7 +7,7 @@ import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
 const book = (id: string, label: string): ReferenceBookView => ({ id, source_label: label, language: "en", size_bytes: 1_000_000, snapshot_date: "2026-09-01", licence: "CC BY-SA 4.0", article_count: 10 });
 const article: ReferenceArticleView = { title: "Aurora", book: "wikipedia_en_all_maxi_2026-09", path: "Aurora", source_label: "Wikipedia", licence: "CC BY-SA 4.0", snapshot_date: "2026-09-01", toc: [], blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "Lights in the sky." }] }] };
-const originals = { books: api.referenceBooks, article: api.referenceArticle, random: api.referenceRandom, suggest: api.referenceSuggest };
+const originals = { books: api.referenceBooks, article: api.referenceArticle, random: api.referenceRandom, suggest: api.referenceSuggest, saves: api.referenceSaves, save: api.referenceSave, unsave: api.referenceUnsave };
 
 function mount(initial = "/wikipedia") {
   const view = renderWithQueryClient(<MemoryRouter initialEntries={[initial]}><Routes><Route path="/wikipedia/*" element={<WikipediaPage />} /></Routes></MemoryRouter>);
@@ -28,8 +28,9 @@ describe("Wikipedia app", () => {
     api.referenceArticle = async () => article;
     api.referenceRandom = async () => ({ title: "Aurora", book: "wikipedia_en_all_maxi_2026-09", path: "Aurora" });
     api.referenceSuggest = async () => [{ title: "Aurora", book: "wikipedia_en_all_maxi_2026-09", path: "Aurora" }];
+    api.referenceSaves = async () => ({ saves: [] });
   });
-  afterEach(() => { cleanup(); Object.assign(api, { referenceBooks: originals.books, referenceArticle: originals.article, referenceRandom: originals.random, referenceSuggest: originals.suggest }); });
+  afterEach(() => { cleanup(); Object.assign(api, { referenceBooks: originals.books, referenceArticle: originals.article, referenceRandom: originals.random, referenceSuggest: originals.suggest, referenceSaves: originals.saves, referenceSave: originals.save, referenceUnsave: originals.unsave }); });
 
   test("with no Wikipedia in the library it says so and what to do, with no search box", async () => {
     api.referenceBooks = async () => [book("vikidia_en_all_2026-09", "Vikidia")];
@@ -69,5 +70,20 @@ describe("Wikipedia app", () => {
       expect(await view.findByText("Search results for “aurora”")).toBeTruthy();
       expect(await view.findByText("About 120 results")).toBeTruthy();
     } finally { api.referenceSearchPage = original; }
+  });
+
+  test("Save on an article saves it through the hub, and the Saved section lists it with a Remove button", async () => {
+    const saved: Array<{ id: string; book: string; path: string; title: string; saved_at: string; offline: boolean }> = [];
+    api.referenceSaves = async () => ({ saves: [...saved] });
+    api.referenceSave = async (b, p) => { const row = { id: "refsave-aaaaaa", book: b, path: p, title: "Aurora", saved_at: "2026-10-30T00:00:00Z", offline: false }; saved.push(row); return row; };
+    api.referenceUnsave = async () => { saved.length = 0; return { removed: true }; };
+    const view = mount(`/wikipedia/a/${encodeURIComponent("wikipedia_en_all_maxi_2026-09")}/Aurora`);
+    await view.findByText("Lights in the sky.");
+    fireEvent.click((await view.findAllByRole("button", { name: "Save" }))[0]!);
+    await waitFor(() => expect(saved.length).toBe(1));
+    fireEvent.click(within(view.getByRole("navigation", { name: "Wikipedia sections" })).getByRole("button", { name: "Saved" }));
+    expect(await view.findByRole("link", { name: /Aurora/ })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Remove Aurora from Saved" }));
+    expect(await view.findByText(/Nothing saved yet/)).toBeTruthy();
   });
 });

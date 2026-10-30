@@ -4,7 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArticleView, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
+import { useReferenceSaves } from "./saves";
 
+const SAVE_ONLY: ("save")[] = ["save"];
 const PREVIEW_STALE_MS = 10 * 60 * 1000;
 
 export interface ReaderArticleProps {
@@ -22,6 +24,7 @@ export interface ReaderArticleProps {
 export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavailable }: ReaderArticleProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const saves = useReferenceSaves();
   const query = useQuery<ReferenceArticleView>({ queryKey: ["reference-article", book, path], queryFn: () => api.referenceArticle(book, path), retry: false });
   const loadPreview = useCallback(async (target: { book: string; path: string }): Promise<ArticlePreview | null> => {
     try {
@@ -38,7 +41,9 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
   return (
     <div id="reference-article" data-touch-target-exempt className="min-w-0">
       <ArticleView
-        data={toArticleViewData(article, { appName, onAppHome })}
+        data={{ ...toArticleViewData(article, { appName, onAppHome }), saved: saves.isSaved(book, path) }}
+        available={SAVE_ONLY}
+        onAction={(action, ids) => { if (action === "save") saves.setSaved(book, path, ids.on !== false); }}
         onBack={() => navigate(-1)}
         loadPreview={loadPreview}
         renderTargetLink={(target, text) => <Link className="underline underline-offset-2" to={routeFor(target.book, target.path)}>{text}</Link>}

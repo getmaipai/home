@@ -190,6 +190,7 @@ export interface ReferenceArticleView {
   related?: Array<{ book: string; path: string; title: string; thumbnail?: { src: string; alt: string } }>;
 }
 export interface ReferencePreview { title: string; summary: string; description?: string; kicker?: string; lead?: string; thumbnail?: { src: string; alt: string } }
+export interface ReferenceSaveView { id: string; book: string; path: string; title: string; saved_at: string; offline: boolean }
 export interface ReferenceSearchPage { hits: ReferenceSearchHit[]; total: number }
 
 export type PersonRosterEntry = Omit<Person, "birthdate"> & {
@@ -1005,6 +1006,9 @@ export const api = {
     const total = Number(res.headers.get("X-Total-Results"));
     return { hits, total: Number.isFinite(total) && total >= hits.length ? total : hits.length };
   },
+  referenceSaves: () => request<{ saves: ReferenceSaveView[] }>("/api/reference/saves"),
+  referenceSave: (book: string, path: string) => request<ReferenceSaveView>("/api/reference/saves", { method: "POST", body: JSON.stringify({ book, path }) }),
+  referenceUnsave: (id: string) => request<{ removed: true }>(`/api/reference/saves/${encodeURIComponent(id)}`, { method: "DELETE" }),
   referenceState: () => request<ReferenceLibraryState>("/api/reference/state"),
   referenceCatalog: () => request<ReferenceCatalogSet[]>("/api/reference/catalog"),
   referencePlan: (preset: "minimum" | "moderate" | "full" | "custom", selection?: ReferenceSelection[]) => request<ReferencePlan>("/api/reference/plan", { method: "POST", body: JSON.stringify({ preset, selection }) }),

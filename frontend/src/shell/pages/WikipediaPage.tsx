@@ -9,6 +9,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 import { ReaderArticle } from "@/shell/reader/ReaderArticle";
 import { ReaderSearchBox } from "@/shell/reader/SearchBox";
 import { SearchResults } from "@/shell/reader/SearchResults";
+import { useReferenceSaves } from "@/shell/reader/saves";
 
 const RECENT_KEY = "maipai.wikipedia.recent";
 const RECENT_MAX = 8;
@@ -49,6 +50,30 @@ function ExploreGrid({ book }: { book: string }) {
   );
 }
 
+function SavedList({ books }: { books: readonly ReferenceBookView[] }) {
+  const { saves, isPending, isError, remove } = useReferenceSaves();
+  const names = new Map(books.map((item) => [item.id, item.source_label]));
+  return (
+    <section aria-label="Saved" className="flex flex-col gap-3">
+      <h2 className="text-xl font-semibold">Saved</h2>
+      {isPending ? <p role="status">Opening your saved articles…</p> : null}
+      {isError ? <p role="alert">Could not load your saved articles. Check that Home is running, then try again.</p> : null}
+      {!isPending && !isError && !saves.length ? <p className="text-muted-foreground">Nothing saved yet. Open an article and press Save to keep it here.</p> : null}
+      <ul className="flex flex-col gap-1">
+        {saves.map((save) => (
+          <li key={save.id} className="flex items-center gap-2">
+            <Link className="hover:bg-muted min-w-0 flex-1 rounded-md px-2 py-1.5" to={articleRoute(save.book, save.path)}>
+              <span className="font-semibold">{save.title}</span>
+              {names.get(save.book) ? <span className="text-muted-foreground block text-sm">{names.get(save.book)}</span> : null}
+            </Link>
+            <Button variant="ghost" size="sm" aria-label={`Remove ${save.title} from Saved`} onClick={() => remove(save.id)}>Remove</Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function WikipediaPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,7 +86,7 @@ export function WikipediaPage() {
   const articlePath = articleMatch ? decodeURIComponent(articleMatch[2]!) : undefined;
   const params = new URLSearchParams(location.search);
   const q = params.get("q") ?? "";
-  const section = location.pathname.startsWith("/wikipedia/explore") ? "explore" : "home";
+  const section = location.pathname.startsWith("/wikipedia/explore") ? "explore" : location.pathname.startsWith("/wikipedia/saved") ? "saved" : "home";
   const [recent, setRecent] = useState<RecentArticle[]>(readRecent);
   const article = useQuery({ queryKey: ["reference-article", articleBook, articlePath], queryFn: () => api.referenceArticle(articleBook!, articlePath!), enabled: Boolean(articleBook && articlePath), retry: false });
   useEffect(() => { if (article.data && articleBook && articlePath) { remember({ book: articleBook, path: articlePath, title: article.data.title }); setRecent(readRecent()); } }, [article.data, articleBook, articlePath]);
@@ -88,12 +113,14 @@ export function WikipediaPage() {
             <div className="flex flex-wrap items-center gap-2" role="navigation" aria-label="Wikipedia sections">
               <Chip selected={!articleMatch && !onSearchPage && section === "home"} onClick={() => navigate("/wikipedia")}>Home</Chip>
               <Chip selected={section === "explore" && !articleMatch} onClick={() => navigate("/wikipedia/explore")}>Explore</Chip>
+              <Chip selected={section === "saved" && !articleMatch} onClick={() => navigate("/wikipedia/saved")}>Saved</Chip>
               <Button variant="outline" size="sm" disabled={random.isPending} onClick={() => random.mutate()}>Random article</Button>
               {random.isError ? <span role="alert" className="text-muted-foreground text-sm">No article came back. Try once more.</span> : null}
             </div>
             {articleBook && articlePath ? <ReaderArticle book={articleBook} path={articlePath} routeFor={articleRoute} appName="Wikipedia" onAppHome={appHome} /> : null}
             {onSearchPage ? <SearchResults q={q} {...(resultBook ? { book: resultBook } : {})} books={books} routeFor={articleRoute} onBook={(next) => search(q, next)} onSearch={(next) => search(next, resultBook)} /> : null}
             {!articleMatch && !onSearchPage && section === "explore" ? <ExploreGrid book={book} /> : null}
+            {!articleMatch && !onSearchPage && section === "saved" ? <SavedList books={books} /> : null}
             {!articleMatch && !onSearchPage && section === "home" ? (
               <section aria-label="Recent" className="flex flex-col gap-3">
                 <h2 className="text-xl font-semibold">Recent</h2>
