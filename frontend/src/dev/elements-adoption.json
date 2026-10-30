@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-30T01:22:11.693Z",
-  "kitTag": "ui-v0.5.421",
+  "generatedAt": "2026-10-30T01:41:46.579Z",
+  "kitTag": "ui-v0.5.423",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1016,6 +1016,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "moon-disc.tsx",
+      "name": "moon-disc",
+      "group": "moon",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "music-track.tsx",
