@@ -12,7 +12,10 @@ export interface BudgetNow { freeMemoryBytes: number; loaded: { class: string; p
 let source: ProfileSource | (() => ProfileSource | null) | null = null;
 /** A function is read at every admission, so a change on the Performance page applies to the next job. */
 export function setProfileSource(next: ProfileSource | (() => ProfileSource | null) | null): void { source = next; }
-export function getProfileSource(): ProfileSource | null { return typeof source === "function" ? source() : source; }
+export function getProfileSource(): ProfileSource | null {
+  if (typeof source !== "function") return source;
+  try { return source(); } catch { return null; }
+}
 
 export function memoryNowFromBudget(b: BudgetNow): MemoryNow {
   // GB uses decimal units: 1 GB = 1e9 bytes.
