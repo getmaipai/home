@@ -9,6 +9,13 @@ untouched: each bench ran its own process on its own port with its own scratch f
 not affected; every speed and latency figure is an upper bound and the order of two close models can flip. Rerun speed rows on a quiet machine
 before quoting them as a promise.
 
+## Listening verdicts (Jesse, 2026-10-30)
+
+- **Voice:** Chatterbox Nano is close enough to Turbo that users will not tell; confirmed by ear as the Reduced voice on p64 and p128.
+- **Music:** he preferred the shipped turbo to XL SFT (possibly style rather than quality) and found them too close to call. XL SFT does not earn a Max slot: it costs 2 to 3 times the time and more memory for no audible gain.
+  Max music stays empty.
+- **Pictures:** no verdict on the sheets; Qwen-Image 20B stays the Max picture slot as already ruled.
+
 ## Owner rulings (2026-10-30, after the first pass)
 
 1. Chatterbox Nano is the recommended Reduced voice on p64 and p128, switchable in AI and models. Pocket TTS stays the p16 and p32 default and the fallback. Jesse will listen later.
@@ -22,9 +29,9 @@ before quoting them as a promise.
 | Row | Result | State |
 |---|---|---|
 | TIER-EVAL-01 Reduced chat | Qwen3-4B passes the measured parts; two parts need the real build | measured, partly open |
-| TIER-EVAL-02 Reduced voice | Chatterbox Nano runs on MLX, half the memory of Turbo, same words and same voice closeness by proxy | measured; ear check is Jesse's |
+| TIER-EVAL-02 Reduced voice | Chatterbox Nano runs on MLX, half the memory of Turbo, same words and same voice closeness by proxy | measured; confirmed by Jesse's ear (2026-10-30) |
 | TIER-EVAL-08 listening side | No, from the 2026-10-25 numbers; household audio needs real recordings | decided, see below |
-| TIER-EVAL-06 music Boost and Max | XL turbo: no slot; XL SFT: Max candidate pending a listen | measured; ear check is Jesse's |
+| TIER-EVAL-06 music Boost and Max | XL turbo: no slot; XL SFT: no slot; Max music stays empty | measured; Jesse heard no gain (2026-10-30) |
 | TIER-EVAL-07 stem splitting | htdemucs Standard; ft and 6s pending a listen; TIER-STEMS-01 can start | measured; ear check is Jesse's |
 | TIER-EVAL-04 picture Max, Max edit | Qwen-Image 20B is the Max lead; ERNIE base dropped; Max edit empty | 9 of 22 prompts; eye is Jesse's |
 | TIER-EVAL-05 chat Boost and Max | Qwen3.6-35B-A3B leads Standard on speed; the 120B class ran beside live chat: Mistral Small 4 leads the probe but no clear gain; Max undecided | reduced probe only; real benches missing |
@@ -177,7 +184,7 @@ Reading it, with the numbers only (the listening verdict is Jesse's):
 - **XL SFT is the only candidate with a visible gain**: the folk song's words were nearly all right (3% against 19%). It costs 10 GB more than the
   shipped model and 2 to 3 times the time (26 to 35 s for 40 s of music at load average about 50, so a 3-minute song is on the order of 2 to 3
   minutes). It fits the Max cap with room. It earns a Max slot only if the songs also sound better; three songs and one transcript is thin evidence.
-- **Verdict for the table:** shipped 2B turbo stays Standard. XL turbo: no slot. XL SFT: candidate for Max, pending Jesse's listen (songs in
+- **Verdict for the table:** shipped 2B turbo stays Standard. XL turbo: no slot. XL SFT: no Max slot after Jesse's listen (songs in
   the shared notes folder under `music-eval/`: `shipped-*`, `xl-turbo-*`, `xl-sft-*`) and a longer-song and more-songs check.
 
 ## TIER-EVAL-07: stem splitting models
