@@ -641,7 +641,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
 | `backend/src/lib/plugins.ts` | almanacHostInputs, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly, loadPackage |
 | `backend/src/lib/ports.ts` | DEFAULT_HOME_PORT, DEFAULT_STACK_PORT, homePort, stackPort, defaultStackBaseUrl |
-| `backend/src/lib/prefixPrewarm.ts` | notePrefix, prewarmPrefix, __resetPrefixPrewarmForTests |
+| `backend/src/lib/prefixPrewarm.ts` | notePrefix, prewarmPrefix, warmSpokenPrefixAtBoot, __resetPrefixPrewarmForTests |
 | `backend/src/lib/privacy.ts` | platformConnections, pluginConnections, offlinePluginNames, privacyConnections, privacyPageData |
 | `backend/src/lib/projects/assemblers.ts` | registerAssembler, getAssembler |
 | `backend/src/lib/projects/fromManifest.ts` | buildProjectTypeFromManifest |
@@ -857,7 +857,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/toolGates.ts` | __resetToolGateLatchForTests, budgetWithTurnToolGates |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
 | `backend/src/lib/turnMachine/turnNext.ts` | answeredByFor, conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
-| `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
+| `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt, turnWarmupRequest |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | adviceOf, EVERYDAY_IMPERATIVES, carriesNoTask, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal |
 | `backend/src/lib/turnStats.ts` | firstTokenFromGenerations, buildTurnStats |
