@@ -12,7 +12,8 @@ export const SETTINGS_AREAS = [...(areasFile.areas as unknown as SettingsAreaDef
   sections: area.sections.map((section) => ({
     ...section,
     ...(section.kind === "keys" && (!(section.cards?.length) && section.tabs?.some((tab) => tab.view)) ? { kind: "view" as const } : {}),
-    ...(section.id === "ai" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(["overview", "models", "engines", "advanced"].includes(tab.id) ? { view: "home.engine_admin" } : {}) })) } : {}),
+    // MEM-SPACE-04: the Performance tab (admins only), drawn by the ai.performance view; before Coding. Owed to the settings spec's area file.
+    ...(section.id === "ai" && section.tabs ? { tabs: [...section.tabs.filter((tab) => tab.id !== "coding"), { id: "performance", label: "Performance", min_role: "admin" as const, view: "ai.performance" }, ...section.tabs.filter((tab) => tab.id === "coding")].map((tab) => ({ ...tab, ...(["overview", "models", "engines", "advanced"].includes(tab.id) ? { view: "home.engine_admin" } : {}) })) } : {}),
     ...(section.id === "ai" && section.cards ? { cards: section.cards.map((card) => ["household.coding", "household.coding_people", "household.coding_limits"].includes(card.group ?? "") ? { ...card, tab: "coding" } : card) } : {}),
     ...(section.id === "apps" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(tab.id === "robot" ? { view: "home.devices_admin" } : {}) })) } : {}),
     ...(section.id === "advanced" ? { tabs: [{ id: "developer", label: "Developer tools", view: "home.routing_stats" }, { id: "network", label: "Network and access" }], cards: section.cards?.map((card) => card.group === "household.network_port" ? { ...card, tab: "network" } : card) } : {}),

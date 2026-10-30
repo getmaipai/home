@@ -241,7 +241,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       : area.id === "settings" && active.id === "ai" && tab === "coding"
         ? <CodingAdminSettings />
         : area.id === "settings" && active.id === "ai"
-          ? <><SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />{viewer.role === "owner" || viewer.role === "admin" ? <AssistantKeysSettings /> : null}</>
+          ? <><SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />{(viewer.role === "owner" || viewer.role === "admin") && currentTab !== "performance" ? <AssistantKeysSettings /> : null}</>
           : <SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />;
   }
 

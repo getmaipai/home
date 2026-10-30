@@ -18,6 +18,7 @@ import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentia
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { AiGlance } from "@/apps/settings/AiGlance";
 import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
+import { PerformanceSettings } from "@/apps/settings/PerformanceSettings";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
@@ -120,6 +121,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.engine_admin": HomeEngineAdminSettings,
   "ai.glance": AiGlance,
   "ai.always_on": AiAlwaysOnView,
+  "ai.performance": PerformanceSettings,
   "home.users_admin": HomeUsersAdminSettings,
   "home.devices_admin": HomeDevicesAdminSettings,
   "home.routing_stats": HomeRoutingStatsSettings,

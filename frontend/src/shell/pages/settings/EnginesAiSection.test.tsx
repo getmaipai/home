@@ -77,7 +77,7 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
 
   test("the spec declares the tab strip and default view tab", () => {
     const ai = SETTINGS_AREAS.find((area) => area.id === "settings")!.sections.find((section) => section.id === "ai")!;
-    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "engines", "advanced", "coding"]);
+    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "engines", "advanced", "performance", "coding"]);
     expect(ai.tabs?.filter((tab) => ["overview", "engines", "advanced"].includes(tab.id)).every((tab) => tab.view === "home.engine_admin")).toBe(true);
     expect(SETTINGS_VIEWS["home.engine_admin"]).toBeDefined();
   });
