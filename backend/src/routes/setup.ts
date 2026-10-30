@@ -18,6 +18,7 @@ import { recommend } from "@/lib/modelCatalog";
 import { setupLocalOnly } from "@/middleware/setupLocalOnly";
 import { setupFolderRoutes } from "@/routes/setupFolders";
 import { setupHostTuneRoutes } from "@/routes/setupHostTune";
+import { setupCloseAppsRoutes } from "@/routes/setupCloseApps";
 import { getCookie } from "hono/cookie";
 import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { resolveHumanSession, requireRole } from "@/middleware/auth";
@@ -59,6 +60,8 @@ setupRoutes.use("*", setupLocalOnly);
 setupRoutes.route("/", setupFolderRoutes);
 // HOST-TUNE-01: the Mac tuning step; also before the catch-all.
 setupRoutes.route("/", setupHostTuneRoutes);
+// MEM-SPACE-12: the Close apps question and its permission test.
+setupRoutes.route("/", setupCloseAppsRoutes);
 
 const codingChoiceBody = z.object({ choice: z.enum(["set_up", "later"]) }).strict();
 const setupCodingPieceSchema = z.object({ id: z.string(), label: z.string(), size_bytes: z.number().nullable(), state: z.enum(["installed", "installing", "notInstalled", "failed", "unsupported"]) });

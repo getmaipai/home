@@ -26,6 +26,7 @@ import { useIsDark } from "@/shell/ThemeToggle";
 import { InstallStrip } from "@/shell/InstallStrip";
 import { PlanStep } from "./PlanStep";
 import { HostTuneStep, useHostTuneSupported } from "./HostTuneStep";
+import { CloseAppsStep, useCloseAppsQuestion } from "./CloseAppsStep";
 import { WebSearchStep } from "./WebSearchStep";
 import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
@@ -46,7 +47,7 @@ const PHASES: WizardStep[] = [
 ];
 // Steps older installs recorded that no screen shows any more.
 const RETIRED_STEPS = new Set<string>(["away", "face", "profile", "hello"]);
-const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "web_search", "owner", "coding_mode", "backup", "done"] as const;
+const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "web_search", "owner", "coding_mode", "close_apps", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
@@ -59,6 +60,7 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   web_search: "Turn on web search",
   owner: "Create your owner account",
   coding_mode: "Coding on this Home",
+  close_apps: "Close apps for big jobs",
   backup: "Save your backup key",
   done: "You're all set",
 };
@@ -86,6 +88,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   web_search: "Optional. Skip it any time.",
   owner: "Create the account that manages this Home.",
   coding_mode: "Choose whether to set up Coding on this computer.",
+  close_apps: "Optional. Not now is fine.",
   backup: "Save this key somewhere other than this computer.",
   done: "Your Home is ready to use.",
 };
@@ -99,6 +102,7 @@ const SCREEN_ART: Partial<Record<ScreenId, string>> = {
   web_search: "/setup-art/search.webp",
   owner: "/setup-art/owner.webp",
   coding_mode: "/setup-art/coding.webp",
+  close_apps: "/setup-art/tune.webp",
   backup: "/setup-art/backup.webp",
   checks: "/setup-art/checking.webp",
   done: "/setup-art/done.webp",
@@ -176,6 +180,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [storageBlocked, setStorageBlocked] = useState(false);
   // The optional "This computer" step shows only on a Mac that runs the AI itself.
   const hostTuneShown = useHostTuneSupported(engine === "this_computer");
+  // The Close apps question shows once the owner exists, and only on a Mac used as a regular computer (MEM-SPACE-12).
+  const closeAppsShown = useCloseAppsQuestion(engine === "this_computer" && (screen === "coding_mode" || screen === "close_apps") && Boolean(state && stepIsDone(state, "owner")));
   const codingReadyPieces = Boolean(codingSetup.data && codingSetup.data.pieces.length > 0 && codingSetup.data.pieces.every((piece) => piece.state === "installed"));
   const codingSetupStarted = Boolean(codingBusy === "set_up" || codingSetup.data?.pieces.some((piece) => piece.state === "installing"));
   const finishCodingChoice = () => setScreen(neighbour("coding_mode", 1) ?? "backup");
@@ -202,6 +208,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     if (SCREEN_IDS[index] === "host_tune" && !hostTuneShown) index += step;
     // The Web search screen shows only when Home's own search is not ready (SETUP-SEARCH-02).
     if (SCREEN_IDS[index] === "web_search" && !searchNeeded) index += step;
+    if (SCREEN_IDS[index] === "close_apps" && !closeAppsShown) index += step;
     return SCREEN_IDS[index];
   };
 
@@ -302,7 +309,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
   }
 
-  const phase = screen === "owner" || screen === "coding_mode" || screen === "backup" || screen === "done" ? "meet" : "computers";
+  const phase = screen === "owner" || screen === "coding_mode" || screen === "close_apps" || screen === "backup" || screen === "done" ? "meet" : "computers";
   const completedCount = phase === "meet" ? 1 : 0;
   const thingsLeftLine = openThings === null ? null : setupChecklistCountLine(openThings);
 
@@ -333,6 +340,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     const stepId = screen === "before_start" ? "welcome" : screen;
     if (screen === "web_search") { await (searchContinue.current ?? (async () => { setScreen(neighbour(screen, 1) ?? "owner"); }))(); return; }
     if (screen === "host_tune") { setScreen(neighbour(screen, 1) ?? "checks"); return; }
+    if (screen === "close_apps") { setScreen(neighbour(screen, 1) ?? "backup"); return; }
     const deferred = (["checks", "plan"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
     const folders = screen === "storage" ? { ...(engine === "this_computer" && storageChoice.models ? { models: storageChoice.models } : {}), ...(storageChoice.records ? { records: storageChoice.records } : {}) } : {};
@@ -419,6 +427,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "engine_location": body = renderSetupReviewScreen({ screen: "engine_location", engine, onEngineChange: setEngine, showTitle: false }); break;
     case "storage": body = <StorageStep split={engine === "another_computer"} value={storageChoice} onChange={(value, blocked) => { setStorageChoice(value); setStorageBlocked(blocked); }} />; break;
     case "host_tune": body = <HostTuneStep onSkip={() => void next()} />; break;
+    case "close_apps": body = <CloseAppsStep onDone={() => setScreen(neighbour("close_apps", 1) ?? "backup")} />; break;
     case "checks": {
       body = initialScreen === "checks" ? renderSetupReviewScreen({ screen: "checks", checkRows, checkError, checksFetching, showTitle: false, onRetryChecks: () => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); rememberSearch(result); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); } }) : <div>
         <AsyncState data={checkRows} error={checkError} isFetching={checksFetching || (checkRows === null && !checkError)} onRetry={retryChecks} errorMessage={checksErrorMessage(engine)} loadingLabel={checksTitle(engine)}>

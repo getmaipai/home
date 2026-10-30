@@ -34,3 +34,23 @@ export function listHelperApps(path = helperSocketPath(), timeoutMs = 2000): Pro
     socket.on("close", () => finish({ installed: false, apps: [] }));
   });
 }
+
+/** Sends one request to the helper and returns its reply object, or null when nothing answered in time. */
+export function askHelper(request: Record<string, unknown>, path = helperSocketPath(), timeoutMs = 2000): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => {
+    let done = false;
+    let buffer = "";
+    const socket = connect(path);
+    const finish = (value: Record<string, unknown> | null) => { if (done) return; done = true; clearTimeout(timer); socket.destroy(); resolve(value); };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const end = buffer.indexOf("\n");
+      if (end < 0) return;
+      try { finish(JSON.parse(buffer.slice(0, end)) as Record<string, unknown>); } catch { finish(null); }
+    });
+    socket.on("error", () => finish(null));
+    socket.on("close", () => finish(null));
+  });
+}
