@@ -471,6 +471,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobs/householdQueue.ts` | order, writePositions, registerQueueProvider, refreshHouseholdQueue, releaseHouseholdQueue |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
 | `backend/src/lib/kiwixCatalog.ts` | KIWIX_BINARIES, KIWIX_READY_MARKER, selectKiwixBinary |
+| `backend/src/lib/kiwixClient.ts` | KIWIX_REQUEST_TIMEOUT_MS, libraryRequest, installed |
 | `backend/src/lib/kiwixSidecar.ts` | KIWIX_SIDECAR_ID, KIWIX_SERVE_PORT, referenceLibraryDir, resolveReferenceLibraryLocation, ensureKiwixInstalled, regenerateLibrary |
 | `backend/src/lib/layeredScalar.ts` | SELF_STAMP, isLayeredScalar, isSelfService, isLockStamp, resolveLayeredScalar, assertCanWriteSelfService |
 | `backend/src/lib/legacyHubLogPurge.ts` | purgeLegacyHubLogs |
