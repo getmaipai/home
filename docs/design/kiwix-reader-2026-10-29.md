@@ -129,3 +129,42 @@ section says how the mockup maps onto it. The mockup's name "lore" is a placehol
 New slices: **READER-07** (kit: `image.badge`, `lead`, `actionRow`, `quick_fact`, `related`; before the tag, so one tag carries
 READER-00 and 00b) and **READER-08** (backend: `lead`, `reading_minutes`, `kicker` from the book's category when present,
 `quick_fact`, `related` on the article response, additive). READER-03 and 04 draw the mockup; READER-04 gains Explore and Offline.
+
+## 11. Owner's second mockup (Jesse, 2026-10-29): article with a facts column, and search results
+
+Jesse sent a second mockup the same day: "how search results and pages with right column data need to look like - just make it
+match the style of the page i already gave you". Two screens in the same dark style as section 10. The image was pasted into the
+chat and was not available as a file for this repo, so it is described here from the picture (Jesse can drop the file into
+`assets/kiwix-reader-2026-10-29/` and it replaces this paragraph). Same rules as section 10: the book's own text only, nothing
+invented, adults-only links and `related`, theme tokens only, shipped kit parts.
+
+**Article with a facts column (screen 01).** Breadcrumb (Home, then the category, then the title); a category chip under it;
+Save, Listen, Share and a More menu at the top right of the same row; the large title; a one-line description under it; a floated
+picture at the left of the first paragraphs; and a facts card at the right with a name, a large picture, then label and value
+rows (full name, born, occupation and the like).
+
+| In screen 01 | Built as |
+|---|---|
+| Breadcrumb | New `ArticleViewData.breadcrumb` (items with an optional book link). Home, then the kicker when present, then the title. No invented middle step: with no kicker it is Home, then the title. |
+| Category chip | The kicker drawn as a chip (kit). |
+| Save, Listen, Share, More at top right | `actionRow: "top"` (the row sits on the chip line instead of under the hero); `"under-hero"` stays for pages with a hero. |
+| One-line description | `description`. The hub fills it from the book's own short description element when the article has one (Wikipedia carries it), else omits it. |
+| Floated picture in the text | The article's first figure floats at the left on a wide screen (kit, `md` and up), full width on a phone. |
+| Facts card with a picture | The existing infobox card gains an optional `image` (the lead picture, same-origin, only when `reference.images` allows) shown under its title; when the infobox carries the picture the page draws no separate hero. |
+
+**Search results (screen 02).** "Search results for “zendaya”" with "About N results" at the right; filter chips (All, Articles,
+Images, People, Films, TV shows, Lists); a card per result with a picture, title, description, category chips, a two-line
+snippet and a chevron; a "Related searches" strip of chips at the foot; ⌘K focuses the search box.
+
+| In screen 02 | Built as |
+|---|---|
+| About N results | The sidecar's `totalResults` summed over the books searched, returned in a new `X-Total-Results` response header on `GET /search` (the body stays the same array). |
+| Filter chips | Only what the books can honestly tell: **All** and one chip per readable book (Wikipedia, Simple English, and so on). People, Films and the other type chips need a type the books do not carry and are not drawn. An Images chip waits for a later slice. |
+| Result card | Kit `Chip`, `List` and a thumbnail as shipped; the card's picture, description and category chips come from the `preview` route (READER-02, now also returning `description`, `kicker`, `lead`), asked for as a card scrolls into view and cached for 10 minutes. A card with no preview yet shows its title and snippet. The age band, minor floor and images rule are the preview route's own. |
+| Related searches | The sidecar's `/suggest` titles for the same query, other than the top result, drawn as chips; a tap runs that search. They are the book's own titles, not tracked or invented searches. Rule 6a: no query text is logged. |
+| ⌘K | Focuses the search box (app header, S2). |
+| Sidebar tagline and moon toggle | Not built: the theme control is the global one in Settings, and pitch copy comes only from `brand/COPY.md`. |
+
+New slices: **READER-09** (kit: `breadcrumb`, kicker as a chip, `actionRow: "top"`, first figure floats, infobox `image`; one more
+kit tag), **READER-10** (backend: `description` from the short description element, `infobox.image`, preview `description`,
+`kicker` and `lead`, `X-Total-Results`), **READER-11** (frontend: the search results page). READER-03 and 04 draw both screens.
