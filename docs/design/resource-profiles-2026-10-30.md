@@ -29,27 +29,33 @@ person-level fairness and aging (Q3, Q5, T4), the indicator through the existing
 
 Not found in this pass (say so rather than guess): NVIDIA MPS and CUDA stream priority are for CUDA GPUs and do not apply to the Mac Studio's unified memory.
 
-## 3. Profiles: a tier for every category (G1)
+## 3. Profiles: a table, one row per job kind and tier (G1)
 
-**A job asks for a tier in its own category. The governor then computes a profile: the tier each other category gets while the job runs.**
+**A job asks for a tier in its own category. A profile table says what every other category does while it runs.** (Owner, 2026-10-30: use an
+editable table, not a general solver; a table is one definition an admin can read and change.)
 
-The solver, in plain steps:
+| Lead job | Chat | Pictures | Video | Music | Stems and tools |
+|---|---|---|---|---|---|
+| Video Max (companion video) | Reduced | Boost (before the video loads) | Max | queued (`max_window`) | queued |
+| Video Boost | Standard | Standard | Boost | queued | Standard |
+| Picture Max | Standard | Max | queued | queued | queued |
+| Chat Max (lease) | Max | queued | queued | queued | queued |
 
-1. Start every category at its Standard slot. Memory needed is the sum of resident models plus the lead job's peak.
-2. If the lead job's peak (its Max or Boost cap) fits beside that, stop: nothing shifts.
-3. Otherwise lower categories one step at a time, **lowest priority first** (section 4's list, bottom up), until the sum fits. A category lowers Max to Boost to Standard to Reduced, then off (queue with reason). Chat bottoms at Reduced and voice never goes off (a spoken turn is never queued).
-4. Raise categories that now have room and that the job *uses* (the companion video also needs a picture: lift pictures to Boost if memory allows). The job declares what it uses: `uses: { image: "boost" }`.
-5. Result: a profile such as `chat Reduced, image Boost, video Max, music queued (max_window)`. It is stored on the job and the window, shown, and undone when the window ends.
-
-Example, the companion video: lead video Max (about 80 GB peak). Standard set leaves 72 GB, so chat must drop (Reduced frees about 24 GB, giving about 95 GB). The video uses pictures for its first frame, so pictures run Boost (60 GB cap) *before* the video starts, then are evicted when the video loads (they never hold memory together). Music is last in the list, so it queues.
+(Rows are the defaults for the Studio, filled by the evaluations of the tiers note section 14; one table per hardware class, section 4 of the tiers
+note.) A cell is a tier, `queued` (waits with a reason) or `off`. Chat's cell is never `queued` or `off`: **chat is never paused or stopped, only
+lowered to Reduced at the lowest** (owner, 2026-10-30), and voice never lowers below its current slot.
 
 Rules:
 
-- **P1. A profile is a plan, not a promise to run everything.** The solver is deterministic and testable as a pure function: input is categories, tiers, footprints and the priority list; output is the profile or "does not fit even at the bottom" (refused at submit with numbers, Q1).
-- **P2. Profiles are phased.** A job with stages (pictures, then video) declares them; each stage gets its own profile, so chat returns to Standard between stages only if the quiet window and cooldown (section 5) allow it, otherwise it stays Reduced to the end of the job (no thrash).
+- **P1. The table is validated, not solved.** On save, each row is checked: the lead job's peak plus the resident models of the other cells fits the
+  hardware class's budget (the governor's `fits_ever` figures). A row that does not fit cannot be saved, with the numbers. A job whose kind and tier have
+  no row runs at Standard beside everything or is not offered at that tier.
+- **P2. Stages.** A row may list stages (pictures, then video), each with its own cells, so chat returns to Standard between stages only if the quiet
+  window and cooldown (section 5) allow it; otherwise it stays Reduced to the end of the job (no thrash).
 - **P3. Nothing is lost.** A forced stop stays the watchdog-CRITICAL case of T5. A lowered category's work in flight finishes first (drain) or pauses at a boundary.
 - **P4. Age and surface gates run first** and no profile loosens them; a minor's categories stay at their ceilings (RULES.md rule 8). Reduced chat for a minor keeps the no-tools fail-safe.
-- **P5. Admins can pin a category** ("never lower chat below Standard"); then the solver treats it as unlowerable and a job that cannot fit without it is not offered, with the reason.
+- **P5. Admins can pin a cell** ("chat never below Standard"); a row that needs the pinned cell lowered cannot be used, and the job is not offered at that tier, with the reason.
+- **P6. Admin-editable per row,** through the Priorities panel (section 7); defaults ship in the settings spec.
 
 ## 4. Priorities that are not round robin (G2)
 
@@ -69,14 +75,14 @@ Replace the fixed Q2 order with a score the admin tunes. Round robin by person s
 - **R3. Backfill and the flex band stand** (Q4, Q8).
 - **R4. Per-level policy** (Triton): each class has `max_wait_before_aging`, `max_concurrent_per_person` (default one heavy job per person, ISOLATION-03) and `daily_cap` (child caps, unchanged).
 - **R5. Explainable.** Every card can answer "why is mine not first": the reason line names the one term that decided it ("Ahead of you: a picture (pictures go first)", "Ahead of you: another person's video (fair share)").
-- **R6. The scheduler is a pure function** like the solver, so a simulator can replay a day of jobs and prove: chat never waits; no job waits more than its class bound; nobody starves; one person cannot take more than their fair share while others wait.
+- **R6. The scheduler is a pure function**, so a simulator can replay a day of jobs and prove: chat never waits; no job waits more than its class bound; nobody starves; one person cannot take more than their fair share while others wait.
 
 ## 5. When a switch may happen: quiet window and cooldowns (G3)
 
 Chat is shared. Switching chat to Reduced under someone who is mid-conversation is the worst surprise in the design. So switches that lower a category other people use are gated.
 
 - **S1. Quiet window.** A downshift of chat (to Reduced) starts only when **no other person** has sent or received a chat or voice turn in the last `quiet_seconds` (default 60, admin-editable, minimum 20 because a swap takes 20 to 60 s) and no turn is in flight. The requester's own chat does not block their job; it just finishes first.
-- **S2. The wait is bounded and visible, never forced.** The job sits queued with the line "Waiting for a quiet moment in chat" (cause `quiet_wait`). After `quiet_max_wait` (default 10 minutes) the admin's choice applies, set once in the profile: **wait on** (default; the job stays queued, because a limit never destroys work and nobody is interrupted) or **proceed with a warning** (chat swaps at the next turn boundary and every signed-in person sees the Reduced line). Never kill a turn.
+- **S2. The wait is bounded and visible, and chat is never paused (owner, 2026-10-30).** The job sits queued with the line "Waiting for a quiet moment in chat" (cause `quiet_wait`). After `quiet_max_wait` (default 10 minutes) the swap goes ahead at the next turn boundary: chat keeps answering, on the Reduced model, and every signed-in person sees the one Reduced line. No turn is killed or delayed. An admin can set `quiet_max_wait` to "never" so the job keeps waiting instead.
 - **S3. Asymmetric like HPA.** Downshift needs the quiet window. Upshift (back to Standard) happens as soon as the window ends and a turn boundary is reached; there is no delay for restoring service.
 - **S4. Anti-flap cooldown.** After chat is restored, it will not be lowered again for `cooldown_seconds` (default 300) unless the next job's profile is the same window (consecutive jobs chain inside one window: chat stays Reduced between them if the next job starts within the cooldown, instead of swapping back and forth).
 - **S5. Someone starts chatting while Reduced is on.** They get Reduced chat and the one-line notice; the job continues (a mid-job swap back would cost 20 to 60 s and break S4). The heavy gate pauses the job for each turn if the admin chose "pause for chat" in the profile, else it does not. This is the only place a person is on Reduced without a quiet window, and the notice says so.
@@ -98,7 +104,7 @@ Resources > Priorities: the ordered category list (drag), per-class aging and pe
 
 | Row | Slice | Done when |
 |---|---|---|
-| TIER-PRIO-01 | Pure `solveProfile` and `scoreJobs` modules plus a day-replay simulator | Property tests for R6 and P1 pass; the companion-video example solves as in section 3 |
+| TIER-PRIO-01 | Pure `scoreJobs` and profile-table validator modules plus a day-replay simulator | Property tests for R6 and P1 pass; the section 3 table validates for the Studio |
 | TIER-PRIO-02 | Priority and policy settings spec, defaults, admin panel | One definition; the panel edits the list and the quiet window |
 | TIER-PRIO-03 | Quiet window and cooldown in Home's household queue (S1 to S6; only Home knows who chatted, the Stack's governor sees no person) | Test: a second person chats at second 50, the swap waits; at 61 it proceeds |
 | TIER-PRIO-04 | Profile on the job record and window, phased stages (P2) | Companion video runs end to end on a scratch Stack with chat Reduced, pictures Boost |
@@ -109,17 +115,17 @@ Order: 01 first (no Stack needed), then 02 and 03, then 04 to 06. Depends on TIE
 
 ## 8a. Reuse check
 
-Considered and rejected: a scheduling library (vLLM, Triton and YARN are servers or clusters, not embeddable, and chat rule 11 allows only our own tested Stack components to run models); a second queue (org principle 1). Built on what exists: `solveProfile` extends the TIER-STACK-01 resolver and Stack `lib/governor.ts`; `scoreJobs` replaces the ordering inside `backend/src/lib/jobs/householdQueue.ts`, not a new queue; the quiet window lives in that Home queue. The Priorities panel is drawn as data by `SettingsShell` (rule S4). If the spec or kit has no reorderable-list control, rule 9(c) applies: a kit change lands in `commons` first (own worktree; Jesse says yes to any tag). Shipped kit controls checked first in TIER-PRIO-02.
+Prebuilt check (2026-10-30): p-queue (MIT, priority and `setPriority`, no per-person fairness), pg-boss (needs Postgres), BullMQ (needs Redis, per-group concurrency is paid) would each be a second queue beside the persisted household queue; oMLX (engine pool, least-recently-used eviction, idle timeout, pinning, memory cap) and llama-swap (MIT, swap matrix, idle timeout, pause and unload endpoints, no priority) are model-loading mechanics, not policy, and oMLX is already a gated candidate for the Stack (memory notes). None knows people, ages or tiers, so the policy stays ours. Considered and rejected: a scheduling library (vLLM, Triton and YARN are servers or clusters, not embeddable, and chat rule 11 allows only our own tested Stack components to run models); a second queue (org principle 1). Built on what exists: the profile table is validated against the TIER-STACK-01 resolver and Stack `lib/governor.ts` figures; `scoreJobs` replaces the ordering inside `backend/src/lib/jobs/householdQueue.ts`, not a new queue; the quiet window lives in that Home queue. The Priorities panel is drawn as data by `SettingsShell` (rule S4). If the spec or kit has no reorderable-list control, rule 9(c) applies: a kit change lands in `commons` first (own worktree; Jesse says yes to any tag). Shipped kit controls checked first in TIER-PRIO-02.
 
 ## 9. Rules check
 
-Rule 8 (minors): profiles never raise a minor above their ceilings and Reduced chat keeps the fail-safe for minors. Age and surface gates first. Status reuse (S6): no new surface. Chat strict priority is the 2026-10-21 ruling. No limit destroys work: S2 defaults to waiting. No privacy impact: all signals (who chatted in the last minute) are in-memory counters inside Home, never stored or shown by name to others.
+Rule 8 (minors): profiles never raise a minor above their ceilings and Reduced chat keeps the fail-safe for minors. Age and surface gates first. Status reuse (S6): no new surface. Chat strict priority is the 2026-10-21 ruling. No limit destroys work: S2 goes ahead after 10 minutes at a turn boundary, with chat still answering on Reduced. No privacy impact: all signals (who chatted in the last minute) are in-memory counters inside Home, never stored or shown by name to others.
 
-## 10. Open for Jesse
+## 10. Decided and open
 
-1. **Name.** Your message says "high"; the design says Boost. Keep Boost, or rename to High (copy only, one definition).
-2. **Quiet window default** 60 s, and after 10 minutes of waiting: keep waiting (recommended) or proceed with a warning.
-3. **Strict categories** beyond chat: none by default (pictures first by weight only).
+Decided (Jesse, 2026-10-30): the profile table replaces the solver; the names stay Reduced, Standard, Boost, Max; chat is never paused, only lowered to Reduced, and a waiting job goes ahead after 10 minutes.
+
+Open: quiet window default 60 s (admin-editable); strict categories beyond chat: none by default.
 
 ## Supersedes
 
@@ -129,7 +135,10 @@ Changes these decided rules (the older notes get a pointer when this lands):
 - Q3 (round robin by person) becomes the tie-breaker (R2).
 - Q5 (aging moves up one class, once) becomes smooth aging, +1 per minute, capped at the next class's gap.
 - `resource-tiers-2026-10-27.md` section 7.2 ("Q2 stands") is replaced by section 4 here.
-- Tiers section 2a rule 1 (Reduced only when a Max job does not fit) widens: the solver may lower categories for any lead job whose cap does not fit (section 3).
+- Tiers section 2a rule 1 (Reduced only when a Max job does not fit) widens: the profile table may lower categories for any lead job (section 3).
+- Tiers section 2a rule 2 ("no setting that turns a category to Reduced") changes: an admin edits the profile table, whose chat cell may be Reduced. A person still cannot choose Reduced.
 - Tiers section 2a ("ends when the Max job ends") widens: P2 and S4 keep chat Reduced across stages and chained jobs inside one window.
-- Tiers section 2a rule 6 (wait for the in-flight turn, then swap) adds the quiet window (S1).
+- Tiers section 2a rule 6 (wait for the in-flight turn, then swap) adds the quiet window (S1), and a waiting job goes ahead after 10 minutes (S2), where the tiers note waited.
+- Tiers section 7 T1 (Standard jobs of different categories may run together if they fit) is overridden by a profile row that queues a category (for example Video Boost queues music).
+- Tiers section 7 T6 (Standard jobs that fit run during a Chat Max lease) is overridden by the Chat Max row, which queues pictures, video and music.
 - TIER-HOME-01's fairness rules (T4 b, c) are replaced by TIER-PRIO-06.
