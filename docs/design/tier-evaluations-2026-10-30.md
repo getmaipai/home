@@ -206,8 +206,10 @@ Reading it:
   a song with no drums on every model. The 6-stem model separates guitar and piano, which the 4-stem models fold into "other".
 - **Which model sounds better is not decided here.** I cannot hear stems. The four-stem standard (`htdemucs`) is the cheapest and sums back to the song
   most exactly; `htdemucs_ft` costs two to four times the time and 0.5 GB more memory for a fine-tuned bag of models; `htdemucs_6s` is the only one that
-  can offer guitar and piano as their own tracks. One set of stems (the pop song, all three models) is in the shared notes folder under `stem-eval/`.
+  can offer guitar and piano as their own tracks (but see the listening result below). One set of stems (the pop song, all three models) is in the shared notes folder under `stem-eval/`.
 - **RoFormer-class models were not tried**: none has a clearly permissive weights licence with a Mac path in the lists searched.
+
+**Listening result (Jesse, 2026-10-30).** The `htdemucs_6s` piano stem for the pop song is near silent (rms 0.00012, peak 0.0012, against 0.03 to 0.09 for the other five stems), most likely because that ACE-Step pop song has no piano, so the 6-stem model only helps on songs that contain piano; its guitar stem has real audio. `htdemucs_ft` and `htdemucs_6s` stay unverified by ear beyond this, and `htdemucs` stays the Standard stem slot.
 
 **Verdict.** TIER-STEMS-01 can start: the Standard slot is `htdemucs` (fast, small, MIT). Boost is `htdemucs_ft` if a listen finds it audibly cleaner
 than the standard; otherwise Boost collapses into Standard, per the tier collapse rule. `htdemucs_6s` is a feature choice (guitar and piano tracks),
@@ -294,6 +296,8 @@ Reading it:
 (after the real benches). Max: undecided, needs the 120B-class runs in a swap window. The draft-model choice (CHAT-TPS-02) stays Jesse's, and nothing here plans a draft model for chat.
 
 ## TIER-EVAL-03: video Standard and Max (first pass)
+
+**Listening result (Jesse, 2026-10-30).** The other clips looked good. `wan5b-street.mp4` has a visible artifact, a head appearing behind the umbrella; record it as a known Wan 5B artifact on the Standard video candidate.
 
 **What ran.** The Stack's own two video workers, driven the same way as EVAL-06: the **Standard** worker (Wan2.2 TI2V-5B FastWan, 3-step DMD, 832 x 480) and the
 **Boost** worker (LTX-2.3 22B distilled, bf16, 8 plus 3 steps with the x2 upscaler, sound made in the same pass, 768 x 448), each on two prompts (a cat asleep beside lemons at

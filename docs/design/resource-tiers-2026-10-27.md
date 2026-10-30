@@ -232,7 +232,7 @@ The two pins we have do not differ in memory (44 GB and 46 GB), so today's pair 
 |---|---|---|---|---|
 | Standard | Wan2.2 TI2V-5B FastWan, silent, 480p (today's Quick, 44 GB, fits beside the resting pool). A lighter variant (q8 weights, 61 frames, tiny decoder) is the way to make it truly "beside everything" | 44 GB (lighter: to measure) | 130 s | measured; lighter is to verify |
 | Boost | LTX-2.3 distilled with sound and spoken words, up to 10 s (today's Detailed), 768x448 | 46 GB | 42 to 49 s (10 s: 80 s) | measured |
-| Max | LTX-2.3 dev two-stage (non-distilled, with guidance) at higher resolution and longer clips on mlx-video. Memory and time unmeasured; Wan2.2 A14B (Apache-2.0) has no Mac path found and its card asks 80 GB, so it is out for now. LTX-2.5 (released 2026-08-11) has no MLX port found | 60 to 72 GB (guess) | 10 to 30 min (guess) | not measured; **Max video stays empty for now (owner, 2026-10-30)**. Reference numbers measured 2026-10-30 at load 33 to 40: Standard Wan 5B 25.4 GB and 75 to 88 s per 2 s clip; Boost LTX-2.3 distilled 39.9 GB and 41 to 46 s with sound |
+| Max | LTX-2.3 dev two-stage (non-distilled, with guidance) at higher resolution and longer clips on mlx-video. Memory and time unmeasured; Wan2.2 A14B (Apache-2.0) has no Mac path found and its card asks 80 GB, so it is out for now. LTX-2.5 (released 2026-08-11) has no MLX port found | 60 to 72 GB (guess) | 10 to 30 min (guess) | not measured; **Max video stays empty for now (owner, 2026-10-30)**. Reference numbers measured 2026-10-30 at load 33 to 40: Standard Wan 5B 25.4 GB and 75 to 88 s per 2 s clip (known Wan 5B artifact, seen by Jesse: a head appearing behind the umbrella in the street clip); Boost LTX-2.3 distilled 39.9 GB and 41 to 46 s with sound |
 
 Research (2026-10-27): a community 4-bit LTX-2.3 distilled build (`gajesh/ltx-2.3-mlx-q4`) claims 29.9 GB peak against 34.2 GB at FP16 for
 video only, which would make a sound-capable clip an Standard candidate; one author, one machine, and a user reported the package it names was not
@@ -257,8 +257,8 @@ model the music slot holds. Stable Audio 3 Medium (open weights, up to 6:20) is 
 
 | Tier | Proposal | Confidence |
 |---|---|---|
-| Standard | Demucs htdemucs, 4 stems (MIT code and weights; official `demucs` package on torch with MPS works: 1.2 GB, 2 to 5 s per 40 s song, measured 2026-10-30) | measured; separation heard is Jesse's check |
-| Boost | Demucs htdemucs_ft (1.75 GB, 7 to 8 s, only if a listen finds it cleaner) or htdemucs_6s (1.4 GB, adds guitar and piano as a feature choice) | measured; ear check pending |
+| Standard | Demucs htdemucs, 4 stems (MIT code and weights; official `demucs` package on torch with MPS works: 1.2 GB, 2 to 5 s per 40 s song, measured 2026-10-30) | measured; stays Standard after Jesse's listen (2026-10-30) |
+| Boost | Demucs htdemucs_ft (1.75 GB, 7 to 8 s, only if a listen finds it cleaner) or htdemucs_6s (1.4 GB, adds guitar and piano; Jesse heard the guitar stem is real but the piano stem on the pop song is near silent, so it helps only on songs with piano) | measured; ft and 6s unverified by ear beyond that |
 | Max | BS-RoFormer SW (6 stems) scores highest on MVSEP's own table (vocals 11.3 dB against about 8.3 for htdemucs_ft, vendor numbers), but its checkpoint licence is "unknown", the code README warns the MIT code is not a grant for the weights, and it has no Mac path (CPU and CUDA only). Not shippable until a permissive weights licence and an MLX or MPS path exist | vendor-claim; blocked |
 
 Until a RoFormer-class model clears licence and Apple path, stems have Standard and Boost only; the tier collapse rule (section 4) hides Max. ACE-Step
