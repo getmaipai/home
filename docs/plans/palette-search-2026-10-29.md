@@ -57,12 +57,21 @@ page already applies), the settings result placement (`placeSetting`), the conve
 8. **Release.** The commons change is its own worktree and a `ui-v0.5.x` tag; Home pins it after. Only Jesse says yes to the
    tag (PINNING.md).
 
+## Mockup addendum (2026-10-30)
+
+The owner shared a mockup: a "Universal search" dialog with tabs, rich cards (source label, title, two-line snippet, facts
+line, thumbnail, an Open button on the highlighted card) and a footer hint. Built as decisions 5 to 7 describe, on the
+shipped command-palette Element. Files come from the Library through `listLibrary()`; Wikipedia from the offline library
+through the one `searchReference()` the Sources route also calls. **Web** is not in this slice: an explicit open-web search from
+the palette needs the search rules checked (RULES.md rule 1, the child and teen limits) and its own design row.
+
 ## Rows
 
 - SEARCH-MODERN-01 (built, tests beside the change): server providers `memory`, `alarm`, `companion`, `command`.
 - SEARCH-MODERN-02 (built): tiered ranking and `match` on the wire.
-- SEARCH-MODERN-03: delete the client-side provider set; `useSearchCommand` and Home's prompt box read `api.search`.
-- SEARCH-MODERN-04 (commons): `HeaderSearch` on the `command-palette` Element, recents, Ask row; Home pin bump after the tag.
+- SEARCH-MODERN-03 (built): the client-side provider set and `useSearchCommand` are deleted (nothing imported them).
+- SEARCH-MODERN-04 (commons, built): `HeaderSearch` on the `command-palette` Element with tabs, rich cards, recents and the Ask row (`ui-v0.5.426`); Home pins it.
+- SEARCH-MODERN-06 (built): `file` (Library) and `reference` (offline Wikipedia) providers, and `snippet`, `source`, `meta`, `thumbnail`, `action` on a result, from the owner's mockup of 2026-10-30 (tabs All, Chats, Files, Wikipedia, Home; a Web tab is not built, it needs its own rules check).
 - SEARCH-MODERN-05: `news` provider through the shelf release path.
 
 ## Out of scope

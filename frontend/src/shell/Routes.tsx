@@ -1,4 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { HeaderSearchOptionsContext } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DrawerSectionsContext } from "@/shell/drawerSections";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation, useMatch, useNavigate, useParams } from "react-router-dom";
@@ -20,7 +22,7 @@ import { meetsMinRole } from "@/apps/people/roles";
 import { SignInPage } from "@/shell/pages/SignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
-import type { Roster } from "@/lib/api";
+import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { AudioSessionProvider } from "@/shell/audioSessionContext";
 import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
@@ -299,6 +301,13 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     side: sideChat,
   });
   paneControlRef.current = ambientPaneProps.control;
+  // SEARCH-MODERN-04: the palette's empty query lists the person's own recent chats (the same actor-scoped list the chat
+  // sidebar reads, nothing stored locally), and its "Ask" row sends the typed text to the companion as an ordinary message.
+  const recentChats = useQuery({ queryKey: ["search-recents"], queryFn: () => api.conversationList(), staleTime: 60_000, enabled: !incognito });
+  const headerSearchOptions = useMemo(() => ({
+    recents: (Array.isArray(recentChats.data) ? recentChats.data : []).slice(0, 5).map((c) => ({ kind: "conversation", id: c.id, title: c.title ?? "New Chat", href: `/chat?conversation=${encodeURIComponent(c.id)}` })),
+    onAsk: ambient ? (text: string) => paneControlRef.current?.ask(text) : undefined,
+  }), [recentChats.data, ambient]);
   const ambientRightPane = ambient ? <RightPane {...ambientPaneProps} /> : undefined;
   const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const locked = useSessionLocked();
@@ -392,7 +401,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }, { name: "Reminders", url: "/reminders", icon: "layout-list" }, { name: "Clock", url: "/clock", icon: "clock" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }, { name: "Reminders", url: "/reminders", icon: "layout-list" }, { name: "Clock", url: "/clock", icon: "clock" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
