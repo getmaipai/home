@@ -27,7 +27,7 @@ async function personSession(client: TestClient, id: string) {
   return child;
 }
 
-function add(id: string, personId: string, job: string, at: string, input: Record<string, string>, status = "pending") {
+function add(id: string, personId: string, job: string, at: string, input: Record<string, string | number>, status = "pending") {
   db.insert(scheduledJobs).values({ id, kind: "core", packageId: "core", job, personId, inputs: JSON.stringify(input), when: at, recurring: false, nextRunAt: at, status, createdAt: at, lastRunAt: status === "done" ? at : null, lastError: null }).run();
 }
 
@@ -37,16 +37,48 @@ describe("coming up", () => {
     const otherId = await addPerson(client, "Marlow");
     add("alarm-later", id, "alarms.fire", "2099-01-03T08:00:00.000Z", { task: "Wake" });
     add("reminder-soon", id, "reminders.fire", "2099-01-01T09:00:00.000Z", { task: "Milk" });
-    add("timer", id, "timers.fire", "2099-01-02T09:00:00.000Z", { label: "Tea" });
+    add("timer", id, "timers.fire", "2099-01-02T09:00:00.000Z", { label: "Tea", total_seconds: 3600 });
     add("other", otherId, "alarms.fire", "2099-01-01T08:00:00.000Z", { task: "Private" });
     add("done", id, "alarms.fire", "2099-01-01T07:00:00.000Z", { task: "Already ran" }, "done");
     const response = await client.get("/api/coming-up");
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([
       { id: "reminder-soon", kind: "reminder", text: "Milk", at: "2099-01-01T09:00:00.000Z" },
-      { id: "timer", kind: "timer", text: "Tea", at: "2099-01-02T09:00:00.000Z" },
+      { id: "timer", kind: "timer", text: "Tea", at: "2099-01-02T09:00:00.000Z", total_seconds: 3600 },
       { id: "alarm-later", kind: "alarm", text: "Wake", at: "2099-01-03T08:00:00.000Z" },
     ]);
+  });
+
+  test("creates own timers with duration metadata and extends the same pending job", async () => {
+    const { client, id } = await ownerSession();
+    const otherId = await addPerson(client, "Marlow");
+    expect((await client.post("/api/coming-up/timers", { label: "Focus", minutes: 0 })).status).toBe(400);
+    expect((await client.post("/api/coming-up/timers", { label: "Focus", minutes: 1441 })).status).toBe(400);
+    const response = await client.post("/api/coming-up/timers", { label: "Focus", minutes: 25 });
+    expect(response.status).toBe(201);
+    const timer = await response.json() as { id: string };
+    const before = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, timer.id)).get()!;
+    expect(before.job).toBe("timers.fire");
+    expect(JSON.parse(before.inputs)).toEqual({ label: "Focus", total_seconds: 1500 });
+    expect((await client.post(`/api/coming-up/${timer.id}/extend`)).status).toBe(200);
+    const after = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, timer.id)).get()!;
+    expect(after.id).toBe(before.id);
+    expect(Date.parse(after.nextRunAt) - Date.parse(before.nextRunAt)).toBe(60_000);
+    expect(JSON.parse(after.inputs).total_seconds).toBe(1560);
+    const completed = { ...after, status: "done", lastRunAt: new Date().toISOString() };
+    db.update(scheduledJobs).set({ status: "done", lastRunAt: completed.lastRunAt }).where(eq(scheduledJobs.id, timer.id)).run();
+    expect((await client.post(`/api/coming-up/${timer.id}/extend`)).status).toBe(400);
+    add("foreign-timer", otherId, "timers.fire", "2099-01-01T09:00:00.000Z", { label: "Private", total_seconds: 30 });
+    expect((await client.post("/api/coming-up/foreign-timer/extend")).status).toBe(403);
+  });
+
+  test("legacy timers infer total seconds from their scheduled interval", async () => {
+    const { client, id } = await ownerSession();
+    const createdAt = new Date(Date.now() - 30_000).toISOString();
+    const dueAt = new Date(Date.now() + 90_000).toISOString();
+    db.insert(scheduledJobs).values({ id: "legacy-timer", kind: "core", packageId: "core", job: "timers.fire", personId: id, inputs: JSON.stringify({ label: "Tea" }), when: dueAt, recurring: false, nextRunAt: dueAt, status: "pending", createdAt, lastRunAt: null, lastError: null }).run();
+    const rows = await (await client.get("/api/coming-up")).json() as Array<{ id: string; total_seconds?: number }>;
+    expect(rows.find((row) => row.id === "legacy-timer")?.total_seconds).toBe(120);
   });
 
   test("done cancels own row and refuses another person's row even for an owner", async () => {

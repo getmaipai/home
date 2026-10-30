@@ -89,9 +89,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, DUPLEX_CONFIRM_MS, REACTION_MIN_WORDS |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
 | `frontend/src/apps/clock/AlarmDays.tsx` | AlarmDays |
+| `frontend/src/apps/clock/AlarmEditor.tsx` | AlarmEditor |
 | `frontend/src/apps/clock/AlarmRecordRow.tsx` | alarmTime, AlarmRecordRow |
+| `frontend/src/apps/clock/AlarmsTab.tsx` | AlarmsTab |
 | `frontend/src/apps/clock/ClockHeaderTitle.tsx` | ClockHeaderTitle |
 | `frontend/src/apps/clock/ClockPage.tsx` | ClockPage |
+| `frontend/src/apps/clock/StopwatchTab.tsx` | StopwatchTab |
+| `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
+| `frontend/src/apps/clock/WorldClocksTab.tsx` | WorldClocksTab |
 | `frontend/src/apps/memory/PeopleAndThings.tsx` | PeopleAndThings |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |
@@ -357,7 +362,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, DROPPED_SAMPLING, parseBody, personText, DEFAULT_OUTPUT_TOKENS |
 | `backend/src/lib/codingMode.ts` | codingModeReason, codingModeReadiness, reconcileCodingModeAtStartup, raiseModeFailure |
-| `backend/src/lib/comingUp.ts` | listComingUp, doneComingUp, snoozeComingUp |
+| `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, checkCompanionArt, requireCompanionPictureOk, takeAssets |

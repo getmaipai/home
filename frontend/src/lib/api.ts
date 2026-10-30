@@ -23,7 +23,9 @@ import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import type { Alarm } from "@maipai/spec/gen/ts/alarm.js";
 
-export type ComingUpItem = { id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string };
+export type ComingUpItem = { id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string; total_seconds?: number };
+export type QuickTimerView = { id: string; name: string; minutes: number; position: number };
+export type WorldPlaceView = { id: string; name: string; country: string; zone: string; position: number };
 export type AlarmView = Alarm & { next_at: string | null };
 import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -965,6 +967,16 @@ export interface MediaBudgetResponse { limit_min: number; used_min: number; left
 export const api = {
   lists: () => request<ListRecord[]>("/api/lists"),
   comingUp: () => request<ComingUpItem[]>("/api/coming-up"),
+  startTimer: (label: string, minutes: number) => request<{ id: string }>("/api/coming-up/timers", { method: "POST", body: JSON.stringify({ label, minutes }) }),
+  extendTimer: (id: string) => request<{ id: string; at: string; total_seconds: number }>(`/api/coming-up/${encodeURIComponent(id)}/extend`, { method: "POST" }),
+  quickTimers: () => request<QuickTimerView[]>("/api/quick-timers"),
+  createQuickTimer: (name: string, minutes: number) => request<QuickTimerView>("/api/quick-timers", { method: "POST", body: JSON.stringify({ name, minutes }) }),
+  updateQuickTimer: (id: string, input: { name?: string; minutes?: number; position?: number }) => request<QuickTimerView>(`/api/quick-timers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteQuickTimer: (id: string) => request<{ id: string }>(`/api/quick-timers/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  worldPlaces: () => request<WorldPlaceView[]>("/api/world-places"),
+  createWorldPlace: (input: { name: string; country: string; zone: string; source: "local" }) => request<WorldPlaceView>("/api/world-places", { method: "POST", body: JSON.stringify(input) }),
+  updateWorldPlace: (id: string, position: number) => request<WorldPlaceView>(`/api/world-places/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ position }) }),
+  deleteWorldPlace: (id: string) => request<{ id: string }>(`/api/world-places/${encodeURIComponent(id)}`, { method: "DELETE" }),
   alarms: () => request<AlarmView[]>("/api/alarms"),
   createAlarm: (input: Partial<Pick<Alarm, "time" | "days" | "label" | "tag" | "enabled" | "sound" | "snooze_minutes">>) => request<AlarmView>("/api/alarms", { method: "POST", body: JSON.stringify(input) }),
   updateAlarm: (id: string, input: Partial<Pick<Alarm, "time" | "days" | "label" | "tag" | "enabled" | "sound" | "snooze_minutes">>) => request<AlarmView>(`/api/alarms/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
@@ -1426,7 +1438,7 @@ export const api = {
     request<Array<{ name: string; area: string | null; lat: number; lon: number }>>(`/api/places/search?q=${encodeURIComponent(q)}`),
   // WEATHER-HOME-ASK-01: offline city lookup and nearest city for a point; nothing leaves the home.
   localSearchPlaces: (q: string) =>
-    request<Array<{ name: string; area: string | null; lat: number; lon: number }>>(`/api/places/local-search?q=${encodeURIComponent(q)}`),
+    request<Array<{ name: string; area: string | null; lat: number; lon: number; country: string; zone: string }>>(`/api/places/local-search?q=${encodeURIComponent(q)}`),
   nearestPlace: (lat: number, lon: number) =>
     request<{ name: string; area: string | null; lat: number; lon: number } | null>(`/api/places/nearest?lat=${lat}&lon=${lon}`),
   // kind is deliberately not editable (backend/src/lib/entities.ts's own

@@ -14,9 +14,17 @@ function stub(items: Array<{ id: string; kind: "alarm" | "reminder" | "timer"; t
     const url = String(input);
     const method = init?.method ?? "GET";
     if (url.endsWith("/api/alarms") && method === "GET") return Promise.resolve(Response.json(records));
+    if (url.endsWith("/api/quick-timers") && method === "GET") return Promise.resolve(Response.json([
+      { id: "tea", name: "Tea steep", minutes: 4 },
+      { id: "break", name: "A little break", minutes: 10 },
+      { id: "focus", name: "Focus session", minutes: 25 },
+      { id: "deep", name: "Deep work", minutes: 45 },
+    ]));
+    if (url.endsWith("/api/world-places") && method === "GET") return Promise.resolve(Response.json([]));
     if (url.endsWith("/api/coming-up") && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json(items));
     calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (method === "POST" && url.endsWith("/api/alarms")) return Promise.resolve(Response.json({ id: "alarm-created1", next_at: null }));
+    if (method === "POST" && url.endsWith("/api/coming-up/timers")) return Promise.resolve(Response.json({ id: "timer-created" }));
     if (method === "POST" && url.endsWith("/skip-next")) return Promise.resolve(Response.json({ id: "alarm-abcdef", next_at: null }));
     if (url.endsWith("/api/alarms") || url.includes("/api/alarms/")) return Promise.resolve(Response.json({ id: "alarm-abcdef", next_at: null }));
     return Promise.resolve(Response.json({ ok: true }));
@@ -35,11 +43,39 @@ describe("ClockPage", () => {
       const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
       expect(await view.findByText("Wake", { selector: "p" })).toBeInTheDocument();
       expect(view.queryByText("Milk")).toBeNull();
+      expect(view.queryByText("Quick timers")).toBeNull();
+      expect(view.queryByText("No places yet")).toBeNull();
       fireEvent.click(view.getByRole("tab", { name: "Timers" }));
-      expect(await view.findByText("Tea")).toBeInTheDocument();
+      expect((await view.findAllByText("Tea")).length).toBeGreaterThan(0);
+      expect(view.queryByText("Wake", { selector: "p" })).toBeNull();
+      expect(view.queryByText("No places yet")).toBeNull();
       expect(view.getByText(/remaining/)).toBeInTheDocument();
       fireEvent.click(view.getByRole("button", { name: "Done" }));
       expect(api.calls.some((call) => call.url.endsWith("/t1/done"))).toBe(true);
+    } finally { api.restore(); }
+  });
+
+  test("each tab renders only its own content", async () => {
+    const api = stub([]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      await view.findByText("No alarms");
+      expect(view.queryByText("Quick timers")).toBeNull();
+      expect(view.queryByText("No places yet")).toBeNull();
+
+      fireEvent.click(view.getByRole("tab", { name: "Timers" }));
+      await view.findByText("Quick timers");
+      expect(view.queryByText("No places yet")).toBeNull();
+
+      fireEvent.click(view.getByRole("tab", { name: "World clocks" }));
+      await view.findByText("No places yet");
+      expect(view.queryByText("Quick timers")).toBeNull();
+      expect(view.queryByText("No alarms")).toBeNull();
+
+      fireEvent.click(view.getByRole("tab", { name: "Stopwatch" }));
+      expect(view.getByRole("button", { name: "Start" })).toBeInTheDocument();
+      expect(view.queryByText("Quick timers")).toBeNull();
+      expect(view.queryByText("No places yet")).toBeNull();
     } finally { api.restore(); }
   });
 
@@ -58,7 +94,16 @@ describe("ClockPage", () => {
     const api = stub([]);
     const width = window.innerWidth;
     const originalMatchMedia = window.matchMedia;
-    window.matchMedia = ((query: string) => ({ matches: query.includes("639.98") ? window.innerWidth < 640 : false, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("639.98") ? window.innerWidth < 640 : false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
     try {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 402 });
       const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
@@ -69,6 +114,35 @@ describe("ClockPage", () => {
     } finally {
       api.restore(); window.matchMedia = originalMatchMedia;
       Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+    }
+  });
+
+  test("main shell navigation renders at every required width", async () => {
+    const api = stub([]);
+    const originalWidth = window.innerWidth;
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("639.98") ? window.innerWidth < 640 : false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    try {
+      for (const width of [360, 402, 874, 744, 1440]) {
+        Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+        const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+        expect(await view.findByRole("tab", { name: "Alarms" })).toBeInTheDocument();
+        expect(view.getByRole("tab", { name: "World clocks" })).toBeInTheDocument();
+        view.unmount();
+      }
+    } finally {
+      api.restore();
+      window.matchMedia = originalMatchMedia;
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     }
   });
 
