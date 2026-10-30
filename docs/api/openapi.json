@@ -45013,6 +45013,62 @@
         }
       }
     },
+    "/api/reference/disk": {
+      "get": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Drive size, free space and the room offline books take",
+        "responses": {
+          "200": {
+            "description": "Where the offline books live: the drive's size, what is free, and what the installed books use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalBytes": {
+                      "type": "number"
+                    },
+                    "freeBytes": {
+                      "type": "number"
+                    },
+                    "booksBytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "totalBytes",
+                    "freeBytes",
+                    "booksBytes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reference/sets/{id}/install": {
       "post": {
         "tags": [

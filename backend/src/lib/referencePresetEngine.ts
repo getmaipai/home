@@ -5,7 +5,7 @@ import { Referencelibrarypresets } from "@maipai/spec/gen/ts/reference-presets.j
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { referenceLibraryDir, resolveReferenceLibraryLocation } from "@/lib/kiwixSidecar";
 import { installAndPublishReferenceFlavour, listInstalledReferenceFlavours, removeInstalledReferenceFlavour, resolveReferenceFlavour } from "@/lib/referenceLibrary";
-import { sourceById, BAND_SOURCE_IDS } from "@/lib/retrieval/referenceSources";
+import { sourceById, sourceForBook, BAND_SOURCE_IDS } from "@/lib/retrieval/referenceSources";
 import { diskUsage } from "@/lib/storage";
 import { newJobId } from "@/lib/id";
 import type { DownloadProgress } from "@/lib/modelDownload";
@@ -22,17 +22,20 @@ export type ReferenceJob = { id: string; setId: string; state: "queued" | "waiti
 type StateFile = { jobs: ReferenceJob[]; order: string[]; selection: Selection; settings: Record<string, string | number | boolean>; location?: string };
 const statePath = () => join(referenceLibraryDir(), ".reference-jobs.json");
 const knownSources = new Set(["vikidia", "wikipedia-simple", "wikipedia-en", "wiktionary-simple", "wiktionary-en", "wikivoyage", "wikibooks", "world-factbook", "medlineplus", "stackexchange"]);
+// `book` is the catalogue's exact book name (never a loose prefix: "wikipedia_" once matched the Football-only edition),
+// so every source keeps its own slot. An empty flavour is a book Kiwix publishes in one build only.
 const sourceMap: Record<string, { book: string; language: string; flavor: string }> = {
-  // ZIM-IMG-01: picture builds, so answers can show the library's own pictures (Vikidia maxi 0.08 GB, Simple Wikipedia maxi 3.1 GB).
-  vikidia: { book: "vikidia", language: "eng", flavor: "maxi" },
-  "wikipedia-simple": { book: "wikipedia", language: "eng", flavor: "maxi" },
-  "wikipedia-en": { book: "wikipedia", language: "eng", flavor: "mini" },
-  "wiktionary-simple": { book: "wiktionary", language: "eng", flavor: "nopic" },
-  "wiktionary-en": { book: "wiktionary", language: "eng", flavor: "maxi" },
-  wikivoyage: { book: "wikivoyage", language: "eng", flavor: "maxi" },
-  wikibooks: { book: "wikibooks", language: "eng", flavor: "maxi" },
-  "world-factbook": { book: "world-factbook", language: "eng", flavor: "maxi" },
-  medlineplus: { book: "medlineplus", language: "eng", flavor: "maxi" },
+  // ZIM-IMG-01: picture builds, so answers can show the library's own pictures.
+  vikidia: { book: "vikidia_en_all", language: "eng", flavor: "maxi" },
+  "wikipedia-simple": { book: "wikipedia_en-simple_all", language: "eng", flavor: "maxi" },
+  "wikipedia-en": { book: "wikipedia_en_all", language: "eng", flavor: "mini" },
+  "wiktionary-simple": { book: "wiktionary_en-simple_all", language: "eng", flavor: "nopic" },
+  "wiktionary-en": { book: "wiktionary_en_all", language: "eng", flavor: "nopic" },
+  wikivoyage: { book: "wikivoyage_en_all", language: "eng", flavor: "maxi" },
+  wikibooks: { book: "wikibooks_en_all", language: "eng", flavor: "maxi" },
+  "world-factbook": { book: "theworldfactbook_en_all", language: "eng", flavor: "" },
+  medlineplus: { book: "medlineplus.gov_en_all", language: "eng", flavor: "" },
+  // Kiwix publishes Stack Exchange as one book per site, so there is no single book to offer yet.
   stackexchange: { book: "stackexchange", language: "eng", flavor: "maxi" },
 };
 function setSpec(source: string, flavour: string): SetSpec {
@@ -81,11 +84,13 @@ export async function planReference(preset: PresetId | "custom", custom?: Select
   const dedup = [...new Map(chosen.map((item) => [`${item.source}:${item.flavour}`, item])).values()];
   const specs = dedup.map((row) => setSpec(row.source, row.flavour));
   const installed = listInstalledReferenceFlavours();
-  const rows = await Promise.all(specs.map(async (spec) => {
-    const resolved = await resolveReferenceFlavour(spec.book, spec.language, spec.catalogFlavour, catalogUrlOverride);
+  const skipped: string[] = [];
+  const rows = (await Promise.all(specs.map(async (spec) => {
+    let resolved: Awaited<ReturnType<typeof resolveReferenceFlavour>>;
+    try { resolved = await resolveReferenceFlavour(spec.book, spec.language, spec.catalogFlavour, catalogUrlOverride); } catch { skipped.push(sourceById(spec.source)?.label ?? spec.source); return null; }
     const source = sourceById(spec.source);
     return { id: `${spec.source}:${spec.flavour}`, source: spec.source, flavour: spec.flavour, name: resolved.name, snapshotDate: resolved.snapshotDate, sizeBytes: resolved.sizeBytes, sha256: resolved.sha256, installed: installed.some((i) => i.book === spec.book && i.language === spec.language && i.flavour === spec.catalogFlavour), child: spec.child, wikipedia: spec.wikipedia, label: source?.label ?? spec.source } satisfies PlannedSet & { label: string };
-  }));
+  }))).filter((row): row is NonNullable<typeof row> => row !== null);
   const totalBytes = rows.reduce((sum, row) => sum + (row.installed ? 0 : row.sizeBytes), 0);
   const dir = resolveReferenceLibraryLocation(location);
   const disk = diskUsage(dir);
@@ -96,6 +101,7 @@ export async function planReference(preset: PresetId | "custom", custom?: Select
   const mbps = Number(currentSetting("reference.update.max_mbps", 20));
   const estimatedSeconds = mbps > 0 ? Math.ceil(totalBytes / (mbps * 1_000_000)) : null;
   const warnings: string[] = [];
+  if (skipped.length) warnings.push(`${[...new Set(skipped)].join(", ")} cannot be downloaded right now because the Kiwix library does not list it, so it is left out.`);
   if (rows.some((row) => row.child)) warnings.push("Some sets are designed for children; their articles still follow each child's search protections.");
   if (rows.some((row) => row.wikipedia)) warnings.push("The offline Wikipedia snapshot can be weeks old; live Wikipedia search may still find newer information.");
   if (currentSetting("search.source_mode", "mix") === "offline" && !rows.some((row) => row.source === "wikipedia-en" || row.source === "wikipedia-simple")) warnings.push("Live Wikipedia search is off and no Wikipedia set is selected, so Wikipedia results will not be available.");
@@ -109,11 +115,10 @@ export async function listReferenceCatalog() {
   const installed = listInstalledReferenceFlavours();
   const choices: Selection = [
     { source: "vikidia", flavour: "default" }, { source: "wikipedia-simple", flavour: "default" },
-    { source: "wikipedia-en", flavour: "mini" }, { source: "wikipedia-en", flavour: "maxi" },
+    { source: "wikipedia-en", flavour: "mini" }, { source: "wikipedia-en", flavour: "nopic" }, { source: "wikipedia-en", flavour: "maxi" },
     { source: "wiktionary-simple", flavour: "default" }, { source: "wiktionary-en", flavour: "default" },
     { source: "wikivoyage", flavour: "default" }, { source: "wikibooks", flavour: "default" },
     { source: "world-factbook", flavour: "default" }, { source: "medlineplus", flavour: "default" },
-    { source: "stackexchange", flavour: "default" },
   ];
   return Promise.all(choices.map(async (choice) => {
     const spec = setSpec(choice.source, choice.flavour);
@@ -142,19 +147,7 @@ export function getReferenceState() {
   const matches = presetLibrary.presets.filter((p) => p.members.every((m) => installedIds.has(`${m.source}:${m.flavour}`))).map((p) => p.id);
   return { installed, jobs: state.jobs.filter((j) => ["queued", "waiting_window", "downloading", "paused"].includes(j.state)), matchesPresets: matches };
 }
-function REFERENCE_SOURCE_BY_BOOK(book: string): string | null {
-  if (book.startsWith("vikidia")) return "vikidia";
-  if (book.startsWith("wikipedia_en_simple")) return "wikipedia-simple";
-  if (book.startsWith("wikipedia_en")) return "wikipedia-en";
-  if (book.startsWith("wiktionary_en_simple")) return "wiktionary-simple";
-  if (book.startsWith("wiktionary_en")) return "wiktionary-en";
-  if (book.startsWith("wikivoyage")) return "wikivoyage";
-  if (book.startsWith("wikibooks")) return "wikibooks";
-  if (book.startsWith("medlineplus")) return "medlineplus";
-  if (book.startsWith("stackexchange")) return "stackexchange";
-  if (book.startsWith("world-factbook") || book.startsWith("zimgit-the-world-factbook") || book.startsWith("worldfactbook")) return "world-factbook";
-  return null;
-}
+function REFERENCE_SOURCE_BY_BOOK(book: string): string | null { return sourceForBook(book)?.id ?? null; }
 export async function applyReference(preset: PresetId | "custom", custom?: Selection, location?: string): Promise<{ jobs: ReferenceJob[]; idempotent: boolean }> {
   const plan = await planReference(preset, custom, location);
   if (plan.refusal) throw new Error(plan.refusal);
@@ -227,3 +220,12 @@ export async function installOneReference(source: string, flavour: string, locat
   return result.jobs[0] ?? { id: "", setId: `${source}:${flavour}`, state: "done", completedBytes: 0, totalBytes: 0, message: null };
 }
 export async function removeOneReference(id: string) { return removeInstalledReferenceFlavour(id); }
+
+/** The drive the books live on: its size, what is free, and what the installed books use (the numbers behind the Offline data disk bar). */
+export function referenceDisk(location?: string): { totalBytes: number; freeBytes: number; booksBytes: number } {
+  const dir = resolveReferenceLibraryLocation(location);
+  const disk = diskUsage(dir);
+  const booksBytes = listInstalledReferenceFlavours().reduce((sum, row) => { try { return sum + statSync(join(dir, `${row.name}_${row.flavour}.zim`)).size; } catch { return sum; } }, 0);
+  const finite = (n: number) => Number.isFinite(n) ? n : 0;
+  return { totalBytes: finite(disk.totalBytes), freeBytes: finite(disk.freeBytes), booksBytes };
+}

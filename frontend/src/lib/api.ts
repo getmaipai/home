@@ -1014,6 +1014,7 @@ export const api = {
   referencePlan: (preset: "minimum" | "moderate" | "full" | "custom", selection?: ReferenceSelection[]) => request<ReferencePlan>("/api/reference/plan", { method: "POST", body: JSON.stringify({ preset, selection }) }),
   referenceApply: (preset: "minimum" | "moderate" | "full" | "custom", selection?: ReferenceSelection[]) => request<{ jobs: ReferenceJob[]; idempotent: boolean }>("/api/reference/apply", { method: "POST", body: JSON.stringify({ preset, selection }) }),
   referenceInstall: (id: string) => request<ReferenceJob>(`/api/reference/sets/${encodeURIComponent(id)}/install`, { method: "POST" }),
+  referenceDisk: () => request<{ totalBytes: number; freeBytes: number; booksBytes: number }>("/api/reference/disk"),
   referenceRemove: (id: string) => request<{ removed: boolean; freedBytes: number }>(`/api/reference/sets/${encodeURIComponent(id)}/remove`, { method: "POST" }),
   referenceJob: (id: string, action: "pause" | "resume" | "cancel") => request<ReferenceJob>(`/api/reference/jobs/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),

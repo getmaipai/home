@@ -101,23 +101,21 @@ export async function resolveReferenceFlavour(
   flavour: string,
   catalogUrl: string = KIWIX_CATALOG_URL,
 ): Promise<ResolvedFlavour> {
-  const url = `${catalogUrl}?q=${encodeURIComponent(book)}&lang=${encodeURIComponent(language)}&count=50`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Kiwix catalog lookup for "${book}" failed: GET ${url} returned ${res.status}`);
-  const document = new DOMParser().parseFromString(await res.text(), "text/xml");
-  const entries = [...document.getElementsByTagName("entry")];
-  // `q=` is a fuzzy title search, not an exact book-id filter (the
-  // legacy notes' own warning: "the OPDS catalog's q= matches titles,
-  // not file names") - a review caught the first draft trusting the
-  // first flavour match regardless of which title it belonged to. Every
-  // real entry's own <name> follows Kiwix's stable "<book>_<lang>_..."
-  // convention (docs/dev.md's own examples: "vikidia_en_all",
-  // "wikipedia_en_all_nopic"), so requiring that prefix rules out an
-  // unrelated title that happens to share a flavour tag.
-  const match = entries.find((e) => {
-    const entryName = textOf(e.getElementsByTagName("name")[0]);
-    return textOf(e.getElementsByTagName("flavour")[0]) === flavour && entryName?.startsWith(`${book}_`);
-  });
+  // `name=` is Kiwix's exact book-name filter (the stems this repo uses); `q=` is only a fuzzy title search, kept as the fallback for a loose book prefix.
+  let url = "";
+  let match: ReturnType<InstanceType<typeof DOMParser>["parseFromString"]>["getElementsByTagName"] extends (n: string) => infer R ? R extends ArrayLike<infer E> ? E | undefined : never : never;
+  for (const param of ["name", "q"]) {
+    url = `${catalogUrl}?${param}=${encodeURIComponent(book)}&lang=${encodeURIComponent(language)}&count=50`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Kiwix catalog lookup for "${book}" failed: GET ${url} returned ${res.status}`);
+    const document = new DOMParser().parseFromString(await res.text(), "text/xml");
+    // Every real entry's own <name> follows Kiwix's "<book>_<lang>_..." convention, so requiring the exact name or that prefix rules out an unrelated title that shares a flavour tag.
+    match = [...document.getElementsByTagName("entry")].find((e) => {
+      const entryName = textOf(e.getElementsByTagName("name")[0]);
+      return (textOf(e.getElementsByTagName("flavour")[0]) ?? "") === flavour && (entryName === book || entryName?.startsWith(`${book}_`));
+    });
+    if (match) break;
+  }
   if (!match) {
     throw new Error(`no "${flavour}" flavour of "${book}" (${language}) found in Kiwix's catalog`);
   }

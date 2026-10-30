@@ -13,11 +13,11 @@ Books are grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Tra
 
 ## Choose how much to keep
 
-At the top, the **Disk space** bar shows how much room the offline books use and how much is free. Under **How much to keep**, choose **Minimum**, **Moderate**, or **Full**. The choice switches every book at once, and the page marks it. Nothing changes yet: Home stages the changes and shows an **Apply** bar at the bottom. It says how much will download, how long that takes, and how much will be freed. If the drive is too full, the message says so and **Apply** stays off.
+At the top, the **Disk space** bar shows the whole drive: what the offline books use, what everything else uses, and what is free. Under **How much to keep**, choose **Minimum**, **Moderate**, or **Full**. The choice switches every book at once, and the page marks it. Nothing changes yet: Home stages the changes and shows an **Apply** bar at the bottom. It says how much will download, how long that takes, and how much will be freed. If the drive is too full, the message says so and **Apply** stays off.
 
 ## Change one book
 
-Each book has its own row and a switch, grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Travel and the world, and Books and how-to. A row says what the book is, whether it has pictures, its size, its snapshot date, and whether it is installed. Wikipedia has a row for each version: everything with pictures (the biggest), everything without pictures, or short introductions only. Switch a book on to download it, or off to remove it, then choose **Apply**. Removing a book asks first and names any books that children or teens may lose.
+Each source has one row, grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Travel and the world, and Books and how-to. A row says what the book is, whether it has pictures, its size, its snapshot date, and whether it is installed. A source that comes in one size has a switch. Wikipedia has one row with a menu: Off, everything with pictures (the biggest, about 127 GB), everything without pictures, or short introductions only. Switch a source on, or pick a version, to download it. Pick Off to remove it. Then choose **Apply**. Removing a book asks first and names any books that children or teens may lose.
 
 While a book downloads, its row shows progress. Choose **Pause** to stop for now, **Resume** to keep going, or **Cancel** to stop the download.
 

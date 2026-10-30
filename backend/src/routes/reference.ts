@@ -151,7 +151,7 @@ referenceRoutes.openapi(DELETE_SAVE_ROUTE, (c) => {
   const { id } = c.req.valid("param");
   return removeReferenceSave(c.get("person").id, id) ? c.json({ removed: true }, 200) : unavailable(c);
 });
-import { applyReference, controlReferenceJob, getReferenceState, planReference, type PresetId, type Selection, installOneReference, removeOneReference, listReferenceCatalog } from "@/lib/referencePresetEngine";
+import { applyReference, controlReferenceJob, getReferenceState, planReference, type PresetId, type Selection, installOneReference, removeOneReference, listReferenceCatalog, referenceDisk } from "@/lib/referencePresetEngine";
 import { requireRole } from "@/middleware/auth";
 
 
@@ -168,6 +168,8 @@ const stateRoute = createRoute({ method: "get", path: "/state", tags: ["Referenc
 referenceRoutes.openapi(stateRoute, (c) => c.json(getReferenceState(), 200));
 const catalogRoute = createRoute({ method: "get", path: "/catalog", tags: ["Reference library"], summary: "List reference sets offered by Kiwix", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), source: z.string(), flavour: z.string(), name: z.string(), language: z.string(), sizeBytes: z.number(), snapshotDate: z.string().nullable(), installed: z.boolean(), child: z.boolean(), wikipedia: z.boolean(), bands: z.array(z.string()), available: z.boolean(), message: z.string().nullable() })) } }, description: "Resolved reference set catalogue." }, ...errorResponses({ 401: "Not signed in", 403: "Owner or admin only" }) } });
 referenceRoutes.openapi(catalogRoute, async (c) => c.json(await listReferenceCatalog(), 200));
+const diskRoute = createRoute({ method: "get", path: "/disk", tags: ["Reference library"], summary: "Drive size, free space and the room offline books take", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: z.object({ totalBytes: z.number(), freeBytes: z.number(), booksBytes: z.number() }) } }, description: "Where the offline books live: the drive's size, what is free, and what the installed books use." }, ...errorResponses({ 401: "Not signed in", 403: "Owner or admin only" }) } });
+referenceRoutes.openapi(diskRoute, (c) => c.json(referenceDisk(), 200));
 const setId = z.string().regex(/^[a-z-]+:(mini|maxi|nopic|default)$/).openapi({ param: { name: "id", in: "path" } });
 const installSetRoute = createRoute({ method: "post", path: "/sets/{id}/install", tags: ["Reference library"], summary: "Install one reference set", middleware: [requireRole("owner", "admin")] as const, request: { params: z.object({ id: setId }) }, responses: { 202: { content: { "application/json": { schema: JobSchema } }, description: "Download queued." }, ...errorResponses({ 400: "Install refused or invalid", 401: "Not signed in", 403: "Owner or admin only" }) } });
 referenceRoutes.openapi(installSetRoute, async (c) => { const [source, flavour] = c.req.valid("param").id.split(":"); try { return c.json(await installOneReference(source!, flavour!), 202); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The set could not be installed." }, 400); } });

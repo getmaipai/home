@@ -1,5 +1,5 @@
-// READER-14: Settings, Offline data (view `home.reference_library`). One row per offline book with a switch, and Minimum, Moderate
-// and Full as one parent choice that sets the rows. Choices are staged in the page and written only by Apply, with the same
+// READER-14: Settings, Offline data (view `home.reference_library`). One row per source (Wikipedia is one row) with a switch, or a
+// version picker when the source comes in several sizes, and Minimum, Moderate and Full as one parent choice that sets the rows. Choices are staged in the page and written only by Apply, with the same
 // storage bar and action bar as AI and models (AiGlance).
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { Progress } from "@maipai/ui/src/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
@@ -46,20 +47,27 @@ const SOURCE_LABEL: Record<string, string> = {
   "wikipedia-en": "Wikipedia", "wikipedia-simple": "Simple English Wikipedia", vikidia: "Vikidia", "wiktionary-simple": "Simple English Wiktionary", "wiktionary-en": "Wiktionary",
   medlineplus: "MedlinePlus", wikivoyage: "Wikivoyage", "world-factbook": "CIA World Factbook", wikibooks: "Wikibooks", stackexchange: "Stack Exchange",
 };
-/** A plain name for a row: the source's own name, and for a source with several versions which version it is. The catalogue's raw book name is only the fallback. */
+/** A plain name for a version or a book: the source's own name, then which version when the source has several. */
 const titleOf = (set: { source: string; flavour: string; name: string }) => {
   const label = SOURCE_LABEL[set.source];
   if (!label) return set.name;
   const flavour = FLAVOUR_LABEL[set.flavour];
   return flavour ? `${label}: ${flavour.charAt(0).toLowerCase()}${flavour.slice(1)}` : label;
 };
+const versionLabel = (set: { flavour: string }) => FLAVOUR_LABEL[set.flavour] ?? "Standard";
 
-function topicGroups<T extends { source: string; flavour: string }>(sets: T[]): Array<{ topic: string; sets: T[] }> {
+/** One entry per source, with its versions biggest first. A source with one version has just that one. */
+interface SourceRow { source: string; label: string; versions: ReferenceCatalogSet[] }
+function sourceRows(sets: ReferenceCatalogSet[]): Array<{ topic: string; rows: SourceRow[] }> {
+  const order = (set: ReferenceCatalogSet) => { const at = FLAVOUR_ORDER.indexOf(set.flavour); return at < 0 ? 99 : at; };
+  const rowFor = (source: string): SourceRow | null => {
+    const versions = sets.filter((set) => set.source === source).sort((a, b) => order(a) - order(b));
+    return versions.length ? { source, label: SOURCE_LABEL[source] ?? versions[0]!.name, versions } : null;
+  };
   const known = new Set(TOPICS.flatMap((t) => t.sources));
-  const order = (set: T) => { const at = FLAVOUR_ORDER.indexOf(set.flavour); return at < 0 ? 99 : at; };
-  const groups = TOPICS.map((t) => ({ topic: t.topic, sets: sets.filter((set) => t.sources.includes(set.source)).sort((a, b) => order(a) - order(b)) }));
-  groups.push({ topic: "Other", sets: sets.filter((set) => !known.has(set.source)) });
-  return groups.filter((group) => group.sets.length > 0);
+  const groups = TOPICS.map((t) => ({ topic: t.topic, rows: t.sources.map(rowFor).filter((row): row is SourceRow => row !== null) }));
+  const others = [...new Set(sets.filter((set) => !known.has(set.source)).map((set) => set.source))].map(rowFor).filter((row): row is SourceRow => row !== null);
+  return [...groups, { topic: "Other", rows: others }].filter((group) => group.rows.length > 0);
 }
 
 const presetIds = (id: string): Set<string> => new Set((presets.find((p) => p.id === id)?.members ?? []).map((m) => `${m.source}:${m.flavour}`));
@@ -69,38 +77,46 @@ export function ReferenceLibrarySettings() {
   const state = useQuery({ queryKey: ["reference-state"], queryFn: api.referenceState, refetchInterval: (query) => query.state.data?.jobs.length ? 1500 : false });
   const catalog = useQuery({ queryKey: ["reference-catalog"], queryFn: api.referenceCatalog, refetchInterval: () => state.data?.jobs.length ? 5000 : false });
   const hardware = useQuery({ queryKey: ["host", "hardware"], queryFn: () => api.hardware(), staleTime: 300_000 });
-  // The wanted state of a book, only where it differs from what is installed now.
-  const [staged, setStaged] = useState<Record<string, boolean>>({});
+  // The wanted version of each source, only where it differs from what is installed now: a set id, or null for off.
+  const [staged, setStaged] = useState<Record<string, string | null>>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<string | null>(null);
 
   const sets = useMemo(() => (catalog.data ?? []).filter((set) => set.available || set.installed), [catalog.data]);
-  const wants = (set: ReferenceCatalogSet) => staged[set.id] ?? set.installed;
-  const additions = sets.filter((set) => wants(set) && !set.installed);
-  const removals = sets.filter((set) => !wants(set) && set.installed);
-  const stagedCount = additions.length + removals.length;
+  const installedFor = (source: string) => sets.find((set) => set.source === source && set.installed)?.id ?? null;
+  const wantedFor = (source: string) => source in staged ? staged[source]! : installedFor(source);
+  const additions = sets.filter((set) => wantedFor(set.source) === set.id && !set.installed);
+  const removals = sets.filter((set) => set.installed && wantedFor(set.source) !== set.id);
+  const stagedCount = new Set([...additions, ...removals].map((set) => set.source)).size;
   const installedBytes = sets.filter((set) => set.installed).reduce((sum, set) => sum + set.sizeBytes, 0);
   const addBytes = additions.reduce((sum, set) => sum + set.sizeBytes, 0);
   const freedBytes = removals.reduce((sum, set) => sum + set.sizeBytes, 0);
   const jobFor = (set: ReferenceCatalogSet): ReferenceJob | undefined => state.data?.jobs.find((job) => job.setId === set.id);
 
-  const stage = (set: ReferenceCatalogSet, on: boolean) => setStaged((previous) => {
+  const choose = (source: string, id: string | null) => setStaged((previous) => {
     const next = { ...previous };
-    if (on === set.installed) delete next[set.id]; else next[set.id] = on;
+    if (id === installedFor(source)) delete next[source]; else next[source] = id;
     return next;
   });
-  // A parent choice sets every row: the books in it are on, the others off. Nothing is written until Apply.
+  // A parent choice sets every source: the member's version is on, the others off. Nothing is written until Apply.
   const choosePreset = (id: string) => {
     const members = presetIds(id);
-    const next: Record<string, boolean> = {};
-    for (const set of sets) if (members.has(set.id) !== set.installed) next[set.id] = members.has(set.id);
+    const next: Record<string, string | null> = {};
+    for (const source of new Set(sets.map((set) => set.source))) {
+      const pick = sets.find((set) => set.source === source && members.has(set.id))?.id ?? null;
+      if (pick !== installedFor(source)) next[source] = pick;
+    }
     setStaged(next);
     setError(null);
   };
   const activePreset = presets.find((preset) => {
     const members = presetIds(preset.id);
-    return sets.length > 0 && sets.every((set) => wants(set) === members.has(set.id));
+    return sets.length > 0 && [...new Set(sets.map((set) => set.source))].every((source) => {
+      const wanted = wantedFor(source);
+      const member = sets.find((set) => set.source === source && members.has(set.id))?.id ?? null;
+      return wanted === member;
+    });
   })?.id;
 
   // What the downloads would need, asked of the hub whenever the additions change.
@@ -127,9 +143,14 @@ export function ReferenceLibrarySettings() {
     onError: () => setError("Home could not change this download. Check the Home connection, then try again."),
   });
 
-  const free = plan.data?.freeBytes ?? hardware.data?.freeDiskBytes ?? null;
-  const capacity = free !== null ? installedBytes + free : null;
+  const drive = useQuery({ queryKey: ["reference-disk"], queryFn: api.referenceDisk, refetchInterval: () => state.data?.jobs.length ? 5000 : false });
+  const total = drive.data && drive.data.totalBytes > 0 ? drive.data.totalBytes : null;
+  const free = drive.data?.freeBytes ?? plan.data?.freeBytes ?? hardware.data?.freeDiskBytes ?? null;
+  const capacity = total ?? (free !== null ? installedBytes + free : null);
+  // Everything else on the drive is the part that is neither free nor an offline book.
+  const otherBytes = total !== null && free !== null ? Math.max(0, total - free - installedBytes) : 0;
   const segments = [
+    ...(otherBytes > 0 ? [{ id: "other", label: "Everything else", bytes: otherBytes, hue: "--hue-blue" }] : []),
     { id: "books", label: "Offline books", bytes: installedBytes, hue: "--hue-violet" },
     ...(addBytes > 0 ? [{ id: "pending", label: "Staged", bytes: addBytes, hue: "--hue-orange" }] : []),
   ];
@@ -148,7 +169,8 @@ export function ReferenceLibrarySettings() {
           <ItemContent>
             <ItemTitle>Disk space</ItemTitle>
             <StorageBar segments={segments} capacityBytes={capacity} formatBytes={sizeGb} />
-            {stagedCount > 0 ? <ItemDescription clamp={false}>After applying: {sizeGb(installedBytes + addBytes - freedBytes)} of books ({signed(addBytes - freedBytes)}){free !== null ? `, ${sizeGb(Math.max(0, free - addBytes + freedBytes))} free on this computer` : ""}.</ItemDescription> : <ItemDescription clamp={false}>{sizeGb(installedBytes)} of offline books{free !== null ? `, ${sizeGb(free)} free on this computer` : ""}.</ItemDescription>}
+            <ItemDescription clamp={false}>{total !== null ? `${sizeGb(total)} drive` : "This computer"}{free !== null ? ` · ${sizeGb(free)} free` : ""} · {sizeGb(installedBytes)} of offline books.</ItemDescription>
+            {stagedCount > 0 ? <ItemDescription clamp={false}>After applying: {sizeGb(installedBytes + addBytes - freedBytes)} of books ({signed(addBytes - freedBytes)}){free !== null ? `, ${sizeGb(Math.max(0, free - addBytes + freedBytes))} free` : ""}.</ItemDescription> : null}
           </ItemContent>
         </Item>
       </ItemGroup>
@@ -163,11 +185,11 @@ export function ReferenceLibrarySettings() {
       </section>
 
       {catalog.isLoading || state.isLoading ? <p role="status">Loading offline books…</p> : null}
-      {topicGroups(sets).map((group) => (
+      {sourceRows(sets).map((group) => (
         <section key={group.topic} aria-label={group.topic} className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">{group.topic}</h2>
           <ItemGroup variant="card" role="group" aria-label={group.topic}>
-            {group.sets.map((set) => rowOf({ set, on: wants(set), job: jobFor(set), onSwitch: (on) => stage(set, on), onJob: (job, action) => jobAction.mutate({ job, action }) }))}
+            {group.rows.map((row) => rowOf({ row, wanted: wantedFor(row.source), installed: installedFor(row.source), jobFor, onChoose: (id) => choose(row.source, id), onJob: (job, action) => jobAction.mutate({ job, action }) }))}
           </ItemGroup>
         </section>
       ))}
@@ -207,32 +229,47 @@ export function ReferenceLibrarySettings() {
   );
 }
 
-/** One book as a plain function so no Home component has a kit Item as its root (rule 9). */
-function rowOf({ set, on, job, onSwitch, onJob }: { set: ReferenceCatalogSet; on: boolean; job: ReferenceJob | undefined; onSwitch: (on: boolean) => void; onJob: (job: ReferenceJob, action: "pause" | "resume" | "cancel") => void }) {
-  const flavour = FLAVOUR_LABEL[set.flavour];
-  const forKids = set.bands.includes("child");
-  const status = set.installed ? "Installed" : !set.available ? "Unavailable" : "Not installed";
-  const pending = on !== set.installed;
+/** One source as a plain function so no Home component has a kit Item as its root (rule 9). A source with one version gets a switch;
+ * one with several gets a picker (Off, then each version with its size). */
+function rowOf({ row, wanted, installed, jobFor, onChoose, onJob }: { row: SourceRow; wanted: string | null; installed: string | null; jobFor: (set: ReferenceCatalogSet) => ReferenceJob | undefined; onChoose: (id: string | null) => void; onJob: (job: ReferenceJob, action: "pause" | "resume" | "cancel") => void }) {
+  const multi = row.versions.length > 1;
+  const current = row.versions.find((set) => set.id === wanted) ?? null;
+  const shown = current ?? row.versions.find((set) => set.id === installed) ?? row.versions[0]!;
+  const job = row.versions.map(jobFor).find(Boolean);
+  const forKids = row.versions.some((set) => set.bands.includes("child"));
+  const pending = wanted !== installed;
+  const status = installed ? "Installed" : "Not installed";
+  const blocked = Boolean(job) || row.versions.every((set) => !set.installed && !set.available);
   return (
-    <Item key={set.id} data-testid={`offline-row-${set.id}`}>
+    <Item key={row.source} data-testid={`offline-row-${row.source}`}>
       <ItemContent>
         <ItemTitle>
-          {titleOf(set)}
+          {row.label}
           {forKids ? <Badge variant="secondary">For children</Badge> : null}
-          {pending ? <Badge variant="outline">{on ? "Will download" : "Will remove"}</Badge> : null}
+          {pending ? <Badge variant="outline">{wanted ? "Will download" : "Will remove"}</Badge> : null}
         </ItemTitle>
-        <ItemDescription clamp={false}>{[SOURCE_BLURB[set.source], flavour ? `${flavour}.` : null].filter(Boolean).join(" ")}</ItemDescription>
-        <ItemDescription clamp={false}>{set.language} · {set.available ? sizeGb(set.sizeBytes) : "Size unavailable"} · Snapshot {set.snapshotDate ?? "date not listed"} · {status}{job ? ` · ${job.state}` : ""}{set.message ? ` · ${set.message}` : ""}</ItemDescription>
+        <ItemDescription clamp={false}>{SOURCE_BLURB[row.source]}</ItemDescription>
+        <ItemDescription clamp={false}>{multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : "Off") : sizeGb(shown.sizeBytes)} · Snapshot {shown.snapshotDate ?? "date not listed"} · {status}{job ? ` · ${job.state}` : ""}{shown.message ? ` · ${shown.message}` : ""}</ItemDescription>
         {job ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Progress value={job.totalBytes ? Math.round(job.completedBytes / job.totalBytes * 100) : 0} aria-label={`${titleOf(set)} download progress`} />
+            <Progress value={job.totalBytes ? Math.round(job.completedBytes / job.totalBytes * 100) : 0} aria-label={`${row.label} download progress`} />
             <span className="text-base">{sizeGb(job.completedBytes)} of {sizeGb(job.totalBytes)}</span>
             <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, job.state === "paused" ? "resume" : "pause")}>{job.state === "paused" ? "Resume" : "Pause"}</Button>
             <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "cancel")}>Cancel</Button>
           </div>
         ) : null}
       </ItemContent>
-      <ItemActions><Switch checked={on} disabled={Boolean(job) || (!set.installed && !set.available)} onCheckedChange={onSwitch} aria-label={`${titleOf(set)}: ${on ? "on" : "off"}`} /></ItemActions>
+      <ItemActions>
+        {multi ? (
+          <Select value={wanted ?? "off"} disabled={blocked} onValueChange={(value) => onChoose(value === "off" ? null : value)}>
+            <SelectTrigger aria-label={`${row.label} version`}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">Off</SelectItem>
+              {row.versions.map((set) => <SelectItem key={set.id} value={set.id}>{versionLabel(set)} · {sizeGb(set.sizeBytes)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : <Switch checked={wanted !== null} disabled={blocked} onCheckedChange={(on) => onChoose(on ? row.versions[0]!.id : null)} aria-label={`${row.label}: ${wanted ? "on" : "off"}`} />}
+      </ItemActions>
     </Item>
   );
 }

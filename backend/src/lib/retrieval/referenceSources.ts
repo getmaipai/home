@@ -31,16 +31,16 @@ export interface ReferenceSource {
 /** Every source tier K can read, in no particular order. */
 export const REFERENCE_SOURCES: readonly ReferenceSource[] = [
   { id: "vikidia", label: "Vikidia", bookPrefixes: ["vikidia_"], licence: "cc-by-sa-4.0" },
-  { id: "wikipedia-simple", label: "Simple English Wikipedia", bookPrefixes: ["wikipedia_en_simple"], licence: "cc-by-sa-4.0" },
+  { id: "wikipedia-simple", label: "Simple English Wikipedia", bookPrefixes: ["wikipedia_en_simple", "wikipedia_en-simple"], licence: "cc-by-sa-4.0" },
   { id: "wikipedia-en", label: "Wikipedia", bookPrefixes: ["wikipedia_en_all", "wikipedia_en_top"], licence: "cc-by-sa-4.0" },
-  { id: "wiktionary-simple", label: "Simple English Wiktionary", bookPrefixes: ["wiktionary_en_simple"], licence: "cc-by-sa-4.0" },
+  { id: "wiktionary-simple", label: "Simple English Wiktionary", bookPrefixes: ["wiktionary_en_simple", "wiktionary_en-simple"], licence: "cc-by-sa-4.0" },
   { id: "wiktionary-en", label: "Wiktionary", bookPrefixes: ["wiktionary_en_all"], licence: "cc-by-sa-4.0" },
   { id: "wikivoyage", label: "Wikivoyage", bookPrefixes: ["wikivoyage_en"], licence: "cc-by-sa-4.0" },
   { id: "wikibooks", label: "Wikibooks", bookPrefixes: ["wikibooks_en"], licence: "cc-by-sa-4.0" },
   // UNVERIFIED: the Kiwix catalogue's exact book name for the Factbook and
   // for MedlinePlus; both prefixes are read from the publisher's listing
   // when the library manager installs them (KS-BENCH-05 re-checks).
-  { id: "world-factbook", label: "CIA World Factbook", bookPrefixes: ["zimgit-the-world-factbook", "world-factbook", "worldfactbook"], licence: "public-domain" },
+  { id: "world-factbook", label: "CIA World Factbook", bookPrefixes: ["theworldfactbook", "zimgit-the-world-factbook", "world-factbook", "worldfactbook"], licence: "public-domain" },
   { id: "medlineplus", label: "MedlinePlus", bookPrefixes: ["medlineplus"], licence: "public-domain" },
   { id: "stackexchange", label: "Stack Exchange", bookPrefixes: ["cooking.stackexchange.com", "diy.stackexchange.com", "gardening.stackexchange.com", "askubuntu.com", "superuser.com", "stackoverflow.com"], licence: "cc-by-sa-4.0" },
 ];

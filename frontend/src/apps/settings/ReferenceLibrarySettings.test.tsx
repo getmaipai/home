@@ -26,6 +26,7 @@ function mount(options: { jobs?: ReferenceJob[]; plan?: Partial<ReferencePlan> }
   api.referenceState = mock(async () => ({ installed: [], jobs, matchesPresets: [] as string[] }));
   api.referenceCatalog = mock(async () => catalog);
   api.hardware = mock(async () => ({ freeDiskBytes: 50_000_000_000 }) as never);
+  api.referenceDisk = mock(async () => ({ totalBytes: 2_000_000_000_000, freeBytes: 1_000_000_000_000, booksBytes: 2_000_000_000 }));
   api.referencePlan = mock(async () => ({ ...plan, ...options.plan }));
   api.referenceInstall = mock(async (id: string) => { calls.push(`install ${id}`); return job; });
   api.referenceRemove = mock(async (id: string) => { calls.push(`remove ${id}`); return { removed: true, freedBytes: 1 }; });
@@ -41,8 +42,17 @@ describe("Offline data settings", () => {
     expect(view.getByRole("group", { name: "Health and medicine" })).toBeTruthy();
     expect(view.getByRole("switch", { name: "Vikidia: on" }).getAttribute("aria-checked")).toBe("true");
     expect(view.getByRole("switch", { name: "MedlinePlus: off" }).getAttribute("aria-checked")).toBe("false");
-    expect(view.getByText(/1.9 GB of offline books/)).toBeTruthy();
+    expect(view.getByText(/1863 GB drive/)).toBeTruthy();
+    expect(view.getByText(/931 GB free · 1.9 GB of offline books/)).toBeTruthy();
     expect(view.getAllByText("For children").length).toBe(2);
+    view.restore();
+  });
+
+  test("Wikipedia is one row with a version picker, not one row per size", async () => {
+    const view = mount();
+    await view.findByRole("group", { name: "Encyclopedia" });
+    expect(view.getAllByText("Wikipedia", { selector: "[data-slot='item-title']" }).length).toBe(1);
+    expect(view.getByRole("combobox", { name: "Wikipedia version" }).textContent).toContain("Off");
     view.restore();
   });
 
@@ -83,7 +93,7 @@ describe("Offline data settings", () => {
 
   test("a plan refusal explains itself and keeps Apply off", async () => {
     const view = mount({ plan: { refusal: "Keep at least 20 percent of the drive free." } });
-    fireEvent.click(await view.findByRole("switch", { name: "Wikipedia: everything, with pictures: off" }));
+    fireEvent.click(await view.findByRole("switch", { name: "MedlinePlus: off" }));
     expect(await view.findByText("Keep at least 20 percent of the drive free.")).toBeTruthy();
     expect((view.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
     view.restore();
@@ -91,7 +101,7 @@ describe("Offline data settings", () => {
 
   test("a download in flight shows progress and pause, resume and cancel", async () => {
     const view = mount({ jobs: [job] });
-    expect(await view.findByRole("progressbar", { name: "Wikipedia: short introductions only download progress" })).toBeTruthy();
+    expect(await view.findByRole("progressbar", { name: "Wikipedia download progress" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Pause" }));
     await waitFor(() => expect(view.calls).toContain("pause"));
     fireEvent.click(view.getByRole("button", { name: "Cancel" }));

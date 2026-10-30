@@ -15,19 +15,20 @@ server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(req): Response {
   const u = new URL(req.url);
   if (u.pathname === "/catalog/v2/entries") {
     const entries = [...bodies.keys()].map((key) => {
-      const [book, flavor] = key.split(":"); const body = bodies.get(key)!; const name = `${book}_en_all`;
-      return `<entry><name>${name}</name><flavour>${flavor}</flavour><link rel="http://opds-spec.org/acquisition/open-access" href="http://127.0.0.1:${server.port}/zim/${name}_${flavor}_2026-09.zim.meta4" /></entry>`;
+      const [book, flavor] = key.split(":"); const body = bodies.get(key)!; const name = book;
+      return `<entry><name>${name}</name><flavour>${flavor}</flavour><link rel="http://opds-spec.org/acquisition/open-access" href="http://127.0.0.1:${server.port}/zim/${name}${flavor ? `_${flavor}` : ""}_2026-09.zim.meta4" /></entry>`;
     }).join("");
     return new Response(`<feed xmlns="http://www.w3.org/2005/Atom">${entries}</feed>`);
   }
   const meta = /\/zim\/(.+)\.meta4$/.exec(u.pathname);
-  if (meta) { const name = meta[1]!; const match = [...bodies.entries()].find(([key]) => { const [book, flavor] = key.split(":"); return name === `${book}_en_all_${flavor}_2026-09.zim`; }); if (!match) return new Response("missing", { status: 404 }); const bytes = new TextEncoder().encode(match[1]); return new Response(`<metalink><file name="${name}"><size>${bytes.length}</size><hash type="sha-256">${createHash("sha256").update(bytes).digest("hex")}</hash></file></metalink>`); }
+  if (meta) { const name = meta[1]!; const match = [...bodies.entries()].find(([key]) => { const [book, flavor] = key.split(":"); return name === `${book}${flavor ? `_${flavor}` : ""}_2026-09.zim`; }); if (!match) return new Response("missing", { status: 404 }); const bytes = new TextEncoder().encode(match[1]); return new Response(`<metalink><file name="${name}"><size>${bytes.length}</size><hash type="sha-256">${createHash("sha256").update(bytes).digest("hex")}</hash></file></metalink>`); }
   return new Response("fixture zim");
 } });
 
 beforeEach(() => {
   resetDb(); bodies.clear();
-  for (const book of ["vikidia", "wikipedia", "wiktionary", "wikivoyage", "wikibooks", "world-factbook", "medlineplus", "stackexchange"]) for (const flavor of ["nopic", "mini", "maxi"]) bodies.set(`${book}:${flavor}`, `${book} ${flavor} snapshot`);
+  for (const book of ["vikidia_en_all", "wikipedia_en-simple_all", "wikipedia_en_all", "wiktionary_en-simple_all", "wiktionary_en_all", "wikivoyage_en_all", "wikibooks_en_all", "stackexchange"]) for (const flavor of ["nopic", "mini", "maxi"]) bodies.set(`${book}:${flavor}`, `${book} ${flavor} snapshot`);
+  for (const book of ["theworldfactbook_en_all", "medlineplus.gov_en_all"]) bodies.set(`${book}:`, `${book} snapshot`);
   const dir = join(process.env.MAIPAI_DATA_DIR!, "reference-presets"); rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
   setHouseholdSettingValue("reference.library_dir", dir);
   setHouseholdSettingValue("household.quiet_hours.from", "00:00"); setHouseholdSettingValue("household.quiet_hours.to", "23:59");
@@ -56,6 +57,12 @@ describe("KS-REF-PRESETS-01 engine", () => {
   test("refuses a plan when installs would leave less than twenty percent free", async () => {
     const plan = await planReference("full", undefined, "/dev");
     expect(plan.refusal).toContain("20 percent");
+  });
+
+  test("Wikipedia resolves to the whole encyclopedia, never a topic edition that shares its prefix", async () => {
+    bodies.set("wikipedia_en_football:maxi", "football maxi snapshot");
+    const plan = await planReference("custom", [{ source: "wikipedia-en", flavour: "maxi" }, { source: "wikipedia-simple", flavour: "default" }]);
+    expect(plan.sets.map((set) => set.name)).toEqual(["wikipedia_en_all", "wikipedia_en-simple_all"]);
   });
 
   test("applies idempotently, queues child sets first and Wikipedia last", async () => {
