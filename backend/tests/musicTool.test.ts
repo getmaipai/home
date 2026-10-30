@@ -58,6 +58,10 @@ describe("music jobs and their private files", () => {
       expect(generationOf(row.provenance)).toMatchObject({ task: "text2music", parent_file_id: parent.fileId, source_kind: "made_here" });
       expect(row.provenance).toContain(parent.fileId!);
     }
+    // A stem is its own track: the song's versions stay the song's, and a stem has no versions but itself.
+    const song = getMusicJobFor(people.owner, parent.id)!;
+    expect(musicVersions(people.owner, song).map((v) => v.fileId)).toEqual([parent.fileId]);
+    for (const job of jobs) expect(musicVersions(people.owner, getMusicJobFor(people.owner, job.id)!).map((v) => v.fileId)).toEqual([job.fileId]);
   });
   test("the tool node returns at once, puts the job on the tool part, and stores unchanged AAC with prompt-free provenance", async () => {
     const state = musicState(people.owner);

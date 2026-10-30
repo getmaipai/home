@@ -330,7 +330,9 @@ export function conversationHasMusic(actor: PersonRow, conversationId: string, t
 /** The connected version tree, scoped to the owner and this conversation. */
 export function musicVersions(actor: PersonRow, root: MusicJob): MusicJob[] {
   if (root.personId !== actor.id || !root.conversationId) return [];
-  const songs = jobsForConversation(actor, root.conversationId, root.temporary).filter((j) => j.fileId && ownsMusicAttachment(actor, j));
+  // A stem is its own track, never a version of the song it was split from: it stays out of the song's family and has none of its own.
+  if (root.task === "stems") return root.fileId && ownsMusicAttachment(actor, root) ? [root] : [];
+  const songs = jobsForConversation(actor, root.conversationId, root.temporary).filter((j) => j.fileId && j.task !== "stems" && ownsMusicAttachment(actor, j));
   const ids = new Set([root.fileId, root.parentFileId].filter((id): id is string => !!id));
   let changed = true;
   while (changed) {
