@@ -75,8 +75,16 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
     wind: number(details, "wind_speed") !== undefined ? { speed: number(details, "wind_speed")!, direction: number(details, "wind_direction") ?? 0 } : undefined,
     pressure: number(details, "pressure"), visibility: number(details, "visibility") === undefined ? undefined : number(details, "visibility")! / 1000,
     sunrise: string(details, "sunrise") ? clock(string(details, "sunrise")!) : undefined, sunset: string(details, "sunset") ? clock(string(details, "sunset")!) : undefined, uvIndex: number(details, "uv_index"),
-    moon: details.moon && typeof details.moon === "object" && typeof (details.moon as Record<string, unknown>).phase === "string" && typeof (details.moon as Record<string, unknown>).illumination === "number" ? { phase: (details.moon as { phase: string }).phase, illumination: (details.moon as { illumination: number }).illumination } : undefined,
+    moon: moonDetail(details.moon),
   } : undefined, localTime: string(details, "timezone") ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: string(details, "timezone") }).format(new Date()) : undefined };
+}
+
+/** The Weather moon tile's data from a page document's `moon` object; the next full and new moon dates ride along only when they are strings. */
+function moonDetail(value: unknown): { phase: string; illumination: number; nextFull?: string; nextNew?: string } | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const moon = value as Record<string, unknown>;
+  if (typeof moon.phase !== "string" || typeof moon.illumination !== "number") return undefined;
+  return { phase: moon.phase, illumination: moon.illumination, ...(typeof moon.nextFull === "string" ? { nextFull: moon.nextFull } : {}), ...(typeof moon.nextNew === "string" ? { nextNew: moon.nextNew } : {}) };
 }
 
 /** One page document of a package app. A document the interpreter cannot parse is an error state with a retry, never a crashed page. */

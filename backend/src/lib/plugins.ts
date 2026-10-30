@@ -685,7 +685,7 @@ export async function runPlugin(
     if (summary !== "") answer.data = { ...(answer.data ?? {}), summary };
     // WEATHER-PORT-04: the Weather page's moon tile comes from the almanac-moon app's own answer (one run per day).
     const moon = id === "weather"
-      ? await moonTile(async () => { const run = await runPlugin("almanac-moon", actor, {}, undefined, { band: options.band }); return run.ok ? run.value.data as { phase?: unknown; illumination?: unknown } | undefined : undefined; })
+      ? await moonTile(async () => { const run = await runPlugin("almanac-moon", actor, {}, undefined, { band: options.band }); return run.ok ? run.value.data as { phase?: unknown; illumination?: unknown; next_full_moon?: unknown; next_new_moon?: unknown } | undefined : undefined; })
       : undefined;
     const appDetails = id === "weather"
       ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice) } : {}), ...(summary !== "" ? { summary } : {}), ...(moon ? { moon } : {}), ...(alert ? { alert } : {}) }

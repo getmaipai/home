@@ -22,4 +22,12 @@ describe("moonTile", () => {
     expect(await moonTile(async () => ({ phase: "New Moon" }))).toBeUndefined();
     expect(await moonTile(async () => ({ phase: "New Moon", illumination: 0 }))).toEqual({ phase: "New Moon", illumination: 0 });
   });
+  test("keeps the next full and new moon dates when they are real calendar dates", async () => {
+    const tile = await moonTile(async () => ({ phase: "Waxing Crescent", illumination: 0.28, next_full_moon: "2026-11-24", next_new_moon: "2026-11-09" }));
+    expect(tile).toEqual({ phase: "Waxing Crescent", illumination: 28, nextFull: "2026-11-24", nextNew: "2026-11-09" });
+  });
+  test("drops a date that is not a real calendar date and keeps the tile", async () => {
+    const tile = await moonTile(async () => ({ phase: "Full Moon", illumination: 1, next_full_moon: "2026-02-31", next_new_moon: "soon" }));
+    expect(tile).toEqual({ phase: "Full Moon", illumination: 100 });
+  });
 });
