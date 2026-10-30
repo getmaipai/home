@@ -32,7 +32,7 @@ export function installFakeMusicStack() {
     if (path.startsWith("/v1/audio/stems/") && path.endsWith(".m4a")) return new Response(testM4a(), { headers: { "content-type": "audio/mp4" } });
     if (path === "/v1/audio/stems/stems-job") {
       const polls = (fake.polls.get("stems-job") ?? 0) + 1; fake.polls.set("stems-job", polls);
-      return json(polls >= fake.pollsToFinish ? { state: "done", data: [{ url: "/v1/audio/stems/vocals.m4a", name: "vocals", duration_s: 52 }, { url: "/v1/audio/stems/drums.m4a", name: "drums", duration_s: 52 }] } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
+      return json(polls >= fake.pollsToFinish ? { state: "done", data: [{ url: "/v1/audio/stems/vocals.m4a", stem: "vocals" }, { url: "/v1/audio/stems/drums.m4a", stem: "drums" }] } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
     }
     if (path === "/v1/audio/music" && method === "POST") {
       const body = JSON.parse(String(init?.body)) as MusicBody;

@@ -3,7 +3,8 @@ import type { MusicRequest } from "./types";
 import { getStackUrl } from "@/lib/stackEngine";
 export type MusicState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; bpm?: number; key?: string; model?: string }
-export interface StackStem { url: string; name: "vocals" | "drums" | "bass" | "other"; duration_s: number }
+/** What the Stack lists for a finished split: each stem by name, fetched at its url; every stem is as long as the song. */
+export interface StackStem { url: string; stem: "vocals" | "drums" | "bass" | "other" }
 export interface StackStemsStatus { available: boolean; state: string; install?: unknown }
 export interface StackMusicStatus {
   available: boolean; state: string; limits: { min_seconds: number; max_seconds: number };

@@ -219,7 +219,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   void startSongCover(actor, job).catch(() => {});
 }
 async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
-  if (!stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.name) || !s.url || !Number.isFinite(s.duration_s))) { fail(job, "bad_reply"); return; }
+  if (!stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "bad_reply"); return; }
   let turn = false;
   for (let i = 0; i < 120 && !signal.aborted; i++) {
     if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, job.turnId!), eq(conversationTurns.personId, actor.id))).get()) { turn = true; break; }
@@ -234,7 +234,7 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
     if (signal.aborted || stopped(job)) return;
     if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
     const target = i === 0 ? job : { ...job, id: newMusicJobId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), fileId: null, stackJob: null };
-    const provenance: GenerationProvenance = { ...parent, job_id: target.id, duration_s: stem.duration_s, parent_file_id: job.parentFileId, source_kind: "made_here", made_at: new Date().toISOString() };
+    const provenance: GenerationProvenance = { ...parent, job_id: target.id, duration_s: job.request.seconds, parent_file_id: job.parentFileId, source_kind: "made_here", made_at: new Date().toISOString() };
     if (job.temporary) {
       target.fileId = newFileId(); temporarySongs.set(target.fileId, { bytes, jobId: target.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(target.createdAt), provenance });
     } else {
@@ -242,8 +242,8 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
       if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
       target.fileId = made.value.id;
     }
-    target.request = { ...job.request, title: `${job.request.title ?? "Song"} (${stem.name})`, instrumental: stem.name !== "vocals", seconds: stem.duration_s };
-    target.seed = parent.seed ?? job.seed ?? 0; target.durationS = stem.duration_s; target.state = "done"; target.stage = "ready"; target.progress = 1; target.etaSeconds = 0; target.errorCode = null; target.errorLine = null;
+    target.request = { ...job.request, title: `${job.request.title ?? "Song"} (${stem.stem})`, instrumental: stem.stem !== "vocals", seconds: job.request.seconds };
+    target.seed = parent.seed ?? job.seed ?? 0; target.durationS = job.request.seconds; target.state = "done"; target.stage = "ready"; target.progress = 1; target.etaSeconds = 0; target.errorCode = null; target.errorLine = null;
     persistMusicJob(target);
   }
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
