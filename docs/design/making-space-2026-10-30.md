@@ -115,6 +115,15 @@ This note adds what is missing: the tiers and the memory behaviour.
 7. **After setup, the same table is what the AI and models page edits,** so a person who skipped Max at setup can turn it on later without
    re-learning anything.
 
+8. **The Spotlight exclusion extends the wizard's existing "Tune this computer" screen (owner, 2026-10-30).** `scripts/studio/host-tune.sh` already has the
+   `no-spotlight` item (HOST-TUNE-01): an empty `.metadata_never_index` marker, written in the person's own account with no privileges, with Apply
+   recommended, Apply, Revert and Skip on `HostTuneStep`. It covers the data and models folders. This note adds the engines, media and cache folders to it
+   (new folder arguments, or folders derived from the data folder), so Spotlight stops re-scanning model files (measured on the Studio: `mds` at 25 percent
+   CPU and 32 `mdworker` processes). It stays click to apply, as SETUP-TUNE-REVAMP-01 decided; Apply recommended includes it. The same list is shown under
+   Settings > Performance through the existing detect, apply and revert routes, opened to the owner after setup. Further optimizations join the host-tune
+   list, each reversible. There is no second step and no second way to write the markers. (The worktree folder on our own development Mac is dev tooling,
+   not the product: `wt.sh` writes its marker, see RELIABILITY-PREVENT-09.)
+
 ## 7. Proposed rows (evaluations first where a number is unknown)
 
 | Row | Slice | Done when |
@@ -124,6 +133,7 @@ This note adds what is missing: the tiers and the memory behaviour.
 | MEM-SPACE-03 | R4: feed the Stack's dev-load reading into the Status page's whole-system row for admins, with the existing card wording | Admin sees the other-apps line; no new reader; nothing is logged or sent; no process is signalled |
 | MEM-SPACE-04 | Performance page: presets (`resources.preset`), Free up memory, Customize (absorbs TIER-PRIO-02's panel); new reasons and copy on the existing status mechanisms | Screenshots opened and judged at both widths; every control states its effect |
 | MEM-SPACE-05 | Wizard: machine class and capability table, tier-aware plan, presets | Run on the dev Mac and a simulated 36 GB class: the table is right and unfit tiers are not downloaded |
+| MEM-SPACE-13 | Extend host-tune's `no-spotlight` item to the engines, media and cache folders; show the host-tune list under Settings > Performance | `hostTune.test.ts` proves apply and revert against a temp tree for all five folders and that nothing outside Home's folders is touched; the owner can open the routes after setup |
 | MEM-SPACE-06 | Capability table as a kit Table on SETUP-SIZE-01's page, the same page under Settings | One page, one source of numbers; lint shows no second copy |
 
 Order: 01 and 02 independent; 04 after the tiers rows that define the switches (TIER-HOME-03/04); 05 and 06 after SETUP-SIZE-01; 03 any time.
@@ -150,3 +160,5 @@ Nothing owner-decided is overridden. Changes to decided text:
 - The profiles note section 7 "Resources > Priorities" panel moves into the Performance page's Customize view (one home, S4); TIER-PRIO-02 is built there.
 - The preset writes defaults for `quiet_seconds`, `quiet_max_wait` and "lower without asking"; a Customize change overrides one value and the page shows "Custom". The profiles note defaults (60 s, 10 minutes, ask) equal the Chat first preset.
 - Tiers section 3a rule 7 switches stay on AI and models (TIER-HOME-04); this note adds none.
+- HOST-TUNE-01 (`docs/dev.md`): the `no-spotlight` item covers five folders (data, models, engines, media, cache) instead of two, and its list is also shown in Settings > Performance with the host-tune routes opened to the owner after setup (they close when setup ends today).
+- SETUP-TUNE-REVAMP-01 stands: tuning stays click to apply; Apply recommended includes the added folders.
