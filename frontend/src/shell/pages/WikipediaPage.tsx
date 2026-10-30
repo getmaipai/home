@@ -81,7 +81,7 @@ function OfflineList() {
   return (
     <section aria-label="Offline" className="flex flex-col gap-3">
       <h2 className="text-xl font-semibold">Offline</h2>
-      <p className="text-muted-foreground text-sm"><Link className="underline underline-offset-2" to="/settings/search?tab=reference-library">Manage downloaded books</Link> (owner or admin). Articles kept on this device open without Home. Open an article and press Keep on this device.</p>
+      <p className="text-muted-foreground text-sm"><Link className="underline underline-offset-2" to="/settings/offline-data">Manage downloaded books</Link> (owner or admin). Articles kept on this device open without Home. Open an article and press Keep on this device.</p>
       {ready && !kept.length ? <p className="text-muted-foreground">Nothing is kept on this device yet.</p> : null}
       <ul className="flex flex-col gap-1">
         {kept.map((item) => (
@@ -136,8 +136,8 @@ export function WikipediaPage() {
         {booksQuery.data && !book ? (
           <section className="flex flex-col gap-2" aria-label="Wikipedia is not installed">
             <h2 className="text-xl font-semibold">Wikipedia is not in your library yet</h2>
-            <p className="text-muted-foreground">An owner or admin can download it in Settings, Search and web, on the Reference library tab (pick everything with pictures, without pictures, or short introductions only). It downloads once and then works without the internet.</p>
-            <Link className="underline underline-offset-2" to="/settings/search?tab=reference-library">Open the Reference library</Link>
+            <p className="text-muted-foreground">An owner or admin can download it in Settings, Offline data (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet.</p>
+            <Link className="underline underline-offset-2" to="/settings/offline-data">Open Offline data</Link>
           </section>
         ) : null}
         {book ? (

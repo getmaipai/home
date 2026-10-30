@@ -9,7 +9,7 @@ The Wikipedia app reads Wikipedia from a copy stored on your Home computer. Noth
 
 ## Get Wikipedia first
 
-An owner or admin has to download it once. Open **Settings**, choose **Search and web**, then open the **Reference library** tab. Pick one of these:
+An owner or admin has to download it once. Open **Settings** and choose **Offline data**. Switch on the Wikipedia version you want, then choose **Apply**:
 
 - Everything, with pictures: the biggest download.
 - Everything, no pictures: smaller.

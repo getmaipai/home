@@ -28,7 +28,7 @@ day the hub arrives; the rest are for when you need them.
 - [What MaiPai remembers](memory.md): see, export, or forget what MaiPai has remembered from your conversations.
 - [People and parental controls](people.md): see who is in your household, manage accounts, and check in on a child.
 - [Settings](settings.md): find your way around MaiPai's settings, for the household and for you.
-- [Reference library](reference-library.md): choose and manage offline books for your household.
+- [Offline data](reference-library.md): choose and manage offline books (Wikipedia, health and more) for your household.
 - [Ease of use](ease-of-use.md): make words bigger, buttons roomier and colors clearer for yourself.
 
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.

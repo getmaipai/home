@@ -1,16 +1,25 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+// READER-14: Settings, Offline data (view `home.reference_library`). One row per offline book with a switch, and Minimum, Moderate
+// and Full as one parent choice that sets the rows. Choices are staged in the page and written only by Apply, with the same
+// storage bar and action bar as AI and models (AiGlance).
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
+import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemSeparator, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { Chip } from "@maipai/ui/src/primitives/Chip";
+import { Progress } from "@maipai/ui/src/ui/progress";
+import { Switch } from "@maipai/ui/src/ui/switch";
+import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import presetsData from "@maipai/spec/vocab/reference-presets.json";
-import { api, type ReferenceJob, type ReferencePlan, type ReferenceSelection, type ReferenceSet } from "@/lib/api";
+import { api, ApiError, type ReferenceCatalogSet, type ReferenceJob } from "@/lib/api";
+import { sizeGb } from "../../../../shared/diskPlanMath";
 
 const presets = presetsData.presets;
-const bytes = (n: number) => n >= 1_000_000_000 ? `${(n / 1_000_000_000).toFixed(1)} GB` : `${(n / 1_000_000).toFixed(0)} MB`;
-const duration = (n: number | null) => n === null ? "Time estimate unavailable" : n < 60 ? `About ${n} seconds` : `About ${Math.ceil(n / 60)} minutes`;
-
+const duration = (n: number | null) => n === null ? "Time estimate unavailable" : n < 60 ? `About ${n} seconds` : n < 3600 ? `About ${Math.ceil(n / 60)} minutes` : `About ${Math.ceil(n / 3600)} hours`;
+const signed = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
+const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
 const TOPICS: Array<{ topic: string; sources: string[] }> = [
   { topic: "Encyclopedia", sources: ["wikipedia-en", "wikipedia-simple", "vikidia"] },
@@ -20,7 +29,7 @@ const TOPICS: Array<{ topic: string; sources: string[] }> = [
   { topic: "Books and how-to", sources: ["wikibooks", "stackexchange"] },
 ];
 const SOURCE_BLURB: Record<string, string> = {
-  "wikipedia-en": "The full English Wikipedia.",
+  "wikipedia-en": "The English Wikipedia.",
   "wikipedia-simple": "Wikipedia in plain, simple English.",
   vikidia: "An encyclopedia written for children.",
   "wiktionary-simple": "Word meanings in simple English.",
@@ -31,64 +40,188 @@ const SOURCE_BLURB: Record<string, string> = {
   wikibooks: "Free textbooks and manuals.",
   stackexchange: "Questions and answers on cooking, repairs, gardens and computers.",
 };
-const FLAVOUR_BLURB: Record<string, string> = { maxi: "Everything, with pictures (largest).", nopic: "Everything, no pictures (smaller).", mini: "Short introductions only (smallest)." };
-const plainLine = (set: { source: string; flavour: string }) => [SOURCE_BLURB[set.source], FLAVOUR_BLURB[set.flavour]].filter(Boolean).join(" ");
-function topicGroups<T extends { source: string }>(sets: T[]): Array<{ topic: string; sets: T[] }> {
+const FLAVOUR_LABEL: Record<string, string> = { maxi: "Everything, with pictures", nopic: "Everything, no pictures", mini: "Short introductions only" };
+const FLAVOUR_ORDER = ["maxi", "nopic", "mini"];
+
+function topicGroups<T extends { source: string; flavour: string }>(sets: T[]): Array<{ topic: string; sets: T[] }> {
   const known = new Set(TOPICS.flatMap((t) => t.sources));
-  const groups = TOPICS.map((t) => ({ topic: t.topic, sets: sets.filter((set) => t.sources.includes(set.source)) }));
+  const order = (set: T) => { const at = FLAVOUR_ORDER.indexOf(set.flavour); return at < 0 ? 99 : at; };
+  const groups = TOPICS.map((t) => ({ topic: t.topic, sets: sets.filter((set) => t.sources.includes(set.source)).sort((a, b) => order(a) - order(b)) }));
   groups.push({ topic: "Other", sets: sets.filter((set) => !known.has(set.source)) });
   return groups.filter((group) => group.sets.length > 0);
 }
+
+const presetIds = (id: string): Set<string> => new Set((presets.find((p) => p.id === id)?.members ?? []).map((m) => `${m.source}:${m.flavour}`));
 
 export function ReferenceLibrarySettings() {
   const client = useQueryClient();
   const state = useQuery({ queryKey: ["reference-state"], queryFn: api.referenceState, refetchInterval: (query) => query.state.data?.jobs.length ? 1500 : false });
   const catalog = useQuery({ queryKey: ["reference-catalog"], queryFn: api.referenceCatalog, refetchInterval: () => state.data?.jobs.length ? 5000 : false });
-  const [confirm, setConfirm] = useState<{ kind: "install"; set: ReferenceSet; plan: ReferencePlan } | { kind: "remove"; set: ReferenceSet } | { kind: "preset"; preset: "minimum" | "moderate" | "full"; plan: ReferencePlan } | null>(null);
+  const hardware = useQuery({ queryKey: ["host", "hardware"], queryFn: () => api.hardware(), staleTime: 300_000 });
+  // The wanted state of a book, only where it differs from what is installed now.
+  const [staged, setStaged] = useState<Record<string, boolean>>({});
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function refresh() { await client.invalidateQueries({ queryKey: ["reference-state"] }); }
-  async function planSet(set: ReferenceSet) {
+  const [step, setStep] = useState<string | null>(null);
+
+  const sets = useMemo(() => (catalog.data ?? []).filter((set) => set.available || set.installed), [catalog.data]);
+  const wants = (set: ReferenceCatalogSet) => staged[set.id] ?? set.installed;
+  const additions = sets.filter((set) => wants(set) && !set.installed);
+  const removals = sets.filter((set) => !wants(set) && set.installed);
+  const stagedCount = additions.length + removals.length;
+  const installedBytes = sets.filter((set) => set.installed).reduce((sum, set) => sum + set.sizeBytes, 0);
+  const addBytes = additions.reduce((sum, set) => sum + set.sizeBytes, 0);
+  const freedBytes = removals.reduce((sum, set) => sum + set.sizeBytes, 0);
+  const jobFor = (set: ReferenceCatalogSet): ReferenceJob | undefined => state.data?.jobs.find((job) => job.setId === set.id);
+
+  const stage = (set: ReferenceCatalogSet, on: boolean) => setStaged((previous) => {
+    const next = { ...previous };
+    if (on === set.installed) delete next[set.id]; else next[set.id] = on;
+    return next;
+  });
+  // A parent choice sets every row: the books in it are on, the others off. Nothing is written until Apply.
+  const choosePreset = (id: string) => {
+    const members = presetIds(id);
+    const next: Record<string, boolean> = {};
+    for (const set of sets) if (members.has(set.id) !== set.installed) next[set.id] = members.has(set.id);
+    setStaged(next);
     setError(null);
-    try { const plan = await api.referencePlan("custom", [{ source: set.source, flavour: set.flavour as ReferenceSelection["flavour"] }]); const planned = plan.sets[0] ?? set; setConfirm({ kind: "install", set: planned, plan }); }
-    catch { setError("Home could not check this set's size and drive space. Check the Home connection, then try again."); }
-  }
-  async function planPreset(preset: "minimum" | "moderate" | "full") {
-    setError(null);
-    try { setConfirm({ kind: "preset", preset, plan: await api.referencePlan(preset) }); }
-    catch { setError("Home could not check this library choice. Check the Home connection, then try again."); }
-  }
-  async function runConfirm() {
-    if (!confirm) return;
-    try {
-      if (confirm.kind === "remove") { await api.referenceRemove(confirm.set.id); }
-      else if (confirm.kind === "install") { await api.referenceInstall(confirm.set.id); }
-      else if (confirm.kind === "preset") {
-        const existing = new Set(catalog.data?.filter((set) => set.installed).map((set) => set.id) ?? []);
-        const additions = confirm.plan.sets.filter((set) => !existing.has(set.id));
-        await Promise.all(additions.map((set) => api.referenceInstall(set.id)));
-      }
-      setConfirm(null); await refresh();
-    } catch { setError("Home could not change the reference library. Check drive space and the Home connection, then try again."); }
-  }
-  async function jobAction(job: ReferenceJob, action: "pause" | "resume" | "cancel") {
-    setError(null);
-    try { await api.referenceJob(job.id, action); await refresh(); }
-    catch { setError(`Home could not ${action} this download. Check the Home connection, then try again.`); }
-  }
-  const listed = catalog.data ? catalog.data.map((set) => {
-    const { id, source, flavour, name, language, installed, sizeBytes, snapshotDate, bands } = set;
-    const job = state.data?.jobs.find((j) => j.setId === id);
-    return { ...set, id, source, flavour, name, language, installed, sizeBytes, snapshotDate, bands, job };
-  }) : [];
-  return <>
-      <p className="text-sm text-muted-foreground">Offline data. Books that live on this Home, like Wikipedia and health information. Choose what to download, and how much detail. Everything here keeps working with no internet, and children and teens only see the books suited to them.</p>
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-      {state.isError || catalog.isError ? <p role="alert" className="text-sm text-destructive">Home could not load the reference library. Check the Home connection, then reload this page.</p> : null}
-      <section aria-label="Library shortcuts"><h2 className="text-sm font-medium">Quick choices</h2><ItemGroup variant="card" aria-label="Library shortcuts">{presets.map((preset) => <Item key={preset.id}><ItemContent><ItemTitle>{preset.label}{state.data?.matchesPresets.includes(preset.id) ? " · Current" : ""}</ItemTitle><ItemDescription clamp={false}>{preset.copy}</ItemDescription></ItemContent><ItemFooter><Button type="button" variant={state.data?.matchesPresets.includes(preset.id) ? "default" : "outline"} onClick={() => void planPreset(preset.id as "minimum" | "moderate" | "full")}>Select</Button></ItemFooter></Item>)}</ItemGroup></section>
-      <section aria-label="Reference sets"><h2 className="mb-1 text-sm font-medium">Offline books</h2><p className="mb-3 text-sm text-muted-foreground">Each book downloads once, then works without the internet. Pick the version that fits your drive: with pictures is the biggest, introductions only is the smallest.</p>{catalog.isLoading || state.isLoading ? <p>Loading reference sets…</p> : <div className="flex flex-col gap-5">{topicGroups(listed).map((group) => <section key={group.topic} aria-label={group.topic} className="flex flex-col gap-2"><h3 className="text-sm font-medium">{group.topic}</h3><ItemGroup variant="card" aria-label={group.topic}>{group.sets.map((set, index) => <div key={set.id}>{index ? <ItemSeparator variant="inset" /> : null}<Item>
-        <ItemContent><ItemTitle>{set.name}</ItemTitle>{plainLine(set) ? <p className="text-sm">{plainLine(set)}</p> : null}<ItemDescription clamp={false}>{set.language} · {set.available ? bytes(set.sizeBytes) : "Size unavailable"} · Snapshot {set.snapshotDate ?? "date not listed"} · {set.installed ? "Installed" : set.available ? "Not installed" : "Unavailable"}{set.job ? ` · ${set.job.state}` : ""}{set.message ? ` · ${set.message}` : ""}</ItemDescription></ItemContent>
-        <ItemFooter>{set.job ? <><Progress value={set.job.totalBytes ? Math.round(set.job.completedBytes / set.job.totalBytes * 100) : 0} aria-label={`${set.name} download progress`} /><span>{bytes(set.job.completedBytes)} of {bytes(set.job.totalBytes)}</span>{set.job.state === "paused" ? <Button variant="outline" size="sm" onClick={() => void jobAction(set.job!, "resume")}>Resume</Button> : <Button variant="outline" size="sm" onClick={() => void jobAction(set.job!, "pause")}>Pause</Button>}<Button variant="outline" size="sm" onClick={() => void jobAction(set.job!, "cancel")}>Cancel</Button></> : <Button type="button" variant="outline" disabled={!set.installed && !set.available} onClick={() => set.installed ? setConfirm({ kind: "remove", set: { ...set, sha256: "" } }) : void planSet({ ...set, sha256: "" })}>{set.installed ? "Remove" : set.available ? "Install" : "Unavailable"}</Button>}</ItemFooter>
-      </Item></div>)}</ItemGroup></section>)}</div>}</section>
-      {confirm ? <AlertDialog open onOpenChange={(open) => { if (!open) setConfirm(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{confirm.kind === "remove" ? `Remove ${confirm.set.name}?` : confirm.kind === "preset" ? `Install the ${presets.find((preset) => preset.id === confirm.preset)?.label} library?` : `Install ${confirm.set.name}?`}</AlertDialogTitle><AlertDialogDescription>{confirm.kind === "remove" ? `${bytes(confirm.set.sizeBytes)} will be freed. ${catalog.data?.find((set) => set.id === confirm.set.id)?.bands.filter((band) => band === "child" || band === "teen").join(" and ") || "No child or teen"} readers may lose access to this set.` : confirm.plan.refusal ? confirm.plan.refusal : confirm.kind === "preset" ? `${confirm.plan.sets.length} sets are in this choice. Sets you already have stay installed. ${bytes(confirm.plan.totalBytes)} to download, with ${bytes(confirm.plan.freeAfterInstallBytes)} free after install. ${duration(confirm.plan.estimatedSeconds)}.` : `${bytes(confirm.plan.totalBytes)} to download. ${bytes(confirm.plan.freeAfterInstallBytes)} free after install. ${duration(confirm.plan.estimatedSeconds)}.`}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>{confirm.kind === "remove" ? <AlertDialogAction variant="destructive" onClick={() => void runConfirm()}>Remove set</AlertDialogAction> : confirm.plan.refusal ? <Button variant="outline" disabled>Cannot continue</Button> : <AlertDialogAction onClick={() => void runConfirm()}>{confirm.kind === "preset" ? "Install choice" : "Install set"}</AlertDialogAction>}</AlertDialogFooter></AlertDialogContent></AlertDialog> : null}
-  </>;
+  };
+  const activePreset = presets.find((preset) => {
+    const members = presetIds(preset.id);
+    return sets.length > 0 && sets.every((set) => wants(set) === members.has(set.id));
+  })?.id;
+
+  // What the downloads would need, asked of the hub whenever the additions change.
+  const planKey = additions.map((set) => set.id).sort().join(",");
+  const plan = useQuery({
+    queryKey: ["reference-plan", planKey],
+    queryFn: () => api.referencePlan("custom", additions.map((set) => ({ source: set.source, flavour: set.flavour as "mini" | "maxi" | "nopic" | "default" }))),
+    enabled: additions.length > 0,
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  const apply = useMutation({
+    mutationFn: async () => {
+      for (const set of removals) { setStep(`Removing ${set.name}…`); await api.referenceRemove(set.id); }
+      for (const set of additions) { setStep(`Starting ${set.name}…`); await api.referenceInstall(set.id); }
+    },
+    onSuccess: async () => { setStep(null); setStaged({}); setError(null); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
+    onError: async (e) => { setStep(null); setError(messageOf(e, "Home could not change the offline books. Check the drive space and the Home connection, then try again.")); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
+  });
+  const jobAction = useMutation({
+    mutationFn: ({ job, action }: { job: ReferenceJob; action: "pause" | "resume" | "cancel" }) => api.referenceJob(job.id, action),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["reference-state"] }),
+    onError: () => setError("Home could not change this download. Check the Home connection, then try again."),
+  });
+
+  const free = plan.data?.freeBytes ?? hardware.data?.freeDiskBytes ?? null;
+  const capacity = free !== null ? installedBytes + free : null;
+  const segments = [
+    { id: "books", label: "Offline books", bytes: installedBytes, hue: "--hue-violet" },
+    ...(addBytes > 0 ? [{ id: "pending", label: "Staged", bytes: addBytes, hue: "--hue-orange" }] : []),
+  ];
+  const refusal = plan.data?.refusal ?? null;
+  const planFailed = additions.length > 0 && plan.isError;
+  const kidsLose = removals.filter((set) => set.bands.includes("child") || set.bands.includes("teen"));
+  const loadFailed = state.isError || catalog.isError;
+
+  return (
+    <section aria-label="Offline data" className="flex flex-col gap-4" data-testid="offline-data">
+      <p className="text-base text-muted-foreground">Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them.</p>
+      {loadFailed ? <Alert variant="destructive"><AlertTitle>The page did not load</AlertTitle><AlertDescription>Home could not load the offline books. Check that Home is running, then reload this page.</AlertDescription></Alert> : null}
+
+      <ItemGroup variant="card">
+        <Item>
+          <ItemContent>
+            <ItemTitle>Disk space</ItemTitle>
+            <StorageBar segments={segments} capacityBytes={capacity} formatBytes={sizeGb} />
+            {stagedCount > 0 ? <ItemDescription clamp={false}>After applying: {sizeGb(installedBytes + addBytes - freedBytes)} of books ({signed(addBytes - freedBytes)}){free !== null ? `, ${sizeGb(Math.max(0, free - addBytes + freedBytes))} free on this computer` : ""}.</ItemDescription> : <ItemDescription clamp={false}>{sizeGb(installedBytes)} of offline books{free !== null ? `, ${sizeGb(free)} free on this computer` : ""}.</ItemDescription>}
+          </ItemContent>
+        </Item>
+      </ItemGroup>
+
+      <section aria-label="Library size" className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">How much to keep</h2>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Library size">
+          {presets.map((preset) => <Chip key={preset.id} selected={activePreset === preset.id} onClick={() => choosePreset(preset.id)}>{preset.label}</Chip>)}
+          {activePreset === undefined && sets.length > 0 ? <Badge variant="secondary">Custom</Badge> : null}
+        </div>
+        <p className="text-base text-muted-foreground">{presets.find((preset) => preset.id === activePreset)?.copy ?? "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below."}</p>
+      </section>
+
+      {catalog.isLoading || state.isLoading ? <p role="status">Loading offline books…</p> : null}
+      {topicGroups(sets).map((group) => (
+        <section key={group.topic} aria-label={group.topic} className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold">{group.topic}</h2>
+          <ItemGroup variant="card" role="group" aria-label={group.topic}>
+            {group.sets.map((set) => rowOf({ set, on: wants(set), job: jobFor(set), onSwitch: (on) => stage(set, on), onJob: (job, action) => jobAction.mutate({ job, action }) }))}
+          </ItemGroup>
+        </section>
+      ))}
+
+      <div className="sticky bottom-0 z-10 flex flex-col gap-2 bg-background pb-2" data-testid="offline-action-bar">
+        {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+        {planFailed ? <Alert variant="destructive"><AlertTitle>Home could not check the drive space</AlertTitle><AlertDescription>Check that Home is running and online, then switch a book off and on again to retry.</AlertDescription></Alert> : null}
+        {refusal ? <Alert variant="warning"><AlertTitle>There is not enough room</AlertTitle><AlertDescription>{refusal}</AlertDescription></Alert> : null}
+        {stagedCount > 0 ? (
+          <Alert data-testid="offline-staged">
+            <AlertTitle>{stagedCount === 1 ? "1 change is waiting" : `${stagedCount} changes are waiting`}</AlertTitle>
+            <AlertDescription>
+              <p className="text-base">{additions.length > 0 ? `${additions.length} to download (${sizeGb(addBytes)}${plan.data ? `, ${duration(plan.data.estimatedSeconds)}` : ""}). ` : ""}{removals.length > 0 ? `${removals.length} to remove (frees ${sizeGb(freedBytes)}).` : ""}</p>
+              {apply.isPending && step ? <p className="text-base">{step}</p> : null}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={apply.isPending} onClick={() => setStaged({})}>Discard</Button>
+                <Button type="button" size="sm" disabled={apply.isPending || Boolean(refusal) || (additions.length > 0 && plan.isPending) || planFailed} onClick={() => removals.length > 0 ? setConfirmRemove(true) : apply.mutate()}>{apply.isPending ? "Applying…" : "Apply"}</Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+      </div>
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{removals.length === 1 ? `Remove ${removals[0]?.name}?` : `Remove ${removals.length} books?`}</AlertDialogTitle>
+            <AlertDialogDescription>{sizeGb(freedBytes)} will be freed. {kidsLose.length > 0 ? "Children and teens may lose access to " + kidsLose.map((set) => set.name).join(", ") + "." : "No book for children or teens is removed."} You can download them again later.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { setConfirmRemove(false); apply.mutate(); }}>Remove and apply</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
+}
+
+/** One book as a plain function so no Home component has a kit Item as its root (rule 9). */
+function rowOf({ set, on, job, onSwitch, onJob }: { set: ReferenceCatalogSet; on: boolean; job: ReferenceJob | undefined; onSwitch: (on: boolean) => void; onJob: (job: ReferenceJob, action: "pause" | "resume" | "cancel") => void }) {
+  const flavour = FLAVOUR_LABEL[set.flavour];
+  const forKids = set.bands.includes("child");
+  const status = set.installed ? "Installed" : !set.available ? "Unavailable" : "Not installed";
+  const pending = on !== set.installed;
+  return (
+    <Item key={set.id} data-testid={`offline-row-${set.id}`}>
+      <ItemContent>
+        <ItemTitle>
+          {set.name}
+          {forKids ? <Badge variant="secondary">For children</Badge> : null}
+          {pending ? <Badge variant="outline">{on ? "Will download" : "Will remove"}</Badge> : null}
+        </ItemTitle>
+        <ItemDescription clamp={false}>{[SOURCE_BLURB[set.source], flavour ? `${flavour}.` : null].filter(Boolean).join(" ")}</ItemDescription>
+        <ItemDescription clamp={false}>{set.language} · {set.available ? sizeGb(set.sizeBytes) : "Size unavailable"} · Snapshot {set.snapshotDate ?? "date not listed"} · {status}{job ? ` · ${job.state}` : ""}{set.message ? ` · ${set.message}` : ""}</ItemDescription>
+        {job ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Progress value={job.totalBytes ? Math.round(job.completedBytes / job.totalBytes * 100) : 0} aria-label={`${set.name} download progress`} />
+            <span className="text-base">{sizeGb(job.completedBytes)} of {sizeGb(job.totalBytes)}</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, job.state === "paused" ? "resume" : "pause")}>{job.state === "paused" ? "Resume" : "Pause"}</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "cancel")}>Cancel</Button>
+          </div>
+        ) : null}
+      </ItemContent>
+      <ItemActions><Switch checked={on} disabled={Boolean(job) || (!set.installed && !set.available)} onCheckedChange={onSwitch} aria-label={`${set.name}: ${on ? "on" : "off"}`} /></ItemActions>
+    </Item>
+  );
 }

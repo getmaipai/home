@@ -1,31 +1,25 @@
 ---
-title: Reference library
+title: Offline data
 description: Choose which offline books your household can read.
 ---
 
-# Reference library
+# Offline data
 
-The Reference library stores books on your Home computer. People in your household can read those books even when the internet is down.
+Offline data stores books on your Home computer. People in your household can read those books even when the internet is down.
 
-Only an owner or admin can change the library. Open **Settings**, choose **Search and web**, then open the **Reference library** tab. The Wikipedia app links straight to it. Children, teens, and other adults cannot open this page.
+Only an owner or admin can change the library. Open **Settings** and choose **Offline data** in The home group. The Wikipedia app and the Search and web page link straight to it. Children, teens, and other adults cannot open this page.
 
 Books are grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Travel and the world, and Books and how-to. Each Wikipedia choice says what you get. Everything with pictures is the biggest. Everything without pictures is smaller. Short introductions only is the smallest.
 
-## Choose a starting set
+## Choose how much to keep
 
-At the top of the page, choose **Minimum**, **Moderate**, or **Full**. The current choice is marked. Home shows how much space the choice needs, how much space will be left, and an estimate of the download time. Choose **Use this list** to make it your Custom list. A choice that would leave too little drive space cannot be used. The message explains what to change.
-
-![Reference library choices on a desktop](../assets/screens/reference-library-1440-light.png)
+At the top, the **Disk space** bar shows how much room the offline books use and how much is free. Under **How much to keep**, choose **Minimum**, **Moderate**, or **Full**. The choice switches every book at once, and the page marks it. Nothing changes yet: Home stages the changes and shows an **Apply** bar at the bottom. It says how much will download, how long that takes, and how much will be freed. If the drive is too full, the message says so and **Apply** stays off.
 
 ## Change one book
 
-Each row shows a book's language, size, snapshot date, and whether it is installed. Use the checkbox to add or remove it from your Custom list. Choose **Install** to see the space check before the download starts. Choose **Remove** to see how much space it frees and which age groups may lose access.
+Each book has its own row and a switch, grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Travel and the world, and Books and how-to. A row says what the book is, whether it has pictures, its size, its snapshot date, and whether it is installed. Wikipedia has a row for each version: everything with pictures (the biggest), everything without pictures, or short introductions only. Switch a book on to download it, or off to remove it, then choose **Apply**. Removing a book asks first and names any books that children or teens may lose.
 
-![Reference library on a phone](../assets/screens/reference-library-390-light.png)
-
-While a book downloads, Home shows its progress. Choose **Pause** to stop for now, **Resume** to keep going, or **Cancel** to stop the download.
-
-Custom is only the list you edit. Home does not save it as another named preset.
+While a book downloads, its row shows progress. Choose **Pause** to stop for now, **Resume** to keep going, or **Cancel** to stop the download.
 
 ## Pictures in answers
 
