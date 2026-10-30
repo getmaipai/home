@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -42,7 +43,6 @@ const libraryHeaderListeners = new Set<() => void>();
 function publishLibraryCanAdd(value: boolean) { if (libraryCanAdd === value) return; libraryCanAdd = value; for (const listener of libraryHeaderListeners) listener(); }
 function subscribeLibraryHeader(listener: () => void) { libraryHeaderListeners.add(listener); return () => libraryHeaderListeners.delete(listener); }
 function libraryHeaderSnapshot() { return libraryCanAdd; }
-function LibraryHeaderTitle() { return <h1 className="min-w-0 flex-1 truncate text-base font-medium">Library</h1>; }
 function LibraryHeaderAction() {
   const canUpload = useSyncExternalStore(subscribeLibraryHeader, libraryHeaderSnapshot, libraryHeaderSnapshot);
   return <><Button type="button" onClick={() => window.dispatchEvent(new Event(LIBRARY_UPLOAD_EVENT))}>{canUpload ? <UploadIcon aria-hidden className="size-4" /> : null}{canUpload ? "Upload" : "Ask to add a file"}</Button></>;
@@ -70,7 +70,7 @@ const CHILD_ADD = "Ask a grown-up to add this file. Adding files to the Library 
 /** The Library: a Dropbox-style page. Sections, search, filters and sort are all in the address; the hub does the filtering
  * and paging; the kit draws the tiles, the table, the viewer and the share dialog. No folders. */
 export function FilesPage({ person }: { person: Roster }) {
-  useHeaderExtra(LibraryHeaderTitle, LibraryHeaderAction);
+  useHeaderExtra(PageHeaderTitle, LibraryHeaderAction);
   useTabItem("Library");
   const [params, setParams] = useSearchParams();
   const view = useMemo(() => parseView(params), [params]);

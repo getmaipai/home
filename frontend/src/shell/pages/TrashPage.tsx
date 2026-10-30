@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SettingsShell } from "@maipai/ui/src/settings/SettingsShell";
@@ -21,6 +23,7 @@ const TRASH_AREA: SettingsAreaDef = {
   id: "storage-trash", title: "Storage", audience: { min_role: "guest" }, groups: [{ label: "Storage", sections: ["trash"] }], sections: [{ id: "trash", label: "Trash", icon: "trash", kind: "view", view: "trash" }],
 };
 export function TrashPage({ person }: { person: Roster }) {
+  useHeaderExtra(PageHeaderTitle);
   useTabItem("Trash");
   const navigate = useNavigate();
   const client = useQueryClient();

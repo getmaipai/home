@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, } from "react";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { describeMedia, useDeleteMediaAsk } from "@/apps/chat/chatDeleteMedia";
 import { useRemixAsk } from "@/apps/chat/chatRemix";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -1236,7 +1237,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // On a phone the conversation's title and actions sit in the shell's top bar, not in a second row under it.
   const phone = useIsPhoneLayout();
   const barOnPhone = phone && !companionShells;
-  useHeaderExtra(barOnPhone ? ChatHeaderBar : undefined);
+  useHeaderExtra(barOnPhone ? ChatHeaderBar : PageHeaderTitle);
   const callReady = useVoiceCallReady(false, chatAvailability === "ready" ? undefined : "Chat is unavailable");
   const openVoiceFromHeader = useCallback(() => closeAwareSetVoiceOpen(true), [closeAwareSetVoiceOpen]);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);

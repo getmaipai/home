@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -31,7 +32,6 @@ function publishProjectsCreateAllowed(value: boolean) {
 function subscribeProjectsHeader(listener: () => void) { projectsHeaderListeners.add(listener); return () => projectsHeaderListeners.delete(listener); }
 function projectsHeaderSnapshot() { return projectsCreateAllowed; }
 
-function ProjectsHeaderTitle() { return <h1 className="min-w-0 flex-1 truncate text-base font-medium">Projects</h1>; }
 function ProjectsHeaderAction() {
   const canCreate = useSyncExternalStore(subscribeProjectsHeader, projectsHeaderSnapshot, projectsHeaderSnapshot);
   if (!canCreate) return null;
@@ -53,7 +53,7 @@ const emptyValue: ProjectSettingsValue = {
 /** The app's project index. The hub's access field controls every action;
  * the page only renders the kit table, ProjectMark, and settings Element. */
 export function ProjectsPage({ person }: { person: Roster }) {
-  useHeaderExtra(ProjectsHeaderTitle, ProjectsHeaderAction);
+  useHeaderExtra(PageHeaderTitle, ProjectsHeaderAction);
   const { on: incognito } = useIncognitoContext();
   useTabItem("Projects");
   const queryClient = useQueryClient();

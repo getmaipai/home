@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { UsersSection } from "@/apps/settings/UsersSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
@@ -12,12 +12,6 @@ export function UsersPage({ person }: { person: Roster }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <CardHeader>
-        <CardTitle><span className="flex items-center gap-2">
-          <UsersIcon size={16} className="text-muted-foreground" />
-          Users
-        </span></CardTitle>
-      </CardHeader>
       {canManage ? (
         <UsersSection person={person} />
       ) : (

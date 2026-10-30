@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useMemo, type ReactNode } from "react";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -49,6 +51,7 @@ const DESKTOP_MIN_WIDTH = 960;
  * renderer draw everything. An area the viewer may not open replaces to
  * their own Settings page before any household request is made. */
 export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
+  useHeaderExtra(PageHeaderTitle);
   const { section: areaId } = useParams();
   const { areas: packageAreas, ready } = usePackageAreas();
   const central = settingsArea("settings");

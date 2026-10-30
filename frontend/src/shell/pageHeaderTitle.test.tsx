@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { headerEntryFor } from "@/shell/pageHeaderTitle";
+import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 const { PageHeaderTitle } = await import("@/shell/pageHeaderTitle");
 
 afterEach(cleanup);
@@ -17,7 +19,7 @@ afterEach(cleanup);
 // own exported icon constant both resolve to the icon a person would
 // actually see, not just that something non-null rendered.
 function renderAt(pathname: string) {
-  return render(
+  return renderWithQueryClient(
     <MemoryRouter initialEntries={[pathname]}>
       <PageHeaderTitle />
     </MemoryRouter>,
@@ -43,6 +45,16 @@ describe("PageHeaderTitle", () => {
     ["/users", "Users", "lucide-users"],
     ["/files", "Library", "lucide-folder"],
     ["/notifications", "Notifications", "lucide-bell"],
+    // Pages that drew no title, or text without an icon, before the one standard: every route reads as an icon and a name.
+    ["/companions", "Companions", "lucide-bot"],
+    ["/companions/create", "Companions", "lucide-bot"],
+    ["/all-apps", "All apps", "lucide-layout-grid"],
+    ["/reference", "Reference", "lucide-book-open"],
+    ["/media", "Media", "lucide-cast"],
+    ["/settings/ai", "Settings", "lucide-settings"],
+    ["/storage/trash", "Storage", "lucide-database"],
+    // A page inside an app reads as the app (owner, 2026-10-29): never the page's own name.
+    ["/chat/projects", "Chat", "lucide-message-circle"],
   ];
 
   for (const [pathname, label, iconClass] of cases) {
@@ -60,6 +72,13 @@ describe("PageHeaderTitle", () => {
   // keeps chat a true sibling route, never wrapped by
   // PageHeaderLayout; chatHeaderBar.tsx owns that page's header
   // instead). A path in neither table is the real defensive case.
+  // Installed package apps come from the hub at run time, so their routes resolve through the merged catalog the shell passes in.
+  test("a package app and every page inside it read as the app's icon and name", () => {
+    const apps = [{ to: "/apps/news", icon: "newspaper", label: "News", description: "", category: "Info", keywords: [] }];
+    for (const path of ["/apps/news", "/apps/news/search", "/apps/news/discuss"]) expect(headerEntryFor(path, apps)?.label).toBe("News");
+    expect(headerEntryFor("/apps/other", apps)).toBeUndefined();
+  });
+
   test("a path in neither table renders nothing rather than crashing", () => {
     const view = renderAt("/some-future-page-nobody-mapped-yet");
     expect(view.container).toBeEmptyDOMElement();

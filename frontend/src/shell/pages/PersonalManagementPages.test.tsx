@@ -49,7 +49,7 @@ describe("Next personal management pages", () => {
     const restore = mockApi();
     try {
       renderWithQueryClient(<CommandsPage person={makePerson("adult")} />);
-      await waitFor(() => expect(document.body.textContent).toContain("Create a command"));
+      await waitFor(() => expect(document.querySelector('input[placeholder*="Trigger phrase"]')).not.toBeNull());
       expect(document.querySelector('input[placeholder*="Trigger phrase"]')).not.toBeNull();
       expect(document.body.textContent).not.toContain("No commands");
     } finally { restore(); }

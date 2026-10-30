@@ -33,11 +33,6 @@ function snapshot(): PackageAppHeaderState | null {
 
 const GearIcon = getIcon("settings");
 
-export function PackageAppHeaderTitle() {
-  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
-  return state ? <h1 data-top-row-hide="" className="min-w-0 flex-1 truncate text-base font-medium">{state.title || state.label}</h1> : null;
-}
-
 export function PackageAppHeaderActions() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   const navigate = useNavigate();

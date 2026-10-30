@@ -18,6 +18,10 @@
 // `UpdatesIcon`, `RepairsIcon`, `BackupsIcon`), imported here directly -
 // one definition, that page's own, not a copy of it.
 import { useLocation } from "react-router-dom";
+import { getIcon } from "@maipai/ui/src/icons";
+import { isActiveNavPath } from "@maipai/ui/src/nav";
+import { APP_CATALOG, type AppEntry } from "@/shell/appCatalog";
+import { useAppCatalog } from "@/shell/useAppCatalog";
 import type { Icon } from "@maipai/ui/src/icons";
 import SidebarContent from "@maipai/ui/src/dashboard/layouts/full/vertical/sidebar/sidebaritems";
 import { PerformanceIcon } from "@/shell/pages/PerformancePage";
@@ -31,7 +35,6 @@ import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
 import { RemindersIcon } from "@/apps/reminders/RemindersPage";
-import { getIcon } from "@maipai/ui/src/icons";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 
 interface PageHeaderEntry {
@@ -65,29 +68,44 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/clock": { icon: getIcon("clock"), label: "Clock" },
 };
 
-function entryFor(pathname: string): PageHeaderEntry | undefined {
-  if (pathname.startsWith("/people/")) return sidebarEntries.get("/people");
-  return sidebarEntries.get(pathname) ?? MANAGE_PAGE_ENTRIES[pathname];
+// Core destinations the app catalog and the sidebar do not list (they sit in the rail's own core group): one row each, the same
+// icon the rail draws.
+const CORE_ENTRIES: Record<string, PageHeaderEntry> = {
+  "/media": { icon: getIcon("cast"), label: "Media" },
+  "/all-apps": { icon: getIcon("layout-grid"), label: "All apps" },
+  "/reference": { icon: getIcon("book"), label: "Reference" },
+};
+
+/** The one answer to "which icon and name does this route's header show": the app or page the route belongs to, by the longest
+ * matching path, so a page inside an app (News search, a Videos watch page, a person's profile) reads as that app. Every page and
+ * app header draws this and nothing else: the title never comes from the page itself, and the page's body never repeats it. */
+export function headerEntryFor(pathname: string, apps: readonly AppEntry[] = APP_CATALOG): PageHeaderEntry | undefined {
+  const path = pathname.replace(/\/$/, "") || "/";
+  const fromCatalog = [...apps].filter((app) => app.to !== "/").sort((a, b) => b.to.length - a.to.length).find((app) => isActiveNavPath(path, app.to));
+  if (fromCatalog) return { icon: getIcon(fromCatalog.icon), label: fromCatalog.label };
+  const known = [...Object.keys(CORE_ENTRIES), ...Object.keys(MANAGE_PAGE_ENTRIES), ...sidebarEntries.keys()].filter((to) => to !== "/").sort((a, b) => b.length - a.length).find((to) => isActiveNavPath(path, to));
+  if (known) return CORE_ENTRIES[known] ?? MANAGE_PAGE_ENTRIES[known] ?? sidebarEntries.get(known);
+  return path === "/" ? sidebarEntries.get("/") : undefined;
 }
 
-/** Mounted once per non-chat `/` page (`PageHeaderLayout` in
- * `Routes.tsx`) - a stable module-level reference (`useHeaderExtra`'s
- * own requirement), reading the current route itself via `useLocation()`
- * rather than needing a fresh identity per page. Chat has its own icon,
- * prepended directly in `chatHeaderBar.tsx` instead of through this
- * lookup - it never mounts this component at all. */
-export function PageHeaderTitle() {
-  const location = useLocation();
-  const entry = entryFor(location.pathname);
-  // Unreachable in practice - PageHeaderLayout only wraps the exact
-  // routes this table covers - but a route added to one and not the
-  // other should read as a blank header slot, never a crash.
-  if (!entry) return null;
-  const PageIcon = entry.icon;
+/** The icon and name, drawn once. `hideInTopRow` marks it for the phone layouts where a page places its own top row. */
+export function HeaderTitle({ entry, hideInTopRow = false, heading = false }: { entry: PageHeaderEntry; hideInTopRow?: boolean; heading?: boolean }) {
+  const EntryIcon = entry.icon;
+  const Name = heading ? "h1" : "span";
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
-      <PageIcon className="text-muted-foreground size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate text-base font-medium">{entry.label}</span>
+    <div className="flex min-w-0 flex-1 items-center gap-2 px-2" {...(hideInTopRow ? { "data-top-row-hide": "" } : {})}>
+      <EntryIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+      <Name data-slot="header-title" className="min-w-0 flex-1 truncate text-base font-medium">{entry.label}</Name>
     </div>
   );
+}
+
+/** Mounted through `useHeaderExtra(PageHeaderTitle)` by every page and app: a stable module-level reference (the hook's own
+ * requirement) that reads the current route itself. A route no table covers reads as a blank slot, never a crash. */
+export function PageHeaderTitle() {
+  const { pathname } = useLocation();
+  const entry = headerEntryFor(pathname, useAppCatalog());
+  // A package app has no other page heading, so its title is the page's h1; shell pages carry their own (sr-only) one.
+  const isApp = pathname.startsWith("/apps/");
+  return entry ? <HeaderTitle entry={entry} hideInTopRow={isApp} heading={isApp} /> : null;
 }

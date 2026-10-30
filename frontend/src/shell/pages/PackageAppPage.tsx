@@ -1,4 +1,5 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -22,7 +23,7 @@ import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@mai
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
-import { PackageAppHeaderTitle, PackageAppHeaderActions, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
+import { PackageAppHeaderActions, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import "./packageAppNews.css";
 
@@ -186,7 +187,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // On a phone the app's name and its two icon buttons live in the shell's top bar, not in a row of the page.
   const phone = useIsPhoneLayout();
   const inShellBar = phone && app !== undefined;
-  useHeaderExtra(PackageAppHeaderTitle, PackageAppHeaderActions);
+  useHeaderExtra(PageHeaderTitle, PackageAppHeaderActions);
   // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Search last when the
   // app has a search page; a page that plays something (a video, a book) draws no bar.
   const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search")) : null;

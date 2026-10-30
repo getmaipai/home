@@ -71,7 +71,7 @@ export function ReferencePage() {
     if (query.trim()) navigate(`/reference?${new URLSearchParams({ q: query.trim(), ...(book ? { book } : {}) })}`);
   }
 
-  return <Page title={title}>
+  return <Page title={title} hideTitle={title === "Reference"}>
     <div className="flex min-w-0 flex-1 flex-col gap-5 p-4">
       {book && path ? <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" onClick={() => navigate(-1)}>Back</Button>
