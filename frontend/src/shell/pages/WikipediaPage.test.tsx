@@ -86,4 +86,10 @@ describe("Wikipedia app", () => {
     fireEvent.click(view.getByRole("button", { name: "Remove Aurora from Saved" }));
     expect(await view.findByText(/Nothing saved yet/)).toBeTruthy();
   });
+
+  test("the Offline section says nothing is kept, and still opens when the hub does not answer", async () => {
+    api.referenceBooks = async () => { throw new TypeError("network"); };
+    const view = mount("/wikipedia/offline");
+    expect(await view.findByText(/Nothing is kept on this device yet/)).toBeTruthy();
+  });
 });

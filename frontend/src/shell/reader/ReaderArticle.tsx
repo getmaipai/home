@@ -1,10 +1,12 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArticleView, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
+import { Button } from "@maipai/ui/src/ui/button";
 import { useReferenceSaves } from "./saves";
+import { readKeptArticle, useKeptArticles } from "./offline";
 
 const SAVE_ONLY: ("save")[] = ["save"];
 const PREVIEW_STALE_MS = 10 * 60 * 1000;
@@ -25,7 +27,17 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const saves = useReferenceSaves();
-  const query = useQuery<ReferenceArticleView>({ queryKey: ["reference-article", book, path], queryFn: () => api.referenceArticle(book, path), retry: false });
+  const query = useQuery<ReferenceArticleView>({ queryKey: ["reference-article", book, path], queryFn: async () => {
+    try { return await api.referenceArticle(book, path); } catch (error) {
+      // The hub does not answer (an ApiError means it did): read the copy kept on this device, if there is one.
+      if (error instanceof ApiError) throw error;
+      const kept = await readKeptArticle(book, path);
+      if (kept) return kept;
+      throw error;
+    }
+  }, retry: false });
+  const keptArticles = useKeptArticles();
+  const [keepMessage, setKeepMessage] = useState<string | null>(null);
   const loadPreview = useCallback(async (target: { book: string; path: string }): Promise<ArticlePreview | null> => {
     try {
       const preview = await queryClient.fetchQuery({ queryKey: ["reference-preview", target.book, target.path], queryFn: () => api.referencePreview(target.book, target.path), staleTime: PREVIEW_STALE_MS });
@@ -49,6 +61,12 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
         renderTargetLink={(target, text) => <Link className="underline underline-offset-2" to={routeFor(target.book, target.path)}>{text}</Link>}
         footer={<>{article.licence} · Snapshot {article.snapshot_date ?? "date unavailable"}</>}
       />
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {keptArticles.isKept(book, path)
+          ? <Button variant="outline" size="sm" onClick={() => { setKeepMessage(null); void keptArticles.remove(book, path); }}>Remove from this device</Button>
+          : <Button variant="outline" size="sm" onClick={async () => { setKeepMessage(null); const result = await keptArticles.keep(book, path); if (!result.ok) setKeepMessage(result.message); }}>Keep on this device</Button>}
+        {keepMessage ? <p role="alert" className="text-muted-foreground text-sm">{keepMessage}</p> : null}
+      </div>
     </div>
   );
 }

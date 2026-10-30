@@ -10,6 +10,8 @@ import { ReaderArticle } from "@/shell/reader/ReaderArticle";
 import { ReaderSearchBox } from "@/shell/reader/SearchBox";
 import { SearchResults } from "@/shell/reader/SearchResults";
 import { useReferenceSaves } from "@/shell/reader/saves";
+import { useKeptArticles } from "@/shell/reader/offline";
+import { SectionSidebar, type SectionSidebarItem } from "@maipai/ui/src/primitives/SectionSidebar";
 
 const RECENT_KEY = "maipai.wikipedia.recent";
 const RECENT_MAX = 8;
@@ -74,6 +76,25 @@ function SavedList({ books }: { books: readonly ReferenceBookView[] }) {
   );
 }
 
+function OfflineList() {
+  const { kept, ready, remove } = useKeptArticles();
+  return (
+    <section aria-label="Offline" className="flex flex-col gap-3">
+      <h2 className="text-xl font-semibold">Offline</h2>
+      <p className="text-muted-foreground text-sm">Articles kept on this device open without Home. Open an article and press Keep on this device.</p>
+      {ready && !kept.length ? <p className="text-muted-foreground">Nothing is kept on this device yet.</p> : null}
+      <ul className="flex flex-col gap-1">
+        {kept.map((item) => (
+          <li key={`${item.book}:${item.path}`} className="flex items-center gap-2">
+            <Link className="hover:bg-muted min-w-0 flex-1 rounded-md px-2 py-1.5 font-semibold" to={articleRoute(item.book, item.path)}>{item.title}</Link>
+            <Button variant="ghost" size="sm" aria-label={`Remove ${item.title} from this device`} onClick={() => void remove(item.book, item.path)}>Remove</Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function WikipediaPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -86,7 +107,7 @@ export function WikipediaPage() {
   const articlePath = articleMatch ? decodeURIComponent(articleMatch[2]!) : undefined;
   const params = new URLSearchParams(location.search);
   const q = params.get("q") ?? "";
-  const section = location.pathname.startsWith("/wikipedia/explore") ? "explore" : location.pathname.startsWith("/wikipedia/saved") ? "saved" : "home";
+  const section = location.pathname.startsWith("/wikipedia/explore") ? "explore" : location.pathname.startsWith("/wikipedia/saved") ? "saved" : location.pathname.startsWith("/wikipedia/offline") ? "offline" : "home";
   const [recent, setRecent] = useState<RecentArticle[]>(readRecent);
   const article = useQuery({ queryKey: ["reference-article", articleBook, articlePath], queryFn: () => api.referenceArticle(articleBook!, articlePath!), enabled: Boolean(articleBook && articlePath), retry: false });
   useEffect(() => { if (article.data && articleBook && articlePath) { remember({ book: articleBook, path: articlePath, title: article.data.title }); setRecent(readRecent()); } }, [article.data, articleBook, articlePath]);
@@ -95,9 +116,19 @@ export function WikipediaPage() {
   const onSearchPage = location.pathname.startsWith("/wikipedia/search") && q;
   const resultBook = params.get("book") ?? undefined;
   const appHome = () => navigate("/wikipedia");
+  const atSection = !articleMatch && !onSearchPage;
+  const go = (to: string) => (event: { preventDefault: () => void }) => { event.preventDefault(); navigate(to); };
+  const sectionItems: SectionSidebarItem[] = [
+    { id: "home", label: "Home", icon: "home", href: "/wikipedia", active: atSection && section === "home", onClick: go("/wikipedia") },
+    { id: "explore", label: "Explore", icon: "globe", href: "/wikipedia/explore", active: atSection && section === "explore", onClick: go("/wikipedia/explore") },
+    { id: "saved", label: "Saved", icon: "bookmark", href: "/wikipedia/saved", active: atSection && section === "saved", onClick: go("/wikipedia/saved") },
+    { id: "offline", label: "Offline", icon: "download", href: "/wikipedia/offline", active: atSection && section === "offline", onClick: go("/wikipedia/offline") },
+  ];
 
   return (
     <Page title="Wikipedia" hideTitle>
+      <div className="flex min-h-0 flex-1" data-workspace-fill="">
+      <SectionSidebar standalone density="compact" groups={[{ id: "wikipedia-sections", items: sectionItems }]} />
       <div className="flex min-w-0 flex-1 flex-col gap-5 p-4">
         {booksQuery.isPending ? <p role="status">Opening Wikipedia…</p> : null}
         {booksQuery.isError ? <p role="alert">Could not open your library. Check that Home is running, then try again.</p> : null}
@@ -110,16 +141,18 @@ export function WikipediaPage() {
         {book ? (
           <>
             <ReaderSearchBox key={`${location.pathname}${location.search}`} book={book} placeholder="Search Wikipedia" routeFor={articleRoute} onSearch={(next) => search(next)} initial={onSearchPage ? q : ""} />
-            <div className="flex flex-wrap items-center gap-2" role="navigation" aria-label="Wikipedia sections">
+            <div className="flex flex-wrap items-center gap-2 lg:hidden" role="navigation" aria-label="Wikipedia sections">
               <Chip selected={!articleMatch && !onSearchPage && section === "home"} onClick={() => navigate("/wikipedia")}>Home</Chip>
               <Chip selected={section === "explore" && !articleMatch} onClick={() => navigate("/wikipedia/explore")}>Explore</Chip>
               <Chip selected={section === "saved" && !articleMatch} onClick={() => navigate("/wikipedia/saved")}>Saved</Chip>
+              <Chip selected={section === "offline" && !articleMatch} onClick={() => navigate("/wikipedia/offline")}>Offline</Chip>
               <Button variant="outline" size="sm" disabled={random.isPending} onClick={() => random.mutate()}>Random article</Button>
               {random.isError ? <span role="alert" className="text-muted-foreground text-sm">No article came back. Try once more.</span> : null}
             </div>
             {articleBook && articlePath ? <ReaderArticle book={articleBook} path={articlePath} routeFor={articleRoute} appName="Wikipedia" onAppHome={appHome} /> : null}
             {onSearchPage ? <SearchResults q={q} {...(resultBook ? { book: resultBook } : {})} books={books} routeFor={articleRoute} onBook={(next) => search(q, next)} onSearch={(next) => search(next, resultBook)} /> : null}
             {!articleMatch && !onSearchPage && section === "explore" ? <ExploreGrid book={book} /> : null}
+            {!articleMatch && !onSearchPage && section === "offline" ? <OfflineList /> : null}
             {!articleMatch && !onSearchPage && section === "saved" ? <SavedList books={books} /> : null}
             {!articleMatch && !onSearchPage && section === "home" ? (
               <section aria-label="Recent" className="flex flex-col gap-3">
@@ -129,6 +162,8 @@ export function WikipediaPage() {
             ) : null}
           </>
         ) : null}
+        {booksQuery.isError && section === "offline" ? <OfflineList /> : null}
+      </div>
       </div>
     </Page>
   );

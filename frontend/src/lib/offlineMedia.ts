@@ -145,6 +145,19 @@ export async function listKept(): Promise<OfflineManifest[]> {
   return manifests;
 }
 
+/** One kept entry's JSON, read from this person's bucket with no network (a kept reference article, for instance). Null when nothing is kept. */
+export async function readKeptJson(item: OfflineRecordRef, entryPrefix: string): Promise<unknown | null> {
+  const name = bucket();
+  if (!name || !globalThis.caches) return null;
+  try {
+    const cache = await caches.open(name);
+    const manifest = OfflineManifest.safeParse(await (await cache.match(indexUrl(item)))?.json().catch(() => null));
+    const entry = manifest.success ? manifest.data.entries.find((e) => e.id.startsWith(entryPrefix)) : undefined;
+    const response = entry ? await cache.match(entry.url) : undefined;
+    return response ? await response.json() : null;
+  } catch { return null; }
+}
+
 export async function removeFromDevice(item: OfflineRecordRef): Promise<void> {
   const name = bucket();
   if (!name || !globalThis.caches) return;
