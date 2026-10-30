@@ -696,6 +696,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
 | `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, receivedBackupFileExists, deleteReceivedBackupsForDevice |
+| `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice |
 | `backend/src/lib/reference/article.ts` | loadArticleFor, articlePayloadFor, readArticleImage |
 | `backend/src/lib/reference/saves.ts` | listReferenceSaves, getReferenceSave, addReferenceSave, removeReferenceSave |
 | `backend/src/lib/referenceLibrary.ts` | KIWIX_CATALOG_URL, resolveReferenceFlavour, removeInstalledReferenceFlavour, installReferenceFlavour, listInstalledReferenceFlavours, getReferenceUpdates |

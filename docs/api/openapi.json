@@ -274,6 +274,7 @@
                                 "paused_by_admin",
                                 "mode_change",
                                 "offline",
+                                "tier_reduced",
                                 null
                               ]
                             }
@@ -371,6 +372,7 @@
                                 "paused_by_admin",
                                 "mode_change",
                                 "offline",
+                                "tier_reduced",
                                 null
                               ]
                             }
@@ -468,6 +470,7 @@
                                 "paused_by_admin",
                                 "mode_change",
                                 "offline",
+                                "tier_reduced",
                                 null
                               ]
                             }
@@ -565,6 +568,7 @@
                                 "paused_by_admin",
                                 "mode_change",
                                 "offline",
+                                "tier_reduced",
                                 null
                               ]
                             }
@@ -662,6 +666,7 @@
                                 "paused_by_admin",
                                 "mode_change",
                                 "offline",
+                                "tier_reduced",
                                 null
                               ]
                             }
@@ -759,6 +764,7 @@
                                 "paused_by_admin",
                                 "mode_change",
                                 "offline",
+                                "tier_reduced",
                                 null
                               ]
                             }

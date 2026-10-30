@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-30T16:28:03.606Z",
-  "kitTag": "ui-v0.5.430",
+  "generatedAt": "2026-10-30T18:57:43.230Z",
+  "kitTag": "ui-v0.5.432",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1485,6 +1485,14 @@
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
+    },
+    {
+      "file": "tier-segment.tsx",
+      "name": "tier-segment",
+      "group": "tier",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": true
     },
     {
       "file": "timeline.tsx",
