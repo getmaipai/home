@@ -102,6 +102,8 @@ const ADMIN_HELD_GRANT_ACTIONS = new Set([
   "search.household_subject",
   "notify.person",
   "approvals.decide",
+  "tier.max",
+  "tier.max:<category>",
 ]);
 const GRANT_AUTHORITY_ERROR = "You can't give someone a permission you don't have. Ask the owner to grant it.";
 
@@ -118,6 +120,15 @@ function actorHoldsAction(actor: { id: string; role: Role }, action: string, cat
   return effectivePermissions(actor.id).some((permission) => permission.action === action && permission.effect === "allow");
 }
 
+/** RULES.md rules 0 and 8 and the spec policy for `tier.max`: a child never holds it, and a teen holds it only for pictures. */
+function tierGrantRefusal(catalogActionId: string, action: string, personId: string): string | null {
+  if (catalogActionId !== "tier.max" && catalogActionId !== "tier.max:<category>") return null;
+  const role = db.select({ role: people.role }).from(people).where(eq(people.id, personId)).get()?.role;
+  if (role === "child") return "A child can't be given Max. Children keep the Standard level.";
+  if (role === "teen" && action !== "tier.max:image") return "A teen can be given Max only for pictures. Chat, video and music stay Standard for them.";
+  return null;
+}
+
 export function createGrant(actor: { id: string; role: Role }, input: GrantCreate): OpResult<GrantT> {
   const person = db.select({ id: people.id }).from(people).where(and(eq(people.id, input.person), isNull(people.deletedAt))).get();
   if (!person) return { ok: false, status: 400, error: "person does not name an existing profile" };
@@ -126,6 +137,8 @@ export function createGrant(actor: { id: string; role: Role }, input: GrantCreat
   if (actor.role === "admin" && actor.id === input.person && input.action === "backups.restore") {
     return { ok: false, status: 400, error: "Admins cannot grant themselves backup restore access. Ask the owner to grant it." };
   }
+  const tierRefusal = tierGrantRefusal(matchedAction.id, input.action, person.id);
+  if (tierRefusal) return { ok: false, status: 400, error: tierRefusal };
   if (!actorHoldsAction(actor, input.action, matchedAction.id)) return { ok: false, status: 400, error: GRANT_AUTHORITY_ERROR };
 
   const now = new Date().toISOString();

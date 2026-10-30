@@ -19,6 +19,8 @@ const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
+import { allowedQuality } from "@/lib/tiers";
+import { householdVideoQuality } from "./policy";
 import { chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
 import { StackVideoError } from "./stack";
 
@@ -141,7 +143,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const adapter = named && !kid ? matchVideoAdapter(available, named) : null;
   const styleNote = named && !adapter ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
   // VIDEO-LTX-01: Quick or Detailed. A style made for one model decides; a length past five seconds needs Detailed; else what was asked for, else the household's setting.
-  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? args.quality : undefined, style: adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" });
+  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : undefined, household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick" });
   // A style made for Detailed cannot be used without Detailed: say so rather than start a clip the Stack would refuse.
   if (adapter && qualityOfBase(adapter.base_model) === "detailed" && !detailedVideoReady(engine)) {
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, which are not on this computer yet. An admin can get them in Settings, Models and storage, or I can make the video without the style." }, data: { refused: "style_needs_detailed" }, actions: [] } });

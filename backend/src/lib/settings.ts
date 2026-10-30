@@ -3,6 +3,8 @@
 // definitions from the registry (3.2) and from package manifests." This
 // is the store and its API; the generic renderer and the UI rules in
 // 6.5/6.6 are shell/kit work (chapter 6, not started).
+import { TierSlot } from "@maipai/spec/gen/ts/tier-slot.js";
+import { checkTierSlotOptions } from "@maipai/spec/records/ts/tierSlot.js";
 import { checkFeedAddressBox } from "@/lib/shelf/feedAddresses";
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
@@ -201,6 +203,14 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       break;
     }
     case "text":
+      // TIER-HOME-02: a tier slot is a { model, options, who } record, checked against the spec's shape and its category's typed options.
+      if (range?.value_schema === "tier-slot") {
+        const slot = TierSlot.safeParse(value);
+        if (!slot.success) return { ok: false, status: 400, error: "A slot needs a model (a catalog id, recommended or off) and its options." };
+        const problems = checkTierSlotOptions(String(range.category), slot.data.options);
+        if (problems.length > 0) return { ok: false, status: 400, error: problems.join(" ") };
+        break;
+      }
       if (typeof value !== "string") return { ok: false, status: 400, error: "expected a string" };
       break;
     case "select": {
@@ -438,6 +448,10 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
  * background jobs already gated elsewhere - see that function's doc).
  * Caller is responsible for scope/key/authorization checks; this only
  * validates the value against the key's selector and persists it. */
+const householdWriteListeners: Array<(key: string, value: unknown) => void> = [];
+/** Runs after every stored household value, so a legacy key can keep its replacement in step until the legacy key retires (tierSlotMigration.ts). */
+export function onHouseholdWrite(listener: (key: string, value: unknown) => void): void { householdWriteListeners.push(listener); }
+
 function writeValue(
   scope: string,
   keyDef: SettingsKey,
@@ -490,6 +504,7 @@ function writeValue(
   }
 
   settingsCache.delete(settingsCacheKey(scope, key));
+  if (scope === "household") for (const listener of householdWriteListeners) listener(key, value);
   const descriptionContext = opts.viewer
     ? { viewer: opts.viewer, subject: opts.subject, adminName: opts.adminName }
     : undefined;

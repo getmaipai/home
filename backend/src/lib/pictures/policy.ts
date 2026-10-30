@@ -19,6 +19,9 @@ import type { SurfaceClass } from "@/lib/surfaceClass";
 import type { Surface } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { readSlot, slotIsOff } from "@/lib/tiers";
+// Registers the mirror from the legacy Quick and Detailed keys into the slots this file reads.
+import "@/lib/tierSlotMigration";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { mentionsSexualWord, minorSexualMatch, mixedScriptMinorCue, normalise } from "@/lib/pictures/minorLine";
 import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, childPromptUnsafe, kidLaneOn, laneOf, teenPromptUnsafe, type Lane } from "@/lib/pictures/lane";
@@ -98,19 +101,19 @@ export function householdPictureQuality(): "quick" | "detailed" {
   }
 }
 
-/** `generation.picture_quick_model`: "ernie" (default) or "klein", the model behind Quick pictures. */
+/** The picture Standard slot (`engines.image.tier.standard`; migrated from `generation.picture_quick_model`): "ernie" (default) or "klein", the model behind Quick pictures. */
 export function householdQuickModel(): "ernie" | "klein" {
   try {
-    return getHouseholdSettingValue("generation.picture_quick_model") === "klein" ? "klein" : "ernie";
+    return readSlot("image", "standard").model === "flux2-klein-4b" ? "klein" : "ernie";
   } catch {
     return "ernie";
   }
 }
 
-/** `generation.picture_detailed.enabled`: the Detailed pictures switch on the AI and models page. On unless turned off. */
+/** The picture Boost slot is on (`engines.image.tier.boost`; migrated from `generation.picture_detailed.enabled`): the Detailed pictures switch on the AI and models page. On unless turned off. */
 export function householdDetailedEnabled(): boolean {
   try {
-    return getHouseholdSettingValue("generation.picture_detailed.enabled") !== false;
+    return !slotIsOff("image", "boost");
   } catch {
     return true;
   }

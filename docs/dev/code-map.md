@@ -777,7 +777,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/serviceComponent.ts` | serviceId, serviceComponent |
 | `backend/src/lib/serviceHealth.ts` | classifyServiceOutcome, recordServiceOutcome, serviceState, serviceDetail, serviceDiagnostics, reconcileServiceBlockIssues |
 | `backend/src/lib/session.ts` | generateSessionToken, hashSessionToken, sessionExpiresAt, sessionSignInSource, pruneExpiredSessions, issueSession |
-| `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, resolveForResponse, listValues, SESSION_LOCK_REQUIRED_KEY |
+| `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, resolveForResponse, listValues, onHouseholdWrite |
 | `backend/src/lib/settingsAreas.ts` | getSettingsAreas, settingsViewerFor, placeSetting, settingHref |
 | `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
 | `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
@@ -853,6 +853,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/text.ts` | wordsOf, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
+| `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, mirrorLegacyIntoSlot, migrateTierSlots |
+| `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, slotIsOff |
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |

@@ -10,6 +10,7 @@ import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIA
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
+import { allowedQuality } from "@/lib/tiers";
 import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -185,7 +186,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
-  const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
+  const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: allowedQuality(actor, "image", isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", routeAudience(actor).band), style: used[0] ?? null, engine: await pictureEngineStatus() });
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
   const slot = kid ? reserveKid(actor, "picture", 1, words) : null;
   if (kid && !slot) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
