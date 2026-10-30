@@ -19,7 +19,8 @@ before quoting them as a promise.
 | TIER-EVAL-06 music Boost and Max | XL turbo: no slot; XL SFT: Max candidate pending a listen | measured; ear check is Jesse's |
 | TIER-EVAL-07 stem splitting | htdemucs Standard; ft and 6s pending a listen; TIER-STEMS-01 can start | measured; ear check is Jesse's |
 | TIER-EVAL-04 picture Max, Max edit | Qwen-Image 20B is the Max lead; ERNIE base dropped; Max edit empty | 9 of 22 prompts; eye is Jesse's |
-| TIER-EVAL-03, 05 | in progress | see "Not run yet" |
+| TIER-EVAL-05 chat Boost and Max | Qwen3.6-35B-A3B leads Standard on speed; 120B class not run (needs a swap window) | partial; real benches missing |
+| TIER-EVAL-03 video | in progress | see "Not run yet" |
 
 ## TIER-EVAL-01: Reduced chat
 
@@ -242,7 +243,49 @@ Reading it:
 **Verdict.** Max picture: Qwen-Image 20B is the one to keep testing (finish the other 13 prompts, then Jesse looks); ERNIE-Image base is dropped as a Max
 candidate. Max edit: no slot yet. Both are catalogued only after Jesse sees a gain he thinks is worth four to six minutes.
 
-## Not run yet: TIER-EVAL-03 and 05, with download sizes
+## TIER-EVAL-05: chat Boost and Max (first pass: the models that fit beside the live set)
+
+**What ran and what did not.** The 120B-class candidates (gpt-oss-120b 62 GB, Qwen3.5-122B-A10B 70 GB, Mistral Small 4 119B 68 GB, Ornith-1.5-122B 69 GB)
+need most of the machine; loading one beside the household's resident models would risk the live chat, and "do not change engines on the live hub" rules out
+unloading them. Their weights are on disk (Ornith since before; the other three downloaded 2026-10-30), but they are **not run**: they need a window in which Jesse
+says the resident set may be swapped out, the same swap coding mode uses. What ran is every candidate under about 30 GB, each in its own `llama-server` (GGUF) or
+`mlx_lm.server` (Gemma, MLX) process on a spare port, same bench as EVAL-01 (reduced probe: 8 turns and 18 tool decisions, thinking off, 400-token cap), one at a time.
+The CHAT-AB-01 and KS-BENCH-01 harnesses are not in this repository, so **this is not those benches**; and no licence reading or minors' floors test was done (Home policy,
+not model behavior). Studio load average was 35 to 45.
+
+| | Muse Glimmer 30B (resident today) | Qwen3.6-35B-A3B (UD Q4 K XL) | Qwen3.8-27B (UD Q4 K M, no MTP) | Gemma 4 26B-A4B (MLX 4-bit) |
+|---|---|---|---|---|
+| File | 19.7 GB | 22.4 GB | 16.5 GB | 15.3 GB |
+| Resident / peak memory | 18.6 / 19.0 GB | 21.3 / 23.6 GB | 16.6 / 22.2 GB | 13.7 / 13.7 GB |
+| Load, files cached | 5.4 s | 5.9 s | 6.6 s | 1.1 s |
+| Speed, median | 22.4 tok/s | **70.3 tok/s** | 23.5 tok/s | 42.0 tok/s |
+| First word, short turns (median, worst) | see note | 0.11 s, 0.15 s | 0.32 s, 0.48 s | 0.15 s, 0.52 s |
+| First word, 4k-token history | see note | 0.85 s | 3.4 s | 1.75 s |
+| Searches when it should | 6 of 9 | **9 of 9** | 8 of 9 | 6 of 9 |
+| Searches when it should not | 0 of 9 | 0 of 9 | 0 of 9 | 0 of 9 |
+| 2.5 times 3/4 cup in tablespoons (30) | no answer in the cap | 24, wrong | 27, wrong | 30, right |
+| Child turn, child unsafe ask, teen unsafe ask | safe where it answered | safe | safe | safe |
+
+Note on Muse: it is a thinking model, and this bench's way of turning thinking off did not stop it; four of eight turns spent the whole 400-token cap thinking and
+returned no answer, which also makes its first-word times (17 to 25 s) meaningless here. Its 22.4 tok/s is valid and matches the 26 tok/s measured earlier. A fair Muse
+row needs the Stack's own request settings for it (the catalog record's thinking mode), which this bench does not use. Its 6 of 9 search recall is also indicative only.
+
+Reading it:
+
+- **Qwen3.6-35B-A3B is the standout on speed.** Three times Muse's tokens per second in about 3 GB more memory, a first word in about a tenth of a second, and the
+  best tool probe of the four (every search that was needed, none that was not). It is the leading candidate to replace Muse at Standard, and its quality is
+  unmeasured on the real benches. That makes it a MODEL-VET-01 item next, with CHAT-AB-01 and KS-BENCH-01 and a licence read. The earlier note that the stared benchmark
+  puts it at 85 to 105 tok/s at 8-bit is consistent with 70 tok/s at Q4 on a loaded machine.
+- **Qwen3.8-27B (dense) is a Boost candidate on quality grounds only.** Speed equals Muse's (23.5 tok/s without the MTP draft; MTP is the whole case for it and was not run here),
+  and its first word after a 4k-token history was 3.4 s, so a spoken turn on it is slow. It matches Muse's memory. Do not call it faster than Muse until the MTP run.
+- **Gemma 4 26B-A4B is the smallest (13.7 GB), twice Muse's speed, and the only one to get the arithmetic right**, but its tool recall (6 of 9) matches Muse's and
+  trails Qwen3.6. It is a Boost or small-machine candidate worth the real benches.
+- **None of these decide Max.** The Max candidates are the 120B class, and they are the ones not run.
+
+**Verdict.** Standard: put Qwen3.6-35B-A3B through MODEL-VET-01 as the replacement candidate for Muse. Boost: Qwen3.8-27B (after an MTP run) or Gemma 4 26B-A4B
+(after the real benches). Max: undecided, needs the 120B-class runs in a swap window. The draft-model choice (CHAT-TPS-02) stays Jesse's, and nothing here plans a draft model for chat.
+
+## Not run yet: TIER-EVAL-03 and the 120B part of 05, with download sizes
 
 These rows judge peak memory and minutes per item, and at a load average of 50 both numbers would mislead, so they wait for a quiet window
 on the Studio. Sizes below are what the Hugging Face file lists showed on 2026-10-30 for the builds that have an Apple path; "on disk" means the Studio
