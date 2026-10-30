@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
 import { quickReaction } from "@/lib/quickReaction";
+import { getTtsTags } from "@/lib/ttsCapabilities";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -111,6 +112,8 @@ interface ResumeSession {
   spokenTurn: boolean;
   /** VOICE-QUICK-01: what the person said, for the quick reaction. */
   utterance?: string;
+  /** VOICE-DELIVERY-01: the sound tags the quick reaction may use (an adult on an engine that advertises them). */
+  reactionTags?: readonly string[];
   /** REG-02: set once the turn is known to be a refusal, error, crisis, package or command line; no spoken cue after that. */
   cueBlocked?: boolean;
   modelStatus?: ModelSelectionStatus;
@@ -148,6 +151,12 @@ export function isOwnedStaleTurnGeneration(turnId: string, ownerId: string, gene
 /** REG-02: whether the speech route may add a spoken cue to this turn's
  * sentences. Fails closed: only the owner's own, spoken, model-worded turn
  * that has not been a refusal, an error or a crisis qualifies. */
+/** What the person said in this in-flight turn, for the small model that chooses how its reply is delivered. Only the owner's own turn. */
+export function turnUtterance(turnId: string, ownerId: string): string | undefined {
+  const session = inFlightTurns.get(turnId);
+  return session && session.ownerId === ownerId ? session.utterance : undefined;
+}
+
 export function turnAllowsVoiceCues(turnId: string, ownerId: string): boolean {
   const session = inFlightTurns.get(turnId);
   return Boolean(session && session.ownerId === ownerId && session.spokenTurn && !session.cueBlocked && !conversationInCrisis(session.conversationId));
@@ -322,7 +331,8 @@ turnRoutes.post("/react", requireAuth, async (c) => {
   if (!said || now - (lastReactAt.get(person.id) ?? 0) < REACT_MIN_GAP_MS) return c.json({ text: null }, 200);
   if (lastReactAt.size > 500) lastReactAt.clear();
   lastReactAt.set(person.id, now);
-  const text = await quickReaction(person.id, said);
+  const tags = speakerAgeBand(person, new Date()) === "adult" ? await getTtsTags() : [];
+  const text = await quickReaction(person.id, said, [], undefined, tags);
   return c.json({ text: text ? normalizeForSpeech(text) : null }, 200);
 });
 
@@ -524,7 +534,7 @@ function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, session.spokenTurn ? SPOKEN_CUE_DELAY_MS : THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn, utterance: session.utterance })) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, session.spokenTurn ? SPOKEN_CUE_DELAY_MS : THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn, utterance: session.utterance, reactionTags: session.reactionTags })) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -617,7 +627,7 @@ export async function* streamTurnEvents(
   speakerBand: "adult" | "teen" | "child" = "child",
   releasedText?: () => string,
   heardChars?: () => number | undefined,
-  options: { spokenTurn?: boolean; utterance?: string; stillCueGapMs?: number; onToolStart?: (packageId: string) => void } = {},
+  options: { spokenTurn?: boolean; utterance?: string; reactionTags?: readonly string[]; stillCueGapMs?: number; onToolStart?: (packageId: string) => void } = {},
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -687,7 +697,7 @@ export async function* streamTurnEvents(
     const statusWake = () => (result.status.closed ? new Promise<never>(() => {}) : result.status.wait().then(() => "status" as const));
     let pendingStatus = statusWake();
     const firstStep = iterator.next();
-    const quick: Promise<string | null> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases) : Promise.resolve(null);
+    const quick: Promise<string | null> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases, undefined, options.reactionTags) : Promise.resolve(null);
     const timer = delay(remainingDelayMs);
     // A status line wakes the race without ending the wait: the cue's timer
     // keeps running, so a slow first token still gets its cue (THIN-7C: every
@@ -1123,6 +1133,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     dropReasoning,
     spokenTurn,
     utterance: typeof body.text === "string" ? body.text : undefined,
+    reactionTags: spokenTurn && speakerAgeBand(actor, new Date()) === "adult" ? await getTtsTags() : [],
     modelStatus: modelSelection.status,
     conversationId: result.conversationId,
     turnId: result.turnId,

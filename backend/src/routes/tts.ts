@@ -5,10 +5,11 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getTtsTags } from "@/lib/ttsCapabilities";
-import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, planForPerson, type HesitationLevel } from "@/lib/voiceCues";
+import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, isProtectedSentence, planForPerson, sentenceIndexFor, type HesitationLevel } from "@/lib/voiceCues";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues } from "@/routes/turn";
+import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnUtterance } from "@/routes/turn";
+import { chooseDelivery } from "@/lib/deliveryChoice";
 
 export const ttsRoutes = apiRouter();
 
@@ -66,7 +67,11 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
     const configured = getHouseholdSettingValue("voice.hesitations");
     const level = HESITATION_LEVELS.includes(configured as HesitationLevel) ? (configured as HesitationLevel) : DEFAULT_HESITATION_LEVEL;
     if (level !== "off") {
-      spoken = planForPerson(actor.id, { text: body.text, turnId: body.turn_id, level, band: speakerAgeBand(actor, new Date()), supportedTags: await getTtsTags(), blocked: !turnAllowsVoiceCues(body.turn_id, actor.id) }).text;
+      const band = speakerAgeBand(actor, new Date()), supportedTags = await getTtsTags(), blocked = !turnAllowsVoiceCues(body.turn_id, actor.id);
+      // VOICE-DELIVERY-01: from a turn's second sentence on, the small model chooses the delivery (never the first: it would delay the first sound).
+      const choice = band === "adult" && !blocked && supportedTags.length > 0 && sentenceIndexFor(actor.id, body.turn_id) >= 1 && !isProtectedSentence(body.text.trim())
+        ? await chooseDelivery(body.text, turnUtterance(body.turn_id, actor.id), supportedTags) : undefined;
+      spoken = planForPerson(actor.id, { text: body.text, turnId: body.turn_id, level, band, supportedTags, blocked, choice }).text;
     }
   }
   const result = await synthesizeSpeech(spoken, voiceId);

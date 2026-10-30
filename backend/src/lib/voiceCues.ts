@@ -79,6 +79,9 @@ export const CUE_POLICIES: Record<Exclude<HesitationLevel, "off">, CuePolicy> = 
   natural: { maxPerTurn: 2, minGapSentences: 3, cooldownTurns: 1, cueChance: 0.9, fillerChance: 0.4, allowOpenerTag: true },
 };
 
+/** VOICE-DELIVERY-01: when the small model chooses, it already decides how often; these are only the outer limits. */
+const MODEL_POLICY: CuePolicy = { maxPerTurn: 2, minGapSentences: 2, cooldownTurns: 0, cueChance: 1, fillerChance: 0, allowOpenerTag: false };
+
 export interface CueInput {
   /** One sentence (or short run) about to be spoken. */
   text: string;
@@ -92,6 +95,8 @@ export interface CueInput {
   blocked?: boolean;
   /** Test hook: replaces the seeded roll. */
   roll?: number;
+  /** VOICE-DELIVERY-01: what the small model chose for this sentence. undefined means it gave no answer (the keyword rules decide); null or a tag-less choice means "play it plain". */
+  choice?: { tag: string | null; place: "before" | "after" } | null;
   state: CueState;
 }
 
@@ -180,7 +185,7 @@ export function planVoiceCues(input: CueInput): CueResult {
   const trimmed = text.trim();
   if (!trimmed || isProtectedSentence(trimmed)) return plain(text, state);
 
-  const policy = CUE_POLICIES[level];
+  const policy = input.choice !== undefined ? MODEL_POLICY : CUE_POLICIES[level];
   if (state.insertedThisTurn >= policy.maxPerTurn) return plain(text, state);
   if (state.lastInsertedSentence !== null && index - state.lastInsertedSentence < policy.minGapSentences) return plain(text, state);
   if (state.insertedThisTurn === 0 && state.turnsSinceInsert < policy.cooldownTurns) return plain(text, state);
@@ -196,6 +201,14 @@ export function planVoiceCues(input: CueInput): CueResult {
     state.turnsSinceInsert = 0;
     return { text: nextText, state, inserted };
   };
+
+  // 0. The small model's own choice, when it gave one. It replaces the keyword rules and the chance roll; the gates above and the caps still apply.
+  if (input.choice !== undefined) {
+    const picked = input.choice;
+    if (!picked || !picked.tag || !supported.includes(picked.tag)) return plain(text, state);
+    if (picked.place === "after" && !endsSentence(trimmed)) return plain(text, state);
+    return picked.place === "after" ? commit(`${trimmed} [${picked.tag}]`, { kind: "tag", name: picked.tag }) : commit(`[${picked.tag}] ${trimmed}`, { kind: "tag", name: picked.tag });
+  }
 
   // 1. A nonverbal cue, only when the engine advertises the tag.
   if (supported.length > 0 && roll < policy.cueChance) {
@@ -263,6 +276,12 @@ export function sanitizeSpeechTags(text: string, supportedTags: readonly string[
 // anyone said.
 const states = new Map<string, CueState>();
 const MAX_TRACKED_PEOPLE = 500;
+
+/** How many sentences of this turn have been planned so far for this person (0 for a new turn). */
+export function sentenceIndexFor(personId: string, turnId: string): number {
+  const state = states.get(personId);
+  return state && state.turnId === turnId ? state.sentences : 0;
+}
 
 export function planForPerson(personId: string, input: Omit<CueInput, "state">): CueResult {
   const result = planVoiceCues({ ...input, state: states.get(personId) ?? freshCueState() });

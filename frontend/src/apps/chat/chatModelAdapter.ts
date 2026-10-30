@@ -575,7 +575,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // "the moment someone without audio needs that indicator most"
             // was the gap (a cue playing has never had any VISIBLE trace).
             activityShown = true;
-            yield { metadata: { custom: { activity: event.text } } };
+            yield { metadata: { custom: { activity: event.text.replace(/\[[A-Za-z ]+\]\s*/g, "") } } };
           } else if (event.type === "status") {
             // CHAT-16 (Session A): a real TurnStreamEvent member
             // (backend/src/wire.ts, BACKLOG.md's "Engine emits `status`

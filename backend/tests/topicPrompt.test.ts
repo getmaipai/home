@@ -183,6 +183,7 @@ const EXEMPT: Record<string, string> = {
   "lib/weatherSummary.ts": "a one or two sentence forecast summary from the day's numbers, shared by everyone who sees the place, so the text must pass the child floor before it is stored; it never blocks a page, and a refusal shows the advice line instead; gives no advice of its own",
   "lib/media/podcasts.ts": "3 to 5 sentence summary and takeaways for a stored podcast episode transcript, one per episode, never for a child; the text must pass the teen output gate (evaluateReply) before it is stored and again each time it is read; gives no advice of its own",
   "lib/prefixPrewarm.ts": "re-sends a person's last system message with a one-token answer that is discarded, only to refill the engine's prompt cache; no text reaches anyone",
+  "lib/deliveryChoice.ts": "picks one sound tag (laugh, sigh, gasp or none) and its place for a sentence that was already written and checked; the model writes no words, and a child or teen is never asked",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",
