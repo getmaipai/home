@@ -41,7 +41,8 @@ async function links(view: ReturnType<typeof open>) {
 test("the column lists Home first, then the media apps in the hub's order", async () => {
   const view = open("videos");
   expect(view.getByTestId("media-hub-frame")).toBeTruthy();
-  expect(view.getByText("Media")).toBeTruthy();
+  // The column carries no title of its own: the header row says Media (owner, 2026-10-29).
+  expect(view.container.querySelector('[data-slot="section-sidebar"] h2')).toBeNull();
   const rows = await links(view);
   expect(rows.map((row) => row.textContent)).toEqual(["Home", "Videos", "Shows", "Music", "Podcasts", "Books"]);
 });

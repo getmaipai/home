@@ -335,7 +335,7 @@ export function FilesPage({ person }: { person: Roster }) {
       onDragOver={(event) => { if (event.dataTransfer?.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
       onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }}
       onDrop={(event) => { setDragging(false); const files = Array.from(event.dataTransfer?.files ?? []); if (files.length > 0) { event.preventDefault(); addFiles(files); } }}>
-      <SectionSidebar standalone title="Library" groups={groups} footer={footer} footerSlot={<div className="px-3 pb-2"><LibraryStorage me={person} /></div>} density="compact" collapsedStyle="hidden" collapsed={collapsed} onCollapsedChange={setCollapsed}
+      <SectionSidebar standalone groups={groups} footer={footer} footerSlot={<div className="px-3 pb-2"><LibraryStorage me={person} /></div>} density="compact" collapsedStyle="hidden" collapsed={collapsed} onCollapsedChange={setCollapsed}
         sidebarProps={{ id: "library-sidebar" }}
         search={{ value: searchText, onChange: setSearchText, label: "Search your Library", onSubmit: () => update({ q: searchText }) }} />
       <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">

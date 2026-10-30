@@ -1439,7 +1439,6 @@ export function ChatPage({ person }: { person: Roster }) {
     <SectionSidebar
       standalone
       density="compact"
-      title="Chat"
       collapsed={mobile ? false : column.collapsed}
       onCollapsedChange={(collapsed) => { if (mobile) setSheetOpen(!collapsed); else column.setCollapsedPreference(collapsed); }}
       collapseLabels={{ hide: "Hide conversations", show: "Show conversations", pin: "Keep conversations open" }}
@@ -1856,7 +1855,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetTitle>Conversations</SheetTitle>
               <SheetDescription>Past conversations</SheetDescription>
             </SheetHeader>
-            <SectionSidebar standalone density="compact" title="Chat" headerActions={<TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>} search={{ value: column.search, onChange: column.setSearch, label: "Search chats" }} primaryAction={newChatAction} sidebarProps={{ id: "next-chat-threads", "data-slot": "chat-rail", "aria-label": "Conversations", role: "region", "data-chat-column-mobile": "" }} body={threadSidebarBody} />
+            <SectionSidebar standalone density="compact" headerActions={<TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>} search={{ value: column.search, onChange: column.setSearch, label: "Search chats" }} primaryAction={newChatAction} sidebarProps={{ id: "next-chat-threads", "data-slot": "chat-rail", "aria-label": "Conversations", role: "region", "data-chat-column-mobile": "" }} body={threadSidebarBody} />
           </SheetContent>
         </Sheet>
         {/* CANVAS-SHEET-DESKTOP-01 (fixes #183): `open` is gated on

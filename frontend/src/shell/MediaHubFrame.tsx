@@ -44,7 +44,7 @@ export function MediaHubFrame({ packageId, children }: { packageId: string; chil
   };
   return (
     <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="media-hub-frame" data-testid="media-hub-frame">
-      <SectionSidebar standalone density="compact" title="Media" search={{ value: draft, onChange: setDraft, label: "Search Media", onSubmit: submitSearch }} groups={[{ id: "media-apps", items }]} />
+      <SectionSidebar standalone density="compact" search={{ value: draft, onChange: setDraft, label: "Search Media", onSubmit: submitSearch }} groups={[{ id: "media-apps", items }]} />
       {children}
     </div>
   );

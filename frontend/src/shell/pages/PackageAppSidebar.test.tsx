@@ -112,12 +112,13 @@ describe("an app that declares a sidebar", () => {
     expect(side.getByRole("link", { name: "Science" })).toBeTruthy();
   });
 
-  test("COLUMN-UNIFY-01: the column carries the app's name, its settings and its favorite control, and the page keeps none from wide screens up", async () => {
+  test("COLUMN-UNIFY-01 (2026-10-29): the app's name and settings sit in the header row, not in the column, and the page keeps none from wide screens up", async () => {
     rows = [{ ...row, settings_area: { id: "demo", title: "Demo news", app: "/apps/demo" } } as AppRow];
     const view = open("/apps/demo");
     await view.findByText("Today's stories");
     const side = await column(view);
-    expect(side.getByRole("heading", { level: 2, name: "Demo news" })).toBeTruthy();
+    // No title in the column: the header row names the app (owner, 2026-10-29).
+    expect(side.queryByRole("heading", { level: 2, name: "Demo news" })).toBeNull();
     // Settings sit in the header row beside the companion, never a second time in the column (owner, 2026-10-29).
     expect(side.queryByRole("link", { name: "Demo news settings" })).toBeNull();
     expect(side.queryByRole("button", { name: /favorites/ })).toBeNull();

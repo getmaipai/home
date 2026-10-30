@@ -305,7 +305,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
   const framed = sidebarProps ? (
     <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
-      <SectionSidebar standalone density="compact" title={app?.label} {...sidebarProps} />
+      <SectionSidebar standalone density="compact" {...sidebarProps} />
       {content}
     </div>
   ) : content;
