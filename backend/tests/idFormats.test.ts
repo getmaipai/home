@@ -38,6 +38,7 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newNewsItemId", "news-", 10],
   ["newNewsInterestId", "interest-", 10],
   ["newNewsSaveId", "save-", 10],
+  ["newReferenceSaveId", "refsave-", 10],
   ["newNewsReadId", "read-", 10],
   ["newNewsSearchRecentId", "recent-", 10],
   ["newFileReferenceId", "fref-", 10],
