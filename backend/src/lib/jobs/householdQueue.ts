@@ -351,7 +351,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
       for (const id of jobsAwaitingReopen()) {
         if (jobs.some((item) => item.id === id)) continue;
         const close = getProfileSource()?.close;
-        await reopenForJob(id, close ?? { mode: "off", always: [], never: [], reopen: false, noReopen: [] });
+        await reopenForJob(id, close ?? { mode: "off", always: [], never: [], reopen: true, noReopen: [] });
       }
       if (activePlan && !jobs.some((item) => item.id === activePlan!.jobId)) activePlan = null;
       for (const entry of entries) {

@@ -51,7 +51,8 @@ export async function fitForAdmission(job: { id?: string; jobClass: "picture" | 
     if (closableGb <= 0) return plain;
     const hypothetical = fitWith({ ...memory, evictableGb: memory.evictableGb + closableGb });
     const better = rank[hypothetical.outcome] > rank[plain.outcome] || (hypothetical.outcome === plain.outcome && (hypothetical.lowered.length < plain.lowered.length || (plain.belowPick && !hypothetical.belowPick)));
-    if (!better) return plain;
+    // Only close for a job that will start: a job that waits for an answer or for room never costs the Mac's user an app.
+    if (!better || hypothetical.outcome !== "run") return plain;
     const shortfallGb = hypothetical.needGb - Math.min(memory.freeGb, configured.hw.budgetGb) - memory.evictableGb;
     const result = await closeForJob(job.id, kindWords(lead), shortfallGb, close, helper);
     if (result.closedApps === 0) return plain;
