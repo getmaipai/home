@@ -11,6 +11,11 @@ import { getRegistry } from "@/lib/settingsRegistry";
 import { placeSetting, settingHref, settingsViewerFor } from "@/lib/settingsAreas";
 import type { PersonRow } from "@/types";
 import { searchMedia } from "@/lib/media/search";
+import { list as listMemories } from "@/lib/memory";
+import { listAlarms } from "@/lib/alarms";
+import { listCompanionCards } from "@/lib/companionsApp";
+import { listCommands } from "@/lib/commands";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export interface SearchResult {
   kind: string;
@@ -18,6 +23,8 @@ export interface SearchResult {
   title: string;
   subtitle?: string;
   href: string;
+  /** SEARCH-MODERN-02: [start, end) of the first match in `title`, so a client can highlight it. */
+  match?: [number, number];
 }
 
 export interface SearchGroup {
@@ -154,4 +161,96 @@ const mediaProvider: SearchProvider = {
   },
 };
 
-export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider, mediaProvider];
+function titleOf(text: string): string {
+  const line = text.trim().replace(/\s+/g, " ");
+  return line.length > 100 ? `${line.slice(0, 97)}...` : line;
+}
+
+// SEARCH-MODERN-01: memories through the memory page's own list() (canRead
+// already narrows it to what this actor may see), plain memories only, never
+// entity or episode records.
+const memoriesProvider: SearchProvider = {
+  kind: "memory",
+  heading: "Memories",
+  async search(query, actor) {
+    const needle = query.trim().toLowerCase();
+    return listMemories(actor)
+      .filter((m) => m.record_kind === "memory" && `${m.text} ${m.category}`.toLowerCase().includes(needle))
+      .slice(0, RESULT_CAP)
+      .map((m) => ({ kind: "memory", id: m.id, title: titleOf(m.text), subtitle: m.category, href: `/memory?ids=${encodeURIComponent(m.id)}` }));
+  },
+};
+
+// The actor's own alarms and reminders (listAlarms is already per person).
+const alarmsProvider: SearchProvider = {
+  kind: "alarm",
+  heading: "Alarms",
+  async search(query, actor) {
+    const needle = query.trim().toLowerCase();
+    return listAlarms(actor)
+      .filter((a) => `${a.label} ${a.tag} ${a.time}`.toLowerCase().includes(needle))
+      .slice(0, RESULT_CAP)
+      .map((a) => ({ kind: "alarm", id: a.id, title: a.label || "Alarm", subtitle: a.time, href: "/clock" }));
+  },
+};
+
+// Companions through the same card list the Companions page draws, so a
+// person finds only companions their age band and household settings allow.
+const companionsProvider: SearchProvider = {
+  kind: "companion",
+  heading: "Companions",
+  async search(query, actor) {
+    const needle = query.trim().toLowerCase();
+    return listCompanionCards(actor)
+      .filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(needle))
+      .slice(0, RESULT_CAP)
+      .map((card) => ({ kind: "companion", id: card.id, title: card.name, subtitle: card.tagline, href: "/companions" }));
+  },
+};
+
+// Household chat commands: the same owner-or-admin gate as GET /api/commands.
+const commandsProvider: SearchProvider = {
+  kind: "command",
+  heading: "Commands",
+  async search(query, actor) {
+    if (!isOwnerOrAdmin(actor)) return [];
+    const listed = listCommands(actor);
+    if (!listed.ok) return [];
+    const needle = query.trim().toLowerCase();
+    return listed.value
+      .filter((c) => c.trigger.toLowerCase().includes(needle))
+      .slice(0, RESULT_CAP)
+      .map((c) => ({ kind: "command", id: c.id, title: c.trigger, href: "/settings" }));
+  },
+};
+
+export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider, mediaProvider, memoriesProvider, alarmsProvider, companionsProvider, commandsProvider];
+
+// SEARCH-MODERN-02: one score over every provider's matches. Exact title 0,
+// title starts with the query 1, a word in the title starts with it 2, the
+// query appears elsewhere in the title 3, subtitle only 4. Lower is better;
+// results keep their provider's own order within a score (stable sort).
+export function matchScore(result: SearchResult, query: string): number {
+  const q = query.trim().toLowerCase();
+  const title = result.title.toLowerCase();
+  if (title === q) return 0;
+  if (title.startsWith(q)) return 1;
+  if (title.split(/[\s\-_/]+/).some((word) => word.startsWith(q))) return 2;
+  if (title.includes(q)) return 3;
+  return 4;
+}
+
+/** Orders each group's results by score, marks the title match, and orders groups by their best result (ties keep provider order). */
+export function rankGroups(groups: SearchGroup[], query: string): SearchGroup[] {
+  const q = query.trim().toLowerCase();
+  const ranked = groups.map((group) => {
+    const scored = group.results.map((result, index) => ({ result, index, score: matchScore(result, q) }));
+    scored.sort((a, b) => a.score - b.score || a.index - b.index);
+    const results = scored.map(({ result }) => {
+      const at = result.title.toLowerCase().indexOf(q);
+      return at >= 0 ? { ...result, match: [at, at + q.length] as [number, number] } : result;
+    });
+    return { group: { ...group, results }, best: scored[0]?.score ?? 5 };
+  });
+  return ranked.map((entry, index) => ({ ...entry, index })).sort((a, b) => a.best - b.best || a.index - b.index).map((entry) => entry.group);
+}

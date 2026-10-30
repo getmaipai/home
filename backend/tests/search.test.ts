@@ -35,6 +35,7 @@ interface SearchResult {
   title: string;
   subtitle?: string;
   href: string;
+  match?: [number, number];
 }
 interface SearchGroup {
   kind: string;
@@ -90,7 +91,7 @@ describe("GET /api/search: conversations", () => {
     updateConversationTitle(actor, conv.value.id, "Pizza night plans");
     const groups = await search(client, "pizza");
     const conversations = group(groups, "conversation");
-    expect(conversations?.results).toEqual([{ kind: "conversation", id: conv.value.id, title: "Pizza night plans", href: `/chat?conversation=${conv.value.id}` }]);
+    expect(conversations?.results).toEqual([{ kind: "conversation", id: conv.value.id, title: "Pizza night plans", href: `/chat?conversation=${conv.value.id}`, match: [0, 5] }]);
   });
 
   test("a temporary chat never appears", async () => {
@@ -212,5 +213,73 @@ describe("GET /api/search: settings", () => {
     expect(await find(childClient, "pictures in answers", "reference.images")).toBeUndefined();
     expect(await find(teenClient, "Send photos", "chat.photo_uploads")).toBeDefined();
     expect(await find(childClient, "Send photos", "chat.photo_uploads")).toBeUndefined();
+  });
+});
+
+// SEARCH-MODERN-01 (docs/plans/palette-search-2026-10-29.md): the kinds the
+// palette used to miss, each behind the visibility rule of the page that owns it.
+describe("GET /api/search: memories, alarms, companions", () => {
+  test("a saved memory is found by a word in its text and opens the memory page at that record", async () => {
+    const { client } = await owner();
+    const saved = await client.post("/api/memory", { text: "Sage keeps the spare key under the blue flowerpot", category: "fact", tier: "durable", scope: "household", importance: 0.6 });
+    expect(saved.status).toBeLessThan(300);
+    const hit = group(await search(client, "flowerpot"), "memory")?.results[0];
+    expect(hit?.title).toContain("flowerpot");
+    expect(hit?.href).toStartWith("/memory?ids=");
+  });
+
+  test("a person's alarm is found by its label, and another person never finds it", async () => {
+    const { client: ownerClient } = await owner();
+    const created = await ownerClient.post("/api/alarms", { time: "06:45", label: "Marathon training" });
+    expect(created.status).toBe(201);
+    const hit = group(await search(ownerClient, "marathon"), "alarm")?.results[0];
+    expect(hit?.title).toBe("Marathon training");
+    expect(hit?.href).toBe("/clock");
+    const { client: kid } = await addPerson(ownerClient, "Nova", "child");
+    expect(group(await search(kid, "marathon"), "alarm")).toBeUndefined();
+  });
+
+  test("household commands are searchable by an owner and never by a child", async () => {
+    const { client: ownerClient } = await owner();
+    const created = await ownerClient.post("/api/commands", { trigger: "movie night", minRole: "child", action: { kind: "reply", text: "Starting movie night mode." } });
+    expect(created.status).toBe(200);
+    expect(group(await search(ownerClient, "movie"), "command")?.results[0]?.title).toBe("movie night");
+    const { client: kid } = await addPerson(ownerClient, "Nova", "child");
+    expect(group(await search(kid, "movie"), "command")).toBeUndefined();
+  });
+});
+
+describe("GET /api/search: ranking", () => {
+  test("an exact-title group outranks a group that only contains the word, and the title match is marked", async () => {
+    const { client } = await owner();
+    await client.post("/api/alarms", { time: "07:00", label: "Sage" });
+    await client.post("/api/alarms", { time: "08:00", label: "Walk with Sage" });
+    const groups = await search(client, "sage");
+    expect(groups[0]?.results[0]?.title.toLowerCase()).toBe("sage");
+    const alarms = group(groups, "alarm")!.results;
+    expect(alarms.map((r) => r.title)).toEqual(["Sage", "Walk with Sage"]);
+    expect(alarms[1]?.match).toEqual([10, 14]);
+  });
+});
+
+describe("GET /api/search: the owning page's visibility holds", () => {
+  test("a private memory of the owner's is never found by a child, while the owner finds it", async () => {
+    const { client: ownerClient, actor } = await owner();
+    const saved = await ownerClient.post("/api/memory", { text: "Sage is planning a surprise birthday lanternfest", category: "fact", tier: "durable", scope: "person", person: actor.id, importance: 0.6 });
+    expect(saved.status).toBeLessThan(300);
+    expect(group(await search(ownerClient, "lanternfest"), "memory")?.results.length).toBe(1);
+    const { client: kid } = await addPerson(ownerClient, "Nova", "child");
+    expect(group(await search(kid, "lanternfest"), "memory")).toBeUndefined();
+  });
+
+  test("companions come from the Companions page's own card list, so a child finds exactly what that list shows", async () => {
+    const { listCompanionCards } = await import("@/lib/companionsApp");
+    const { client: ownerClient } = await owner();
+    const { client: kid, actor } = await addPerson(ownerClient, "Nova", "child");
+    const card = listCompanionCards(actor)[0];
+    expect(card).toBeDefined();
+    const found = group(await search(kid, card!.name), "companion")?.results ?? [];
+    expect(found.some((r) => r.id === card!.id)).toBe(true);
+    for (const r of found) expect(listCompanionCards(actor).some((c) => c.id === r.id)).toBe(true);
   });
 });

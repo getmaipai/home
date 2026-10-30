@@ -7,7 +7,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
-import { SEARCH_PROVIDERS } from "@/lib/search/providers";
+import { SEARCH_PROVIDERS, rankGroups } from "@/lib/search/providers";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { clearSearchAddress, testOrSaveSearchAddress } from "@/lib/searchAddressSave";
 import { webSourcesPicked } from "@/lib/retrieval/webSources";
@@ -25,6 +25,7 @@ const SearchResultSchema = z.object({
   title: z.string(),
   subtitle: z.string().optional(),
   href: z.string(),
+  match: z.tuple([z.number(), z.number()]).optional().describe("[start, end) of the first match in title, for highlighting."),
 });
 
 const SearchGroupSchema = z.object({
@@ -75,7 +76,7 @@ searchRoutes.openapi(searchRoute, async (c) => {
     }
     return outcome.value.length > 0 ? { kind: provider.kind, heading: provider.heading, results: outcome.value } : null;
   }).filter((g): g is NonNullable<typeof g> => g !== null);
-  return c.json({ groups }, 200);
+  return c.json({ groups: rankGroups(groups, q) }, 200);
 });
 
 const SearchCheckSchema = z.object({
