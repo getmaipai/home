@@ -266,7 +266,7 @@ describe("ChatPage (SHELL-02's first slice)", () => {
     }
   });
 
-  test("ordinary new chat shows the greeting and generic starter chips, with no where-it-runs or can-make-mistakes line", async () => {
+  test("ordinary new chat greets the person by name and puts the generic starter chips under the composer, with no where-it-runs or can-make-mistakes line", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -274,10 +274,17 @@ describe("ChatPage (SHELL-02's first slice)", () => {
           <ChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      expect(await view.findByText("How can I help you today?")).toBeVisible();
+      await view.findByRole("button", { name: "Explain how rainbows form" });
+      const greeting = view.container.querySelector('[data-slot="empty-state-greeting"]')!;
+      expect(greeting.textContent).not.toContain("How can I help you today?");
+      expect(greeting.textContent).toContain((makePerson().display_name ?? "").split(" ")[0]!);
       expect(view.queryByText("Runs on your own hub. Your chats stay at home.")).toBeNull();
       expect(view.queryByText(/can make mistakes/i)).toBeNull();
       expect(await view.findByRole("button", { name: "Explain how rainbows form" })).toBeVisible();
+      // The chips follow the composer in the page, which is what "under the input" means on screen.
+      const composer = view.container.querySelector("textarea")!;
+      const chips = view.container.querySelector('[data-slot="empty-state-suggestions"]')!;
+      expect(composer.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     } finally {
       restore();
     }

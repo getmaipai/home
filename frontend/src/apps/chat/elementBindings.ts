@@ -33,6 +33,7 @@ import {
   ComposerTrailingWithThinkingMode,
   MessageFooterExtra,
   ChatWelcome,
+  ChatStarterPills,
   ReasoningGroup,
   FailedTurnActionBarExtras,
 } from "@/apps/chat/chatThreadSlots";
@@ -117,6 +118,8 @@ export const THREAD_SLOTS = {
     trustedLinks: ({ message, messages }: MarkdownLinkContext) => trustedChatLinks(message, messages),
   },
   Welcome: ChatWelcome,
+  // The starter chips sit under the composer on a new chat, not above it.
+  BelowComposer: ChatStarterPills,
   // ELEMENTS-ADOPT-01 E4: the kit DayDivider before a message that opens a new day or follows a long pause.
   MessageBefore: ChatDateDivider,
   AssistantMoreItems,

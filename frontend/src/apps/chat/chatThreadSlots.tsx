@@ -4,7 +4,8 @@
 // hands them to the kit Thread.
 import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
-import { CharacterHero } from "@maipai/ui/src/elements/character-hero";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { starterGreeting } from "@/apps/chat/starterGreeting";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
@@ -583,8 +584,8 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
 export function ChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
   const person = useContext(WakeWordPersonContext);
-  const aui = useAui();
-  const engineDown = useEngineDownReason();
+  // One pick per new chat: the line holds still while the screen is up and is a different one next time.
+  const [pick] = useState(() => Math.random());
   const conversationId = useContext(DraftConversationContext);
   const conversationQuery = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
   const settingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person?.id ?? ""}`], queryFn: () => api.settingsValues(`person:${person!.id}`), enabled: Boolean(person?.id) });
@@ -599,29 +600,44 @@ export function ChatWelcome() {
   return (
     <>
       <EngineStartingLoader />
-      {name ? <CharacterHero name={name} seed={companionId} media={presence ? <CompanionAvatar name={presence.name} clips={presence.clips} wanted={presence.wanted} once={presence.once} size="lg" onFail={presence.onFail} /> : undefined} line="How can I help you today?" /> : null}
       <EmptyState>
-        {!name ? <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting> : null}
+        {name ? (
+          <div className="flex size-40 items-center justify-center overflow-hidden rounded-full">
+            {presence ? <CompanionAvatar name={presence.name} clips={presence.clips} wanted={presence.wanted} once={presence.once} size="lg" onFail={presence.onFail} /> : <Avatar name={name} seed={companionId} size="profile" className="size-full text-4xl" />}
+          </div>
+        ) : null}
+        <EmptyStateGreeting>{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
-        <EmptyStateSuggestions>
-          {STARTER_SUGGESTIONS.map((suggestion, index) => (
-            <EmptyStateSuggestion
-              key={suggestion.title}
-              index={index}
-              disabled={engineDown !== undefined}
-              aria-label={engineDown === undefined ? undefined : `${suggestion.title} ${suggestion.label}. ${engineDown}`}
-              onClick={() => {
-                if (engineDown !== undefined) return;
-                aui.composer().setText(suggestion.prompt);
-                aui.composer().send();
-              }}
-            >
-              {suggestion.title} {suggestion.label}
-            </EmptyStateSuggestion>
-          ))}
-        </EmptyStateSuggestions>
       </EmptyState>
+      {/* Room between the greeting and the composer now that the chips no longer sit there. */}
+      <div aria-hidden className="h-8" />
     </>
+  );
+}
+
+/** The four starter chips, drawn under the composer on a new chat (the kit's below-composer slot). Generic and the same for everyone:
+ * never drawn from memory, history or a profile (see chatStarterSuggestions). */
+export function ChatStarterPills() {
+  const aui = useAui();
+  const engineDown = useEngineDownReason();
+  return (
+    <EmptyStateSuggestions>
+      {STARTER_SUGGESTIONS.map((suggestion, index) => (
+        <EmptyStateSuggestion
+          key={suggestion.title}
+          index={index}
+          disabled={engineDown !== undefined}
+          aria-label={engineDown === undefined ? undefined : `${suggestion.title} ${suggestion.label}. ${engineDown}`}
+          onClick={() => {
+            if (engineDown !== undefined) return;
+            aui.composer().setText(suggestion.prompt);
+            aui.composer().send();
+          }}
+        >
+          {suggestion.title} {suggestion.label}
+        </EmptyStateSuggestion>
+      ))}
+    </EmptyStateSuggestions>
   );
 }
 
