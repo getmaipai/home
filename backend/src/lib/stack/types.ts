@@ -36,6 +36,12 @@ export interface StackMemoryWatchdog {
   generation_paused: boolean;
 }
 
+/** The Stack's dev-load reading (`memory.dev-load`, memory note 4.2): what other programs hold. Optional and additive: Stacks that do not expose it omit the field. Names go to admins only. */
+export interface StackDevLoad {
+  others_bytes: number;
+  processes: { name: string; bytes: number }[];
+}
+
 export interface StackVoice {
   id: string; name: string; description: string; language: string; country: string;
   gender: "female" | "male" | "neutral" | "unknown";
