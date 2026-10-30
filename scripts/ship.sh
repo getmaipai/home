@@ -4,7 +4,7 @@
 # --tag labels a shipped commit afterwards;
 # the live .installed-tag remains sha-<first 7> so update checks do not treat it as a release.
 set -euo pipefail
-usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--reinstall]" >&2; }
+usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--reinstall] [--retry]" >&2; }
 die() { echo "ship.sh: $1" >&2; exit "${2:-1}"; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a Home checkout."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
@@ -28,8 +28,8 @@ stack_url="${MAIPAI_SHIP_STACK_URL:-http://127.0.0.1:${stack_port}/healthz}"
 migrations_cmd="${MAIPAI_SHIP_MIGRATIONS_CMD:-sqlite3 -readonly $live/data/hub.db 'select count(*) from __drizzle_migrations'}"
 publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest NOTES}"
 health_timeout="${MAIPAI_SHIP_HEALTH_TIMEOUT:-90}"
-before_green=0; tag_after=0; dry=0; adopt_empty_live=0; reinstall=0; target=main
-while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --reinstall) reinstall=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
+before_green=0; tag_after=0; dry=0; adopt_empty_live=0; reinstall=0; retry=0; target=main
+while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
 git fetch origin || die "could not fetch origin; check network access and retry."
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
@@ -90,7 +90,7 @@ lock_dir="${MAIPAI_SHIP_LOCK:-$data/ship.lock.d}"; lock_wait="${MAIPAI_SHIP_LOCK
 release_lock() { if (( held_lock )); then rm -rf "$lock_dir"; held_lock=0; fi; }
 if (( ! dry )); then
   mkdir -p "$(dirname "$lock_dir")" || die "could not create the ship data folder $(dirname "$lock_dir")."
-  waited=0
+  waited=0; wait_started="$(date +%s)"
   until mkdir "$lock_dir" 2>/dev/null; do
     owner_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
     if [[ "$owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then echo "ship.sh: the ship that held the lock (pid $owner_pid) is gone; clearing its lock." >&2; rm -rf "$lock_dir"; continue; fi
@@ -101,6 +101,30 @@ if (( ! dry )); then
   held_lock=1; echo "$$" > "$lock_dir/pid"; echo "$label from $(hostname -s) pid $$" > "$lock_dir/what"
   trap release_lock EXIT
   before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
+  # A ship of this very commit that failed while this one waited has just shown that the install does not work: repeating it only
+  # stops the service again (2026-10-30: three ships of one commit in a row each failed, each stopped the hub and each rollback failed).
+  if (( waited > 0 && ! retry && ! reinstall )) && [[ -f "$data/shipped.jsonl" ]]; then
+    failed_line="$(python3 - "$data/shipped.jsonl" "$sha" "$wait_started" <<'PY'
+import json, sys
+path, sha, since = sys.argv[1], sys.argv[2], int(sys.argv[3])
+last = None
+for line in open(path):
+    try:
+        row = json.loads(line)
+    except ValueError:
+        continue
+    try:
+        at = int(row.get("ts", 0))
+    except (TypeError, ValueError):
+        continue
+    if row.get("sha") == sha and at >= since:
+        last = row
+if last and last.get("result") != "shipped":
+    print(last.get("result"))
+PY
+)"
+    if [[ -n "$failed_line" ]]; then die "another ship of $label failed while this one waited (${failed_line}), so installing it again would only stop the hub again. Read the log in $data, fix the cause, then run ship.sh --retry."; fi
+  fi
   # A ship that finished while this one waited may already include this commit.
   live_ref="${before_tag#sha-}"; live_sha="$(git rev-parse --verify -q "${live_ref}^{commit}" 2>/dev/null || true)"
   if (( ! reinstall )) && [[ -n "$live_sha" && "$live_sha" != "$sha" ]] && git merge-base --is-ancestor "$sha" "$live_sha" 2>/dev/null; then

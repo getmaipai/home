@@ -840,10 +840,12 @@ link_commons_siblings() {
   while read -r pkg cdir tag; do
     [ -n "$pkg" ] || continue
     for name in $(grep -oE '"file:\.\./[a-z0-9-]+"' "${work}/commons-tags/${cdir}/${pkg}/package.json" | sed -E 's/^"file:\.\.\/(.*)"$/\1/'); do
-      [ -e "${work}/commons-tags/${cdir}/${name}" ] && continue
       sibling_dir=$(printf '%s\n' "$deps" | awk -v n="$name" '$1 == n { print $2; exit }')
+      # A real folder stays. A link made for an earlier pairing (the same ui tag next to another spec tag) is pointed at the
+      # sibling this Home names, so a package never imports the old spec folder, which has no dependencies installed.
+      [ -L "${work}/commons-tags/${cdir}/${name}" ] || { [ -e "${work}/commons-tags/${cdir}/${name}" ] && continue; }
       [ -n "$sibling_dir" ] || continue
-      ln -s "../${sibling_dir}/${name}" "${work}/commons-tags/${cdir}/${name}" \
+      ln -sfn "../${sibling_dir}/${name}" "${work}/commons-tags/${cdir}/${name}" \
         || die "Could not link ${name} next to ${pkg} in ${work}/commons-tags/${cdir}. Check that the folder is writable, then run the installer again."
     done
   done <<< "$deps"
@@ -860,6 +862,11 @@ build_app() {
   local shim
   shim=$(mktemp -d) && ln -s "$bun_bin" "${shim}/node" && ln -s "$bun_bin" "${shim}/bun" \
     || die "could not create the temporary node shim. Check that the temp folder is writable, then run the installer again."
+  # Every build starts from clean dependency folders. bun install on top of the previous version's node_modules can leave a
+  # package linked to the old version (2026-10-30: the type check read spec 0.1.272 on an install that pinned 0.1.275, then the
+  # rollback built on the same leftovers and failed too, and the hub stayed down). The cost is one fresh install from Bun's cache.
+  rm -rf "${dir:?}/node_modules" "${dir:?}/backend/node_modules" "${dir:?}/frontend/node_modules" \
+    || { rm -rf "$shim"; return 1; }
   (cd "$dir/backend" && PATH="${shim}:${PATH}" "$bun_bin" install --production) \
     || { rm -rf "$shim"; return 1; }
   (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" install && PATH="${shim}:${PATH}" "$bun_bin" run build) \
