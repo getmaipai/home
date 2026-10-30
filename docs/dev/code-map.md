@@ -377,6 +377,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, lockoutDurationMs, ensureCredentialRowExists, clearFailedAttempts, currentLockout, recordFailedAttempt |
 | `backend/src/lib/dashboard.ts` | getDashboard |
 | `backend/src/lib/dataClasses.ts` | DATA_CLASSES, dataClassById |
+| `backend/src/lib/deliveryChoice.ts` | DELIVERY_DEADLINE_MS, parseDelivery, chooseDelivery, __setDeliveryRunnerForTests |
 | `backend/src/lib/denoHost.ts` | buildDenoRunArgs, denoEnv, killLiveProcessForInstallChange, callTier1Handle, startIdleSweep, registerDenoHostGracefulExit |
 | `backend/src/lib/deviceCommands.ts` | DEVICE_COMMAND_RETENTION_MS, DEVICE_HEARTBEAT_MS, registerDeviceAlarmActionHandler, issueDeviceCommand, listRobotsPairedUnderPerson, publishSettingsChanged |
 | `backend/src/lib/deviceId.ts` | getDeviceId6 |
