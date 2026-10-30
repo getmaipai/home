@@ -34,6 +34,16 @@ test("iconLinksOf lists declared icons, largest first, https only", () => {
   expect(iconLinksOf(html, "https://s.example/")).toEqual(["https://s.example/a.png", "https://s.example/f.ico"]);
 });
 
+test("trimArticleTail drops a Related box with its headline lines mid-story and keeps the story going", () => {
+  const p = (text: string): ArticleBlock => ({ type: "paragraph", inlines: [{ type: "text", text }] });
+  const h = (text: string): ArticleBlock => ({ type: "heading", level: 2, id: text, text });
+  const long = (id: string): ArticleBlock => p(`${id} ${"A full sentence of the story that runs past the prose threshold for a real paragraph. ".repeat(2)}`);
+  const blocks = [long("a"), long("b"), long("c"), long("d"), h("Related Stories"), h("New 'Naruto' Anime Series and 'Shadow Rising' Manga Revealed"), h("Magic: The Gathering Reveals New 'Darkhold Destiny' Marvel Set"), long("e"), long("f")];
+  const kept = trimArticleTail(blocks);
+  expect(kept).toHaveLength(6);
+  expect(kept.some((block) => block.type === "heading")).toBe(false);
+});
+
 test("trimArticleTail drops a paragraph that repeats the one before it", () => {
   const lede = "Reddit's homepage is now going to offer For You and Following feeds, which could be a big shift.";
   expect(trimArticleTail([p(lede), p(lede), p("A second, different paragraph.")]).map((b) => (b.type === "paragraph" ? b.inlines[0]!.text : ""))).toEqual([lede, "A second, different paragraph."]);

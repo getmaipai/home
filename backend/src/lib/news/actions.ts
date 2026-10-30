@@ -61,6 +61,14 @@ async function save(person: PersonRow, viewer: Viewer, body: Record<string, unkn
     const store = sharedShelfStore();
     const textKept = content.stored && content.source !== "teaser";
     if (textKept) store?.pinContent(item.id, true);
+    else if (store && content.blocks.length > 0) {
+      // Only the feed's summary could be fetched: keep it, pinned, so the saved story's row is not pruned away with the shelf and its
+      // row never opens on "not available". The stored teaser is never served as the article (loadContent ignores it and fetches again).
+      try {
+        store.putContent(item.id, viewer.band, { blocks: content.blocks, source: "teaser", reading_s: content.reading_s, fetched_at: new Date().toISOString() });
+        store.pinContent(item.id, true);
+      } catch { /* the pin is a keep-alive: a failed write never fails the save */ }
+    }
     const hasPicture = item.image_url || store?.getEnrichment(item.id, viewer.band)?.image_url || newsPictureCached(item.id);
     const pictureKept = hasPicture ? await ensureAndPinNewsPicture(item, viewer.band) : true;
     addSave(person.id, { itemId: item.id, storyId: storyIdOf(item), canonicalUrl: item.canonical_url, title: item.title, publisher: item.publisher, offline: textKept && pictureKept });

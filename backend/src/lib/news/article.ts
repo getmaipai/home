@@ -254,8 +254,12 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
     if (!keptNumbers.has(number)) return [];
     return [{ ...block, src: `/api/plugins/news/images/${item.id}/figure/${number}?w=1280` }];
   }) : loaded.blocks.filter((block) => block.type !== "figure");
-  const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;
-  if (blocks.length === 0 || gate.sawCrisis()) return null;
+  const gated = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;
+  if (gate.sawCrisis()) return null;
+  // No page text and no feed summary: the story still exists, so it opens with its headline, picture and source and says why there is
+  // no text, never "This story is not available". A child's story whose every sentence the gate removed stays hidden.
+  const blocks: ArticleBlock[] = gated.length > 0 ? gated : band === "child" ? [] : [{ type: "note", text: `The text of this story did not load. Press Try again, or open it at ${publisher}.` }];
+  if (blocks.length === 0) return null;
   const topic = topicsShown(item, band).map((id) => topicById(id)?.label).find((label): label is string => !!label);
   const image = imageOf(item, title, publisher, env);
   const speech = speechFor(title, blocks);
