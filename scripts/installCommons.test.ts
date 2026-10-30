@@ -297,7 +297,7 @@ describe("required Stack setup failures", () => {
   test.each([
     ["missing Stack user", 'find_console_user() { echo ""; }', "logged-in console user"],
     ["missing Stack binary", 'find_console_user() { echo marlow; }; render_stack_binary_name() { echo absent; }', "compiled Stack binary is missing"],
-    ["failed service install", 'find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; run_as_console_user() { return 1; }', "install-service command failed"],
+    ["failed service install", 'find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; run_as_console_user() { return 1; }; sleep() { :; }', "install-service command failed"],
     ["health timeout", 'find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; run_as_console_user() { return 0; }; curl() { return 22; }; sleep() { :; }', "did not answer /healthz in time"],
   ] as const)("fails when there is a %s", (_name, setup, message) => {
     const root = mkdtempSync(join(tmpdir(), "maipai-install-required-stack-"));
@@ -327,6 +327,20 @@ describe("Stack port on upgrade (2026-10-28 outage)", () => {
       return { result, log, port: require("node:fs").readFileSync(join(root, "stack", ".port"), "utf8").trim() };
     } finally { rmSync(root, { recursive: true, force: true }); }
   };
+
+  test("a Stack service that is still unloading is booted out first and the install retried", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-install-stack-retry-"));
+    mkdirSync(join(root, "stack"));
+    writeFileSync(join(root, "stack", "maipai-stack-darwin-arm64"), "", { mode: 0o755 });
+    const calls = join(root, "calls.log");
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; STACK_PORT_BASE=8770; find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; sleep() { :; }; find_free_port() { echo 8771; }; port_in_use() { return 1; }; curl() { return 0; }; run_as_console_user() { shift 2; echo "$*" >> "${calls}"; case "$*" in *install-service*) [ "$(grep -c install-service "${calls}")" -ge 2 ] || return 1;; esac; return 0; }; (cd() { :; }; true); install_stack_service "${root}" "${root}/bun" darwin arm64 no`], { env: { ...process.env, STACK_HEALTH_TRIES: "2" } });
+      const log = require("node:fs").readFileSync(calls, "utf8");
+      expect(log).toContain("launchctl bootout gui/");
+      expect(log.split("\n").filter((line: string) => line.includes("install-service")).length).toBe(2);
+      expect(result.stdout.toString() + result.stderr.toString()).toContain("try 1 of 3");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 
   test("the old Stack still holds its port: the upgrade keeps that port", () => {
     const { log, port } = run("port_in_use() { return 0; }; stack_answers_on() { return 0; }; curl() { return 0; }; (cd() { :; }; true)", "8770");

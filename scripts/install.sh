@@ -1564,7 +1564,21 @@ install_stack_service() {
   local install_service_argv=() argv_line
   while IFS= read -r argv_line; do install_service_argv+=("$argv_line"); done < <(stack_install_service_argv "$binary" "$stack_data_dir" "$stack_port" "$bun_bin")
   clear_quarantine_and_sign "$os" "$stack_dir" "$binary"
-  run_as_console_user "$os" "$stack_user" "${install_service_argv[@]}" \
+  # 2026-10-30: install-service failed with "Bootstrap failed: 5: Input/output error" when the old Stack service was still loaded or
+  # still shutting down (launchd tears a service down asynchronously). Unload it first, give launchd a moment, and try the
+  # install up to three times before giving up.
+  if [ "$os" = "darwin" ]; then
+    run_as_console_user "$os" "$stack_user" launchctl bootout "gui/$(id -u "$stack_user" 2>/dev/null)/com.maipai.stack" >/dev/null 2>&1 || true
+    sleep 2
+  fi
+  local install_attempt=1 install_ok=no
+  while [ "$install_attempt" -le 3 ]; do
+    if run_as_console_user "$os" "$stack_user" "${install_service_argv[@]}"; then install_ok=yes; break; fi
+    log "The Stack's install-service command did not succeed (try ${install_attempt} of 3)."
+    install_attempt=$((install_attempt + 1))
+    sleep 3
+  done
+  [ "$install_ok" = yes ] \
     || { log "The Stack's install-service command failed. The MaiPai Stack is required; installation cannot continue. On a Mac this usually means no one is logged in at the Mac's own screen: log in there, open Terminal, and run the installer again."; return 1; }
   echo "$stack_port" > "${stack_dir}/.port" || { log "Could not write ${stack_dir}/.port. The MaiPai Stack is required; installation cannot continue."; return 1; }
   if [ "$os" = "linux" ]; then
