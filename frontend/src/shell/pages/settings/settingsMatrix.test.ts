@@ -71,7 +71,7 @@ describe("which Settings pages and keys each role sees", () => {
   test.each(ROLES)("the column groups pages by audience for %s", (role) => {
     const personal = ["profile", "appearance", "chat", "voice", "notifications"];
     const expected = role === "owner" || role === "admin"
-      ? [...personal, "pictures", "data", "household", "privacy", "ai", "media", "home-voice", "search", "apps", "backups", "advanced"]
+      ? [...personal, "pictures", "data", "household", "privacy", "ai", "media", "home-voice", "search", "offline-data", "apps", "backups", "advanced"]
       : [...personal, ...(role === "adult" ? ["pictures"] : []), "data"];
     expect(sectionIds("settings", viewerFor(role, EMPTY_HOME))).toEqual(expected);
     expect(sectionIds("settings", viewerFor(role, FULL_HOME))).toEqual(expected);

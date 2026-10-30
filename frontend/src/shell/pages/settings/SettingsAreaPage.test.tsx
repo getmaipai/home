@@ -131,7 +131,7 @@ describe("the settings route", () => {
   test("an owner opens Settings and sees the personal and household pages together", async () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/household"));
-    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice and robot", "Notifications", "Pictures and videos", "Your data and apps", "Household and people", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voice", "Search and web", "Apps and devices", "Backups, storage and updates", "Advanced"]);
+    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice and robot", "Notifications", "Pictures and videos", "Your data and apps", "Household and people", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voice", "Search and web", "Offline data", "Apps and devices", "Backups, storage and updates", "Advanced"]);
     expect(view.getByRole("heading", { level: 1, name: /^Household and people$/ })).toBeTruthy();
   });
 
@@ -168,10 +168,10 @@ describe("the settings route", () => {
   });
 
   test("a child gets the Home settings access explanation on a direct URL", async () => {
-    const view = open(makePerson("child"), "/settings/search?tab=reference-library");
+    const view = open(makePerson("child"), "/settings/offline-data");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(where(view)).toBe("/settings/search?tab=reference-library");
-    expect(view.queryByText("All sets")).toBeNull();
+    expect(where(view)).toBe("/settings/offline-data");
+    expect(view.queryByText("Disk space")).toBeNull();
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
 
@@ -183,10 +183,10 @@ describe("the settings route", () => {
     expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
   });
 
-  test("an admin opens the spec-declared Reference library view", async () => {
-    const view = open(makePerson("admin"), "/settings/search?tab=reference-library");
-    await waitFor(() => expect(where(view)).toBe("/settings/search?tab=reference-library"));
-    expect(view.getByRole("tab", { name: "Reference library" })).toBeTruthy();
+  test("an admin opens Offline data as its own page, with no tab row", async () => {
+    const view = open(makePerson("admin"), "/settings/offline-data");
+    await waitFor(() => expect(where(view)).toBe("/settings/offline-data"));
+    expect(view.queryByRole("tab", { name: "Reference library" })).toBeNull();
   });
 
   test("an owner manages the household command list in Home settings", async () => {
