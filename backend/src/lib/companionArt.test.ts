@@ -52,8 +52,10 @@ describe("companion art model resolution", () => {
     setHouseholdSettingValue("generation.video_quality", "quick");
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests())).toEqual({ model: "wan2.2-ti2v-5b-fastwan-mlx", quality: "quick" });
     setHouseholdSettingValue("generation.video_quality", "detailed");
-    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed", detailedPicture: true }))).toEqual({ model: "ltx-2-3-distilled-mlx", quality: "detailed" });
-    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed" }))).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
+    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed", detailedPicture: true }), "detailed")).toEqual({ model: "ltx-2-3-distilled-mlx", quality: "detailed" });
+    // Teens and children are never sent to Detailed, even when the household default is Detailed.
+    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed", detailedPicture: true }))).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
+    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed" }), "detailed")).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
     expect(resolveCompanionEdit().model).toBe("flux2-klein-4b");
   });
 

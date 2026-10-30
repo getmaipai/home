@@ -43,8 +43,9 @@ export function resolveCompanionStillFromStatus(engine: StackImageStatus | null)
 export async function resolveCompanionStill(): Promise<CompanionArtChoice> { return resolveCompanionStillFromStatus(await (statusReaders?.picture ?? pictureEngineStatus)()); }
 export function resolveCompanionEdit(): CompanionArtChoice { return { model: COMPANION_EDIT_MODEL, quality: "quick" }; }
 
-export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null): CompanionArtChoice {
-  const choice = chooseVideoQuality({ engine, hasPicture: true });
+/** Adults' companions ask for the Detailed model (better motion, and it falls back to Quick when it cannot start from a picture or is not installed); teens and children stay on Quick. */
+export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, requested: "quick" | "detailed" = "quick"): CompanionArtChoice {
+  const choice = chooseVideoQuality({ engine, hasPicture: true, requested });
   const model = choice.quality === "detailed" ? engine?.qualities?.detailed.id ?? DETAILED_BASE : engine?.qualities?.quick.id ?? engine?.model?.id ?? QUICK_BASE;
   const q = engine?.qualities?.[choice.quality];
   if (engine?.qualities ? (!q || !q.installed || !q.available) : choice.quality !== "quick" || !engine?.model?.installed || engine.model.id !== model) refusal(COMPANION_CLIP_MODEL_MISSING_LINE);
@@ -52,4 +53,4 @@ export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null):
 }
 /** The value the Stack's video `model` field takes (lib/pictures/lane.ts): "detailed", or the Quick model name, never a status id. */
 export const stackVideoModel = (art: CompanionArtChoice): string => (art.quality === "detailed" ? "detailed" : WAN_QUICK_VIDEO_MODEL);
-export async function resolveCompanionClip(): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)()); }
+export async function resolveCompanionClip(requested: "quick" | "detailed" = "quick"): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)(), requested); }

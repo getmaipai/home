@@ -8,6 +8,7 @@ import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook"
 import { takeUsable, addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE, keyframePath, writeKeyframe, readKeyframeMeta } from "@/lib/companionStates";
 import { existsSync } from "node:fs";
 import { routeAudience } from "@/lib/pictures/audience";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
 import { maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
@@ -39,7 +40,13 @@ const activeByCompanion = new Map<string, string>();
 const starting = new Set<string>();
 let takeRetryWaitMs = TAKE_RETRY_WAIT_MS;
 
-const stateRows = media.states as Array<{ id: string; motion: string }>;
+const stateRows = media.states as Array<{ id: string; motion: string; motions?: string[] }>;
+/** A person's own words for the animation win; otherwise one of the animation's varied motions, picked at random for each clip so the clips differ. */
+const chosenMotion = (state: string, own: string | null | undefined): string => {
+  if (own) return own;
+  const row = stateRows.find((item) => item.id === state)!, variants = row.motions?.length ? row.motions : [row.motion];
+  return variants[Math.floor(Math.random() * variants.length)]!;
+};
 
 export function takePrompt(card: { text: string }, motion: string, keyName: "green" | "magenta"): string {
   return `${card.text.slice(0, 600)}. ${motion}. Locked camera, no zoom, no pan, the character stays in the centre of the frame and keeps the same size. Plain solid ${keyName} background, no shadows, no ground, no text, no other objects. Smooth natural motion.`;
@@ -82,10 +89,9 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
       if (run.cancelled) break;
       if (motionOverride !== undefined && run.states.length === 1) setMotion(run.companionId, state, motionOverride);
       const stored = readStates(run.companionId).states[state];
-      const motion = stored?.motion ?? stateRows.find((row) => row.id === state)!.motion;
-      const prompt = takePrompt(sheet.card, motion, keyName);
       for (let index = 1; index <= count; index++) {
         if (run.cancelled) break;
+        const prompt = takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
         run.label = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
@@ -94,7 +100,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         let engineFailure = false;
         try {
           let seed = Math.floor(Math.random() * 2_147_483_647);
-          const art = await resolveCompanionClip();
+          const art = await resolveCompanionClip(laneOfPerson(actor) === "adult" ? "detailed" : "quick");
           const seconds = Math.min(media.generate.seconds, maxSecondsFor(art.quality));
           take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt) });
           let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
