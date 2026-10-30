@@ -49,7 +49,7 @@ const chosenMotion = (state: string, own: string | null | undefined): string => 
 };
 
 export function takePrompt(card: { text: string }, motion: string, keyName: "green" | "magenta"): string {
-  return `${card.text.slice(0, 600)}. ${motion}. Locked camera, no zoom, no pan, the character stays in the centre of the frame and keeps the same size. Plain solid ${keyName} background, no shadows, no ground, no text, no other objects. Smooth natural motion.`;
+  return `Static shot, the camera never moves. ${card.text.slice(0, 600)}. The character stays exactly this size and in exactly this place in the frame, whole body always visible from head to feet, the same picture in every frame. Plain solid ${keyName} background with nothing on it; the character floats on it with nothing under it. Action: ${motion}. One single smooth motion from start to end, one prop only.`;
 }
 
 export function activeTakeRun(companionId: string): TakeRun | null {
