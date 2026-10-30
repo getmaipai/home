@@ -16,7 +16,7 @@ before quoting them as a promise.
 | TIER-EVAL-01 Reduced chat | Qwen3-4B passes the measured parts; two parts need the real build | measured, partly open |
 | TIER-EVAL-02 Reduced voice | Chatterbox Nano runs on MLX, half the memory of Turbo, same words and same voice closeness by proxy | measured; ear check is Jesse's |
 | TIER-EVAL-08 listening side | No, from the 2026-10-25 numbers; household audio needs real recordings | decided, see below |
-| TIER-EVAL-03 to 07 | not run yet | see "Not run" |
+| TIER-EVAL-03 to 07 | not run; wait for a quiet window | see "Not run yet" |
 
 ## TIER-EVAL-01: Reduced chat
 
