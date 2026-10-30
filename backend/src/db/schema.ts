@@ -2179,6 +2179,23 @@ export const newsSaves = sqliteTable(
   (table) => [uniqueIndex("news_saves_person_item_idx").on(table.personId, table.itemId)],
 );
 
+// READER-05: an article saved by one person. The row persists if its book is later uninstalled or leaves that person's band list.
+export const referenceSaves = sqliteTable(
+  "reference_saves",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id),
+    book: text("book").notNull(),
+    path: text("path").notNull(),
+    title: text("title").notNull(),
+    savedAt: text("saved_at").notNull(),
+    offline: integer("offline", { mode: "boolean" }).notNull().default(false),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("reference_saves_person_book_path_idx").on(table.personId, table.book, table.path)],
+);
+
 // One person's open of a story (spec NewsRead): pruned at 90 days, feeds only the affinity and the person's own dimmed cards.
 export const newsReads = sqliteTable(
   "news_reads",

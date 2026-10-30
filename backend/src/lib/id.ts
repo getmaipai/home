@@ -222,6 +222,11 @@ export function newNewsSaveId(): string {
   return `save-${randomSuffix(10)}`;
 }
 
+/** Matches spec ReferenceSave's `^refsave-[a-z0-9]{6,}$` id. */
+export function newReferenceSaveId(): string {
+  return `refsave-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/news-search-recent.schema.json's `^recent-[a-z0-9]{6,}$` (NEWS-LOOK-02). */
 export function newNewsSearchRecentId(): string {
   return `recent-${randomSuffix(10)}`;

@@ -63,6 +63,7 @@ import {
   newsSaves,
   newsReads,
   newsSearchRecents,
+  referenceSaves,
   videoAdapterPrefs,
   artifacts,
   conversations,
@@ -220,6 +221,7 @@ export function resetDb(): void {
   db.delete(newsSaves).run();
   db.delete(newsReads).run();
   db.delete(newsSearchRecents).run();
+  db.delete(referenceSaves).run();
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();
   db.delete(conversations).run();

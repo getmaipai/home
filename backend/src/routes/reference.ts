@@ -20,6 +20,8 @@ import { extractArticleImages } from "@/lib/retrieval/articleImages";
 import { sourceForBook } from "@/lib/retrieval/referenceSources";
 import { installed, libraryRequest } from "@/lib/kiwixClient";
 import { searchReference } from "@/lib/referenceSearch";
+import { addReferenceSave, listReferenceSaves, removeReferenceSave } from "@/lib/reference/saves";
+import { ReferenceSave } from "@maipai/spec/gen/ts/reference-save.js";
 
 export const referenceRoutes = apiRouter();
 
@@ -37,6 +39,11 @@ const previewResponse = z.object({ title: z.string(), summary: z.string(), descr
 const PREVIEW_ROUTE = createRoute({ method: "get", path: "/preview/{book}/{path}", tags: ["Sources"], summary: "Preview an offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: previewResponse } }, description: "Article preview." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 const RANDOM_ROUTE = createRoute({ method: "get", path: "/random/{book}", tags: ["Sources"], summary: "Choose a random offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200) }) }, responses: { 200: { content: { "application/json": { schema: z.object({ title: z.string(), book: z.string(), path: z.string() }) } }, description: "Random readable article." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 const MEDIA_ROUTE = createRoute({ method: "get", path: "/media/{book}/{path}", tags: ["Sources"], summary: "Read an allowed offline article image", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 1000) }) }, responses: { 200: { description: "Image bytes." }, 404: { description: "Image not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+const referenceSaveSchema = z.object({ id: z.string(), person_id: z.string(), book: z.string(), path: z.string(), title: z.string(), saved_at: z.string(), offline: z.boolean(), hlc: z.string(), provenance: z.string() });
+const savesResponse = z.object({ saves: z.array(referenceSaveSchema) });
+const SAVES_ROUTE = createRoute({ method: "get", path: "/saves", tags: ["Sources"], summary: "List saved offline articles", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: savesResponse } }, description: "Articles the person saved and may read today." }, ...errorResponses({ 401: "Not signed in" }) } });
+const ADD_SAVE_ROUTE = createRoute({ method: "post", path: "/saves", tags: ["Sources"], summary: "Save an offline article", middleware: [requireAuth] as const, request: { body: { content: { "application/json": { schema: z.object({ book: z.string().min(1).max(200), path: z.string().min(1).max(500) }) } } } }, responses: { 200: { content: { "application/json": { schema: z.unknown() } }, description: "Saved article." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+const DELETE_SAVE_ROUTE = createRoute({ method: "delete", path: "/saves/{id}", tags: ["Sources"], summary: "Remove a saved offline article", middleware: [requireAuth] as const, request: { params: z.object({ id: param("id", 100) }) }, responses: { 200: { content: { "application/json": { schema: z.object({ removed: z.literal(true) }) } }, description: "Saved article removed." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Saved article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 
 const unavailable = (c: any) => { c.header("Content-Type", "text/plain; charset=utf-8"); c.header("X-Content-Type-Options", "nosniff"); return c.body(REFUSAL, 404); };
 function snapshotDate(value: string): string | null { return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null; }
@@ -171,6 +178,28 @@ referenceRoutes.openapi(MEDIA_ROUTE, async (c) => {
     c.header("Content-Type", type); c.header("X-Content-Type-Options", "nosniff"); c.header("Content-Security-Policy", "default-src 'none'; sandbox"); c.header("Cross-Origin-Resource-Policy", "same-origin"); c.header("Cache-Control", "private, max-age=600");
     return c.body(await res.arrayBuffer(), 200);
   } catch { return unavailable(c); }
+});
+
+referenceRoutes.openapi(SAVES_ROUTE, async (c) => {
+  const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
+  if (!base) return c.json({ saves: [] }, 200);
+  try {
+    const names = await installed(base); const allowed = new Set(readableBooks(names, band).books.map((row) => row.book));
+    const saves = listReferenceSaves(person.id).filter((save) => allowed.has(save.book));
+    return c.json({ saves: saves.map((save) => ReferenceSave.parse(save)) }, 200);
+  } catch { return c.json({ saves: [] }, 200); }
+});
+
+referenceRoutes.openapi(ADD_SAVE_ROUTE, async (c) => {
+  const { book, path } = c.req.valid("json"); const result = await loadArticle(c, book, path);
+  if (!result || "redirect" in result) return unavailable(c);
+  const record = addReferenceSave(c.get("person").id, { book, path, title: result.title });
+  return c.json(ReferenceSave.parse(record), 200);
+});
+
+referenceRoutes.openapi(DELETE_SAVE_ROUTE, (c) => {
+  const { id } = c.req.valid("param");
+  return removeReferenceSave(c.get("person").id, id) ? c.json({ removed: true }, 200) : unavailable(c);
 });
 import { applyReference, controlReferenceJob, getReferenceState, planReference, type PresetId, type Selection, installOneReference, removeOneReference, listReferenceCatalog } from "@/lib/referencePresetEngine";
 import { requireRole } from "@/middleware/auth";
