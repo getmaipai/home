@@ -78,4 +78,11 @@ describe("toArticleViewData", () => {
     expect(other.blocks).toHaveLength(1);
     expect(paragraph(other.blocks[0]).inlines[0]!.text).toBe("Starts elsewhere. Different.");
   });
+
+  test("a page with no infobox photo opens with its first figure as the hero, with its caption as the chip", () => {
+    const data = toArticleViewData({ ...base, blocks: [{ type: "paragraph", inlines: ["Intro."] }, { type: "figure", src: "/m/a.jpg", alt: "Aurora", caption: "Earth's light show" }, { type: "paragraph", inlines: ["More."] }] }, opts);
+    expect(data.image).toEqual({ w480: "/m/a.jpg", w1280: "/m/a.jpg", alt: "Aurora", badge: "Earth's light show" });
+    expect(data.blocks.map((block) => block.type)).toEqual(["paragraph", "paragraph"]);
+    expect(data.actionRow).toBe("under-hero");
+  });
 });

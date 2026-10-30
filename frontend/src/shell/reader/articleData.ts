@@ -47,8 +47,19 @@ export interface ArticleDataOptions {
   onAppHome: () => void;
 }
 
+/** A page with no lead picture of its own (no infobox photo) opens with its first figure as the hero, the way the mockup does. */
+function firstFigureHero(blocks: ReferenceBlock[]): { hero: { src: string; alt: string; caption: string }; rest: ReferenceBlock[] } | null {
+  const at = blocks.findIndex((block) => block.type === "figure");
+  const figure = blocks[at];
+  if (!figure || figure.type !== "figure") return null;
+  return { hero: { src: figure.src, alt: figure.alt, caption: figure.caption ?? "" }, rest: [...blocks.slice(0, at), ...blocks.slice(at + 1)] };
+}
+const shortCaption = (caption: string) => caption.length <= 30 ? caption : caption.slice(0, 30).replace(/\s+\S*$/, "").trim();
+
 export function toArticleViewData(article: ReferenceArticleView, options: ArticleDataOptions): ArticleViewData {
   const infoboxPicture = article.infobox?.image;
+  const figureHero = !infoboxPicture && !article.lead_image ? firstFigureHero(article.blocks) : null;
+  const blocksIn = figureHero ? figureHero.rest : article.blocks;
   const kicker = article.kicker;
   return {
     title: article.title,
@@ -58,6 +69,7 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     ...(article.lead ? { lead: article.lead } : {}),
     breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker }] : []), { label: article.title }],
     ...(article.infobox && article.infobox.rows.length ? { infobox: article.infobox } : {}),
+    ...(figureHero ? { image: { w480: figureHero.hero.src, w1280: figureHero.hero.src, alt: figureHero.hero.alt, ...(figureHero.hero.caption ? { badge: shortCaption(figureHero.hero.caption) } : {}) } } : {}),
     ...(!infoboxPicture && article.lead_image ? { image: { w480: article.lead_image.src, w1280: article.lead_image.src, alt: article.lead_image.alt, ...(article.badge ? { badge: article.badge } : {}) } } : {}),
     ...(article.quick_fact ? { quick_fact: article.quick_fact } : {}),
     ...(article.related?.length ? { related: article.related.map((item) => ({ target: { book: item.book, path: item.path }, title: item.title, ...(item.thumbnail ? { thumbnail: item.thumbnail } : {}) })) } : {}),
@@ -65,6 +77,6 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     foldSections: true,
     floatFirstFigure: true,
     actionRow: infoboxPicture ? "top" : "under-hero",
-    blocks: withoutLead(article.blocks.map(asBlock), article.lead),
+    blocks: withoutLead(blocksIn.map(asBlock), article.lead),
   };
 }
