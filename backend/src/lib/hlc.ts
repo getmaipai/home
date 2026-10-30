@@ -61,6 +61,8 @@ export const HLC_BEARING_TABLES = [
   "robot_offers",
   "picture_jobs",
   "video_jobs",
+  "quick_timers",
+  "world_places",
   "music_jobs",
   "media_sources",
   "media_items",
