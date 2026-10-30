@@ -414,3 +414,7 @@ export function crisisSupportFor(crisisResources: string | undefined, band: "adu
   const help = CHILD_HELP_LINES[region];
   return { title: CRISIS_SUPPORT_TITLE, text: `${CHILD_CRISIS_LINE} ${crisisResources}`, actions: help ? [...actions, { ...help }] : actions };
 }
+
+/** WEB-TAB-01: the search palette's Web tab, when the search itself fails (the other reasons reuse the chat's own refusal lines). */
+export const WEB_TAB_NOT_ANSWERING = "Web search is not answering right now. Try again in a moment.";
+export const WEB_TAB_NOT_ALLOWED = "Web search is not available for this profile.";

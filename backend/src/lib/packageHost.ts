@@ -1614,6 +1614,22 @@ function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
  * `floor_dropped` counts the drops for the turn's trace. The check is
  * silent (no parent notice, no log of the text): it is about what we
  * fetched, not about what the person said. */
+/** The household's picked web sources for one band, run and blended: the single place a web search (the websearch tool and
+ * the search palette's Web tab) chooses sources, keeps a guest off ddgs and hands a minor's rows to the floor. WEB-TAB-01. */
+export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; role: string; spoken: boolean; temporary: boolean; searxOpts: SearchOptions; signal?: AbortSignal; deadlineAt?: number; imagesOrVideos?: boolean }): Promise<SearxngSearchResult> {
+  const sources = p.imagesOrVideos ? (["searxng"] as WebSourceId[]) : webSourcesFor(p.band, p.temporary, p.spoken).filter((id) => !(id === "ddgs" && p.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
+  if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
+  if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(p.args, p.searxOpts);
+  const rowsOnly = { ...(p.args as object), read_page: false };
+  const blended = await runWebSources(sources.map((id) => (): Promise<WebRows> => {
+    if (id === "searxng") return searxngSearch(rowsOnly, p.searxOpts);
+    const search = webSourceSearch(id);
+    if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
+    return search({ args: rowsOnly, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
+  }));
+  return attachSearchPages(blended, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
+}
+
 export type MinorBand = "child" | "teen";
 
 export function floorSearchResult(result: SearxngSearchResult, band: MinorBand): SearxngSearchResult {
@@ -2391,17 +2407,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             // tool node from the planned surface class), never from the model-visible args alone. A caller
             // that does not say (a direct API run) counts as spoken, so a minor stays on SearXNG there; the args flag is a second signal.
             const spokenTurn = runtime.spoken !== false || wantsSpoken(args as { spoken?: unknown } | undefined);
-            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary, spokenTurn).filter((id) => !(id === "ddgs" && actor.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
-            if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
-            if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(args, searxOpts);
-            const rowsOnly = { ...(args as object), read_page: false };
-            const blended = await runWebSources(sources.map((id) => (): Promise<WebRows> => {
-              if (id === "searxng") return searxngSearch(rowsOnly, searxOpts);
-              const search = webSourceSearch(id);
-              if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
-              return search({ args: rowsOnly, band, signal: runtime.signal, deadlineAt: runtime.deadlineAt, role: actor.role, spoken: spokenTurn });
-            }));
-            return attachSearchPages(blended, args, band === "adult" ? undefined : band, runtime.signal, temporary);
+            return searchPickedWebSources({ args, band, role: actor.role, spoken: spokenTurn, temporary, searxOpts, signal: runtime.signal, deadlineAt: runtime.deadlineAt, imagesOrVideos: input?.category === "images" || input?.category === "videos" });
           };
           // KS-02: the model's `scope` argument. An image search, or a call with no query, is the
           // old single path: the library has no pictures and nothing to look up.

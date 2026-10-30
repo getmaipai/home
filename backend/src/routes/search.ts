@@ -11,6 +11,7 @@ import { SEARCH_PROVIDERS, rankGroups } from "@/lib/search/providers";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { clearSearchAddress, testOrSaveSearchAddress } from "@/lib/searchAddressSave";
 import { webSourcesPicked } from "@/lib/retrieval/webSources";
+import { webTabSearch } from "@/lib/webTabSearch";
 import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
 import { SearchTestSummarySchema, summarizeSearchStatus } from "@/lib/searchTestSummary";
 import { buildSearchInstanceSnippet, checkSearchInstance, SearchInstanceRefreshCooldownError } from "@/lib/searchInstanceCheck";
@@ -37,6 +38,33 @@ const SearchGroupSchema = z.object({
   kind: z.string(),
   heading: z.string(),
   results: z.array(SearchResultSchema),
+});
+
+// WEB-TAB-01: the palette's Web tab (GET /web is the admin's web-search settings status). A separate route so GET /api/search stays fully local; it runs only when a person presses
+// Enter on the Web tab, never as they type. The query is not stored, logged or cached beyond the request.
+const webSearchRoute = createRoute({
+  method: "get",
+  path: "/web-results",
+  tags: ["Search"],
+  summary: "One explicit web search from the search palette's Web tab",
+  middleware: [requireAuth] as const,
+  request: {
+    query: z.object({
+      q: z.string().min(1).max(200).openapi({ param: { name: "q", in: "query" }, example: "how to brew tea" }),
+    }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ results: z.array(SearchResultSchema), note: z.string().optional().describe("Plain words for why there are no rows (off, no source, not allowed, not answering).") }) } },
+      description: "Web result rows, or an empty list with a reason in note.",
+    },
+    ...errorResponses({ 400: "Missing or too long q", 401: "Not signed in" }),
+  },
+});
+searchRoutes.openapi(webSearchRoute, async (c) => {
+  const answer = await webTabSearch(c.get("person"), c.req.valid("query").q, c.req.raw.signal);
+  c.header("Cache-Control", "no-store");
+  return c.json(answer, 200);
 });
 
 const searchRoute = createRoute({

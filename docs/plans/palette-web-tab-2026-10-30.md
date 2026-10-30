@@ -35,7 +35,7 @@ the household's `search.web_sources` pick, the adult-site host list, and the pri
    Typing in All, Chats, Files, Wikipedia or Home never reaches the web, and the tab never runs per keystroke. Web results are
    never mixed into All or appended when local results are few. This keeps "nothing leaves the house" true for every default
    path and makes each outside query one the person asked for (PRIVACY.md, "Outbound connections are user-serving").
-2. **One definition, reused.** A new `GET /api/search/web?q=` calls `webSourcesFor`, `runWebSources` and `blendWebRows`, then
+2. **One definition, reused.** A new `GET /api/search/web-results?q=` (`GET /api/search/web` is the admin settings status) calls `webSourcesFor`, `runWebSources` and `blendWebRows`, then
    returns `SearchResult` rows (kind `web`). It is not a provider in `SEARCH_PROVIDERS`, so `GET /api/search` stays fully local.
    No second search client, no second source list, no new setting. The per-source closures `runWebSources` takes are built only
    inside `packageHost.ts` (`webSide`: SearXNG options, `minorBand` for `floorSearchResult`, the guest ddgs filter). WEB-TAB-01
