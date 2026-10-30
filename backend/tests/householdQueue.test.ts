@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
+import { reducedChatState, setReducedChat } from "../src/lib/reducedChat";
 import { setProfileSource, type ProfileSource } from "../src/lib/jobs/admissionFit";
 import type { ProfileRow } from "../src/lib/jobs/profileTable";
 
@@ -356,5 +357,24 @@ describe("household queue", () => {
         expect(submitted).toEqual(["max"]);
       } finally { remove(); resetTierStateForTests(); }
     });
+  });
+  test("a Max job that runs with chat Reduced shows the chat line with its minutes, Stop ends it, and the line clears (TIER-HOME-03)", async () => {
+    resetTierStateForTests(); resetFitMemoryForTests();
+    const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } };
+    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    const j = job("max-win", "p-win", "video", now, { tier: "max" });
+    let stopped = 0;
+    const remove = registerQueueProvider(() => [{ job: j, save: () => undefined, applyFit: () => undefined, release: async () => { j.state = "running"; j.remainingSeconds = 600; }, stop: async () => { stopped += 1; j.state = "done" as QueueJob["state"]; } }]);
+    try {
+      await releaseHouseholdQueue();
+      await releaseHouseholdQueue();
+      expect(reducedChatState()).toEqual({ minutesLeft: 10 });
+      expect(await endMaxWindow()).toBe(true);
+      expect(stopped).toBe(1);
+      await releaseHouseholdQueue();
+      expect(reducedChatState()).toBeNull();
+      expect(await endMaxWindow()).toBe(false);
+    } finally { remove(); setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); setReducedChat(null); }
   });
 });

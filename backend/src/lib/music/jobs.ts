@@ -36,6 +36,7 @@ registerQueueProvider(() => {
       position: job.position, estimateSeconds: job.etaSeconds, typicalSeconds: 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveMusicJob(job); },
+      stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelMusicJob(owner as PersonRow, job.id); } : undefined,
       release: job.state === "queued" && !job.stackJob ? () => releaseMusic(job) : undefined,
       save: () => { job.position = queued.position ?? null; persistMusicJob(job); } };
   });

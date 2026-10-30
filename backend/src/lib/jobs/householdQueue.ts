@@ -1,6 +1,7 @@
 /** The shared household order for heavy jobs. This module has no database or notification dependency. */
 import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
-import { fitForAdmission, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
+import { setReducedChat } from "@/lib/reducedChat";
+import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -34,8 +35,21 @@ export interface TierState {
   startedSinceMax: readonly string[];
   lastMaxPersonId: string | null;
 }
-export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
+export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
 type QueueProvider = () => QueueStoreEntry[];
+
+/** The Max job whose plan lowered chat to Reduced (TIER-HOME-03): the chat line under the input shows while it runs. */
+let reducedChatJobId: string | null = null;
+let currentEntries: QueueStoreEntry[] = [];
+
+/** Admin Stop for the open Max window: ends the running Max job through its own store, which frees the room and lets chat return. False when no Max job runs. */
+export async function endMaxWindow(): Promise<boolean> {
+  const entry = currentEntries.find((item) => item.job.state === "running" && item.job.tier === "max");
+  if (!entry?.stop) return false;
+  await entry.stop();
+  void releaseHouseholdQueue();
+  return true;
+}
 
 let queuePolicy: ScorePolicy = DEFAULT_POLICY;
 export function setQueuePolicy(policy: ScorePolicy): void { queuePolicy = policy; }
@@ -300,6 +314,9 @@ export async function releaseHouseholdQueue(): Promise<void> {
       const positions = order(jobs, now, usage);
       const runningMax = jobs.find((job) => job.state === "running" && job.tier === "max");
       tierState.windowOpenFor = runningMax?.id ?? null;
+      currentEntries = entries;
+      if (runningMax && runningMax.id === reducedChatJobId) setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
+      else { reducedChatJobId = null; setReducedChat(null); }
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
       const admitted = new Set(admit(jobs, now, tierState).start);
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
@@ -318,6 +335,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
               const key = JSON.stringify(admission);
               if (lastFit.get(entry.job.id) !== key) { lastFit.set(entry.job.id, key); entry.applyFit?.(admission); }
               if (fit.outcome !== "run") continue;
+              if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced") reducedChatJobId = entry.job.id;
             }
           } catch { /* Fit is advisory: admission proceeds as it did before. */ }
         }

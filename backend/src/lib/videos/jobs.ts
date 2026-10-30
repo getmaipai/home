@@ -146,6 +146,7 @@ registerQueueProvider(() => {
       headOfClass: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveVideoJob(job); },
+      stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelVideoJob(owner as PersonRow, job.id); } : undefined,
       release: job.state === "queued" && !job.stackJob ? () => releaseVideo(job) : undefined,
       save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; persistVideoJob(job); } };
   });
