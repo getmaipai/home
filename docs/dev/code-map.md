@@ -615,6 +615,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/notificationTypes.ts` | NOTIFICATION_TYPES, registerPackageNotificationTypes, getNotificationType |
 | `backend/src/lib/notifications.ts` | trigger, quietHours, deliverHeldNotifications, notifyIfFlagged, listPending, listHistory |
 | `backend/src/lib/offline/media.ts` | matches, playableItem, keepRefusal, missing, mediaManifest, mediaFile |
+| `backend/src/lib/offline/reference.ts` | referenceOfflineProvider |
 | `backend/src/lib/offline/registry.ts` | registerOfflineProvider, offlineProvider |
 | `backend/src/lib/openapi.ts` | apiRouter, emptyJsonBodyAsObject |
 | `backend/src/lib/operatorDiagnose.ts` | newsView, MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView |
@@ -684,6 +685,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
 | `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, receivedBackupFileExists, deleteReceivedBackupsForDevice |
+| `backend/src/lib/reference/article.ts` | loadArticleFor, articlePayloadFor, readArticleImage |
 | `backend/src/lib/reference/saves.ts` | listReferenceSaves, getReferenceSave, addReferenceSave, removeReferenceSave |
 | `backend/src/lib/referenceLibrary.ts` | KIWIX_CATALOG_URL, resolveReferenceFlavour, removeInstalledReferenceFlavour, installReferenceFlavour, listInstalledReferenceFlavours, getReferenceUpdates |
 | `backend/src/lib/referencePresetEngine.ts` | __setReferenceCatalogUrlForTests, planReference, listReferenceCatalog, getReferenceState, applyReference, resumeReferenceJobsOnBoot |
