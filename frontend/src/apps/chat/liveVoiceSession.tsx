@@ -84,10 +84,9 @@ export const DUPLEX_PAUSE_AFTER_MS = 150;
 export const DUPLEX_FALSE_INTERRUPTION_MS = 1200;
 /** VOICE-QUICK-02: a reaction while the person is still talking. It needs a real stretch of speech first (words), a pause that
  * lasted this long, and this long since the last one; it is also left out some of the time so it never sounds mechanical. */
-export const DUPLEX_DUCK_LEVEL = 0.25;
-/** VOICE-QUICK-03: on the first voiced frame the voice drops to this level and keeps going; if the sound is still there this long later it is
- * speech and the voice pauses for good, as before. A cough or a soft "mm-hm" that ends sooner gets the voice back at full volume. */
-export const DUPLEX_DUCK_MS = 600;
+/** Jesse, 2026-10-30: the voice must not fade or stop at the first sound (it fades into silence and any breath or room noise cut her sentences short). It plays on at full volume and
+ * pauses only once the sound is clearly speech: it lasted this long, or a partial transcript has real words in it. */
+export const DUPLEX_CONFIRM_MS = 700;
 export const REACTION_MIN_WORDS = 8;
 export const REACTION_PAUSE_MS = 400;
 export const REACTION_MIN_GAP_MS = 8000;
@@ -158,15 +157,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const yieldVoice = () => {
     const scheduler = turnSchedulerRef.current;
     if (!scheduler) return;
-    scheduler.duck(DUPLEX_DUCK_LEVEL);
     overlapPausedRef.current = true;
     if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
-    duckTimerRef.current = setTimeout(() => { duckTimerRef.current = null; turnSchedulerRef.current?.pause(); }, DUPLEX_DUCK_MS);
+    duckTimerRef.current = setTimeout(() => { duckTimerRef.current = null; turnSchedulerRef.current?.pause(); }, DUPLEX_CONFIRM_MS);
   };
   const restoreVoice = () => {
     if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
     duckTimerRef.current = null;
-    turnSchedulerRef.current?.unduck();
     turnSchedulerRef.current?.resume();
   };
   const cancelReaction = () => {
@@ -307,11 +304,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               });
             break;
           case "reply_pause":
-            // The server heard the first voiced frame while a reply plays (DUPLEX-02a): pause at once; the transcript, or a later
-            // reply_resume, decides what happens next.
-            if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
-              yieldVoice();
-            }
+            // The server heard the first voiced frame while a reply plays. That is too early to stop her: a breath or room noise would cut her
+            // sentence short. The voice session decides from how long the sound lasts and from the words in the partial transcript.
             break;
           case "reply_resume":
             // The sound was not speech: carry on from the same spot.
@@ -331,7 +325,15 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // from background TV or a cough left Home silent). The reply stays paused; the final transcript decides. Real-looking
               // words just stop the pause from timing out into a resume.
               const heard = normalizedTranscript(message.v);
-              if (heard && !isReaction(heard, message.v)) overlapTranscriptRef.current = true;
+              if (heard && !isReaction(heard, message.v)) {
+                overlapTranscriptRef.current = true;
+                // Two real words are speech, not noise: pause now rather than wait out the confirm window.
+                if (heard.split(" ").length >= 2) {
+                  if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
+                  turnSchedulerRef.current?.pause();
+                  overlapPausedRef.current = true;
+                }
+              }
             }
             // Not shown: a partial can revise itself several times a
             // second (interim ASR hypotheses) - the listening ring's

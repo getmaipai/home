@@ -397,7 +397,7 @@ describe("live voice session", () => {
     } finally { random.mockRestore(); react.mockRestore(); cleanup(); }
   });
 
-  test("sound that lasts past the duck window pauses the voice for good; the voice only ducked before that", async () => {
+  test("sound that lasts past the confirm window pauses the voice; before that she plays on at full volume", async () => {
     const pause = mock();
     const socket = controlledSocket();
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />);
@@ -408,7 +408,7 @@ describe("live voice session", () => {
     act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(pause).not.toHaveBeenCalled();
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    await new Promise((resolve) => setTimeout(resolve, 900));
     expect(pause).toHaveBeenCalledTimes(1);
     cleanup();
   });
@@ -471,7 +471,7 @@ describe("live voice session", () => {
   });
 
 
-  test("the server's reply_pause pauses at once and reply_resume carries on without cancelling", async () => {
+  test("the server's reply_pause alone does not stop her, and reply_resume changes nothing", async () => {
     const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const socket = controlledSocket();
     const sent: string[] = [];
@@ -481,11 +481,10 @@ describe("live voice session", () => {
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
     await new Promise((resolve) => setTimeout(resolve, 500));
     act(() => socket.send({ t: "reply_pause" }));
-    expect(pause).not.toHaveBeenCalled(); // VOICE-QUICK-03: the voice ducks first and pauses only if the sound lasts
+    expect(pause).not.toHaveBeenCalled(); // the server's first-frame signal alone no longer stops her
     act(() => socket.send({ t: "reply_resume" }));
-    expect(resume).toHaveBeenCalledTimes(1);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    expect(pause).not.toHaveBeenCalled(); // the resume cancelled the pending pause
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(pause).not.toHaveBeenCalled();
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
