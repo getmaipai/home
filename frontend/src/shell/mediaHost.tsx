@@ -14,7 +14,7 @@ import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
-import { createStoryListener } from "@/shell/newsListen";
+import { createListenStatus, createStoryListener, type ListenStatus } from "@/shell/newsListen";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
 import type Hls from "hls.js";
 
@@ -89,10 +89,10 @@ export function createMediaStore() {
       notify();
     },
     /** Point the held element at the next piece of the same item (Listen reads a story paragraph by paragraph) without a new element. */
-    retarget(el: HTMLMediaElement, patch: { src: string; subtitle?: string }) {
+    retarget(el: HTMLMediaElement, patch: { src?: string; subtitle?: string; title?: string; poster?: string; started?: boolean }) {
       if (!current || current.el !== el) return;
       current = { ...current, ...patch };
-      el.setAttribute("src", patch.src);
+      if (patch.src !== undefined) el.setAttribute("src", patch.src);
       notify();
     },
     clear() {
@@ -104,6 +104,9 @@ export function createMediaStore() {
   };
 }
 
+/** What the shell's Listen is doing right now (which story, starting or speaking, how far). The package app page hands it to the news
+ * reader's own context: the reader and the host cannot share one object by package path in the dev server, so the page is the bridge. */
+export const ListenStatusContext = createContext<ListenStatus>({ storyId: null, phase: null, progress: 0 });
 export const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {}, next: async () => {} });
 
 /** The item the host holds, for the media app's docked mini bar. */
@@ -124,7 +127,9 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   const pushRef = useRef(push);
   pushRef.current = push;
   // NEWS-04: Listen on an article reads it into the host's element, which the global mini player then shows.
-  const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line)), [store]);
+  const [status] = useState(createListenStatus);
+  const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line), status), [store, status]);
+  const speech = useSyncExternalStore(status.subscribe, status.get, status.get);
   const host = useMemo<MediaHost>(
     () => ({
       async onPlay(mediaId, item) {
@@ -233,8 +238,10 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   return (
     <MediaHostContext.Provider value={host}>
       <MediaDockContext.Provider value={dock}>
+       <ListenStatusContext.Provider value={speech}>
         {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
         {children}
+       </ListenStatusContext.Provider>
       </MediaDockContext.Provider>
     </MediaHostContext.Provider>
   );

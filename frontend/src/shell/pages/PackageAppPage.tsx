@@ -1,12 +1,14 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SchemaPage } from "@maipai/ui/src/schema/SchemaPage";
+import { ArticleSpeechContext } from "@maipai/ui/src/primitives/ArticleView";
+import { ListenStatusContext } from "@/shell/mediaHost";
 import { PageNodeSchema } from "@maipai/ui/src/schema/types";
 import { cn } from "@maipai/ui/src/utils";
 import { ApiError, api, type Roster } from "@/lib/api";
@@ -137,6 +139,13 @@ function pagesOf(app: NonNullable<ReturnType<typeof useAppRows>>[number]): strin
  * (`GET /api/plugins/:id/pages/:pageId`), drawn by the kit's SchemaPage inside the package scope: it can read only
  * its own package and navigate only inside its own app. Home holds no per-package code. An unknown, hidden,
  * disabled or uninstalled app or page is the same "not found" page. */
+/** The reader keeps its own speech context (the dev server loads the package-path copy and the kit's own copy as two objects), so the
+ * shell's Listen status is handed over here, beside the page that holds the reader. */
+function ArticleSpeechBridge({ children }: { children: React.ReactNode }) {
+  const speech = useContext(ListenStatusContext);
+  return <ArticleSpeechContext.Provider value={speech}>{children}</ArticleSpeechContext.Provider>;
+}
+
 export function PackageAppPage({ person }: { person: Roster }) {
   const splat = useParams()["*"] ?? "";
   const [packageId = "", pageSegment = ""] = splat.split("/").filter(Boolean);
@@ -254,7 +263,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         loadingLabel="Opening the app"
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
-          {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} />}
+          {packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
           {media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <div className="flex"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
