@@ -324,7 +324,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/answerImages/turn.ts` | SHOW_IMAGES_TOOL_ID, ANSWER_IMAGES_BUDGET_MS, SHOW_IMAGES_MAX_SUBJECTS, showImagesNames, showImagesResultLine, showImagesPendingResultLine |
 | `backend/src/lib/answerImages/wikimedia.ts` | wikimediaFetchJson, kindScore, wikimediaLiveBlocked, resolveWikimediaSubject, isUnder18, isNonPhotoFile |
 | `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldDiagnoseKey |
-| `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps, askHelper |
+| `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps, askHelper, quitHelperApp, reopenHelperApp |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
 | `backend/src/lib/apps.ts` | settingsAreaProblems, sidebarFor, appPackageProblems, appVisibleTo, pageMinRole, pageVisibleTo |
@@ -496,6 +496,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
 | `backend/src/lib/jobs/admissionFit.ts` | setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission, admissionFitProfile, admissionFitAskLine |
+| `backend/src/lib/jobs/closeApps.ts` | realHelper, closeSettingsFrom, closableApps, pickSmallestSet, closeForJob, reopenForJob |
 | `backend/src/lib/jobs/householdQueue.ts` | activeProfileLine, resetActivePlanForTests, openMaxWindow, endMaxWindow, setQueuePolicy, getQueuePolicy |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
 | `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |
