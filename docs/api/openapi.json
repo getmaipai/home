@@ -47662,6 +47662,15 @@
                                 },
                                 "href": {
                                   "type": "string"
+                                },
+                                "match": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "number"
+                                  },
+                                  "minItems": 2,
+                                  "maxItems": 2,
+                                  "description": "[start, end) of the first match in title, for highlighting."
                                 }
                               },
                               "required": [
