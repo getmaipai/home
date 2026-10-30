@@ -20,6 +20,7 @@ const OUTSIDE_CHANNEL_EVENTS = [
 export const EASE_SETTING_KEYS: readonly string[] = [
   "ease.preset", "ease.text_size", "ease.spacing", "ease.targets", "ease.motion", "ease.contrast",
   "ease.simple_mode", "ease.read_aloud", "ease.word_help", "ease.explainers", "ease.reading_level",
+  "alarms.sound", "alarms.volume", "alarms.snooze_minutes",
 ];
 
 /** The person-scope keys a child saw: personality, safe search, voice, the

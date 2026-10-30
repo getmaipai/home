@@ -9,5 +9,8 @@
   "stack.engines.stt.smart_turn",
   "notifications.remind.due.telegram",
   "notifications.alarm.due.telegram",
-  "notifications.timer.done.telegram"
+  "notifications.timer.done.telegram",
+  "alarms.sound",
+  "alarms.volume",
+  "alarms.snooze_minutes"
 ]

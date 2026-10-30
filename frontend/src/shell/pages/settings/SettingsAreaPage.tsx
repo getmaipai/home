@@ -53,9 +53,10 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
   const { areas: packageAreas, ready } = usePackageAreas();
   const central = settingsArea("settings");
   const packageArea = packageAreas.find((candidate) => candidate.id === areaId);
+  const homeArea = settingsArea(areaId);
   const area = !areaId || central?.sections.some((section) => section.id === areaId)
     ? central
-    : packageArea;
+    : homeArea ?? packageArea;
   // A package's area is known only once the app list has answered: wait for it, never bounce to Account first.
   if (!area && !ready) return <Progress mode="spinner" label="Loading settings" />;
   if (!area) return <Navigate to={settingsPath("profile")} replace />;
@@ -82,7 +83,7 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
       </Empty>
     </>
   );
-  return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} packageArea={area.id !== "settings"} />;
+  return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} packageArea={area.id !== "settings" && area.id !== "clock"} />;
 }
 
 const BackIcon = getIcon("arrow-left");
@@ -117,7 +118,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   const routeParams = useParams();
   const sectionId = packageArea ? routeParams.detailId : routeParams.section;
   const detailId = packageArea ? undefined : routeParams.detailId;
-  const pagePath = (id?: string, pageTab?: string) => packageArea
+  const pagePath = (id?: string, pageTab?: string) => packageArea && area.id !== "clock"
     ? `/settings/${area.id}${id ? `/${id}` : ""}`
     : settingsPath(id, pageTab);
   const navigate = useNavigate();
@@ -284,7 +285,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       layout="docked"
       backLink={<SettingsBackLink title="Settings" reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
       labels={{ columnTitle: "Settings" }}
-      trail={[{ label: area.title, href: packageArea ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
+      trail={[{ label: area.title, href: packageArea && area.id !== "clock" ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
       contentAs="section"
       area={area}
       viewer={viewer}
@@ -294,7 +295,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       tabs={tabs}
       tab={tab}
       onTabChange={(id) => { if (confirmRouteLeave()) setParams((current) => { const next = new URLSearchParams(current); if (id === tabs[0]?.id) next.delete("tab"); else next.set("tab", id); return next; }); }}
-      sectionHref={(id) => packageArea ? `/settings/${area.id}/${id}` : settingsPath(id)}
+      sectionHref={(id) => packageArea && area.id !== "clock" ? `/settings/${area.id}/${id}` : settingsPath(id)}
       onNavigate={(to) => { if (confirmRouteLeave()) navigate(to.kind === "link" ? to.href : pagePath(to.sectionId)); }}
       searchQuery={query}
       onSearchChange={(next) => setParams((current) => { const updated = new URLSearchParams(current); if (next) updated.set("q", next); else updated.delete("q"); return updated; }, { replace: true })}

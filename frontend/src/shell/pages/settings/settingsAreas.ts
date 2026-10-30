@@ -1,7 +1,13 @@
 import areasFile from "@maipai/spec/settings/areas.json";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 
-export const SETTINGS_AREAS = (areasFile.areas as unknown as SettingsAreaDef[]).map((area) => ({
+const clockArea: SettingsAreaDef = {
+  id: "clock", title: "Clock", audience: { min_role: "child" },
+  groups: [{ label: "Clock", sections: ["clock"] }],
+  sections: [{ id: "clock", label: "Clock", icon: "clock", kind: "keys", scope: "person", cards: [{ scope: "person", group: "person.clock", label: "Alarms" }] }],
+};
+
+export const SETTINGS_AREAS = [...(areasFile.areas as unknown as SettingsAreaDef[]), clockArea].map((area) => ({
   ...area,
   sections: area.sections.map((section) => ({
     ...section,

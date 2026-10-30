@@ -29,6 +29,11 @@ export function getSettingsAreas(): AreasFile {
     for (const area of cached.areas) for (const section of area.sections) {
       if (section.cards) section.cards = section.cards.filter((card) => card.group !== "household.news");
     }
+    // ALARM-06: Clock is Home-owned until the settings area is carried by a shared spec tag.
+    if (!cached.areas.some((area) => area.id === "clock")) cached.areas.push({
+      id: "clock", title: "Clock", audience: { min_role: "child" }, groups: [{ label: "Clock", sections: ["clock"] }],
+      sections: [{ id: "clock", label: "Clock", kind: "keys", cards: [{ scope: "person", group: "person.clock", label: "Alarms" }] }],
+    } as AreasFile["areas"][number]);
   }
   return cached;
 }

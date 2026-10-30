@@ -19,6 +19,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { WebSearchSettings } from "@/shell/pages/settings/WebSearchSettings";
 import { usePlaceAdapter } from "@/shell/pages/settings/placeAdapter";
 import { useIncognitoContext } from "@/shell/incognitoContext";
+import { ClockCardRenderer } from "@/shell/pages/settings/ClockCardRenderer";
 import type { PlaceAdapter } from "@maipai/ui/src/settings/LocationField";
 
 /** SEARXNG-SET-05: the keys the Web search block above the Search cards draws itself, so the cards never repeat them. */
@@ -101,7 +102,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     matrix: card.matrix,
     includeExpert: props.section.id === "advanced" && props.tab === "network",
   };
-  const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
+  const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : props.section.id === "clock" ? <ClockCardRenderer {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
   if (props.section.id === "advanced" && props.tab === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
