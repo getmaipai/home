@@ -145,7 +145,7 @@ rows (full name, born, occupation and the like).
 
 | In screen 01 | Built as |
 |---|---|
-| Breadcrumb | New `ArticleViewData.breadcrumb` (items with an optional book link). Home, then the kicker when present, then the title. No invented middle step: with no kicker it is Home, then the title. |
+| Breadcrumb | New `ArticleViewData.breadcrumb` (items with an optional book link). The first item is the app's own home (the Wikipedia app's Home, or Reference's library), never the global Home, which lives only in the main rail (S2). Then the kicker when present, then the title. No invented middle step: with no kicker it is the app's home, then the title. |
 | Category chip | The kicker drawn as a chip (kit). |
 | Save, Listen, Share, More at top right | `actionRow: "top"` (the row sits on the chip line instead of under the hero); `"under-hero"` stays for pages with a hero. |
 | One-line description | `description`. The hub fills it from the book's own short description element when the article has one (Wikipedia carries it), else omits it. |
@@ -158,13 +158,13 @@ snippet and a chevron; a "Related searches" strip of chips at the foot; ⌘K foc
 
 | In screen 02 | Built as |
 |---|---|
-| About N results | The sidecar's `totalResults` summed over the books searched, returned in a new `X-Total-Results` response header on `GET /search` (the body stays the same array). |
+| About N results | The sidecar's `totalResults` summed over the books searched, returned in a new `X-Total-Results` response header on `GET /search` (the body stays the same array). For a child or teen the number is the count of hits actually returned after the minor floor, never the sidecar's count, so it does not reveal what the floor dropped. |
 | Filter chips | Only what the books can honestly tell: **All** and one chip per readable book (Wikipedia, Simple English, and so on). People, Films and the other type chips need a type the books do not carry and are not drawn. An Images chip waits for a later slice. |
 | Result card | Kit `Chip`, `List` and a thumbnail as shipped; the card's picture, description and category chips come from the `preview` route (READER-02, now also returning `description`, `kicker`, `lead`), asked for as a card scrolls into view and cached for 10 minutes. A card with no preview yet shows its title and snippet. The age band, minor floor and images rule are the preview route's own. |
-| Related searches | The sidecar's `/suggest` titles for the same query, other than the top result, drawn as chips; a tap runs that search. They are the book's own titles, not tracked or invented searches. Rule 6a: no query text is logged. |
+| Related searches | The sidecar's `/suggest` titles for the same query, other than the top result, drawn as chips. For a child or teen every suggested title first passes `tripsMinorFloor` in the `suggest` route itself (READER-10), which also covers the type-ahead box, so a minor sees only titles the floor allows; a tap runs that search. They are the book's own titles, not tracked or invented searches. Rule 6a: no query text is logged. |
 | ⌘K | Focuses the search box (app header, S2). |
 | Sidebar tagline and moon toggle | Not built: the theme control is the global one in Settings, and pitch copy comes only from `brand/COPY.md`. |
 
 New slices: **READER-09** (kit: `breadcrumb`, kicker as a chip, `actionRow: "top"`, first figure floats, infobox `image`; one more
 kit tag), **READER-10** (backend: `description` from the short description element, `infobox.image`, preview `description`,
-`kicker` and `lead`, `X-Total-Results`), **READER-11** (frontend: the search results page). READER-03 and 04 draw both screens.
+`kicker` and `lead`, `X-Total-Results` as the returned-hit count for a minor, and `tripsMinorFloor` on every `suggest` title for a child or teen), **READER-11** (frontend: the search results page). READER-03 and 04 draw both screens.
