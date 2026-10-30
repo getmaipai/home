@@ -751,7 +751,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, resolveForResponse, listValues, SESSION_LOCK_REQUIRED_KEY |
 | `backend/src/lib/settingsAreas.ts` | getSettingsAreas, settingsViewerFor, placeSetting, settingHref |
 | `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
-| `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
+| `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
 | `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, getRegistryKey, __reloadRegistryForTests |
 | `backend/src/lib/setupChecklist.ts` | SETUP_CHECKLIST_ITEMS, checklistFromFacts, getSetupChecklist |
 | `backend/src/lib/setupSearchAddress.ts` | SEARCH_ADDRESS_NOT_LOCAL, SEARCH_ADDRESS_NOT_AN_ADDRESS, parseSearchAddress |

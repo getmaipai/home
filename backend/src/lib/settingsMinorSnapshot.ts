@@ -20,8 +20,11 @@ const OUTSIDE_CHANNEL_EVENTS = [
 export const EASE_SETTING_KEYS: readonly string[] = [
   "ease.preset", "ease.text_size", "ease.spacing", "ease.targets", "ease.motion", "ease.contrast",
   "ease.simple_mode", "ease.read_aloud", "ease.word_help", "ease.explainers", "ease.reading_level",
-  "alarms.sound", "alarms.volume", "alarms.snooze_minutes",
 ];
+
+/** ALARM-06: a person's own alarm sound, volume and snooze. Comfort keys, shown to a child and a teen, but not
+ * `self_service` ease keys (that flag is the ease:* keys' own, EASE-OF-USE-01c). */
+export const ALARM_SETTING_KEYS: readonly string[] = ["alarms.sound", "alarms.volume", "alarms.snooze_minutes"];
 
 /** The person-scope keys a child saw: personality, safe search, voice, the
  * alert switch and muted senders, quiet hours, Telegram, appearance, the
@@ -41,6 +44,7 @@ export const CHILD_VISIBLE_SETTING_KEYS: readonly string[] = [
   "ui.show_turn_stats",
   "ui.enrollment_sounds",
   ...EASE_SETTING_KEYS,
+  ...ALARM_SETTING_KEYS,
 ];
 
 /** A teen saw everything a child did, plus the chat photo switch (a child's
