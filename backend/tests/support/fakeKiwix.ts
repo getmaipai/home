@@ -17,6 +17,8 @@ export interface FakeBook {
   articleCount?: number;
   /** Optional title snippets returned by Kiwix's full-text index. */
   searchSnippet?: string;
+  /** Optional OpenSearch totalResults value, independent of the returned hits. */
+  totalResults?: number;
   /** Articles by path, e.g. "Juniper_Falls". */
   articles: Record<string, FakeArticle>;
   /** Book-local image files by path, e.g. "I/cat.jpg". */
@@ -69,7 +71,8 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
           .filter(([, a]) => a.html.toLowerCase().includes(pattern))
           .map(([path, a]) => `<item><title>${esc(a.title)}</title><link>/content/${book.id}/${path}</link><description>${esc(book.searchSnippet ?? a.html.replace(/<[^>]+>/g, " ").slice(0, 240))}</description></item>`)
           .join("");
-        return new Response(`<?xml version="1.0"?><rss><channel>${items}</channel></rss>`, { headers: { "content-type": "application/xml" } });
+        const total = book.totalResults ?? Object.keys(book.articles).length;
+        return new Response(`<?xml version="1.0"?><rss><channel><opensearch:totalResults>${total}</opensearch:totalResults>${items}</channel></rss>`, { headers: { "content-type": "application/xml" } });
       }
       if (url.pathname === "/random") {
         const book = books.find((b) => b.id === url.searchParams.get("content"));

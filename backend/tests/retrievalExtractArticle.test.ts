@@ -87,3 +87,11 @@ test("full article captures the first visible category before dropping the categ
   const result = extractFullArticle(`<div class="mw-parser-output"><h1>Example</h1><p>First sentence. Another sentence follows.</p></div><div id="catlinks"><a>Hidden category</a><a>Nature and Earth</a></div>`, { book: "wiki", allowedBooks: new Set(), allowLinks: false, allowImages: false });
   expect(result.kicker).toBe("Nature and Earth");
 });
+
+test("full article captures a hidden short description before hidden nodes are removed", () => {
+  const options = { book: "wiki", allowedBooks: new Set<string>(), allowLinks: false, allowImages: false };
+  const withDescription = extractFullArticle(`<div class="shortdescription" style="display:none">  A concise   book description. </div><div class="mw-parser-output"><h1>Example</h1><p>Lead sentence.</p></div>`, options);
+  const withoutDescription = extractFullArticle(`<div class="mw-parser-output"><h1>Example</h1><p>Lead sentence.</p></div>`, options);
+  expect(withDescription.description).toBe("A concise book description.");
+  expect(withoutDescription.description).toBeUndefined();
+});

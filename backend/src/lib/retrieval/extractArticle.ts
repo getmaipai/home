@@ -27,7 +27,7 @@ export type ArticleBlock =
   | { type: "figure"; src: string; alt: string; caption: string }
   | { type: "note"; text: string }
   | { type: "quote"; inlines: ArticleInline[]; cite?: string };
-export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; infobox?: { title?: string; rows: Array<{ label: string; value: string }> }; summary?: string; hatnote?: string; kicker?: string; redirectTo?: string }
+export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; infobox?: { title?: string; rows: Array<{ label: string; value: string }> }; summary?: string; description?: string; hatnote?: string; kicker?: string; redirectTo?: string }
 
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
 
@@ -92,6 +92,8 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   const category = (Array.from(document.querySelectorAll("#catlinks a, .catlinks a")) as Element[]).map(plain).find((text) => text && !/\bhidden\b/i.test(text));
   const kicker = category ? cutAtBoundary(category, 40) : undefined;
   const redirectTo = document.querySelector(".redirectMsg a, .redirectText a, #redirectedfrom a")?.getAttribute("href") ?? null;
+  const shortDescription = document.querySelector(".shortdescription");
+  const description = shortDescription ? cutAtBoundary(plain(shortDescription), 160) : undefined;
   const metadata = news ? cleanArticleDocument(document) : {};
   document.querySelectorAll(FULL_ARTICLE_DROP).forEach((n: Node) => n.remove());
   if (news) document.querySelectorAll(NEWS_DROP).forEach((n: Node) => n.remove());
@@ -203,7 +205,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
     for (const child of children) { if (child.tagName === "DT") label = plain(child); else if (child.tagName === "DD" && label) { rows.push({ label, value: plain(child) }); label = ""; } }
     if (rows.length) blocks.push({ type: "rows", rows });
   }
-  return { title, blocks, toc, ...metadata, ...(infobox ? { infobox } : {}), ...(summary ? { summary } : {}), ...(hatnote ? { hatnote } : {}), ...(kicker ? { kicker } : {}), ...(redirectTo ? { redirectTo } : {}) };
+  return { title, blocks, toc, ...metadata, ...(infobox ? { infobox } : {}), ...(summary ? { summary } : {}), ...(description ? { description } : {}), ...(hatnote ? { hatnote } : {}), ...(kicker ? { kicker } : {}), ...(redirectTo ? { redirectTo } : {}) };
 }
 
 /** Section headings that are never kept (their text is not read either). */

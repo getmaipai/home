@@ -43332,6 +43332,16 @@
         "responses": {
           "200": {
             "description": "Search hits.",
+            "headers": {
+              "X-Total-Results": {
+                "schema": {
+                  "type": "string",
+                  "description": "Total sidecar matches for adults; returned hit count for children and teens."
+                },
+                "required": true,
+                "description": "Total sidecar matches for adults; returned hit count for children and teens."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -43485,11 +43495,29 @@
                               "value"
                             ]
                           }
+                        },
+                        "image": {
+                          "type": "object",
+                          "properties": {
+                            "src": {
+                              "type": "string"
+                            },
+                            "alt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "src",
+                            "alt"
+                          ]
                         }
                       },
                       "required": [
                         "rows"
                       ]
+                    },
+                    "description": {
+                      "type": "string"
                     },
                     "summary": {
                       "type": "string"
@@ -43649,6 +43677,15 @@
                       "type": "string"
                     },
                     "summary": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "kicker": {
+                      "type": "string"
+                    },
+                    "lead": {
                       "type": "string"
                     },
                     "thumbnail": {
