@@ -38,7 +38,7 @@ function open(path: string, engines: { image: unknown; video: unknown }, version
 }
 const button = (view: ReturnType<typeof open>, name: string) => view.getByRole("button", { name }) as HTMLButtonElement;
 
-test("screen 1: Generate Character and the photo upload are greyed out with the one line while pictures are paused", async () => {
+test("screen 1: Generate Character is greyed out with the one line while pictures are paused, and the photo picker stays usable", async () => {
   const view = open("/companions/create", { image: paused("picture"), video: READY });
   const name = await view.findByLabelText("Character name"); fireEvent.change(name, { target: { value: "Marlow" } }); fireEvent.blur(name);
   fireEvent.change(await view.findByLabelText("Describe the character"), { target: { value: "A friendly fox" } });
@@ -49,7 +49,8 @@ test("screen 1: Generate Character and the photo upload are greyed out with the 
   expect(generate.getAttribute("aria-describedby")).toBe(reason.id);
   expect(button(view, "Approve & Continue").disabled).toBe(true);
   fireEvent.click(view.getByRole("radio", { name: "Upload Photo" }));
-  await waitFor(() => expect((view.getByLabelText("Photo") as HTMLInputElement).disabled).toBe(true));
+  // Choosing a file is local, so the picker never greys out; the upload waits until pictures are back.
+  await waitFor(() => expect((view.getByLabelText("Photo") as HTMLInputElement).disabled).toBe(false));
 });
 
 test("screen 1: the same controls work again once pictures are ready", async () => {

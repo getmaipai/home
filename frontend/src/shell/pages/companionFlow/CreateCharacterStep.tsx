@@ -137,9 +137,11 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const uploadedFor = useRef<File | null>(null);
   /** A chosen photo goes up at once (once the name is typed) and shows on the right as it is; a style other than Keep as is is applied by Generate. */
   function maybeUpload(chosen: File | null) {
-    if (!chosen || !name.trim() || uploadedFor.current === chosen) return;
+    if (!chosen || !name.trim() || uploadedFor.current === chosen || making.disabled) return;
     uploadedFor.current = chosen; void uploadPhoto(chosen);
   }
+  // Picking a photo never waits on the engine; a photo chosen while pictures are paused goes up when they are back.
+  useEffect(() => { if (!making.disabled) maybeUpload(file); }, [making.disabled]); // eslint-disable-line react-hooks/exhaustive-deps
   async function uploadPhoto(chosen: File) {
     setError(""); setPreviewError(""); setBusyKind("upload");
     try {
@@ -224,7 +226,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           </ToggleGroup>
           {mode === "describe"
             ? <Textarea aria-label="Describe the character" shape="rounded" maxRows={12} placeholder="Describe the character you want to create..." value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
-            : <Input ref={fileInput} aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked || making.disabled} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
+            : <Input ref={fileInput} aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
           {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt="Your upload" draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
         </DialogSection>
       </div>
