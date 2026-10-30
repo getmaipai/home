@@ -40,6 +40,7 @@ import { UsersIcon } from "@/shell/pages/UsersPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
 import { RemindersIcon } from "@/apps/reminders/RemindersPage";
 import { StatusIcon } from "@/shell/pages/StatusPage";
+import { ClockHeaderTitle } from "@/apps/clock/ClockHeaderTitle";
 
 interface PageHeaderEntry {
   icon: Icon;
@@ -111,6 +112,7 @@ export function PageHeaderTitle() {
   const entry = headerEntryFor(pathname, useAppCatalog());
   // A package app has no other page heading, so its title is the page's h1; shell pages carry their own (sr-only) one.
   const isApp = pathname.startsWith("/apps/");
+  if (pathname === "/clock") return <ClockHeaderTitle />;
   return entry ? <HeaderTitle entry={entry} hideInTopRow={isApp} heading={isApp} /> : null;
 }
 

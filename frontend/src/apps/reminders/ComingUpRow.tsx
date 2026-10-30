@@ -19,7 +19,7 @@ export function TimerCountdown({ at }: { at: string }) {
   return <span aria-label="Time remaining">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")} remaining</span>;
 }
 
-export function ComingUpRow({ item, onChanged }: { item: ComingUpItem; onChanged: () => void }) {
+export function ComingUpRow({ item, onChanged, presentation = "default" }: { item: ComingUpItem; onChanged: () => void; presentation?: "default" | "alarm" }) {
   async function done() {
     await api.doneComingUp(item.id);
     onChanged();
@@ -28,14 +28,35 @@ export function ComingUpRow({ item, onChanged }: { item: ComingUpItem; onChanged
     await api.snoozeComingUp(item.id, input);
     onChanged();
   }
-  return <li className="flex flex-col gap-2 border-b py-3 sm:min-h-14 sm:flex-row sm:items-center sm:gap-3 sm:py-2">
-    <div className="flex items-center gap-3 sm:contents">
-      <time dateTime={item.at} className="shrink-0 text-sm text-muted-foreground sm:w-36">{describeTime(new Date(item.at))}</time>
-      <Badge variant="secondary" className="sm:order-3">{item.kind === "alarm" ? "Alarm" : item.kind === "timer" ? "Timer" : "Reminder"}</Badge>
-    </div>
+  if (presentation === "alarm") {
+    const date = new Date(item.at);
+    const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(date);
+    const hourMinute = time.filter((part) => part.type === "hour" || part.type === "minute" || part.type === "literal").map((part) => part.value).join("").trim();
+    const dayPeriod = time.find((part) => part.type === "dayPeriod")?.value ?? "";
+    const weekday = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
+    return <li aria-label={`${hourMinute} ${dayPeriod}, once, ${item.text}`} className="flex flex-col gap-3 border-b py-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0" aria-label={`${hourMinute} ${dayPeriod}, once, ${item.text}`} role="group">
+        <div className="flex items-baseline gap-2 tabular-nums"><time dateTime={item.at} className="text-4xl font-light tracking-tight">{hourMinute}</time><span className="text-sm text-muted-foreground">{dayPeriod}</span></div>
+        <p className="m-0 text-sm text-muted-foreground">Once · {weekday}</p>
+        <p className="m-0 truncate text-base">{item.text}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {item.text ? <Badge variant="secondary">{item.text}</Badge> : null}
+        <Button variant="secondary" onClick={() => void done()}>Done</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="outline">Snooze</Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {SNOOZE_OPTIONS.map((option) => <DropdownMenuItem key={option.label} onSelect={() => void snooze(option.input)}>{option.label}</DropdownMenuItem>)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </li>;
+  }
+  return <li className="flex flex-col gap-3 border-b py-5 sm:flex-row sm:items-center sm:gap-4">
+    <time dateTime={item.at} className="shrink-0 text-2xl font-light tabular-nums tracking-tight">{describeTime(new Date(item.at))}</time>
     <span className="min-w-0 break-words sm:flex-1 sm:truncate">{item.text}</span>
-    <div className="flex flex-wrap items-center gap-2 sm:order-4">
-      {item.kind === "timer" ? <TimerCountdown at={item.at} /> : null}
+    <div className="flex flex-wrap items-center gap-2">
+      {item.kind === "timer" ? <span className="text-sm tabular-nums text-muted-foreground"><TimerCountdown at={item.at} /></span> : null}
       <Button variant="secondary" onClick={() => void done()}>Done</Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="outline">Snooze</Button></DropdownMenuTrigger>

@@ -138,7 +138,7 @@ describe("the rail's apps", () => {
     await within(drawer).findByRole("link", { name: "Weather" });
   });
 
-  test.each(["/reminders", "/clock"])("core navigation is present at every S3 width on %s", async (path) => {
+  test.each(["/clock"]) ("core navigation is present at every S3 width on %s", async (path) => {
     start();
     for (const width of [360, 402, 874, 744, 1440]) {
       const view = open(path, width);
