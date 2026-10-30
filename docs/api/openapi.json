@@ -275,6 +275,7 @@
                                 "mode_change",
                                 "offline",
                                 "tier_reduced",
+                                "gpu",
                                 null
                               ]
                             }
@@ -373,6 +374,7 @@
                                 "mode_change",
                                 "offline",
                                 "tier_reduced",
+                                "gpu",
                                 null
                               ]
                             }
@@ -471,6 +473,7 @@
                                 "mode_change",
                                 "offline",
                                 "tier_reduced",
+                                "gpu",
                                 null
                               ]
                             }
@@ -569,6 +572,7 @@
                                 "mode_change",
                                 "offline",
                                 "tier_reduced",
+                                "gpu",
                                 null
                               ]
                             }
@@ -667,6 +671,7 @@
                                 "mode_change",
                                 "offline",
                                 "tier_reduced",
+                                "gpu",
                                 null
                               ]
                             }
@@ -765,6 +770,7 @@
                                 "mode_change",
                                 "offline",
                                 "tier_reduced",
+                                "gpu",
                                 null
                               ]
                             }
