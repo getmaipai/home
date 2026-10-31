@@ -120,6 +120,17 @@ describe("PrivacyPage", () => {
     } finally { restore(); }
   });
 
+  test("explains what keeps traces after someone is removed", async () => {
+    const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
+    try {
+      const view = renderWithQueryClient(<PrivacyPage />);
+      const heading = await view.findByText("When someone is removed");
+      const card = heading.closest("[data-slot='card']");
+      expect(card?.textContent).toContain("Older backups");
+      expect(card?.textContent).toContain("logs still mention them");
+    } finally { restore(); }
+  });
+
   test("retry refetches privacy and the loading state uses the shared loading branch", async () => {
     const original = globalThis.fetch;
     let privacyCalls = 0;

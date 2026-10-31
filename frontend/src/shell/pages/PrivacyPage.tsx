@@ -102,6 +102,19 @@ export function PrivacyPage() {
                 </ul>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader><CardTitle>When someone is removed</CardTitle></CardHeader>
+              <CardContent>
+                <p className="mb-3 text-sm">Their memories, conversations, settings and private files are deleted right away.</p>
+                <ul className="flex list-none flex-col gap-2 p-0 text-sm">
+                  <li>Older backups can keep their data for up to three months. Restoring a whole older backup brings them back.</li>
+                  <li>The hub&apos;s logs still mention them, without anything they said, for 7 days.</li>
+                  <li>Label exports are made only when an operator runs the export tool. Names are replaced, and exports stay until someone deletes them.</li>
+                  <li>App folders keep whatever an installed app saved until that app is removed.</li>
+                </ul>
+              </CardContent>
+            </Card>
           </>
           );
         }}

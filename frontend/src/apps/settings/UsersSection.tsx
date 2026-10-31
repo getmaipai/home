@@ -251,6 +251,9 @@ export function UsersSection({ person }: UsersSectionProps) {
                 they recorded will be deleted. So will any files only they could see; files they shared stay with
                 the household. To save someone&apos;s files first, remove them one at a time. This cannot be undone.
               </p>
+              <p className="text-base text-[var(--muted-foreground)]">
+                Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub&apos;s logs still mention them, without anything they said, for 7 days.
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
                   {busy ? "Removing…" : `Yes, remove ${selectMode.count}`}
@@ -321,6 +324,9 @@ export function UsersSection({ person }: UsersSectionProps) {
                     <p className="text-base text-[var(--muted-foreground)]">
                       Everything MaiPai remembers about {p.display_name}, every conversation they had, their
                       settings and any voice they recorded will be deleted. This cannot be undone.
+                    </p>
+                    <p className="text-base text-[var(--muted-foreground)]">
+                      Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub&apos;s logs still mention them, without anything they said, for 7 days.
                     </p>
                     <DeletionFilesNote name={p.display_name} preview={previewQuery.data} failed={previewQuery.isError} />
                   </div>
