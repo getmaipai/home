@@ -9,6 +9,7 @@
 // run, its draft, which names the splash engine), and setup/checks/setupDownloads.ts installs each named engine before
 // the pulls. `missingCodingPiece()` is the one fact the key store reads to hold coding keys suspended.
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
+import { chatLeaseHeld } from "@/lib/chatLease";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
@@ -216,7 +217,7 @@ export function missingFrom(pieces: readonly CodingPiece[]): string | null {
   const engine = pieces.find((piece) => piece.id === "engine");
   const model = pieces.find((piece) => piece.id === "model");
   // In coding mode the large model is the only coding model; the small one need not be there.
-  if (getHouseholdSettingValue("coding.home_mode") === "coding" && pieces.find((piece) => piece.id === "heavy_model")?.state === "installed" && engine?.state === "installed") return null;
+  if (chatLeaseHeld() && pieces.find((piece) => piece.id === "heavy_model")?.state === "installed" && engine?.state === "installed") return null;
   if (model && model.state !== "installed" && model.state !== "installing") return "The coding model is not installed. An admin can install it in Settings, Coding.";
   if (model && model.state === "installing") return "The coding model is still downloading.";
   if (engine && engine.name === LLAMA && engine.state !== "installed") return "The coding engine is not installed. An admin can finish the AI setup in Settings.";

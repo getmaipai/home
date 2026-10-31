@@ -1,19 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { createChatLease, DEFAULT_LEASE } from "../src/lib/chatLease";
-import { admit, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { setChatTurnObserver, trackChatLease, admit, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 
 const owner = { id: "owner", role: "owner" } as const;
 const child = { id: "kid", role: "child" } as const;
 const teen = { id: "teen", role: "teen" } as const;
 
-function rig(over: { ready?: boolean; failBig?: boolean } = {}) {
+function rig(over: { ready?: boolean; failBig?: boolean; window?: boolean; failReturns?: number } = {}) {
+  let returnFailures = over.failReturns ?? 0;
   let clock = 1_000_000;
   const calls: string[] = [];
   const lease = createChatLease({
     now: () => clock,
     ready: async () => over.ready ?? true,
+    windowOpen: () => over.window === true,
     swapToBig: async () => { calls.push("big"); if (over.failBig) throw new Error("post-load check failed"); },
-    swapToStandard: async () => { calls.push("standard"); },
+    swapToStandard: async () => { calls.push("standard"); if (returnFailures > 0) { returnFailures -= 1; throw new Error("stack unreachable"); } },
   });
   return { lease, calls, advance: (ms: number) => { clock += ms; } };
 }
@@ -48,6 +50,38 @@ describe("Max chat lease", () => {
     expect(await lease.acquire(owner)).toEqual({ ok: false, refusal: "swap_failed" });
     expect(lease.snapshot().state).toBe("off");
     expect(lease.holdsGenerators()).toBe(false);
+  });
+
+  test("a failed swap back is retried on the next ticks and blocks a new lease meanwhile", async () => {
+    const { lease, calls, advance } = rig({ failReturns: 1 });
+    await lease.acquire(owner);
+    advance(DEFAULT_LEASE.idleMs);
+    expect(await lease.tick()).toBe(true);
+    expect(lease.holdsGenerators()).toBe(false);
+    expect(await lease.acquire(owner)).toEqual({ ok: false, refusal: "stack_busy" });
+    await lease.tick();
+    expect(calls).toEqual(["big", "standard", "standard"]);
+    expect(await lease.acquire(owner)).toEqual({ ok: true, state: "held" });
+  });
+
+  test("a Max window that is open blocks the lease until it ends", async () => {
+    const { lease, calls } = rig({ window: true });
+    expect(await lease.acquire(owner)).toEqual({ ok: false, refusal: "max_window" });
+    expect(calls).toEqual([]);
+  });
+
+  test("a chat turn between observer start and release keeps the lease through the idle timer", async () => {
+    const { lease, advance } = rig();
+    await lease.acquire(owner);
+    setChatTurnObserver({ started: () => lease.requestStarted(), ended: () => lease.requestEnded() });
+    try {
+      const turn = trackChatLease("owner", { release: () => undefined });
+      advance(DEFAULT_LEASE.idleMs * 2);
+      expect(await lease.tick()).toBe(false);
+      expect(lease.snapshot().inFlight).toBe(1);
+      turn.release();
+      expect(lease.snapshot().inFlight).toBe(0);
+    } finally { setChatTurnObserver(null); }
   });
 
   test("a second person is told the Stack is busy while the lease is held", async () => {

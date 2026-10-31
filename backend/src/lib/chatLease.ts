@@ -7,7 +7,7 @@ import { holdsMax } from "@/lib/tiers";
 import type { PersonRow } from "@/types";
 
 export type LeaseState = "off" | "starting" | "held" | "releasing";
-export type LeaseRefusal = "not_a_holder" | "not_ready" | "swap_failed" | "stack_busy";
+export type LeaseRefusal = "not_a_holder" | "not_ready" | "swap_failed" | "stack_busy" | "max_window";
 
 export interface LeaseConfig { idleMs: number; pinCapMs: number }
 /** Section 7 T7: 30 minutes idle, and a pinned lease still ends after 4 hours of quiet from the pinned person. */
@@ -21,6 +21,8 @@ export interface LeaseDeps {
   swapToStandard: () => Promise<void>;
   /** The readiness record gate (coding mode's eight items): false means Max chat is not offered on this machine. */
   ready: () => Promise<boolean>;
+  /** A generator Max window is open: a lease request waits for it (the job's card says so). */
+  windowOpen?: () => boolean;
   config?: LeaseConfig;
 }
 
@@ -45,6 +47,8 @@ export function createChatLease(deps: LeaseDeps) {
   let inFlight = 0;
   let lastActivityAt: number | null = null;
   let transition: Promise<unknown> | null = null;
+  /** The swap back failed: the lease reads as off, but the Stack may still hold the big model, so the next ticks keep asking it to return. */
+  let pendingReturn = false;
 
   const limitMs = () => (pinned ? config.pinCapMs : config.idleMs);
 
@@ -67,8 +71,9 @@ export function createChatLease(deps: LeaseDeps) {
       if (opts.pinned && (person.role === "owner" || person.role === "admin")) pinned = true;
       return { ok: true, state: "held" };
     }
+    if (deps.windowOpen?.()) return { ok: false, refusal: "max_window" };
     if (transition) return { ok: false, refusal: "stack_busy" };
-    if (state !== "off") return { ok: false, refusal: "stack_busy" };
+    if (state !== "off" || pendingReturn) return { ok: false, refusal: "stack_busy" };
     if (!(await deps.ready())) return { ok: false, refusal: "not_ready" };
     state = "starting";
     const run = deps.swapToBig();
@@ -99,7 +104,7 @@ export function createChatLease(deps: LeaseDeps) {
     state = "releasing";
     const run = deps.swapToStandard();
     transition = run;
-    try { await run; } catch { /* The Stack's retry loop owns a failed return; the lease reads as released so generators are not held forever. */ }
+    try { await run; } catch { pendingReturn = true; /* generators are not held forever; tick() retries the return */ }
     transition = null;
     state = "off";
     holderId = null;
@@ -109,6 +114,13 @@ export function createChatLease(deps: LeaseDeps) {
 
   /** Called on a short interval: releases between requests once the holder has been quiet for the limit. Never while a request is in flight. */
   async function tick(): Promise<boolean> {
+    if (state === "off" && pendingReturn && !transition) {
+      const run = deps.swapToStandard();
+      transition = run;
+      try { await run; pendingReturn = false; } catch { /* asked again on the next tick */ }
+      transition = null;
+      return false;
+    }
     if (state !== "held" || inFlight > 0 || lastActivityAt === null) return false;
     if (deps.now() - lastActivityAt < limitMs()) return false;
     await release();
@@ -129,3 +141,9 @@ export function createChatLease(deps: LeaseDeps) {
 }
 
 export type ChatLease = ReturnType<typeof createChatLease>;
+
+let active: ChatLease | null = null;
+/** The running lease registers itself so readers that cannot import the runtime (it imports them) can ask whether Max chat is up. */
+export function registerActiveChatLease(lease: ChatLease | null): void { active = lease; }
+/** True while the big chat model is leased: big generators wait, robot captioning and canary pictures stand aside. */
+export const chatLeaseHeld = (): boolean => active?.snapshot().state === "held";

@@ -21,7 +21,7 @@ import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingModeReadi
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 import { downloadProgress } from "@/lib/downloadProgress";
 
-const KEYS = ["coding.enabled", "coding.home_mode", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
+const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
 const messageOf = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
 const sizeText = (bytes: number | null) => bytes == null ? "Size not reported" : bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.ceil(bytes / 1024 ** 2)} MB`;
@@ -63,9 +63,6 @@ export function CodingAdminSettings() {
   const [testStartedAt, setTestStartedAt] = useState<number | null>(null);
   const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running || q.state.data?.state === "switching" || q.state.data?.state === "waiting" ? 2000 : false) });
   const selfTest = selfTestState(mode.data, testStartedAt);
-  const homeModeValue = settings.data?.find((setting) => setting.key === "coding.home_mode")?.value;
-  // A change in the Home mode dropdown starts a switch; look once, then the poll above follows it while it runs.
-  useEffect(() => { void mode.refetch(); }, [homeModeValue]);
   // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
   useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt]);
   const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
@@ -77,7 +74,6 @@ export function CodingAdminSettings() {
   const [removePiece, setRemovePiece] = useState<CodingPiece | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
   const paused = settings.data?.find((setting) => setting.key === "coding.paused")?.value === true;
-  const modeReason = mode.data?.readiness.first_unmet ? codingModeReasons[mode.data.readiness.first_unmet] : undefined;
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["coding-pieces"] }), client.invalidateQueries({ queryKey: ["coding-grants"] }), client.invalidateQueries({ queryKey: ["people"] })]);
   const refreshModeChecklist = () => Promise.all([mode.refetch(), pieces.refetch(), settings.refetch()]).then(() => undefined);
   const runModeAction = async (id: CodingModeReadinessItemId) => {
@@ -126,11 +122,11 @@ export function CodingAdminSettings() {
   });
   const enabledValue = grants.data ?? [];
   return <div className="flex flex-col gap-4">
-    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled", "coding.home_mode"]} titleOverrides={{ "household.coding": "Coding and Home mode" }} rowExtras={{ "coding.home_mode": { lockedReason: mode.data && !mode.data.readiness.ready ? modeReason : undefined } }} />
-    <Card><CardHeader><CardTitle>Home mode checklist</CardTitle><CardDescription>Finish these steps before you turn on Coding mode.</CardDescription></CardHeader><CardContent>
+    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled"]} titleOverrides={{ "household.coding": "Coding" }} />
+    <Card><CardHeader><CardTitle>Max chat checklist</CardTitle><CardDescription>Finish these steps before anyone can pick Max for chat or a coding app. Home loads the big model for them and gives it back by itself.</CardDescription></CardHeader><CardContent>
       {homeModeSentence(mode.data) ? <p role="status" className="text-sm">{homeModeSentence(mode.data)}</p> : null}
-      <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Home mode checklist." loadingLabel="Loading Home mode checklist">
-        {(rows) => <ItemGroup variant="card" aria-label="Home mode checklist">{rows.map((item, index) => <Item key={item.id}>
+      <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Max chat checklist." loadingLabel="Loading Max chat checklist">
+        {(rows) => <ItemGroup variant="card" aria-label="Max chat checklist">{rows.map((item, index) => <Item key={item.id}>
           <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{(modeActionBusy === item.id || selfTest.running) && item.id === "self_test" ? "Running" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "self_test" && selfTest.running ? "Running" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>
             {item.state !== "done" ? <ItemDescription>{codingModeReasons[item.reason_key]}</ItemDescription> : null}
             {item.id === "self_test" && selfTest.running ? <ItemDescription>Home is loading the large model, checking it, and switching back. This takes a few minutes. You can leave this page.</ItemDescription> : null}
@@ -144,7 +140,7 @@ export function CodingAdminSettings() {
       </AsyncState>
       {modeActionError ? <p role="alert" className="text-sm text-destructive">{modeActionError}</p> : null}
     </CardContent></Card>
-    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding", "household.coding_people", "household.coding_limits"]} includeKeys={KEYS.filter((key) => key !== "coding.paused" && key !== "coding.enabled" && key !== "coding.home_mode")} titleOverrides={{ "household.coding": "More Coding settings" }} />
+    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding", "household.coding_people", "household.coding_limits"]} includeKeys={KEYS.filter((key) => key !== "coding.paused" && key !== "coding.enabled")} titleOverrides={{ "household.coding": "More Coding settings" }} />
     <Card><CardHeader><CardTitle>Stop all coding now</CardTitle><CardDescription>Pause coding requests until you resume. This does not delete keys.</CardDescription></CardHeader><CardContent><Button type="button" variant={paused ? "default" : "destructive"} onClick={() => setPauseOpen(true)}>{paused ? "Resume coding" : "Stop all coding now"}</Button>{settings.isError ? <p role="alert" className="text-sm text-destructive">Could not load the pause setting.</p> : null}</CardContent></Card>
     <Card>
       <CardHeader><CardTitle>Who can code</CardTitle><CardDescription>Adults follow the household default. Teens and children need an admin grant.</CardDescription></CardHeader>

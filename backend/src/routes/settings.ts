@@ -30,35 +30,11 @@ import { scheduleHubRestart } from "@/lib/hubRestart";
 import { turnOnTailscaleAccess, setTailscaleRenewalActive } from "@/lib/tailscale";
 import { closeRobotSttSockets } from "@/routes/stt";
 import { startRobotHosts, stopRobotHosts } from "@/lib/robotHost";
-import { codingModeReadiness, codingModeReason, raiseModeFailure } from "@/lib/codingMode";
 import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 
 export const settingsRoutes = apiRouter();
-
-async function followCodingMode(target: "normal" | "coding", actor: PersonRow): Promise<void> {
-  const deadline = Date.now() + 45 * 60_000;
-  while (Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 2_000));
-    try {
-      const state = await getStackClient().getCodingMode();
-      if (state.state === "switching" || state.state === "waiting") continue;
-      if (state.state === "stable" && state.mode === target) { await resolveIssue("coding_mode", "switch_failed"); return; }
-      if (state.state === "failed") {
-        setValue(actor, "household", "coding.home_mode", "normal");
-        publishSettingsChanged("household", "coding.home_mode", "normal");
-        await raiseModeFailure(state.reason ?? "The AI could not switch modes.");
-        console.info(JSON.stringify({ event:"coding_mode.switch_failed" }));
-        return;
-      }
-    } catch { /* the Stack can come back during the transaction */ }
-  }
-  setValue(actor, "household", "coding.home_mode", "normal");
-  publishSettingsChanged("household", "coding.home_mode", "normal");
-  await raiseModeFailure("The AI did not finish switching modes within 45 minutes.");
-  console.info(JSON.stringify({ event: "coding_mode.switch_timeout" }));
-}
 
 function refreshRobotClips(deviceIds: string[]): void {
   for (const deviceId of deviceIds) {
@@ -210,34 +186,10 @@ settingsRoutes.openapi(putRoute, async (c) => {
     const personaRefusal = personaWriteRefusal(body.scope, body.value);
     if (personaRefusal) return c.json({ error: personaRefusal }, 400);
   }
-  const isHomeMode = body.scope === "household" && body.key === "coding.home_mode";
-  const previousHomeMode = isHomeMode ? getHouseholdSettingValue("coding.home_mode") : undefined;
-  if (isHomeMode) {
-    if (!isOwnerOrAdminActor(actor)) return c.json({ error: "Admins only" }, 403) as never;
-    if (body.value !== "normal" && body.value !== "coding") return c.json({ error: "Choose normal or coding mode." }, 400);
-    if (body.value === "coding") {
-      const readiness = await codingModeReadiness();
-      if (!readiness.ready) return c.json({ error: codingModeReason(readiness.first_unmet ?? "engine"), readiness }, 409);
-    }
-  }
+  if (body.scope === "household" && body.key === "coding.home_mode") return c.json({ error: "Coding mode is now Max chat. Pick Max in a chat, or connect a coding app, and Home loads the big model for you." }, 400);
   const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
-  }
-  if (isHomeMode) {
-    const target = body.value as "normal" | "coding";
-    // The Stack may already be there (Home restarted, or the setting was lost): that is the answer wanted, not a refusal.
-    const now = await getStackClient().getCodingMode().catch(() => null);
-    const alreadyThere = now?.mode === target && now.state === "stable";
-    if (!alreadyThere) {
-      try { await getStackClient().setCodingMode(target); }
-      catch (error) {
-        const reason = error instanceof StackError && error.status === 409 ? error.reason ?? error.message : "Home could not reach the AI engine.";
-        setValue(actor, "household", body.key, previousHomeMode ?? "normal");
-        return c.json({ error: reason, readiness: await codingModeReadiness() }, 409);
-      }
-      void followCodingMode(target, actor);
-    }
   }
   if (warning) await reconcileCapabilities();
   if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === false) {
@@ -312,16 +264,6 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
-  }
-  if (body.scope === "household" && body.key === "coding.home_mode") {
-    if (!isOwnerOrAdminActor(actor)) return c.json({ error: "Admins only" }, 403) as never;
-    const target = result.value.value === "coding" ? "coding" : "normal";
-    try { await getStackClient().setCodingMode(target); }
-    catch (error) {
-      setValue(actor, "household", "coding.home_mode", getRegistry().find((key) => key.key === "coding.home_mode")?.default ?? "normal");
-      return c.json({ error: error instanceof StackError && error.status === 409 ? error.reason ?? error.message : "Home could not reach the AI engine.", readiness: await codingModeReadiness() }, 409) as never;
-    }
-    void followCodingMode(target, actor);
   }
   if (body.scope === "household" && body.key === "home.robots.enabled" && result.value.value === false) {
     await stopRobotHosts();

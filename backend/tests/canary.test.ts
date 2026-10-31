@@ -393,13 +393,14 @@ describe("identity", () => {
 });
 
 describe("canary in coding mode", () => {
-  test("the picture check is skipped, not failed, while Home is in coding mode", async () => {
+  test("the picture check is skipped, not failed, while the Max chat lease is held", async () => {
     const { setHouseholdSettingValue } = await import("@/lib/settings");
     const { CHECK_BY_ID } = await import("@/lib/canary/checks");
-    setHouseholdSettingValue("coding.home_mode", "coding");
+    const { registerActiveChatLease } = await import("@/lib/chatLease");
+    registerActiveChatLease({ snapshot: () => ({ state: "held" }) } as never);
     let asked = false;
     const out = await CHECK_BY_ID.get("image_tiny")!.run({ image: async () => { asked = true; return { ok: false }; } } as never, {} as never);
-    setHouseholdSettingValue("coding.home_mode", "normal");
+    registerActiveChatLease(null);
     expect(out.kind).toBe("skip"); expect(asked).toBe(false);
   });
 });

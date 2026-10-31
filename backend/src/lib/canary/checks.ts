@@ -1,5 +1,6 @@
 // CANARY-01: the checks. Each asserts BEHAVIOUR (a tool was called, text arrived, a vector came back), never wording.
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { chatLeaseHeld } from "@/lib/chatLease";
 import type { CanaryCheck, CanaryId, ChatProbe, Outcome } from "./types";
 
 /** Short fixed set of generic phrases; none carries household data. The scheduler picks one per run. */
@@ -125,7 +126,7 @@ export const CHECKS: CanaryCheck[] = [
     id: "image_tiny", name: "Pictures", group: "pictures", timeoutMs: 240_000, title: "Picture making is not working",
     async run(deps) {
       // In coding mode picture jobs wait on purpose, so a missing test picture is not a fault.
-      if (getHouseholdSettingValue("coding.home_mode") === "coding") return { kind: "skip", reason: "Home is busy with a big job, so pictures wait." };
+      if (chatLeaseHeld()) return { kind: "skip", reason: "Home is busy with a big job, so pictures wait." };
       const result = await deps.image();
       return result.ok ? pass() : fail("The picture engine did not make a small test picture.", "Open Settings, Pictures and videos, check the picture model, then run the checks again.");
     },

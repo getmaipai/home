@@ -2,7 +2,15 @@
 
 Design record: [coding-mode-2026-10-22.md](../design/coding-mode-2026-10-22.md). User page: [coding-mode.md](../user/coding-mode.md). Backlog: "Home mode" rows.
 
-## The setting and the gate
+## Retired by the Max chat lease (TIER-HOME-05, 2026-10-31)
+
+There is no household switch any more. `PUT /api/settings` for `coding.home_mode` answers 400, the Settings row and the "Home mode" wording are gone, and
+`reconcileCodingModeAtStartup` resets a stored `coding` to `normal` and returns a Stack left in coding mode to normal when no lease is held. The key stays in
+`@maipai/spec` until a spec tag removes it (nothing reads it). The Stack's coding-mode transaction is now the lease's swap: see
+[max-chat-lease-2026-10-31.md](../design/max-chat-lease-2026-10-31.md) and `backend/src/lib/chatLease.ts`. Readers that used the switch ask
+`chatLeaseHeld()`. The rest of this page describes the transaction and the readiness record, which the lease reuses unchanged.
+
+## The setting and the gate (historical)
 
 `coding.home_mode` (`normal` | `coding`) is a household setting declared in `@maipai/spec` (`settings/keys.json`, `lives_in: household.coding`, admin only). Home does not push it like the other coding settings: it is a
 transaction run by the Stack. `PUT /api/settings` for this key goes through `routes/settings.ts`: `coding` is refused with a 409 and the first unmet reason unless `codingModeReadiness()` is `ready`; after the write Home calls the Stack's

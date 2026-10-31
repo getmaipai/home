@@ -7,6 +7,7 @@
 // history, only the one latest description per robot, and it expires. Nothing here reads, writes or logs the picture's bytes
 // beyond handing them once to the local chat engine through Home's own Stack client (docs/PRIVACY.md).
 import { complete, type LlmImagePart } from "@/lib/llm";
+import { chatLeaseHeld } from "@/lib/chatLease";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { activeTurnCount } from "@/lib/turnActivity";
@@ -318,7 +319,7 @@ export async function acceptFrame(input: FrameInput): Promise<FrameOutcome> {
   if (last !== undefined && now - last < floor) return { ok: false, status: 429, code: "too_fast", error: "Pictures are coming too fast. Wait a few seconds between pictures." };
   // ROBOT-VISION-BUSY-01: a look never competes with real work. Coding mode refuses every look; a background look also waits for any running
   // chat turn; and only one picture is described at a time per robot (dropped, never stacked). Nothing touches the model before these.
-  const busy = getHouseholdSettingValue("coding.home_mode") === "coding" || (scene && activeTurnCount() > 0) || captioning.has(input.deviceId);
+  const busy = chatLeaseHeld() || (scene && activeTurnCount() > 0) || captioning.has(input.deviceId);
   if (busy) return { ok: false, status: 503, code: "busy", error: "Home is busy with something else right now, so the robot skipped this look. It will try again later." };
   (scene ? lastSceneFrameAt : lastFrameAt).set(input.deviceId, now);
   captioning.add(input.deviceId);

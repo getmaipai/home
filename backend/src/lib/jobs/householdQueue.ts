@@ -247,12 +247,16 @@ export function requestTier(request: unknown): "standard" | "boost" | "max" {
 }
 
 /** Counts a chat turn for the quiet window (turn time and in-flight count only) and undoes the in-flight count once, on the lease's own release. */
+let chatTurnObserver: { started: () => void; ended: () => void } | null = null;
+/** TIER-HOME-05: the Max chat lease learns when a turn starts and ends, to guard a request in flight. */
+export function setChatTurnObserver(observer: { started: () => void; ended: () => void } | null): void { chatTurnObserver = observer; }
 export function trackChatLease<T extends { release(): void }>(personId: string, lease: T, now = Date.now()): T {
   noteChatTurn(personId, now);
   noteChatInFlight(1);
+  try { chatTurnObserver?.started(); } catch { /* the observer is advisory */ }
   const release = lease.release.bind(lease);
   let counted = true;
-  lease.release = () => { if (counted) { counted = false; noteChatInFlight(-1); noteChatTurn(personId, Date.now()); } release(); };
+  lease.release = () => { if (counted) { counted = false; noteChatInFlight(-1); noteChatTurn(personId, Date.now()); try { chatTurnObserver?.ended(); } catch { /* advisory */ } } release(); };
   return lease;
 }
 

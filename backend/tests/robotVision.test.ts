@@ -1,3 +1,4 @@
+import { registerActiveChatLease } from "../src/lib/chatLease";
 import { beforeEach, describe, expect, test, spyOn } from "bun:test";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
@@ -187,16 +188,18 @@ describe("ROBOT-VISION-BUSY-01: a look never competes with real work", () => {
     expect((await frame(deviceId, "scene", 1_000_000 + SCENE_FRAME_INTERVAL_MS)).ok).toBe(true);
   });
 
-  test("Coding mode refuses every look, asked or background, without touching the model", async () => {
+  test("The Max chat lease refuses every look, asked or background, without touching the model", async () => {
     const { deviceId } = await household();
     let calls = 0;
     __setCaptionForTests(async () => { calls++; return CAPTION; });
-    expect(setHouseholdSettingValue("coding.home_mode", "coding").ok).toBe(true);
-    for (const purpose of ["scene", "ask"] as const) {
-      const out = await frame(deviceId, purpose, 1_000_000);
-      expect(out.ok === false && out.code).toBe("busy");
-    }
-    expect(calls).toBe(0);
+    registerActiveChatLease({ snapshot: () => ({ state: "held" }) } as never);
+    try {
+      for (const purpose of ["scene", "ask"] as const) {
+        const out = await frame(deviceId, purpose, 1_000_000);
+        expect(out.ok === false && out.code).toBe("busy");
+      }
+      expect(calls).toBe(0);
+    } finally { registerActiveChatLease(null); }
   });
 
   test("only one picture is described at a time per robot; a second is dropped, not queued", async () => {

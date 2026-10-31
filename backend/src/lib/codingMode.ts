@@ -7,7 +7,8 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { codingClientLater } from "@/lib/setupState";
-import { raiseIssue } from "@/lib/issues";
+import { chatLeaseHeld } from "@/lib/chatLease";
+import { resolveIssue } from "@/lib/issues";
 import reasonVocab from "@maipai/spec/vocab/coding-mode-readiness-reasons.json" with { type: "json" };
 
 const anchors = ["Turn on coding", "Choose a coding engine", "Add the model files", "Check your computer", "Make room in memory", "Test the coding model", "Connect a coding app", "Check coding speed"];
@@ -39,22 +40,17 @@ export async function codingModeReadiness(): Promise<Readiness> {
   add("client", hasCodeKey() || codingClientLater(), "can_do", 6); add("bench", mode.checks.bench, "manual", 7);
   return CodingModeReadiness.parse({ ready:base.every(x=>x.state==="done"), first_unmet:base.find(x=>x.state!=="done")?.id ?? null, checked_at:new Date().toISOString(), items:base, provenance:"home: coding mode readiness check", hlc:nextHlc() });
 }
-/** Reconciles persisted Home intent with the Stack after the coding settings push. */
+/** TIER-HOME-05 migration: coding mode is retired for the Max chat lease. A Home that restarts with the old switch on, or a Stack still in
+ * coding mode with no lease, goes back to normal once; nothing else reads `coding.home_mode` any more. A missing Stack never blocks startup. */
 export async function reconcileCodingModeAtStartup(): Promise<void> {
   try {
+    await resolveIssue("coding_mode", "switch_failed");
+    if (getHouseholdSettingValue("coding.home_mode") !== "normal") setHouseholdSettingValue("coding.home_mode", "normal");
     const stack = await getStackClient().getCodingMode();
-    const stored = getHouseholdSettingValue("coding.home_mode");
-    if (stack.mode === "coding" && stored !== "coding") {
-      try { await getStackClient().setCodingMode("normal"); } catch { /* Next boot/change retries. */ }
-    } else if (stored === "coding" && stack.mode === "normal" && stack.state !== "switching" && stack.state !== "waiting") {
-      setHouseholdSettingValue("coding.home_mode", "normal");
-      await raiseModeFailure(stack.reason ?? "The AI is in normal mode.");
+    if (stack.mode === "coding" && !chatLeaseHeld()) {
+      try { await getStackClient().setCodingMode("normal"); } catch { /* the lease's own release retries on the next idle tick */ }
     }
   } catch { /* A missing Stack must never prevent Home from starting. */ }
-}
-export async function raiseModeFailure(detail: string): Promise<void> {
-  await raiseIssue({ source: "coding_mode", key: "switch_failed", severity: "warning", title: "Home could not switch modes", detail,
-    fix: { label: "Try again", action: "retry_coding_mode" }, learnMore: "/docs/user/coding-mode" });
 }
 function hasCodeKey(): boolean {
   return db.select().from(people).all().some(person => listApiKeysForAdmin(person as never).some(key => key.status === "active" && key.scopes.includes("code")));

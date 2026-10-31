@@ -1,6 +1,6 @@
 # Max chat lease: build addendum (TIER-HOME-05)
 
-Status: slice 1 built 2026-10-31; later slices not built. Extends [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) sections 7 (T6, T7) and
+Status: slices 1 to 3 and the retirement built 2026-10-31; chat bench numbers and the composer picker still open. Extends [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) sections 7 (T6, T7) and
 [resource-profiles-2026-10-30.md](resource-profiles-2026-10-30.md). Decided by Jesse (2026-10-30, 2026-10-31): chat is never paused, only lowered to
 Reduced; no household switch; decide and build without asking.
 
@@ -18,20 +18,23 @@ Reduced; no household switch; decide and build without asking.
   (T6; the Chat Max row of the profile table, which also queues Standard pictures, video and music, stays with the profile ladder's own rows).
   Card copy `max_chat` is in `jobQueueCopy.ts`.
 
-## Not built yet, in order
+## Built after slice 1 (same day)
 
-1. **Routes and composer.** Take and release: `POST /api/ai/chat-lease` (acquire, pin) and `DELETE` (release), admin and holder only; the
-   composer chip's Max marker reads `snapshot()`. Needs the model chip's Standard/Boost/Max picker (TIER-UI rows).
-2. **Request accounting.** `requestStarted`, `noteToken`, `requestEnded` called around each chat turn on the big model, so the in-flight guard
-   and the idle timer see real traffic. Until this lands nothing marks a request in flight, so the routes must not ship before it: wire the hooks first.
-3. **Other threads on the big model.** While held, other people's threads answer on the big model (T6); the Stack's chat role mapping for
-   `coding` mode already does this. A minor's thread keeps its floors (thinking off, no tools) whatever model answers.
-4. **Retire `coding.home_mode`.** Migration that maps a stored `coding` to no lease, removes the Settings card switch, `reconcileCodingModeAtStartup`
-   and the `/settings` mode routes; MODE-* rows are already marked superseded. Only after 1 to 3 are live.
-5. **Bench numbers** (llama-server vs Splash chat) from the Stack session: they decide the default big model for Max chat and the 20 to 60 s
-   swap estimate shown on the confirm line. Nothing in slice 1 depends on them.
-6. **Window interaction.** Acquire refused while a generator Max window is open (the job's card says so); a lease request during a window
-   queues behind it with `max_window`. Not yet in `acquire`.
+- Routes: `GET`, `POST` (optional `pinned`, owner and admin only) and `DELETE /api/ai/chat-lease`, with plain refusal lines (not a holder, not set up,
+  swap failed, someone else holds it, a Max job is running). A request while a generator Max window is open is refused (`max_window`).
+- Request accounting: `trackChatLease` tells the lease when a chat turn starts and ends (`setChatTurnObserver`), so a turn in flight keeps the lease
+  and the idle timer restarts at its end.
+- `coding.home_mode` retired: Settings row and wording removed, the PUT refused, startup migration, readers (robot looks, canary pictures, the
+  large-model-alone piece check) now ask `chatLeaseHeld()`.
+- TIER-PRIO-03 (same branch): `decideDownshift` now gates every admission that lowers chat. A second person chatting at second 50 delays it, at
+  second 61 it goes; the job shows `quiet_wait` or `cooldown_wait`. Settings: `resources.quiet_seconds`, `quiet_max_wait`, `quiet_timeout`, `cooldown_seconds`.
+
+## Not built yet
+
+1. The composer's Standard/Boost/Max picker and the Max marker on the model chip (TIER-UI rows); the routes are ready for it.
+2. Bench numbers (llama-server vs Splash chat) from the Stack session: they set the default big model and the swap estimate on the confirm line.
+3. S4 chaining (consecutive jobs keep chat Reduced inside one window) is passed as not chained; the cooldown covers the flap case.
+4. Removing the `coding.home_mode` key itself needs a commons spec tag.
 
 ## Gaps found re-reading resource-profiles-2026-10-30.md against the code
 

@@ -77,26 +77,24 @@ describe("coding mode self-test route", () => {
   });
 });
 
-describe("saving an unrelated setting", () => {
-  test("leaves Home mode alone and raises no mode failure", async () => {
-    const client = new TestClient(); await client.post("/api/auth/setup", {displayName:"Sage",secret:"correcthorse"});
-    setHouseholdSettingValue("coding.home_mode", "coding");
-    const saved = await client.put("/api/settings", {scope:"household", key:"coding.enabled", value:true});
-    expect(saved.status).toBe(200);
-    expect(getHouseholdSettingValue("coding.home_mode")).toBe("coding");
-  });
-});
-
-describe("choosing the mode the Stack is already in", () => {
-  test("keeps the setting and does not ask the Stack to switch again", async () => {
+describe("the retired Home mode switch (TIER-HOME-05)", () => {
+  test("saving coding.home_mode is refused and the Stack is never asked to switch", async () => {
     const client = new TestClient(); await client.post("/api/auth/setup", {displayName:"Sage",secret:"correcthorse"});
     let switches = 0;
-    setHouseholdSettingValue("coding.enabled", true);
-    await client.post("/api/settings/api-keys", {name:"editor", scopes:["code"]});
-    __setStackClientForTests({ getCodingMode: async () => response({ mode: "coding", target: "coding" }), setCodingMode: async () => { switches++; }, roles: async () => ({ roles: [{ id: "coding", state: { state: "installed" } }] }) } as never);
+    __setStackClientForTests({ getCodingMode: async () => response({ mode: "normal", target: "normal" }), setCodingMode: async () => { switches++; } } as never);
     const saved = await client.put("/api/settings", {scope:"household", key:"coding.home_mode", value:"coding"});
-    expect(saved.status).toBe(200);
+    expect(saved.status).toBe(400);
     expect(switches).toBe(0);
-    expect(getHouseholdSettingValue("coding.home_mode")).toBe("coding");
+    expect(getHouseholdSettingValue("coding.home_mode")).toBe("normal");
+  });
+
+  test("startup returns a Stack left in coding mode to normal when no lease is held, and clears a stored switch", async () => {
+    const { reconcileCodingModeAtStartup } = await import("@/lib/codingMode");
+    setHouseholdSettingValue("coding.home_mode", "coding");
+    const sent: string[] = [];
+    __setStackClientForTests({ getCodingMode: async () => response({ mode: "coding", target: "coding", state: "stable" }), setCodingMode: async (mode: string) => { sent.push(mode); } } as never);
+    await reconcileCodingModeAtStartup();
+    expect(sent).toEqual(["normal"]);
+    expect(getHouseholdSettingValue("coding.home_mode")).toBe("normal");
   });
 });

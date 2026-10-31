@@ -8,7 +8,9 @@
 // through as its sentences, like routes/components.ts does.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { requireRole } from "@/middleware/auth";
+import { requireAuth, requireRole } from "@/middleware/auth";
+import { getChatLease } from "@/lib/chatLeaseRuntime";
+import { holdsMax } from "@/lib/tiers";
 import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
@@ -220,6 +222,51 @@ const stopWindowRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.object({ stopped: z.boolean() }) } }, description: "True when a Max job was running and has been stopped." }, ...refusals },
 });
 aiChoicesRoutes.openapi(stopWindowRoute, async (c) => c.json({ stopped: await endMaxWindow() }, 200));
+
+const leaseShape = z.object({ state: z.enum(["off", "starting", "held", "releasing"]), held_by_you: z.boolean(), pinned: z.boolean(), can_use: z.boolean(), releases_in_seconds: z.number().int().nullable() });
+const leaseView = (person: { id: string; role: string }) => {
+  const snap = getChatLease().snapshot();
+  const mine = snap.holderId === person.id;
+  return { state: snap.state, held_by_you: mine, pinned: mine && snap.pinned, can_use: person.role !== "teen" && holdsMax(person as never, "chat"), releases_in_seconds: mine ? snap.releasesInSeconds : null };
+};
+const leaseGetRoute = createRoute({
+  method: "get", path: "/chat-lease", tags: ["AI"], summary: "Whether the big chat model is leased, whether you hold it and whether you may (TIER-HOME-05)",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: leaseShape } }, description: "Your view of the Max chat lease." }, ...refusals },
+});
+aiChoicesRoutes.openapi(leaseGetRoute, (c) => c.json(leaseView(c.get("person")), 200));
+const leaseTakeRoute = createRoute({
+  method: "post", path: "/chat-lease", tags: ["AI"], summary: "Take the Max chat lease: Home loads the big chat model and gives it back by itself when you go quiet (TIER-HOME-05)",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ pinned: z.boolean().optional() }) } }, required: false } },
+  responses: { 200: { content: { "application/json": { schema: leaseShape } }, description: "The lease is yours." }, ...refusals },
+});
+const LEASE_REFUSAL: Record<string, { status: 403 | 409 | 503; line: string }> = {
+  not_a_holder: { status: 403, line: "Max chat is not turned on for you. Ask an admin to give you Max." },
+  not_ready: { status: 409, line: "Max chat is not set up on this computer yet. Finish the coding setup first." },
+  swap_failed: { status: 503, line: "Home could not load the big chat model, so chat stays as it was. Try again in a minute." },
+  stack_busy: { status: 409, line: "Someone else is using Max chat right now. It ends by itself when they stop." },
+  max_window: { status: 409, line: "A Max job is running. Max chat can start when it ends." },
+};
+aiChoicesRoutes.openapi(leaseTakeRoute, async (c) => {
+  const person = c.get("person");
+  const body = await c.req.json().catch(() => ({})) as { pinned?: boolean };
+  const result = await getChatLease().acquire(person, { pinned: body.pinned === true });
+  if (!result.ok) { const refusal = LEASE_REFUSAL[result.refusal]!; return c.json({ error: refusal.line, code: result.refusal }, refusal.status) as never; }
+  return c.json(leaseView(person), 200);
+});
+const leaseReleaseRoute = createRoute({
+  method: "delete", path: "/chat-lease", tags: ["AI"], summary: "Give the Max chat lease back; chat returns to the standard model between requests (TIER-HOME-05)",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: leaseShape } }, description: "The lease after release." }, ...refusals },
+});
+aiChoicesRoutes.openapi(leaseReleaseRoute, async (c) => {
+  const person = c.get("person");
+  const snap = getChatLease().snapshot();
+  const admin = person.role === "owner" || person.role === "admin";
+  if (snap.state === "held" && (snap.holderId === person.id || admin)) await getChatLease().release();
+  return c.json(leaseView(person), 200);
+});
 
 const tiersRoute = createRoute({
   method: "get", path: "/tiers/{job}", tags: ["AI"], summary: "The models each level of a job may use on this computer, by family, with what fits each level's cap (TIER-HOME-04)",

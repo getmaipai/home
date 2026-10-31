@@ -1,24 +1,20 @@
 ---
-title: Coding mode
-description: Give most of your computer's memory to one big coding model, and what changes in Home while it is on.
+title: Max chat
+description: Use one big model for chat and coding for a while, and what changes in Home while you do.
 ---
 
-# Coding mode
+# Max chat
 
-Home has two modes. You pick one in **Settings**, **AI and models**, **Coding**, in the row called **Home mode**.
-
-**Normal** is how Home works today. Chat, pictures, videos and songs all run as usual.
-
-**Coding** is for a big computer. Home loads one large model and gives it most of the memory. That one model writes code and also answers chat. Home turns the usual chat model off while it does this.
+There is no switch to flip. An admin, or an adult an admin gave **Max**, picks Max for a chat or connects a coding app. Home then loads one large model and gives it most of the memory. That one model writes code and also answers chat. When nobody has used it for 30 minutes, Home gives the memory back by itself. Children and teens never hold Max chat.
 
 ## Why it exists
 
-A large coding model is smarter on hard tasks, but it is big. It needs about 85 GB of memory. The usual chat model and the other parts need about 36 GB. A 128 GB Mac cannot hold both. Coding mode makes room by letting the big model do both jobs.
+A large coding model is smarter on hard tasks, but it is big. It needs about 85 GB of memory. The usual chat model and the other parts need about 36 GB. A 128 GB Mac cannot hold both. Max chat makes room by letting the big model do both jobs.
 
 ## What changes while it is on
 
 - Chat is answered by the large model. It may feel different from the usual chat model.
-- Pictures, videos and songs wait. You see a message that Home is in coding mode.
+- Pictures, videos and songs wait. You see a message that big jobs are waiting for Max chat.
 - Voice and search keep working.
 - For children and teens, chat works but without tools such as web search, and without thinking. That keeps their protections the same until the new model has been measured.
 - Home uses about 91 GB of memory instead of 36 GB.
@@ -60,14 +56,12 @@ At least one coding app must be connected, or you chose **Later** in setup. Make
 
 Home needs a recorded speed and quality check for the large model on this kind of computer. Until it is recorded, the mode stays off. Updates add this when it is ready.
 
-## Switch it on
+## Start it and stop it
 
-Pick **Coding** in the **Home mode** row. Chat shows that Home is switching. The switch takes a few minutes. The old chat model unloads first, then the large model loads and Home tests it.
+Pick **Max** on a chat, or send a request from a coding app. Chat shows that Home is getting ready. This takes a minute or so. The usual chat model unloads first, then the large model loads and Home tests it.
 
-## Switch it off
+It stops by itself 30 minutes after the last answer, and never in the middle of an answer. An admin can keep it for longer: it still stops after 4 hours without use. Anyone who holds it can also give it back at once.
 
-Pick **Normal**. The large model unloads, then the usual models load again.
+## If it fails
 
-## If a switch fails
-
-Home puts everything back the way it was and adds an item to **Repairs** that says what went wrong. Open it, read the line, and press **Try again** when the problem is fixed.
+Home puts everything back the way it was and tells you what went wrong. Chat keeps working on the usual model. Fix the problem named in the checklist and try again.
