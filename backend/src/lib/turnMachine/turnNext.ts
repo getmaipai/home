@@ -80,6 +80,7 @@ import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { readLook } from "@/lib/companionLook";
+import { trimClosers } from "@/lib/guards";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
 import type { GateDecision } from "@/lib/gate/types";
 

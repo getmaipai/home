@@ -7,7 +7,6 @@ import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
 
 const person = { id: "person-1", display_name: "Person", role: "adult" } as Roster;
 const companion = { id: "companion-1", name: "Companion", type: "adult", type_label: "Adult", tagline: "Calm", who_can_use: "Everyone", dials: [], voice: "", is_default: true, is_household: false, portrait: null, status: "ready", chats: 0, can_edit: false, can_copy: false };
-const secondCompanion = { ...companion, id: "companion-2", name: "Other Companion", is_default: false };
 const row = (over: Record<string, unknown> = {}) => ({ id: "task-1", kind: "picture", title: "Picture", state: "waiting", created_at: "2026-10-27T10:00:00Z", updated_at: "2026-10-27T10:00:00Z", needs_you: true, waiting_reason: "Choose a size", ...over });
 
 function Probe() {
