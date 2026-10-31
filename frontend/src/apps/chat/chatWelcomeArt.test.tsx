@@ -18,8 +18,8 @@ afterEach(() => cleanup());
 
 const ART = "img[src^='/chat-art/']";
 
-describe("chat welcome art", () => {
-  test("shows the companion's picture and a line for the person by first name, with no companion name and no assistant line", async () => {
+describe("chat welcome", () => {
+  test("shows a line for the person by first name with no companion picture, name, or assistant line", async () => {
     const oldSettings = api.settingsValues;
     const oldCompanions = api.companions;
     api.settingsValues = (async () => [{ key: "persona.active_id", value: "sprout", source: "user", label: "Personality", level: "basic", secret: false }]) as unknown as typeof api.settingsValues;
@@ -33,6 +33,7 @@ describe("chat welcome art", () => {
       expect(view.queryByText("Sprout")).toBeNull();
       expect(view.queryByText("How can I help you today?")).toBeNull();
       expect(view.container.querySelector(ART)).toBeNull();
+      expect(view.container.querySelector("[role='img']")).toBeNull();
     } finally {
       api.settingsValues = oldSettings;
       api.companions = oldCompanions;

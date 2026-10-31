@@ -4,7 +4,6 @@
 // hands them to the kit Thread.
 import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
-import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { starterGreeting } from "@/apps/chat/starterGreeting";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
@@ -55,7 +54,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { picturesApi } from "@/lib/picturesApi";
 import { videosApi } from "@/lib/videosApi";
 import { ReloadMainThreadContext } from "@/apps/chat/chatThreadContexts";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { sourcesFromMessage } from "@/apps/chat/chatSources";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
@@ -66,9 +65,6 @@ import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
-import { useCompanionPresence } from "@/apps/chat/useCompanionPresence";
-import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
-import { DraftConversationContext } from "@/apps/chat/chatThreadContexts";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -586,30 +582,10 @@ export function ChatWelcome() {
   const person = useContext(WakeWordPersonContext);
   // One pick per new chat: the line holds still while the screen is up and is a different one next time.
   const [pick] = useState(() => Math.random());
-  const conversationId = useContext(DraftConversationContext);
-  const conversationQuery = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
-  const settingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person?.id ?? ""}`], queryFn: () => api.settingsValues(`person:${person!.id}`), enabled: Boolean(person?.id) });
-  const companionsQuery = useQuery({ queryKey: ["companions"], queryFn: api.companions });
-  const settings = Array.isArray(settingsQuery.data) ? settingsQuery.data : [];
-  const selectedId = settings.find((setting) => setting.key === "persona.active_id")?.value;
-  const fallbackId = typeof selectedId === "string" && companionsQuery.data?.companions?.some(({ id }) => id === selectedId) ? selectedId : companionsQuery.data?.default_id;
-  // "Test Conversation" opens /chat?try=<id>: the picture and name on this screen are that draft, not the person's usual companion.
-  const [searchParams] = useSearchParams();
-  const tryId = searchParams.get("try")?.trim() || null;
-  const tryRecord = useQuery({ queryKey: ["companions", tryId, "edit"], queryFn: () => api.editCompanion(tryId!), enabled: Boolean(tryId), retry: false });
-  const companionId = tryId ?? conversationQuery.data?.companion_id ?? fallbackId ?? null;
-  const presence = useCompanionPresence(companionId);
-  const companion = companionsQuery.data?.companions?.find(({ id }) => id === companionId);
-  const name = presence?.name ?? companion?.name ?? (tryId ? tryRecord.data?.name : undefined);
   return (
     <>
       <EngineStartingLoader />
       <EmptyState>
-        {name ? (
-          <div className="flex size-40 items-center justify-center overflow-hidden rounded-full">
-            {presence ? <CompanionAvatar name={presence.name} clips={presence.clips} wanted={presence.wanted} once={presence.once} size="lg" onFail={presence.onFail} /> : <Avatar name={name} seed={companionId} size="profile" className="size-full text-4xl" />}
-          </div>
-        ) : null}
         <EmptyStateGreeting>{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
       </EmptyState>
