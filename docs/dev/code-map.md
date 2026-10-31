@@ -524,6 +524,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
+| `backend/src/lib/listActions.ts` | runListAction |
+| `backend/src/lib/listResolver.ts` | resolveList, resolveItems, isListPronoun |
 | `backend/src/lib/lists.ts` | listLists, getList, createList, findOrCreateStandingList, updateList, deleteList |
 | `backend/src/lib/liveView.ts` | LIVE_VIEW_MAX_MS, LIVE_VIEW_ATTACH_GRACE_MS, LIVE_VIEW_MAX_FRAME_BYTES, liveViewAdmits, getLiveView, startLiveView |
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |
