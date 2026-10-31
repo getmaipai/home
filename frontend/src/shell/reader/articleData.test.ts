@@ -85,4 +85,11 @@ describe("toArticleViewData", () => {
     expect(data.blocks.map((block) => block.type)).toEqual(["paragraph", "paragraph"]);
     expect(data.actionRow).toBe("under-hero");
   });
+
+  test("a page with a facts card keeps its first paragraph whole instead of drawing a standfirst", () => {
+    const article: ReferenceArticleView = { ...base, lead: "Zendaya is an actor.", infobox: { title: "Zendaya", rows: [{ label: "Born", value: "1996" }] }, blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "Zendaya is an actor. She began as a model." }] }] };
+    const data = toArticleViewData(article, opts);
+    expect(data.lead).toBeUndefined();
+    expect(data.blocks[0]).toMatchObject({ type: "paragraph", inlines: [{ text: "Zendaya is an actor. She began as a model." }] });
+  });
 });

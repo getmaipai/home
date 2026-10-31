@@ -61,11 +61,13 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
   const figureHero = !infoboxPicture && !article.lead_image ? firstFigureHero(article.blocks) : null;
   const blocksIn = figureHero ? figureHero.rest : article.blocks;
   const kicker = article.kicker;
+  // The standfirst is the hero page's look (the Aurora mockup); a page with a facts card (the Zendaya mockup) opens with its normal first paragraph.
+  const standfirst = article.infobox && article.infobox.rows.length ? undefined : article.lead;
   return {
     title: article.title,
     ...(kicker ? { kicker, kickerStyle: "chip" as const } : {}),
     description: article.description ?? (article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label),
-    ...(article.lead ? { lead: article.lead } : {}),
+    ...(standfirst ? { lead: standfirst } : {}),
     breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker }] : []), { label: article.title }],
     ...(article.infobox && article.infobox.rows.length ? { infobox: article.infobox } : {}),
     ...(figureHero ? { image: { w480: figureHero.hero.src, w1280: figureHero.hero.src, alt: figureHero.hero.alt, ...(figureHero.hero.caption ? { badge: shortCaption(figureHero.hero.caption) } : {}) } } : {}),
@@ -76,6 +78,6 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     foldSections: true,
     floatFirstFigure: true,
     actionRow: infoboxPicture ? "top" : "under-hero",
-    blocks: withoutLead(blocksIn.map(asBlock), article.lead),
+    blocks: withoutLead(blocksIn.map(asBlock), standfirst),
   };
 }
