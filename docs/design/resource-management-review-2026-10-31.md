@@ -91,6 +91,12 @@ after one) and takes the engine offline for the load time.
 The watch was written for a leaking worker. It has never caught one; it has only restarted the engine the whole design
 exists to protect ("reserved: never evicted for a job").
 
+Addendum, 2026-10-31: two Stack commits already narrowed the trigger for the Splash engine (`2b0646a` on 2026-10-28 and
+`af6f00e` on 2026-10-29: a memory-mapped engine's post-load reading no longer arms the watch), which is why the restarts
+stopped after 10-29; the live hub's Stack (`3e11721`) carries both. RESOURCE-FIX-01 (Stack `6a36b64`, landed 2026-10-31)
+removes the restart for every reserved role and engine: the governor records a `Kept` decision and raises
+`resident-memory-grew.<role>` instead. Home's Stack pin and the hub do not have it yet.
+
 Fix: a reserved role is never restarted by the runaway watch. A sustained rise raises the existing `memory-pressure-warn`
 health item with the numbers, and only the watchdog's CRITICAL branch (60 s of critical) restarts chat, as the design
 says. The limit for the roles that keep the watch (jit workers) should be the admitted peak plus headroom, not a fraction
