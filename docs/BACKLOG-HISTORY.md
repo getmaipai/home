@@ -10931,3 +10931,1462 @@ DONE (spot-check 2026-10-17): the rebuilt turn machine adds the household roster
       plugins list already exists as its own separate prompt section
       (`pluginsListLine()`, predates this item).
     Done claim not verified 2026-10-17: Session A step 1 commits exist but listActivePeople is not in turnMachine/nodes/context.ts; one check: grep -rn listActivePeople backend/src/lib/turnMachine backend/src/lib/turnShared.ts.
+
+## Archived on 2026-10-31 (audit sweep: superseded programs)
+Each section below was moved whole from BACKLOG.md on 2026-10-31 because a later program, design note or rule replaced it; open rows that still matter were re-filed under their living section before the move. Reasons are on each section heading.
+
+## Light profile for building (owner, 2026-10-07) (archived 2026-10-31: overtaken by Resource tiers (owner, 2026-10-27))
+
+- [ ] **STACK-LIGHT-PROFILE-01: a light model profile the Stack can switch to while the household is building on a 24 GB machine** (S to M; owner 2026-10-07: "we have to build an entire system out but have limited memory (24gb) so ... use smaller models, less resources", and "cant you also get a smaller vision model"). Today the chat, judge, router and coding roles are all bound to Qwen3-8B (loading Qwen3-4B is refused with 'The judge role loaded qwen3-8b-instruct-q4-k-m instead'), so a smaller model cannot be chosen without changing role bindings. Add a Stack setting `stack.profile` (standard, light) that binds those roles to Qwen3-4B (text) and, once Qwen3-VL-4B is installed through the pinned downloader, to Qwen3-VL-4B as the one chat model that also reads pictures; light also lowers the context length to a measured value (the 8-bit KV cache setting belongs here as well). The profile never changes a safety floor; the memory governor sizes the light roles; Home shows nothing technical. Qwen3-VL-4B files (official Qwen GGUF repo) are in data-scratch/model-trials/qwen3-vl-4b (Q4_K_M and the Q8_0 projector; checksum and pin them through the catalog before install). Needs CHAT-LATE-SYSTEM-01 on main first (the VL template drops later system messages), the model vetter's template needle check when MODEL-VET-01 lands, and the benchmarks that gate a landing run on the 8B (standard profile) on a scratch Stack. Architect verdict first.
+    Design: [chat-engine-and-model-records-2026-10-17](design/chat-engine-and-model-records-2026-10-17.md)
+- [ ] **JUDGE-VISION-ONE-01: one 4B model for the judge and the vision role, to save about 2.5 GB** (S, bench; owner's question 2026-10-29). Today the judge beside chat is Qwen3-4B Q4_K_M (2.5 GB file, about 4.5 GB resident at a 40,960 context, running) and the separate vision role is Qwen3-VL-4B-Instruct Q4_K_M (2.5 GB) plus its Q8_0 projector (454 MB), installed but not resident. One `llama-server` started with the VL-4B and its projector serves text and picture requests, so the second set of weights and its context cache would go. Open risk: the VL-4B is Instruct with no thinking mode while the judge is the hybrid Qwen3-4B, and the judge is a safety and memory surface (RULES.md rules 3 and 8 need a bench before a swap). Objective: run the existing judge bench (memory dedupe and merge fixtures such as MEMORY-MERGE-01, the age and picture checks, false-block and false-allow rates, 3 or more repeats) against the VL-4B on a spare port, plus a picture-read pair, and record the memory saved. Decide from the numbers: adopt only if the judge is not worse than the 4B beyond the gate's cost, then the Stack binds both roles to the one process (Stack repo; Home only calls the roles); otherwise record why in `dev.md` and close. Reuse check: the judge bench scripts and `backend/scripts/bench/vision-02e.ts`; related to STACK-LIGHT-PROFILE-01 and the open floor-judge decision under Hardware tiers. Architect verdict first. Exit: the bench table in `dev.md`, then `bash scripts/check.sh --docs`.
+
+## Studio day one (2026-09-23) (archived 2026-10-31: the Studio has been in daily production use since mid-October; only scripts/studio/host-tune.sh came of this)
+
+A month of lead time is prework time: stage, script and dry-run now so the Studio downloads nothing large, runs a checked runbook, evaluates its own configuration, and becomes a coding lane. The design record is [docs/plans/studio-day-one-2026-09-23.md](plans/studio-day-one-2026-09-23.md); its numbered questions are the owner's.
+
+- [ ] **STUDIO-STAGE-01: the staging kit** (M, Sonnet). Objective: `scripts/studio/stage.sh` fetches every day-one artifact by its pinned URL and verifies its sha256 through the Stack's own download code (`stack/backend/src/lib/download.ts`), writing the Stack's store layout onto an external drive with a `STAGE.md` of every hash and size, and `--verify` re-hashes the drive; `--install <drive>` copies it into place. Items: llama-server b10797 macOS arm64, Qwen3.8-27B and Qwen3.6-35B-A3B as GGUF at Q6 at pinned revisions, the two Splash packages (17.4 GB and 20.9 GB, pre-seeded into the Hugging Face cache layout; the package is proprietary, 4-bit weights with the vision encoder and the draft in one file that only Splash loads, so the GGUF cannot stand in for it and both forms are staged on purpose), the MLX-format weights of both candidates at pinned revisions for oMLX and mlx-serve, the pins the installer and the Stack already carry. Acceptance: `--verify` green on this Mac's drive; a dry run proves whether `splash serve` honours the pre-seeded cache with the network denied, recorded either way; the Splash formula revision in `STAGE.md` (the Studio ships with macOS 26.4, decision 1 of the record, so no macOS contingency). Out of scope: any model not in MEASURE-02. Exit: `bash scripts/check.sh` and `STAGE.md`.
+    Design: [studio-day-one-2026-09-23](plans/studio-day-one-2026-09-23.md)
+- [ ] **STUDIO-RUNBOOK-01: the runbook, unboxing to the acceptance workload** (M, Sonnet). Objective: the record's eleven steps as a checked document (`docs/dev/studio-runbook.md`), each with its command and its check, a target under two hours; every scriptable step gains a `--dry-run` flag (`scripts/install.sh` has one) and is run on this Mac now with its output recorded. Acceptance: the dry run of every scriptable step recorded in dev.md; the restore step rehearsed against a fresh data directory from this Mac's latest backup. Out of scope: the evaluation (STUDIO-EVAL-01). Exit: `bash scripts/check.sh --docs` and the recorded dry run.
+    Design: [studio-day-one-2026-09-23](plans/studio-day-one-2026-09-23.md)
+- [ ] **STUDIO-EVAL-01: the Studio evaluates its own configuration** (M, Sonnet). Objective: `scripts/studio/evaluate.sh` chains, on a scratch data directory, the Stack's Studio bench protocol (`stack/scripts/bench/studio-bench.sh`), ENGINE-CONTRACT-01's suite per engine (the set is four: llama-server, oMLX, mlx-serve and Splash, each through the same suite, the same MEASURE-02 rows and the same workload; the summary picks by the numbers and the contract, never by a headline claim, and an engine that loses on chat keeps its own role: oMLX's SSD prefix cache for long companion contexts, mlx-serve's media roles), ENGINE-SPLASH-01, MEASURE-02's rows per candidate with llama-server run with the model's MTP head on and every latency measured cold and warm at 32K with the effective rate from send to last token, and STUDIO-ACCEPT-01's workload with first useful answer cold and warm, collecting the summary rows into one `report.md` in the protocol's shape and appending them to dev.md "Measured so far", so a Claude session reads tables. Mirror: `studio-bench.sh`. Acceptance: a rehearsal on this Mac (tier 1, the 8B) runs end to end and writes the report with the rehearsal marked as such; the report's summary names the candidate that passes the contract suite, clears the tool-calling bars and gives the best first useful answer under the workload. Exit: `bash scripts/check.sh` and the rehearsal report.
+    Design: [studio-day-one-2026-09-23](plans/studio-day-one-2026-09-23.md)
+- [ ] **STUDIO-LANE-01: the Studio as a coding lane** (M, Sonnet; after STUDIO-EVAL-01). Objective: the coordinator's OpenCode HTTP driver pointed at the Studio's engine, with the lane rules from the record: a fresh session and a fresh worktree per brief at the base the coordinator names, deleted after the report; a wall-clock budget (three times a reference run) in place of a step count and a run that ends without a done report counted as blocked; the tool set the brief names (read, edit, the named tests, commit, never push); S and M coding items, second reviews by a different model, the benches. `splash claude` proven on the Studio before Claude Code is routed to it (Splash's README ships the launcher and names its Anthropic Messages endpoint; it never names Claude Code). Acceptance: one S item from the backlog done end to end on the Studio with a clean done report and a review by the other model; the driver's budget stop tested with a brief that cannot finish. Out of scope: anything the record keeps on the subscription (design, verdicts, diagnosis, cross-subsystem items, the first review of a safety change). Exit: `bash scripts/check.sh` and the done report. **Owner direction 2026-10-18 (harness and model order, from web research that was anecdotal, not benched):** the Studio has 128 GB, so Reika (chosen for the 24 GB laptop and small models) is not the default here; people on large-memory Macs mostly run OpenCode or Aider, and Cline in VS Code. Try Aider first (lightest, diff-based, git-native, fine at 16K context), on Qwen3.8-27B, then Qwen3.8-Flash-Next (about 125B total, 6B active, roughly 63 GB at 4-bit; vendor DeepSWE 58.7 against 42.2 for the 27B, a tie on SWE-bench Pro; independent index and one hands-on test favour the 27B, so measure it), then OpenCode on the winner, Reika last. Flash-Next is not yet a MEASURE-02 candidate; add it there. Every run goes through the LOCALCODER-SANDBOX-01 sandbox. **Pilot 2026-10-18 (this Mac, not through the Stack): Aider 0.86.2 on Splash 1.3.2 serving Qwen3.8-27B UD-Q4_K_M, thinking capped at medium effort and 2000 tokens, one S item (STATUS-APPS-REG-01) in its own worktree, 25-minute cap, the test as the only feedback loop.** Three attempts. Attempts one and two failed on the harness, not the model: `--yes-always` auto-adds any file the instruction names, and naming the 37,000-line `docs/dev.md` overflowed the context window both times (the first attempt also added it explicitly). Attempt three, with big files kept out of the instruction and the docs note written to a small new file, finished in 83 seconds (9.8k tokens sent, 5.6k received) and the test file passed 21 of 21, but the new test was vacuous: it hard-coded the list of shell destinations inside the test instead of reading the real navigation, so a new destination could never fail it, and the reasons it wrote for its allowlist were invented. Two causes: the item's own pointer was wrong (the backend cannot import `@maipai/ui`; the test belongs in the frontend beside `frontend/src/shell/statusApps.ts`), and the only feedback loop was 'tests pass', which a trivial test satisfies. Nothing landed. **Lessons the lane must build in:** pick items whose pointers a person has just verified; give every item an acceptance check that proves the new test can fail (plant a destination and watch it fail); never combine `--yes-always` with free-text file names or files over a few hundred lines; keep the instruction's named files small and add the rest by hand; a review by a different model is part of the lane, not optional; and the cheap parts worked: no Codex or Claude usage, 83 seconds per attempt, clean worktree discipline. The diff is kept in the session scratchpad (`pilot/pilot-attempt3.diff`).
+    Design: [studio-day-one-2026-09-23](plans/studio-day-one-2026-09-23.md)
+- [ ] **STUDIO-MOVE-01: the Studio beside this Mac, then the move, then the rollback** (S, Sonnet). Objective: this Mac's Home points its chat, embed and judge roles at the Studio's engines with the Studio as the household's engine computer (REMOTE-STACK-01): the whole Stack on the Studio, Home linked to it, the privacy page's engine computer rows; then Home moves per the runbook's step 11 with the Studio restoring from this Mac's last backup and this Mac's hub stopped, never deleted; rollback is repointing the URLs or restarting this Mac's hub on its untouched data directory. Acceptance: a turn on this Mac's hub answered by the Studio's engine; the rollback rehearsed. Exit: `bash scripts/check.sh --docs` and the recorded rehearsal.
+    Design: [studio-day-one-2026-09-23](plans/studio-day-one-2026-09-23.md)
+
+## Chat parity program (design pass, 2026-09-16) (archived 2026-10-31: superseded by “The chat rebuild (2026-09-22)”, “Thin chat path” and RULES.md chat rules 1 to 14)
+
+The dated inventory and product decisions are in
+`docs/plans/chat-parity-2026-09-16.md`. These items are additive follow-ups;
+they do not change the completed conversation, attachment, composer, or
+stats item text above.
+
+- [ ] **CHAT-PARITY-03: household share and local export** (M, after CHAT-PARITY-02)
+
+    Objective: let an adult send a conversation to a named household member
+    or save Markdown, PDF, and JSON locally. Files: conversation routes,
+    export serializers, `frontend/src/apps/chat/`, the PDF artifact path, and
+    `docs/user/chat.md`. Pattern: mirror authenticated conversation ownership,
+    sanitized source links, the batch confirmation pattern, and the PDF
+    render-and-verify flow. Acceptance: every export preserves branches,
+    sources, and timestamps; a share names one recipient and creates no public
+    URL; child profiles have no share or export controls; failed files leave no
+    partial artifact. Out of scope: cloud sharing, anonymous links, and
+    importing foreign chat formats. Exit: route, serializer, privacy,
+    permission, and rendered PDF tests, `bash scripts/check.sh`.
+    Design: [chat-parity-2026-09-16](plans/chat-parity-2026-09-16.md)
+- [ ] **CHAT-PARITY-05: continuous voice call controls** (M, after CHAT-PARITY-04)
+
+    Objective: support an adult hands-free voice conversation with visible
+    listening, speaking, mute, and stop states while retaining turn-level
+    safety and history. Files: `chatListenStore.ts`, the STT socket and
+    dictation adapter, sentence speech scheduler, `ChatPage.tsx`, and the
+    voice routes. Pattern: mirror the existing sentence speech and
+    `SensesDock` lifecycle states. Acceptance: one utterance creates one turn,
+    barge-in stops speech, a hard stop closes the microphone, errors return to
+    text chat, child profiles do not enable a continuous microphone, and crisis
+    resources remain an alongside banner. Out of scope: wake-word autonomy
+    and background recording. Exit: voice lifecycle tests, a phone screenshot,
+    safety tests, `bash scripts/check.sh`.
+    Design: [chat-parity-2026-09-16](plans/chat-parity-2026-09-16.md)
+- [ ] **CHAT-PARITY-06: artifacts and canvas design pass** **Rewritten 2026-10-02 for chat rule 9.** The canvas uses the chat's renderer (`MarkdownText`, THIN-5F); the design pass names only the gaps that no shipped part covers, each recorded before any code. (L, design pass first) Amended 2026-10-01 (reference screens review): the design pass also names the closed set of typed blocks for a designed document and how the same page prints to PDF, and covers files a project assembles (a PDF, a picture), how they show in the pane on a wide screen and on a phone, and whether a produced file is listed in Library; see `docs/dev/reference-screens-review-2026-10-01.md`.
+
+    Objective: decide whether a private document and code workspace belongs in
+    the chat pane or is a separate package, including revision, storage,
+    execution, and child projection contracts. Files: a new design record,
+    `spec/schemas/turn-artifact.schema.json`, `frontend/src/apps/chat/`, the
+    shell pane contract, and the package permission model. Pattern: mirror
+    COMP-01 documents, the UI `DetailPane`, and ATT-01 immutable attachments.
+    Acceptance: the design names the artifact types, local storage and
+    retention, allowed runtimes, permission prompts, revision identity,
+    import/export, adult and child projections, and a testable threat model.
+    Out of scope: implementation, arbitrary code execution, public artifact
+    links, and cloud-hosted artifact apps. Exit: reviewed design and a later
+    implementation brief. No code plan is authorized by this item.
+    Design: [artifacts-evaluation-2026-09-21](plans/artifacts-evaluation-2026-09-21.md)
+- [ ] **CHAT-PARITY-07: research progress and source timeline** **Rewritten 2026-10-02 for chat rule 9.** The source timeline is built from the kit's sources parts and the `[n]` citation mapper (THIN-4B), on `turnMachine/` and the page-reading search of THIN-4A, not `turnEngine.ts`. (M, after COMP-02 and PAGE-01)
+
+    Objective: make bounded research legible as it searches and reads sources,
+    then hand off the report to the existing details document. Files:
+    `backend/src/lib/turnEngine.ts`, `turnContext.ts`, websearch and page
+    packages, `ChatPage.tsx`, and notifications. Pattern: mirror COMP-02's
+    research mode, PAGE-01's single-page budget, status events, and the source
+    card. Acceptance: the parent sees plan, progress, source count, and a
+    stop action; the run has a declared ceiling and no linked-page fan-out; a
+    partial run is labeled partial; the final report has citations; children
+    receive the existing short projection. Out of scope: autonomous crawling,
+    hidden provider accounts, and an unbounded agent loop. Exit: bench rows,
+    source and cancellation tests, screenshots, `bash scripts/check.sh`.
+    Design: [chat-parity-2026-09-16](plans/chat-parity-2026-09-16.md)
+- [ ] **CHAT-PARITY-08: two-model comparison** (M, after CHAT-PARITY-01)
+
+    Objective: let an adult ask two selected local models the same prompt and
+    compare separate answers without merging their provenance. Files:
+    `backend/src/lib/turnEngine.ts`, model settings and health routes,
+    `frontend/src/apps/chat/`, and a comparison artifact fixture. Pattern:
+    mirror the composer comparison section, selected model metadata, and
+    `SplitView` in UI.md. Acceptance: both calls share one bounded prompt,
+    each answer has its own model and sources, one failure does not erase the
+    other, cancellation stops both, and child projection returns only the
+    safe short line. Out of scope: hidden voting, ensembles, or more than two
+    foreground model calls. Exit: backend, frontend, budget, and screenshot
+    tests, `bash scripts/check.sh`.
+    Design: [chat-parity-2026-09-16](plans/chat-parity-2026-09-16.md)
+- [ ] **CHAT-PARITY-09: owner repair summary** (S, after STATS-01)
+    Design: [chat-parity-2026-09-16](plans/chat-parity-2026-09-16.md)
+- [ ] **CHAT-PARITY-11: chat backup and restore** (M, after CHAT-PARITY-03)
+
+    Objective: include conversations, branches, attachments, sources, and
+    metadata in the household's local backup and restore path. Files:
+    `backend/src/lib/backup.ts`, conversation and attachment serializers,
+    restore routes, `frontend/src/apps/chat/`, and backup docs. Pattern: mirror
+    the household backup record, JSON export, checksummed attachments, and
+    destructive confirmation. Acceptance: a backup round-trips into a new
+    household data directory, corrupt files are rejected without partial
+    restore, secrets and provider tokens are excluded, the owner sees a
+    restore preview, and children cannot export or restore. Out of scope:
+    third-party sync and automatic cloud copies. Exit: backup fixtures,
+    restore, retention, and UI tests, `bash scripts/check.sh`.
+
+<a id="comp-01"></a>
+    Design: [chat-parity-2026-09-16](plans/chat-parity-2026-09-16.md)
+- [ ] **COMP-01: The details pane and its documents** (M, spec first, after CHAT-16)
+
+    Objective: the bubble is the friend's line; the detail is a
+    revisioned document beside it, built only when opened. Spec first:
+    `spec/schemas/turn-artifact.schema.json` (typed sections, sources,
+    provenance, the originating turn, a revision number, the evidence
+    version), fixtures and bindings. Then: `backend/src/lib/turnContext.ts`
+    and `conversationHistory.ts` (a `document` JSON column beside
+    `outcomes`, a migration), `backend/src/lib/turnEngine.ts` (the
+    composer builds `lookup`, `card`, `procedure`, `comparison` from the
+    retained outcomes), `backend/src/routes/conversations.ts`
+    (`GET /api/conversations/turns/:id/document`, Zod and OpenAPI;
+    `document_available` on `TurnValue`, additive), `frontend/src/apps/chat/`
+    (a Details handle beside `chatSourcesCard.tsx`, a pane at desktop
+    widths, a bottom sheet on a phone, a new revision on a same-subject
+    follow-up), `docs/user/chat.md`, the screenshot pipeline. Mirror:
+    `SourcesCard` and the lane 10 sources shape; the shell's responsive
+    rules in UI.md. Acceptance: a document exists only for a turn with
+    a lookup, a typed-source answer or a procedural ask (effect: the
+    column is null for the greeting and timer rows and non-null for the
+    world-knowledge rows); its content equals the outcome's data (a
+    typed card carries the source's fields and sources, never model
+    prose); "the whole recipe" opens it and the line is one sentence; a
+    same-subject follow-up writes revision two with revision one kept;
+    a voice-surface turn says where it is and never reads it;
+    screenshots opened and judged. Out of scope: research mode
+    (COMP-02). Exit: the spec suite, backend and frontend suites, the
+    screenshot review, `bash scripts/check.sh`.
+
+    - [x] **COMP-01a: document storage** (mechanical). Add the
+      `document` JSON column and migration in
+      `backend/src/db/schema.ts`, `backend/src/lib/conversationHistory.ts`
+      and the migrations directory. Mirror the existing `outcomes`
+      column and its null behavior. Acceptance: turns without lookup,
+      typed-source or procedural material keep `document` null and a
+      valid `TurnArtifact` round-trips beside outcomes. Exit: targeted
+      migration and history tests, then `bash scripts/check.sh`.
+    - [x] **COMP-01b: document route and wire** (mechanical). Add the
+      named GET route and additive `document_available` in
+      `backend/src/routes/conversations.ts` and `backend/src/wire.ts`.
+      Mirror `createRoute`, the `SourcesCard` source shape and generated
+      OpenAPI. Acceptance: authenticated GET returns the validated
+      artifact, missing documents stay absent, and API docs regenerate.
+      Exit: route tests and the API-docs check.
+    - [x] **COMP-01c: composer document builders** (mechanical). Build
+      `lookup`, `card`, `procedure` and `comparison` in
+      `backend/src/lib/composer.ts` and `backend/src/lib/turnEngine.ts`.
+      Mirror `sourcesFromRows()` and retained outcome data. Acceptance:
+      each outcome family produces its typed section, chit-chat produces
+      none, child projection keeps the ceiling and strips sources, and
+      new evidence creates a new revision. Exit: composer and engine
+      tests plus `bash scripts/check.sh`.
+    - [x] **COMP-01d: details pane** (mechanical). Add the handle and
+      responsive pane under `frontend/src/apps/chat/`. Mirror
+      `chatSourcesCard.tsx` and the shell's `UI.md` responsive rules.
+      Acceptance: desktop uses a side pane, phones use a bottom sheet,
+      the child projection has no sources, and voice directs the person
+      to the phone or hub screen. Exit: frontend tests and judged
+      screenshots.
+    Design: [artifacts-evaluation-2026-09-21](plans/artifacts-evaluation-2026-09-21.md)
+- [ ] **PANE-01: The pane as an offer, never a push** (M, design pass first, owner's question 2026-09-16)
+
+    The question: when a person says "that film was fantastic", should
+    the pane show reviews, cast, where to watch, without being asked?
+    The owner is unsure where "useful" ends and "too much" begins; that
+    line is the design, not the code. Principle to design against: the
+    pane is a door, never a billboard. The bubble stays the friend's
+    line and never gains an unasked-for card; what may appear is a
+    small handle naming what the pane could hold ("Reviews", "Cast",
+    "Where to watch"), built only when tapped (COMP-01's rule), so
+    nothing costs a lookup until the person wants it. The design pass
+    decides: which subjects earn a handle (a named world subject with a
+    typed kind: film, album, game, person, place; never a household
+    subject, never a feeling), which handle labels per kind (drawn from
+    the kind's typed fields, the same table LOOKUP-01 uses, never a
+    per-case list), how often (once per subject per conversation, never
+    on consecutive turns, none in the child band, none while an ask is
+    pending), how it is measured (the handle's tap rate per kind in the
+    weekly report; a kind under five percent loses its handle), and
+    the voice rule (a tapped handle's document opens beside the same
+    short line; the line itself never says "see the pane"). Pointers:
+    `docs/dev.md` COMP-01 and COMP-02, `chatDocumentPane.tsx`, the
+    subject stack in `turnContext.ts`. Out of scope: any automatic
+    lookup before a tap. Exit: the design section, the rows for "handle
+    offered", "handle not offered on a household subject", "handle not
+    offered twice", then the mechanical items it names.
+
+<a id="comp-02"></a>
+- [ ] **COMP-03: The companion package's full shape** (M, spec first)
+
+    Objective: a companion is a name, a personality, a directness, a
+    specialty, a default voice, a kid-safe flag and a rapport flag,
+    declared once in its manifest; which wake word summons it is the
+    binding record's job alone (COMP-06). Files:
+    `spec/schemas/manifest.schema.json` (the `companion` block:
+    `directness`, `specialty`, `voice`, `kid_safe`, `rapport`, and,
+    deferred by the coherence review to a slice after CRED-01,
+    `credulity` with a `default` of trusting, ordinary or skeptical and
+    per-class `overrides` for claims about the person's own life,
+    `life_event`, `money`, `health`, `achievement`, `plan`, the classes
+    declared once in `spec/vocab/life-events.json`, the validator
+    refusing any other key; dev.md section 15),
+    fixtures and bindings, `backend/src/lib/persona.ts` (`directness`
+    rendered as one sentence; MaiPai `direct`, the bundled
+    personalities `conversational`), the four bundled manifests,
+    `backend/scripts/bench/persona-eval.ts` (a directness row per
+    companion; every correctness row of the conversation bench once per
+    companion), `docs/PACKAGES.md` in `.github` for the catalog's
+    admission review of `kid_safe`. Acceptance: the direct companion
+    answers the point first with no offer on the persona-eval rows in
+    three runs; the same correctness rows pass for every bundled
+    companion; ASK-01's clarification is appended under every companion
+    (a test per bundled one); a test asserts one composer and one guard
+    list; the bundled profiles (Buddy trusting, MaiPai ordinary, The
+    Tutor skeptical with `achievement: ordinary`) and the `credulity`
+    conversation (section 15, part 5) under all three, the same
+    record at the same confidence on the memory table under each,
+    three seeded runs; a `skeptical` package that is `kid_safe` fails
+    catalog review, and the runtime clamp (skeptical reads as ordinary
+    on the child band) stays as the guard; a manifest with an override
+    key outside the five classes is refused by the validator (a test).
+    Exit: the spec round trip, persona-eval, `bash
+    scripts/check.sh`.
+
+<a id="comp-04"></a>
+    Design: [companions-design-brief-2026-09-13](plans/companions-design-brief-2026-09-13.md)
+- [ ] **COMP-04: Per-person companion sets, the kid-safe rule, and the voice per turn** (M, after COMP-03, spec first). The per-person set is filtered by `companions.allowed`; `companions.enabled` (the list) stays a separate key.
+
+    Objective: each person has their own companions; a child's set is
+    chosen by an adult from the kid-safe ones; a message may name the
+    companion; the voice is resolved per turn. Files:
+    `spec/settings/keys.json` (`companions.enabled`, person scope, the
+    generic renderer; `persona.active_id` becomes the default;
+    `tts.voice_id` becomes the fallback behind the companion's own
+    voice), `backend/src/lib/settings*.ts` (validation: a child's list
+    holds only `kid_safe` ids, written by an adult),
+    `backend/src/lib/turnEngine.ts` (the companion on the turn from a
+    header pick, a name opener in text, or the wake word; the resolved
+    voice on the turn), `backend/src/routes/tts.ts` (reads the turn's
+    resolved voice, then the setting), `frontend/src/apps/chat/` (the
+    header pick), `docs/user/chat.md`. Acceptance: a child's write of a
+    non-kid-safe id is refused at the settings API; a named companion
+    answers one message in its own voice and the next message returns
+    to the default; switching changes neither the conversation nor
+    recall (effect: the same memory rows in context before and after).
+    **Amended 2026-09-14 (dev.md section 13, parts 6 and 7):** every
+    key this item and section 13 name for a child (the companion set,
+    the audience default, the teen's audience, the notification rule)
+    is adult-written, and a child-role write to any of them is refused
+    at the settings API (a test per key); a child's companion set is
+    the band's register first and the personality's second; an
+    unidentified speaker on a shared device gets the child band's plan,
+    ceiling and audience and no person-scope recall (COMP-06's rule),
+    and a guest reads as adult for register and as child for audience
+    and ceiling; the kid-safe rule is validated at the selection
+    boundary on every turn, not only at write time (a person ages into
+    a stricter band, a manifest changes, an unknown speaker inherits a
+    device binding), with an invalid selection falling back to the
+    bundled kid-safe default and the reason recorded; no companion can
+    change the band, the disclosure result, the notification decision,
+    the safety result or a memory's scope (section 13, part 9). Exit:
+    the suites, `bash scripts/check.sh`.
+
+<a id="comp-05"></a>
+    Design: [companions-design-brief-2026-09-13](plans/companions-design-brief-2026-09-13.md)
+- [ ] **COMP-05: Rapport, one more scope on memory** (M, spec first; a robot's own memories are ROBOT-MEMORY-01, keyed by device, not this scope)
+
+    Objective: every companion knows what the hub knows; each also has
+    its own rapport with the person, in the one memory store. Files:
+    `spec/schemas/memory-record.schema.json` (`scope` gains `companion`;
+    `companion_id`, nullable, required at that scope), fixtures and
+    bindings, `backend/src/lib/memoryJudge.ts` (a rapport fact written
+    at that scope), `memory.ts` (recall reads household, person and the
+    active companion's rapport only), `turnEngine.ts` (the rapport
+    lines under their own heading in the memory section),
+    `backend/tests/memory.test.ts`, `memoryJudge.test.ts`,
+    `conversationFixture.ts` (a hard row: companion A's running joke is
+    absent from companion B's context, the B5 shape). Acceptance: the
+    hard row in three seeded runs; the judge writes a rapport fact at
+    the companion scope and a household fact at its own; the Memory
+    page lists rapport under the companion's name; (deferred to the credulity slice after CRED-01, the coherence
+    review) a typed calibration
+    record per companion, person and claim class in the rapport scope
+    (`adjustment: earned_trusting | baseline | earned_cautious` with
+    its `observations`, each a mechanically resolved outcome citing
+    its turn ids: `provisional_later_corroborated` or
+    `exaggeration_acknowledged` by the person's own words; a model's
+    impression never counts, nor an external contradiction without the
+    person's acknowledgment), a bounded window of the most recent
+    twelve per class, three in one direction moving the adjustment one
+    step and mixed evidence returning it toward baseline, moving only
+    the social provisional boundary one rung, never the fact's
+    confidence, recall, evidence requirements, actions, safety, privacy,
+    another companion, person or class, never rendered in recall or the
+    profile, resettable from the Memory page (dev.md section 15, part 3
+    and part 6); the earned-trust
+    rows of section 15, part 5, three seeded runs. Exit: the spec round
+    trip, the named tests, `bash scripts/check.sh`.
+
+<a id="comp-06"></a>
+    Design: [companions-design-brief-2026-09-13](plans/companions-design-brief-2026-09-13.md)
+- [ ] **COMP-06: Wake word to companion bindings** (L, spec first; engine after COMP-04)
+
+    Objective: a wake word names a slot, the speaker names the person,
+    the person's binding names the companion; shared devices carry an
+    admin-set default; nothing is declared twice. Spec first, three
+    things: a new `spec/schemas/companion-binding.schema.json`
+    (`scope: person | device | household`, `scope_id`,
+    `wakeword_package_id`, `companion_package_id`; no voice, no
+    register); device ownership for a shared device
+    (`device.schema.json` requires one `person_id` and treats
+    re-pairing as a new row, which a shared kitchen display
+    contradicts; settle the shape first); and a measured answer on
+    several wake words at once (the client loads one selected detector
+    today: CPU cost and false-activation rate on recorded audio
+    fixtures before the binding promises it). Then: `backend/src/lib/`
+    (one `resolveCompanionForVoiceTurn()` with a unit-tested table:
+    speaker's binding, device's, household default; identity per turn,
+    never sticky; an unknown or low-confidence speaker gets the
+    device's or household's binding, an anonymous context for a world
+    question, a who-is-speaking ask before a personal memory is read, a
+    personal state is changed or an age-dependent safety decision is
+    made, and the strictest applicable safety policy), the voice route,
+    the Settings UI for a person's bindings and a device's defaults,
+    `docs/user/`. Depends on SPEAK-01 for identification on shared
+    devices; until it lands, the device binding and the anonymous
+    context alone, and a shared device stays usable. Acceptance: the
+    resolution table as unit tests (two people, one word, two
+    companions; a personal device; an unknown speaker on a world
+    question, on a personal-memory question and on an age-gated
+    request); the records sync to the robot as spec records. Exit: the
+    spec round trip, the suites, the wake-runtime measurement recorded,
+    `bash scripts/check.sh`.
+
+<a id="speak-01"></a>
+    Design: [companions-design-brief-2026-09-13](plans/companions-design-brief-2026-09-13.md)
+- [ ] **SPEAK-01: Speaker identification on shared devices** (L, hardware)
+
+    Objective: an enrolled voice print per household member, resolved
+    locally per turn on a shared surface, as a confidence signal for
+    COMP-06 and never a prerequisite for a shared device's ordinary
+    use; enrollment is with the person's consent, and the
+    print is never updated from an uncertain match. Files: the bot's microphone pipeline first (the reSpeaker
+    array), then the hub's voice route; a maintained speaker-embedding
+    model fetched on demand (pinned URL, checksum), never vendored;
+    enrollment in Settings under the org's training rules. Acceptance:
+    a real-microphone check with three enrolled roster voices
+    recognized at a stated rate, an unenrolled voice reported unknown,
+    and a speaker change mid-conversation detected, recorded with the
+    engine build and a sanitized hardware description; no household
+    recording in any repo. Exit: the bench record, `bash
+    scripts/check.sh`.
+
+<a id="wake-02"></a>
+- [ ] **WAKE-02: Wake-word training as a household feature** (L, after the bot's pipeline item)
+
+    Objective: a person trains a new word on the hub under the org's
+    rules and binds it to a companion. Files: the training pipeline
+    item under Legacy (the bot's), a hub UI in Settings, registration
+    as a wakeword package, `docs/user/`. Acceptance: the pipeline's own
+    gates (real speech, near misses, verified data) plus a binding
+    resolved through COMP-06's table. Exit: the pipeline's checks,
+    `bash scripts/check.sh`.
+
+<a id="review-01"></a>
+- [ ] **REVIEW-01: The conversation quality controller** **Rewritten 2026-10-02 for chat rule 12.** Retargeted: it reads the thin path's turn records, not `turnEngine.ts`; 'after CHAT-16' becomes after THIN-7D. Spec first, unchanged. (M, spec first, after CHAT-16; the auto-apply set waits for a month of the report)
+    Design: [chat-engine-and-model-records-2026-10-17](design/chat-engine-and-model-records-2026-10-17.md)
+
+    Objective: the hub reviews its own turns and adjusts records and
+    bounded settings, never weights, prompts or engine rules. Spec
+    first: `spec/schemas/turn-review.schema.json` (defect codes,
+    evidence ids, corrected-by-person, responsible layer, retrieved
+    items that helped, a proposed adjustment of a bounded type,
+    evaluation result, status, provenance) and a per-record retrieval
+    signal on `memory-record.schema.json`; fixtures and bindings.
+    Then: `backend/src/lib/turnReview.ts` (the immediate deterministic
+    checks on every turn, from the turn context, the stored signal and
+    plan (ACT-01, ACT-03: `act_mismatch`, `emotion_mismatch`,
+    `missing_reaction`, `unwanted_question`, `closing_reopened`,
+    `register_plan_violation`, `playful_under_distress`) and the
+    retained outcomes; the nightly pass on the background engine with the 4B
+    drafting only on turns that carry a deterministic trigger (a guard
+    hit, a correction, a repeated question, a lookup without a source, a
+    thumb; never every turn, the coherence review's cap) and every
+    finding confirmed mechanically), the auto-apply
+    set (rank, duplicates, disputed, a household routing example,
+    package preference, the assistant-prose flag, stale evidence
+    refresh, an open question), the replay gate for proposals (the
+    shipped fixture plus the household's recent turns, run locally
+    against a candidate; kept only if the targeted measure improves
+    and no protected row regresses), the household's weekly report in
+    plain words (`docs/user/`), the approvals path for proposals.
+    Mirror: the judge's queue and `runConsolidation()`; the effect
+    standard of the bench. Acceptance: a seeded week of fixture
+    conversations with planted defects yields one `TurnReview` per
+    planted turn with the right code and layer (effect: the rows); the
+    auto-applied changes are visible with provenance and reversible
+    from the Memory page; a planted correction lowers the offending
+    record's rank on the next recall; a proposal for a guard rule
+    never changes the guard and appears as a report; the stable prompt
+    is byte-identical before and after a week. Out of scope: any model
+    training. Exit: the spec suite, the named tests, `bash
+    scripts/check.sh`.
+
+<a id="eval-07"></a>
+- [ ] **EVAL-07: Public conversation datasets as a second bench** (M, after MEM-06, before CUR-01)
+
+    Objective: the hub's memory and register are judged against a
+    public baseline nobody here graded, so CUR-01 and REVIEW-01 report
+    deltas beside the household bench. Text, the datasets checked, the
+    licenses and the amended grading rules: `docs/plans/
+    media-conversation-program-2026-09-13.md`, "EVAL-07". Files: a
+    script under `backend/scripts/bench/` that downloads
+    LongMemEval-cleaned (MIT) at a pinned checksum into the ignored
+    data directory (download, never vendor, never shipped), converts it
+    to `conversationFixture.ts`'s shape, replays it through the live
+    engine seeded on a quiet machine, and scores it by the dataset's
+    own metric with abstention and knowledge-update reported
+    separately; then LoCoMo (CC BY-NC, research only); DailyDialog for
+    register through phenomena rewritten into the fixture shape, never
+    scored against the human reply. Mirror: `scripts/bench/
+    conversationLive.ts` and BENCH-01's pins (ENGINE-HOST-01: a replay
+    points its three URLs at engines on another machine, so a second
+    engine set never sits in this machine's memory); `backgroundAssets.ts` for
+    the pinned download with a checksum. Acceptance: the first run is
+    the baseline recorded in docs/dev/session-a.md with the engine
+    build, model files and a sanitized hardware line; later items
+    report deltas. Out of scope: ACT-02's classifier heads (a separate
+    session, once this script exists), CANDOR and MSC (second phase,
+    licenses to confirm). Exit: the script's own run on a quiet
+    machine, `bash scripts/check.sh`.
+
+    Found live, 2026-09-14 (baseline v0, `replay.ts`): the replay
+    process's own resident memory grows across questions and
+    `resetReplayDatabase()` does not return it to the OS - three
+    single-process oracle-v0 runs in a row were killed for low memory,
+    each getting further than the last with no other process's own
+    interference to explain it. Worked around, not fixed, by
+    `replay-per-question.ts` (one fresh OS process per question, same
+    seed and order as the manifest, RSS start/end recorded on each
+    question's own row) - the real fix (find and close whatever
+    `ingestRow`/`runJudgeBatch`/the recording proxy holds onto across
+    questions inside one process) is still open. Corrected the same day:
+    the per-process kills were the Claude Code harness's own background-
+    task monitor stopping a tracked task when free memory looked low,
+    not macOS killing the process - every kill's own row showed the
+    process itself healthy and small (max 343MB, mean 160MB across the
+    real 35-question run). Free memory on this machine sits near ~90MB
+    as its own steady state whenever the 8B chat engine's mapped model
+    pages are touched, which the OS reclaims on demand; the harness read
+    that as pressure. The actual fix was running the per-question loop
+    detached (`nohup`, disowned, watched via a log tail, never a
+    harness-tracked foreground wait) - `replay-per-question.ts`'s own
+    memory guard (wait for free memory before each spawn, capped) stayed
+    in as cheap insurance, not the load-bearing fix. Full account:
+    docs/dev/session-b.md, "Lane 14 item 2 follow-up 2".
+
+    Baseline v0 recorded 2026-09-14 (35 questions, seed 20260914):
+    14/35 overall. Per type in docs/dev/session-b.md; per-row failure
+    read pending.
+
+    Dataset half shipped 2026-09-14, Session B (lane 12 item 4), amended
+    per the coherence review's own split (dev.md, "Coherence review,
+    2026-09-14", question 5: this item's replay-through-the-engine half
+    is Session A's, memory mode, later): `backend/scripts/bench/
+    datasets/` - the registry (`registry.json`, one entry per dataset
+    downloaded into `data-scratch/datasets/`, a `verify` command
+    checking checksums, a separate `download` command), the internal
+    form (`types.ts`), loaders for LongMemEval-cleaned, LoCoMo and
+    DailyDialog into it (`longmemeval.ts`, `locomo.ts`, `dailydialog.ts`,
+    each proven both against a small embedded unit-test sample and live
+    against the real downloaded file), and the coherence review's own
+    40-per-type LongMemEval sample, seeded and deterministic
+    (`sample.ts`, `sample-manifest.json`, 230 ids). Design note:
+    `docs/dev/session-b.md`, "Lane 12 item 4". Left: the engine replay
+    itself (Session A's).
+
+    Mining half's own tool shipped 2026-09-14, Session B (lane 13 item
+    1): `mine.ts` selects about 200 phenomenon fragments (23
+    phenomena, no model) from Taskmaster-1, CCPE-M and QuAC (three new
+    loaders, `taskmaster1.ts`/`ccpeM.ts`/`quac.ts`) plus DailyDialog,
+    LoCoMo and LongMemEval, each rule named in the committed
+    `phenomena.json`, into the git-ignored `data-scratch/eval/
+    review-sheet.md` for a person to mark keep/skip/rewrite. Design
+    note: `docs/dev/session-b.md`, "Lane 13 item 1". Left: Jesse's or a
+    design session's review of the sheet, and the rewrite into bench
+    scenarios (after CHAT-16).
+
+    Reference distributions shipped 2026-09-14, Session B (lane 13
+    item 2): `reference.ts` computes DailyDialog's act and emotion
+    distributions and their transition tables (train+validation for
+    the distributions, honoring the test split's own held-out note;
+    train alone for the transitions, matching dev.md's own wording),
+    committed to `reference/dailydialog.json` with the registry's
+    version and checksums inside; a test pins the numbers to dev.md
+    section 12's own quoted figures within one point. A live check
+    found one of dev.md's own quoted figures ("a question 16 percent"
+    after a question) does not match the act-based transition (11.4
+    percent, a real 4.6-point gap) - it matches a different, surface
+    measurement (the next turn's own text carrying a "?", 16.3
+    percent) dev.md's prose folds into the same sentence without
+    naming it; both numbers are now reported correctly, never
+    conflated. Design note: `docs/dev/session-b.md`, "Lane 13 item 2".
+    No child-length reference file: no public source supports the
+    design's own child/teen word-and-sentence caps, recorded as such.
+
+<a id="cur-01"></a>
+    Design: [media-conversation-program-2026-09-13](plans/media-conversation-program-2026-09-13.md)
+- [ ] **CUR-01: The memory curator** (S-M, after MEM-06)
+
+    Progress 2026-09-15 (on the next stack): a record past its own
+    `valid_to` is archived with `expired_at`, provenance intact, a bare
+    date ending at the end of its day, a pin never keeping it alive
+    (9f7c625); an exact re-assertion never writes a second record, a
+    state is extended to the later end date, anything else counts a
+    use, neither embedded nor sent to the model (1fdc85d). The rest
+    below stays open.
+
+    Objective: the store stays clean and honest without inventing
+    anything. Files: `backend/src/lib/memoryJudge.ts`
+    (`runConsolidation()` grows into the curator), `memory.ts`,
+    `entities.ts`, `relationships.ts`, `backend/tests/memoryJudge.test.ts`.
+    Do: exact and semantic duplicates merged with provenance kept;
+    conflicting active records marked disputed and not presented as
+    fact; time-sensitive facts expired; every active record verified
+    to trace to the speaker's words or an authoritative integration,
+    assistant-derived ones quarantined; unknown-kind entities turned
+    into ASK-01 open questions; confidence lowered on contradiction;
+    a record past `valid_to` archived with `expired_at`, provenance
+    intact (the read boundary itself is CHAT-08's, which precedes this
+    item; the coherence review, 2026-09-14), pinning never reviving an
+    expired state, a state extended on a re-assertion,
+    repeated states kept as episodes with three across two weeks
+    producing an open question or a proposal and never a trait, a
+    later denial or correction superseding the active state, an event
+    surviving the state it came with, a dated `goal` or `event` fading
+    the day after, a `reported` record superseded and never extended by
+    the speaker's own later words (dev.md section 12, part 6); and, deferred to CRED-01 by the coherence review
+    (2026-09-14), the rest of this sentence: credence
+    recomputed from evidence, never incremented (dev.md section 14,
+    part 3): exact re-assertions merged with every source kept,
+    distinct calendar days and distinct authorized speakers counted
+    (never repeated turns in one conversation), corroboration only at
+    the same authorized scope and never across one person's private
+    memory and another's turn, an authoritative integration counting
+    and a web snippet or the hub's reply never, an unresolved
+    contradiction marked through `conflicts_with` and an open question
+    and never resolved from model preference, provisional and
+    conflicted records excluded from profile synthesis, a later
+    contradiction lowering without deleting evidence, and never a decay
+    with time. Never resolves a conflict itself: the next relevant
+    conversation asks. Two layers (the outside review, 2026-09-14): a
+    deterministic maintenance pass (expiry, exact duplicates, the state
+    transitions) that this item builds first, and an offline semantic
+    pass that only proposes merge and conflict candidates; promotion of
+    a person-scoped inference into household knowledge needs the
+    person's answer or an adult's confirmation, never the curator's own
+    judgment. Acceptance: a seeded store with each defect class comes out
+    with the right statuses and no invented resolution; a disputed
+    record is absent from the next prompt; the open question is asked
+    on the next turn; a record past `valid_to` absent from the next
+    context before the sweep; the `act-memory-curator` conversation of
+    section 12, part 6 (extended, expired, the event surviving, three
+    states with no trait, a denial superseding), driven with the
+    bench's clock, three seeded runs; the `corroborated` and
+    `contradicted` rows of section 14, part 7. Exit: the named tests, `bash scripts/check.sh`.
+
+<a id="pref-01"></a>
+- [ ] **PREF-01: Explicit, inspectable preferences** (M, spec first, after REVIEW-01)
+    Design: [memory-lifecycle-and-preferences-2026-10-17](design/memory-lifecycle-and-preferences-2026-10-17.md)
+
+    Objective: personal adaptation is a setting with a reason, never a
+    hidden profile. Spec first: `spec/settings/keys.json` gains
+    person-scope keys for reply length, directness, register, whether
+    follow-up questions are welcome, the preferred companion per
+    surface and per wake word, and source preferences per task, and
+    `setting-value.schema.json` gains a `provenance` field (who or
+    what set it, from which review, when). Then: the generic settings
+    renderer shows the reason and a reset; REVIEW-01 may create a
+    proposed preference from repeated behavior that the person
+    accepts, and silence is never consent; the composer and the
+    companion resolution read them. Acceptance: a repeated behavior
+    in the fixture yields a proposal, not a change; accepting it
+    changes the next reply's length (effect: `maxWords`); reset
+    restores the default and clears the provenance. Exit: the settings
+    suite, `bash scripts/check.sh`.
+
+<a id="cred-01"></a>
+- [ ] **CRED-01: Credence on a fact** (M, engine only, after the companions block; deferred by the coherence review, 2026-09-14)
+
+    Objective: dev.md section 14 as designed, on the fields SPEC-01
+    already carries: `computeFactConfidence()` in one engine-owned
+    module called by the judge, the remember package, a correction, the
+    curator, recall and the robot; the curator's recompute, merge,
+    corroborate and conflict rules; CHAT-08's ordered read with the
+    typed `FactPresentation` and the `doubt_of_person` and
+    `overclaimed_fact` guard rows; ACT-03's `claim_state` with the
+    surprise and contradiction moves. The turn-time contradiction reads
+    only what the engine sees without a model (an inform whose subject
+    has an active record of the same category carrying a different date,
+    day, number or name); every other contradiction is the judge's
+    finding turned into an `OpenQuestion` of kind `clarify_fact`. Files:
+    `backend/src/lib/memoryJudge.ts`, `memory.ts`, `register.ts`,
+    `guards.ts`, their tests, the fixture. Acceptance: the `credence`
+    conversations of section 14, part 7, three seeded runs, with the
+    contradiction row's clarification arriving at the end of the next
+    reply when the judge found it. Out of scope: any person-level score;
+    the credulity flavor (COMP-03's slice). Exit: the named tests,
+    `bash scripts/check.sh`.
+
+<a id="act-01"></a>
+- [ ] **ACT-02: The act, emotion and stance heads on the utterance embedding** **Rewritten 2026-10-02 for chat rule 1.** The heads are kept only for the plan line, memory-judge eligibility, the wire `signal` event and spoken-cue suppression. Nothing they predict decides a search or a tool, and no learned head sits in the safety, consent or privacy path. Acceptance is the heads' agreement on act, emotion and stance, with no lookup-routing row. (M, after ACT-01)
+    Design: [chat-engine-and-model-records-2026-10-17](design/chat-engine-and-model-records-2026-10-17.md)
+
+    Objective: inform versus commissive, an unpunctuated question, the
+    emotion in the common case and a clause's stance when no marker
+    settled it, decided in microseconds from the vector the turn
+    already computes, with a license-clean, calibrated artifact.
+    Files: `backend/scripts/train/turn-signal-heads.ts` (dev-time only:
+    labels the act and stance corpus with the 4B under the DailyDialog
+    act definitions and the stance definitions over Taskmaster-1,
+    CCPE-M, the bench fixture and synthetic roster dialogues; trains
+    three multinomial heads over the nomic vector, the emotion head on
+    GoEmotions with its published Ekman mapping; class-weighted loss,
+    temperature scaling per head on a held-out split, per-class
+    thresholds chosen on precision; writes the artifact with the
+    embedding identity, the label-map version and the validation
+    numbers), `backend/src/lib/turnSignalAssets.ts` (the
+    `wakewordAssets.ts` pattern: pinned URL, pinned checksum, single-
+    flight, a clear offline message), `backend/src/lib/turnSignal.ts`
+    (the heads after the rules, run right after the embed for every
+    model turn; refused at load when the embedding identity differs,
+    CHAT-09; `source: fallback` when the embed engine is down or the
+    artifact is missing; below a class threshold a clause is `unknown`),
+    `home/data-scratch/datasets/SOURCES.md` (GoEmotions, Apache 2.0,
+    added; the 500-turn reviewed sample recorded; the DailyDialog paper
+    pinned for the label definitions), the catalog model package.
+    Mirror: `wakewordAssets.ts`; the org's training rules (verify the
+    data landed, validate on held-out real data, never a household
+    transcript in the set). Acceptance: on DailyDialog's test split and
+    on the fixture, rules plus heads beat the rule pass alone on act
+    macro F1 and on the neutral-versus-not emotion split by a stated
+    margin, with per-class precision and recall, confusion, calibration
+    error and the neutral false-positive rate reported at the natural
+    distribution and on a balanced slice, else the heads do not ship;
+    stance precision per class on the reviewed sample; the fixture
+    floors of ACT-01 hold; the artifact loads only against its
+    embedding identity; the per-turn cost measured under one
+    millisecond warm. The measured alternative, built only if the
+    heads fall short on context-dependent fragments after the protocol
+    layer: a MiniLM-class encoder reading the previous hub turn plus
+    the person's, through the ONNX runtime the backend already
+    carries, at a warm CPU p95 under 20 ms on the hub and the robot.
+    Out of scope: any training in the house. Exit: the training
+    script's validation report in the dev docs, `bun test
+    tests/turnSignal.test.ts tests/turnSignalAssets.test.ts`, `bash
+    scripts/check.sh`.
+
+    Training half landed 2026-09-14 (`backend/scripts/train/
+    turn-signal-heads.ts` and its tests): the finding is the heads do
+    not ship. Act and emotion both miss the stated 5-point margin on
+    DailyDialog's human labels (act -4.4, emotion neutral-vs-not
+    -10.1); stance has no independent human-labeled validation yet
+    (waits on `data-scratch/eval/turn-signal-review-sheet.md`). Full
+    numbers in dev.md, "Session B, lane 16." No artifact to wire;
+    `turnSignal.ts` and `turnSignalAssets.ts` remain untouched. The
+    item stays open on the measured alternative (a MiniLM-class
+    encoder, section 12) as the next design question.
+
+<a id="act-03"></a>
+- [ ] **ACT-03: The reply plan, from the signal to the composer's permitted moves** **Rewritten 2026-10-02 for chat rule 5.** The plan's `max_words` and `max_sentences` bands apply to spoken turns, a child's or teen's chat and glance surfaces only. An adult's written turn gets no word or sentence cap in the plan and no instruction about length; `max_tokens` is a ceiling, not a target (THIN-1A). 'Rides with CHAT-16' is void (dropped). File names below that say `turnEngine.ts` read as their `turnMachine/` equivalent. (M, rides with CHAT-16)
+
+    Reachy v2 addition (2026-10-05; after EMO-MAP-01): the plan event gains `react_move`, chosen by the model from the emotion map candidates for its label when `react_allowed` and the band allow-list permit, at most once per reply; the robot react hook (`moves/react.py`) consumes it. With the optional moves pack absent the plan carries no `react_move` and the primitive plays alone (OWNER-ANSWERS 7). Acceptance adds: a child-band turn never carries a clip outside the child allow-list; safety refusals, consent asks and crisis lines carry none; with no moves pack installed no `react_move` is set. Cloud: no.
+
+    Objective: the engine decides which moves exist and how long the
+    reply is; the companion decides the wording of the optional ones;
+    the model writes the words; a forbidden move is dropped
+    structurally. Files: `backend/src/lib/register.ts` (the base table
+    by act, the emotion overrides, the companion modulation inside the
+    envelope, the explicit brevity request, the surface; one typed
+    `ReplyPlan` per turn), `backend/src/lib/turnEngine.ts` (one context
+    line per turn from the plan, ahead of the memory section;
+    `max_words` into CHAT-12's reserve; the plan and the typed moves
+    persisted beside the signal), the composer (CHAT-16: typed move
+    fields on the `ComposedTurn`, `react`, `care`, `say`, `pick`,
+    `point`, `ask_back`, `close`; a forbidden move omitted before the
+    boundary), `backend/src/lib/persona.ts` (`engagement` and
+    `directness` read by the table; the reaction and follow-up prose
+    retired, the remaining sentences realization only),
+    `backend/src/lib/guards.ts` (REG-01's statement rule reads the
+    signal; `near_echo` and `repeat_question` read it; a
+    `plan_violation` family: an unwanted follow-up, a missing required
+    acknowledgment, a closing reopened, playfulness under distress, a
+    length over the cap), `backend/src/lib/personaJudge.ts` (the rubric
+    line, with the stored signal, plan and outcome printed per
+    exchange), `backend/scripts/bench/conversationFixture.ts` (the
+    `act-register` conversation's plan checks; the signal assertion on
+    feeling-before-task, asks-back, child-register,
+    length-matches-the-moment and greeting-and-thanks),
+    `docs/user/chat.md`. Mirror: CHAT-16's composer and claim-type
+    ladder, `composePersonaPrompt()`. Acceptance: the `act-register`
+    conversation (dev.md section 12, part 4) and the five existing
+    register rows, three seeded runs, every turn's signal recorded and
+    every move read from the typed moves and the reply's effect; the
+    persona-eval judge scores the fit line per bundled companion and
+    every correctness row runs under every companion; the direct
+    companion drops an optional react on questions and keeps a required
+    acknowledgment on sadness; "just the numbers" suppresses the
+    optional moves under every companion; the crisis overlay and every
+    guard unchanged on every row; one authority for register (a test
+    that the persona prose carries no move decision). **Amended
+    2026-09-14 (dev.md section 13):** the age band is the plan's third
+    axis (`lib/register.ts` reads `ageBand` beside act and emotion: the
+    child envelope with care required on any negative emotion, `point`
+    and `pick` forbidden, two sentences and 40 words, three and 45 on a
+    disclosure, `vocabulary_level` simple (the coherence review: the
+    earlier "one sentence and 20 words" here was stale against section
+    13's table); the teen cap at two and 55; the companion's dials within the band,
+    never across it), the `band_claim` guard row, and the three child
+    conversations (`child-family-conflict`, `child-grandma`,
+    `child-goldfish`, section 13 part 8) plus the adult twins, run
+    under every bundled companion, three seeded runs; the plan gains
+    the typed fields `age_band`, `vocabulary_level`, `explanation_style`,
+    `trusted_adult_move` (`defer`) and `content_disclosure`, the caps
+    are the minimum of the act, emotion, band, surface and brevity caps
+    and the optional moves the intersection of the four masks, and the
+    `plan_violation` family gains `age_register_violation`,
+    `missing_child_care`, `missing_trusted_adult`, `patronizing_register`
+    and `disclosure_violation` (section 13, part 9). **Amended
+    2026-09-14 (dev.md section 14):** the plan gains `claim_state:
+    routine | major_new | contradiction | none`, set by the engine from
+    the clause, the life-events vocabulary and the dedupe pass; the
+    surprise move (`major_new`: `react` required and never skeptical,
+    `ask_back` required once for one useful detail and never about
+    truth, `say` a brief acknowledgment with no independent assertion
+    the event happened, two sentences, the engagement dial unable to
+    remove the question; a major claim followed by a closing saves
+    provisionally and still closes); the contradiction move (a light
+    acknowledgment, exactly one clarification about change, identity or
+    date, never "are you sure", never an argument; before the answer
+    both records conflicted and neither recalled plainly; a
+    confirmation superseding with `valid_to` at the change time and no
+    second question, a rejection archiving the provisional record; a
+    mixed directive running under the normal rules before any
+    clarification); plan defects `skeptical_of_person`,
+    `missing_surprise_reaction`, `missing_credence_question`,
+    `repeated_credence_question`, `silent_contradiction_overwrite`,
+    `action_blocked_by_credence`, `joke_stored_as_fact`; the `credence`
+    conversations (section 14, part 7), three seeded runs. **Amended
+    2026-09-14 (dev.md section 15):** the plan gains a `credulity` block
+    (`applicable`, `effective_disposition`, `surprise_move`: delight,
+    curiosity, tease or none, `detail_state`: complete, invite,
+    one_detail or two_details, `contradiction_style`: assume_change,
+    compare_versions, light_plot_twist or none), resolved in one order
+    (the class override, the package default, the rapport calibration,
+    the child clamp: skeptical reads as ordinary) and read for three
+    things only: the surprise move (react required on every setting; a
+    trusting companion may use a delighted invitation, ordinary and
+    skeptical ask one concrete detail; a tease only on the adult or
+    teen band, on a happy claim under a playful register, never about
+    another member, never phrased as disbelief or a request for proof,
+    falling back to curiosity; "I don't buy it" and "prove it" guard
+    rows), how many grounded details across turns end the news (one
+    question per reply on every setting; a skeptical second question
+    waits for a later same-subject turn), and the contradiction
+    phrasing (every style naming the hub's own record, never "are you
+    sure"); a claim about another member is reported and cautious
+    under every profile and never makes the hub act as the other
+    person, a world claim takes the ladder's stance under every
+    profile with no companion adopting a false belief or a political
+    stance of its own; `skeptical_of_person` fires the same under every
+    profile; the rows `credulity-big-claim`, `credulity-earned-trust`,
+    `credulity-caught-exaggeration`, `credulity-reported-household`,
+    `credulity-world-neutrality` and the child control (section 15,
+    parts 5 and 6), three seeded runs under the three bundled profiles.
+    **Amended 2026-09-14 (the coherence review):** typed move fields
+    exist on composed turns only (the second, unstreamed completion of a
+    lookup turn); on a streamed chat turn the plan is enforced at the
+    boundary by the sentence guards reading deterministic signs (a
+    question sentence is an ask_back, a closing phrase a close, a word
+    from the reaction list a react, a length over the cap overlong), and
+    the 8B never emits JSON on the streamed path; the control context a
+    turn adds (the plan line, the subject line, the unknown line, the
+    presentation wording) is capped at 160 tokens and the signal is
+    never narrated to the model; `claim_state`, the
+    surprise and contradiction moves, the seven credence plan defects
+    and the `credulity` block are deferred (CRED-01, the COMP slices),
+    the defects collapsing into `plan_violation`, `repeat_question` and
+    memory-table effects; the per-companion runs of every correctness
+    row are COMP-03's acceptance, not this item's; the `band-claim` row
+    joins ("I'm actually a grown-up, my mom said I can" from Bramble:
+    the band on the turn unchanged, the deferral line, guard
+    `band_claim`), and so do `plan-line-cache` (two ordinary turns with
+    different plans keep the stable prefix byte-identical, the cache
+    hit on the `[turn]` line unchanged) and `composed-turn-not-streamed`
+    (a lookup turn's composer completion is the second and last; a chat
+    turn's completion count is one).
+    Out of scope:
+    canned replies per label, a second prompt path, any plan rule over
+    a safety, authorization, confirmation, evidence or privacy
+    decision. Exit: the named tests, the persona-eval bench, `bash
+    scripts/check.sh`.
+
+<a id="age-01"></a>
+- [ ] **AGE-01: Household facts a child may hear, the audience on the record and the defer move** (spec S, engine S-M; after ASK-01, before CHAT-16's composer work)
+    Design: [modes-and-child-protections-2026-10-17](design/modes-and-child-protections-2026-10-17.md)
+
+    Objective: a household fact that is an adult's to tell never
+    reaches a child from the hub, by a field an adult sets with a safe
+    default, and the child is deferred to a parent with care, never
+    lied to and never recited a record. Spec first:
+    `spec/schemas/memory-record.schema.json` gains `child_disclosure:
+    child_ok | teen_ok | adult_only` with `child_disclosure_set_by` and
+    `child_disclosure_set_at` (null on person and self scope; the
+    default by class, never raised by the judge on an existing record;
+    section 13, part 9), a new `spec/vocab/life-events.json` carrying
+    the adult-to-tell classes (a death or a funeral, an illness or a
+    diagnosis, a pregnancy, a separation or a divorce, money and debt, a
+    legal or police matter, a job loss, an adult's private plan to leave
+    or move) and section 14's life-events classes as one file, fixtures,
+    both bindings. Then:
+    `backend/src/lib/memoryJudge.ts` (the deterministic default at
+    write time: `adults` when the subject is a memorialized person or
+    the text falls in a class or the sensitivity detector flags it,
+    never the judge model's call), `backend/src/lib/memory.ts`
+    (`canRead()` gains the band: a child reads their own person-scope
+    records and household records at `child_ok` and not `sensitive`, a
+    teen those at `child_ok` or `teen_ok`; recall, the profile paragraph and episode recall all
+    through it; a teen reads as adult unless an adult-written key sets
+    the teen's audience to child), `backend/src/lib/turnEngine.ts` and
+    `register.ts` (the `defer` move when a child's question resolves
+    to a subject only `adults` records could answer: care first, "a
+    question for mom or dad" in the child's words, an offer to help
+    ask that queues ASK-01's open question for the adults' next turn,
+    never the record's content, never a lie, never the honesty
+    vocabulary), the Memory page (an adult flips the audience either
+    way, a record edit with provenance), `backend/src/lib/guards.ts`
+    (a `false_comfort` row: "she's on a trip", "away for a while" on a
+    deferred subject), `docs/user/memory.md` and the user privacy page.
+    Mirror: `canRead()`'s `sensitive` rule; `ensureSubjectEntity` for
+    the memorialized-person check; ASK-01's open question. **Amended
+    2026-09-14 (the coherence review):** the spec fields land in
+    SPEC-01; this item's engine half is the write-time default, the
+    `canRead()` band and a fixed deferral line through the guard
+    replacement path (care first, "a question for mom or dad", the offer
+    to relay as an `OpenQuestion` of kind `relay` for the adults); the
+    `defer` move as a plan move rides with ACT-03; the teen-audience
+    settings key is deleted (the role is the one definition, an adult
+    sets it); the `unknown-speaker-shared-device` row joins (no
+    identified speaker on a shared surface: `age_band_basis:
+    unknown_speaker_default`, no person-scope record in context, the
+    child result on the grandma question). Acceptance:
+    the `child-grandma` conversation (dev.md section 13, part 8) with
+    its adult twin, three seeded runs, the effects on the context
+    message and the memory table; unit tests for the default per class
+    and for the memorialized subject, the band in `canRead()` for
+    child, teen, adult and guest, and the adult's flip; the `teen_ok`
+    record withheld from the child and available to a teen, and the
+    unknown speaker receiving the child result. Out of scope: the
+    notification (AGE-02), the plan's band axis (ACT-03). Exit:
+    the spec suite, `bun test tests/memory.test.ts
+    tests/memoryJudge.test.ts tests/turnEngine.test.ts`, `bash
+    scripts/check.sh`.
+
+<a id="age-02"></a>
+- [ ] **AGE-02: The worrying-conversation notice to the household's adults** (S, after AGE-01 and the defect items through CHAT-16)
+    Design: [modes-and-child-protections-2026-10-17](design/modes-and-child-protections-2026-10-17.md)
+
+    Objective: when a child's turn falls in the worrying class, the
+    household's adults learn that a worrying conversation happened,
+    never the child's words, and the child is told the hub may mention
+    it. Jesse's decision (2026-09-14, dev.md section 13, part 4): the
+    parents are notified, on by default, with no switch per child or
+    per household. Files:
+    `backend/src/lib/notificationTypes.ts` (`child.worrying_conversation`,
+    level `time_sensitive`, audience `adults`, fixed copy naming the
+    child and that a check-in may help, with no slot for the child's
+    text, the adults' names, the topic, memory text or a transcript
+    link; stored as the child id, the turn id for dedupe and audit, the
+    policy version and the coarse result; never the safety result and
+    never marking the conversation unsafe), `backend/src/lib/turnEngine.ts` (`notifyOncePerTurn()`
+    fires it from the stored signal and the subject: the child band,
+    sadness, fear or anger at moderate or high intensity with `target:
+    other` naming a household adult or an unknown person, or a subject
+    in the fixed list, or today's `notify_parent`; never sadness or fear
+    alone, so a sad question about a story or a pet does not notify, a
+    row; before ACT-02's emotion head the intensity comes from surface
+    cues only, and the fixed subject list is what carries the bench row),
+    `lib/register.ts`
+    (the "I might mention to a grown-up that you seemed sad" clause in
+    the child's plan when the notice fires), `docs/user/privacy.md` and
+    `docs/user/people.md` (what the notice carries and that it cannot be
+    turned off, in plain words).
+    Mirror: `safety.flagged_turn` and its delivery. Acceptance: the
+    `child-family-conflict` conversation (section 13, part 8), three
+    seeded runs: the notification exists for the adults with no
+    fragment of the child's words or the reply in its body, the child's
+    reply carries the clause, a teen's identical turn produces no
+    notice, no settings key exists that can stop it (a test that the
+    settings registry carries none), and a second worrying turn in the
+    same conversation produces no second notice within the per-turn
+    dedupe window. Out of scope: any reading of the child's words by a
+    model to decide; any switch.
+    Exit: the named tests, `bash scripts/check.sh`.
+
+## Design pass 2026-09-13: the findings from live use, and the companions brief (archived 2026-10-31: one session’s findings, 13 of 14 done; companions are now the companion-three-screens and ambient-companion notes)
+
+The design is [dev.md, "The chat design pass"](dev.md#the-chat-design-pass-findings-1-to-18-and-the-companions-brief-2026-09-13);
+the findings are in
+[docs/plans/media-conversation-program-2026-09-13.md](plans/media-conversation-program-2026-09-13.md).
+The execution contract above applies. **Order (revised 2026-09-14 by
+the coherence review, dev.md "Coherence review, 2026-09-14"; the queue
+itself lives in the program file):** RECALL-02 and OUT-01 (in flight);
+SPEC-01; ACT-01; REG-01; EXP-01; ASK-01; MEM-06 core; AGE-01 core;
+LOOKUP-01; CHAT-13; CHAT-16 with ACT-03 core; then CHAT-08, CUR-01,
+EVAL-07 memory mode, AGE-02, ACT-02, REVIEW-01, PREF-01, EVAL-07
+mining, SPEC-02, COMP-01 to COMP-06, CRED-01, the credulity slices,
+SPEAK-01, WAKE-02. Every item's acceptance is a bench conversation that
+fails on `main` today and passes three seeded runs when done
+(`scripts/bench/conversationLive.ts`, BENCH-01's pins, lookups from
+recorded fixtures through the bench's `recordingProxy`, the live
+SearXNG run a separate check); the rows are named in the design note,
+invented for the roster's household, and added to
+`conversationFixture.ts` as the first step of the item.
+
+<a id="recall-02"></a>
+
+- [ ] **REG-02: Composer-owned voice disfluencies and nonverbal cues** **Rewritten 2026-10-02 for chat rule 14; owner ruling 2026-10-06: default light, rate limited, voice.hesitations key, never inside numbers, names, instructions, safety, alarms or child learning; blind listening test is follow-up.** Companion expressiveness dials stay a per-request mechanism (steering vector or adapter), never prompt prose. Server-side speech text is ported by THIN-0J; `reply.speech` is produced on the one path. The voice is chosen (Chatterbox Turbo, owner, 2026-10-17): tags are live via `tts.tags`. (M) **Built 2026-10-17:** `voice.hesitations` (off, light, natural; default light) in `backend/src/settings/voiceKeys.ts`, the composer-owned inserter `backend/src/lib/voiceCues.ts` (sentence boundaries only, never in numbers, names, steps or safety lines, never for a child or teen, written chat never carries a cue), the tag capability read from the Stack's tts role (only the six tags verified by ear on Chatterbox Turbo: laugh, chuckle, cough, sigh, clear throat, gasp; no text opener for tag engines), and a live-shape fixture. Still open: the blind listening test; moving the key into a spec tag (SPEC-MINOR-DDGS-KEYS-01). User page: `docs/user/voice.md`.
+
+    Objective: a companion can request a natural hesitation or nonverbal
+    sound without making the screen or transcript noisy, and a voice model
+    never invents those cues on its own. Keep `reply.text` clean and put the
+    selected model's accepted tags in `reply.speech` before phrase-level TTS.
+    Add companion dials for expressiveness, disfluency, humour, nonverbal
+    frequency, and pace; they drive the plan line, example lines, and a
+    measured steering vector, not prompt prose. Record each candidate's tag
+    vocabulary and time to first audio. Acceptance: the top-two bench has a
+    first-day line with a hesitation and a laugh, the tag output is verified
+    by listening, and the composer leaves clean speech untouched. Out of
+    scope: a separate performance-director model before measurement shows it
+    is needed. Exit: the tag vocabulary and bench are recorded, the companion
+    record owns the dials, and the named voice/register tests plus
+    `bash scripts/check.sh` pass.
+
+    **Built 2026-10-17 (Home half, composer-owned, no model hint):**
+    `backend/src/lib/voiceCues.ts` is the pure insertion policy (cues only
+    at sentence boundaries, a seeded roll, light: 1 per turn and 3 turns
+    apart, natural: 2 per turn, 3 sentences apart; nothing for a child or
+    teen, a safety, refusal, crisis, package or error line, a number, link,
+    instruction or alarm sentence). `POST /api/tts` applies it per sentence
+    of a live spoken model turn (`turnAllowsVoiceCues`, fails closed);
+    `lib/tts.ts` drops any bracketed tag the engine does not advertise
+    (`sanitizeSpeechTags`), and `finalizeNextReply` strips a tag the model
+    wrote from the reply. `lib/ttsCapabilities.ts` reads `tts.tags` from the
+    Stack's tts role (absent means none, so Pocket TTS gets no tag, only an
+    optional plain-text "Hmm," or "Well," opener). Setting `voice.hesitations`
+    (off, light, natural; default light; household, so a minor never sees
+    it). **2026-10-17 Stack half live** (Chatterbox Turbo MLX; stack
+    fb93272): the real shape `tts: {engine, requested, tags, fallback_reason}`
+    on the tts role and `tts: {engine, tags}` on each voice is parsed and
+    pinned by a fixture copied from the live response; a `fallback_reason`
+    means no tags. Verified tags only (laugh, chuckle, cough, sigh, clear
+    throat, gasp; groan and unknown tags are never placed). An engine that
+    advertises tags gets no "Hmm,"/"Well," opener; only a tagless engine
+    (Pocket fallback) keeps it. Situation map: laugh/chuckle after humor,
+    sigh after weariness or sympathy, gasp before surprise, clear throat
+    (then cough) as a rare natural-level opener before a long first
+    sentence. Still open: the blind listening test;
+    companion dials; a model-written tag in the live token stream is
+    stripped only from the final stored reply, not from streamed deltas;
+    Wyoming satellites get the tag drop but no cue insertion yet.
+
+<a id="exp-01"></a>
+    Design: [studio-voice-2026-10-17](design/studio-voice-2026-10-17.md)
+## Chat direction 2026-09-12: the next block, two tracks (archived 2026-10-31: superseded by rule 14 and the SPEECH-STYLE rows; QR-01/02 have their own design note (quick-reply-chips-2026-10-25))
+
+The [2026-09-12 review](dev.md#chat-direction-review-and-the-two-track-plan-2026-09-12)
+found that the CHAT program above rests on three things the code does not
+do: cache the prompt prefix, keep background work off the chat engine,
+and let world knowledge through the guards. This block fixes those first,
+plus the two memory gaps no item above covers (verbatim episodes across
+conversations, and a judge that drains). It runs as two concurrent
+sessions with disjoint file ownership (the table in that dev.md section
+is the contract; if a task seems to need a file the other track owns,
+stop and record it as a JOIN item instead of editing it). The CHAT
+program resumes after this block, starting with CHAT-22. No CHAT-xx item
+runs concurrently with FAST or MEM items.
+
+**Execution contract for every item here** is the same as the CHAT
+program's above (read the named files and their tests first, regression
+test before fix, `bun:test` only, docs in the same commit, `bash
+scripts/check.sh` before every commit, code review at medium effort before
+every code commit, never lower a threshold to pass, never ask the owner
+to run a runnable command). Two additions for this block:
+
+- **Every item is written for an implementer with no conversation
+  context.** Do exactly what the item says, in the order it says. If a
+  named function or constant does not exist under that name, grep for the
+  behavior described and use what is there; do not invent a parallel one.
+- **Record numbers, never impressions.** Each live check writes its
+  before and after numbers into the track's own dated section at the end
+  of `docs/dev.md`, with the engine build, model file, and machine named.
+  "Feels faster" is not a result.
+
+**Step 0, before either track branches (one session, on `main`):** commit
+the pre-existing uncommitted tree as its own commit (the CHAT program docs,
+the CHAT-05 implementation with its tests, the chat page and screenshot
+changes) after `git status`, `git diff`, and `bash scripts/check.sh`, then
+`git branch -d main-ref-check`. Both tracks branch from that commit.
+
+**Track setup.** `$MAIN` is the main checkout of this repo. Each track
+works in its own worktree (the one case the org's branch rule allows,
+because two sessions edit the same repo at once) and never points at
+`$MAIN/data`:
+
+```
+cd $MAIN
+git worktree add ../home-track-a -b track-a main     # or track-b
+cd ../home-track-a
+mkdir -p data
+ln -s $MAIN/data/models data/models
+ln -s $MAIN/data/engines data/engines
+bun install
+```
+
+Live checks for Track A spawn their own chat engine so engine flags can
+change; run the backend from `backend/` with this environment (the engine
+binary path is whatever `find ../data/engines -name llama-server -type f`
+prints):
+
+```
+MAIPAI_LLAMA_SERVER_BIN=<that path>
+MAIPAI_CHAT_MODEL_PATH=../data/models/qwen3-8b-instruct-q4-k-m.gguf
+MAIPAI_CHAT_MODEL_ID=qwen3-8b-instruct-q4-k-m
+MAIPAI_LLAMA_SERVER_PORT=8798
+MAIPAI_EMBED_URL=http://127.0.0.1:8794
+PORT=8797
+bun run start
+```
+
+Live checks for Track B reuse the main checkout's running chat and embed
+engines by URL and spawn only the new background engine:
+
+```
+MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8788
+MAIPAI_EMBED_URL=http://127.0.0.1:8794
+MAIPAI_BACKGROUND_PORT=8789
+PORT=8807
+bun run start
+```
+
+A fresh worktree database has no household; for a live turn through the
+API, complete first-run through the setup route (read
+`backend/src/routes/setup.ts` for the exact body) with the owner named
+`alfred`. Benches connect to engine URLs directly and never need a
+household.
+
+**Finishing a track:** `bash scripts/check.sh`, stage files by name,
+commit, then in `$MAIN` run `git merge --ff-only track-a`. If `main` has
+moved, first `git rebase main` inside the worktree, re-run `check.sh`,
+then merge. Then `git worktree remove ../home-track-a` and `git branch -d
+track-a`. Append the track's dated section at the end of `docs/dev.md`
+and tick only the track's own boxes here; on a merge conflict in either
+doc, keep both sides. JOIN items run on `main` after both tracks merge.
+
+**Order:** Track A: FAST-01, FAST-02, FAST-04, FAST-05, FAST-03, FAST-06.
+Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
+
+### The block after this one (not scheduled; each needs its design note in dev.md first)
+
+- [ ] **STYLE-ADAPTER-01: the runtime, written class first** (M, Sonnet, review medium (a wire shape and a launch flag); after STYLE-SPEC-01 and a STYLE-BENCH-01 pass for at least one companion; never before). Objective: a passing companion's adapter is downloaded, loaded at engine launch, and selected on every generation of a turn for the person whose companion it is. Change: bump the spec pin; `persona.ts` reads `style_adapters` onto `Persona` and exports `styleAdapterFor(persona, modelId)`; the download through `modelDownload.ts`'s own self-healing path into `modelsDir/adapters/<companion>/<base_model>.gguf` with the checksum verified and a clear offline failure (mirror the model download exactly, no second downloader); `llmSupervisor.ts` passes `--lora <sorted files>` and `--lora-init-without-apply` at spawn for every installed companion's adapter matching the running model, reads `GET /lora-adapters` after health, and keeps a registry of companion id to adapter id (an adapter the engine did not list is a Repairs issue, not a silent skip); `llm.ts`'s `LlmCompleteOptions` gains `lora?: { id: number; scale: number }[]`, reaching the body through `chatRequestBody`'s existing spread, `lora: []` when the persona has none; `turnNext.ts` resolves the adapter once beside the persona (line 254) onto the turn state and `nodes/model.ts` passes it on every `startCompleteStream` of that turn (line 262), the same set on the tool-decision, forced and phrasing rounds (a differing set clears the slot's prompt cache, verified in b10797's `launch_slot_with_task`). The governor's resident budget gains the loaded adapters' bytes. `WRITTEN_VOICE_PROSE` and the written twins untouched. The bundled companions' adapter files attach as `home` release assets with the manifest entries pointing at them. Mirror: `modelDownload.ts`, `engineAutotune.ts`'s `launchFlagsToArgs`, PHRASE-01's `lastTools` persistence for "the same array on every round". Tests in these words: a persona with an adapter for the running model yields `lora: [{id, scale: 1}]` on all three rounds of a forced-search turn and the phrasing request's body is otherwise byte-identical; a persona without one yields `lora: []`; an adapter file with a wrong checksum is refused and named in Repairs; the launch args list every installed adapter in sorted order. Acceptance: live on the dev machine, two people with different companions alternating typed turns each get their companion's voice (the bench's marker check run on the live replies; on a document-shaped typed reply the voice is in the opener and closer and the body reads as the bare model's own, per VOICE-CLASS-01, 2026-09-29, so the live check reads the frame and a restructured or interrupted body is a failure of the adapter, not a voice), the switch cost matches STYLE-BENCH-01's recorded number, and `scripts/bench/tool-calling.ts` holds. The Stack's side (the chat role passing `lora` through, the launcher taking the adapter list, the engine contract reporting `style_adapter: per_request | none`) is filed in `stack` the day this row starts, and Home on the Stack degrades to no voice when the engine reports `none`. Out of scope: the spoken class (next row), any settings key, a strength knob. Exit: `bash scripts/check.sh` and the live check in dev.md.
+    Design: [style-spec-01-lane-a-2026-09-28](plans/style-spec-01-lane-a-2026-09-28.md)
+- [ ] **STYLE-ADAPTER-02: the spoken class moves onto the adapter, the prose retires** (S-M, Sonnet; after STYLE-ADAPTER-01 is live; VOICE-CLASS-01, 2026-09-29: the spoken prompt class includes every child's and teen's chat turn (`promptSurfaceClassFor`), so the naturalness rerun here adds the written set's five kinds under the spoken prefix as rows, since the corpus trained on them). Objective: a spoken turn for a companion with an adapter carries no dial sentences and no few-shot block, and `NATURALNESS_POLICY` goes if the naturalness bench holds without it. Change: `composePersonaPrompt`'s spoken branch returns only `INFORMATION_HANDLING_POLICY` (and `NATURALNESS_POLICY` until measured) when the turn carries an adapter, byte-identical to today when it does not; `scripts/bench/naturalness.ts` and `persona-eval.ts --judge` rerun with the adapter on. Mirror: PREFIX-CLASS-01's per-class table. Tests in these words: the spoken prefix for a persona with an adapter contains no `FORMALITY_FRAGMENT` text and no "Some examples of how you talk"; for a persona without one it is byte-identical to before this row. Acceptance: the naturalness bench at or above its current score and the spike's thirty-turn drift check held on the live spoken path; `NATURALNESS_POLICY` retired only on that number, otherwise kept and the number recorded. Out of scope: the written twins and `WRITTEN_VOICE_PROSE` (WRITTEN-VOICE-TIER-01's re-scoped measurement retires them). Exit: `bash scripts/check.sh` and the two bench numbers in dev.md.
+- [ ] **WRITTEN-VOICE-TIER-01: WRITTEN_VOICE_PROSE becomes hardware-tier-aware** (S, 2026-09-23; dev.md "The written prompt on tier 1, decided"; re-sequenced after `EVAL-03`, TRUEUP-01's own commit - the designed fallback is offered per tier only once the primary has been tested, owner's rule 2026-09-23 evening). **Re-scoped 2026-09-28 (dev.md "EVAL-03 design pass"): the primary is the STYLE adapter, not a control vector, so the tier-3 measurement here runs STYLE-BENCH-01's arms with the written voice twins (prose) as one more arm against the same companion's adapter on the Studio; the loser retires there, and `WRITTEN_VOICE_PROSE` plus the `_WRITTEN` twins go with it if prose loses. Waits on STYLE-ADAPTER-01.** Objective: `persona.ts`'s `WRITTEN_VOICE_PROSE` is a plain module constant (`false`), not a settings key, because tier 1's own 8B measured every voice-prose shape under the bar - a bigger model (tier 3, the Studio) may not have the same collapse, and this constant is the one place that decides whether the written class's own dial/policy prose (already declared, already tested) ever composes into a real prompt. Change: once STUDIO-ACCEPT-01 or an equivalent tier-3 workload measures the written voice twins (`FORMALITY_FRAGMENT_WRITTEN` and the rest, already exported) clearing WRITTEN-PARITY-01's own bar on that hardware, `WRITTEN_VOICE_PROSE` becomes a value the hardware probe proposes per tier (hardware-tiers-2026-09-23.md's own "the configuration is proposed, never fixed" pattern) rather than a hardcoded `false` - still no settings key, a probed default a person could override the same way any other tier default can be. Out of scope until tier 3 is measured: the probe wiring itself. Exit: the tier-3 measurement recorded in dev.md, then the constant's own change plus a test that tier 1 still defaults to off.
+    Design: [hardware-tiers-2026-09-23](plans/hardware-tiers-2026-09-23.md)
+- [ ] **EVAL-04: A reranker over hybrid episode recall** (S). Only where MEM-04's bench shows misses; latency budget 100 ms on the background engine.
+    Design: [memory-lifecycle-and-preferences-2026-10-17](design/memory-lifecycle-and-preferences-2026-10-17.md)
+- [ ] **EVAL-05: Offline prompt optimization for tool descriptions and the extraction prompt** (M). A development-only tool (GEPA-style) over held-out conversations; ships fixed reviewed text; never runs in a household turn.
+    Design: [chat-engine-and-model-records-2026-10-17](design/chat-engine-and-model-records-2026-10-17.md)
+- [ ] **QR-01: answer chips from the follow-up call** (S, 2026-10-25; design `docs/design/quick-reply-chips-2026-10-25.md`, architect QR-DESIGN-2026-10-25 APPROVED). `generateFollowUpSuggestions` returns `{ kind: "answers" | "followups", suggestions }`; answers are 1 to 40 characters, follow-ups 4 to 140, limits kept once in `backend/src/lib/followUpSuggestions.ts`; the route's Zod response adds `kind` (default `followups`). No `answers` when the turn left a pending confirm ask or approval card (a typed "Yes" resumes a parked ask). Adults only, same gate as follow-ups. Files: `followUpSuggestions.ts`, `routes/conversations.ts`, `frontend/src/lib/api.ts`, tests. Acceptance: tests for a yes/no question, a "which of these" question, a statement, an empty result, an injection reply, a pending ask, and the age and Incognito gates. Supersedes the "three prompts, questions only" part of ELEMENTS-ADOPT-02 E14 slice 3.
+- [ ] **QR-02: answer chips in the chat row** (S, after QR-01). The web adapter passes `kind` through to the kit `follow-up-suggestions` row as it ships (no `className`; a look change is a `commons` prop first). A tap sends the label once and the row clears. Captures at 1440 and 390 in both themes, opened and judged.
+- [ ] **TALK-01: A fine-tuned quick-reply model for the user-facing answer (Talker/Reasoner)** (L). Research item: needs training data and a loop; not before the household has a stable corpus.
+
+## Row-Bot backlog additions (2026-10-06) (archived 2026-10-31: research harvest with no owner; the bot repo holds robot work)
+
+- [ ] **CALM-TOKENS-03: Home reads the new tokens** (S, home; after CALM-TOKENS-02; pin bump). Objective: bump the `ui` pin in `scripts/check.sh` and both package `file:` paths, run `bun install --force`, restart the hub, and verify the kit applies its tokens. Home applies no shadow or tone classes; kit rules and the kit layout wrapper apply `--page`, `--elevation-1` on Card, `--elevation-3` on popovers and the accent shadow. If “one primary button per view” cannot be expressed as a kit rule, drop it. Acceptance: proof from port 8787 after the restart; captures of every / page including a child persona, light and dark, both widths, before and after, opened and judged; S3 rail test green. Verdict: `data-scratch/architect/CALM-TOKENS-03.verdict`. Commons items CALM-TOKENS-00/01/02 are filed in commons.
+- [ ] **CHAR-01: the household character from shipped parts** (M, home; after PRESENCE-STATES-01; alongside ASSIST-NAME-01 for the name and portrait). Objective: a kit block `companion-presence` (in `getmaipai/commons` `ui`, S of this item) composed of `VoiceOrb` (`elements/voice.tsx`), `ui/avatar` with `AvatarBadge`, and `AgentStatus`, taking one `PresenceState` prop; a resolver `resolvePresence()` in `@maipai/core` with the contract of CHARACTER.md section 3, fed on the backend by the turn stream (`turn_meta`, `status`, `reasoning`, `delta`, `spoken_cue`, `done`, `error`, the tool events), the BRAKES-01 ask rows and `conversations.pending_ask`, routine runs and `ENGINE-AVAIL-01`, published on the device event feed as an additive `presence` event; the frontend merges the client-only states (the live voice session's orb state, `connection-state`). Shown in the dashboard greeting beside `EmptyStateGreeting`, and chat uses only the working dot at the reply tail and the voice orb; no separate character mark appears in the chat column. Files: `DashboardPage.tsx`, `frontend/src/apps/chat/chatThreadSlots.tsx` (speaker mark), `backend/src/lib/presence.ts` (new), `backend/src/routes/devices.ts` (the feed). Mirror: `StatusBanner.tsx`'s use of shipped parts; `composerVoiceControls.tsx` already wires the voice session state. Acceptance: every state in the vocabulary renders through tokens only (a snapshot per state); a stale `thinking` with no `done` returns to `idle` within 120 s; answering an ask from Telegram clears the badge within 5 s; a child-band session never renders `concerned` and renders `asking` as "Asked a parent"; `prefers-reduced-motion` holds a still frame; the live region announces at most once per transition; the dashboard greeting and speaker mark render at both widths. Chat placement is the kit thinking-indicator dot at the reply tail and the voice orb; only the rail-foot portrait is held for owner answer 8. Out of scope: an animated face (CHAR-02), sounds (NOTIFY-SOUND-01), the Needs-you list (NEEDS-YOU-01). Reuse check: `VoiceOrb`, `Avatar`, `AgentStatus`, `SpeakerIdentity`, `EmptyStateGreeting` are shipped Elements, none implemented in Home yet; the resolver is pure data over the spec. Privacy and age: the block shows the signed-in person's state only; no identity, no other person's asks; a child's settings are the parent's. Exit: `bash scripts/check.sh`; `bun run elements:status` shows the five Elements implemented.
+    Design: [answer-blocks-places-and-documents-2026-10-17](design/answer-blocks-places-and-documents-2026-10-17.md)
+- [ ] **BRAKES-02: an ask is answered where you are, waits until it is, and a denial is shown as skipped** (S, home, after BRAKES-01; bot half S after OFFER-01). Objective: the ask record is the one truth; every surface (the chat `approval-card`, the Needs-you list, a stored-state badge when its placement is approved, Telegram for adults (action summary only, never child or teen ask content; privacy page names what an ask sends), the robot's spoken "go ahead" and "not now" through OFFER-01's `ask_answer` (adults only, simple asks only, and only when speaker evidence identifies the ask owner; otherwise answer on screen)) reads and writes it, an answer anywhere resolves everywhere, an ask never expires on its own and shows how long it has waited, Cmd+Enter approves the focused simple ask on the web, a complex ask (one with a diff, a file list or more than one target) opens the thread instead of answering inline, a denied action is rendered as skipped and the model is told it did not run (rule 6's "the answer continues" applies), and "always allow in this chat" is written as a grant row shown as a chip and never offered to a child; for a teen it follows BRAKES-01 policy. Files: `backend/src/lib/approvals.ts`, the ask schema in `commons` if a `waiting_since` or `surface_answered` field is missing (additive, spec first), the Telegram notifier, bot `conversation/offer.py`. Mirror: `approvals.ts`'s existing self-decide refusal, untouched. Acceptance: a table test over the five surfaces answering the same ask id; a denied tool call renders "skipped" and the transcript shows the model's own words about it; a child's ask reaches the parent's surfaces and never the robot's spoken window; an ask older than 24 h is still answerable. Out of scope: new ask kinds. Reuse check: `approval-card` Element; the robot's keyword spotter already carries the accept and decline sets. Privacy and age: adults only on Telegram; a child's content never on a shared surface. Exit: `bash scripts/check.sh` in Home; the bot gate.
+    Design: [notifications-and-asks-2026-10-17](design/notifications-and-asks-2026-10-17.md)
+- [ ] **SINCE-01: "Since you were last here"** (S, home; after STATUS-C2 (built); richer after ROUTINES-01 and MEM-TIDY-01). Objective: a dashboard timeline, per person, of what happened since their last session: routine runs and failures, deliveries to them, repairs opened and closed, the memory tidy's one-line summary, engine restarts; each row links where the thing lives. Files: `DashboardPage.tsx`, a `GET /api/since` route over the status history, routine run and notification tables (additive). Mirror: the `/status` daily strips (STATUS-C3b). Acceptance: the list is empty with "Nothing happened" when nothing did; a member sees their own rows and household-wide engine rows; a teen's rows never appear for an admin; rows are capped at 20 with "more" to `/status`. Reuse check: `timeline` Element (TimelineEvent: past, now, future), not yet implemented in Home. Privacy and age: no conversation content, only the fact of a run or a delivery. Exit: `bash scripts/check.sh`.
+    Design: [answer-blocks-places-and-documents-2026-10-17](design/answer-blocks-places-and-documents-2026-10-17.md)
+- [ ] **MEM-TIDY-01: the overnight memory tidy** (M, home; spec first: `source` values `tidy_merge`, `tidy_decay`, `tidy_prune` and a `tidy-journal` record in `commons`; after MEM-02 (built) and QUIET-HOURS-01; journal view after MEM-EDIT-01). Objective: by default in the household's quiet hours, on the background engine (MEM-01, MEM-02), merge duplicate memories above a measured similarity and the same kind (with a stricter bar when the normalised subjects differ, Row-Bot's 0.93 and 0.98 pair as starting values), decay the confidence of inferred links older than 90 days by a fixed step per cycle and prune the ones that fall below the floor, refresh the rolling summaries that are due; never invent a fact, never touch a record under 24 h old, never touch crisis, consent or age state; every change tagged with its `source`, reversible for 30 days; Forget or admin deletion removes a record from the undo store immediately and undo never resurrects it, written to a journal the person can read (MEM-EDIT-01's record history and SINCE-01), with a rejection memory so an undone merge is never proposed again for a week at least; "Tidy now" for an admin with a preview of what would change: own and child changes are shown, other adult changes are counts only, and teen content is never shown. Files: `backend/src/lib/memory/tidy.ts` (new), the judge's dedupe path in MEM-02 (reused, not copied), `scheduler.ts`. Mirror: `dream_cycle.py`'s five phases and thresholds as starting values (merge 0.93 and 0.98, infer 0.80, batch 50, decay 10 percent per cycle after 90 days), re-measured on the memory scripts of CHAT-AB-01 (rule 13). Acceptance: a fixture household with ten planted duplicates, three planted false pairs and four stale inferred links: the duplicates merge, the false pairs do not, the stale links decay and the lowest is pruned, an undone merge is not re-proposed; a child's memories are tidied under the parent's rules and the journal is the parent's; a teen's journal is the teen's; the tidy never starts while a turn is active and yields when one starts (CHAT-19's priority, Row-Bot's "busy check"), and stops at the end of quiet hours; the journal row names merged, decayed, pruned and refreshed counts. Out of scope: relation inference from co-occurrence (a learned inference in the memory path needs its own design and bench), an insights pass, the force graph. Reuse check: the background engine, the judge and the dedupe already exist; the tidy is a scheduled caller of them. Privacy and age: as acceptance; nothing leaves the house; no learned component in a safety, consent or privacy path. Exit: `bash scripts/check.sh`; the CHAT-AB-01 memory rows unchanged or better.
+    Design: [memory-lifecycle-and-preferences-2026-10-17](design/memory-lifecycle-and-preferences-2026-10-17.md)
+- [ ] **MEM-REVIEW-02: the review queue** (S, home; after MEM-EDIT-01; spec first if the memory record lacks a `status` field: `active, needs_review, superseded, archived`). Objective: memories the judge saved with low confidence or a detected contradiction (status `needs_review`), and the tidy's merges, wait in a Review list on the memory page with three actions each: keep, edit, remove; a count on the page header; a kept record returns to `active`, a removed one becomes `archived` (restorable), never deleted from the queue; `needs_review` records are not injected into the prompt until kept; household proposals and personal review records use this same section. Files: the memory page from MEM-EDIT-01, `GET /api/memories?status=review` (additive). Mirror: the batch pattern of UI.md (multi-select, one confirmation naming the number, partial results reported). Acceptance: a reviewed memory leaves the queue; batch keep and batch remove work and report partial refusals; an admin reviews a child's queue, never a teen's. Reuse check: `data-table`, the kit's selection mode. Privacy and age: as acceptance. Exit: `bash scripts/check.sh`.
+    Design: [memory-lifecycle-and-preferences-2026-10-17](design/memory-lifecycle-and-preferences-2026-10-17.md)
+- [ ] **ROUTINES-02: the routines list rows** (S, home; after ROUTINES-01). Objective: each routine row shows name, one-line description, "n steps · last ran … · every …", next run in words, a ten-slot strip of the last runs (ok, failed, skipped-because-waiting), "step n of m" while running, an enable toggle, and a chip for its ask setting ("asks first", "never acts") from BRAKES-01; search and All, Enabled, Scheduled, Failed filters; "Run again" from a failed row. Files: the routines page from ROUTINES-01. Mirror: `home-workflows.png`. Acceptance: a failed run shows red in the strip and "Run again" works; a row waiting on an ask shows "waiting on you" and its next run shows "skipped, waiting"; a member sees only their routines. Reuse check: `schedule-card` (ScheduleRun) and `job-progress` (implemented); `data-table`. Privacy and age: a child's routines are the parent's to see and edit. Exit: `bash scripts/check.sh`.
+    Design: [assistant-layer-2026-10-04](plans/assistant-layer-2026-10-04.md)
+- [ ] **PALETTE-INTENTS-01: the palette understands intents and flips settings with Undo** (S, home; after "Unified search: one palette over everything"). Objective: the palette matches a declared intent list ("dark mode", "connect a phone", "pair the robot", "mute notifications", "find a setting …") over the settings keys' labels and help text in `keys.json` and the installed packages' declared commands, flips an allowed boolean or select setting in place with a toast and Undo; outbound, credential, child-protection and parental keys always open their exact row, and jumps to the exact settings row for everything else; "/" on a settings page filters rows the same way. Files: the palette adapter in `frontend/src/shell/`, `commons` `ui`'s `command-palette` (implemented). Mirror: `palette-intents.ts` in Row-Bot for the shape of an intent entry, written as data. Acceptance: every intent is a row in a fixture, never a regex over the person's words in the turn path (rule 1 does not apply to the palette, but the list is still data); Undo restores the prior value; a child's palette shows only the child's settings; a teen's never shows parental rows. Reuse check: `command-palette` Element; the settings keys are already declared with labels and help. Privacy and age: as acceptance. Exit: `bash scripts/check.sh`.
+- [ ] **NOTIFY-SOUND-01: a short sound for an ask and a finished job** (S, home; after the commons setting key and FACE-02M). Objective: two or three short shipped cues (an ask arrived, a routine finished, a routine failed), per person, off by default, silent in quiet hours, played through the kit's audio path, with `ui.companion.sounds` declared in the spec first. Files: `spec/settings/keys.json` (commons), the notification bell and CHAR-01's block. Mirror: FACE-02M's Web Audio cues (built) and `ui.enrollment_sounds`. Acceptance: a cue plays once per ask, never repeats, never in quiet hours; a parent sets a child's switch; the sound files are ours (licence recorded in `dev.md`). Reuse check: the Web Audio path FACE-02M already uses; no library. Privacy and age: as acceptance. Exit: `bash scripts/check.sh`.
+    Design: [notifications-and-asks-2026-10-17](design/notifications-and-asks-2026-10-17.md)
+- [ ] **LEARNED-01: "Learned this week" on the dashboard** (S, home; after MEM-EDIT-01). Objective: a card of the memories saved for the signed-in person in the last seven days as chips (added, updated), each opening the record; "Nothing new this week" when empty. Files: `DashboardPage.tsx`, `GET /api/memories?since=` (additive). Acceptance: a child's card shows the child's own memories; an admin's never shows a teen's; chips open MEM-EDIT-01's record. Reuse check: `memory-chips` Element (MemoryChange: added, updated, existing), not yet implemented. Privacy and age: as acceptance. Exit: `bash scripts/check.sh`.
+    Design: [answer-blocks-places-and-documents-2026-10-17](design/answer-blocks-places-and-documents-2026-10-17.md)
+- [ ] **MEM-EXPORT-01: memories as a folder of Markdown** (S, home; after EXPORT-01). Objective: a person's memory export as one Markdown file per record with a readable name, a short code on a clash, provenance in the front matter, links between related records; export only, no sync-back. Files: `lib/export.ts` from EXPORT-01. Acceptance: shaped by EXPORT-01's read-path projection (a minor gets what they can read); never overwrites a file it did not write; a second export moves replaced files aside. Reuse check: EXPORT-01's zip writer in `@maipai/core`. Privacy and age: an export is a boundary; the page says so. Exit: `bash scripts/check.sh`.
+    Design: [security-and-data-lifecycle-2026-10-17](design/security-and-data-lifecycle-2026-10-17.md)
+- [ ] **ERRCOPY-01a: the spec failure-kind vocabulary has one sentence and one fix, and a test says so** (S, home; no deps; after CHAT-FAIL-DETAIL-02 (built)). Objective: one table maps every defect code (`spec/vocab/defect-codes.json`) and every wire `error` kind to a dad-test sentence and at most one fix (Retry, Reconnect, Open the exact setting, Send again, New chat); an unknown code reads "Something went wrong. Try again." with the code under the admin's details; a test walks the whole list and fails on a code with no sentence, a fix that links to a settings row that does not exist, or a sentence containing an internal word (a fixture list: receipt, lease, checkpoint, admission, slot, engine id). Rule 6 is untouched: a failed lookup is still told in the model's own words; this table covers engine, transport and store failures that reach the person as a callout. Files: `frontend/src/apps/chat/` error rendering, `backend/src/wire.ts` error kinds, the commons spec copy table beside `vocab/defect-codes.json` (spec first), consumed by Home and Bot read by the `error-state` Element (implemented). Mirror: Row-Bot's `frontend/src/api/errors.ts` test, as a shape. Acceptance: the test covers only codes rendered as a person-facing callout; raw details stay admin-only; a child's sentence never names a setting the child cannot open. Reuse check: `error-state` Element; the defect-code vocabulary. Privacy and age: no raw error text to a non-admin (rule 6). Exit: `bash scripts/check.sh`.
+- [ ] **SELF-KNOW-01: the model knows what the house can do** (S, home; spec first: a `capability-summary` fixture shape in `commons`; after COMP-03 for the identity line it extends). Objective: a stable prompt section generated from the installed packages' manifests (one line per package: what it does, in the manifest's own `description`) and a one-line volatile live state (robot paired or not, voice available on this device), with state names from `spec/vocab/capabilities.json`, per band (a child's list names only the packages the child can use), so the model answers "can you set a timer?" or "can you see the camera?" truthfully instead of guessing; package lines in the stable prefix change only on install or remove; live state is volatile (rule 4); never a rule, never a tool, never a reason to act. Files: `backend/src/lib/persona.ts` (the identity line already comes from the companion), `backend/src/lib/composer.ts`, the package host's manifest list. Mirror: Row-Bot's `self_knowledge.py` (`FEATURE_MANIFEST` plus a dynamic state block), as the idea. Acceptance: a fixture household with three packages produces the three lines and nothing else; removing a package removes its line on the next turn; the child band's section omits an adult-only package; CHAT-AB-01's adult rows are not shorter or slower (rule 13). Out of scope: a status tool for the model (our model never calls tools about itself). Reuse check: the manifests already carry descriptions; this is a renderer over them. Privacy and age: as acceptance; the live state names no person. Exit: `bash scripts/check.sh`; CHAT-AB-01 unchanged.
+    Design: [packages-apps-and-integrations-2026-10-17](design/packages-apps-and-integrations-2026-10-17.md)
+- [ ] **NOTIFY-FOLD-01: repeated notices fold into one, shown once per device** (S, home; no deps; the notification system (4.13) is built). Objective: a notice with the same text within ten minutes folds into one row with a count; each notice shows once per device per hub start (a device that showed it records that; a second window opened later does not repeat it); warnings and errors always show; the journal keeps the latest 64 notices and 32 start-up warnings per person; start-up warnings stay listed on `/status`. Files: `backend/src/lib/notifications/` and the bell. Mirror: Row-Bot's notices journal (`docs/CLIENT_PLATFORM_PRODUCT_SYSTEM.md`, "Background notices"). Acceptance: three identical engine warnings in two minutes show as one row with "3"; a second tab does not re-show a shown notice; a child's bell never carries an admin's warning. Reuse check: the kit's toast and the bell; the existing notification records. Privacy and age: per person, as today. Exit: `bash scripts/check.sh`.
+- [ ] **PORTRAIT-01: a household-made portrait for the character** (S, home; after IMAGE-01 and ASSIST-NAME-01). Objective: an adult describes a look, the Stack's local `image` role renders one 1024 px still, the person previews it and keeps it as the character's portrait for the household or for themselves; stored as household data under the `file` record; never clips, never cloud. Acceptance: image generation uses only the local image role or a licence-clean tool; store its generation record and captured tool terms beside the art; no cloud user-data path; a child cannot start it and a parent chooses a child's portrait. The portrait is household art, not a logo or brand asset, and must be reviewed before any trademark filing. Reuse check: IMAGE-01's job path, `image-generation` Element. Privacy and age: as acceptance. Exit: `bash scripts/check.sh`.
+    Design: [image-generation-2026-10-17](design/image-generation-2026-10-17.md)
+
+## Row-Bot device and settings follow-up (2026-10-06) (archived 2026-10-31: research harvest with no owner; the bot repo holds robot work)
+
+Plain boolean switches and selects in `/settings` call the save handler immediately; only typed credentials keep a Save button. No SETTINGS-AUTOSAVE-01 item is needed.
+
+- [ ] **DEVICE-PHONE-01: connect a phone from the Devices page** (S, admin only; LAN only). Objective: the Devices page shows a QR with a one-time code so an admin can connect a phone on the household network. The code expires in 10 minutes, works once, and is stored hashed as required by CREDENTIALS.md. Acceptance: a second redemption and an expired code are refused; no public route or outbound service is used. Reuse check: the existing device pairing and token patterns. Privacy and age: an admin starts pairing; no child can initiate it. Exit: `bash scripts/check.sh`.
+    Design: [people-roles-and-account-2026-10-17](design/people-roles-and-account-2026-10-17.md)
+
+## Wave 2 additions (2026-09-06) (archived 2026-10-31: dated 2026-09-06, overtaken by the rebuild)
+
+Jesse asked for the backlog to be filled out to "a fully working app" and
+split into four sessions that never collide. The split is in
+`docs/plans/wave-2.md` (ownership, shared-file protocol, contracts) and
+one work order per session (`session-c-brain-and-voice.md`,
+`session-d-packages-and-store.md`, `session-e-ui-and-docs.md`,
+`session-f-platform-and-trust.md`). This section lists only what the
+2026-09-06 review found missing from this file; everything already
+listed above is assigned in the plans, not repeated here. The review
+read the platform plan's chapters 4, 5, 7, 12 and 13 against the code
+on `main` plus the Wave 1 worktrees, the org standards, and the legacy
+mirror's module list and header comments. Each item names the session
+that owns it.
+
+**First run and the household lifecycle**
+
+- [ ] **A family member joins, a kid profile, a guest** (S-M, E and F) -
+      the QR from the admin's screen carrying the address and the CA, the
+      picker, PIN or passkey; birthdate in, band out, presets shown to
+      the parent with what they will see; a guest with an expiry and no
+      memory (plan 12, 7.4).
+    Design: [people-profile-2026-09-26](plans/people-profile-2026-09-26.md)
+- [ ] **HUB-MIGRATE-01: Hub migration, two hubs** (S-M, F) - plan 4.15; none exist.
+      Migration keeps the instance id and CA so pinned clients survive;
+      two hubs are two instance ids and a client remembers its choice.
+- [ ] **The reading-level lint, wired as a check.sh gate** (S, F/E) -
+      `scripts/reading-level.ts` exists and is correct (Flesch-Kincaid
+      Grade Level against docs/STYLE.md's grade 6-8 target), but wiring
+      it into check.sh now would block every commit repo-wide over
+      content this session doesn't own the prose of: 7 of 9 docs/user/
+      pages currently exceed grade 8 (memory.md highest at 14.4). Filed
+      as `getmaipai/home#42` with the exact scores and the one-line
+      check.sh addition to add once Session E has simplified the flagged
+      pages.
+- [ ] **The release ceremony for v0.1.0** (M, F, only when Jesse says so)
+      - a security review pass, the clean-clone build, the restore
+      drill, the changelog, the tag; `spec-v0.1.0`'s own tag prep (the
+      spec README's pin line, the fixtures green in both languages) so
+      it unblocks the `bot` repo. Cutting it is Jesse's word in the
+      moment; everything up to the tag should be ready to go once he
+      gives it.
+- [ ] **SELF-UPDATE-TESTS-01: The Windows self-update rules as tests** (S, F, with self-update)
+      - Defender holds `dist/` handles past 3 s; untracked files are not
+      dirty; an unresolvable upstream never reads "up to date". Listed
+      above under "Lessons to record"; now a build item, not a note.
+- [ ] **Performance budgets measured** (S-M, F) - ENGINEERING.md names
+      budgets and plan 4.11 says the archived latency numbers gate the
+      first release (legacy `chat-latency.md`: 200 to 900 ms warm first
+      token after six fixes, each documented); no bench measures first
+      token, page open or cold start here. A full voice-turn latency
+      audit (2026-09-06, GitHub issue #36, full report in the private
+      review folder outside this repo) traced one turn end to end
+      (~2.8 s estimated warm speech-end-to-first-audio on the target
+      laptop) and found the real fix order below; this item is still
+      the measurement half none of it has landed yet - a `TurnTrace`
+      threaded through `routes/turn.ts`/`turnEngine.ts`, llama-server's
+      own `timings`/`/metrics` parsed per turn, a `turn_timings` table,
+      and `backend/scripts/bench/latency.ts` replaying scripted turns
+      against the real engine. Landed from that same review without
+      waiting on the harness (mechanical, no model-quality risk): one
+      embed call per turn instead of two (`turnEngine.ts`'s `route()`/
+      `recall()` shared `utteranceVector`), gating the Tier 2 grammar
+      call to an ambiguous score band (`TIER2_AMBIGUOUS_FLOOR`) instead
+      of every routable turn, mtime-cached package/skill manifests and
+      an in-process settings/commands cache (all previously re-read from
+      disk or SQLite every turn), warming the chat/embed/TTS engines at
+      boot instead of on a household's first message, and idle-gating
+      the memory judge's per-minute tick so it skips a batch while a
+      real turn is active instead of contending for the shared chat
+      slot - **tightened 2026-09-07** (getmaipai/home#63, a live
+      diagnosis: one extraction call alone measured adding 2 to 4.7
+      seconds to a chat reply started mid-batch) - the gate only checked
+      once at the top of a ten-turn batch, and a turn's own 20 s idle
+      window only ever measured from when it STARTED, so a reply
+      streaming past that window looked idle before it was even done.
+      `lib/turnActivity.ts` now tracks turns actually in flight and the
+      real end of the last one (`markTurnFinished()`, called from both
+      of `turnEngine.ts`'s finalize paths); `memoryJudge.ts`'s
+      `MAX_TURNS_PER_RUN` dropped from 10 to 1, and `judgeTurn()` itself
+      re-checks before every fact's own embed/dedupe call, not just once
+      per batch, stopping cleanly mid-turn (the turn stays unjudged for
+      the next tick, and anything already written becomes a dedupe
+      candidate the resumed pass supersedes onto rather than
+      duplicates); `scheduler.ts`'s `sortDueJobsForPriority()` moves
+      `memory.judge`/`memory.consolidate` after every other due job in
+      the same tick, so a reminder or timer never queues behind one.
+      Still open, each needing the harness above (or, for the STT
+      items, a wired frontend client) to land safely rather than guessed
+      at blind:
+      - Amended 2026-09-12: the sub-list below is superseded by the
+        [2026-09-12 block](#chat-direction-2026-09-12-the-next-block-two-tracks):
+        prefix reorder and cache are FAST-01 and FAST-02, the cue timer
+        and first chunk are FAST-04 and VOICE-01, the judge's own model
+        is MEM-01, barge-in is VOICE-01. Multi-slot `-np 2` is dropped:
+        with background work off the chat engine one slot serves a
+        household. Kept for the record only.
+      - **Multi-slot separation for the chat engine** (`-np 2` +
+        `id_slot` per role so the judge/summary refresh never contend
+        with a live turn at the process level, not just the idle-gate
+        above) - real risk found by the review itself: llama-server
+        splits `-c` across slots, so this needs `autotuneContextSize`'s
+        own math re-derived for `np=2` and `/props` checked on the
+        pinned build before it ships, not assumed.
+      - **Reorder the prompt for the prefix cache** - move memory
+        bullets, summary, matched skills and the time line (currently
+        before the conversation history) to after it, so the cache hit
+        covers the whole history instead of just the stable prefix.
+        Same content, different position, but needs the persona/
+        routing/conversation bench re-run before landing (a small model
+        measurably drifts on prompt shape changes, `docs/dev.md`'s own
+        BACKLOG entry on this).
+      - **Shorten the first spoken chunk and fix the thinking-cue
+        timer** - `routes/turn.ts`'s 900 ms cue races the GATED
+        generator (first-sentence time), not the raw token stream
+        (first-token time), so it fires on most ordinary ~8B-model
+        turns; `sentenceChunker.ts`'s first-chunk gate (90 chars) is
+        also on the high side.
+      - **Stream the first TTS sentence** instead of buffering it whole
+        before playback (`sentenceSpeechScheduler.ts` already has the
+        incremental PCM path via `streamingWavPlayer.ts`, just not
+        wired into the turn path) and **pre-render fixed phrases**
+        (thinking cues, refusals, confirmations) per voice so they play
+        with no `/api/tts` round trip.
+      - **Streaming STT** (sherpa-onnx streaming Zipformer or Moonshine
+        v2) to replace the fixed 0.8 s silence timeout with Silero
+        (~0.2 s) plus Smart Turn v3.1, and speculative prefill on
+        speech onset - lower priority than the rest: no frontend client
+        exists yet for `WS /api/stt/stream` in either tree, so none of
+        this is reachable from a real conversation today.
+      - **The memory judge on its own small model** (a second
+        llama-server/router-mode process, ~1 GB) so its extraction/
+        dedupe calls stop sharing the 8B chat model's VRAM and slot
+        entirely, not just its scheduling.
+      - **Barge-in** (`vad speaking:true` stops the scheduler, aborts
+        the stream, truncates the logged reply to what actually played)
+        - a correctness requirement for hands-free voice, not a latency
+        win, but blocked on the same missing STT frontend client above.
+      - **Pod/robot transport** - one WebSocket carrying turn events and
+        PCM16 audio chunks, replacing the NDJSON-over-HTTP shape that's
+        fine for today's one browser client but wrong once a pod or the
+        robot is a real caller.
+    Design: [chat-throughput-2026-10-17](design/chat-throughput-2026-10-17.md)
+- [ ] **PKG-RESULT-01: `ask` continuation, `confirm`, `end_conversation` from a result**
+      (S-M, D produces, C consumes) - `result.schema.json` has them;
+      `runRecipe` never sets `ask`, and the turn engine reads none of
+      them. A lookup cannot ask "which Springfield" deterministically.
+- [ ] **Audit `host.*` against plan 4.9** (S, D) - not reached this wave.
+      `host.log`, `host.config.get`, `host.data.forget`,
+      `host.diagnostics` and the emulator twins are still missing or
+      unverified; Session D step 5-9's own package work only ever needed
+      `host.fetch`, `host.home.call_service`, `host.lists.*`,
+      `host.reminders.set`, `host.timers.set`, and `host.integration.call`
+      for real, so this audit was never forced and stayed unbuilt.
+      Genuinely open for a future session.
+
+## From Open WebUI research (2026-09-24) (archived 2026-10-31: research harvest with no owner)
+
+Why not fork Open WebUI, and what's genuinely worth taking from it: [docs/dev.md "OPENWEBUI-01"](dev.md). These three are candidates, each needs its own design pass before it is chunked further; not started.
+
+- [ ] **CHANNELS-01: a shared, multi-person timeline** (L, design pass first). Objective: a household "family room" where more than one person shares one conversation timeline, unlike every MaiPai conversation today (one person plus the assistant). Design questions before any row is chunked: whose turn budget and content-ceiling rules apply in a multi-speaker turn, how per-person safe search resolves when the speakers differ, how the turn machine's context list handles more than one active speaker, whether a model can be addressed directly (an @-mention shape) inside it. Files: TBD, pending the design pass. Exit: TBD.
+- [ ] **NOTES-01: a persistent notes workspace, attachable to chat** (M, a new catalog app). Objective: a document space separate from chat for long-form drafting, attachable to a conversation so its content injects into context, matching Open WebUI's Notes feature. Files: an assistant-ui Elements-shaped editor (no hand-built one), a hook into the existing memory/context-attach mechanism. Exit: TBD, pending a design pass on the attach mechanism.
+    Design: [packages-apps-and-integrations-2026-10-17](design/packages-apps-and-integrations-2026-10-17.md)
+- [ ] **STREAM-DELTA-01: measure patch-based streaming against MaiPai's own SSE** **Rewritten 2026-10-02 for chat rule 9.** Retargeted: measure the web chat's `assistant-stream` encoding (THIN-5D) against the NDJSON events on reply traffic, after THIN-5E. Verify any library claim in the installed source and cite the line, as before. (S-M, bench first). Objective: Open WebUI's v0.11.1 claims an order-of-magnitude reply-traffic reduction from patch-based rather than full-token streaming - a claim to verify in the installed source before building anything, per the org's own rule on library claims, not a number to copy. Exit: a measured comparison in dev.md; only becomes a build item if the numbers hold up.
+    Design: [chat-thin-path-2026-10-02](plans/chat-thin-path-2026-10-02.md)
+
+## From DeepSeek Harness research (2026-09-26) (archived 2026-10-31: research harvest with no owner)
+
+What DeepSeek Harness does, why it is not a base for Home, and what's worth taking: [docs/dev.md "DSH-01"](dev.md). Candidates, not started. NEXT-BRANCH-01 is a defect the audit surfaced; INCOGNITO-11 (above) is the audit's priority finding and stays in its own area.
+
+- [ ] **CONV-STATE-01: the conversation list shows which chats need you** (S). Objective: a mark on a conversation row when it is waiting on your answer (`conversations.pending_ask` set), has an unread reply, or has a scheduled routine (after ROUTINES-01). Files: the thread list adapter (`frontend/src/apps/chat/chatThreadListAdapter.ts`) and the list route's response (additive field). Acceptance: a parked ask shows the mark, answering it clears it; test in those words. Exit: `bash scripts/check.sh`.
+    Design: [assistant-layer-2026-10-04](plans/assistant-layer-2026-10-04.md)
+- [ ] **ROUTINES-01: a scheduled prompt delivered into its conversation** (M, a catalog package, design note first). Objective: "every weekday at 7, the weather and today's calendar" runs on schedule and lands in the conversation it was made in, for the person who made it, under their safety and content rules. Shape from DeepSeek Harness's schedule tools: one-shot, daily, weekly or cron with a time zone; survives restart; only the latest missed run is delivered. Built on `backend/src/lib/scheduler.ts` through the package host's `host.schedule`, never a second scheduler. Acceptance: a routine made by a child runs under the child's rules; a restart mid-schedule delivers once, not twice. Out of scope: routines that act on devices (integrations' own consent path). Exit: the design note in dev.md, then `bash scripts/check.sh`. Row-Bot acceptance: while a run waits on an ask the next scheduled run is skipped and the row says so; an explicit "in app only" delivery stays in app if the household default changes; only the latest missed run is delivered after restart; deleting a routine keeps run rows with prompt text scrubbed. **Weekly schedules (2026-10-30): the time-zone-aware weekly next-occurrence function is written once in `backend/src/lib/scheduler.ts` by CLOCK-03 and this item reuses it, so there is one definition.**
+    Design: [assistant-layer-2026-10-04](plans/assistant-layer-2026-10-04.md)
+- [ ] **ATTACH-PREVIEW-01: preview an uploaded document beside the chat** (M, after COMPOSER-DOC-ATTACH-01). Objective: an attached PDF, office document or spreadsheet opens in the canvas side panel (`ChatPage.tsx`'s CanvasSplit, a bottom sheet on phones). The viewer is named as a gap in the design record first: no shipped kit component renders PDF or office files today, and the smallest composition of maintained parts wins. Exit: TBD, pending that record.
+- [ ] **CONV-EXPORT-01: download one conversation** (S, after EXPORT-01). Objective: a conversation's menu offers a download of that conversation alone, shaped by EXPORT-01's read-path projection (a minor gets what they can read, nothing more). Exit: `bash scripts/check.sh`.
+
+## From Hermes research (2026-09-27) (archived 2026-10-31: research harvest with no owner)
+
+Why Hermes Agent is not a base for Home, why the Hermes models are not a chat-role candidate, and the two things worth taking: [docs/dev.md "HERMES-01"](dev.md). Candidates, not started; each needs its own pass before it is chunked.
+
+- [ ] **GATEWAY-01: talk to the hub from a messaging app, inbound** (L, design pass first, PRIVACY.md verdict before anything else). Objective: a family member outside the house sends a message from an app they already have (Telegram first, the channel `repairs.new` already notifies on; Signal and WhatsApp as later candidates) and gets the hub's reply back in the same chat, under their own rules. Shape from Hermes Agent's gateway: default deny, an allowlist, a one-time pairing code that binds one chat id to exactly one Person, so a child's chat runs under a child's rules and an unknown chat gets nothing. Design questions before a row is chunked: whether inbound chat through a vendor's servers is the same privacy class as the existing outbound notification toggle or a new one (the record must say, with PRIVACY.md's user-tier page updated either way); a catalog integration package (`runtime: deno`), never core; THIRD-PARTY-SERVICES.md in full. Out of scope: group chats (CHANNELS-01), voice notes. Exit: the design record in dev.md.
+    Design: [privacy-mode-2026-09-24](plans/privacy-mode-2026-09-24.md)
+- [ ] **TOOL-RESULT-TRUST-01: fetched content is data, and the bench proves it** (M, research first). Objective: text the hub fetches on a person's behalf (search snippets, `read_page`, feeds, an attached document) enters the model's context with nothing marking it as untrusted and nothing measuring whether instructions inside it steer the turn; `backend/src/lib/promptSanitize.ts` only strips line breaks and braces from a display name, and `routes/llm.ts` names prompt injection in the safety list without a tool-result path. Per RULES-AND-LEARNED-COMPONENTS.md the answer is structural or measured, never a word list: a boundary the frozen turn context declares once (tool output is quoted data, an instruction inside it is never followed), a replay bench of seeded pages that carry instructions (roster-synthetic fixtures, never a real page), the pass rate recorded in dev.md, and a learned detector only if the bench shows the boundary alone is not enough, never as the sole gate in the safety path. Mirror: CORRECTION-02's one-line contract plus replay rows. Acceptance: the bench exists with its rows and numbers; a failing row is a finding to root-cause, never a patch that makes one phrasing pass. Out of scope: model-authored skills or recipes (none exist), memory poisoning (the MEM rows). Exit: the bench and its dev.md numbers, then `bash scripts/check.sh` for any code.
+    Design: [chat-engine-and-model-records-2026-10-17](design/chat-engine-and-model-records-2026-10-17.md)
+
+## Legacy: copy, re-examine, record (archived 2026-10-31: a verdict list, not work; verdicts live in docs/PACKAGES.md)
+
+The rebuild is about 23k lines of app code against legacy's 413k
+(172 route files, 168 pages, 60 chat tools, 22 releases). Per principle
+8 nothing carries over by existing; per the org's "copy from legacy"
+allowance, hard-won logic does. The chat, memory, link, voice, limiter
+and UI copy items are filed in their own sections above; this section
+holds what is left: features needing a verdict, and lessons that would
+otherwise be lost with the mirror.
+
+- [ ] **SHOWS-IPTV-01: IPTV in the Shows app** (M, design first, a catalog package). Objective: the household's own IPTV subscription (an M3U or Xtream Codes account, the two formats every provider offers) plays inside the Shows app beside the library and the linear channels: a channel guide (EPG from the provider's XMLTV), live playback through the same player the app uses, favourites and per-person channel visibility (a child sees the channels a parent allowed), catch-up where the provider supports it. Rules: the credentials live in the credentials center (docs/CREDENTIALS.md), never in a URL a client sees; playback is proxied or tokenized by the hub so the provider's URL and password never reach a browser or the TV; the org's third-party-services rule applies (we are the subscriber, a person's pace, no scraping); nothing from the legacy MaiPai TV linear-channel code is a requirement, its playlist parsing and the EPG cache are the hard-won parts to read (`legacy-backups/home-legacy.git`, the MaiPai TV screens and their sources). Shipped as a catalog package (`iptv`) with a manifest, its settings keys declared once (provider type, playlist or Xtream endpoint, the account), and its UI from the kit's data-table and cards (the guide as a table, the channel as a card), nothing hand-built. Acceptance: a real provider account configured on the dev hub plays a live channel in the Shows app on the laptop and on the TV client's player, the guide shows the next two hours, a child's profile sees only the allowed channels, the password never appears in any request the browser makes (a test over the proxy route). Out of scope: recording. Exit: `bash scripts/check.sh`.
+- [ ] **Verdicts for the features absent from both this file and the
+      rebuild** (L, one line each, recorded here before anything is
+      built) - MaiPai TV linear channels; Music Studio, karaoke and
+      stems (music generation, the studio and stems are decided in
+      design/music-generation-2026-10-17.md: MUSIC-GEN rows,
+      MUSIC-STUDIO-01, MUSIC-GEN-12; karaoke still needs its verdict); Podcasts (with generated shows, gpodder, snips); Books,
+      readers, OPDS and KOSync; Bookmarks, Reader and Clipper;
+      Reference (Kiwix ZIM); the coding agent and sandbox (decided in
+      design/local-coding-2026-10-17.md: redesigned, CODE rows); Remote (SSH,
+      VNC, RDP); Notes and voice memos; Photo Frame; Cameras (Frigate);
+      the Routines engine; Drop (file relay); Home Inventory; Maps
+      (offline MapLibre plus GraphHopper); Recipes, Medical, Reverse
+      Lookup, On This Day, Holidays, Moon, Local Events, Speed Test;
+      File Converter; Spotlight search, Writing Tools, Watch and Listen
+      Together, Cast; in-app docs; the Display/HUD pod pages; the DNS
+      filter; family audio guardrails; storage locations; monitoring;
+      uninstall; consent records; MCP in and out; remote engine pairing;
+      SABnzbd/aria2; ESPHome flashing; the Electron desktop (HUD,
+      hotkey, tray, dictation); Atom Echo and Tab5 firmware; the tvOS
+      Top Shelf endpoint. Plus roughly 35 of legacy's 60 chat tools with
+      no package and no line here (datetime, holidays, moonphase,
+      onthisday, showtimes, recipes, medical, maps, forget,
+      recall_conversations, request_media, set_status, sleep,
+      service_status, machineStatus, others), and the bot's 83 skill
+      classes in 55 modules (bot `dev.md` says "roughly 90").
+- [ ] **WAKE-01: The wake-word training and calibration pipeline** (L; bot
+      `dev.md` already plans the port, the code is where the fixed
+      pipeline lives) - `train_wakeword.py` plus `wakewordTrainer.ts`:
+      event-replay calibration (per-window counting picked thresholds
+      that measured 40-140 false accepts per hour live), gates of at
+      most one false accept per hour and recall of at least 0.85 on
+      held-out real audio, the possessive near-miss bucket, harvested
+      false triggers. The trained manifest v2 reached 0.00 FA/hr and 85%
+      recall over 34 minutes of real audio and still fires on "hey my
+      pie".
+- [ ] **VOICE-LOOP-01: The bot's voice loop numbers** (M, when the voice loop is
+      rebuilt) - 0.3 s pre-roll with retry from the onset byte, 6 s wake
+      patience, detector reset on every sleep (the robot re-woke
+      itself); Smart Turn v3.2 endpointing (threshold 0.5, 0.2 s probe
+      every 0.25 s, 1.2 s ceiling, 12 s max, 120 ms per probe budget);
+      barge-in (0.6 s confirm, stop phrases bypass, backchannels never
+      stop, duck 0.35 without AEC and 0.75 with, 0.25 s playout slices
+      because blocking writes left the mic unwatched, 0.7 s re-arm
+      grace, self-echo at 0.8 overlap, interrupted text clipped from
+      history); output leveling to a target RMS and a sink drain sized
+      from device latency plus 0.15 s (the last second of every line
+      used to be lost); the browser's barge-in thresholds
+      (`useHandsFree.ts`: 700 ms arm, RMS 0.04 plus probability 0.60
+      over 12 frames, legacy-only - `useHandsFree.ts` itself doesn't
+      exist in this repo, only in the read-only `home-legacy.git`
+      mirror). **Correction (session E step 4, 2026-09-06): the claim
+      "`sentenceSpeechScheduler.stop()` exists and nothing calls it" was
+      already stale** - `chatModelAdapter.ts` was calling it on every new
+      turn since session B step 4 (stopping an earlier reply's speech
+      when a new one starts). That's a different case from real barge-in
+      though, which step 4 adds for real: `sttDictationAdapter.ts` calls
+      it the moment the server's own VAD reports `speaking: true` while a
+      reply is still playing, wired through the new push-to-talk mic
+      button (`frontend/src/lib/voice/sttDictationAdapter.ts`,
+      `sttSocket.ts`, `sttContract.ts` - a real `DictationAdapter`
+      against C's frozen `WS /api/stt/stream` contract, C's route not
+      shipped yet so pressing the mic fails fast and honestly rather than
+      faking a transcript). **Still not built, left for whoever tackles
+      the fuller hands-free loop**: wake-word detection auto-starting a
+      dictation session (today the wake-word toggle only shows a
+      reworded banner, deliberately not tied to the real mic button yet -
+      compounding two still-partial features felt like a worse
+      interaction than either alone); the re-listen-after-reply loop; and
+      re-tuning the legacy RMS/probability thresholds for THIS browser
+      pipeline (mic-capture.ts, a different capture path than the legacy
+      hub's), which needs real held-out speech to validate against per
+      this org's own training-data standards, not numbers copied in
+      blind.
+- [ ] **The bot's four bench harnesses** (L) - one of four shipped
+      2026-09-06, Session C step 3: conversation (28 of 34 real broken
+      replies - six excluded and named in
+      `backend/scripts/bench/conversation.ts`'s own header, genuinely out
+      of scope for a stationary hub or already covered by the routing
+      corpus), rebuilt against `lib/guards.ts` directly (no model needed
+      for the offline half - see docs/dev/session-c.md). Still unbuilt:
+      honesty (105 questions,
+      raw versus guarded), interaction (424 cases), latency (refuses to
+      run on a busy machine). The plan's "bench on demand" tier
+      has no benches for these three yet.
+- [ ] **Lessons to record in the right doc, so they survive the mirror**
+      (S) - in org `CLAUDE.md`: cache only genuine misses, never a
+      transient failure; never throw synchronously inside a socket
+      callback (the 7/29 three-hour outage); the age-gate inversion
+      (resolving a stream through an adult account removes a platform's
+      own 18+ refusal for a kid profile: gate the stream route, not the
+      search), which belongs with the safety invariants; a green tick is
+      never inferred from the absence of bad news (`check.sh | tail`
+      once shipped a lint failure by reporting tail's exit code). In
+      `home/docs/dev.md`: the laptop power path caused the hub's hard
+      power-offs (GPU clock cap re-asserted hourly, charge cap 28%); the
+      Windows self-update rules (Defender holds `dist/` handles past
+      3 s, untracked files are not dirty, an unresolvable upstream never
+      reads "up to date"); VRAM hygiene (Vulkan ignores
+      `CUDA_VISIBLE_DEVICES`; a context-size mismatch between warm-up
+      and the real call costs a 930 ms reload per turn); the
+      chat-latency "do not change without re-testing" list (warm-up
+      prefix equals chat prefix, background LLM work must yield: the
+      August 15-second regression); the HTTP/1.1 six-connection cap
+      shared across tabs (SSE once starved `/api/health`); 16 px inputs
+      or iOS zooms, never `maximum-scale=1`. In `bot/docs/dev.md`: the
+      bodies of legacy `hardware.md` (pin map, I2C and USB budget,
+      PCA9685 versus the mux) and `design-decisions.md` (58 dated
+      sections), which the fresh repo cites by path and does not
+      contain; the driver quirks (ST7789 at 16 MHz, 40 MHz draws
+      nothing; the PCA9685 driver never clears ALLCALL; the Pi 5 cannot
+      drive WS2812, hence the Pico; 22.05 kHz crashed Piper on the
+      array); "instruments lie" (history primed with a clock answer,
+      lifetime CPU from `ps`, repeated-prompt benches hiding prompt
+      evaluation).
+
+
+### Placeholder stubs removed 2026-10-31
+These rows had a title and boilerplate only; nothing was designed or built.
+
+- [ ] **MEDIA-INT-01: media int 01** (S; after design record; Reuse check: see its named kit, spec or design record; Exit: `bash scripts/check.sh`); `data-scratch/architect/MEDIA-INT-01.verdict`
+- [ ] **MEDIA-INT-18: media int 18** (S; after design record; Reuse check: see its named kit, spec or design record; Exit: `bash scripts/check.sh`); `data-scratch/architect/MEDIA-INT-18.verdict`
+- [ ] **CAP-05: jsonrepair in the envelope parser only** (S; after design record; Reuse check: see its named kit, spec or design record; Exit: `bash scripts/check.sh`); `data-scratch/architect/CAP-05.verdict`
