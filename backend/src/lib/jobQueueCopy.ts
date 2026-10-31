@@ -5,7 +5,7 @@ export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
   | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
-  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "still_running"
+  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_chat" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -72,6 +72,10 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
   },
   max_window: {
     adult: "Home is running a Max job and will be back to normal in about N minutes. Yours starts after it.",
+    child: "Home is busy with a big job. Yours starts after it.",
+  },
+  max_chat: {
+    adult: "Someone is using Max chat, so big jobs wait. Yours starts by itself when they are done, or tap Cancel.",
     child: "Home is busy with a big job. Yours starts after it.",
   },
   max_drain: {

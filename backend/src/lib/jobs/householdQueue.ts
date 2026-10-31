@@ -31,11 +31,13 @@ export interface QueueJob {
 }
 
 export interface QueuePosition { id: string; position: number }
-export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait";
+export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat";
 export interface TierState {
   windowOpenFor: string | null;
   startedSinceMax: readonly string[];
   lastMaxPersonId: string | null;
+  /** TIER-HOME-05: a Max chat lease is up; Boost and Max generator jobs wait with `max_chat`, Standard jobs go on. */
+  chatLeaseHeld?: boolean;
 }
 export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
 type QueueProvider = () => QueueStoreEntry[];
@@ -148,7 +150,12 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
   const openMax = state.windowOpenFor ? jobs.find((job) => job.id === state.windowOpenFor && job.state === "running" && job.tier === "max") : undefined;
   const holds: Record<string, AdmissionHold> = {};
   const start: string[] = [];
-  const ordered = positions.map(({ id }) => queued.get(id)!).filter(Boolean);
+  let ordered = positions.map(({ id }) => queued.get(id)!).filter(Boolean);
+
+  if (state.chatLeaseHeld) {
+    for (const job of ordered) if (job.tier === "boost" || job.tier === "max") holds[job.id] = "max_chat";
+    ordered = ordered.filter((job) => !holds[job.id]);
+  }
 
   if (openMax) {
     for (const job of ordered) holds[job.id] = "max_window";
@@ -251,6 +258,9 @@ export function trackChatLease<T extends { release(): void }>(personId: string, 
 
 /** The window, fairness and heavy-slot memory behind `admit`. Process memory only. */
 const tierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
+let chatLeaseSource: (() => boolean) | null = null;
+/** TIER-HOME-05: where the queue reads whether the Max chat lease is up (`chatLease.holdsGenerators`). Null clears it. */
+export function setChatLeaseSource(source: (() => boolean) | null): void { chatLeaseSource = source; }
 export function resetTierStateForTests(): void { tierState.windowOpenFor = null; tierState.startedSinceMax = []; tierState.lastMaxPersonId = null; }
 
 /** Updates only changed records. The caller supplies its own store writer. */
@@ -347,6 +357,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
       const positions = order(jobs, now, usage);
       const runningMax = jobs.find((job) => job.state === "running" && job.tier === "max");
       tierState.windowOpenFor = runningMax?.id ?? null;
+      tierState.chatLeaseHeld = chatLeaseSource?.() ?? false;
       currentEntries = entries;
       for (const id of jobsAwaitingReopen()) {
         if (jobs.some((item) => item.id === id)) continue;

@@ -8,6 +8,7 @@ import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
 import { startTrashSweeper } from "@/lib/trash/sweep";
 import { startMediaScanner } from "@/lib/media/scan";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
+import { startChatLease } from "@/lib/chatLeaseRuntime";
 import { profileSourceFromSettings } from "@/lib/jobs/profileSource";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
@@ -357,6 +358,7 @@ startConversationTitleSweep();
 // MEDIA-LIB-01: the media library's scan intervals (one per root).
 startMediaScanner();
 setProfileSource(() => profileSourceFromSettings(getHouseholdSettingValue));
+startChatLease();
 startTrashSweeper();
 // SRC-ICON-01: the source favicon cache's own daily sweep -
 // lib/scheduler.ts's own CORE_JOBS entry, lib/favicons.ts for the
