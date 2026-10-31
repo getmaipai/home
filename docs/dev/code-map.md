@@ -334,6 +334,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/artifacts.ts` | toArtifact, createArtifact, updateArtifact, getArtifactRow, currentArtifactRow, deleteArtifactsForTurns |
 | `backend/src/lib/askForm.ts` | ASK_FORM_TTL_MS, ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues |
 | `backend/src/lib/askNames.ts` | subjectsForTurn, answerWhoTurn, NO_ASK_APPEND, askAppendFor |
+| `backend/src/lib/assistWidened.ts` | WIDENED_SETTING_KEY, WIDENED_PACKAGE_IDS, readWidenedFile, widenedAssistOn, applyWidenedAssist |
 | `backend/src/lib/assistantStreamWire.ts` | createAssistantStreamSink |
 | `backend/src/lib/attachments.ts` | checkAttachmentCapacity, attachmentFilePath, storedFileIntact, toRecord, createAttachment, storeFile |
 | `backend/src/lib/backgroundWork.ts` | trackBackgroundWork, __drainBackgroundWorkForTests |

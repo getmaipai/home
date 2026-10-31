@@ -26,6 +26,7 @@ You'll know it worked when MaiPai says it added the item, or reads your list bac
 - Say "Remind me tomorrow at noon to walk the dog."
 - Say "What reminders do I have?"
 - Say "Cancel the reminder to call Nadia."
+- Say "Snooze my reminder" or "Snooze that reminder." The reminder comes back later.
 
 After you set a reminder, the chat shows **Reminder set for** and the time. Tap **Undo** within 10 minutes if it is wrong.
 
