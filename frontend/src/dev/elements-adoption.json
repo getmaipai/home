@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T18:57:43.230Z",
+  "generatedAt": "2026-10-31T04:08:18.662Z",
   "kitTag": "ui-v0.5.432",
   "items": [
     {
@@ -1490,8 +1490,8 @@
       "file": "tier-segment.tsx",
       "name": "tier-segment",
       "group": "tier",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Wired on video cards by TIER-HOME-03 (8518bf3e3): the Quality segment that makes another clip at Standard, Boost or Max.",
       "implemented": true
     },
     {
