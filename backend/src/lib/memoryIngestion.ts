@@ -74,11 +74,15 @@ export function storeEmbeddingInTx(
 ): boolean {
   return sqlite.transaction(() => {
     const existing = db
-      .select({ id: memoryRecords.id })
+      .select({ id: memoryRecords.id, deletedAt: memoryRecords.deletedAt })
       .from(memoryRecords)
       .where(eq(memoryRecords.id, memoryId))
       .get();
-    if (!existing) return false;
+    // Issue 231: an erased record (deleted_at set) never takes a late vector; a superseded or archived one can come back, so it still may.
+    if (!existing || existing.deletedAt !== null) {
+      clearPendingWork(memoryId);
+      return false;
+    }
     const row = {
       memoryId,
       space,
