@@ -17,6 +17,7 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
+import { JOB_QUEUE_COPY, jobQueueCopy } from "@/lib/jobQueueCopy";
 
 export const picturesRoutes = apiRouter();
 
@@ -47,11 +48,13 @@ const JobSchema = z.object({
 });
 
 
-function phaseLabel(job: PictureJob): string {
-  if (job.state === "queued") return job.position && job.position > 1 ? `Waiting in line, number ${job.position}` : "Waiting for the picture engine";
-  if (job.phase === "waiting for memory") return "Waiting for memory to free up";
-  if (job.phase === "paused: low memory") return "Paused: low memory";
-  if (job.phase === "starting" || job.phase === "setting up" || job.phase === "loading") return "Getting the picture model ready";
+export function phaseLabel(job: PictureJob, audience: "adult" | "child" = "adult"): string {
+  const hold = (job as PictureJob & { riseReason?: string }).riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
+  if (hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(hold)) return jobQueueCopy("queued", hold as "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain", job.position, null, audience);
+  if (job.state === "queued") return job.position && job.position > 1 ? jobQueueCopy("queued", "picture_line", job.position, null, audience).replace("N", String(job.position)) : jobQueueCopy("queued", "picture_engine", null, null, audience);
+  if (job.phase === "waiting for memory") return jobQueueCopy("waiting_memory", "picture_memory", null, null, audience);
+  if (job.phase === "paused: low memory") return JOB_QUEUE_COPY.picture_paused_memory[audience];
+  if (job.phase === "starting" || job.phase === "setting up" || job.phase === "loading") return JOB_QUEUE_COPY.picture_starting[audience];
   if (job.phase === "decoding") return "Finishing the picture";
   if (job.phase === "finding people") return "Finding the people in the picture";
   if (job.phase === "removing people") return "Removing them and filling in the background";
@@ -90,7 +93,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
   const shown = active ?? last;
   const state = active ? active.state : files.length > 0 ? "done" as const : last.state;
   return {
-    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? getLive(active.id)?.stageLabel : null) ?? phaseLabel(active) : "", position: active ? active.position : null,
+    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? getLive(active.id)?.stageLabel : null) ?? phaseLabel(active, kid ? "child" : "adult") : "", position: active ? active.position : null,
     ...(active && active.state === "running" ? withheldFromYoung(actor, liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`)) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,

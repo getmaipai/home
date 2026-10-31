@@ -224,6 +224,17 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     });
   });
 
+  test("a full Stack line leaves the video queued for the next Home release", async () => {
+    fake.refuseSubmit = { status: 429, code: "queue_full", error: "The queue is full." };
+    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [BOAT]), reply: () => "On its way." }, async () => {
+      const { value } = await streamValue(people.owner, "make a short video of a paper boat");
+      await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "queued");
+      const job = getVideoJobFor(people.owner, value.video!.id)!;
+      expect(job.error).toBeNull();
+      expect(job.request).not.toHaveProperty("memoryRequeues");
+    });
+  });
+
   test("a temporary chat keeps the job and the clip in memory: no job row, no file row, and the owner can still read it", async () => {
     await withStub(script(BOAT), async () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat", { temporary: true });

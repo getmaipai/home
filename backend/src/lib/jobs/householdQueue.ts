@@ -16,7 +16,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | null;
   category?: JobCategory;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
@@ -191,8 +191,9 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
   return { start, holds };
 }
 
+export const CRITICAL_MEMORY_RETRY_LIMIT = 2;
 export function requeueAfterCritical(job: { requeues: number }): "requeue_head" | "fail_low_memory" {
-  return job.requeues < 2 ? "requeue_head" : "fail_low_memory";
+  return job.requeues < CRITICAL_MEMORY_RETRY_LIMIT ? "requeue_head" : "fail_low_memory";
 }
 
 export function stillRunningMinutes(job: QueueJob): number | null {
@@ -285,7 +286,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
   for (const job of jobs) {
     const next = byId.get(job.id) ?? null;
     const old = previous.get(job.id) ?? null;
-    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" ? job.riseReason : null;
+    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" || job.riseReason === "heavy_slot" || job.riseReason === "fairness_wait" || job.riseReason === "max_window" || job.riseReason === "max_chat" || job.riseReason === "max_drain" ? job.riseReason : null;
     if (next !== null && old !== null && next > old) {
       const overtaker = positions.filter((item) => item.position < next && item.position < (previous.get(item.id) ?? Infinity)).sort((a, b) => b.position - a.position)[0];
       if (overtaker) {
@@ -329,6 +330,18 @@ const providers = new Set<QueueProvider>();
 let releasing = false;
 let releaseAgain = false;
 const lastFit = new Map<string, string>();
+const LAST_FIT_LIMIT = 200;
+function forgetFinishedFits(jobs: readonly QueueJob[]): void {
+  const active = new Set(jobs.filter((job) => job.state === "queued" || job.state === "running").map((job) => job.id));
+  for (const id of lastFit.keys()) if (!active.has(id)) lastFit.delete(id);
+}
+function rememberFit(id: string, key: string): void {
+  lastFit.delete(id);
+  lastFit.set(id, key);
+  while (lastFit.size > LAST_FIT_LIMIT) lastFit.delete(lastFit.keys().next().value!);
+}
+export function rememberFitForTests(id: string, key: string): void { rememberFit(id, key); }
+export function fitMemorySizeForTests(): number { return lastFit.size; }
 export function resetFitMemoryForTests(): void { lastFit.clear(); }
 let budgetReader: (() => Promise<BudgetNow>) | null = null;
 export function setBudgetReader(fn: (() => Promise<BudgetNow>) | null): void { budgetReader = fn; }
@@ -365,6 +378,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
       releaseAgain = false;
       const entries = [...providers].flatMap((provider) => provider());
       const jobs = entries.map((entry) => entry.job);
+      forgetFinishedFits(jobs);
       const now = Date.now();
       accrueRunningUsage(jobs, now);
       const usage = usageLastHour(now);
@@ -391,7 +405,15 @@ export async function releaseHouseholdQueue(): Promise<void> {
         reducedChatJobId = null; setReducedChat(null);
       }
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
-      const admitted = new Set(admit(jobs, now, tierState).start);
+      const admission = admit(jobs, now, tierState);
+      const admitted = new Set(admission.start);
+      for (const entry of entries) {
+        if (entry.job.state !== "queued") continue;
+        const hold = admission.holds[entry.job.id] ?? null;
+        const specific = entry.job.riseReason === "profile_lowered" || entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait" || entry.job.riseReason === "requeued_memory";
+        if (hold && !specific && entry.job.riseReason !== hold) { entry.job.riseReason = hold; entry.save(); }
+        else if (!hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
+      }
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));
       const runningPeople = new Set(entries.filter((entry) => entry.job.state === "running").map((entry) => entry.job.personId));
@@ -406,7 +428,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
               entry.job.fit = admission;
               // Save only when the answer changed: a save refreshes the queue, which would run this loop again forever for a job that keeps waiting.
               const key = JSON.stringify(admission);
-              if (lastFit.get(entry.job.id) !== key) { lastFit.set(entry.job.id, key); entry.applyFit?.(admission); }
+              if (lastFit.get(entry.job.id) !== key) { rememberFit(entry.job.id, key); entry.applyFit?.(admission); }
               if (fit.outcome !== "run") continue;
               if (fit.applied?.cells.chat?.state === "reduced") {
                 // PRIO-03 (S1 to S4): chat is lowered only after a quiet moment, outside the cooldown; chat is never paused, so the wait is bounded.

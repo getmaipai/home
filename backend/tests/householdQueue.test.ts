@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, setSystemTime } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, resetDownshiftForTests, setQuietConfigSource, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { fitMemorySizeForTests, rememberFitForTests, resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, resetDownshiftForTests, setQuietConfigSource, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 import { reducedChatState, setReducedChat } from "../src/lib/reducedChat";
 import { setProfileSource, type ProfileSource } from "../src/lib/jobs/admissionFit";
@@ -103,6 +103,46 @@ describe("household queue", () => {
       await releaseHouseholdQueue();
       expect(submitted).toEqual(["a1", "b1", "a2", "a3"]);
     } finally { remove(); }
+  });
+
+  test("release saves heavy-slot and fairness holds on the waiting job", async () => {
+    resetTierStateForTests();
+    const running = job("heavy-running", "A", "video", now - 1000, { state: "running", tier: "boost" });
+    const held = job("heavy-held", "B", "picture", now, { tier: "boost" });
+    const entries = [running, held];
+    const remove = registerQueueProvider(() => entries.map((j) => ({ job: j, save: () => undefined })));
+    try {
+      await releaseHouseholdQueue();
+      expect(held.riseReason).toBe("heavy_slot");
+    } finally { remove(); resetTierStateForTests(); }
+  });
+
+  test("release saves the fairness hold after a Max job ends", async () => {
+    resetTierStateForTests();
+    const runningMax = job("max-running", "A", "video", now - 2000, { state: "running", tier: "max" });
+    const waitingMax = job("max-waiting", "A", "video", now - 1000, { tier: "max" });
+    const other = job("other-person", "B", "picture", now);
+    const entries = [runningMax, waitingMax, other];
+    const remove = registerQueueProvider(() => entries.map((j) => ({ job: j, save: () => undefined, release: j.state === "queued" ? async () => undefined : undefined })));
+    try {
+      await releaseHouseholdQueue();
+      runningMax.state = "done";
+      await releaseHouseholdQueue();
+      expect(waitingMax.riseReason).toBe("fairness_wait");
+    } finally { remove(); resetTierStateForTests(); }
+  });
+
+  test("fit memory keeps the newest 200 jobs and forgets a finished job", async () => {
+    resetTierStateForTests(); resetFitMemoryForTests();
+    try {
+      for (let index = 0; index < 250; index += 1) rememberFitForTests(`fit-${index}`, `value-${index}`);
+      expect(fitMemorySizeForTests()).toBe(200);
+      const ended = job("fit-249", "p-249", "video", now, { state: "done" });
+      const stillQueued = Array.from({ length: 199 }, (_, index) => job(`fit-${index + 50}`, `p-${index + 50}`, "video", now));
+      const remove = registerQueueProvider(() => [...stillQueued, ended].map((item) => ({ job: item, save: () => undefined })));
+      await releaseHouseholdQueue(); remove();
+      expect(fitMemorySizeForTests()).toBe(199);
+    } finally { resetTierStateForTests(); resetFitMemoryForTests(); }
   });
 
   test("a cancelled held job is never released to Stack", async () => {

@@ -21,7 +21,8 @@ import { cancelPictureJob, getPictureJob, startPictureJob, __setPicturePollMsFor
 import { deleteAttachmentsForTurns } from "@/lib/attachments";
 import { pictureJobs } from "@/db/schema";
 import { saveJob, type PictureJob } from "@/lib/pictures/jobStore";
-import { cardView } from "@/routes/pictures";
+import { cardView, phaseLabel } from "@/routes/pictures";
+import { JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
 import { __setPictureStatusForTests } from "@/lib/pictures/ready";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
@@ -212,9 +213,18 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [FOX]), reply: () => "I couldn't start that one just now; try again in a minute." }, async () => {
       const { value } = await streamValue(people.owner, "make me a picture of a red fox");
       expect(value.picture).toBeDefined();
-      await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "failed");
-      expect(getPictureJob(people.owner, value.picture!.id)?.error).toContain("full line");
+      await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "queued");
+      expect(getPictureJob(people.owner, value.picture!.id)?.error).toBeNull();
     });
+  });
+
+  test("picture card waiting labels come from the shared copy table", () => {
+    const base = { state: "queued", position: 3, phase: "queued", kind: "generate" } as PictureJob;
+    expect(phaseLabel(base)).toBe(JOB_QUEUE_COPY.picture_line.adult.replace("N", "3"));
+    expect(phaseLabel({ ...base, position: 1 })).toBe(JOB_QUEUE_COPY.picture_engine.adult);
+    expect(phaseLabel({ ...base, state: "running", phase: "waiting for memory" })).toBe(JOB_QUEUE_COPY.picture_memory.adult);
+    expect(phaseLabel({ ...base, state: "running", phase: "paused: low memory" })).toBe(JOB_QUEUE_COPY.picture_paused_memory.adult);
+    expect(phaseLabel({ ...base, state: "running", phase: "starting" })).toBe(JOB_QUEUE_COPY.picture_starting.adult);
   });
 
   test("a temporary chat keeps the job and the picture in memory: no job row, no file row", async () => {

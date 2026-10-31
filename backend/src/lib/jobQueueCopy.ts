@@ -5,7 +5,7 @@ export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
   | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
-  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_chat" | "still_running"
+  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_chat" | "heavy_slot" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -82,6 +82,13 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     adult: "Max starts when the jobs ahead finish (about N minutes). New jobs wait behind it.",
     child: "Home is busy with a big job. Yours starts after it.",
   },
+  heavy_slot: { adult: "Another big job is running; this one starts when it finishes.", child: "A big job is running. Yours starts when it finishes." },
+  fairness_wait: { adult: "Other people's jobs go first this round; this one is next.", child: "Other people's jobs go first this round. Yours is next." },
+  picture_line: { adult: "Waiting in line, number N", child: "Waiting in line, number N" },
+  picture_engine: { adult: "Waiting for the picture engine", child: "Waiting for the picture engine" },
+  picture_memory: { adult: "Waiting for memory to free up", child: "Waiting for memory to free up" },
+  picture_paused_memory: { adult: "Paused: low memory", child: "Paused: low memory" },
+  picture_starting: { adult: "Getting the picture model ready", child: "Getting the picture model ready" },
   still_running: { adult: "Still running, about N minutes more.", child: "Still running. It will be done soon." },
 };
 

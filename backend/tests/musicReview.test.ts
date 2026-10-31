@@ -68,6 +68,17 @@ describe("provenance comes from the Stack's job result", () => {
 });
 
 describe("a stop during the submit sticks", () => {
+  test("a full Stack line leaves the song queued", async () => {
+    fake.refuse = { status: 429, code: "queue_full", error: "The queue is full." };
+    const state = musicState(owner.owner);
+    const outcome = await runGenerateMusic({ state, args: { description: "an original folk song" }, callId: "full", spoken: false });
+    const id = musicForOutcomes([outcome])!.id;
+    const job = getMusicJobFor(owner.owner, id)!;
+    expect(job.state).toBe("queued");
+    expect(job.errorLine).toBeNull();
+    expect(job.request).not.toHaveProperty("memoryRequeues");
+  });
+
   test("cancel while the Stack call is in flight frees the Stack copy, starts no watcher and stays cancelled", async () => {
     const state = musicState(owner.owner, true);
     let release!: () => void;

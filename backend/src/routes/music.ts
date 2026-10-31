@@ -89,6 +89,8 @@ export function musicStageIndex(job: MusicJob): number {
 const warnedMusicStages = new Set<string>();
 export function musicStageLabel(job: MusicJob, audience: "adult" | "child" = "adult"): string {
   if (job.stage == null || job.stage === "") return "";
+  const hold = job.stage.startsWith("held:") ? job.stage.slice(5) : null;
+  if (hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(hold)) return jobQueueCopy("queued", hold as "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain", job.position, null, audience);
   if (job.state === "queued" && job.stage === "queued") return jobQueueCopy("queued", "queue", job.position, null, audience);
   if (job.stage === "paused") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.stage === "longer") return ["queued", "running"].includes(job.state) ? "Making it longer so every line fits" : "";

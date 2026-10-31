@@ -15,7 +15,7 @@ import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
 import { clearLive, updateLive } from "@/lib/genLive";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
@@ -26,13 +26,14 @@ type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReas
 const queuedPictureSubmits = new Map<string, () => Promise<{ job: string; done: StackPic[] | null }>>();
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;
+  const phaseHold = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
   const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, tier: requestTier(job.request), createdAt: job.createdAt, headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
-    position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason, typicalSeconds: job.kind === "edit" ? 20 : 44 };
+    position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason ?? phaseHold, typicalSeconds: job.kind === "edit" ? 20 : 44 };
   return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
     applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; savePictureJob(job); },
     stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelPictureJob(owner as PersonRow, job.id); } : undefined,
     release: job.state === "queued" && !job.stackJob ? () => releasePicture(job) : undefined,
-    save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); saveJob(job); } };
+    save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); if (queued.riseReason && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; saveJob(job); } };
 }));
 
 async function releasePicture(job: PictureJob): Promise<void> {
@@ -50,6 +51,7 @@ async function releasePicture(job: PictureJob): Promise<void> {
     savePictureJob(job);
     void watch(job, db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow, submitted.done);
   } catch (error) {
+    if (error instanceof StackPicturesError && error.code === "queue_full") { job.phase = "queued"; saveJob(job); return; }
     job.state = "failed"; job.error = plainFailure(error); queuedPictureSubmits.delete(job.id); savePictureJob(job);
   }
 }
@@ -164,7 +166,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
       if (status.state === "cancelled" && status.code === "no_memory") {
         const request = job.request as PictureJob["request"] & { memoryRequeues?: number };
         const retries = request.memoryRequeues ?? 0;
-        if (retries < 2) { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; savePictureJob(job); return; }
+        if (requeueAfterCritical({ requeues: retries }) === "requeue_head") { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; savePictureJob(job); return; }
         job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`; savePictureJob(job); return;
       }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; savePictureJob(job); return; }
