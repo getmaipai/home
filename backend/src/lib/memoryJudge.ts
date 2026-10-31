@@ -1516,6 +1516,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         tier: categoryToTier(fact.category),
         scope: fact.scope,
         device_id: robotBound ? robotDeviceId : null,
+        created_by: speaker.id,
         person: fact.scope === "person" ? speaker.id : undefined,
         source: turn.id,
         importance: fact.importance,

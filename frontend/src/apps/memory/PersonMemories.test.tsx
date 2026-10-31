@@ -52,6 +52,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     deleted_at: null,
     ...overrides,
     folder_id: overrides.folder_id ?? null,
+    created_by: overrides.created_by ?? null,
   };
 }
 
@@ -80,6 +81,27 @@ describe("OwnMemories", () => {
       const archiveButton = await findByRole("button", { name: 'Archive "Riff prefers oat milk in coffee"' });
       fireEvent.click(archiveButton);
       await waitForGone(() => queryByText("Riff prefers oat milk in coffee"));
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("household memories show their author or the legacy null label", async () => {
+    const rows = [
+      record({ id: "household-authored", scope: "household", person: null, created_by: "person-sage01" }),
+      record({ id: "household-legacy", scope: "household", person: null, created_by: null }),
+    ];
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/people")) return Promise.resolve(new Response(JSON.stringify([{ id: "person-sage01", display_name: "Sage" }]), { status: 200 }));
+      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(rows), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByText } = renderWithQueryClient(<OwnMemories filterIds={null} actorIsAdult={false} />);
+      await findByText(/Added by Sage/);
+      await findByText(/Added before authors were kept/);
     } finally {
       globalThis.fetch = original;
     }

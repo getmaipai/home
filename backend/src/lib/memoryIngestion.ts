@@ -192,6 +192,7 @@ export type IngestInput = {
   validTo?: string | null;
   precomputedEmbedding?: { space: string; vector: readonly number[]; preprocess: string };
   deviceId?: string | null;
+  createdBy?: string | null;
 };
 
 export type IngestResult =
@@ -261,6 +262,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     hlc: nextHlc(),
     deleted_at: null,
     device_id: input.deviceId ?? null,
+    created_by: input.createdBy ?? null,
   };
 
   const parsed = MemoryRecord.safeParse(candidate);
@@ -300,6 +302,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     deletedAt: parsed.data.deleted_at,
     archivedReason: parsed.data.archived_reason ?? null,
     deviceId: parsed.data.device_id ?? null,
+    createdBy: parsed.data.created_by ?? null,
   };
 
   db.insert(memoryRecords)
@@ -419,6 +422,7 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     deletedAt: null,
     archivedReason: null,
     deviceId: input.oldRecord.deviceId,
+    createdBy: input.oldRecord.createdBy,
   };
 
   const result = supersedeInTx(input.oldRecord, newCandidate);

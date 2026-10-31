@@ -46,6 +46,8 @@ describe("POST /api/memory (remember)", () => {
     const adult = remember(ownerRow, { text: "private fact", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, child_disclosure: "adult_only" });
     expect(ordinary.ok && ordinary.value.child_disclosure).toBe("child_ok");
     expect(adult.ok && adult.value.child_disclosure).toBe("adult_only");
+    expect(ordinary.ok && ordinary.value.created_by).toBe(ownerRow.id);
+    expect(adult.ok && adult.value.created_by).toBe(ownerRow.id);
     expect(ordinary.ok && ordinary.value.child_disclosure_set_by).toBeNull();
     expect(ordinary.ok && ordinary.value.child_disclosure_set_at).toBeNull();
   });

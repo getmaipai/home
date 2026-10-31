@@ -159,6 +159,7 @@ memoryRoutes.post("/", requireAuth, async (c) => {
     category: body.category,
     tier: body.tier,
     scope: body.scope,
+    created_by: actor.id,
     person: body.person ?? undefined,
     importance: body.importance,
     sensitive: body.sensitive,

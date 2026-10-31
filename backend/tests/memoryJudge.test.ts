@@ -142,6 +142,7 @@ describe("judgeTurn() - extraction and provenance", () => {
     expect(rows[0]!.tier).toBe("durable"); // categoryToTier: preference is durable
     expect(rows[0]!.scope).toBe("person");
     expect(rows[0]!.person).toBe(actor.id);
+    expect(rows[0]!.createdBy).toBe(actor.id);
     // Provenance: source is the turn's own id, the exact join key
     // listConversationTurns()'s memory_ids already reads (lib/
     // conversationHistory.ts) - no new column needed for that contract.

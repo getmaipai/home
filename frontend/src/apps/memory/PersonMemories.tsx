@@ -10,7 +10,7 @@ import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, type MemoryRecordWithDevice as MemoryRecord } from "@/lib/api";
+import { api, ApiError, type MemoryRecordWithDevice as MemoryRecord, type PersonRosterEntry } from "@/lib/api";
 
 const ArchiveIcon = getIcon("archive");
 
@@ -52,6 +52,7 @@ function MemoryRows({
   subtitle = subtitleFor,
   actorIsAdult = false,
   audienceId,
+  people = [],
   onSetAudience,
 }: {
   records: MemoryRecord[];
@@ -71,6 +72,7 @@ function MemoryRows({
    * A child or teen sees no control and cannot change it. */
   actorIsAdult?: boolean;
   audienceId?: string | null;
+  people?: PersonRosterEntry[];
   onSetAudience?: (id: string, value: "child_ok" | "teen_ok" | "adult_only") => void;
 }) {
   return (
@@ -90,7 +92,7 @@ function MemoryRows({
           ) : null}
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-base">{m.text}</span>
-            <span className="text-sm text-muted-foreground">{subtitle(m)}</span>
+            <span className="text-sm text-muted-foreground">{subtitle(m)}{m.scope === "household" ? ` · ${m.created_by ? `Added by ${people.find((p) => p.id === m.created_by)?.display_name ?? "someone"}` : "Added before authors were kept"}` : ""}</span>
           </div>
         </div>
       )}
@@ -292,6 +294,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
 // The subtitle shows the raw scope value instead.
 export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string> | null; actorIsAdult: boolean }) {
   const queryClient = useQueryClient();
+  const roster = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const query = useQuery<MemoryRecord[]>({
     queryKey: ["memory-list", ME],
     queryFn: () => api.memories(),
@@ -429,6 +432,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
                 actorIsAdult={actorIsAdult}
                 audienceId={audienceId}
                 onSetAudience={handleSetAudience}
+                people={roster.data ?? []}
               />
             )}
           </MemoryGroups>
