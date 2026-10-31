@@ -520,6 +520,7 @@ export interface ConversationSummary {
   surface: string;
   placement: "chat" | "side";
   companion_id: string | null;
+  device_id?: string | null;
   title: string | null;
   pinned: boolean;
   /** CONV-ARCHIVE-01: shelved chats leave the default list. */

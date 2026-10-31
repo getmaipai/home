@@ -26,7 +26,7 @@ import type { CompanionClips, StateId } from "@maipai/ui/src/elements/companion-
 import { ChatAgeBandContext, AdminContext, TemporaryChatContext } from "@/apps/chat/chatThreadContexts";
 import type { useSideChat } from "@/shell/useSideChat";
 import type { AmbientRing, AmbientWakeIndicator } from "@/shell/ambientRing";
-import { api, type Roster, type ConversationSummary, type DeviceInfo } from "@/lib/api";
+import { api, type Roster, type DeviceInfo } from "@/lib/api";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { useMicGate, micHelp } from "@/lib/media/micGate";
 import { voiceFailureLine } from "@maipai/home-backend/src/lib/failureCopy";
@@ -300,13 +300,11 @@ export function useAmbientCompanionPane({ person, companionName, companionId, av
     enabled: state.open && tab === "history",
   });
   const rows = useMemo(() => (conversations.data ?? []).filter((row) => {
-    const extended = row as ConversationSummary & { companion_id?: string | null; placement?: "chat" | "side"; surface?: string; device_id?: string | null };
-    return (extended.companion_id ?? companionId) === companionId && (bot ? extended.placement === "side" && extended.surface !== "robot" && extended.device_id === bot.id : !extended.device_id);
+    return row.companion_id === companionId && (bot ? row.device_id === bot.id : !row.device_id);
   }).sort((a, b) => (b.last_turn_at ?? b.created_at).localeCompare(a.last_turn_at ?? a.created_at)), [bot, companionId, conversations.data]);
   const activityGroups = [{ id: "conversations", label: "Conversations", items: rows.map((row) => {
-    const extended = row as ConversationSummary & { placement?: "chat" | "side" };
-    return { id: row.id, title: row.title || "New conversation", line: <span className="flex items-center gap-2"><Badge variant="secondary">{extended.placement === "side" ? "Side chat" : "Chat"}</Badge><span>{formatRelative(row.last_turn_at ?? row.created_at)}</span></span>, action: <Button type="button" variant="ghost" size="sm" onClick={() => {
-      if (extended.placement === "side") load(row.id);
+    return { id: row.id, title: row.title || "New conversation", line: <span className="flex items-center gap-2"><Badge variant="secondary">{row.placement === "side" ? "Side chat" : "Chat"}</Badge><span>{formatRelative(row.last_turn_at ?? row.created_at)}</span></span>, action: <Button type="button" variant="ghost" size="sm" onClick={() => {
+      if (row.placement === "side") load(row.id);
       else navigate(`/chat?conversation=${encodeURIComponent(row.id)}`);
     }}>Open</Button> };
   }) }];
