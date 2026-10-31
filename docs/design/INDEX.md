@@ -30,6 +30,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md) | owner ruling | adult-content-model-decides (RULES.md rule 10) |
 | [alarm-ring-2026-10-30.md](alarm-ring-2026-10-30.md) | design; remaining slices open | Alarm and Reminders rows |
 | [ambient-companion-2026-10-27.md](ambient-companion-2026-10-27.md) | owner ruling (RULES.md S2) | ambient companion ruling |
+| [bots-in-the-ambient-companion-2026-10-31.md](bots-in-the-ambient-companion-2026-10-31.md) | current | BOTS-AMBIENT-01 |
 | [auto-close-apps-2026-10-30.md](auto-close-apps-2026-10-30.md) | proposed, not decided, not built | MEM-SPACE-07 to -12 |
 | [chat-cards-2026-10-18.md](chat-cards-2026-10-18.md) | design and audit only; nothing built | chat cards rows |
 | [chat-engine-comparison-2026-10-17.md](chat-engine-comparison-2026-10-17.md) | built on Stack side | ENGINE-MLX-01 |
