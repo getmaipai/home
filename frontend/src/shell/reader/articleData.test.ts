@@ -92,4 +92,10 @@ describe("toArticleViewData", () => {
     expect(data.lead).toBeUndefined();
     expect(data.blocks[0]).toMatchObject({ type: "paragraph", inlines: [{ text: "Zendaya is an actor. She began as a model." }] });
   });
+
+  test("a page with a facts card puts its first picture before the first paragraph so it floats beside it", () => {
+    const article: ReferenceArticleView = { ...base, infobox: { title: "Zendaya", image: { src: "/m/z.jpg", alt: "Z" }, rows: [{ label: "Born", value: "1996" }] }, blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "First." }] }, { type: "paragraph", inlines: [{ type: "text", text: "Second." }] }, { type: "figure", src: "/m/a.jpg", alt: "A", caption: "In 2011" }] };
+    const data = toArticleViewData(article, opts);
+    expect(data.blocks.map((block) => block.type)).toEqual(["figure", "paragraph", "paragraph"]);
+  });
 });

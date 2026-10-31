@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { List } from "@maipai/ui/src/primitives/List";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api, type ReferenceBookView, type ReferenceSearchHit } from "@/lib/api";
 
+const ChevronRight = getIcon("chevron-right");
 const PREVIEW_STALE_MS = 10 * 60 * 1000;
 const RELATED_MAX = 5;
 
@@ -27,14 +29,15 @@ function ResultRow({ hit }: { hit: ReferenceSearchHit }) {
   const preview = useQuery({ queryKey: ["reference-preview", hit.book, hit.path], queryFn: () => api.referencePreview(hit.book, hit.path), enabled: seen, staleTime: PREVIEW_STALE_MS, retry: false });
   const data = preview.data;
   return (
-    <div ref={ref} data-slot="reader-result" className="flex min-w-0 items-start gap-3">
-      {data?.thumbnail ? <img src={data.thumbnail.src} alt={data.thumbnail.alt} loading="lazy" className="size-20 shrink-0 rounded-md object-cover" /> : null}
+    <div ref={ref} data-slot="reader-result" className="flex w-full min-w-0 items-center gap-4 rounded-xl border bg-card p-3">
+      {data?.thumbnail ? <img src={data.thumbnail.src} alt={data.thumbnail.alt} loading="lazy" className="h-28 w-24 shrink-0 rounded-lg object-cover sm:h-32 sm:w-28" /> : preview.isPending && seen ? <div aria-hidden className="h-28 w-24 shrink-0 rounded-lg bg-muted sm:h-32 sm:w-28" /> : null}
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{hit.title}</p>
+        <p className="text-lg font-semibold">{hit.title}</p>
         {data?.description ? <p className="text-muted-foreground text-sm">{data.description}</p> : null}
-        {data?.kicker ? <div className="my-1"><Chip>{data.kicker}</Chip></div> : null}
+        {data?.kicker ? <div className="my-1.5"><Chip>{data.kicker}</Chip></div> : null}
         <p className="text-muted-foreground line-clamp-2 break-words text-sm">{hit.snippet || data?.lead || data?.summary}</p>
       </div>
+      <ChevronRight aria-hidden className="text-muted-foreground size-5 shrink-0" />
     </div>
   );
 }

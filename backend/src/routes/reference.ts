@@ -13,7 +13,7 @@ import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
 import { licenceLabel } from "@/lib/retrieval/referenceSources";
 import { readableBooks } from "@/lib/retrieval/referenceSources";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
-import { extractArticle, extractFullArticle, cutAtSentence } from "@/lib/retrieval/extractArticle";
+import { extractArticle, extractFullArticle, cutAtSentence, deriveDescription } from "@/lib/retrieval/extractArticle";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { getPersonSettingValue } from "@/lib/settings";
 import { extractArticleImages } from "@/lib/retrieval/articleImages";
@@ -102,7 +102,7 @@ referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
 referenceRoutes.openapi(PREVIEW_ROUTE, async (c) => {
   const { book, path } = c.req.valid("param"); const result = await loadArticle(c, book, path);
   if (!result || "redirect" in result || !result.full.summary) return unavailable(c);
-  return c.json({ title: result.title, summary: result.full.summary, ...(result.full.description ? { description: result.full.description } : {}), ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.lead ? { lead: result.lead } : {}), ...(result.lead_image ? { thumbnail: result.lead_image } : {}) }, 200);
+  return c.json({ title: result.title, summary: result.full.summary, ...((result.full.description ?? (result.lead ? deriveDescription(result.lead) : undefined)) ? { description: result.full.description ?? deriveDescription(result.lead!) } : {}), ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.lead ? { lead: result.lead } : {}), ...(result.lead_image ? { thumbnail: result.lead_image } : {}) }, 200);
 });
 
 referenceRoutes.openapi(RANDOM_ROUTE, async (c) => {

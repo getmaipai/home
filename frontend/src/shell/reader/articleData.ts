@@ -59,7 +59,13 @@ const shortCaption = (caption: string) => caption.length <= 30 ? caption : capti
 export function toArticleViewData(article: ReferenceArticleView, options: ArticleDataOptions): ArticleViewData {
   const infoboxPicture = article.infobox?.image;
   const figureHero = !infoboxPicture && !article.lead_image ? firstFigureHero(article.blocks) : null;
-  const blocksIn = figureHero ? figureHero.rest : article.blocks;
+  // A page with a facts card opens with its first picture beside the first paragraph, as in the owner's article mockup.
+  const withFigureFirst = (blocks: ReferenceBlock[]): ReferenceBlock[] => {
+    const at = blocks.findIndex((block) => block.type === "figure");
+    const start = blocks.findIndex((block) => block.type === "paragraph");
+    return at > start && start >= 0 ? [blocks[at]!, ...blocks.slice(0, at), ...blocks.slice(at + 1)] : blocks;
+  };
+  const blocksIn = figureHero ? figureHero.rest : article.infobox && article.infobox.rows.length ? withFigureFirst(article.blocks) : article.blocks;
   const kicker = article.kicker;
   // The standfirst is the hero page's look (the Aurora mockup); a page with a facts card (the Zendaya mockup) opens with its normal first paragraph.
   const standfirst = article.infobox && article.infobox.rows.length ? undefined : article.lead;

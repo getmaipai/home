@@ -1,14 +1,15 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArticleView, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
+import { ArticleSpeechContext, ArticleView, type ArticleAction, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
 import { Button } from "@maipai/ui/src/ui/button";
 import { useReferenceSaves } from "./saves";
 import { readKeptArticle, useKeptArticles } from "./offline";
+import { speakableParagraphs, useArticleListen } from "./useArticleListen";
 
-const SAVE_ONLY: ("save")[] = ["save"];
+const ARTICLE_ACTIONS: ArticleAction[] = ["save", "listen"];
 const PREVIEW_STALE_MS = 10 * 60 * 1000;
 
 export interface ReaderArticleProps {
@@ -37,6 +38,8 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
     }
   }, retry: false });
   const keptArticles = useKeptArticles();
+  const reading = useArticleListen();
+  const storyId = `${book}/${path}`;
   const [keepMessage, setKeepMessage] = useState<string | null>(null);
   const loadPreview = useCallback(async (target: { book: string; path: string }): Promise<ArticlePreview | null> => {
     try {
@@ -52,15 +55,21 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
   const article = query.data;
   return (
     <div id="reference-article" data-touch-target-exempt className="min-w-0">
+      <ArticleSpeechContext.Provider value={reading.speech}>
       <ArticleView
         data={{ ...toArticleViewData(article, { appName, onAppHome }), saved: saves.isSaved(book, path) }}
-        available={SAVE_ONLY}
-        onAction={(action, ids) => { if (action === "save") saves.setSaved(book, path, ids.on !== false); }}
+        available={ARTICLE_ACTIONS}
+        ids={{ story_id: storyId }}
+        onAction={(action, ids) => {
+          if (action === "save") saves.setSaved(book, path, ids.on !== false);
+          if (action === "listen") reading.listen(storyId, speakableParagraphs(article));
+        }}
         onBack={() => navigate(-1)}
         loadPreview={loadPreview}
         renderTargetLink={(target, text) => <Link className="underline underline-offset-2" to={routeFor(target.book, target.path)}>{text}</Link>}
         footer={<>{article.licence} · Snapshot {article.snapshot_date ?? "date unavailable"}</>}
       />
+      </ArticleSpeechContext.Provider>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {keptArticles.isKept(book, path)
           ? <Button variant="outline" size="sm" onClick={() => { setKeepMessage(null); void keptArticles.remove(book, path); }}>Remove from this device</Button>

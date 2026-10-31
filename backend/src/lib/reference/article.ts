@@ -41,12 +41,15 @@ export async function loadArticleFor(person: PersonRow, book: string, path: stri
     const leadText = firstParagraph?.type === "paragraph" ? firstParagraph.inlines.map((inline) => inline.text).join("") : "";
     const wordText = full.blocks.flatMap((block) => block.type === "paragraph" ? [block.inlines.map((inline) => inline.text).join("")] : block.type === "list" ? block.items.map((item) => item.map((inline) => inline.text).join("")) : block.type === "heading" ? [block.text] : []).join(" ");
     const lead = leadText ? cutAtSentence(leadText, 300) : undefined;
+    // A category named after the article itself ("Zendaya" on Zendaya) says nothing, so it is not drawn as a chip.
+    const sameWords = (a: string, b: string) => a.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "") === b.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+    const kicker = full.kicker && !sameWords(full.kicker, title) ? full.kicker : undefined;
     const quickFactRow = full.infobox?.rows[0];
     const quickFact = quickFactRow ? `${quickFactRow.label}: ${quickFactRow.value}`.slice(0, 160).trimEnd() : undefined;
     const badge = imagesAllowed && leadImg?.caption ? leadImg.caption.length <= 30 ? leadImg.caption : leadImg.caption.slice(0, 30).replace(/\s+\S*$/, "").trim() : undefined;
     const links = [...new Map(full.blocks.flatMap((block) => block.type === "paragraph" ? block.inlines : []).flatMap((inline) => inline.type === "link" && inline.target ? [`${inline.target.book}\0${inline.target.path}`] : []).map((key) => { const [linkBook, linkPath] = key.split("\0"); return [key, { book: linkBook!, path: linkPath! }] as const; })).values()].filter((target) => !(target.book === book && target.path === path) && target.book === book);
     const leadImage = leadImg ? { src: rewrite(leadImg.imagePath), alt: leadImg.alt } : undefined;
-    return { rb, book, path, title, full: { ...full, blocks }, lead, reading_minutes: Math.max(1, Math.ceil(wordText.trim().split(/\s+/).filter(Boolean).length / 200)), ...(full.kicker ? { kicker: full.kicker } : {}), ...(quickFact ? { quick_fact: quickFact } : {}), ...(badge ? { badge } : {}), relatedTargets: band === "adult" ? links : [], ...(leadImage ? { lead_image: leadImage } : {}), ...(leadImage && full.infobox ? { infoboxImage: leadImage } : {}), profile: sourceForBook(book)?.id.startsWith("wikipedia-") ? "wikipedia" : "generic" };
+    return { rb, book, path, title, full: { ...full, blocks }, lead, reading_minutes: Math.max(1, Math.ceil(wordText.trim().split(/\s+/).filter(Boolean).length / 200)), ...(kicker ? { kicker } : {}), ...(quickFact ? { quick_fact: quickFact } : {}), ...(badge ? { badge } : {}), relatedTargets: band === "adult" ? links : [], ...(leadImage ? { lead_image: leadImage } : {}), ...(leadImage && full.infobox ? { infoboxImage: leadImage } : {}), profile: sourceForBook(book)?.id.startsWith("wikipedia-") ? "wikipedia" : "generic" };
   } catch { return null; }
 }
 
