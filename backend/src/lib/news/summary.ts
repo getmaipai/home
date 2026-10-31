@@ -16,7 +16,7 @@ import { publishedAtOf, releasedItem, storyIdOf } from "./cards";
 import { gateFor, sentencesOf } from "./childGate";
 import { rankStories } from "./rankStories";
 
-const Summary = z.object({ intro: z.string().trim().min(1), points: z.array(z.string().trim().min(1)).min(3).max(5) });
+export const Summary = z.object({ intro: z.string().trim().min(1), points: z.array(z.string().trim().min(1)).min(3).max(5) });
 export type StorySummary = z.infer<typeof Summary>;
 let model = completeBackground;
 let deadlineMs = 30_000;
@@ -30,7 +30,7 @@ function stored(storyId: string, band: AgeBand) {
   return db.select().from(newsStorySummaries).where(and(eq(newsStorySummaries.storyId, storyId), eq(newsStorySummaries.band, band))).get();
 }
 
-function safe(summary: StorySummary, band: AgeBand): boolean {
+export function safe(summary: StorySummary, band: AgeBand): boolean {
   const units = [summary.intro, ...summary.points];
   if (band !== "adult" && tripsMinorFloor(units.join("\n"))) return false;
   if (band === "child") {

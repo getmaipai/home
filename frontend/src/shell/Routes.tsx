@@ -457,8 +457,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="commands" element={meetsMinRole(person.role, "adult") ? <CommandsPage person={person} /> : <Navigate to="/settings/chat" replace />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
-            <Route path="reference/*" element={<ReferencePage />} />
-            <Route path="wikipedia/*" element={<WikipediaPage />} />
+            <Route path="reference/*" element={<ReferencePage person={person} />} />
+            <Route path="wikipedia/*" element={<WikipediaPage person={person} />} />
             <Route path="all-apps" element={<AllAppsPage person={person} />} />
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
             <Route path="media/:id" element={<MediaLinkRedirect />} />

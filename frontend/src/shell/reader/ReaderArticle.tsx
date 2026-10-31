@@ -1,14 +1,38 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArticleSpeechContext, ArticleView, type ArticleAction, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
+import { Skeleton } from "@maipai/ui/src/ui/skeleton";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
 import { useReferenceSaves } from "./saves";
 import { readKeptArticle } from "./offline";
 import { speakableParagraphs, useArticleListen } from "./useArticleListen";
 
-const ARTICLE_ACTIONS: ArticleAction[] = ["save", "listen"];
+const ARTICLE_ACTIONS: ArticleAction[] = ["save", "listen", "summarize"];
+const DISCUSS_PROMPT = "I'd like to talk about this article.";
+/** The chat's `read_item` reference for an article: the book and path as one URL-safe token (the hub decodes it under the person's own age band). */
+export function discussMessage(book: string, path: string): string {
+  const bytes = new TextEncoder().encode(`${book}/${path}`);
+  const id = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${DISCUSS_PROMPT}\n\nmaipai://reference/article/${id}`;
+}
+const MAX_REF_ID = 80;
+
+/** The shape of an article while it loads: a title, a line of facts, a picture and a few paragraphs, so nothing jumps when the words arrive. */
+function ArticleLoading() {
+  return (
+    <div role="status" aria-label="Loading article" className="mx-auto flex w-full max-w-[72ch] flex-col gap-4 px-4 py-6 md:px-6">
+      <Skeleton className="h-5 w-24 rounded-full" />
+      <Skeleton className="h-12 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="aspect-video w-full rounded-lg" />
+      <div className="flex flex-col gap-2.5">
+        {[100, 96, 100, 88, 94, 60].map((width, index) => <Skeleton key={index} className="h-4" style={{ width: `${width}%` }} />)}
+      </div>
+    </div>
+  );
+}
 const PREVIEW_STALE_MS = 10 * 60 * 1000;
 
 export interface ReaderArticleProps {
@@ -17,6 +41,8 @@ export interface ReaderArticleProps {
   /** Where an article lives in the app that draws this reader (Reference and Wikipedia each have their own route). */
   routeFor: (book: string, path: string) => string;
   appName: string;
+  /** Teens and adults can talk about the article with the assistant; a child's page leaves this off. */
+  canDiscuss?: boolean;
   onAppHome: () => void;
   /** Runs a search in the app that draws this reader (the category crumb uses it). */
   onSearch?: (q: string) => void;
@@ -25,7 +51,7 @@ export interface ReaderArticleProps {
 }
 
 /** READER-03: one article, drawn by the kit reader with link previews; used by Reference and by the Wikipedia app. */
-export function ReaderArticle({ book, path, routeFor, appName, onAppHome, onSearch, unavailable }: ReaderArticleProps) {
+export function ReaderArticle({ book, path, routeFor, appName, canDiscuss, onAppHome, onSearch, unavailable }: ReaderArticleProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const saves = useReferenceSaves();
@@ -46,7 +72,18 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, onSear
       return { title: preview.title, summary: preview.description ?? preview.summary, ...(preview.thumbnail ? { thumbnail: preview.thumbnail } : {}) };
     } catch { return null; }
   }, [queryClient]);
-  if (query.isPending) return <p role="status">Loading article…</p>;
+  // Key points write themselves on the hub: the reader asks again quietly until they arrive. A new article starts empty.
+  const [keyPoints, setKeyPoints] = useState<{ key: string; value: { text: string; band: "child" | "teen" | "adult" } } | null>(null);
+  const askKeyPoints = useCallback(async () => {
+    try {
+      const { key_points } = await api.referenceKeyPoints(book, path);
+      if (key_points) setKeyPoints({ key: storyId, value: key_points });
+    } catch { /* not ready or not available: the article stays readable */ }
+  }, [book, path, storyId]);
+  useEffect(() => { setKeyPoints(null); }, [storyId]);
+  const discussable = canDiscuss === true && discussMessage(book, path).split("/").pop()!.length <= MAX_REF_ID;
+  const available: ArticleAction[] = discussable ? [...ARTICLE_ACTIONS, "discuss"] : ARTICLE_ACTIONS;
+  if (query.isPending) return <ArticleLoading />;
   if (query.isError) {
     if (query.error instanceof ApiError && query.error.status === 404) return <>{unavailable ?? <p role="status">This article is not available.</p>}</>;
     return <p role="alert">Could not load this article.</p>;
@@ -56,11 +93,13 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, onSear
     <div id="reference-article" data-touch-target-exempt className="min-w-0">
       <ArticleSpeechContext.Provider value={reading.speech}>
       <ArticleView
-        data={{ ...toArticleViewData(article, { appName, onAppHome, ...(onSearch ? { onCategory: onSearch } : {}) }), saved: saves.isSaved(book, path) }}
-        available={ARTICLE_ACTIONS}
+        data={{ ...toArticleViewData(article, { appName, onAppHome, ...(onSearch ? { onCategory: onSearch } : {}) }), saved: saves.isSaved(book, path), ...(keyPoints?.key === storyId ? { key_points: keyPoints.value } : {}) }}
+        available={available}
         ids={{ story_id: storyId }}
         onAction={(action, ids) => {
           if (action === "save") saves.setSaved(book, path, ids.on !== false);
+          if (action === "summarize") void askKeyPoints();
+          if (action === "discuss") navigate(`/chat?ask=${encodeURIComponent(discussMessage(book, path))}`);
           if (action === "listen") reading.listen(storyId, speakableParagraphs(article));
         }}
         onBack={() => navigate(-1)}

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { Page } from "@maipai/ui/src/primitives/Page";
-import { api, type ReferenceBookView } from "@/lib/api";
+import { api, type ReferenceBookView, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { ReaderArticle } from "@/shell/reader/ReaderArticle";
 import { ReaderSearchBox } from "@/shell/reader/SearchBox";
@@ -124,7 +124,7 @@ function HomeSections({ book, recent }: { book: string; recent: RecentArticle[] 
   );
 }
 
-export function WikipediaPage() {
+export function WikipediaPage({ person }: { person?: Roster } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   useTabItem("Wikipedia");
@@ -178,7 +178,7 @@ export function WikipediaPage() {
               <Button variant="outline" size="sm" disabled={random.isPending} onClick={() => random.mutate()}>Random article</Button>
               {random.isError ? <span role="alert" className="text-muted-foreground text-sm">No article came back. Try once more.</span> : null}
             </div>
-            {articleBook && articlePath ? <ReaderArticle book={articleBook} path={articlePath} routeFor={articleRoute} appName="Wikipedia" onAppHome={appHome} onSearch={(next) => search(next)} /> : null}
+            {articleBook && articlePath ? <ReaderArticle book={articleBook} path={articlePath} routeFor={articleRoute} appName="Wikipedia" canDiscuss={!!person && person.age_band !== "child"} onAppHome={appHome} onSearch={(next) => search(next)} /> : null}
             {onSearchPage ? <SearchResults q={q} {...(resultBook ? { book: resultBook } : {})} books={books} routeFor={articleRoute} onBook={(next) => search(q, next)} onSearch={(next) => search(next, resultBook)} /> : null}
             {!articleMatch && !onSearchPage && section === "explore" ? <ExploreGrid book={book} /> : null}
             {!articleMatch && !onSearchPage && section === "saved" ? <SavedList /> : null}

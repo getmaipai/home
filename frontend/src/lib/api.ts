@@ -998,6 +998,7 @@ export const api = {
   referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),
   referenceSearch: (q: string, book?: string) => request<ReferenceSearchHit[]>(`/api/reference/search?q=${encodeURIComponent(q)}${book ? `&book=${encodeURIComponent(book)}` : ""}`),
   referenceArticle: (book: string, path: string) => request<ReferenceArticleView>(`/api/reference/article/${encodeURIComponent(book)}/${encodeURIComponent(path)}`),
+  referenceKeyPoints: (book: string, path: string) => request<{ key_points: { text: string; band: "child" | "teen" | "adult" } | null }>(`/api/reference/key-points/${encodeURIComponent(book)}/${encodeURIComponent(path)}`, { method: "POST" }),
   referencePreview: (book: string, path: string) => request<ReferencePreview>(`/api/reference/preview/${encodeURIComponent(book)}/${encodeURIComponent(path)}`),
   referenceRandom: (book: string) => request<{ title: string; book: string; path: string }>(`/api/reference/random/${encodeURIComponent(book)}`),
   referenceSearchPage: async (q: string, book?: string): Promise<ReferenceSearchPage> => {

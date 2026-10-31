@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { api, type ReferenceArticleView, type ReferenceBookView } from "@/lib/api";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { api, type ReferenceArticleView, type ReferenceBookView, type Roster } from "@/lib/api";
 import { WikipediaPage, wikipediaBooks } from "@/shell/pages/WikipediaPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
 const book = (id: string, label: string): ReferenceBookView => ({ id, source_label: label, language: "en", size_bytes: 1_000_000, snapshot_date: "2026-09-01", licence: "CC BY-SA 4.0", article_count: 10 });
 const article: ReferenceArticleView = { title: "Aurora", book: "wikipedia_en_all_maxi_2026-09", path: "Aurora", source_label: "Wikipedia", licence: "CC BY-SA 4.0", snapshot_date: "2026-09-01", toc: [], blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "Lights in the sky." }] }] };
-const originals = { books: api.referenceBooks, article: api.referenceArticle, random: api.referenceRandom, suggest: api.referenceSuggest, saves: api.referenceSaves, save: api.referenceSave, unsave: api.referenceUnsave };
+const originals = { books: api.referenceBooks, article: api.referenceArticle, random: api.referenceRandom, suggest: api.referenceSuggest, saves: api.referenceSaves, save: api.referenceSave, unsave: api.referenceUnsave, keyPoints: api.referenceKeyPoints };
 
-function mount(initial = "/wikipedia") {
-  const view = renderWithQueryClient(<MemoryRouter initialEntries={[initial]}><Routes><Route path="/wikipedia/*" element={<WikipediaPage />} /></Routes></MemoryRouter>);
+function ChatProbe() { return <p data-testid="chat-ask">{decodeURIComponent(useLocation().search)}</p>; }
+
+function mount(initial = "/wikipedia", person?: Roster) {
+  const view = renderWithQueryClient(<MemoryRouter initialEntries={[initial]}><Routes><Route path="/wikipedia/*" element={<WikipediaPage {...(person ? { person } : {})} />} /><Route path="/chat" element={<ChatProbe />} /></Routes></MemoryRouter>);
   return { ...view, ...within(view.container) };
 }
 
@@ -30,7 +32,7 @@ describe("Wikipedia app", () => {
     api.referenceSuggest = async () => [{ title: "Aurora", book: "wikipedia_en_all_maxi_2026-09", path: "Aurora" }];
     api.referenceSaves = async () => ({ saves: [] });
   });
-  afterEach(() => { cleanup(); Object.assign(api, { referenceBooks: originals.books, referenceArticle: originals.article, referenceRandom: originals.random, referenceSuggest: originals.suggest, referenceSaves: originals.saves, referenceSave: originals.save, referenceUnsave: originals.unsave }); });
+  afterEach(() => { cleanup(); Object.assign(api, { referenceBooks: originals.books, referenceArticle: originals.article, referenceRandom: originals.random, referenceSuggest: originals.suggest, referenceSaves: originals.saves, referenceSave: originals.save, referenceUnsave: originals.unsave, referenceKeyPoints: originals.keyPoints }); });
 
   test("with no Wikipedia in the library it says so and what to do, with no search box", async () => {
     api.referenceBooks = async () => [book("vikidia_en_all_2026-09", "Vikidia")];
@@ -55,6 +57,21 @@ describe("Wikipedia app", () => {
     expect(await view.findByText("Lights in the sky.")).toBeTruthy();
     expect(document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain("Wikipedia");
     await waitFor(() => expect(window.sessionStorage.getItem("maipai.wikipedia.recent")).toContain("Aurora"));
+  });
+
+  test("an adult can ask for Key points and Discuss the article in chat; a child gets neither Discuss nor a chat link", async () => {
+    api.referenceKeyPoints = async () => ({ key_points: { text: "Aurora is light in the sky.\n\u2022 It happens near the poles.", band: "adult" } });
+    const path = `/wikipedia/a/${encodeURIComponent("wikipedia_en_all_maxi_2026-09")}/Aurora`;
+    const view = mount(path, { age_band: "adult" } as Roster);
+    expect(await view.findByText("It happens near the poles.")).toBeTruthy();
+    fireEvent.click(await view.findByRole("button", { name: /Discuss/ }));
+    const ask = (await view.findByTestId("chat-ask")).textContent ?? "";
+    expect(ask).toContain("I'd like to talk about this article.");
+    expect(ask).toContain("maipai://reference/article/");
+    cleanup();
+    const kid = mount(path, { age_band: "child" } as Roster);
+    expect(await kid.findByText("Lights in the sky.")).toBeTruthy();
+    expect(kid.queryByRole("button", { name: /Discuss/ })).toBeNull();
   });
 
   test("Random article opens the article the hub picked", async () => {

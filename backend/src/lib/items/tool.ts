@@ -8,6 +8,7 @@ import type { ToolSpec } from "@/lib/llm";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 import { readNewsStory } from "@/lib/news/discuss";
+import { readReferenceArticle } from "@/lib/reference/keyPoints";
 
 export const READ_ITEM_TOOL_ID = "read_item";
 export const ITEM_REF_PATTERN = /maipai:\/\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\/([A-Za-z0-9_-]{1,80})/g;
@@ -19,6 +20,7 @@ export type ItemReader = (person: PersonRow, id: string) => Promise<ItemText | n
 
 export const ITEM_READERS: Record<string, ItemReader> = {
   "news/story": readNewsStory,
+  "reference/article": readReferenceArticle,
 };
 
 /** Every reference in a piece of text, in order, once each. */

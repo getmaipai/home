@@ -5,7 +5,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Card } from "@maipai/ui/src/primitives/Card";
 import { Page } from "@maipai/ui/src/primitives/Page";
-import { api, type ReferenceSuggestion } from "@/lib/api";
+import { api, type ReferenceSuggestion, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { ReaderArticle } from "@/shell/reader/ReaderArticle";
 import { SearchResults } from "@/shell/reader/SearchResults";
@@ -14,7 +14,7 @@ const routeFor = (book: string, path: string) => `/reference/${encodeURIComponen
 const sizeLabel = (bytes: number | null) => bytes === null ? "Size unavailable" : bytes < 1_000_000_000 ? `${(bytes / 1_000_000).toFixed(0)} MB` : `${(bytes / 1_000_000_000).toFixed(1)} GB`;
 
 // READER-03: Reference draws its article and its results through the shared reader (shell/reader), the same one the Wikipedia app uses.
-export function ReferencePage() {
+export function ReferencePage({ person }: { person?: Roster } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const routeMatch = location.pathname.match(/^\/reference\/([^/]+)(?:\/(.*))?$/);
@@ -44,7 +44,7 @@ export function ReferencePage() {
         <Button type="submit">Search</Button>
       </form>
       {!path && suggestions.length && query.trim() ? <ul aria-label="Suggested articles" className="flex min-w-0 flex-col">{suggestions.map((item) => <li key={`${item.book}:${item.path}`}><Button asChild variant="link"><Link to={routeFor(item.book, item.path)}>{item.title}</Link></Button></li>)}</ul> : null}
-      {book && path ? <ReaderArticle book={book} path={path} routeFor={routeFor} appName="Reference" onAppHome={() => navigate("/reference")} /> : null}
+      {book && path ? <ReaderArticle book={book} path={path} routeFor={routeFor} appName="Reference" canDiscuss={!!person && person.age_band !== "child"} onAppHome={() => navigate("/reference")} /> : null}
       {!book && resultQuery ? <SearchResults q={resultQuery} {...(resultBook ? { book: resultBook } : {})} books={books} routeFor={routeFor} onBook={(next) => search(resultQuery, next)} onSearch={(next) => search(next, resultBook)} /> : null}
       {!book && !resultQuery ? <section><h2 className="text-xl font-semibold">Your library</h2>{booksQuery.isPending ? <p role="status">Loading library…</p> : null}<div className="grid min-w-0 gap-3 sm:grid-cols-2">{books.map((item) => <Card key={item.id} className="min-w-0 p-4"><h3 className="break-words font-semibold">{item.source_label}</h3><p>{item.language ?? "Language unavailable"} · {sizeLabel(item.size_bytes)}</p><p className="text-muted-foreground">Snapshot {item.snapshot_date ?? "date unavailable"} · {item.article_count.toLocaleString()} articles</p><p className="text-muted-foreground">{item.licence}</p><Button asChild variant="link"><Link to={`/reference/${encodeURIComponent(item.id)}`}>Browse this book</Link></Button></Card>)}</div>{booksQuery.isError ? <p role="alert">Could not load your library.</p> : null}</section> : null}
       {book && !path && !resultQuery ? <section><h2 className="text-xl font-semibold">{books.find((item) => item.id === book)?.source_label ?? "Browse this book"}</h2><p>Search for an article in this book.</p>{query.trim() && !suggestions.length ? <p>No matching article titles.</p> : null}</section> : null}

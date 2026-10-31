@@ -22,6 +22,7 @@ import { installed, libraryRequest } from "@/lib/kiwixClient";
 import { searchReference } from "@/lib/referenceSearch";
 import { addReferenceSave, listReferenceSaves, removeReferenceSave } from "@/lib/reference/saves";
 import { ReferenceSave } from "@maipai/spec/gen/ts/reference-save.js";
+import { referenceKeyPoints } from "@/lib/reference/keyPoints";
 import { articlePayloadFor, loadArticleFor, readArticleImage } from "@/lib/reference/article";
 
 export const referenceRoutes = apiRouter();
@@ -38,6 +39,8 @@ const SEARCH_ROUTE = createRoute({ method: "get", path: "/search", tags: ["Sourc
 const ARTICLE_ROUTE = createRoute({ method: "get", path: "/article/{book}/{path}", tags: ["Sources"], summary: "Read a cleaned offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: articleResponse } }, description: "Closed article blocks." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 const previewResponse = z.object({ title: z.string(), summary: z.string(), description: z.string().optional(), kicker: z.string().optional(), lead: z.string().optional(), thumbnail: z.object({ src: z.string(), alt: z.string() }).optional() });
 const PREVIEW_ROUTE = createRoute({ method: "get", path: "/preview/{book}/{path}", tags: ["Sources"], summary: "Preview an offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: previewResponse } }, description: "Article preview." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+const keyPointsResponse = z.object({ key_points: z.object({ text: z.string(), band: z.enum(["child", "teen", "adult"]) }).nullable() });
+const KEY_POINTS_ROUTE = createRoute({ method: "post", path: "/key-points/{book}/{path}", tags: ["Sources"], summary: "Key points of an offline article (null while they are being written)", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: keyPointsResponse } }, description: "Key points, or null while they are written." }, ...errorResponses({ 401: "Not signed in" }) } });
 const RANDOM_ROUTE = createRoute({ method: "get", path: "/random/{book}", tags: ["Sources"], summary: "Choose a random offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200) }) }, responses: { 200: { content: { "application/json": { schema: z.object({ title: z.string(), book: z.string(), path: z.string() }) } }, description: "Random readable article." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 const MEDIA_ROUTE = createRoute({ method: "get", path: "/media/{book}/{path}", tags: ["Sources"], summary: "Read an allowed offline article image", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 1000) }) }, responses: { 200: { description: "Image bytes." }, 404: { description: "Image not available." }, ...errorResponses({ 401: "Not signed in" }) } });
 const referenceSaveSchema = z.object({ id: z.string(), person_id: z.string(), book: z.string(), path: z.string(), title: z.string(), saved_at: z.string(), offline: z.boolean(), hlc: z.string(), provenance: z.string() });
@@ -97,6 +100,12 @@ referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
   if (!result) return unavailable(c); if ("redirect" in result) return c.redirect(result.redirect!, 302);
   c.header("Cache-Control", "private, max-age=600"); c.header("X-Content-Type-Options", "nosniff");
   return c.json(await articlePayloadFor(c.get("person"), result), 200);
+});
+
+referenceRoutes.openapi(KEY_POINTS_ROUTE, async (c) => {
+  const { book, path } = c.req.valid("param");
+  c.header("Cache-Control", "no-store");
+  return c.json({ key_points: await referenceKeyPoints(c.get("person"), book, path) }, 200);
 });
 
 referenceRoutes.openapi(PREVIEW_ROUTE, async (c) => {
