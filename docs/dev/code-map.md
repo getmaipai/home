@@ -941,7 +941,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceCues.ts` | HESITATION_LEVELS, DEFAULT_HESITATION_LEVEL, KNOWN_CUE_TAGS, normalizeTagName, normalizeTagList, freshCueState |
 | `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, voiceForSpeech |
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
-| `backend/src/lib/voiceResolve.ts` | voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
+| `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
 | `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome |

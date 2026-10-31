@@ -8283,6 +8283,10 @@
                     "type": "string",
                     "maxLength": 4000
                   },
+                  "voice": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
                   "turn_id": {
                     "type": "string"
                   },
