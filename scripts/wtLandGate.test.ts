@@ -8,6 +8,9 @@ const { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, d
 beforeAll(setup);
 afterAll(cleanup);
 
+// The fixture check takes the real heavy-run slot; a busy Mac (load over 20) made it wait past the 30 s test limit (issue 280).
+const IDLE_MACHINE = { GATE_HEAVY_LOAD_CMD: "echo 0", GATE_HEAVY_FREE_CMD: "echo 100" };
+
 describe.skipIf(!hasNode)("wt.sh land gate stamp (needs node installed)", () => {
   const originMain = () => spawnSync("git", ["--git-dir", bare, "rev-parse", "main"], { encoding: "utf8" }).stdout.trim();
   // A worktree with one committed file; `file` decides the tier (docs T0, other code T1).
@@ -20,7 +23,7 @@ describe.skipIf(!hasNode)("wt.sh land gate stamp (needs node installed)", () => 
     writeFileSync(join(path, file), `${slug}\n`);
     spawnSync("git", ["-C", path, "add", file]);
     spawnSync("git", ["-C", path, "commit", "-m", slug], { env: { ...process.env, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
-    const sh = (args: string[]) => spawnSync("bash", [script, ...args], { cwd: path, encoding: "utf8", env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_SESSION: name } });
+    const sh = (args: string[]) => spawnSync("bash", [script, ...args], { cwd: path, encoding: "utf8", env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_SESSION: name, ...IDLE_MACHINE } });
     const stampPath = join(data, "gate-stamps", `${name}.json`);
     const edit = (fn: (s: any) => void) => { const s = JSON.parse(readFileSync(stampPath, "utf8")); fn(s); writeFileSync(stampPath, JSON.stringify(s)); };
     return { path, name, sh, stampPath, edit };

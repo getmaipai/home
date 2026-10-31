@@ -152,6 +152,9 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
   });
 
   test("the card shows the busy line while the Stack makes another picture or video, with the place in line", async () => {
+    // Held in the queue until read: with one queued poll a fast poller could pass the phase between checks (issue 245).
+    fake.queuedPolls = Number.POSITIVE_INFINITY;
+    fake.pollsToFinish = Number.POSITIVE_INFINITY;
     await withStub(script(BOAT), async () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat in the rain");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.phase === "waiting for memory");
@@ -159,6 +162,8 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       // A job the Stack holds for memory says so (and never "You are next", which read as a line of other people when nothing was ahead); no place in line is shown.
       expect(card.items[0]!.label).toBe(JOB_QUEUE_COPY.memory_elsewhere.adult);
       expect(card.items[0]!.label).not.toContain("in line");
+      fake.queuedPolls = 1;
+      fake.pollsToFinish = 3;
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
     });
   });

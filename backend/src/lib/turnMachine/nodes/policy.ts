@@ -26,6 +26,7 @@ import type { Role } from "@/middleware/auth";
 import { brakeFor, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { recordToolAudit } from "@/lib/toolAudit";
+import { LIST_ACTIONS } from "@/lib/listActions";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -506,7 +507,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       if (call.tool === "remind" || call.tool === "timer" || call.tool === "lists") {
         const action = typeof args.action === "string" ? args.action : "";
         const scope = args.scope === "household" || args.list_scope === "household" ? "household" : args.scope === "person" || args.list_scope === "person" ? "person" : undefined;
-        const listActions = new Set(["create_list", "rename_list", "delete_list", "add_items", "remove_items", "check_items", "uncheck_items", "edit_item", "move_items", "copy_list", "reorder", "clear_done", "show_list", "find_list"]);
+        const listActions: ReadonlySet<string> = new Set(LIST_ACTIONS);
         const brakeTool: BrakeTool = call.tool === "remind" && listActions.has(action) ? "lists" : call.tool as BrakeTool;
         const rawMode = getHouseholdSettingValue(`tools.${brakeTool}.mode`);
         const mode: BrakeMode = rawMode === "ask" || rawMode === "never" ? rawMode : "do";

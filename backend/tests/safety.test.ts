@@ -53,6 +53,8 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
       if (key.key === "companions.enabled") return ["stress-test-value"];
       // KS-05: a news feed box holds https feed addresses, one per line; free text is refused with a fix.
       if (key.key.startsWith("news.feeds.")) return "https://news.example.com/feed.xml";
+      // TIER-*: a tier slot is a {model, options} object; its default is a valid value to write.
+      if ((key.range as { value_schema?: string } | undefined)?.value_schema === "tier-slot") return key.default;
       return key.default === "" ? "stress-test-value" : `${key.default}-stressed`;
     case "person": {
       // Home Assistant's `range.multiple` shape selects every person;

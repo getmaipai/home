@@ -258,6 +258,8 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
     await flush();
     await pushPause(session, 600);
+    // The final waits on a transcription request, which can outlast one flush under load (issue 279).
+    for (let i = 0; i < 100 && finals(events).length === 0; i++) await flush();
     const afterHold = [...events];
     await new Promise((resolve) => setTimeout(resolve, 100));
 

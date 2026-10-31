@@ -4258,6 +4258,23 @@
       "replacesHandBuilt": [],
       "realTurnToday": false,
       "verdictReason": "Added to the kit (ui-v0.5.425) for the Weather moon card; no Home screen draws it yet. Wire it when the moon look lands in Home."
+    },
+    {
+      "file": "tier-segment.tsx",
+      "name": "tier-segment",
+      "group": "tier",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": "QUICK",
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "Wired on video cards by TIER-HOME-03 (8518bf3e3): the Quality segment that makes another clip at Standard, Boost or Max."
     }
   ]
 }

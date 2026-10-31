@@ -4,7 +4,8 @@ import { addItem, clearDoneItems, copyList, createList, deleteList, editItem, mo
 import { isListPronoun, resolveItems, resolveList } from "@/lib/listResolver";
 import type { UndoInverse } from "@/lib/toolUndo";
 
-export type ListAction = "create_list" | "rename_list" | "delete_list" | "add_items" | "remove_items" | "check_items" | "uncheck_items" | "edit_item" | "move_items" | "copy_list" | "reorder" | "clear_done" | "show_list" | "find_list";
+export const LIST_ACTIONS = ["create_list", "rename_list", "delete_list", "add_items", "remove_items", "check_items", "uncheck_items", "edit_item", "move_items", "copy_list", "reorder", "clear_done", "show_list", "find_list"] as const;
+export type ListAction = (typeof LIST_ACTIONS)[number];
 export interface ListActionInput { action: ListAction; list?: string; to_list?: string; items?: string[]; name?: string; exclude?: string[]; order?: string[]; lastListId?: string; lastItemIds?: string[] }
 export type ListActionResult = { ok: true; reply: string; listId?: string; itemIds?: string[]; undo?: { inverse: UndoInverse[] } } | { ok: false; reply: string };
 const fail = (reply: string): ListActionResult => ({ ok: false, reply });
