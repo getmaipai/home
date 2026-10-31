@@ -17,7 +17,7 @@ export function RoutesBody({ byRoute }: { byRoute: readonly { route: string; cou
   const model = useDataTableModel(rows, tableColumns<RouteRow>(["route", "turns"], { route: 240, turns: 80 }));
   return (
     <>
-      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Turn routes" getRowId={(row) => row.route} />
+      <DataTable {...model} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Turn routes" getRowId={(row) => row.route} />
     </>
   );
 }

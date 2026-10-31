@@ -28,7 +28,7 @@ export function DiskHardwareBody({ disk, hardware }: { disk: PerformanceDisk; ha
       <p className="mb-4 text-sm text-muted-foreground">
         {toGb(disk.free_bytes)} free of {toGb(disk.total_bytes)}
       </p>
-      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage areas" getRowId={(row) => row.area} />
+      <DataTable {...model} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Storage areas" getRowId={(row) => row.area} />
       <p className="mt-4 text-sm text-muted-foreground">Hardware reading: {hardware.configured ? (hardware.hardware ? "available" : "Stack configured, no reading yet") : "no Stack configured"}</p>
     </>
   );

@@ -10,6 +10,7 @@ import { api, type HomeWidgets, type WidgetData, type WidgetDescriptor } from "@
 
 /** Design note section 6: never more than four Today cards before "More". */
 export const TODAY_CARD_BUDGET = 4;
+const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-date" && widget.id === "today" ? "Coming up" : widget.title;
 
 interface Slot { widget: WidgetDescriptor; data: WidgetData }
 
@@ -54,7 +55,7 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
     </div>
   ) : (
     <Card key={`${slot.widget.package}/${slot.widget.id}`} size="sm" data-testid="home-today-card">
-      <CardHeader><CardTitle>{slot.widget.title}</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{displayTitle(slot.widget)}</CardTitle></CardHeader>
       <CardContent>
         <ItemGroup>
           {slot.data.items.map((item, index) => (
@@ -80,7 +81,7 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
         <h2 className="text-base leading-snug font-medium">Today</h2>
         <div className="flex flex-wrap gap-2">
           {slots.map((slot) => (
-            <Button key={key(slot)} variant="outline" size="sm" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{slot.widget.title}</Button>
+            <Button key={key(slot)} variant="outline" size="sm" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Button>
           ))}
         </div>
         {opened ? <div className="max-w-xl">{cards([opened])}</div> : null}
@@ -94,7 +95,7 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
   const heroSlot = home?.hero && heroData && heroData.items.length > 0 && !heroData.degraded ? { widget: home.hero, data: heroData } : null;
   const showHeroSkeleton = heroOnly && Boolean(home?.hero) && heroQuery.isPending;
   if (showHeroSkeleton) return <RouteSkeleton label="Loading Home highlight" />;
-  if (heroOnly) return heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null;
+  if (heroOnly) return heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{displayTitle(heroSlot.widget)}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null;
   return (
     <>
     {heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null}

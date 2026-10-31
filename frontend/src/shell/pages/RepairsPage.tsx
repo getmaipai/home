@@ -137,7 +137,7 @@ export function RepairsPage({ person }: { person: Roster }) {
               {...model}
               caption="Repair issues"
               getRowId={(row) => row.id}
-              toolbar={<div className="flex w-full flex-col gap-3">
+              toolbar={model.rows.length >= 10 ? <div className="flex w-full flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Input size="row" type="search" aria-label="Search table rows" value={model.filter} onChange={(event) => { model.setFilter(event.target.value); model.setPageIndex(0); }} placeholder="Search rows…" />
                   <Button type="button" size="row" variant="outline" aria-label="Download table as CSV" onClick={model.downloadCsv}><Download aria-hidden="true" className="size-4" /><span>Download CSV</span></Button>
@@ -147,7 +147,7 @@ export function RepairsPage({ person }: { person: Roster }) {
                   <p className="text-sm text-muted-foreground" aria-live="polite">Page {model.currentPage + 1} of {model.pageCount}</p>
                   <div className="flex items-center gap-2"><Label htmlFor={model.pageSizeId}>Rows per page:</Label><Select value={String(model.pageSize)} onValueChange={(value) => { model.setPageSize(Number(value)); model.setPageIndex(0); }}><SelectTrigger id={model.pageSizeId} size="row"><SelectValue /></SelectTrigger><SelectContent>{model.availablePageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectContent></Select></div>
                 </div>
-              </div>}
+              </div> : undefined}
               rowActions={(row) => {
                 const issue = issues.find((candidate) => candidate.id === row.id);
                 if (!issue) return null;

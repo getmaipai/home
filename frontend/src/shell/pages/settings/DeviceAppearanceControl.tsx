@@ -29,7 +29,7 @@ export function DeviceAppearanceControl() {
             <Select value={value ?? "inherit"} onValueChange={(next) => { const appearance = next === "inherit" ? null : isAppearance(next) ? next : null; setValue(appearance); writeDeviceAppearancePreference(appearance); }}>
               <SelectTrigger size="row" aria-label="On this device only"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="inherit">Use my setting</SelectItem>
+                <SelectItem value="inherit">Same as the household</SelectItem>
                 {options.map((option) => <SelectItem key={option} value={option}>{option[0]!.toUpperCase() + option.slice(1)}</SelectItem>)}
               </SelectContent>
             </Select>

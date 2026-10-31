@@ -45,7 +45,7 @@ interface Row extends Record<string, unknown> {
 
 const UPDATE_COLUMNS: readonly DataTableColumn<Row>[] = [
   { id: "name", header: "Name" },
-  { id: "installed", header: "Installed", minWidth: 112 },
+  { id: "installed", header: "Installed", minWidth: 112, cell: (row) => row.installed.length > 7 ? <span title={row.installed}>{row.installed.slice(0, 7)}</span> : row.installed },
   { id: "available", header: "Available", minWidth: 112 },
   { id: "lastChecked", header: "Last checked", minWidth: 176 },
   { id: "status", header: "Status", minWidth: 176 },
@@ -154,7 +154,7 @@ export function UpdatesPage({ person }: { person: Roster }) {
               caption="Available updates"
               sort={table.sort}
               onSortChange={table.onSortChange}
-              toolbar={table.toolbar}
+              toolbar={updateRows.length >= 10 ? table.toolbar : undefined}
               emptyLabel={table.emptyLabel}
               rowActionsLabel="Update actions"
               rowActions={(row) => {

@@ -35,7 +35,7 @@ export function GettingStarted({ person }: { person: Roster }) {
               </Item>
             ))}
           </ItemGroup>
-          {open.length > rows.length ? <Button variant="link" size="row" nativeButton={false} render={<Link to="/settings/household?tab=general" />}>{`${open.length - rows.length} more`}</Button> : null}
+          {open.length > rows.length ? <Button variant="link" size="row" nativeButton={false} render={<Link to="/settings/household?tab=general" />}>{`Show ${open.length - rows.length} more`}</Button> : null}
         </CardContent>
       </Card>
     </section>

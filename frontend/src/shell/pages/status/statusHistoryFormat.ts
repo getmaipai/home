@@ -13,10 +13,10 @@ export function durationWords(minutes: number): string {
 export function statusStripSummary(uptimePercent: number | null, incidents: readonly StatusHistoryIncident[]): string {
   if (uptimePercent === null) return "Last 90 days: no data yet.";
   const count = incidents.length;
-  if (count === 0) return `Last 90 days: ${uptimePercent.toFixed(3)}% uptime, no outages.`;
+  if (count === 0) return `Last 90 days: ${uptimePercent.toFixed(1)}% uptime, no outages.`;
   const outage = count === 1 ? "1 outage" : `${count} outages`;
   const down = durationWords(incidents.reduce((total, incident) => total + incident.minutes, 0));
-  return `Last 90 days: ${uptimePercent.toFixed(3)}% uptime, ${outage}, ${down} down.`;
+  return `Last 90 days: ${uptimePercent.toFixed(1)}% uptime, ${outage}, ${down} down.`;
 }
 
 export function daySummary(minutes: StatusHistoryMinutes): string {

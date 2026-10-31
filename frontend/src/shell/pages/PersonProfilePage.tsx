@@ -118,7 +118,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                       <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
                       <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
                       {/* The per-child cartoon switch (KIDS-CREATE-01): a guardian finds it here, on the child's own page, next to the other limits. The home switch and the daily limits are in Home settings, Pictures and videos. */}
-                      <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_KID_PICTURES_GROUP_IDS} includeKeys={PERSON_KID_PICTURES_KEYS} titleOverrides={{ "person.likeness": "Pictures and videos" }} />
+                      {viewingSelf && profile.age_band !== "child" ? <p className="text-sm text-muted-foreground">Pictures and videos can be made in chat.</p> : <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_KID_PICTURES_GROUP_IDS} includeKeys={PERSON_KID_PICTURES_KEYS} titleOverrides={{ "person.likeness": "Pictures and videos" }} />}
                     </div>
                   </TabsContent>
                 ) : null}

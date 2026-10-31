@@ -48,7 +48,7 @@ export function LayersBody({ layers }: { layers: PerformanceLayers }) {
   ) : (
     <>
       <p className="mb-4 text-sm text-muted-foreground">{layers.turns_with_trace} traced turn(s) in this window</p>
-      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Layer timing" getRowId={(row) => row.node} />
+      <DataTable {...model} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Layer timing" getRowId={(row) => row.node} />
     </>
   );
 }

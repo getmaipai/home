@@ -38,7 +38,7 @@ export function TurnsByEngineBody({ byEngine }: { byEngine: readonly Performance
   ]);
   return (
     <>
-      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Turns per engine" getRowId={(row) => row.engine} />
+      <DataTable {...model} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Turns per engine" getRowId={(row) => row.engine} />
     </>
   );
 }

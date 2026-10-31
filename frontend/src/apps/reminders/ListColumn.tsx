@@ -21,10 +21,10 @@ export function ListColumn({ lists, view, todayCount, scheduledCount, onCreate, 
     </div>
     <div className="grid gap-1">
       <Button variant={view.kind === "today" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "today" })}>
-        <span>Today</span><span>{todayCount}</span>
+        <span>Today</span>{todayCount > 0 ? <span>{todayCount}</span> : null}
       </Button>
       <Button variant={view.kind === "scheduled" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "scheduled" })}>
-        <span>Scheduled</span><span>{scheduledCount}</span>
+        <span>Scheduled</span>{scheduledCount > 0 ? <span>{scheduledCount}</span> : null}
       </Button>
       <hr className="my-2" />
       {lists.map((list, index) => {
@@ -37,7 +37,7 @@ export function ListColumn({ lists, view, todayCount, scheduledCount, onCreate, 
             <Icon aria-hidden className="size-5" />
           </span>
           <span className="flex-1 text-left">{labelFor(list)}</span>
-          <span className="text-muted-foreground">{itemCount(list)}</span>
+          {itemCount(list) > 0 ? <span className="text-muted-foreground">{itemCount(list)}</span> : null}
         </Button>;
       })}
     </div>

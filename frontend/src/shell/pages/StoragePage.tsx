@@ -178,8 +178,8 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
           </CardContent>
         </Card>
       ) : null}
-      <Button variant="outline" nativeButton={false} render={<Link to="/storage/trash" />}>Trash</Button>
-      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage usage by person" getRowId={(row) => row.person} />
+      <div className="mb-3 flex justify-end"><Button variant="outline" nativeButton={false} render={<Link to="/storage/trash" />}>Trash</Button></div>
+      <DataTable {...model} toolbar={rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Storage usage by person" getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
         <BackupsSection person={person} />

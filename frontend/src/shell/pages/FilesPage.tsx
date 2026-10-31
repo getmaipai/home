@@ -268,7 +268,7 @@ export function FilesPage({ person }: { person: Roster }) {
           if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
           event.preventDefault(); goSectionRef.current(id);
         },
-        ...(count !== undefined ? { trailing: <span className="text-base text-muted-foreground tabular-nums">{count}</span> } : {}),
+        ...(count !== undefined && count > 0 ? { trailing: <span className="text-base text-muted-foreground tabular-nums">{count}</span> } : {}),
       };
     };
     const ids = sections.map((section) => section.id);

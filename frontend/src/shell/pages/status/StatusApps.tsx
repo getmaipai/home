@@ -14,7 +14,7 @@ function appStripData(app: StatusApp) {
 }
 
 function appStripSummary(app: StatusApp) {
-  return `Last 90 days: ${app.uptimePercent.toFixed(3)}% uptime.`;
+  return `Last 90 days: ${app.uptimePercent.toFixed(1)}% uptime.`;
 }
 
 function appHasKnownProblem(app: StatusApp) {
@@ -77,7 +77,7 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
     <div className="flex min-h-12 flex-wrap items-center justify-between gap-3">
       <span className="font-medium">{app.name}</span>
       <div className="flex min-h-12 flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(3)}% uptime</span>
+        <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(1)}% uptime</span>
         <Status status={presentation.status}>{presentation.label}</Status>
       </div>
     </div>
@@ -90,7 +90,7 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
       <div className="flex min-h-12 flex-wrap items-center gap-3">
         <span className="mr-auto font-medium">{app.name}</span>
         <span className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(3)}% uptime</span>
+          <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(1)}% uptime</span>
           <Status status={presentation.status}>{presentation.label}</Status>
           <span className="inline-flex min-h-12 items-center">
             <CollapsibleTrigger aria-controls={detailsId} render={<Button type="button" variant="outline" size="sm" />}>

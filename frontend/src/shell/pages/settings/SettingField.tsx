@@ -12,6 +12,7 @@ import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
 import { LocationSetting } from "@/shell/pages/settings/placeAdapter";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { formatBytes } from "@maipai/ui/src/format";
 
 /** SHELL-05's own per-key control: the registry-selector-to-primitive
  * mapping docs/SETTINGS.md's generic renderer calls for, pointed at the
@@ -175,7 +176,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     const optionDescriptions = (def as { copy?: { options?: Record<string, string> } }).copy?.options;
     const optionLabels = (def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels;
     // MINOR-TOPICS-01e: a key's spec copy names its options in plain words; titleCaseOption is the fallback.
-    const getLabel = (option: string) => optionLabels?.[option] ?? (def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
+    const getLabel = (option: string) => optionLabels?.[option] ?? (option === "until_storage_threshold" ? "Until storage runs low" : def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
     control = (
       <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled || Boolean(source && !runtimeOptions && !source.startsWith("models."))}>
         <SelectTrigger aria-label={def.label}>
@@ -242,7 +243,8 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     <>
     <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
-        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{def.label}</span> : <span className="text-sm">{def.label}</span>}
+        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{def.label}</span> : <span className="text-sm">{def.key === "storage.household.cap_bytes" ? "Household storage cap" : def.label}</span>}
+        {def.key === "storage.household.cap_bytes" && typeof resolved.value === "number" ? <ItemDescription clamp={false}>{formatBytes(resolved.value)}</ItemDescription> : null}
         {resolved.does ? <ItemDescription clamp={false}>{resolved.does}</ItemDescription> : null}
         {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
         {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}

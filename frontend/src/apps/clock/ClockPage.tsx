@@ -11,9 +11,9 @@ import { setClockHeaderTab, type ClockTab } from "@/apps/clock/clockHeader";
 import { api, type ComingUpItem } from "@/lib/api";
 
 const taglines: Record<ClockTab, string> = {
-  alarms: "Make space for a gentler start.",
-  timers: "A little focus, one moment at a time.",
-  "world-clocks": "Keep your favorite places close.",
+  alarms: "No alarms yet. Add one with the plus button.",
+  timers: "No timers yet. Add one with the plus button.",
+  "world-clocks": "No world clocks yet. Add one with the plus button.",
   stopwatch: "Every moment, counted.",
 };
 

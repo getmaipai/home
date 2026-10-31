@@ -91,8 +91,8 @@ export function FamilyPage({ person }: { person: Roster }) {
     <Tabs value={activeTab} onValueChange={onTabChange}>
       <TabsList>
         <TabsTrigger value="people">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="pets">Pets{petsQuery.data ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="bots">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="pets">Pets{petsQuery.data && petsQuery.data.length > 0 ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="bots">Bots{botsQuery.data && botsQuery.data.length > 0 ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger>
       </TabsList>
       <TabsContent value="people">
     <AsyncState

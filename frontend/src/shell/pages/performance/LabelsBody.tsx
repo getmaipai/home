@@ -27,7 +27,7 @@ export function LabelsBody({ labels }: { labels: PerformanceLabels }) {
   const model = useDataTableModel(rows, tableColumns<HitRow>(["kind", "key", "count"], { kind: 100, key: 300, count: 80 }));
   return (
     <>
-      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Label harvest counts" getRowId={(row) => `${row.kind}-${row.key}`} />
+      <DataTable {...model} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Label harvest counts" getRowId={(row) => `${row.kind}-${row.key}`} />
       {labels.retire_eligible.length > 0 && (
         <p className="mt-4 text-sm text-muted-foreground">Zero hits this window, retire-eligible: {labels.retire_eligible.join(", ")}</p>
       )}
