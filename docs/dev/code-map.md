@@ -70,7 +70,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, useMusicTrackProps |
 | `frontend/src/apps/chat/branchInNewChatMenuItem.tsx` | BranchInNewChatMenuItem |
 | `frontend/src/apps/chat/chatActionBar.tsx` | useFeedbackFormStore, createChatFeedbackAdapter, clearSubmittedFeedback |
-| `frontend/src/apps/chat/chatAnswerBlocks.tsx` | ANSWER_BLOCK_PART, placeParts, drawableBlocks, answerBlockParts, textWithAnswerParts, AnswerBlockDataRender |
+| `frontend/src/apps/chat/chatAnswerBlocks.tsx` | ANSWER_BLOCK_PART, placeParts, drawableBlocks, textWithAnswerParts, AnswerBlockDataRender |
 | `frontend/src/apps/chat/chatCitationLink.tsx` | ChatCitationLink |
 | `frontend/src/apps/chat/chatConnectionBanner.tsx` | ChatConnectionBanner |
 | `frontend/src/apps/chat/chatDateDivider.tsx` | DATE_DIVIDER_GAP_MS, needsDateDivider, dateDividerLabel, ChatDateDivider |
@@ -97,7 +97,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/clock/StopwatchTab.tsx` | StopwatchTab |
 | `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
 | `frontend/src/apps/clock/WorldClocksTab.tsx` | WorldClocksTab |
-| `frontend/src/apps/memory/PeopleAndThings.tsx` | PeopleAndThings |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |
 | `frontend/src/apps/people/FaceEnrollmentBody.tsx` | canViewFaceEnrollment, FaceEnrollmentBody |
@@ -110,7 +109,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/reminders/ListColumn.tsx` | ListColumn |
 | `frontend/src/apps/reminders/ListMain.tsx` | ListMain |
 | `frontend/src/apps/reminders/ListMenu.tsx` | ListMenu |
-| `frontend/src/apps/reminders/RemindersPage.tsx` | RemindersHeaderTitle, RemindersPage |
+| `frontend/src/apps/reminders/RemindersPage.tsx` | RemindersPage |
 | `frontend/src/apps/reminders/SmartListView.tsx` | SmartListView |
 | `frontend/src/apps/settings/AddChatModel.tsx` | AddChatModel |
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
@@ -125,7 +124,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
 | `frontend/src/apps/settings/CapabilityTable.tsx` | capabilityWords, CapabilityTable |
 | `frontend/src/apps/settings/CloseAppsSettings.tsx` | CloseAppsSettings |
-| `frontend/src/apps/settings/CodingSettings.tsx` | selfTestState, homeModeSentence, CodingAdminSettings, CodingKeysSettings, AdminCodingAccessRow |
+| `frontend/src/apps/settings/CodingSettings.tsx` | selfTestState, homeModeSentence, CodingAdminSettings, CodingKeysSettings |
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
@@ -141,7 +140,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
 | `frontend/src/apps/settings/PicturesLibrary.tsx` | PicturesLibrary |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
-| `frontend/src/apps/settings/RepairsSection.tsx` | RepairsSection |
 | `frontend/src/apps/settings/RobotBody.tsx` | bodyHealthText, didPutDownCountIncrease, RobotBody |
 | `frontend/src/apps/settings/RobotCards.tsx` | fetchFamilyBots, familyBotsQueryKey, RobotCards |
 | `frontend/src/apps/settings/RobotCompanionChoices.tsx` | RobotCompanionChoices |
@@ -186,7 +184,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/ThemeToggle.tsx` | useIsDark, ThemeToggle |
 | `frontend/src/shell/VoiceStage.tsx` | VoiceStage |
 | `frontend/src/shell/ambientRing.tsx` | ambientRingFromWake, effectiveAmbientRing, chatAmbientRing, AmbientRingProvider, useAmbientRing, useAmbientRingValue |
-| `frontend/src/shell/audioSessionContext.tsx` | AudioSessionProvider, useAudioSession, useAudioSessionState, useAudioPosition, useMiniBar, useAudioRegistration |
+| `frontend/src/shell/audioSessionContext.tsx` | AudioSessionProvider, useAudioSession, useAudioSessionState, useMiniBar, useAudioRegistration |
 | `frontend/src/shell/components/DataTableControls.tsx` | DataTableControls |
 | `frontend/src/shell/components/DataTableRowActions.tsx` | DataTableRowActions |
 | `frontend/src/shell/components/SearchTestResultBody.tsx` | SearchResultIcon, SearchTestResultBody |
@@ -219,7 +217,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/DashboardPage.tsx` | DashboardPage |
 | `frontend/src/shell/pages/EnginesPage.tsx` | EnginesIcon, EnginesConsole |
 | `frontend/src/shell/pages/FamilyPage.tsx` | FamilyPage |
-| `frontend/src/shell/pages/FilesPage.tsx` | FilesIcon, FilesPage |
+| `frontend/src/shell/pages/FilesPage.tsx` | FilesPage |
 | `frontend/src/shell/pages/MarkdownDocument.tsx` | MarkdownDocument |
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
@@ -229,9 +227,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
 | `frontend/src/shell/pages/PerformancePage.tsx` | PerformanceIcon, PerformancePage |
 | `frontend/src/shell/pages/PersonProfilePage.tsx` | PersonProfilePage |
-| `frontend/src/shell/pages/PictureCropper.tsx` | visibleRegion, loadPicture, cropToFile, initialFrame, PictureCropper |
 | `frontend/src/shell/pages/PrivacyPage.tsx` | PrivacyIcon, PrivacyPage |
-| `frontend/src/shell/pages/ProjectsPage.tsx` | ProjectsIcon, ProjectsPage |
+| `frontend/src/shell/pages/ProjectsPage.tsx` | ProjectsPage |
 | `frontend/src/shell/pages/ReferencePage.tsx` | ReferencePage |
 | `frontend/src/shell/pages/RepairsPage.tsx` | RepairsIcon, RepairsPage |
 | `frontend/src/shell/pages/SignInPage.tsx` | SignInPage |
@@ -244,7 +241,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/UpdatesPage.tsx` | UpdatesIcon, UpdatesPage |
 | `frontend/src/shell/pages/UsersPage.tsx` | UsersIcon, UsersPage |
 | `frontend/src/shell/pages/VoicesPage.tsx` | VoicesIcon, VoicesPage |
-| `frontend/src/shell/pages/WhatHomeCanDoPage.tsx` | WhatHomeCanDoPage |
 | `frontend/src/shell/pages/WikipediaPage.tsx` | wikipediaBooks, WikipediaPage |
 | `frontend/src/shell/pages/companionFlow/AnimateStep.tsx` | tileWord, AnimateStep |
 | `frontend/src/shell/pages/companionFlow/CompanionFlowDialog.tsx` | CompanionFlowDialog |
@@ -257,10 +253,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
 | `frontend/src/shell/pages/dashboard/Greeting.tsx` | Greeting |
-| `frontend/src/shell/pages/dashboard/HomePlaceAsk.tsx` | label, HomePlaceAsk |
 | `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | ContinueShelf, FamilyShelf, HomeMedia |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, TodaySection |
-| `frontend/src/shell/pages/dataTableControls.tsx` | useDataTableControls |
 | `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderActions, sectionsBarEntries |
 | `frontend/src/shell/pages/performance/DiskHardwareBody.tsx` | DiskHardwareBody |
 | `frontend/src/shell/pages/performance/EnginesHealthBody.tsx` | EnginesHealthBody |
@@ -290,6 +284,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/status/StatusBoard.tsx` | STATUS_BOARD_QUERY_KEY, StatusBoardNotes, StatusMaintenanceBody, MaintenanceDialog, PostNoteControl |
 | `frontend/src/shell/pages/status/StatusComponents.tsx` | ENGINE_ROWS, engineState, formatUptime, StatusLegend, StatusPartsBody |
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
+| `frontend/src/shell/pages/useDataTableControls.tsx` | useDataTableControls |
 | `frontend/src/shell/phoneMenuLinks.tsx` | PhoneMenuLinks, coreAppsGroup, searchWithCoreApps |
 | `frontend/src/shell/reader/ArticleCard.tsx` | useSeen, useArticlePreview, ArticleCard |
 | `frontend/src/shell/reader/ReaderArticle.tsx` | discussMessage, ReaderArticle |
