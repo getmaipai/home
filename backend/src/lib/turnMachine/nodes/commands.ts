@@ -43,6 +43,19 @@ export type CommandsOutput =
 const ALARM_UNKNOWN_SPEAKER = "I can't set an alarm because I can't tell who is asking. Ask me in the app, where you're signed in.";
 const ALARM_FAILED = "I couldn't set that alarm. Please try again.";
 
+/** The structured action for one of timer's alarm patterns, or for remind's two reminder patterns; null for a plain timer or reminder. */
+function alarmPatternAction(id: string, pattern: string): string | null {
+  if (id === "timer") {
+    if (pattern === "set a timer for *") return null;
+    return pattern.startsWith("cancel ") ? "cancel_alarm" : pattern.startsWith("what ") ? "list_alarms" : "set_alarm";
+  }
+  if (id === "remind") {
+    if (pattern.startsWith("cancel the reminder")) return "cancel_reminder";
+    if (pattern.startsWith("what reminders")) return "list_reminders";
+  }
+  return null;
+}
+
 /** `add_items` or `show_list` for one of remind's shopping-list patterns, else null (a plain reminder). */
 function remindListAction(pattern: string): "add_items" | "show_list" | null {
   if ((pattern.startsWith("add ") || pattern.startsWith("put ")) && pattern.endsWith(" shopping list")) return "add_items";
@@ -174,23 +187,23 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
       const listArgs = listAction === "add_items"
         ? { action: listAction, list: "shopping", items: [captured.trim()], expression: captured.trim() }
         : { action: listAction, list: "shopping", expression: "shopping list" };
+      const alarmAction = listAction ? null : alarmPatternAction(id, pattern);
       const args = listAction
         ? listArgs
-        : id === "alarm"
-        ? {
-            action: pattern.startsWith("cancel ") ? "cancel" : pattern.startsWith("what ") ? "list" : "set",
-            expression: captured,
-          }
+        : alarmAction
+        // A list phrase captures nothing, and the tool's expression is never empty.
+        ? { action: alarmAction, expression: captured || (alarmAction === "list_reminders" ? "reminders" : "alarms") }
         : captured ? { [firstArgName(manifest)]: captured } : {};
       // An alarm is private to the identified person, even when a robot has a signed-in owner. The answer is a fixed line,
-      // never the model, which has no alarm tool and once claimed it would "set a reminder" when nothing was set.
-      if (id === "alarm" && speakerIsAnonymous(state)) {
+      // never the model, which once claimed it would "set a reminder" when nothing was set. A plain timer is not an alarm
+      // action, so an unidentified speaker's kitchen timer still runs.
+      if (alarmAction && speakerIsAnonymous(state)) {
         const outcome = outcomeOf({ callId: `pattern:${id}`, packageId: id, status: "failed", via: "pattern", args, errorCode: "unknown_speaker", userMessage: ALARM_UNKNOWN_SPEAKER });
         return { outcome: { ok: true }, output: { matched: true, text: ALARM_UNKNOWN_SPEAKER, outcome } };
       }
       const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
       // An alarm that could not be set answers in the alarm's own fixed words, so the model never explains or invents what happened.
-      if (id === "alarm" && !result.ok) {
+      if (alarmAction && !result.ok) {
         const text = result.code === "invalid_input" && result.error ? result.error : ALARM_FAILED;
         const outcome = outcomeOf({ callId: `pattern:${id}`, packageId: id, status: "failed", via: "pattern", args, errorCode: result.code, userMessage: text });
         return { outcome: { ok: true }, output: { matched: true, text, outcome } };

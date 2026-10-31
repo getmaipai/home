@@ -19,7 +19,9 @@
       "add milk to the shopping list",
       "put milk on the shopping list",
       "what's on my shopping list",
-      "what do I need to buy"
+      "what do I need to buy",
+      "cancel the reminder to call Nadia",
+      "what reminders do I have"
     ],
     "patterns": [
       "remind me *",
@@ -28,7 +30,9 @@
       "put * on the shopping list",
       "what's on my shopping list",
       "what's on the shopping list",
-      "what do i need to buy"
+      "what do i need to buy",
+      "cancel the reminder *",
+      "what reminders do I have"
     ]
   },
   "args": {

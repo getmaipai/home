@@ -14,3 +14,12 @@ All notable changes to the Timers package, in [Keep a Changelog](https://keepach
   does; firing later raises the declared `timer.done` notification
   directly, a `passive` level per the plan's own text. No network, no
   model - `offline: full`.
+
+## [Unreleased]
+
+### Added
+
+- ASSIST-REMIND-01: the alarm phrases (set, cancel, list) now run through
+  this package; the separate `alarm` package is removed. The `alarm.due`
+  notification type keeps its id and is declared here, and the package gains
+  the `reminders:write` permission the alarm engine needs.

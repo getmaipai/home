@@ -23,6 +23,8 @@ export interface BlockCapture {
   listItems?: { id: string; text: string }[];
   /** The reply a shopping-list phrase run through `remind` gives; plugins.ts uses it in place of the reminder reply. */
   listReply?: string;
+  /** The alarm engine's answer to an alarm phrase run through `timer` (or a reminder cancel or list run through `remind`). */
+  alarm?: { task: string; schedule_task?: string; when_text: string; action: string };
 }
 
 type RecipeResult = { reply?: { text: string }; data?: Record<string, unknown> };
@@ -71,6 +73,25 @@ function scheduleCard(producer: string, provenance: string, verb: string, name: 
 function alarmCadence(whenText: string | null): string {
   const repeat = whenText?.match(/^(weekdays|weekends|every day|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:, (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun))*) at /);
   return repeat?.[1] ? `${repeat[1][0]!.toUpperCase()}${repeat[1].slice(1)}` : "Once";
+}
+
+/** The card for an alarm phrase run through timer or remind: "Alarm set" with its cadence, or the cancelled card; none for a list. */
+function alarmBlocks(
+  producer: string,
+  provenance: string,
+  alarm: NonNullable<BlockCapture["alarm"]>,
+  allowed: readonly string[],
+): Record<string, unknown>[] {
+  if (!allowed.includes("schedule_card")) return [];
+  if (alarm.action === "list") return [];
+  return scheduleCard(
+    producer,
+    provenance,
+    alarm.action === "cancel" ? "Alarm or reminder cancelled" : "Alarm set",
+    text(alarm.schedule_task) || text(alarm.task),
+    text(alarm.when_text),
+    alarmCadence(text(alarm.when_text)),
+  );
 }
 
 function todoList(producer: string, provenance: string, items: readonly { id: string; text: string }[]): Record<string, unknown>[] {
@@ -289,6 +310,7 @@ export function blocksForRecipeRun(
   const provenance = `${manifest.id} result${turnId ? ` in turn ${turnId}` : ""}`;
   switch (manifest.id) {
     case "remind": {
+      if (capture.alarm) return alarmBlocks(manifest.id, provenance, capture.alarm, allowed);
       // A shopping-list phrase run through remind: the list's block, never a reminder card.
       if (capture.listReply !== undefined) {
         return capture.listItems && allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems) : [];
@@ -321,11 +343,8 @@ export function blocksForRecipeRun(
       }
       return blocks;
     }
-    case "alarm":
-      if (!allowed.includes("schedule_card")) return [];
-      if (text(result.data?.action) === "list") return [];
-      return scheduleCard(manifest.id, provenance, text(result.data?.action) === "cancel" ? "Alarm or reminder cancelled" : "Alarm set", text(result.data?.schedule_task) || text(result.data?.task), text(result.data?.when_text), alarmCadence(text(result.data?.when_text)));
     case "timer": {
+      if (capture.alarm) return alarmBlocks(manifest.id, provenance, capture.alarm, allowed);
       const blocks = allowed.includes("schedule_card")
         ? scheduleCard(
             manifest.id,

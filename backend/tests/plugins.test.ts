@@ -195,7 +195,7 @@ describe("the bundled websearch package", () => {
 describe("the bundled step-8 packages (lists, reminders, timers)", () => {
   const cases: [string, string[]][] = [
     ["remind", ["reminders:write", "lists:write", "lists:read"]],
-    ["timer", ["timers:write"]],
+    ["timer", ["timers:write", "reminders:write"]],
   ];
   for (const [id, permissions] of cases) {
     test(`${id} is discoverable and its manifest + recipe validate against spec's schemas`, () => {

@@ -90,6 +90,7 @@ import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { recordUndo } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
+import { parseAlarmCall, type AlarmCall } from "@/lib/alarmCalls";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
 import { backoffSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
@@ -2037,6 +2038,17 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
     return { task: "", when_text: "", action: "list" };
   }
 
+  // ASSIST-REMIND-01: an alarm phrase reaches `timer` (a reminder cancel or list reaches `remind`) as a structured action
+  // folded into the op text ("alarm:set:...", written by plugins.ts), the way the list phrases do. The alarm engine does
+  // the work; its answer rides the capture so the reply and the card keep the old alarm wording.
+  function runAlarmCall(call: AlarmCall): void {
+    requirePermission("reminders:write");
+    const band = runtime.band ?? speakerAgeBand(actor, new Date());
+    const result = handleAlarmChat(actor, call.chatText);
+    recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });
+    if (runtime.capture) runtime.capture.alarm = result;
+  }
+
   // capability_missing is the closest fit errors.json has ("A required
   // capability... is not present on this node"), used here for "the
   // real host hasn't wired this RPC at all yet" too, which is a
@@ -2579,9 +2591,13 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         if (manifest.id === "remind") {
           const listCall = parseRemindListCall(text);
           if (listCall) return runRemindListCall(listCall);
+          const reminderCall = parseAlarmCall("remind", text);
+          if (reminderCall) {
+            runAlarmCall(reminderCall);
+            return { task: "", when_text: "", action: reminderCall.action };
+          }
         }
         requirePermission("reminders:write");
-        if (manifest.id === "alarm") return handleAlarmChat(actor, text);
         const parsed = parseReminder(text);
         const result = scheduleCoreJob(actor, "reminders.fire", parsed.when, { task: parsed.task });
         if (!result.ok) mapWriteFailure(result.status, result.error);
@@ -2606,6 +2622,11 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         when_text: string;
         undo_id?: string;
       } {
+        const alarmCall = manifest.id === "timer" ? parseAlarmCall("timer", text) : null;
+        if (alarmCall) {
+          runAlarmCall(alarmCall);
+          return { label: "", when_text: "" };
+        }
         requirePermission("timers:write");
         const parsed = parseTimerDuration(text);
         const result = scheduleCoreJob(actor, "timers.fire", parsed.when, { label: parsed.label });

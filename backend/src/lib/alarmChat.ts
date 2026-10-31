@@ -1,4 +1,4 @@
-// What the `alarm` package does when a person says "wake me at 6:30", "cancel my alarm" or "what alarms do I have".
+// What `timer` does for "wake me at 6:30", "cancel my alarm" and "what alarms do I have", and `remind` for "cancel the reminder ...".
 // A repeating alarm ("on weekdays") becomes an alarm record, the same row the Clock app edits. A one-time alarm stays a
 // plain scheduled job, as before. List and cancel see both.
 import { createAlarm, deleteAlarm, listAlarms } from "@/lib/alarms";

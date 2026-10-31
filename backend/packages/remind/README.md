@@ -8,6 +8,8 @@ Ask MaiPai to remind you about something later.
 - "remind me at 6 to call Nadia"
 - "remind me tomorrow at noon to walk the dog"
 - "remind me in an hour to check the oven"
+- "cancel the reminder to call Nadia"
+- "what reminders do I have"
 
 Say what you want to be reminded about, and when. A single time unit
 ("in 90 minutes") works more reliably than a compound one ("in an hour

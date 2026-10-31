@@ -30,3 +30,11 @@ All notable changes to the Reminders package, in [Keep a Changelog](https://keep
   doesn't always cover the whole phrase - documented as a known
   limitation (this package's own README) rather than chased further:
   say a single unit ("in 90 minutes") for reliable results.
+
+## [Unreleased]
+
+### Added
+
+- ASSIST-REMIND-01: "cancel the reminder ..." and "what reminders do I have"
+  moved here from the removed `alarm` package, so each operation lives in one
+  tool.

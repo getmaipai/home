@@ -27,6 +27,7 @@ import { brakeFor, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { LIST_ACTIONS } from "@/lib/listActions";
+import { isAlarmActionCall } from "@/lib/alarmCalls";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -450,7 +451,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       continue;
     }
     const manifest = loaded.value;
-    if (manifest.id === "alarm" && speakerIsAnonymous(state)) {
+    // An alarm action (or a reminder cancel or list) is private to the identified person; a plain timer or reminder is not.
+    if (isAlarmActionCall(manifest.id, call.args as Record<string, unknown> | undefined) && speakerIsAnonymous(state)) {
       noteRefusal("anonymous_speaker");
       entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "anonymous_speaker" } });
       continue;

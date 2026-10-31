@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { alarms as alarmsTable, people, scheduledJobs, notificationDeliveries } from "@/db/schema";
+import { alarms as alarmsTable, people, scheduledJobs, notificationDeliveries, toolAudit } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { TestClient } from "./client";
-import { createHost } from "@/lib/packageHost";
 import { runDueJobs, scheduleCoreJob, listJobs } from "@/lib/scheduler";
 import { listPending } from "@/lib/notifications";
 import { runPlugin, loadManifestOnly, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { commandsNode } from "@/lib/turnMachine/nodes/commands";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { commandOpeners, loadAllManifests } from "@/lib/turnShared";
+import { getNotificationType } from "@/lib/notificationTypes";
+import { policyNode } from "@/lib/turnMachine/nodes/policy";
+import type { TurnState } from "@/lib/turnMachine/contract";
+import { listPackageIds } from "@/lib/plugins";
 
 let householdClient: TestClient;
 beforeEach(() => { resetDb(); householdClient = new TestClient(); });
@@ -32,19 +35,17 @@ async function childPerson(displayName: string) {
   return db.select().from(people).where(eq(people.id, body.id)).get()!;
 }
 
-describe("alarm package", () => {
-  async function runAlarm(actor: Awaited<ReturnType<typeof person>>, action: "set" | "list" | "cancel", expression = "") {
-    return runPlugin("alarm", actor, { action, expression });
+// ASSIST-REMIND-01: the alarm phrases run through `timer` (and the reminder cancel and list phrases through `remind`).
+describe("alarms through the timer package", () => {
+  const ACTIONS = { set: "set_alarm", list: "list_alarms", cancel: "cancel_alarm" } as const;
+  async function runAlarm(actor: Awaited<ReturnType<typeof person>>, action: "set" | "list" | "cancel", expression = "alarms") {
+    return runPlugin("timer", actor, { action: ACTIONS[action], expression });
   }
 
   test("setting an alarm schedules alarms.fire for the asking person", async () => {
     const actor = await person("Sage");
-    const loaded = loadManifestOnly("alarm");
-    expect(loaded.ok).toBe(true);
-    if (!loaded.ok) return;
-    const host = createHost(actor, loaded.value);
-    const result = host.reminders.set("set tomorrow at 7 called gym");
-    expect(result.task).toContain("gym");
+    const result = await runAlarm(actor, "set", "tomorrow at 7 called gym");
+    expect(result.ok && result.value.reply?.text).toContain("gym");
     const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]!.personId).toBe(actor.id);
@@ -53,7 +54,7 @@ describe("alarm package", () => {
 
   test("a bare hour with a label, as people say it, schedules the morning and keeps only the label", async () => {
     const actor = await person("Sage");
-    const result = await runPlugin("alarm", actor, { action: "set", expression: "for 7 tomorrow called gym" });
+    const result = await runAlarm(actor, "set", "for 7 tomorrow called gym");
     expect(result.ok).toBe(true);
     const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all();
     const row = rows[rows.length - 1]!;
@@ -66,13 +67,13 @@ describe("alarm package", () => {
 
   test("the package reply includes its schedule card", async () => {
     const actor = await person("Sage");
-    const result = await runPlugin("alarm", actor, { action: "set", expression: "tomorrow at 7 for gym" });
+    const result = await runAlarm(actor, "set", "tomorrow at 7 for gym");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const value = result.value as unknown as { reply?: { text?: string }; blocks?: unknown[] };
     expect(value.reply?.text).toBeString();
     expect(value.reply?.text).toContain("Okay, alarm set: gym");
-    expect(value.blocks?.[0]).toMatchObject({ kind: "schedule_card", producer: "alarm" });
+    expect(value.blocks?.[0]).toMatchObject({ kind: "schedule_card", producer: "timer" });
   });
 
   test("an alarm fires once to its person only, including after a restart", async () => {
@@ -92,10 +93,9 @@ describe("alarm package", () => {
 
   test("a child may set an alarm for themselves", async () => {
     const actor = await person("Nova", "child");
-    const loaded = loadManifestOnly("alarm");
-    expect(loaded.ok).toBe(true);
-    if (!loaded.ok) return;
-    expect(() => createHost(actor, loaded.value).reminders.set("tomorrow at 7 for gym")).not.toThrow();
+    const result = await runAlarm(actor, "set", "tomorrow at 7 for gym");
+    expect(result.ok).toBe(true);
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()[0]!.personId).toBe(actor.id);
   });
 
   test("an unidentified speaker cannot schedule an alarm", async () => {
@@ -125,16 +125,13 @@ describe("alarm package", () => {
 
   test("a time without a label uses Alarm as its task", async () => {
     const actor = await person("Sage");
-    const loaded = loadManifestOnly("alarm");
-    if (!loaded.ok) throw new Error(loaded.error);
-    expect(createHost(actor, loaded.value).reminders.set("set at 6:30").task).toContain("Alarm");
+    const result = await runAlarm(actor, "set", "at 6:30");
+    expect(result.ok && result.value.data?.task).toContain("Alarm");
   });
 
   test("alarm task text never appears in logs during set or fire", async () => {
     registerAllPackageNotificationTypes();
     const actor = await person("Sage");
-    const loaded = loadManifestOnly("alarm");
-    if (!loaded.ok) throw new Error(loaded.error);
     const logs: string[] = [];
     const old = { log: console.log, info: console.info, warn: console.warn, error: console.error, debug: console.debug };
     const capture = (...args: unknown[]) => { logs.push(args.map(String).join(" ")); };
@@ -144,7 +141,7 @@ describe("alarm package", () => {
     console.error = capture;
     console.debug = capture;
     try {
-      createHost(actor, loaded.value).reminders.set("tomorrow at 7 called SECRET-GYM-TASK");
+      await runAlarm(actor, "set", "tomorrow at 7 called SECRET-GYM-TASK");
       await runAlarm(actor, "list");
       await runAlarm(actor, "cancel", "SECRET-GYM-TASK");
       const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).get()!;
@@ -262,5 +259,128 @@ describe("alarm package", () => {
     expect(made.ok).toBe(true);
     expect(db.select().from(alarmsTable).all()).toHaveLength(0);
     expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()).toHaveLength(1);
+  });
+});
+
+
+// ASSIST-REMIND-01: what the port of the alarm package into timer (and its reminder phrases into remind) must keep.
+describe("the alarm port into timer", () => {
+  const abort = new AbortController().signal;
+  const ACTION_NAMES = { set: "set_alarm", list: "list_alarms", cancel: "cancel_alarm" } as const;
+  async function runAlarm(actor: Awaited<ReturnType<typeof person>>, action: "set" | "list" | "cancel", expression = "alarms") {
+    return runPlugin("timer", actor, { action: ACTION_NAMES[action], expression });
+  }
+
+  async function say(utterance: string, anonymous: boolean) {
+    const actor = await person("Sage");
+    const signal = classifyTurnSignal({ text: utterance, ageBand: anonymous ? "child" : "adult", commandOpeners: commandOpeners(loadAllManifests()) });
+    const state = { actor, surface: anonymous ? "robot" : "chat", speakerEvidence: anonymous ? null : undefined, signal, temporary: false, turnId: "port", conversationId: "port", outcomes: [], toolEvents: [] } as never;
+    return (await commandsNode(state, { utterance }, abort)).output as { matched: boolean; text?: string; blockEvents?: Array<{ block?: { kind?: string; props?: Record<string, unknown>; producer?: string } }> };
+  }
+
+  test("the alarm package is gone and each alarm and reminder operation lives in exactly one tool", () => {
+    expect(listPackageIds()).not.toContain("alarm");
+    const owners = (pattern: string) => loadAllManifests().filter((l) => l.manifest.routing?.patterns?.includes(pattern)).map((l) => l.manifest.id);
+    for (const pattern of ["wake me *", "set an alarm *", "cancel my alarm *", "cancel my * alarm", "what alarms do I have", "set a timer for *"]) {
+      expect(owners(pattern)).toEqual(["timer"]);
+    }
+    for (const pattern of ["cancel the reminder *", "what reminders do I have", "remind me *"]) expect(owners(pattern)).toEqual(["remind"]);
+  });
+
+  test("timer keeps its base offer and its model-visible args do not widen", () => {
+    const loaded = loadManifestOnly("timer");
+    if (!loaded.ok) throw new Error(loaded.error);
+    expect(loaded.value.offer).toEqual({ mode: "base", priority: 7 });
+    expect(loaded.value.args).toEqual({ type: "object", required: ["expression"], properties: { expression: { type: "string", minLength: 1 } } });
+    expect(loaded.value.permissions).toEqual(["timers:write", "reminders:write"]);
+    expect(loaded.value.returns_blocks).toEqual(["schedule_card", "confirmation"]);
+  });
+
+  test("alarm.due keeps its id and defaults and is registered from timer's manifest", () => {
+    const loaded = loadManifestOnly("timer");
+    if (!loaded.ok) throw new Error(loaded.error);
+    expect(loaded.value.notifications).toContainEqual({ id: "alarm.due", level: "time_sensitive", audience: "person", template: "Alarm: {task}", configurable: true, default_channels: ["in_app"] });
+    registerAllPackageNotificationTypes();
+    expect(getNotificationType("alarm.due")).toMatchObject({ id: "alarm.due", level: "time_sensitive", audience: "person", template: "Alarm: {task}", configurable: true, defaultChannels: ["in_app"] });
+    expect(getNotificationType("timer.done")).toBeDefined();
+  });
+
+  test("an alarm phrase through timer keeps the old reply and returns the alarm card with its cadence", async () => {
+    const weekdays = await runPlugin("timer", await person("Sage"), { action: "set_alarm", expression: "for 6:30 am on weekdays called gym" });
+    if (!weekdays.ok) throw new Error(weekdays.error);
+    expect(weekdays.value.reply?.text).toBe("Okay, alarm set: gym (weekdays at 6:30 AM).");
+    expect(weekdays.value.data).toMatchObject({ action: "set", schedule_task: "gym", when_text: "weekdays at 6:30 AM" });
+    const card = (weekdays.value as { blocks?: Array<{ kind: string; producer: string; props: Record<string, unknown> }> }).blocks ?? [];
+    expect(card).toHaveLength(1);
+    expect(card[0]).toMatchObject({ kind: "schedule_card", producer: "timer", props: { name: "gym", cadence: "Weekdays", nextRun: "weekdays at 6:30 AM" } });
+    const once = await runPlugin("timer", await person("Sage"), { action: "set_alarm", expression: "for 6:30 am tomorrow called run" });
+    const onceCard = (once.ok ? (once.value as { blocks?: Array<{ props: Record<string, unknown> }> }).blocks : undefined) ?? [];
+    expect(onceCard[0]?.props.cadence).toBe("Once");
+  });
+
+  test("a plain timer is unchanged: its reply, its card and its Undo receipt", async () => {
+    const result = await runPlugin("timer", await person("Sage"), { expression: "ten minutes" });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.value.reply?.text).toMatch(/^Timer set: ten minutes/);
+    const kinds = ((result.value as { blocks?: Array<{ kind: string }> }).blocks ?? []).map((block) => block.kind);
+    expect(kinds).toEqual(["schedule_card", "confirmation"]);
+    expect(db.select().from(toolAudit).all().filter((row) => row.tool === "timer")).toHaveLength(0);
+  });
+
+  test("an alarm action through the host writes one audit row for tool timer", async () => {
+    await runAlarm(await person("Sage"), "set", "tomorrow at 7 called gym");
+    const rows = db.select().from(toolAudit).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ tool: "timer", action: "set_alarm", decision: "do" });
+    await runAlarm(await person("Sage"), "list");
+    expect(db.select().from(toolAudit).all().map((row) => row.action)).toEqual(["set_alarm", "list_alarms"]);
+  });
+
+  test("a reminder cancel and list run through remind with the old answers, audit rows and card", async () => {
+    const actor = await person("Sage");
+    scheduleCoreJob(actor, "reminders.fire", "2099-01-01T07:00:00.000Z", { task: "Call Nadia" });
+    const listed = await say("what reminders do I have", false);
+    expect(listed.text).toContain("Call Nadia");
+    const cancelled = await say("cancel the reminder to call Nadia", false);
+    expect(cancelled.text).toBe("Reminder cancelled: Call Nadia.");
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.status, "pending")).all()).toHaveLength(0);
+    expect(db.select().from(toolAudit).all().map((row) => `${row.tool}:${row.action}`)).toEqual(["remind:list_reminders", "remind:cancel_reminder"]);
+  });
+
+  test("an unidentified speaker is refused every alarm action but still starts a plain timer", async () => {
+    for (const utterance of ["wake me at 6:30", "set an alarm for 7 tomorrow", "cancel my alarm at 6:30", "what alarms do I have", "what reminders do I have", "cancel the reminder to call Nadia"]) {
+      const out = await say(utterance, true);
+      expect(out.matched).toBe(true);
+      expect(out.text).toContain("can't set an alarm");
+    }
+    expect(db.select().from(toolAudit).all()).toHaveLength(0);
+    expect(db.select().from(scheduledJobs).all()).toHaveLength(0);
+    const timer = await say("set a timer for 10 minutes", true);
+    expect(timer.matched).toBe(true);
+    expect(timer.text).toMatch(/^Timer set: 10 minutes/);
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "timers.fire")).all()).toHaveLength(1);
+  });
+
+  test("the policy refuses a model's alarm action for an unidentified speaker and lets a plain timer through", async () => {
+    const actor = await person("Sage");
+    const robot = (speakerEvidence: unknown) => ({ actor: { id: actor.id, role: "owner" }, surface: "robot", speakerEvidence, context: [], crisis: false, temporary: false, utterance: "set a timer for 10 minutes" }) as unknown as TurnState;
+    const decide = async (state: TurnState, tool: string, args: Record<string, unknown>) =>
+      (await policyNode(state, { calls: [{ id: "call-1", tool, args }] }, abort)).output.entries[0]?.decision;
+    for (const [tool, action] of [["timer", "set_alarm"], ["timer", "cancel_alarm"], ["timer", "list_alarms"], ["remind", "cancel_reminder"], ["remind", "list_reminders"]] as const) {
+      expect(await decide(robot(null), tool, { action, expression: "x" })).toEqual({ allow: false, reason: "anonymous_speaker" });
+    }
+    expect(await decide(robot(null), "timer", { expression: "10 minutes" })).toEqual({ allow: true });
+    expect(await decide({ ...robot(null), surface: "chat" } as TurnState, "timer", { action: "set_alarm", expression: "x" })).toEqual({ allow: true });
+  });
+
+  test("an expression that starts with a reserved prefix never reaches the alarm engine", async () => {
+    const actor = await person("Sage");
+    await runPlugin("timer", actor, { expression: "alarm:set:tomorrow at 7 called smuggled" });
+    await runPlugin("timer", actor, { expression: "  Alarm:list:" });
+    await runPlugin("remind", actor, { expression: "reminder:cancel:everything" });
+    await runPlugin("remind", actor, { expression: "REMINDER:list:" });
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all()).toHaveLength(0);
+    expect(db.select().from(alarmsTable).all()).toHaveLength(0);
+    expect(db.select().from(toolAudit).all()).toHaveLength(0);
   });
 });

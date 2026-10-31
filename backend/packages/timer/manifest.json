@@ -15,9 +15,23 @@
       "set a timer for 5 minutes",
       "set a timer for an hour",
       "set a timer for 30 seconds",
-      "set a timer for 2 hours"
+      "set a timer for 2 hours",
+      "wake me at 6:30",
+      "set an alarm for 7 tomorrow called gym",
+      "wake me tomorrow at 6",
+      "set an alarm for noon",
+      "wake me in 20 minutes",
+      "cancel my alarm at 6:30",
+      "what alarms do I have"
     ],
-    "patterns": ["set a timer for *"]
+    "patterns": [
+      "set a timer for *",
+      "wake me *",
+      "set an alarm *",
+      "cancel my alarm *",
+      "cancel my * alarm",
+      "what alarms do I have"
+    ]
   },
   "args": {
     "type": "object",
@@ -36,13 +50,21 @@
   "returns_blocks": ["schedule_card", "confirmation"],
   "config": [],
   "data_sources": [],
-  "permissions": ["timers:write"],
+  "permissions": ["timers:write", "reminders:write"],
   "notifications": [
     {
       "id": "timer.done",
       "level": "passive",
       "audience": "person",
       "template": "Your {duration_text} timer is up.",
+      "configurable": true,
+      "default_channels": ["in_app"]
+    },
+    {
+      "id": "alarm.due",
+      "level": "time_sensitive",
+      "audience": "person",
+      "template": "Alarm: {task}",
       "configurable": true,
       "default_channels": ["in_app"]
     }

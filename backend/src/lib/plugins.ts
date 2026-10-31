@@ -12,6 +12,7 @@
 // own). See docs/dev.md's "Naming: skill, plugin, command, connector"
 // entry for the full research and reasoning.
 import { readFileSync, readdirSync } from "node:fs";
+import { alarmFoldFor, neutralizeReservedPrefix } from "@/lib/alarmCalls";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import ERROR_CATALOG from "@maipai/spec/errors/errors.json" with { type: "json" };
@@ -532,14 +533,29 @@ export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>,
 export const WEATHER_NO_PLACE_NOTE = "I don't know where you are yet, so I can't look up the weather. Tell me a city, or an owner or admin can set the Home location in Settings.";
 
 /** ASSIST-LISTS-01: remind's shopping-list phrases carry a structured `action` the recipe folds into the op text
- * ("list:add_items:milk"), as `alarm` folds its action. A plain reminder carries none, so its op text is unchanged. */
+ * ("list:add_items:milk"). ASSIST-REMIND-01: so do its reminder cancel and list phrases ("reminder:cancel:..."). A plain
+ * reminder carries none, so its op text is unchanged. */
 function remindInputs(inputs: Record<string, unknown>): Record<string, unknown> {
   const { action, list: _list, items: _items, ...rest } = inputs;
   if (action === "add_items" || action === "show_list") return { ...rest, action: `list:${action}:` };
-  // The `list:` prefix is the host's private signal for a list call. A reminder whose own text starts with it must never
-  // be read as one, or a model-supplied expression could reach the list engine without the brake and audit.
-  const expression = typeof rest.expression === "string" ? rest.expression.replace(/^(\s*)list:/i, "$1list ") : rest.expression;
+  const reminderFold = alarmFoldFor("remind", action);
+  if (reminderFold) return { ...rest, action: reminderFold };
+  // The `list:` and `reminder:` prefixes are the host's private signal for a list or reminder-engine call. A reminder whose
+  // own text starts with one must never be read as one, or a model-supplied expression could reach the engine without the
+  // brake and audit.
+  const expression = typeof rest.expression === "string"
+    ? (neutralizeReservedPrefix(rest.expression) as string).replace(/^(\s*)list:/i, "$1list ")
+    : rest.expression;
   return { ...rest, expression, action: "" };
+}
+
+/** ASSIST-REMIND-01: timer's alarm phrases carry a structured `action` folded into the op text ("alarm:set:..."). A plain
+ * timer carries none; an expression that starts with the private prefix is neutralized the same way as for remind. */
+function timerInputs(inputs: Record<string, unknown>): Record<string, unknown> {
+  const { action, ...rest } = inputs;
+  const fold = alarmFoldFor("timer", action);
+  if (fold) return { ...rest, action: fold };
+  return { ...rest, expression: neutralizeReservedPrefix(rest.expression), action: "" };
 }
 
 /** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-
@@ -589,6 +605,7 @@ export async function runPlugin(
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
   if (id === "remind") inputs = remindInputs(inputs);
+  if (id === "timer") inputs = timerInputs(inputs);
   // NAT-01 bench seam (benchSampling.ts): null outside a bench, so a real call falls through.
   const seeded = seededOutcomeFor(id);
   if (seeded) return { ok: true, value: seeded };
@@ -674,6 +691,17 @@ export async function runPlugin(
     if (id === "remind" && capture.listReply !== undefined) {
       value.reply = { text: capture.listReply, speech: capture.listReply };
       value.data = { action: "list" };
+    }
+    // ASSIST-REMIND-01: an alarm phrase run through timer (or a reminder cancel or list through remind) answers in the
+    // alarm engine's own words, with the same data the alarm package gave.
+    if ((id === "timer" || id === "remind") && capture.alarm) {
+      value.reply = { text: capture.alarm.task, speech: capture.alarm.task };
+      value.data = {
+        task: capture.alarm.task,
+        schedule_task: capture.alarm.schedule_task ?? "",
+        when_text: capture.alarm.when_text,
+        action: capture.alarm.action,
+      };
     }
     // The package's blocks come from this run's own data; a failure to build
     // one never changes the reply (the blocks are an addition to it).
