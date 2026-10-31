@@ -1,5 +1,5 @@
 // IMGGEN-UI-01: the picture card's calls to Home (`/api/pictures`). Data only; nothing here draws.
-import { ApiError } from "@/lib/api";
+import { requestJson } from "@/lib/api";
 
 export interface PictureFile { id: string; url: string; width: number; height: number; seed: number | null; model: string | null; steps: number | null; ms: number | null; alt: string }
 export interface PictureCard {
@@ -32,18 +32,12 @@ export interface PictureCard {
 }
 export interface PictureStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; styles: Array<{ id: string; name: string }> }
 
-async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, { credentials: "include", ...init });
-  const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-  if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
-  return body as T;
-}
 
 export const picturesApi = {
-  status: () => send<PictureStatus>("/api/pictures/status"),
-  card: (id: string, signal?: AbortSignal) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
-  stop: (id: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  again: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality || prompt || tier ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
+  status: () => requestJson<PictureStatus>("/api/pictures/status"),
+  card: (id: string, signal?: AbortSignal) => requestJson<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
+  stop: (id: string) => requestJson<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  again: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => requestJson<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality || prompt || tier ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
 };
 
 // IMGGEN-SET-01: the admin side (/api/pictures/admin), for the Pictures and videos settings view.
@@ -69,10 +63,10 @@ export interface AdminOverview {
 export interface AdminJob { state: "running" | "done" | "failed"; percent: number; label: string; error: string | null; code: string | null; adapter: AdminAdapter | null }
 
 export const picturesAdminApi = {
-  overview: () => send<AdminOverview>("/api/pictures/admin"),
-  installModel: (family?: string) => send<{ job: string; family: string }>("/api/pictures/admin/models/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(family ? { family } : {}) }),
-  job: (id: string) => send<AdminJob>(`/api/pictures/admin/jobs/${encodeURIComponent(id)}`),
-  addAdapter: (form: FormData) => send<{ job: string } | { adapter: AdminAdapter }>("/api/pictures/admin/adapters", { method: "POST", body: form }),
-  setEnabled: (id: string, enabled: boolean) => send<AdminAdapter>(`/api/pictures/admin/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }),
-  remove: (id: string) => send<{ ok: true }>(`/api/pictures/admin/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  overview: () => requestJson<AdminOverview>("/api/pictures/admin"),
+  installModel: (family?: string) => requestJson<{ job: string; family: string }>("/api/pictures/admin/models/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(family ? { family } : {}) }),
+  job: (id: string) => requestJson<AdminJob>(`/api/pictures/admin/jobs/${encodeURIComponent(id)}`),
+  addAdapter: (form: FormData) => requestJson<{ job: string } | { adapter: AdminAdapter }>("/api/pictures/admin/adapters", { method: "POST", body: form }),
+  setEnabled: (id: string, enabled: boolean) => requestJson<AdminAdapter>(`/api/pictures/admin/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }),
+  remove: (id: string) => requestJson<{ ok: true }>(`/api/pictures/admin/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

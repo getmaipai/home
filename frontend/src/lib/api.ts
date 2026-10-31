@@ -788,6 +788,11 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
   }
 }
 
+/** JSON API request entry point for feature-specific API modules and components. */
+export async function requestJson<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  return request<T>(path, init);
+}
+
 // Shared by streamSpeech() and streamTurn(): both POST JSON and want the
 // raw Response back (a streamed body the caller reads chunk by chunk),
 // never routed through request<T>() since that always parses and awaits

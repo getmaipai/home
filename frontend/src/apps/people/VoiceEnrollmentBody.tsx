@@ -3,15 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import type { Roster } from "@/lib/api";
+import { requestJson, type Roster } from "@/lib/api";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
 import { audioBlobToWav16k } from "@/apps/people/voiceEnrollment";
 
 interface VoicePrint { id: string; created_at: string }
-
-async function request(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, { ...init, credentials: "include" });
-}
 
 export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profile: Roster }) {
   const allowed = canEnrollFace(viewer, { id: profile.id, role: profile.role });
@@ -24,7 +20,7 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
   const [message, setMessage] = useState("");
   const query = useQuery<VoicePrint[]>({
     queryKey: ["voice-prints", profile.id],
-    queryFn: async () => { const response = await request(`/api/voice-prints?person_id=${encodeURIComponent(profile.id)}`); if (!response.ok) throw new Error("Could not load voice samples."); return response.json() as Promise<VoicePrint[]>; },
+    queryFn: () => requestJson<VoicePrint[]>(`/api/voice-prints?person_id=${encodeURIComponent(profile.id)}`),
     enabled: allowed,
   });
   useEffect(() => () => { streamRef.current?.getTracks().forEach((track) => track.stop()); }, []);
@@ -45,8 +41,7 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
         try {
           const wav = await audioBlobToWav16k(new Blob(chunksRef.current, { type: recorder.mimeType }));
           const form = new FormData(); form.set("person_id", profile.id); form.set("audio", wav, "voice-sample.wav");
-          const response = await request("/api/voice-prints/enroll", { method: "POST", body: form });
-          if (!response.ok) throw new Error("Could not save this sample. Try again.");
+          await requestJson("/api/voice-prints/enroll", { method: "POST", body: form });
           await queryClient.invalidateQueries({ queryKey: ["voice-prints", profile.id] });
           setMessage("Voice sample saved.");
         } catch (error) { setMessage(error instanceof Error ? error.message : "Could not save this sample."); }
@@ -61,8 +56,7 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
     setBusy(true); setMessage("");
     try {
       const url = id ? `/api/voice-prints/${encodeURIComponent(id)}` : `/api/voice-prints?person_id=${encodeURIComponent(profile.id)}`;
-      const response = await request(url, { method: "DELETE" });
-      if (!response.ok) throw new Error("Could not delete the voice sample. Try again.");
+      await requestJson(url, { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: ["voice-prints", profile.id] });
       setMessage(id ? "Voice sample deleted." : "All voice samples deleted.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not delete the voice sample."); }

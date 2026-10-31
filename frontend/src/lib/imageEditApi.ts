@@ -1,6 +1,6 @@
 // IMGTOOLS-05: the picture editor's calls to Home (`/api/image-edit`). Only
 // the data the kit's ImageEditor Element is given; nothing here draws.
-import { ApiError } from "@/lib/api";
+import { requestJson } from "@/lib/api";
 
 export type EditToolState = { enabled: boolean; reason?: string };
 export interface ImageEditStatus {
@@ -21,17 +21,11 @@ export type EditRequest =
   | { operation: "upscale"; scale: 2 | 4 }
   | { operation: "resize"; width: number; height: number };
 
-async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, { credentials: "include", ...init });
-  const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-  if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
-  return body as T;
-}
 const json = (value: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
 
 export const imageEditApi = {
-  status: () => send<ImageEditStatus>("/api/image-edit/status"),
-  versions: (conversationId: string, id: string) => send<{ versions: PictureVersion[] }>(`/api/image-edit/pictures/${encodeURIComponent(id)}/versions?conversation_id=${encodeURIComponent(conversationId)}`).then((body) => body.versions),
+  status: () => requestJson<ImageEditStatus>("/api/image-edit/status"),
+  versions: (conversationId: string, id: string) => requestJson<{ versions: PictureVersion[] }>(`/api/image-edit/pictures/${encodeURIComponent(id)}/versions?conversation_id=${encodeURIComponent(conversationId)}`).then((body) => body.versions),
   run(conversationId: string, id: string, request: EditRequest, signal?: AbortSignal): Promise<EditProgress> {
     const form = new FormData();
     form.append("conversation_id", conversationId);
@@ -39,19 +33,19 @@ export const imageEditApi = {
     if (request.operation === "erase") form.append("mask", request.mask, "mask.png");
     if (request.operation === "upscale") form.append("scale", String(request.scale));
     if (request.operation === "resize") { form.append("width", String(request.width)); form.append("height", String(request.height)); }
-    return send<EditProgress>(`/api/image-edit/pictures/${encodeURIComponent(id)}/edit`, { method: "POST", body: form, signal });
+    return requestJson<EditProgress>(`/api/image-edit/pictures/${encodeURIComponent(id)}/edit`, { method: "POST", body: form, signal });
   },
-  poll: (job: string, signal?: AbortSignal) => send<EditProgress>(`/api/image-edit/jobs/${encodeURIComponent(job)}`, { signal }),
-  cancel: (job: string) => send<{ ok: true }>(`/api/image-edit/jobs/${encodeURIComponent(job)}`, { method: "DELETE" }),
-  apply: (token: string, label: string) => send<{ version: PictureVersion }>(`/api/image-edit/previews/${encodeURIComponent(token)}/apply`, json({ label })).then((body) => body.version),
+  poll: (job: string, signal?: AbortSignal) => requestJson<EditProgress>(`/api/image-edit/jobs/${encodeURIComponent(job)}`, { signal }),
+  cancel: (job: string) => requestJson<{ ok: true }>(`/api/image-edit/jobs/${encodeURIComponent(job)}`, { method: "DELETE" }),
+  apply: (token: string, label: string) => requestJson<{ version: PictureVersion }>(`/api/image-edit/previews/${encodeURIComponent(token)}/apply`, json({ label })).then((body) => body.version),
   saveMarkup(conversationId: string, id: string, png: Blob): Promise<PictureVersion> {
     const form = new FormData();
     form.append("conversation_id", conversationId);
     form.append("label", "Markup");
     form.append("image", png, "markup.png");
-    return send<{ version: PictureVersion }>(`/api/image-edit/pictures/${encodeURIComponent(id)}/versions`, { method: "POST", body: form }).then((body) => body.version);
+    return requestJson<{ version: PictureVersion }>(`/api/image-edit/pictures/${encodeURIComponent(id)}/versions`, { method: "POST", body: form }).then((body) => body.version);
   },
   /** A change in words (IMGGEN-EDITOR-01): starts the picture engine's edit; poll `poll()` with the job it names, then apply the preview. */
   comment: (conversationId: string, id: string, request: { prompt: string; region: { x: number; y: number; width: number; height: number } | null }, signal?: AbortSignal) =>
-    send<EditProgress>(`/api/image-edit/pictures/${encodeURIComponent(id)}/comment`, { ...json({ conversation_id: conversationId, ...request }), ...(signal ? { signal } : {}) }),
+    requestJson<EditProgress>(`/api/image-edit/pictures/${encodeURIComponent(id)}/comment`, { ...json({ conversation_id: conversationId, ...request }), ...(signal ? { signal } : {}) }),
 };

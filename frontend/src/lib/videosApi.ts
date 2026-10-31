@@ -1,5 +1,5 @@
 // VIDEO-GEN-06: the video card's calls to Home (`/api/videos`). Data only; nothing here draws.
-import { ApiError } from "@/lib/api";
+import { requestJson } from "@/lib/api";
 
 export interface VideoClip { url: string; poster_url: string; width: number; height: number; seconds: number | null; seed: number | null; file_id: string; poster_file_id: string; /** VIDEO-LTX-01: the clip has a sound track the model made (speech included). */ has_sound?: boolean }
 export interface VideoItem {
@@ -36,24 +36,18 @@ export interface VideoSettings {
   enabled: boolean; adult_adapters: boolean; minors: string; adapters: VideoAdapterRow[];
 }
 
-async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, { credentials: "include", ...init });
-  const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-  if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
-  return body as T;
-}
 const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
 export const videosApi = {
-  status: () => send<VideoStatus>("/api/videos/status"),
+  status: () => requestJson<VideoStatus>("/api/videos/status"),
   /** The clip prepared for texting (a sound track, a name from the prompt). */
   messagesUrl: (id: string) => `/api/videos/jobs/${encodeURIComponent(id)}/messages.mp4`,
-  card: (id: string, signal?: AbortSignal) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
-  stop: (id: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  another: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt || tier ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
-  animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => send<VideoCard>("/api/videos/animate", json(input)),
-  settings: () => send<VideoSettings>("/api/videos/settings"),
-  setAdapter: (id: string, patch: { enabled?: boolean; classification?: "all-ages" | "adult-only" }) => send<VideoAdapterRow>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),
-  removeAdapter: (id: string) => send<{ ok: true }>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  addAdapter: (form: FormData) => send<VideoAdapterRow>("/api/videos/adapters", { method: "POST", body: form }),
+  card: (id: string, signal?: AbortSignal) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
+  stop: (id: string) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  another: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt || tier ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
+  animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),
+  settings: () => requestJson<VideoSettings>("/api/videos/settings"),
+  setAdapter: (id: string, patch: { enabled?: boolean; classification?: "all-ages" | "adult-only" }) => requestJson<VideoAdapterRow>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),
+  removeAdapter: (id: string) => requestJson<{ ok: true }>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  addAdapter: (form: FormData) => requestJson<VideoAdapterRow>("/api/videos/adapters", { method: "POST", body: form }),
 };
