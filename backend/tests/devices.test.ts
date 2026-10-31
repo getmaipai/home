@@ -42,6 +42,27 @@ describe("GET /api/devices", () => {
     expect(body[0]!.name).toBe("Living room TV");
     expect(body[0]!.kind).toBe("tv");
   });
+
+  test("filters by kind, keeps the unfiltered list, and rejects unknown kinds", async () => {
+    const { client, personId } = await owner();
+    const robot = issueDeviceToken(personId, "robot", "StackChan");
+    issueDeviceToken(personId, "tv", "Living room TV");
+
+    const filtered = await client.get("/api/devices?kind=robot");
+    expect(filtered.status).toBe(200);
+    expect((await filtered.json() as Array<{ id: string; kind: string }>)).toEqual([
+      expect.objectContaining({ id: robot.deviceId, kind: "robot" }),
+    ]);
+
+    const all = await client.get("/api/devices");
+    expect(all.status).toBe(200);
+    expect(await all.json()).toHaveLength(2);
+
+    const invalid = await client.get("/api/devices?kind=unknown");
+    expect(invalid.status).toBe(400);
+    expect(invalid.headers.get("content-type")).toContain("application/json");
+    expect(await invalid.json()).toHaveProperty("error");
+  });
 });
 
 describe("robot names", () => {

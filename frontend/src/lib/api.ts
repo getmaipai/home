@@ -1086,7 +1086,7 @@ export const api = {
   // to the caller's own profile (devices.ts's own comment: "not a
   // household-wide admin view"), the same personal-Profile-page scope
   // PIN/password change already has.
-  devices: () => request<DeviceInfo[]>("/api/devices"),
+  devices: (options?: { kind?: DeviceInfo["kind"] }) => request<DeviceInfo[]>(`/api/devices${options?.kind ? `?kind=${encodeURIComponent(options.kind)}` : ""}`),
   setDeviceOfflineScope: (id: string, offline_scope: Array<"media.offline" | "offline.records">) =>
     request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}/offline-scope`, { method: "PATCH", body: JSON.stringify({ offline_scope }) }),
   revokeDevice: (id: string) =>

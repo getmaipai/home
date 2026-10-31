@@ -18,7 +18,7 @@ export function useSettingsCapabilities(person: Roster, includeCodingAccess = fa
   const wakeword = useQuery({ queryKey: ["wakeword-assets"], queryFn: () => api.wakewordStatus(), enabled: adultOrUp });
   const robots = useQuery({
     queryKey: ["settings-robots", admin ? "household" : "mine"],
-    queryFn: async () => (admin ? await api.robotDevices() : (await api.devices()).filter((device) => device.kind === "robot")),
+    queryFn: async () => (admin ? await api.robotDevices() : await api.devices({ kind: "robot" })),
     enabled: adultOrUp && adultBand,
   });
   const settingsCapabilities = useQuery({

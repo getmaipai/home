@@ -95,13 +95,15 @@ const listRoute = createRoute({
   tags: ["Devices"],
   summary: "Devices paired to my own profile",
   middleware: [requireAuth] as const,
+  request: { query: z.object({ kind: DeviceSchema.shape.kind.optional() }) },
   responses: {
     200: { content: { "application/json": { schema: z.array(DeviceSchema) } }, description: "Every device with a live or once-live token paired to me." },
   },
 });
 devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
-  const devices = listDevicesForPerson(actor.id);
+  const { kind } = c.req.valid("query");
+  const devices = listDevicesForPerson(actor.id).filter((device) => kind === undefined || device.kind === kind);
   return c.json(
     devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(d.kind === "robot" && (actor.role === "owner" || actor.role === "admin") && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
     200,
