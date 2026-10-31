@@ -351,7 +351,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/blocklists/listIndex.ts` | LIST_INDEX_URL, LIST_SOURCE_HOST, LIST_MAX_BYTES, LIST_MAX_ENTRIES, LIST_INDEX_MAX_BYTES, CATALOG_LIST_KEYS_PEM |
 | `backend/src/lib/blocklists/listStore.ts` | emptyState, listFilePath, readState, stateStamp, writeState, pruneListFiles |
 | `backend/src/lib/blocklists/listSync.ts` | LIST_SYNC_ISSUE_SOURCE, bandsInUse, neededListIds, runListSync |
-| `backend/src/lib/blocklists/policy.ts` | BLOCKLIST_POLICY, BLOCKLIST_KEYS, blocklistRow, blocklistIds, lockedListIds, defaultListIds |
+| `backend/src/lib/blocklists/policy.ts` | BLOCKLIST_POLICY, BLOCKLIST_KEYS, blocklistIds, lockedListIds, defaultListIds, enabledListIds |
 | `backend/src/lib/blocklists/status.ts` | blocklistStatusNote |
 | `backend/src/lib/bootGuard.ts` | instanceLock |
 | `backend/src/lib/botRelease.ts` | __setBotReleaseForTests, hasBotReleaseAssets, botReleaseVersion, botReleaseSigningKeys, ensureBotRelease, ensureStackChanFirmware |
@@ -383,7 +383,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, transportRefusal, requestsPerMinute, rateRefusal |
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |
-| `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, DROPPED_SAMPLING, parseBody, personText, DEFAULT_OUTPUT_TOKENS |
+| `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
 | `backend/src/lib/codingMode.ts` | codingModeReason, codingModeReadiness, reconcileCodingModeAtStartup |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
@@ -392,15 +392,15 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, runningSheetJob |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
-| `backend/src/lib/companionPersonality.ts` | COMPANION_DIALS, PERSONALITY_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
+| `backend/src/lib/companionPersonality.ts` | COMPANION_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
-| `backend/src/lib/companionPortrait.ts` | portraitPath, retainedPortraitExists, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
+| `backend/src/lib/companionPortrait.ts` | portraitPath, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
 | `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, CLIP_MISSING_LINE, FINISH_POLL_MS, MEDIA_ROOT_REMOTE_LINE, keyframePath, keyframeMetaPath |
 | `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_NOT_FOUND_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_POLL_MS |
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
-| `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSING_STATUS_TEXT, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn |
+| `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
 | `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, hasUnrestrictedGrant |
@@ -423,7 +423,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/devices.ts` | createDevice, touchDevice, listDevicesForPerson, getDeviceById, createHostedRobot, updateDevice |
 | `backend/src/lib/diagnostics.ts` | generateDiagnostics |
 | `backend/src/lib/dirtyBoot.ts` | osBootTimeMs, windowsEventIndicatesUncleanBoot, macosPanicReportsIndicateUncleanBoot, linuxPreviousBootLogIndicatesUncleanShutdown, bootFollowedUncleanShutdown, initCrashBootHold |
-| `backend/src/lib/diskPlan.ts` | SHIPPED_DISK_PLAN_DATE, shippedDiskPlan, machineTier, shippedPlanForLevel, recordedLevel, nearestExisting |
+| `backend/src/lib/diskPlan.ts` | shippedDiskPlan, machineTier, shippedPlanForLevel, recordedLevel, nearestExisting, freeBytesAt |
 | `backend/src/lib/documentExtraction.ts` | MAX_DOCUMENT_BYTES, MAX_EXTRACTED_TEXT_BYTES, LOCAL_PARSER_TIMEOUT_MS, __setTikaRunnerForTests, __setRapidOcrRunnerForTests, extractDocument |
 | `backend/src/lib/documentMediaTypes.ts` | DOCUMENT_MEDIA_TYPES, isDocumentMediaType |
 | `backend/src/lib/echo.ts` | ECHO_WINDOW_MS, subjectOf, fingerprintOf, repeatNotes, resetEchoRecords |
@@ -432,7 +432,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/engineBoot.ts` | engineWarmupsForStackRoles |
 | `backend/src/lib/engineCatalog.ts` | ENGINE_BINARIES, ENGINE_READY_MARKER, selectEngineBinary |
 | `backend/src/lib/engineIdentity.ts` | hostLabel, sanitizeEngineUrl, modelFileName, readEngineIdentity, formatEngineIdentity, identityIncomplete |
-| `backend/src/lib/engineImpact.ts` | engineImpact |
 | `backend/src/lib/enginePostLoadCheck.ts` | measureProcessMemoryBytes, runPostLoadCheck |
 | `backend/src/lib/engineStats.ts` | sampleEngineStats, getEngineStatsSamples, __clearEngineStatsForTests |
 | `backend/src/lib/entities.ts` | toEntity, listEntities, getEntity, createEntity, confirmTransition, updateEntity |
@@ -492,7 +491,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/tools.ts` | submitImageTool, fetchImageToolResult, runImageTool, removeBackground, upscale |
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, beginInstall |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
-| `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight, installPreflightBlockers |
+| `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight |
 | `backend/src/lib/installStatus.ts` | setRobotReleaseInstall, EMPTY_INSTALL, summarizeBackground, summarizeInstall, resetInstallStatusCache, getInstallStatus |
 | `backend/src/lib/instanceLock.ts` | LEGACY_LOCK_FILE_NAME, OPT_OUT_ENV, hubLockPath, HubAlreadyRunningError, DataDirPlacementError, readProcessFacts |
 | `backend/src/lib/integrations/homeAssistant.ts` | isLanHomeAssistantUrl, subscribeHomeAssistantEntities, homeAssistantEventsHealth, readHomeAssistantEntityState, refreshHomeAssistantEvents, __resetHomeAssistantEventsForTests |
@@ -500,14 +499,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/interruptedReply.ts` | noteInterruptedReply, takeInterruptedReply, mayCarryInterruptedReply, dropInterruptedReply, __clearInterruptedRepliesForTests |
 | `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, __setMaintenanceNowForTests, raiseIssue, resolveIssue, listIssues |
 | `backend/src/lib/items/tool.ts` | READ_ITEM_TOOL_ID, ITEM_REF_PATTERN, ITEM_READERS, itemRefsIn, readItemToolSpec, runReadItemTool |
-| `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, registerProducerJob, updateProducerJob |
+| `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, startImageProducerJob, pollActiveStackImageJobs |
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
 | `backend/src/lib/jobs/admissionFit.ts` | setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission, admissionFitProfile, admissionFitAskLine |
 | `backend/src/lib/jobs/closeApps.ts` | realHelper, closeSettingsFrom, closableApps, pickSmallestSet, closeForJob, reopenForJob |
-| `backend/src/lib/jobs/householdQueue.ts` | activeProfileLine, resetActivePlanForTests, openMaxWindow, endMaxWindow, setQueuePolicy, getQueuePolicy |
+| `backend/src/lib/jobs/householdQueue.ts` | activeProfileLine, resetActivePlanForTests, openMaxWindow, endMaxWindow, recordUsage, usageLastHour |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
-| `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |
 | `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, appliedProfile, stagesFor, chatMayReturnBetweenStages |
 | `backend/src/lib/jobs/profileSource.ts` | STUDIO_HARDWARE, rowsFromSetting, weightsFromPriority, profileSourceFromSettings |
 | `backend/src/lib/jobs/profileTable.ts` | validateProfileTable |
@@ -566,7 +564,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/parsers/film.ts` | filmNameHasYear, parseFilmName, parseNfo, readNfoFor |
 | `backend/src/lib/media/parsers/pdf.ts` | parsePdf, readPdfMeta |
 | `backend/src/lib/media/parsers/text.ts` | decodeEntities, plainText, stripExtension, extensionOf, spaced, naturalCompare |
-| `backend/src/lib/media/parsers/tv.ts` | seasonFolderNumber, parseTvName, findFolderArt, isImageName |
+| `backend/src/lib/media/parsers/tv.ts` | seasonFolderNumber, parseTvName, findFolderArt |
 | `backend/src/lib/media/parsers/zip.ts` | openZip |
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine, podcastSnipLabel, podcastSnipRowsForRoute |
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
@@ -578,11 +576,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, previewStationItemView |
 | `backend/src/lib/media/radioArt.ts` | __setRadioArtDepsForTests, __resetRadioArtForTests, radioArtAddressOk, fetchRadioArt, radioArtCard |
 | `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, rememberPreviewStations, previewStationFor, radioDirectoryHasFavicon, __rememberRadioFaviconForTests, radioDirectoryAllowed |
-| `backend/src/lib/media/radioHls.ts` | openHlsResource, hlsResourceUrl, decodeHlsResource |
+| `backend/src/lib/media/radioHls.ts` | openHlsResource, decodeHlsResource |
 | `backend/src/lib/media/radioIcy.ts` | usableMetaint, parseStreamTitle, IcyDemuxer |
 | `backend/src/lib/media/radioRecordings.ts` | startRadioRecording, stopRadioRecording, radioRecordingRows, radioRecordingItem, __resetRadioRecordingsForTests |
-| `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, activeStreamCount |
-| `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, stopMediaScanner |
+| `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, __resetRadioStreamsForTests |
+| `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, startMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
@@ -675,7 +673,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |
-| `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, EDIT_KINDS, nameEditModel, latestPictureId, runEditPicture |
+| `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, runEditPicture |
 | `backend/src/lib/pictures/finishedCheck.ts` | stricterLane, sha256Of, checkFinishedAssets |
 | `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
 | `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, cancelPictureJob, resumePictureJobs, fileUrl |
@@ -716,7 +714,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
-| `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, receivedBackupFileExists, deleteReceivedBackupsForDevice |
+| `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, deleteReceivedBackupsForDevice |
 | `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice |
 | `backend/src/lib/reference/article.ts` | loadArticleFor, articlePayloadFor, readArticleImage |
 | `backend/src/lib/reference/keyPoints.ts` | __setReferenceKeyPointsModelForTests, articleText, referenceKeyPoints, referenceItemId, readReferenceArticle |
@@ -737,7 +735,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/articleClean.ts` | isPromoText, cleanArticleDocument |
 | `backend/src/lib/retrieval/articleImages.ts` | extractArticleImages |
 | `backend/src/lib/retrieval/ddgsConfig.ts` | DDGS_URL_ENV, setDdgsStackReport, ddgsStackReport, ddgsBaseUrl, ddgsConfigured, ddgsStarting |
-| `backend/src/lib/retrieval/ddgsSource.ts` | DDGS_DESTINATION_HOST, __resetDdgsForTests, __setDdgsClockForTests, ddgsQuietUntil, ddgsSearch |
+| `backend/src/lib/retrieval/ddgsSource.ts` | DDGS_DESTINATION_HOST, __resetDdgsForTests, __setDdgsClockForTests, ddgsSearch |
 | `backend/src/lib/retrieval/ddgsStackSync.ts` | refreshDdgsFromStack, startDdgsStackSync |
 | `backend/src/lib/retrieval/dictionaryFallback.ts` | WIKTIONARY_ORIGIN, WIKTIONARY_LABEL, __resetDictionaryFallbackForTests, headwordOf, dictionaryLookup |
 | `backend/src/lib/retrieval/extractArticle.ts` | LEAD_MAX_CHARS, safeOutboundHref, extractFullArticle, cleanText, cutAtSentence, deriveDescription |
@@ -767,7 +765,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotOfflineWatch.ts` | ROBOT_OFFLINE_AFTER_MS, ROBOT_OFFLINE_POLL_MS, __setRobotOfflineNotifierForTests, __setRobotOfflineHubStartForTests, pollRobotOffline, startRobotOfflineWatch |
 | `backend/src/lib/robotPeople.ts` | followUpAllowed, listRobotPeople |
 | `backend/src/lib/robotSelfTest.ts` | ROBOT_SELF_TEST_PARTS, robotSelfTestPartsFor |
-| `backend/src/lib/robotSelfTestRuns.ts` | ROBOT_SELF_TEST_TIMEOUT_MS, ROBOT_SELF_TEST_RESULT_TTL_MS, startRobotSelfTest, acceptRobotSelfTestResult, pruneRobotSelfTests, getRobotSelfTestResult |
+| `backend/src/lib/robotSelfTestRuns.ts` | ROBOT_SELF_TEST_TIMEOUT_MS, ROBOT_SELF_TEST_RESULT_TTL_MS, startRobotSelfTest, acceptRobotSelfTestResult, pruneRobotSelfTests, __resetRobotSelfTestsForTests |
 | `backend/src/lib/robotSoftware.ts` | compareSemver, robotSoftwareStatus, getRobotSoftware |
 | `backend/src/lib/robotSsh.ts` | RobotPasswordRotationError, rotateRobotPassword |
 | `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, FRESH_ENOUGH_MS, robotVisionMode |
@@ -813,7 +811,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, getRegistryKey, __reloadRegistryForTests |
 | `backend/src/lib/setupChecklist.ts` | SETUP_CHECKLIST_ITEMS, checklistFromFacts, getSetupChecklist |
 | `backend/src/lib/setupSearchAddress.ts` | SEARCH_ADDRESS_NOT_LOCAL, SEARCH_ADDRESS_NOT_AN_ADDRESS, parseSearchAddress |
-| `backend/src/lib/setupState.ts` | SETUP_STEP_IDS, PRE_OWNER_STEPS, setupCodingChoice, setSetupCodingChoice, codingClientLater, getCodingClientLater |
+| `backend/src/lib/setupState.ts` | SETUP_STEP_IDS, PRE_OWNER_STEPS, setupCodingChoice, setSetupCodingChoice, codingClientLater, getMemoryAnswerGb |
 | `backend/src/lib/shares.ts` | createShare, deleteShare, pruneUnreachableShares, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor |
 | `backend/src/lib/shelf/canonicalUrl.ts` | canonicalUrl |
 | `backend/src/lib/shelf/feedAddresses.ts` | MAX_FEED_ADDRESSES_PER_BOX, splitFeedAddresses, checkFeedAddress, checkFeedAddressBox |
@@ -838,7 +836,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/client.ts` | identityFromHeaders, createStackClient |
 | `backend/src/lib/stack/contract.ts` | STACK_CONTRACT_MIN, STACK_CONTRACT_MAX, StackCodingModeSchema |
 | `backend/src/lib/stack/errors.ts` | StackError |
-| `backend/src/lib/stack/events.ts` | startStackEventBridge |
 | `backend/src/lib/stack/httpErrors.ts` | StackFailureSchema, classifyStackError, STACK_ERROR_RESPONSES |
 | `backend/src/lib/stack/link.ts` | LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_CONNECT_WINDOW_MS, LINK_CONNECT_RETRY_MS, LINK_BACKOFF_BASE_MS, LINK_BACKOFF_CAP_MS |
 | `backend/src/lib/stack/linkKeys.ts` | normalizePairingCode, derivePairingLookup, issuePairingCode, getPairingPublicKey, verifyPairingPayload, knownHostsName |
@@ -941,7 +938,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, dropVideoStatusCache, videoStatusReady, videoEngineReady |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
-| `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, VIDEO_SIZES, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId |
+| `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, isVisionAssetInstalled, areVisionAssetsInstalled, ensureVisionAssets |
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |

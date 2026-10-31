@@ -54158,7 +54158,7 @@
                           },
                           "thumb_url": {
                             "type": "string",
-                            "description": "Placeholder for LIBRARY-REVAMP-05; thumbnail serving is not built yet."
+                            "description": "Same-origin thumbnail URL served by the file thumbnail route."
                           },
                           "expires_at": {
                             "type": "string",
