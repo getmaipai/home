@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -211,6 +211,46 @@ describe("lander pipeline", () => {
     expect(git(origin, "rev-parse", "refs/heads/main")).toBe(note("zeta").main_sha);
     expect(existsSync(pidfile)).toBe(false);
     expect(queueFiles()).toHaveLength(0);
+  }, 60_000);
+
+  test("main checkout reinstalls dependencies only when a package file moved", () => {
+    const bin = join(scratch, "stub-bin");
+    const calls = join(scratch, "bun-calls");
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, "bun"), `#!/bin/bash\necho "$PWD: $*" >> "${calls}"\n`, { mode: 0o755 });
+    const prior = { path: env.PATH, skip: env.MAIPAI_LAND_SKIP_INSTALL, update: env.MAIPAI_LAND_UPDATE_MAIN };
+    env.PATH = `${bin}:${process.env.PATH}`;
+    delete env.MAIPAI_LAND_SKIP_INSTALL;
+    env.MAIPAI_LAND_UPDATE_MAIN = "1";
+    try {
+      const pkg = makeWorktree("pkg_bump");
+      mkdirSync(join(pkg, "backend"), { recursive: true });
+      writeFileSync(join(pkg, "backend", "package.json"), "{}\n");
+      commit(pkg, "pkg bump");
+      expect(run("land.sh", ["--detach"], pkg).status).toBe(0);
+      expect(run("lander.sh", ["run-once"]).status).toBe(0);
+      expect(note("pkg_bump").status).toBe("landed");
+      expect(git(main, "log", "-1", "--format=%s")).toBe("pkg bump");
+      const mainReal = realpathSync(main);
+      const recorded = readFileSync(calls, "utf8");
+      expect(recorded).toContain(`${mainReal}/backend: install --frozen-lockfile --force`);
+      expect(recorded).not.toContain(`${mainReal}/frontend`);
+      expect(readFileSync(join(data, "lander.log"), "utf8")).toContain("main checkout dependencies reinstalled (backend)");
+
+      rmSync(calls, { force: true });
+      const doc = makeWorktree("doc_only");
+      writeFileSync(join(doc, "docs", "note.md"), "doc\n");
+      commit(doc, "doc only");
+      expect(run("land.sh", ["--detach"], doc).status).toBe(0);
+      expect(run("lander.sh", ["run-once"]).status).toBe(0);
+      expect(git(main, "log", "-1", "--format=%s")).toBe("doc only");
+      const after = existsSync(calls) ? readFileSync(calls, "utf8") : "";
+      expect(after).not.toContain(realpathSync(main));
+    } finally {
+      env.PATH = prior.path;
+      env.MAIPAI_LAND_SKIP_INSTALL = prior.skip;
+      env.MAIPAI_LAND_UPDATE_MAIN = prior.update;
+    }
   }, 60_000);
 
   test("pipeline status reports stopped, empty queue and both outcomes", () => {

@@ -78,6 +78,21 @@ with open(sys.argv[1], 'a') as f:
 PY
 }
 
+# After the fast-forward, reinstall in backend and frontend when their package files moved, so scripts in the main checkout keep working across a pin bump. Never fails the landing: it is already on main.
+reinstall_main_dependencies() {
+  local before="$1" changed d done_dirs=()
+  [[ -z "${MAIPAI_LAND_SKIP_INSTALL:-}" && -n "$before" ]] || return 0
+  changed="$(git -C "$main" diff --name-only "$before" HEAD -- backend/package.json backend/bun.lock frontend/package.json frontend/bun.lock 2>/dev/null || true)"
+  [[ -n "$changed" ]] || return 0
+  for d in backend frontend; do
+    printf '%s\n' "$changed" | grep -Eq "^$d/" || continue
+    # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md).
+    if (cd "$main/$d" && bun install --frozen-lockfile --force >/dev/null 2>&1); then done_dirs+=("$d")
+    else echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout install failed in $d; run bun install there" >> "$data/lander.log"; fi
+  done
+  [[ ${#done_dirs[@]} -eq 0 ]] || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout dependencies reinstalled (${done_dirs[*]})" >> "$data/lander.log"
+}
+
 update_main_checkout() {
   [[ "${MAIPAI_LAND_UPDATE_MAIN:-1}" == 0 ]] && return 0
   local branch head origin_main lock_path reason
@@ -95,6 +110,7 @@ update_main_checkout() {
       if [[ -z "$branch" ]] && { [[ -z "$head" || -z "$origin_main" ]] || ! git -C "$main" merge-base --is-ancestor "$head" "$origin_main"; }; then reason="diverged (detached HEAD is not an ancestor of origin/main)"
       elif git -C "$main" merge --ff-only origin/main >/dev/null 2>&1; then
         echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout fast-forwarded to $(git -C "$main" rev-parse --short HEAD)" >> "$data/lander.log"
+        reinstall_main_dependencies "$head"
         return 0
       else reason="fast-forward failed"; fi
     fi
