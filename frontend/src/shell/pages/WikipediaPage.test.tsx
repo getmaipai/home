@@ -40,13 +40,14 @@ describe("Wikipedia app", () => {
     expect(view.queryByRole("search")).toBeNull();
   });
 
-  test("the home screen has the search box, Home and Explore, a Random article button and an empty Recent line", async () => {
+  test("the home screen has the search box, Home and Explore, a Random article button, picture picks and the attribution line", async () => {
     const view = mount();
     expect(await view.findByRole("search")).toBeTruthy();
     expect(view.getByRole("button", { name: "Home" }).getAttribute("aria-pressed")).toBe("true");
     expect(view.getByRole("button", { name: "Explore" })).toBeTruthy();
     expect(view.getByRole("button", { name: "Random article" })).toBeTruthy();
-    expect(view.getByText(/show up here until you close this tab/)).toBeTruthy();
+    expect(await view.findByText("Something to read")).toBeTruthy();
+    expect(view.getByText(/CC BY-SA 4.0, kept on this computer/)).toBeTruthy();
   });
 
   test("an article draws through the reader with the app's own home in the breadcrumb, and it is remembered under Recent", async () => {
@@ -87,9 +88,10 @@ describe("Wikipedia app", () => {
     expect(await view.findByText(/Nothing saved yet/)).toBeTruthy();
   });
 
-  test("the Offline section says nothing is kept, and still opens when the hub does not answer", async () => {
-    api.referenceBooks = async () => { throw new TypeError("network"); };
-    const view = mount("/wikipedia/offline");
-    expect(await view.findByText(/Nothing is kept on this device yet/)).toBeTruthy();
+  test("there is no Offline section and no Keep button: the whole book is already on this computer", async () => {
+    const view = mount();
+    await view.findByRole("search");
+    expect(view.queryByRole("button", { name: "Offline" })).toBeNull();
+    expect(view.queryByText(/Keep on this device/)).toBeNull();
   });
 });

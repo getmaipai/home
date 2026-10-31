@@ -3,7 +3,7 @@
 // through a class="mw-disambig" hatnote link.
 import { beforeEach, describe, expect, test } from "bun:test";
 import { __resetReferenceReaderCachesForTests, lookupReference } from "@/lib/retrieval/referenceReader";
-import { deriveDescription, extractArticle } from "@/lib/retrieval/extractArticle";
+import { deriveDescription, extractArticle, extractFullArticle } from "@/lib/retrieval/extractArticle";
 
 const BOOK = "wikipedia_en_all_maxi";
 const catalog = `<feed><entry><title>Wikipedia</title><link rel="http://opds-spec.org/acquisition/open-access" type="text/html" href="/content/${BOOK}"/></entry></feed>`;
@@ -54,5 +54,17 @@ describe("real kiwix shapes", () => {
     const rows = extractArticle(html).infobox;
     expect(rows[0]?.value).toBe("Zendaya Coleman, September 1, 1996, Oakland, California, U.S.");
     expect(rows[1]?.value).toBe("Actress, singer-songwriter");
+  });
+
+  test("a 2026 Wikipedia page links to other articles by bare title, keeps See also, and leaves namespace pages as plain text", () => {
+    const html = `<html><body><div id="mw-content-text"><p>Zendaya was born in <a rel="mw:WikiLink" href="Oakland%2C_California">Oakland</a>, in the <a href="Category:Zendaya">category</a>, and <a href="https://example.com/x">outside</a>.</p><h2>See also</h2><ul><li><a href="Mononymous_person">Mononymous person</a></li></ul><h2>References</h2><ul><li>dropped</li></ul></div></body></html>`;
+    const full = extractFullArticle(html, { book: BOOK, allowedBooks: new Set([BOOK]), allowLinks: true, allowImages: false });
+    const inlines = full.blocks.flatMap((b) => (b.type === "paragraph" ? b.inlines : []));
+    expect(inlines.find((i) => i.type === "link")).toMatchObject({ text: "Oakland", target: { book: BOOK, path: "Oakland,_California" } });
+    expect(inlines.filter((i) => i.type === "link")).toHaveLength(1);
+    const seeAlso = full.blocks.findIndex((b) => b.type === "heading" && b.text === "See also");
+    expect(seeAlso).toBeGreaterThan(-1);
+    expect(JSON.stringify(full.blocks[seeAlso + 1])).toContain("Mononymous_person");
+    expect(full.blocks.some((b) => b.type === "heading" && b.text === "References")).toBe(false);
   });
 });

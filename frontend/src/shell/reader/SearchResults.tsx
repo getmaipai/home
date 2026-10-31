@@ -1,46 +1,12 @@
-import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { ArticleCard } from "./ArticleCard";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { List } from "@maipai/ui/src/primitives/List";
-import { getIcon } from "@maipai/ui/src/icons";
-import { api, type ReferenceBookView, type ReferenceSearchHit } from "@/lib/api";
+import { api, type ReferenceBookView } from "@/lib/api";
 
-const ChevronRight = getIcon("chevron-right");
-const PREVIEW_STALE_MS = 10 * 60 * 1000;
+const RELATED_STALE_MS = 10 * 60 * 1000;
 const RELATED_MAX = 5;
-
-/** True once the element has come near the screen; a browser without IntersectionObserver counts as seen at once. */
-function useSeen(): [React.RefObject<HTMLDivElement | null>, boolean] {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [seen, setSeen] = useState(typeof IntersectionObserver === "undefined");
-  useEffect(() => {
-    if (seen || !ref.current) return;
-    const observer = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { setSeen(true); observer.disconnect(); } }, { rootMargin: "200px" });
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [seen]);
-  return [ref, seen];
-}
-
-/** One result: the hit's own title and snippet at once, the picture, description and category once the card is on screen. */
-function ResultRow({ hit }: { hit: ReferenceSearchHit }) {
-  const [ref, seen] = useSeen();
-  const preview = useQuery({ queryKey: ["reference-preview", hit.book, hit.path], queryFn: () => api.referencePreview(hit.book, hit.path), enabled: seen, staleTime: PREVIEW_STALE_MS, retry: false });
-  const data = preview.data;
-  return (
-    <div ref={ref} data-slot="reader-result" className="flex w-full min-w-0 items-center gap-4 rounded-xl border bg-card p-3">
-      {data?.thumbnail ? <img src={data.thumbnail.src} alt={data.thumbnail.alt} loading="lazy" className="h-28 w-24 shrink-0 rounded-lg object-cover sm:h-32 sm:w-28" /> : preview.isPending && seen ? <div aria-hidden className="h-28 w-24 shrink-0 rounded-lg bg-muted sm:h-32 sm:w-28" /> : null}
-      <div className="min-w-0 flex-1">
-        <p className="text-lg font-semibold">{hit.title}</p>
-        {data?.description ? <p className="text-muted-foreground text-sm">{data.description}</p> : null}
-        {data?.kicker ? <div className="my-1.5"><Chip>{data.kicker}</Chip></div> : null}
-        <p className="text-muted-foreground line-clamp-2 break-words text-sm">{hit.snippet || data?.lead || data?.summary}</p>
-      </div>
-      <ChevronRight aria-hidden className="text-muted-foreground size-5 shrink-0" />
-    </div>
-  );
-}
 
 export interface SearchResultsProps {
   q: string;
@@ -56,7 +22,7 @@ export interface SearchResultsProps {
 export function SearchResults({ q, book, books, routeFor, onBook, onSearch }: SearchResultsProps) {
   const navigate = useNavigate();
   const results = useQuery({ queryKey: ["reference-search-page", q, book ?? null], queryFn: () => api.referenceSearchPage(q, book), retry: false });
-  const related = useQuery({ queryKey: ["reference-related", q, book ?? null], queryFn: () => api.referenceSuggest(book ?? books[0]?.id, q), enabled: books.length > 0, staleTime: PREVIEW_STALE_MS, retry: false });
+  const related = useQuery({ queryKey: ["reference-related", q, book ?? null], queryFn: () => api.referenceSuggest(book ?? books[0]?.id, q), enabled: books.length > 0, staleTime: RELATED_STALE_MS, retry: false });
   const hits = results.data?.hits ?? [];
   const total = results.data?.total ?? 0;
   const topPath = hits[0]?.path;
@@ -82,7 +48,7 @@ export function SearchResults({ q, book, books, routeFor, onBook, onSearch }: Se
           getKey={(hit) => `${hit.book}:${hit.path}`}
           getLabel={(hit) => hit.title}
           onSelect={(hit) => navigate(routeFor(hit.book, hit.path))}
-          renderItem={(hit) => <ResultRow hit={hit} />}
+          renderItem={(hit) => <ArticleCard book={hit.book} path={hit.path} title={hit.title} snippet={hit.snippet} />}
           emptyState={{ icon: "book", text: "No articles found." }}
         />
       ) : null}

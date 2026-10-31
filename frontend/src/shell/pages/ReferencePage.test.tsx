@@ -63,7 +63,7 @@ describe("Reference reader", () => {
     expect(view.getByText("A note")).toBeTruthy();
     expect(view.getByText("Earth").closest("a")?.getAttribute("href")).toBe("/reference/wiki_en/A/Earth");
     expect(view.getByText("outside").closest("a")).toBeNull();
-    expect(view.getByText(/Snapshot 2026-09-01/)).toBeTruthy();
+    expect(view.queryByText(/Snapshot 2026-09-01/)).toBeNull();
   });
 
   test("shows a plain unavailable state for 404", async () => {
@@ -87,7 +87,7 @@ describe("Reference reader", () => {
     expect(reader).not.toBeNull();
     expect(reader!.querySelector("h2#history")?.textContent).toBe("History");
     expect(reader!.textContent).toContain("Wikipedia");
-    expect(reader!.textContent).toContain("CC BY-SA 4.0");
+    expect(reader!.textContent).not.toContain("Snapshot 2026-09-01");
     expect(document.getElementById("reference-article")?.contains(reader)).toBe(true);
   });
 
@@ -123,7 +123,8 @@ describe("Reference reader", () => {
     await view.findByText("A note");
     expect(document.querySelector('[data-slot="article-kicker-chip"]')?.textContent).toBe("Space");
     expect(document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain("Reference");
-    expect(document.querySelector('[data-slot="article-standfirst"]')?.textContent).toBe("Plain strongemphasis");
+    // A page with a facts card keeps its first paragraph whole; the standfirst belongs to the picture-led page.
+    expect(document.querySelector('[data-slot="article-standfirst"]')).toBeNull();
     expect(document.querySelector('[data-slot="article-quick-fact"]')?.textContent).toContain("Orbit: Earth");
     expect(document.querySelector('[data-slot="article-infobox"]')?.textContent).toContain("Earth");
   });

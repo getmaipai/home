@@ -45,6 +45,8 @@ export interface ArticleDataOptions {
   /** The app's own name, the first breadcrumb item (S2: never the global Home). */
   appName: string;
   onAppHome: () => void;
+  /** Opens a search for the category the article sits in, so the category crumb is a link. */
+  onCategory?: (category: string) => void;
 }
 
 /** A page with no lead picture of its own (no infobox photo) opens with its first figure as the hero, the way the mockup does. */
@@ -74,7 +76,7 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     ...(kicker ? { kicker, kickerStyle: "chip" as const } : {}),
     description: article.description ?? (article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label),
     ...(standfirst ? { lead: standfirst } : {}),
-    breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker }] : []), { label: article.title }],
+    breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker, ...(options.onCategory ? { onClick: () => options.onCategory!(kicker) } : {}) }] : []), { label: article.title }],
     ...(article.infobox && article.infobox.rows.length ? { infobox: article.infobox } : {}),
     ...(figureHero ? { image: { w480: figureHero.hero.src, w1280: figureHero.hero.src, alt: figureHero.hero.alt, ...(figureHero.hero.caption ? { badge: shortCaption(figureHero.hero.caption) } : {}) } } : {}),
     ...(!infoboxPicture && article.lead_image ? { image: { w480: article.lead_image.src, w1280: article.lead_image.src, alt: article.lead_image.alt, ...(article.badge ? { badge: article.badge } : {}) } } : {}),

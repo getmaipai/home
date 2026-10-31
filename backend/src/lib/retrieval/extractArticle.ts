@@ -29,6 +29,8 @@ export type ArticleBlock =
   | { type: "quote"; inlines: ArticleInline[]; cite?: string };
 export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; infobox?: { title?: string; rows: Array<{ label: string; value: string }> }; summary?: string; description?: string; hatnote?: string; kicker?: string; redirectTo?: string }
 
+const NAMESPACE_LINK = /^(?:Category|Template|Wikipedia|File|Help|Portal|Draft|Talk|User|Module|MediaWiki|Special|Book|TimedText):/i;
+function safeDecodeUri(value: string): string { try { return decodeURIComponent(value); } catch { return value; } }
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
 /** An infobox value: line breaks and list items become ", " ("Oakland, California" rather than "OaklandCalifornia"), and the hidden machine-readable dates are dropped. */
 function cellText(el: Element): string {
@@ -146,7 +148,10 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
       if (["script", "style", "iframe", "form", "svg", "img", "sup"].includes(tag) || el.hasAttribute("hidden") || el.hasAttribute("style") && /display\s*:\s*none/i.test(el.getAttribute("style") ?? "")) return;
       if (tag === "a") {
         const text = cleanText(el.textContent ?? ""); const href = el.getAttribute("href") ?? "";
-        const match = /^\/(?:content\/)?([^/?#]+)\/([^?#]+)$/.exec(href) ?? /^\.\/([^/?#]+)$/.exec(href);
+        // The book's own links come in three spellings: /content/<book>/<path>, ./<title>, and (the 2026 Wikipedia ZIMs) a bare title such as
+        // "Oakland%2C_California". A bare title that names a namespace page (Category:, File:, Help:) is plain text: it is not an article.
+        const bare = href !== "" && !href.startsWith("/") && !href.startsWith("#") && !/^(?:[a-z][a-z0-9+.-]*:\/\/|mailto:|tel:|javascript:|data:)/i.test(href) && !/^(?:\.\.?\/)/.test(href) && !NAMESPACE_LINK.test(safeDecodeUri(href)) ? /^([^?#]+)$/.exec(href) : null;
+        const match = /^\/(?:content\/)?([^/?#]+)\/([^?#]+)$/.exec(href) ?? /^\.\/([^/?#]+)$/.exec(href) ?? bare;
         if (news) {
           const outbound = opts.allowLinks ? safeOutboundHref(href, opts.baseUrl) : null;
           if (text) out.push(outbound ? { type: "link", text, href: outbound } : { type: "text", text });
@@ -179,7 +184,8 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
     if (options.length) blocks.push({ type: "list", ordered: false, items: options.map((text) => [{ type: "text", text }]) });
   }
   const elements = Array.from(root.querySelectorAll(`h2,h3,h4,p,ul,ol${news ? ",blockquote" : ""},table.infobox,table.infobox_v2,table.infobox_v3,table:not(.infobox):not(.infobox_v2):not(.infobox_v3),figure`)) as Element[];
-  const dropped = new Set(["references", "see also", "external links", "notes", "further reading", "citations", "bibliography", "footnotes", "sources"]);
+  // The encyclopedia reader keeps "See also": it is the page's own list of related articles, drawn as links at the end. Publisher pages (news) drop it.
+  const dropped = new Set(["references", ...(news ? ["see also"] : []), "external links", "notes", "further reading", "citations", "bibliography", "footnotes", "sources"]);
   let skip = false;
   for (const el of elements) {
     if (el.closest(FULL_ARTICLE_DROP) || el.closest("table.infobox,table.infobox_v2,table.infobox_v3")) continue;

@@ -1,12 +1,11 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArticleSpeechContext, ArticleView, type ArticleAction, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
-import { Button } from "@maipai/ui/src/ui/button";
 import { useReferenceSaves } from "./saves";
-import { readKeptArticle, useKeptArticles } from "./offline";
+import { readKeptArticle } from "./offline";
 import { speakableParagraphs, useArticleListen } from "./useArticleListen";
 
 const ARTICLE_ACTIONS: ArticleAction[] = ["save", "listen"];
@@ -19,12 +18,14 @@ export interface ReaderArticleProps {
   routeFor: (book: string, path: string) => string;
   appName: string;
   onAppHome: () => void;
+  /** Runs a search in the app that draws this reader (the category crumb uses it). */
+  onSearch?: (q: string) => void;
   /** Drawn in the loading and unavailable states, so each app keeps its own words. */
   unavailable?: ReactNode;
 }
 
 /** READER-03: one article, drawn by the kit reader with link previews; used by Reference and by the Wikipedia app. */
-export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavailable }: ReaderArticleProps) {
+export function ReaderArticle({ book, path, routeFor, appName, onAppHome, onSearch, unavailable }: ReaderArticleProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const saves = useReferenceSaves();
@@ -37,10 +38,8 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
       throw error;
     }
   }, retry: false });
-  const keptArticles = useKeptArticles();
   const reading = useArticleListen();
   const storyId = `${book}/${path}`;
-  const [keepMessage, setKeepMessage] = useState<string | null>(null);
   const loadPreview = useCallback(async (target: { book: string; path: string }): Promise<ArticlePreview | null> => {
     try {
       const preview = await queryClient.fetchQuery({ queryKey: ["reference-preview", target.book, target.path], queryFn: () => api.referencePreview(target.book, target.path), staleTime: PREVIEW_STALE_MS });
@@ -57,7 +56,7 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
     <div id="reference-article" data-touch-target-exempt className="min-w-0">
       <ArticleSpeechContext.Provider value={reading.speech}>
       <ArticleView
-        data={{ ...toArticleViewData(article, { appName, onAppHome }), saved: saves.isSaved(book, path) }}
+        data={{ ...toArticleViewData(article, { appName, onAppHome, ...(onSearch ? { onCategory: onSearch } : {}) }), saved: saves.isSaved(book, path) }}
         available={ARTICLE_ACTIONS}
         ids={{ story_id: storyId }}
         onAction={(action, ids) => {
@@ -67,15 +66,8 @@ export function ReaderArticle({ book, path, routeFor, appName, onAppHome, unavai
         onBack={() => navigate(-1)}
         loadPreview={loadPreview}
         renderTargetLink={(target, text) => <Link className="underline underline-offset-2" to={routeFor(target.book, target.path)}>{text}</Link>}
-        footer={<>{article.licence} · Snapshot {article.snapshot_date ?? "date unavailable"}</>}
       />
       </ArticleSpeechContext.Provider>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {keptArticles.isKept(book, path)
-          ? <Button variant="outline" size="sm" onClick={() => { setKeepMessage(null); void keptArticles.remove(book, path); }}>Remove from this device</Button>
-          : <Button variant="outline" size="sm" onClick={async () => { setKeepMessage(null); const result = await keptArticles.keep(book, path); if (!result.ok) setKeepMessage(result.message); }}>Keep on this device</Button>}
-        {keepMessage ? <p role="alert" className="text-muted-foreground text-sm">{keepMessage}</p> : null}
-      </div>
     </div>
   );
 }
