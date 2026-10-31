@@ -183,12 +183,12 @@ export function AiGlance({ card }: SettingsViewProps) {
         </Item>
       </ItemGroup>
 
-      {maxWindow.data && (maxWindow.data.open || maxWindow.data.profile || maxWindow.data.closed_apps.length > 0) ? (
+      {maxWindow.data && (maxWindow.data.open || maxWindow.data.profile || (maxWindow.data.closed_apps?.length ?? 0) > 0) ? (
         <div className="flex flex-wrap items-center justify-between gap-3 text-base" role="status" data-testid="max-window-line">
           <div className="space-y-1">
             {maxWindow.data.open ? <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` About ${maxWindow.data.minutes_left} ${maxWindow.data.minutes_left === 1 ? "minute" : "minutes"} left.` : ""}</p> : null}
             {maxWindow.data.profile ? <p data-testid="profile-line">{maxWindow.data.profile}</p> : null}
-            {maxWindow.data.closed_apps.map((line) => <p key={line} className="text-muted-foreground" data-testid="closed-apps-line">{line}</p>)}
+            {(maxWindow.data.closed_apps ?? []).map((line) => <p key={line} className="text-muted-foreground" data-testid="closed-apps-line">{line}</p>)}
           </div>
           {maxWindow.data.open ? <Button type="button" variant="outline" disabled={stopWindow.isPending} onClick={() => stopWindow.mutate()}>Stop the Max job</Button> : null}
         </div>
