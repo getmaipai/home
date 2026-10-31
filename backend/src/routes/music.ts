@@ -50,6 +50,7 @@ const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.strin
 const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;
 const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
 const cardSchema = z.object({
+  conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
@@ -137,6 +138,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
     cover_pending: coverPending,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
+    conversation_id: root.temporary ? null : root.conversationId, made_from_file: root.request.ownedFile === true,
     id: root.id, task: root.task, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,

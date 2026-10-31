@@ -20,6 +20,7 @@ const descriptionOf = (card: MusicCard) => {
   const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
   const style = caption.length > 70 ? `${caption.slice(0, 67).trimEnd()}...` : caption;
   const length = typeof card.duration_s === "number" && card.duration_s > 0 ? `${Math.floor(card.duration_s / 60)}:${String(Math.round(card.duration_s % 60)).padStart(2, "0")}` : "";
+  if (card.made_from_file) return ["Made from your file", length].filter(Boolean).join(", ");
   return [card.length === "full" ? "Full song" : "Quick song", style, length].filter(Boolean).join(", ") || undefined;
 };
 

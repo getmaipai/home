@@ -132,8 +132,8 @@ TIER-STEMS-03. Nothing here changes MUSIC-GEN-14: a recording still cannot be a 
 1. **Source kinds.** `stems` accepts (a) a song made here, as before, and (b) an audio file the person owns in their Library (`kind: "audio"`,
    uploaded or imported through the Library routes; a file shared with them does not count, `ownsMusicAttachment`-style ownership). A file in a
    chat or on another person's shelf is not a source.
-2. **Entry points, no new surface.** "Split into stems" on the Library file detail of an audio file, and on Now playing for a song that is the
-   person's own Library file; both start the same job as the song card's Stems tab (`POST /api/music/stems/from-file`, body `file_id`). The model
+2. **Entry points, no new surface.** "Split into stems" on the Library file detail of an audio file the person owns (built 2026-10-31). Now playing is not an entry point: the music app lists
+   the household's music folders, which are not the person's own files, so it has nothing of theirs to split. The action starts the same job as the song card's Stems tab (`POST /api/music/stems/from-file`, body `file_id`). The model
    still decides from chat for songs made in that chat only (rule 1; no new tool and no file picker tool: a chat tool that reads the Library is a
    privacy surface this ruling does not open).
 3. **The card.** The job and its finished card are the same job card and one stems card that steps through its tracks (section 4); a split of a
@@ -151,7 +151,7 @@ TIER-STEMS-03. Nothing here changes MUSIC-GEN-14: a recording still cannot be a 
    job and deletes it on completion, failure or cancel, and Home stores only the stems. The Stack request carries no file name; no log line, queue reason, music
    job Status row (TIER-HOME-03) or admin view carries the file name, file id or the "Split: <file name>" title, which lives only in the person's own conversation.
 3. **The ledger stays closed to uploads.** The Stack's made-here ledger still refuses an unknown source for every edit and cover. A new request
-   field `source: "owned_file"` is accepted by `POST /v1/audio/stems` only, with the declared sha256 of the bytes. Stems of an owned file are
+   field `origin: "owned_file"` (built as `origin`, because `source` already carries the bytes) is accepted by `POST /v1/audio/stems` only, with the declared sha256 of the bytes. Stems of an owned file are
    **not** recorded in the ledger, so a stem of a person's recording can never be a trim, edit or cover source, and `generate_music` still has no
    source argument. A song made here keeps today's path (ledger check, stems recorded).
 4. **Provenance.** A stem of an owned file carries `provenance.parent_file_id` of the Library file and no generation record, so commercial use

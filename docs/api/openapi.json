@@ -79230,6 +79230,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -79503,6 +79510,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -79794,6 +79808,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -80093,6 +80114,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -80387,6 +80415,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -80685,6 +80720,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -80995,6 +81037,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },
@@ -81296,6 +81345,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
                     },

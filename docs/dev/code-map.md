@@ -598,7 +598,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, startSelectJob |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
-| `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, plainMusicFailure, prepareStemsJob, startMusicJob, cancelMusicJob, resumeMusicJobs |
+| `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, prepareOwnedStemsJob, startMusicJob |
+| `backend/src/lib/music/m4a.ts` | m4aSeconds |
 | `backend/src/lib/music/models.ts` | MUSIC_ENGINE, KNOWN_MUSIC_MODELS, modelStampFor |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
