@@ -3,6 +3,7 @@ import { isDocumentMediaType } from "@/lib/documentMediaTypes";
 // parser surface for PDF and office input; RapidOCR is the separate local
 // path for scanned images. Neither path accepts a URL or makes a network
 // request on behalf of an attachment.
+import { atBackgroundPriority } from "@/lib/backgroundPriority";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -118,7 +119,7 @@ function tikaJarPath(): string {
 async function runTikaProcess(bytes: Uint8Array): Promise<string> {
   // Tika receives bytes on stdin and the literal '-' means "read stdin";
   // no path, URL, or remote parser target crosses this boundary.
-  const process = Bun.spawn(["java", "-jar", tikaJarPath(), "--text", "-"], {
+  const process = Bun.spawn(atBackgroundPriority(["java", "-jar", tikaJarPath(), "--text", "-"]), {
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -147,7 +148,7 @@ function runRapidOcrProcess(bytes: Uint8Array): string {
   // on stdout. The command is administrator-configured, never derived from
   // attachment content, and this process is not given a URL or a network
   // input. A production install pins the command to its RapidOCR runner.
-  const process = Bun.spawnSync(configuredCommand(RAPIDOCR_COMMAND_ENV), {
+  const process = Bun.spawnSync(atBackgroundPriority(configuredCommand(RAPIDOCR_COMMAND_ENV)), {
     stdin: bytes,
     stdout: "pipe",
     stderr: "pipe",

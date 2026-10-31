@@ -4,6 +4,7 @@
 // foreground helper); `ffmpeg` on the PATH is the second choice. When neither exists the caller checks the
 // Stack's poster (frame 0) alone and says so. Everything is local: the clip goes to a temporary folder on this
 // computer, three JPEGs come back, the folder is removed.
+import { atBackgroundPriority } from "@/lib/backgroundPriority";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,7 +65,7 @@ export function __setKeyframesForTests(fn: typeof forTests): void { forTests = f
 export function __resetKeyframeHelperForTests(): void { helperPromise = null; helperFailedAt = 0; }
 
 async function run(cmd: string[], deadlineMs: number): Promise<number> {
-  const child = Bun.spawn(cmd, { stdout: "ignore", stderr: "ignore" });
+  const child = Bun.spawn(atBackgroundPriority(cmd), { stdout: "ignore", stderr: "ignore" });
   const timer = setTimeout(() => child.kill(), deadlineMs);
   const code = await child.exited;
   clearTimeout(timer);
