@@ -874,6 +874,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, slotIsOff |
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
+| `backend/src/lib/toolBrake.ts` | brakeFor |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
 | `backend/src/lib/topicStances.ts` | resolveTopicStances, topicStancesForPerson |
