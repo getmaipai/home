@@ -132,6 +132,15 @@ class ScriptedWyomingClient {
 }
 
 describe("the Wyoming satellite server", () => {
+  test("a loopback-bound server reports its host and accepts a loopback connection", async () => {
+    server = startWyomingServer(0, { hostname: "127.0.0.1" });
+    expect(server.hostname).toBe("127.0.0.1");
+    expect(server.port).toBeGreaterThan(0);
+    const client = new ScriptedWyomingClient();
+    await client.connect(server.port);
+    client.end();
+  });
+
   test("closes the connection outright if the first message isn't a valid authenticate", async () => {
     server = startWyomingServer(0);
     const client = new ScriptedWyomingClient();

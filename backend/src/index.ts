@@ -468,14 +468,18 @@ attachHouseholdTlsRebind({
 // devices, not something a chat/embed/HTTP-serving hub should die over.
 let wyomingServer: ReturnType<typeof startWyomingServer> | null = null;
 let screenshotPortBlocker: import("bun").TCPSocketListener<undefined> | undefined;
-try {
-  const configuredWyomingPort = Number(process.env.MAIPAI_WYOMING_PORT ?? 10700);
+const wyomingPortSetting = process.env.MAIPAI_WYOMING_PORT ?? "10700";
+if (wyomingPortSetting === "off") {
+  console.log("Wyoming satellite server off (MAIPAI_WYOMING_PORT=off)");
+} else try {
+  const configuredWyomingPort = Number(wyomingPortSetting);
+  const wyomingHostname = networkExposure === "loopback" ? "127.0.0.1" : "0.0.0.0";
   if (process.env.MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE === "1") {
-    screenshotPortBlocker = Bun.listen({ hostname: "0.0.0.0", port: configuredWyomingPort, socket: { data() {}, open() {} } });
+    screenshotPortBlocker = Bun.listen({ hostname: wyomingHostname, port: configuredWyomingPort, socket: { data() {}, open() {} } });
     console.error("[index] screenshot fixture requested Wyoming bind failure");
   }
-  wyomingServer = startWyomingServer(screenshotPortBlocker?.port ?? configuredWyomingPort);
-  console.log(`MaiPai Home Wyoming satellite server listening on tcp://0.0.0.0:${wyomingServer.port}`);
+  wyomingServer = startWyomingServer(screenshotPortBlocker?.port ?? configuredWyomingPort, { hostname: wyomingHostname });
+  console.log(`MaiPai Home Wyoming satellite server listening on tcp://${wyomingHostname}:${wyomingServer.port}`);
 } catch (err) {
   screenshotPortBlocker?.stop(true);
   const message = (err as Error).message;

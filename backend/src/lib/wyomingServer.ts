@@ -253,6 +253,7 @@ async function handleMessage(
 export interface WyomingServerHandle {
   stop: () => void;
   port: number;
+  hostname: string;
 }
 
 // `bun run --hot` (AGENTS.md's own dev command) re-executes this whole
@@ -281,10 +282,10 @@ const hotReloadBoundPorts = (globalThis as { __maipaiWyomingBoundPorts?: Set<num
  * service in this codebase already follows. `handshakeTimeoutMs` only
  * exists so a test can prove the timeout fires without a real 10-second
  * wait; index.ts never passes it. */
-export function startWyomingServer(port = 0, opts: { handshakeTimeoutMs?: number } = {}): WyomingServerHandle {
+export function startWyomingServer(port = 0, opts: { handshakeTimeoutMs?: number; hostname?: string } = {}): WyomingServerHandle {
   const handshakeTimeoutMs = opts.handshakeTimeoutMs ?? HANDSHAKE_TIMEOUT_MS;
   const listenOpts: Bun.TCPSocketListenOptions<ConnectionState> = {
-    hostname: "0.0.0.0",
+    hostname: opts.hostname ?? "0.0.0.0",
     port,
     socket: {
       open(socket) {
@@ -339,6 +340,7 @@ export function startWyomingServer(port = 0, opts: { handshakeTimeoutMs?: number
         server.stop(true);
       },
       port: server.port,
+      hostname: server.hostname,
     };
   } catch (err) {
     // Only treated as "just a hot reload" when THIS process already won
@@ -352,7 +354,7 @@ export function startWyomingServer(port = 0, opts: { handshakeTimeoutMs?: number
     // anything it can't swap live.
     if (port !== 0 && hotReloadBoundPorts.has(port) && err instanceof Error && "code" in err && err.code === "EADDRINUSE") {
       console.warn(`[wyoming] port ${port} is already listening (hot reload) - keeping the existing server; restart the process to pick up code changes here`);
-      return { stop: () => {}, port };
+      return { stop: () => {}, port, hostname: opts.hostname ?? "0.0.0.0" };
     }
     throw err;
   }
