@@ -48,14 +48,19 @@
 // Poison guard (the plan's own words: "at most 3 attempts per turn, then
 // mark the turn judge_failed"): tracked PERSISTENTLY across core-job
 // ticks via conversation_turns.judge_attempts/judge_status, not retried
-// in a tight loop within one call - a transient outage (embed backend
-// down, llama-server mid-restart) gets up to 3 separate one-minute-apart
-// tries before the turn is given up on, the same "queue and retry on the
-// job's own cadence" shape lib/memory.ts's pending_embeddings already
-// uses. Only an EXTRACTION failure counts against this budget; a dedupe-
-// round failure never does (it just defaults to ADD, matching legacy's
-// own catch block) - dedupe deciding "keep both" safely is never wrong
-// enough to burn a turn's whole budget over.
+// in a tight loop within one call - a bad answer (not JSON, the wrong
+// shape, a request the Stack refused as invalid) gets up to 3 separate
+// one-minute-apart tries before the turn is given up on, the same "queue
+// and retry on the job's own cadence" shape lib/memory.ts's
+// pending_embeddings already uses; runJudgeBatch() never re-selects a
+// turn it already tried in the same tick, so the three tries are never
+// seconds apart. A transport failure (the Stack unreachable, offline or
+// not configured) is not the turn's fault and spends no attempt: the row
+// stays pending until the Stack answers again. Only an EXTRACTION failure
+// counts against this budget; a dedupe-round failure never does (it just
+// defaults to ADD, matching legacy's own catch block) - dedupe deciding
+// "keep both" safely is never wrong enough to burn a turn's whole budget
+// over.
 import { eq, and, or, isNull, isNotNull, notInArray, inArray, ne, asc, lt, desc } from "drizzle-orm";
 import { hasEligibleClause, isEligibleClause } from "@/lib/turnSignal";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
@@ -97,6 +102,9 @@ import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
 const MAX_JUDGE_ATTEMPTS = 3;
+/** Extraction failures that are the Stack's state, not the turn's: the
+ * row stays pending and no attempt is spent (judgeTurn()). */
+const TRANSPORT_FAILURE_KINDS = new Set(["unreachable", "offline", "not_configured"]);
 const MAX_FACTS_PER_TURN = 12;
 // One core-job tick processes a bounded batch, not the whole backlog at
 // once - the same "amortize over ticks, never monopolize the model"
@@ -641,30 +649,56 @@ export function rejectPromptEchoes(
  * number in it appears too. A fact with no content words at all is
  * ungrounded. Each drop is counted on the same log line as the echo
  * drops. */
+// MEM-AUDIT-02 (the preview fix, 2026-10-31): an instruction is phrased
+// by the model as what the speaker wants of the assistant ("Sage prefers
+// concise answers"), words the person never said ("please keep your
+// answers short from now on"). The verbs the prompt's own instruction
+// shape adds, and the assistant itself, are not grounding words.
+const INSTRUCTION_VERBS = new Set(["want", "wants", "wanted", "prefer", "prefers", "preferred", "ask", "asks", "asked", "should", "like", "likes"]);
+const ASSISTANT_WORDS = new Set(["assistant", "ai", "hub", "bot", "companion", "home"]);
+const SECOND_PERSON_RE = /\b(you|your|yours|yourself)\b/i;
+
+/** Whether the turn speaks to the assistant: a directive clause, a signal
+ * whose target is the hub, or a second-person word in the utterance. */
+export function addressesAssistant(signal: TurnSignal | null | undefined, userText: string): boolean {
+  if (signal?.clauses?.some((clause) => clause.act === "directive" && clause.stance === "asserted")) return true;
+  if (signal?.target === "hub") return true;
+  return SECOND_PERSON_RE.test(userText);
+}
+
 export function rejectUngrounded(
   facts: ExtractedFact[],
   speakerName: string,
   turnDate: string,
   userText: string,
   confirmedAssistantText?: string | null,
+  signal?: TurnSignal | null,
 ): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: "ungrounded" }[] } {
   const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
   const saidText = normalizeNumbers(confirmedAssistantText ? `${userText}\n${confirmedAssistantText}` : userText);
   // tokenize() drops one-character words, so a spoken "two" (now "2") is added back as a digit.
   const said = new Set([...contentWords(saidText), ...(saidText.match(/\d+/g) ?? [])]);
+  const toAssistant = addressesAssistant(signal, userText);
   const kept: ExtractedFact[] = [];
   const dropped: { fact: ExtractedFact; reason: "ungrounded" }[] = [];
   for (const original of facts) {
     const fact = { ...original, text: normalizeNumbers(collapseDatedWeekdays(original.text, said)) };
     const words = contentWords(fact.text);
-    const content = [...words].filter((w) => !skip.has(w));
+    // An instruction addressed to the assistant with no third party in it
+    // is grounded at a third of its content words (minus the instruction
+    // verbs), so "stop saying that" and "why didn't you check the weather"
+    // ground the rule written from them; every other category keeps the
+    // half-words rule exactly as measured (14 junk dropped, 0 true).
+    const instruction = fact.category === "instruction" && toAssistant && properNounsIn(fact.text).every((noun) => skip.has(noun) || ASSISTANT_WORDS.has(noun));
+    const content = [...words].filter((w) => !skip.has(w) && !(instruction && (INSTRUCTION_VERBS.has(w) || ASSISTANT_WORDS.has(w))));
     const shared = content.filter((w) => said.has(w)).length;
+    const needed = instruction ? Math.ceil(content.length / 3) : Math.ceil(content.length / 2);
     const turnDateStart = fact.text.indexOf(turnDate);
     const turnDateEnd = turnDateStart < 0 ? -1 : turnDateStart + turnDate.length;
     const grounded =
       content.length > 0 &&
-      shared >= Math.ceil(content.length / 2) &&
-      properNounsIn(fact.text).every((noun) => skip.has(noun) || said.has(noun)) &&
+      shared >= needed &&
+      properNounsIn(fact.text).every((noun) => skip.has(noun) || said.has(noun) || (instruction && ASSISTANT_WORDS.has(noun))) &&
       [...fact.text.matchAll(/\d+/g)].every((m) => {
         const start = m.index ?? -1;
         const end = start + m[0]!.length;
@@ -676,6 +710,32 @@ export function rejectUngrounded(
       continue;
     }
     kept.push(original);
+  }
+  return { kept, dropped };
+}
+
+// MEM-AUDIT-02 (the bench's false captures, 2026-10-31): on "write a story
+// about my friend Iris" the judge also wrote "Nova wants a story about her
+// friend Iris", the request itself restated as a fact about a person. A
+// request for a story, a song, a poem, a picture, a video, a timer, a
+// reminder or a list is the turn's business, never a durable fact; the
+// relationship inside it ("Iris is Nova's friend") is kept. An
+// instruction ("Sage wants a list of sources with every answer") is a
+// rule for the assistant and is never a request echo.
+const REQUEST_VERBS = "wants?|wanted|asks?|asked|requests?|requested|would like|needs?";
+const REQUEST_OBJECTS = "stor(?:y|ies)|songs?|poems?|pictures?|images?|drawings?|videos?|clips?|timers?|reminders?|lists?|jokes?|limericks?";
+const REQUEST_ECHO_RE = new RegExp(`\\b(?:${REQUEST_VERBS})\\b(?:\\s+(?:for|to hear|to see|to get|to have))?(?:\\s+(?:a|an|the|another|some|his|her|their|my|its))?\\s+(?:\\S+\\s+){0,2}?(?:${REQUEST_OBJECTS})\\b`, "i");
+
+/** Drop a fact that restates a request ("Nova wants a story about her
+ * friend Iris", "Sage asked for a reminder") as `request_echo`. A fact
+ * about a person ("Iris is Nova's friend", "Nova wants a puppy") and an
+ * `instruction` stand. */
+export function rejectRequestEcho(facts: ExtractedFact[]): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: "request_echo" }[] } {
+  const kept: ExtractedFact[] = [];
+  const dropped: { fact: ExtractedFact; reason: "request_echo" }[] = [];
+  for (const fact of facts) {
+    if (fact.category !== "instruction" && REQUEST_ECHO_RE.test(fact.text)) dropped.push({ fact, reason: "request_echo" });
+    else kept.push(fact);
   }
   return { kept, dropped };
 }
@@ -859,10 +919,15 @@ export function citeClause(
   const isSpeakerName = (name: string) => speakerWords.has(name.toLowerCase().replace(/'s$/, "")) || name.toLowerCase() === speakerName.toLowerCase();
   const kept: { fact: ExtractedFact; clause: SignalClause | null }[] = [];
   const dropped: { fact: ExtractedFact; reason: "ineligible_act" | "quoted" | "hypothetical" | "joking" | "unknown_grounding" | "subject_mismatch" }[] = [];
+  const toAssistant = addressesAssistant(signal, userText);
   for (const fact of facts) {
     const words = contentWords(fact.text);
-    const content = [...words].filter((w) => !skip.has(w));
-    const half = Math.ceil(content.length / 2);
+    // An instruction to the assistant is cited the way rejectUngrounded()
+    // grounds it: the instruction verbs and the assistant are not content,
+    // and a third of what remains is enough ("stop saying that").
+    const instruction = fact.category === "instruction" && toAssistant && properNounsIn(fact.text).every((noun) => skip.has(noun) || ASSISTANT_WORDS.has(noun));
+    const content = [...words].filter((w) => !skip.has(w) && !(instruction && (INSTRUCTION_VERBS.has(w) || ASSISTANT_WORDS.has(w))));
+    const half = instruction ? Math.ceil(content.length / 3) : Math.ceil(content.length / 2);
     const sharedWith = (c: (typeof clauses)[number]) => content.filter((w) => c.words.has(w)).length;
     let best: { clause: (typeof clauses)[number]; shared: number } | null = null;
     for (const c of clauses) {
@@ -899,7 +964,7 @@ export function citeClause(
       continue;
     }
     const clauseLower = bestEligible.clause.lower;
-    const properNouns = properNounsIn(fact.text).filter((w) => !skip.has(w));
+    const properNouns = properNounsIn(fact.text).filter((w) => !skip.has(w) && !(instruction && ASSISTANT_WORDS.has(w)));
     const numbers = [...fact.text.matchAll(/\d+/g)].map((m) => m[0]!).filter((n) => n !== year);
     // A fact may join two clauses ("make a note that Marlow is human, and
     // shouldn't be judged by what Nova does"), and a name said one clause
@@ -1121,11 +1186,28 @@ export function rejectWorld(
   return { kept, dropped };
 }
 
+/** The one line a failed extraction leaves behind: the failure class (the
+ * Stack's error kind and HTTP status, or the shape of a bad answer), never
+ * the person's words or the model's text. Each class names its next step,
+ * the way every error line in this repo does. */
+function logExtractionFailure(turnId: string, failure: { kind: string; httpStatus?: number; detail?: string; retried: boolean }): void {
+  const where = failure.httpStatus ? ` (http ${failure.httpStatus})` : "";
+  const detail = failure.detail ? `: ${failure.detail}` : "";
+  const next = failure.retried
+    ? "The turn stays queued and is retried on a later tick; check the Stack's background role in Repairs if this repeats."
+    : "The attempt counts against the turn's three; check the Stack's background role in Repairs if this repeats.";
+  console.warn(`[memory.judge] turn ${turnId}: extraction failed, ${failure.kind}${where}${detail}. ${next}`);
+}
+
 /** Phase 1: one grammar-constrained chat call, or null on any failure
  * (network, malformed JSON, an empty/non-object response) - null is what
  * counts against the poison guard; an empty array is a real, valid
- * "nothing worth remembering here" answer and does NOT. */
-async function extractFacts(speakerName: string, turn: ConversationTurnRow): Promise<{ facts: ExtractedFact[] } | { facts: null; failureKind?: string }> {
+ * "nothing worth remembering here" answer and does NOT. Every null is
+ * logged with its failure class (`failureKind`), so a turn marked failed
+ * can be read back from the log: `stack:<kind>` for a refused or lost
+ * call, `parse_error` for an answer that is not JSON, `no_facts_array`
+ * for JSON of the wrong shape. */
+async function extractFacts(speakerName: string, turn: ConversationTurnRow): Promise<{ facts: ExtractedFact[] } | { facts: null; failureKind: string }> {
   const messages: LlmMessage[] = [
     { role: "system", content: buildExtractionPrompt(speakerName, turn.createdAt) },
     { role: "user", content: `${speakerName}: ${turn.userText}\nAssistant: ${turn.replyText}` },
@@ -1134,19 +1216,28 @@ async function extractFacts(speakerName: string, turn: ConversationTurnRow): Pro
     temperature: 0.1,
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA },
   });
-  if (!result.ok) return { facts: null, failureKind: result.failureKind };
-  try {
-    const parsed = JSON.parse(result.text) as { facts?: unknown };
-    if (!Array.isArray(parsed.facts)) return { facts: null };
-    const facts: ExtractedFact[] = [];
-    for (const raw of parsed.facts.slice(0, MAX_FACTS_PER_TURN)) {
-      const fact = normalizeFact(raw);
-      if (fact) facts.push(fact);
-    }
-    return { facts };
-  } catch {
-    return { facts: null };
+  if (!result.ok) {
+    const kind = result.failureKind ?? "unknown";
+    logExtractionFailure(turn.id, { kind: `stack:${kind}`, httpStatus: result.httpStatus, detail: result.error, retried: TRANSPORT_FAILURE_KINDS.has(kind) });
+    return { facts: null, failureKind: kind };
   }
+  let parsed: { facts?: unknown };
+  try {
+    parsed = JSON.parse(result.text) as { facts?: unknown };
+  } catch {
+    logExtractionFailure(turn.id, { kind: "parse_error", detail: `the judge answered ${result.text.length} characters that are not JSON`, retried: false });
+    return { facts: null, failureKind: "parse_error" };
+  }
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray(parsed.facts)) {
+    logExtractionFailure(turn.id, { kind: "no_facts_array", detail: "the judge's JSON has no facts array", retried: false });
+    return { facts: null, failureKind: "no_facts_array" };
+  }
+  const facts: ExtractedFact[] = [];
+  for (const raw of parsed.facts.slice(0, MAX_FACTS_PER_TURN)) {
+    const fact = normalizeFact(raw);
+    if (fact) facts.push(fact);
+  }
+  return { facts };
 }
 
 const DEDUPE_SCHEMA = {
@@ -1500,10 +1591,13 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   const robotDeviceId = conversation?.deviceId ?? null;
   const extraction = await extractFacts(speakerName, turn);
   if (extraction.facts === null) {
-    // A remote link loss is transport state, not bad model output. Keep the
-    // row pending without consuming the finite malformed-output attempts;
-    // the normal judge worker pass will retry it after the link recovers.
-    if (extraction.failureKind === "unreachable") {
+    // A transport failure (the Stack unreachable, offline for a restart or
+    // for memory, or not configured yet) is the Stack's state, not bad
+    // model output. Keep the row pending without consuming the finite
+    // malformed-output attempts; the next tick retries it once the Stack
+    // answers again (the dev hub, 2026-10-31: three attempts spent in six
+    // milliseconds on a refusal that never reached the model).
+    if (TRANSPORT_FAILURE_KINDS.has(extraction.failureKind)) {
       return { ok: false, factsWritten: 0 };
     }
     if (markAttempt(turn.id, turn.judgeAttempts + 1)) {
@@ -1518,13 +1612,16 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // chunk). Counted per drop, so a run's log says how often the model
   // echoed its instructions or wrote what the person never said.
   const { kept: echoed, dropped: echoDropped } = rejectPromptEchoes(extracted, speakerName, turnDateFor(turn.createdAt), `${turn.userText}\n${turn.replyText}`);
-  const { kept: ungroundedKept, dropped: ungroundedDropped } = rejectUngrounded(echoed, speakerName, turnDateFor(turn.createdAt), turn.userText, null);
+  const { kept: ungroundedKept, dropped: ungroundedDropped } = rejectUngrounded(echoed, speakerName, turnDateFor(turn.createdAt), turn.userText, null, signal);
   // MEM-06 (b): a passing state and a world-subject fact are not written -
   // a state whose verb is conversational is passing, a fact about the
   // turn's world subject (a lookup's title, a world subject on the stack)
   // is the world's unless it is the speaker's own preference or plan.
   const { kept: worldKept, dropped: worldDropped } = rejectWorld(ungroundedKept, worldTitlesFor(turn));
-  const { kept: facts, dropped: passingDropped } = rejectPassing(worldKept);
+  const { kept: unechoed, dropped: passingDropped } = rejectPassing(worldKept);
+  // A request restated as a fact about a person is the turn's business,
+  // never a memory (`request_echo`); the relationship inside it stands.
+  const { kept: facts, dropped: requestDropped } = rejectRequestEcho(unechoed);
   // MEM-06 (c): ground each surviving fact in the eligible clause it came
   // from; a fact whose best eligible clause shares no content, whose
   // proper nouns or numbers are absent from the cited clause, or whose
@@ -1536,7 +1633,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // nothing else; a moderate or high emotion writes a bounded state,
   // none or low writes no state; an explicit valid_to always wins.
   const { kept: shaped, dropped: shapeDropped } = shapeByClause(cited, turn.createdAt);
-  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped, ...citeDropped, ...shapeDropped];
+  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped, ...requestDropped, ...citeDropped, ...shapeDropped];
   if (dropped.length > 0) {
     const counts: Record<string, number> = {};
     for (const d of dropped) counts[d.reason] = (counts[d.reason] ?? 0) + 1;
@@ -1672,7 +1769,22 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // records, and the turn's own write is folded in afterwards (retired in
     // favour of the record written here, or, with nothing older to merge
     // into, replaced by the judge's own statement of the fact, as before).
-    const ownWrites = candidates.filter((c) => c.record.source === turn.id);
+    // The turn's own write is found by its source, never only by the
+    // vector search: the remember package writes its row with no
+    // embedding yet (pending_embeddings fills it later), so a judge pass
+    // seconds after the turn found nothing similar and ADDed a second
+    // active row beside the package's (the dev hub, 2026-10-31). Rows this
+    // loop already wrote are not the turn's "own write" to retire.
+    const ownBySource = db
+      .select({ id: memoryRecords.id, source: memoryRecords.source })
+      .from(memoryRecords)
+      .where(and(eq(memoryRecords.source, turn.id), eq(memoryRecords.status, "active"), eq(memoryRecords.person, speaker.id)))
+      .all()
+      .filter((row) => !writtenIds.includes(row.id));
+    const ownWrites: { record: { id: string; source: string | null } }[] = [
+      ...candidates.filter((c) => c.record.source === turn.id),
+      ...ownBySource.filter((row) => !candidates.some((c) => c.record.id === row.id)).map((row) => ({ record: row })),
+    ];
     const olderCandidates = candidates.filter((c) => c.record.source !== turn.id);
     let decision = await decideDedupe(fact.text, olderCandidates);
     if (decision.action === "ADD" && ownWrites.length > 0) {
@@ -1912,17 +2024,26 @@ export async function runJudgeBatch(): Promise<JudgeBatchResult> {
   let processed = 0;
   let factsWritten = 0;
   const startMs = Date.now();
+  // A turn is judged at most once per tick. A failed extraction leaves the
+  // row pending (its attempt count up by one), and re-selecting it as "the
+  // oldest pending turn" burned all three attempts in one tick, seconds
+  // apart, so a short Stack hiccup marked the turn failed for good (seen
+  // on the dev hub, 2026-10-31). Skipping the ids already tried this run
+  // keeps the header's promise: three tries, at least a tick apart.
+  const triedThisTick: string[] = [];
 
   while (true) {
     if (processed >= MAX_JUDGE_BATCH_TURNS) break;
     if (Date.now() - startMs >= MAX_JUDGE_BATCH_MS) break;
     if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) break;
 
-    const pending = db.select().from(conversationTurns).where(pendingTurnWhere()).orderBy(asc(conversationTurns.createdAt)).limit(1).all();
+    const where = triedThisTick.length > 0 ? and(pendingTurnWhere(), notInArray(conversationTurns.id, triedThisTick)) : pendingTurnWhere();
+    const pending = db.select().from(conversationTurns).where(where).orderBy(asc(conversationTurns.createdAt)).limit(1).all();
 
     if (pending.length === 0) break;
 
     const turn = pending[0]!;
+    triedThisTick.push(turn.id);
     const result = await judgeTurn(turn);
     processed++;
     factsWritten += result.factsWritten;

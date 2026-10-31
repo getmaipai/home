@@ -2693,3 +2693,172 @@ describe("MEM-AUDIT-02: capture what people actually say", () => {
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, identified.id)).all().length).toBe(1);
   });
 });
+
+// The end-to-end preview of the memory redesign (2026-10-31) found four
+// defects: three extraction attempts spent in one tick with no reason in
+// the log, an instruction dropped as ungrounded, a request restated as a
+// fact, and the turn's own package write left active beside the judge's.
+describe("MEM-AUDIT-02: the preview fixes (judge failure class, one try per tick, instruction grounding, request echoes, own writes)", () => {
+  const roster = ["Marlow", "Sage", "Nova"];
+  function signalledTurn(actor: PersonRow, userText: string, replyText: string, source: TurnValue["source"] = "model") {
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
+    const signal = classifyTurnSignal({ text: userText, roster, commandOpeners: commandOpenersFromManifests(loadAllManifests()), ageBand: "adult" });
+    const value: TurnValue = { reply: { text: replyText }, source, safety: SAFE, conversation_id: conv.value.id, turn_id: turnId, ...(source === "plugin" ? { plugin_id: "remember" } : {}) };
+    logTurn(actor, "chat", userText, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal, userText) });
+    return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+  }
+  const activeTexts = () => db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all().map((r) => r.text);
+
+  test("(a) a failed extraction logs its failure class at warn level, never the person's words", async () => {
+    const { actor } = await owner();
+    const secret = "anchovy pizza on Tuesdays";
+    const turn = makeTurn(actor, `I eat ${secret}`, "Noted.");
+    const warned: string[] = [];
+    const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => { warned.push(args.map(String).join(" ")); });
+    try {
+      await withScriptedJudge(() => ({ not_facts: "the wrong shape" }), () => judgeTurn(turn));
+      expect(warned.some((line) => line.includes(`turn ${turn.id}: extraction failed, no_facts_array`))).toBe(true);
+      await withScriptedJudge(() => ({ facts: [] }), async () => {
+        judgeFixture!.client.chat = async () => { throw new StackError("offline", "the judge role is restarting", { status: 503, state: "loaded" }); };
+        await judgeTurn(turn);
+      });
+      expect(warned.some((line) => line.includes("extraction failed, stack:offline (http 503)"))).toBe(true);
+      expect(warned.every((line) => !line.includes(secret))).toBe(true);
+      // Every line says what to do next.
+      expect(warned.every((line) => !line.includes("extraction failed") || line.includes("check the Stack's background role in Repairs"))).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("(c) a Stack refusal (offline) keeps the turn pending and spends no attempt; a bad answer spends one", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I eat anchovies on toast", "Noted.");
+    const spy = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await withScriptedJudge(() => ({ facts: [] }), async () => {
+        judgeFixture!.client.chat = async () => { throw new StackError("offline", "the judge role is restarting", { status: 503 }); };
+        const result = await judgeTurn(turn);
+        expect(result.ok).toBe(false);
+      });
+      let row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+      expect([row.judgeAttempts, row.judgeStatus]).toEqual([0, null]);
+      await withScriptedJudge(() => ({ not_facts: "the wrong shape" }), () => judgeTurn(row));
+      row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+      expect([row.judgeAttempts, row.judgeStatus]).toEqual([1, null]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("(b) one tick tries a failing turn once: two bad turns leave the tick with one attempt each, neither failed", async () => {
+    const { actor } = await owner();
+    __resetTurnActivityForTests();
+    const first = makeTurn(actor, "I eat anchovies on toast", "Noted.");
+    const second = makeTurn(actor, "I eat olives on toast", "Noted.");
+    const spy = spyOn(console, "warn").mockImplementation(() => {});
+    let calls = 0;
+    try {
+      const result = await withScriptedJudge(
+        (schemaName) => {
+          if (schemaName === "memory_extraction") calls++;
+          return { not_facts: "the wrong shape" };
+        },
+        () => runJudgeBatch(),
+      );
+      expect(result.processed).toBe(2);
+      expect(calls).toBe(2);
+      for (const turn of [first, second]) {
+        const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+        expect([row.judgeAttempts, row.judgeStatus]).toEqual([1, null]);
+      }
+      expect(judgeQueueStats().pending).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("an instruction is grounded by a third of its words when the turn speaks to the assistant: 'please keep your answers short' is stored", async () => {
+    const { actor } = await owner();
+    const turn = signalledTurn(actor, "please keep your answers short from now on", "Will do.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: `${actor.displayName} prefers concise answers`, category: "instruction", scope: "person", importance: 0.8 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
+    expect(rows.map((r) => [r.text, r.category])).toEqual([[`${actor.displayName} prefers concise answers`, "instruction"]]);
+  });
+
+  test("'stop saying that' stores an instruction (a directive clause, the rule names the thing)", async () => {
+    const { actor } = await owner();
+    const turn = signalledTurn(actor, "stop saying that", "Sorry, I will stop.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: `${actor.displayName} wants the assistant to stop saying that`, category: "instruction", scope: "person", importance: 0.8 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
+    expect(rows.map((r) => r.category)).toEqual(["instruction"]);
+  });
+
+  test("a fact copied from the assistant's reply is still dropped as ungrounded, in any category", async () => {
+    const { actor } = await owner();
+    const turn = signalledTurn(actor, "my daughter Nova loves horses", "Try the stables at Willow Farm on Saturdays, and I will keep my answers short.");
+    const logged: string[] = [];
+    const spy = spyOn(console, "log").mockImplementation((...args: unknown[]) => { logged.push(args.map(String).join(" ")); });
+    try {
+      await withScriptedJudge(
+        (schemaName) => (schemaName === "memory_extraction" ? { facts: [
+          { text: `${actor.displayName}'s daughter Nova rides at Willow Farm on Saturdays`, category: "fact", scope: "person", importance: 0.5 },
+          { text: `${actor.displayName} wants short answers`, category: "instruction", scope: "person", importance: 0.8 },
+        ] } : undefined),
+        () => judgeTurn(turn),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all()).toEqual([]);
+    expect(logged.some((line) => line.includes(`turn ${turn.id}: dropped 2 extracted candidate(s) {"ungrounded":2}`))).toBe(true);
+  });
+
+  test("request_echo: a request for a story, a reminder or a list is dropped; the relationship inside it, a wish and an instruction stand", async () => {
+    const { rejectRequestEcho } = await import("@/lib/memoryJudge");
+    const fact = (text: string, category: "fact" | "instruction" | "relationship" | "goal" = "fact") => ({ text, category, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+    const result = rejectRequestEcho([
+      fact("Nova, Sage's daughter, wants a story about her friend Iris"),
+      fact("Iris is Nova's friend", "relationship"),
+      fact("Sage asked for a reminder to call the dentist"),
+      fact("Sage would like a list of chores for the week"),
+      fact("Nova wants a puppy", "goal"),
+      fact("Sage wants a list of sources with every answer", "instruction"),
+      fact("Sage keeps a grocery list on the fridge"),
+    ]);
+    expect(result.dropped.map((d) => d.fact.text)).toEqual([
+      "Nova, Sage's daughter, wants a story about her friend Iris",
+      "Sage asked for a reminder to call the dentist",
+      "Sage would like a list of chores for the week",
+    ]);
+    expect(result.dropped.every((d) => d.reason === "request_echo")).toBe(true);
+    expect(result.kept.map((k) => k.text)).toEqual(["Iris is Nova's friend", "Nova wants a puppy", "Sage wants a list of sources with every answer", "Sage keeps a grocery list on the fridge"]);
+  });
+
+  test("a plugin turn's own write with different words and no embedding yet is superseded by the judge's record: one active row, with a subject", async () => {
+    const { actor } = await owner();
+    const turn = signalledTurn(actor, "my daughter Nova loves horses", "Got it, I'll remember that.", "plugin");
+    const own = remember(actor, { text: "Nova's daughter loves horses.", category: "fact", tier: "durable", scope: "person", person: actor.id, source: turn.id, importance: 0.5 });
+    if (!own.ok) throw new Error("setup failed");
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, own.value.id)).get()!.subjectId).toBeNull();
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: `Nova, ${actor.displayName}'s daughter, loves horses`, category: "fact", scope: "person", importance: 0.6, subject: { name: "Nova", kind: "person" } }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const ownRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, own.value.id)).get()!;
+    expect(ownRow.status).toBe("superseded");
+    const active = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(active.map((r) => r.text)).toEqual([`Nova, ${actor.displayName}'s daughter, loves horses`]);
+    expect(active[0]!.subjectId).not.toBeNull();
+    expect(ownRow.supersededBy).toBe(active[0]!.id);
+    expect(activeTexts()).toHaveLength(1);
+  });
+});

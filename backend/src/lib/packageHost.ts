@@ -2001,7 +2001,27 @@ function parseRemindListCall(text: string): RemindListCall | null {
   return match ? { action: match[1] as RemindListCall["action"], text: match[2]!.trim() } : null;
 }
 
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean; band?: AgeBand } = {}): Host {
+const SAVE_OPENER_RE = /^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:remember|make a note|note|keep in mind|don't forget|for future reference)(?:\s+that)?[:,]?\s+/i;
+const CLAUSE_BREAK_RE = /[.!?;:]\s|\s(?:and|but|because|so)\s|,/i;
+const CLAUSE_SKIP_WORDS = new Set(["my", "our", "your", "his", "her", "their", "the", "a", "an", "is", "are", "was", "were", "that", "this", "it", "its", "to", "of", "in", "on", "at", "for", "with", "and", "has", "have", "had", "be", "s"]);
+function clauseWords(text: string): string[] {
+  return (text.toLowerCase().match(/[\p{L}\p{N}]+(?:'[\p{L}]+)?/gu) ?? []).map((w) => w.replace(/'s$/, "")).filter((w) => w.length > 1 && !CLAUSE_SKIP_WORDS.has(w));
+}
+/** The person's own clause when it says the same thing as the model's
+ * paraphrase: one clause (no sentence break, no "and"), at most 160
+ * characters, with every content word of the paraphrase in it (the
+ * speaker's possessives and function words aside). Otherwise the
+ * paraphrase stands. Exported for its test. */
+export function userClauseFor(modelText: string, userText: string): string {
+  const clause = userText.trim().replace(SAVE_OPENER_RE, "").replace(/[.!?]+$/, "").trim();
+  if (clause.length === 0 || clause.length > 160 || CLAUSE_BREAK_RE.test(clause)) return modelText;
+  const said = new Set(clauseWords(clause));
+  const wanted = clauseWords(modelText);
+  if (wanted.length === 0 || !wanted.every((w) => said.has(w))) return modelText;
+  return clause;
+}
+
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string; userText?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean; band?: AgeBand } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -2349,8 +2369,15 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // field for the package id), package id otherwise.
         const source = turn?.id ?? `package:${manifest.id}`;
         if (turn?.id) logEntry("info", "remembered via turn", { turn_id: turn.id });
+        // MEM-AUDIT-02 (the preview, 2026-10-31): the model's tool call
+        // paraphrased "my daughter Nova loves horses" as "Nova's daughter
+        // loves horses". When the person's own sentence carries every
+        // content word of the paraphrase, their sentence is stored instead;
+        // the judge's pass over the turn then resolves it ("Nova, Sage's
+        // daughter, loves horses") and supersedes this row.
+        const stored = turn?.userText ? userClauseFor(text, turn.userText) : text;
         const result = memory.remember(actor, {
-          text,
+          text: stored,
           category: category ?? "fact",
           tier: "durable",
           scope: resolvedScope,

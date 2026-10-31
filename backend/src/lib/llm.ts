@@ -25,7 +25,7 @@ import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, visibleText, type ThinkSpan } from "@/lib/wellFormed";
-import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, stackFailureFacts, resolveStackOffline, type StackFailureResult, type StackFailureFacts } from "@/lib/stackEngine";
+import { isStackRoleEnabled, isStackConfigured, getStackClient, recordStackChatIdentity, stackFailureResult, stackFailureFacts, resolveStackOffline, type StackFailureResult, type StackFailureFacts } from "@/lib/stackEngine";
 import { identityFromHeaders } from "@/lib/stack/client";
 import type { RoleRequest } from "@/lib/stack/types";
 
@@ -1008,18 +1008,27 @@ export async function startCompleteStream(
   return startDirectTokens(role, messages, opts, signal);
 }
 
-export type BackgroundResult = { ok: true; text: string } | { ok: false; unavailable: true; failureKind?: string };
+/** `failureKind` is the Stack client's error kind or the ceiling plan's reason
+ * (`unreachable`, `offline`, `timeout`, `unknown`, `context_too_large`,
+ * `empty_length`, `no_content`); `httpStatus` is the Stack's own HTTP status
+ * when one answered, and `error` the Stack's message (never the prompt). A
+ * caller that gives up on a job logs these three so the failure class is
+ * readable from the log (MEM-AUDIT-02's judge fix: three silent attempts). */
+export type BackgroundResult = { ok: true; text: string } | { ok: false; unavailable: true; failureKind?: string; httpStatus?: number; error?: string };
 
 /** Runs memory extraction and summaries through the configured Stack judge. */
 export async function completeBackground(messages: LlmMessage[], options: LlmCompleteOptions = {}): Promise<BackgroundResult> {
   const { body } = chatRequestBody(messages, options);
   const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" }, options.signal, { exactCeiling: options.exactCeiling });
   if (!result.ok) {
-    return { ok: false, unavailable: true, failureKind: result.failure.reason ?? result.failure.failureKind };
+    // A Home-side refusal (no Stack configured) has no Stack error kind of
+    // its own; named here so a background job can tell it from bad output.
+    const failureKind = result.failure.reason ?? result.failure.failureKind ?? (isStackConfigured() ? "unknown" : "not_configured");
+    return { ok: false, unavailable: true, failureKind, httpStatus: result.failure.facts?.http_status, error: result.failure.error };
   }
   const data = result.data as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content;
-  return typeof content === "string" ? { ok: true, text: content } : { ok: false, unavailable: true };
+  return typeof content === "string" ? { ok: true, text: content } : { ok: false, unavailable: true, failureKind: "no_content", error: "the judge answered without a message" };
 }
 
 export interface ProbeReading { prompt_n: number | null; cache_n: number | null; prompt_ms: number | null }

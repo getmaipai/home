@@ -151,6 +151,7 @@ role), once before and once after MEM-AUDIT-02's capture changes:
 |---|---|---|---|
 | before (chain as it was, 2026-10-31) | 75.0% (tp 6, fp 2) | 28.6% (tp 6, missed 15) | 13/30 |
 | after (three-word gate, rewritten prompt, text-derived subject, carrier clauses, widened saves) | 87.5% (tp 14, fp 2) | 66.7% (tp 14, missed 7) | 1/30 |
+| after, with the spec pin and the preview fixes (spec-v0.1.282 carries `instruction`; instruction grounding, `request_echo`, own write by source) | 87.5% (tp 14, fp 2) | 66.7% (tp 14, missed 7) | 1/30 |
 
 Both runs on 2026-10-31, each exactly once, against the Stack on `127.0.0.1:8770` with the judge role reporting
 `Qwen3-4B-Q4_K_M.gguf` (llama-server b10797, the model it shares with chat): 2.55 s per judged turn after, 3.49 s before.
@@ -170,10 +171,27 @@ which turn each refusal belonged to; the spec change goes first, then a rerun sa
 expects one record for that turn. The bench's own cleanup fails after the numbers print (`FOREIGN KEY constraint failed`
 deleting the household people rows from its disposable database); the scores are complete before that line.
 
+**The third run (2026-10-31, once, the same Stack and judge model, 0.89 s per judged turn)** followed the spec pin and the
+preview fixes of the same day: no insert is refused any more (the three "Invalid option" refusals are gone; the bench now
+prints the case id beside any refused write), `instr-typed` and `instr-weather` are captured, and the request echo on
+`req-story-iris` ("Nova, Sage's daughter, wants a story about her friend Iris") no longer appears: a deterministic
+`request_echo` rejector drops a fact that restates a request for a story, song, poem, picture, video, timer, reminder or
+list. The totals are the same as the second run because the judge model's misses moved rather than vanished: the 7 misses
+are now `req-story-pippa`, `req-story-iris` (it wrote "Nova, Sage's daughter, has a friend named Iris" instead of the
+expected pair), `voice-rewatch`, `voice-film`, `q-boyfriend`, `instr-stop-saying` and `instr-moving`; the 2 false captures are
+that Iris line and a second sentence on `note-marlow` ("Marlow should not be judged by what Nova does", the note split in
+two). The remaining instruction misses are the judge model returning nothing for a three-word directive, JUDGE-QUALITY-01's
+question. The preview also found the judge spending its three attempts on one turn inside one tick, six milliseconds
+apart, with no reason logged: a failed extraction now logs its class (the Stack's error kind and HTTP status, a parse error,
+a wrong shape; never the person's words), a turn is tried once per tick, and a transport failure (the Stack unreachable,
+offline or not configured) spends no attempt. The bench's cleanup deletes the household's relationships, memories and
+entities before its people rows, so it no longer ends in a foreign-key error.
+
 The deterministic half of the measurement is in `bun test` already:
 every fixture shape (the song request, the boyfriend question, the two-clause "make a note", the lowercase friend, the
 instruction category, the joke, the hypothetical, the anonymous robot speaker) has a case in `backend/tests/memoryJudge.test.ts`
-under "MEM-AUDIT-02: capture what people actually say".
+under "MEM-AUDIT-02: capture what people actually say", and the preview fixes under "MEM-AUDIT-02: the preview fixes" (the
+failure class in the log, one try per tick, the two instruction turns, the request echo, the plugin turn's own write).
 
 **Two deviations from the brief, taken deliberately:** the prompt's request example keeps "DDR" as the person said it
 rather than expanding it, because the untouched `ungrounded` rejector drops any proper noun the person never spoke; and

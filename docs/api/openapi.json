@@ -4141,8 +4141,10 @@
                           "goal",
                           "relationship",
                           "fact",
-                          "state"
-                        ]
+                          "state",
+                          "instruction"
+                        ],
+                        "description": "What the record is about. instruction: a standing rule the person gave the assistant about how to behave for them (answer in short sentences, check the weather when I say it is cold, do not say X). Durable, person scope."
                       },
                       "tier": {
                         "type": "string",
@@ -4323,6 +4325,12 @@
                             ]
                           },
                           {
+                            "type": "string",
+                            "enum": [
+                              "profile_card_replaced"
+                            ]
+                          },
+                          {
                             "type": "object",
                             "nullable": true,
                             "enum": [
@@ -4334,7 +4342,7 @@
                           }
                         ],
                         "default": null,
-                        "description": "NAT-07b: why the record left the active set, written by the five archive paths. `end_date`: its own end date passed. `decay`: the hub's age-out. `person`: the person archived it. `edit`: an edit retired it. `forgotten`: the forget tombstone. Null or absent on records written before it existed and on any other archive path (state expiry, person deletion); a record with a null reason is never offered as an opening thread, so only `end_date` ever qualifies."
+                        "description": "NAT-07b: why the record left the active set, written by the archive paths. `end_date`: its own end date passed. `decay`: the hub's age-out. `person`: the person archived it. `edit`: an edit retired it. `forgotten`: the forget tombstone. `profile_card_replaced`: the weekly profile paragraph row was retired when the deterministic profile card replaced it (2026-10-31). Null or absent on records written before it existed and on any other archive path (state expiry, person deletion); a record with a null reason is never offered as an opening thread, so only `end_date` ever qualifies."
                       },
                       "offer_withheld": {
                         "anyOf": [
