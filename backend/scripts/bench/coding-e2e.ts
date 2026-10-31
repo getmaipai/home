@@ -147,7 +147,6 @@ async function collectChatStream(response: Response, knownModels: Set<string>, c
   return { text, model, outputTokens };
 }
 async function toolCallChat(home: URL, key: string, model: string, knownModels: Set<string>, ceiling: number): Promise<void> {
-  const started = performance.now();
   const prompt = "Call read_file on /tmp/e2e-reverse.ts, then write a TypeScript function that reverses a string, reply with code only.";
   const first = await bodyOf(await callCode(home, "/code/v1/chat/completions", key, { model, messages: [{ role: "user", content: prompt }], tools: [TOOL], tool_choice: "auto", max_tokens: 120, thinking_budget_tokens: ceiling, reasoning_effort: "medium" }), "chat tool call");
   assertModel(first, knownModels, "chat tool call");
@@ -158,6 +157,7 @@ async function toolCallChat(home: URL, key: string, model: string, knownModels: 
   assert(call?.function?.name === "read_file", "Chat did not return the read_file tool call.");
   const args = JSON.parse(call.function.arguments);
   assert(args.path === "/tmp/e2e-reverse.ts", "Chat returned an unexpected read_file path.");
+  const secondStarted = performance.now();
   const second = await bodyOf(await callCode(home, "/code/v1/chat/completions", key, { model, messages: [{ role: "user", content: prompt }, assistant, { role: "tool", tool_call_id: call.id, content: "export function reverseString(value: string): string { return [...value].reverse().join(''); }" }], tools: [TOOL], max_tokens: 120, thinking_budget_tokens: ceiling, reasoning_effort: "medium" }), "chat tool result");
   assertModel(second, knownModels, "chat tool result");
   const final = textFromChat(second);
@@ -165,10 +165,9 @@ async function toolCallChat(home: URL, key: string, model: string, knownModels: 
   const { reasoningTokens, outputTokens } = usageOf(second);
   assert(reasoningTokens !== null, "Chat tool round trip did not report reasoning token usage.");
   assert(reasoningTokens <= ceiling, `Chat tool round trip exceeded the ${ceiling} token reasoning ceiling.`);
-  measure("chat tool round trip", started, `tool read_file; ${outputTokens ?? "?"} output tokens`, outputTokens);
+  measure("chat tool result turn", secondStarted, `tool read_file; ${outputTokens ?? "?"} output tokens`, outputTokens);
 }
 async function toolCallMessages(home: URL, key: string, model: string, knownModels: Set<string>, ceiling: number): Promise<void> {
-  const started = performance.now();
   const prompt = "Call read_file on /tmp/e2e-reverse.ts, then write a TypeScript function that reverses a string, reply with code only.";
   const first = await bodyOf(await callCode(home, "/code/v1/messages", key, { model, max_tokens: 1500, messages: [{ role: "user", content: prompt }], tools: [MESSAGE_TOOL], tool_choice: { type: "auto" }, thinking: { type: "enabled", budget_tokens: ceiling } }), "messages tool call");
   assert(typeof first.model === "string" && knownModels.has(first.model), "Messages tool call model is not listed by /models.");
@@ -176,13 +175,14 @@ async function toolCallMessages(home: URL, key: string, model: string, knownMode
   assert(firstReasoning === null || firstReasoning <= ceiling, `Messages tool call reasoning tokens must be reported and stay within ${ceiling}.`);
   const use = first.content?.find((part: any) => part?.type === "tool_use");
   assert(use?.name === "read_file" && use.input?.path === "/tmp/e2e-reverse.ts", "Messages did not return the expected read_file tool call.");
+  const secondStarted = performance.now();
   const second = await bodyOf(await callCode(home, "/code/v1/messages", key, { model, max_tokens: 1500, messages: [{ role: "user", content: prompt }, { role: "assistant", content: first.content }, { role: "user", content: [{ type: "tool_result", tool_use_id: use.id, content: "export function reverseString(value: string): string { return [...value].reverse().join(''); }" }] }], tools: [MESSAGE_TOOL], tool_choice: { type: "auto" }, thinking: { type: "enabled", budget_tokens: ceiling } }), "messages tool result");
   assert(typeof second.model === "string" && knownModels.has(second.model), "Messages tool result model is not listed by /models.");
   const final = textFromMessages(second);
   assert(final.trim().length > 0, "Messages returned no final text after the tool result.");
   const { reasoningTokens, outputTokens } = usageOf(second);
   assert(reasoningTokens === null || reasoningTokens <= ceiling, `Messages tool round trip exceeded the ${ceiling} token reasoning ceiling.`);
-  measure("messages tool round trip", started, `tool read_file; ${outputTokens ?? "?"} output tokens`, outputTokens);
+  measure("messages tool result turn", secondStarted, `tool read_file; ${outputTokens ?? "?"} output tokens`, outputTokens);
 }
 
 async function run(): Promise<void> {
