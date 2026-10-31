@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { api } from "@/lib/api";
+import { api, ApiError, requestJson } from "@/lib/api";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -29,4 +29,16 @@ test("searchWebResults asks the Web tab's own route with the query encoded, and 
 
   expect(urls).toEqual(["/api/search/web-results?q=how%20to%20brew%20tea"]);
   expect(answer).toEqual({ results: [], note: "Web search is off for this household." });
+});
+
+test("requestJson returns the same 401 ApiError path as request", async () => {
+  globalThis.fetch = (async () => Response.json({ error: "Sign in again" }, { status: 401 })) as unknown as typeof fetch;
+  let error: unknown;
+  try {
+    await requestJson("/api/test");
+  } catch (caught) {
+    error = caught;
+  }
+  expect(error).toBeInstanceOf(ApiError);
+  expect(error).toMatchObject({ status: 401, message: "Sign in again" });
 });

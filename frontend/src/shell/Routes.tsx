@@ -463,8 +463,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
             <Route path="media/:id" element={<MediaLinkRedirect />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
-            <Route path="household" element={<Navigate to="/reminders" replace />} />
-            <Route path="household/coming-up" element={<Navigate to="/reminders" replace />} />
+          <Route path="household" element={<Navigate to="/reminders" replace />} />
+          <Route path="household/coming-up" element={<Navigate to="/reminders" replace />} />
             <Route path="reminders" element={<Suspense fallback={null}><RemindersPage /></Suspense>} />
             <Route path="reminders/coming-up" element={<Navigate to="/reminders" replace />} />
             <Route path="clock" element={<Suspense fallback={null}><ClockPage /></Suspense>} />

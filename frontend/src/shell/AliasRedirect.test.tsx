@@ -31,6 +31,14 @@ describe("AliasRedirect", () => {
     expect(landing("/conversations?filter=recent", "/conversations")).toBe("/chat?filter=recent&list=1");
   });
 
+  test.each([
+    ["/settings/models", "/settings/ai?tab=overview"],
+    ["/settings/users", "/settings/household?tab=people"],
+    ["/settings/voices", "/settings/home-voice?tab=voices"],
+  ])("sends %s directly to its final settings destination", (entry, expected) => {
+    expect(landing(entry, entry)).toBe(expected);
+  });
+
   test("a trailing slash on an alias still lands on the current route instead of redirecting to itself", () => {
     expect(landing("/settings/backups/?tab=household", "/settings/backups")).toBe("/backups?tab=household");
   });

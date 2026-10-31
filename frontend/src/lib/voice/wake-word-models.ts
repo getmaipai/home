@@ -6,6 +6,7 @@
 // (backend/src/routes/voice.ts's GET /api/voice/wakewords) rather than
 // hand-duplicating that list here - the backend already owns the
 // canonical set of pinned assets (backend/src/lib/wakewordAssets.ts).
+import { requestJson } from "@/lib/api";
 //
 // All detectors share two upstream ONNX stages (mel + embedding); only
 // the per-wake-word detector swaps.
@@ -73,9 +74,7 @@ let loaded = false;
 export async function loadInstalledWakewords(force = false): Promise<readonly WakeWordModelEntry[]> {
   if (loaded && !force) return listWakeWordModels();
   try {
-    const res = await fetch("/api/voice/wakewords", { credentials: "include" });
-    if (res.ok) {
-      const data = (await res.json()) as { detectors: { id: string; label: string; file: string }[] };
+    const data = await requestJson<{ detectors: { id: string; label: string; file: string }[] }>("/api/voice/wakewords");
       registerWakeWordModels(
         data.detectors.map((d) => ({
           id: d.id,
@@ -85,7 +84,6 @@ export async function loadInstalledWakewords(force = false): Promise<readonly Wa
         })),
       );
       loaded = true;
-    }
   } catch {
     /* offline -> keep the built-in default */
   }

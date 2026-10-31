@@ -1,5 +1,5 @@
 // COMPONENTS-01: Settings, Models and storage. Data only; nothing here draws. The routes are owner and admin only.
-import { ApiError } from "@/lib/api";
+import { requestJson } from "@/lib/api";
 
 export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "tools" | "loras";
 export interface ComponentRow {
@@ -25,18 +25,12 @@ export interface ComponentsOverview {
   free_disk_bytes: number | null; disk_margin_bytes: number; installed_bytes: number; components: ComponentRow[];
 }
 
-async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, { credentials: "include", ...init });
-  const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-  if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
-  return body as T;
-}
 
 export const componentsApi = {
-  list: () => send<ComponentsOverview>("/api/components"),
-  install: (id: string, acceptedLicence?: string) => send<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", ...(acceptedLicence ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ accepted_licence: acceptedLicence }) } : {}) }),
-  licences: () => send<LicenceOverview>("/api/install/licences"),
-  acceptLicences: () => send<{ accepted: true; auto_install: boolean }>("/api/install/licences/accept", { method: "POST" }),
-  installExtras: () => send<{ started: true; models: number }>("/api/install/licences/install-extras", { method: "POST" }),
-  uninstall: (id: string) => send<{ component: string; freed_bytes: number; removed: boolean }>(`/api/components/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  list: () => requestJson<ComponentsOverview>("/api/components"),
+  install: (id: string, acceptedLicence?: string) => requestJson<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", ...(acceptedLicence ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ accepted_licence: acceptedLicence }) } : {}) }),
+  licences: () => requestJson<LicenceOverview>("/api/install/licences"),
+  acceptLicences: () => requestJson<{ accepted: true; auto_install: boolean }>("/api/install/licences/accept", { method: "POST" }),
+  installExtras: () => requestJson<{ started: true; models: number }>("/api/install/licences/install-extras", { method: "POST" }),
+  uninstall: (id: string) => requestJson<{ component: string; freed_bytes: number; removed: boolean }>(`/api/components/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

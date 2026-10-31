@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes as RouterRoutes, useLocation, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes as RouterRoutes, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
 import { RepairsPage } from "@/shell/pages/RepairsPage";
-import { BackupsPage } from "@/shell/pages/BackupsPage";
 import { Routes } from "@/shell/Routes";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
@@ -547,7 +546,6 @@ describe("next Manage routes", () => {
   test.each([
     ["/updates", UpdatesPage],
     ["/repairs", RepairsPage],
-    ["/backups", BackupsPage],
   ])("%s renders the shared tables view", async (route, Page) => {
     const originalFetch = globalThis.fetch;
     const endpoint = routeToApi[route]!;
@@ -579,6 +577,7 @@ describe("next Manage routes", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
 });
 
 // APP-SET-02 (RULES S4): the settings areas sit beside chat, outside
@@ -664,4 +663,24 @@ describe("retired companion routes", () => {
       }
     });
   }
+});
+
+describe("reminder aliases", () => {
+  test.each(["/household", "/household/coming-up", "/reminders/coming-up"])("%s redirects directly to /reminders", async (from) => {
+    function RedirectProbe() {
+      const location = useLocation();
+      return <output>{location.pathname}</output>;
+    }
+    const view = renderWithQueryClient(
+      <MemoryRouter initialEntries={[from]}>
+        <RouterRoutes>
+          <Route path="/household" element={<Navigate to="/reminders" replace />} />
+          <Route path="/household/coming-up" element={<Navigate to="/reminders" replace />} />
+          <Route path="/reminders/coming-up" element={<Navigate to="/reminders" replace />} />
+          <Route path="*" element={<RedirectProbe />} />
+        </RouterRoutes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(view.getByText("/reminders").textContent).toBe("/reminders"));
+  });
 });

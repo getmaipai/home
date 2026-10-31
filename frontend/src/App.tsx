@@ -1,10 +1,12 @@
 import { Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes as RouterRoutes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes as RouterRoutes, Route, Navigate, useLocation } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
-import { AliasRedirect } from "@/shell/AliasRedirect";
+import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
+import { settingsPath } from "@/shell/pages/settings/settingsAreas";
+import type { SignedInPerson } from "@/lib/api";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { lazyNamed } from "@/shell/lazyNamed";
@@ -12,7 +14,7 @@ import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
-import { api, type SignedInPerson } from "@/lib/api";
+import { api } from "@/lib/api";
 import { nextMediaOwner, reconcileKept, setMediaOwner } from "@/lib/offlineMedia";
 import { SessionLockGate } from "@/shell/sessionLockContext";
 import { PreviewRuntime } from "@/apps/setup/preview/PreviewRuntime";
@@ -47,6 +49,28 @@ const Routes = lazyNamed(
 // One QueryClient for the app's lifetime (docs/plans/session-b-ui.md
 // step 3): created once, outside the component, not per render.
 const queryClient = createQueryClient();
+
+function AliasRedirect({ path, person }: { path: string; person: SignedInPerson | null | undefined }) {
+  const location = useLocation();
+  const canManageHousehold = person?.role === "owner" || person?.role === "admin";
+  const destinations: Record<string, string> = {
+    "/conversations": "/chat",
+    "/settings/users": settingsPath("household", "people"),
+    "/settings/backups": settingsPath("backups"),
+    "/settings/commands": settingsPath("home-voice", "commands"),
+    "/settings/devices": settingsPath("profile", "profile"),
+    "/settings/repairs": settingsPath("advanced"),
+    "/settings/updates": settingsPath("backups", "updates"),
+  };
+  const destination = destinations[path]
+    ?? (path === "/settings/models" ? retiredManagePageTarget("/models", { canManageHousehold }) : undefined)
+    ?? (path === "/settings/voices" ? retiredManagePageTarget("/voices", { canManageHousehold }) : undefined)
+    ?? path;
+  const params = new URLSearchParams(location.search);
+  if (path === "/conversations" && !params.has("list")) params.set("list", "1");
+  const query = params.size > 0 ? `?${params}` : "";
+  return <Navigate to={`${destination}${query}${location.hash}`} replace />;
+}
 
 // The root route is the migrated shell. Setup stays separate because it
 // must remain addressable before a household profile exists.
@@ -149,15 +173,15 @@ export function App() {
                         )
                       }
                     />
-                    <Route path="/conversations" element={<AliasRedirect />} />
-                    <Route path="/settings/users" element={<AliasRedirect />} />
-                    <Route path="/settings/models" element={<AliasRedirect />} />
-                    <Route path="/settings/backups" element={<AliasRedirect />} />
-                    <Route path="/settings/voices" element={<AliasRedirect />} />
-                    <Route path="/settings/commands" element={<AliasRedirect />} />
-                    <Route path="/settings/devices" element={<AliasRedirect />} />
-                    <Route path="/settings/repairs" element={<AliasRedirect />} />
-                    <Route path="/settings/updates" element={<AliasRedirect />} />
+                    <Route path="/conversations" element={<AliasRedirect path="/conversations" person={person} />} />
+                    <Route path="/settings/users" element={<AliasRedirect path="/settings/users" person={person} />} />
+                    <Route path="/settings/models" element={<AliasRedirect path="/settings/models" person={person} />} />
+                    <Route path="/settings/backups" element={<AliasRedirect path="/settings/backups" person={person} />} />
+                    <Route path="/settings/voices" element={<AliasRedirect path="/settings/voices" person={person} />} />
+                    <Route path="/settings/commands" element={<AliasRedirect path="/settings/commands" person={person} />} />
+                    <Route path="/settings/devices" element={<AliasRedirect path="/settings/devices" person={person} />} />
+                    <Route path="/settings/repairs" element={<AliasRedirect path="/settings/repairs" person={person} />} />
+                    <Route path="/settings/updates" element={<AliasRedirect path="/settings/updates" person={person} />} />
                     <Route
                       path="/*"
                       element={

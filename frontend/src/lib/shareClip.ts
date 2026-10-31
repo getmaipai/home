@@ -3,6 +3,8 @@
 // file is fetched ahead (when the card shows the clip) and `shareClip` starts `navigator.share` without awaiting
 // anything first. A browser that cannot share files (most desktop Firefox and Chrome on Linux) gets the fallback:
 // Home's own share page for the file.
+import { requestJson } from "@/lib/api";
+
 export interface ShareNavigator {
   canShare?: (data: { files?: File[]; title?: string }) => boolean;
   share?: (data: { files?: File[]; title?: string }) => Promise<void>;
@@ -21,10 +23,8 @@ export function fileNameFrom(disposition: string | null, fallback: string): stri
 /** Fetches the file ahead of the click (a clip's messaging copy, or a song with `type: "audio/mp4"`). */
 export async function prepareClip(url: string, signal?: AbortSignal, options: { type?: string; name?: string } = {}): Promise<PreparedClip> {
   const type = options.type ?? "video/mp4";
-  const res = await fetch(url, { credentials: "include", ...(signal ? { signal } : {}) });
-  if (!res.ok) throw new Error(`clip ${res.status}`);
-  const blob = await res.blob();
-  return { blob: blob.type === type ? blob : new Blob([blob], { type }), name: fileNameFrom(res.headers.get("content-disposition"), options.name ?? "video.mp4") };
+  const { blob, disposition } = await requestJson<{ blob: Blob; disposition: string | null }>(url, { ...(signal ? { signal } : {}) });
+  return { blob: blob.type === type ? blob : new Blob([blob], { type }), name: fileNameFrom(disposition, options.name ?? "video.mp4") };
 }
 
 /** Call from the click handler. Synchronous up to `navigator.share`; the fallback runs when sharing a file is not possible or fails for a reason other than the person closing the sheet. */
