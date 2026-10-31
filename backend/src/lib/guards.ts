@@ -1256,7 +1256,7 @@ export const ACTION_FAMILIES: readonly ActionFamily[] = [
     // list."), never inside a third-person report ("Bruno already added
     // eggs to the list, so ...").
     status: new RegExp(`${START}(?:added|put)\\b[^.!?]{0,40}\\b(?:to|on)\\b[^.!?]{0,20}\\blist\\b|${START}[a-z' ]{1,30}? (?:is )?added to (?:your|the) list\\b|\\b(?:that's|it's|is|are|[a-z]+'s) (?:now )?on (?:your|the) list\\b`, "i"),
-    packages: ["list-add"],
+    packages: ["remind", "list-add"],
     none: "I haven't added anything to your list.",
     failed: "Adding that to your list didn't work.",
     note: "[Nothing was added to the list.]",

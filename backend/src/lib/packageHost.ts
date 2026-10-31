@@ -85,6 +85,8 @@ import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
+import { runListAction } from "@/lib/listActions";
+import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { recordUndo } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
@@ -1987,6 +1989,14 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
+interface RemindListCall { action: "add_items" | "show_list"; text: string }
+
+/** `list:add_items:milk` or `list:show_list:shopping list`, as plugins.ts folds a list phrase into remind's op text. */
+function parseRemindListCall(text: string): RemindListCall | null {
+  const match = /^list:(add_items|show_list):([\s\S]*)$/.exec(text);
+  return match ? { action: match[1] as RemindListCall["action"], text: match[2]!.trim() } : null;
+}
+
 export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean; band?: AgeBand } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
@@ -1994,6 +2004,37 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
     if (!hasPermission(perm)) {
       throw new HostError("permission_denied", `${manifest.id} did not declare permission ${perm}`);
     }
+  }
+
+  // ASSIST-LISTS-01: the shopping-list phrases reach `remind` as a structured action folded into the op text
+  // ("list:add_items:milk", written by plugins.ts from the pattern's `action`), the way `alarm` folds its action.
+  // The list action engine does the work; the reply wording stays list-add's and list-view's.
+  function runRemindListCall(call: RemindListCall): { task: string; when_text: string; action: string } {
+    const band = runtime.band ?? speakerAgeBand(actor, new Date());
+    const list = findOrCreateStandingList("shopping");
+    if (call.action === "add_items") {
+      requirePermission("lists:write");
+      const result = runListAction(actor, band, { action: "add_items", list: "shopping", items: [call.text] });
+      if (!result.ok) throw new HostError("invalid_input", result.reply);
+      recordToolAudit({ personId: actor.id, tool: "lists", action: "add_items", decision: "do", band });
+      const itemId = result.itemIds?.[0];
+      if (itemId) {
+        recordUndo({ personId: actor.id, turnId: turn?.id, tool: manifest.id, action: "add_items", inverse: { kind: "remove_item", listId: list.id, itemId } });
+      }
+      if (runtime.capture) runtime.capture.listReply = `Added ${call.text} to your shopping list.`;
+      return { task: "", when_text: "", action: "list" };
+    }
+    requirePermission("lists:read");
+    const result = runListAction(actor, band, { action: "show_list", list: "shopping" });
+    if (!result.ok) throw new HostError("invalid_input", result.reply);
+    recordToolAudit({ personId: actor.id, tool: "lists", action: "show_list", decision: "do", band });
+    const shown = findOrCreateStandingList("shopping");
+    const items = (JSON.parse(shown.items) as { id: string; text: string; done: boolean }[]).filter((item) => !item.done);
+    if (runtime.capture) {
+      runtime.capture.listItems = items.map((item) => ({ id: item.id, text: item.text }));
+      runtime.capture.listReply = items.length > 0 ? items.map((item) => item.text).join(", ") : "Your shopping list is empty.";
+    }
+    return { task: "", when_text: "", action: "list" };
   }
 
   // capability_missing is the closest fit errors.json has ("A required
@@ -2551,6 +2592,10 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         action: string;
         undo_id?: string;
       } {
+        if (manifest.id === "remind") {
+          const listCall = parseRemindListCall(text);
+          if (listCall) return runRemindListCall(listCall);
+        }
         requirePermission("reminders:write");
         if (manifest.id === "alarm") return handleAlarmChat(actor, text);
         const parsed = parseReminder(text);

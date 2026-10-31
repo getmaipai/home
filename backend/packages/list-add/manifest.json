@@ -16,7 +16,7 @@
       "add paper towels to the shopping list",
       "add dog food to the shopping list"
     ],
-    "patterns": ["add * to the shopping list", "add * to my shopping list", "put * on the shopping list"]
+    "patterns": []
   },
   "args": {
     "type": "object",

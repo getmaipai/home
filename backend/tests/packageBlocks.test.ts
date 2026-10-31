@@ -51,9 +51,9 @@ const proposal = (tool: string, args: Record<string, unknown>, callId: string): 
 
 describe("GENUI-05: the manifests name the kinds they return", () => {
   test.each([
-    ["remind", ["schedule_card"]],
+    ["remind", ["schedule_card", "confirmation", "todo_list"]],
     ["alarm", ["schedule_card"]],
-    ["timer", ["schedule_card"]],
+    ["timer", ["schedule_card", "confirmation"]],
     ["list-view", ["todo_list"]],
   ])("%s declares returns_blocks %p", (id, kinds) => {
     expect(allowed(id)).toEqual(kinds);
@@ -64,7 +64,9 @@ describe("GENUI-05: remind, alarm and timer return a schedule_card", () => {
   test("remind: a valid card built from the reminder the run just scheduled, reply unchanged", async () => {
     const value = await run("remind", people.owner, { expression: "at 6 to call Nadia" });
     expect(value.reply?.text).toContain("call Nadia");
-    expect(value.blocks).toHaveLength(1);
+    // The card, then the Undo receipt ASSIST-UNDO-01 added.
+    expect(value.blocks).toHaveLength(2);
+    expect((value.blocks![1] as Block).kind).toBe("confirmation");
     const block = value.blocks![0] as Block;
     expect(AnswerBlock.safeParse(block).success).toBe(true);
     expect(block.kind).toBe("schedule_card");
@@ -78,7 +80,8 @@ describe("GENUI-05: remind, alarm and timer return a schedule_card", () => {
 
   test("timer: a valid card with the label and the exact time of the timer", async () => {
     const value = await run("timer", people.owner, { expression: "ten minutes" });
-    expect(value.blocks).toHaveLength(1);
+    expect(value.blocks).toHaveLength(2);
+    expect((value.blocks![1] as Block).kind).toBe("confirmation");
     const block = value.blocks![0] as Block;
     expect(AnswerBlock.safeParse(block).success).toBe(true);
     expect(block.kind).toBe("schedule_card");
@@ -126,13 +129,17 @@ describe("GENUI-05: list-view returns a todo_list", () => {
 describe("GENUI-05: the age filter GENUI-02 applies reaches these blocks", () => {
   test("a card whose text fails the output floor is dropped for a child, a teen and an adult; min_band holds the rest", async () => {
     const unsafe = await run("remind", people.owner, { expression: `at 6 to ${UNSAFE}` });
-    expect(unsafe.blocks).toHaveLength(1);
+    // The card and the Undo receipt; the receipt's own sentence is safe, so only the card is dropped.
+    expect(unsafe.blocks).toHaveLength(2);
     const actor = { displayName: "Sage" };
     const kinds = allowed("remind");
-    for (const band of ["child", "teen", "adult"] as const) expect(filterAnswerBlocks(unsafe.blocks, "remind", kinds, band, actor)).toEqual([]);
+    for (const band of ["child", "teen", "adult"] as const) {
+      const kept = filterAnswerBlocks(unsafe.blocks, "remind", kinds, band, actor) as Block[];
+      expect(kept.map((block) => block.kind)).toEqual(["confirmation"]);
+    }
     // A safe card keeps for every band, and the age band gate GENUI-02 applies (min_band) reaches it.
     const safe = (await run("remind", people.owner, { expression: "at 6 to call Nadia" })).blocks as Block[];
-    for (const band of ["child", "teen", "adult"] as const) expect(filterAnswerBlocks(safe, "remind", kinds, band, actor)).toHaveLength(1);
+    for (const band of ["child", "teen", "adult"] as const) expect(filterAnswerBlocks(safe, "remind", kinds, band, actor)).toHaveLength(2);
     const adultOnly = [{ ...safe[0], id: "blk-adultonly1", min_band: "adult" }];
     expect(filterAnswerBlocks(adultOnly, "remind", kinds, "child", actor)).toEqual([]);
     expect(filterAnswerBlocks(adultOnly, "remind", kinds, "adult", actor)).toHaveLength(1);
@@ -150,7 +157,9 @@ describe("GENUI-05: the age filter GENUI-02 applies reaches these blocks", () =>
     const { output } = await toolNode(state, { proposals: [proposal("remind", { expression: `at 6 to ${UNSAFE}` }, "call-r1")] }, SIGNAL);
     expect(output.outcomes[0]?.status).toBe("succeeded");
     expect(output.outcomes[0]?.result?.reply?.text).toContain("remind you");
-    expect(output.toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result"]);
+    // The unsafe card is dropped; the Undo receipt's own sentence is safe and stays.
+    expect(output.toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result", "block"]);
+    expect((output.toolEvents[2] as { block: Block }).block.kind).toBe("confirmation");
   });
 });
 
@@ -158,7 +167,7 @@ describe("GENUI-05: the blocks ride the turn's tool events", () => {
   test("the tool round: tool_call, tool_result, then the schedule_card block, each valid on the wire", async () => {
     const state = toolState(people.owner);
     const { output } = await toolNode(state, { proposals: [proposal("timer", { expression: "ten minutes" }, "call-t1")] }, SIGNAL);
-    expect(output.toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result", "block"]);
+    expect(output.toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result", "block", "block"]);
     for (const event of output.toolEvents) expect(WireEvent.safeParse(event).success).toBe(true);
     const block = output.toolEvents[2] as { t: "block"; call_id: string; block: Block };
     expect(block.call_id).toBe("call-t1");
@@ -174,7 +183,7 @@ describe("GENUI-05: the blocks ride the turn's tool events", () => {
     expect(output.blockEvents).toHaveLength(1);
     const event = output.blockEvents![0] as { t: "block"; call_id: string; block: Block };
     expect(WireEvent.safeParse(event).success).toBe(true);
-    expect(event.call_id).toBe("pattern:list-view");
+    expect(event.call_id).toBe("pattern:remind");
     expect(event.block.kind).toBe("todo_list");
     expect(event.block.props.items[0].text).toBe("eggs");
   });

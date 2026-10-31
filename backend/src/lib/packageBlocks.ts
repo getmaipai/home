@@ -21,6 +21,8 @@ import { undoPropsFor } from "@/lib/toolUndo";
 export interface BlockCapture {
   /** The open rows of the shopping list, as list-view read them. */
   listItems?: { id: string; text: string }[];
+  /** The reply a shopping-list phrase run through `remind` gives; plugins.ts uses it in place of the reminder reply. */
+  listReply?: string;
 }
 
 type RecipeResult = { reply?: { text: string }; data?: Record<string, unknown> };
@@ -287,6 +289,10 @@ export function blocksForRecipeRun(
   const provenance = `${manifest.id} result${turnId ? ` in turn ${turnId}` : ""}`;
   switch (manifest.id) {
     case "remind": {
+      // A shopping-list phrase run through remind: the list's block, never a reminder card.
+      if (capture.listReply !== undefined) {
+        return capture.listItems && allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems) : [];
+      }
       const blocks = allowed.includes("schedule_card")
         ? scheduleCard(
             manifest.id,
@@ -348,6 +354,7 @@ export function blocksForRecipeRun(
       return blocks;
     }
     case "list-view":
+    case "remind":
       return allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems ?? []) : [];
     case "weather":
       return weatherBlocks(manifest.id, provenance, result.data, undefined, allowed.includes("weather_card")).filter((block) => allowed.includes(String(block.kind)));

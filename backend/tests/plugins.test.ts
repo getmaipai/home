@@ -196,7 +196,7 @@ describe("the bundled step-8 packages (lists, reminders, timers)", () => {
   const cases: [string, string[]][] = [
     ["list-add", ["lists:write"]],
     ["list-view", ["lists:read"]],
-    ["remind", ["reminders:write"]],
+    ["remind", ["reminders:write", "lists:write", "lists:read"]],
     ["timer", ["timers:write"]],
   ];
   for (const [id, permissions] of cases) {

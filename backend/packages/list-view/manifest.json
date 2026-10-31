@@ -16,7 +16,7 @@
       "read me the shopping list",
       "what's on my shopping list today"
     ],
-    "patterns": ["what's on my shopping list", "what's on the shopping list", "what do i need to buy"]
+    "patterns": []
   },
   "incognito": "unaffected",
   "requires": [],

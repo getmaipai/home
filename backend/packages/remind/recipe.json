@@ -1,8 +1,8 @@
 {
   "id": "remind",
-  "inputs": [{ "name": "expression", "selector": "text" }],
+  "inputs": [{ "name": "action", "selector": "text" }, { "name": "expression", "selector": "text" }],
   "steps": [
-    { "op": "remind", "as": "reminder", "text": "{expression}" },
+    { "op": "remind", "as": "reminder", "text": "{action}{expression}" },
     { "op": "pick", "as": "task", "from": "reminder", "path": "task" },
     { "op": "pick", "as": "when_text", "from": "reminder", "path": "when_text" },
     { "op": "pick", "as": "undo_id", "from": "reminder", "path": "undo_id" },

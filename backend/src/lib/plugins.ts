@@ -531,6 +531,13 @@ export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>,
 /** Weather with no place to look up. Mirrors the almanac's set-the-home-place note. */
 export const WEATHER_NO_PLACE_NOTE = "I don't know where you are yet, so I can't look up the weather. Tell me a city, or an owner or admin can set the Home location in Settings.";
 
+/** ASSIST-LISTS-01: remind's shopping-list phrases carry a structured `action` the recipe folds into the op text
+ * ("list:add_items:milk"), as `alarm` folds its action. A plain reminder carries none, so its op text is unchanged. */
+function remindInputs(inputs: Record<string, unknown>): Record<string, unknown> {
+  const { action, list: _list, items: _items, ...rest } = inputs;
+  return action === "add_items" || action === "show_list" ? { ...rest, action: `list:${action}:` } : { ...rest, action: "" };
+}
+
 /** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-
  * and-store.md step 5) Tier 1's Deno sandbox - for `actor`, checking
  * min_role first (4.9: the floor role a person needs to invoke this
@@ -577,6 +584,7 @@ export async function runPlugin(
   }
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
+  if (id === "remind") inputs = remindInputs(inputs);
   // NAT-01 bench seam (benchSampling.ts): null outside a bench, so a real call falls through.
   const seeded = seededOutcomeFor(id);
   if (seeded) return { ok: true, value: seeded };
@@ -658,6 +666,11 @@ export async function runPlugin(
   const host = createHost(actor, options.uncached ? { ...manifest, cache: undefined } : manifest, [], turn, { ...options, capture });
   try {
     const value = await runRecipe(recipe, options.hostInputs ? { ...inputs, ...options.hostInputs } : inputs, host);
+    // ASSIST-LISTS-01: a shopping-list phrase run through remind answers in the list's own words, not a reminder's.
+    if (id === "remind" && capture.listReply !== undefined) {
+      value.reply = { text: capture.listReply, speech: capture.listReply };
+      value.data = { action: "list" };
+    }
     // The package's blocks come from this run's own data; a failure to build
     // one never changes the reply (the blocks are an addition to it).
     let blocks: Record<string, unknown>[] = [];

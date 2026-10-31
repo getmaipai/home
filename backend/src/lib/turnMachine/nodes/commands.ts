@@ -43,6 +43,13 @@ export type CommandsOutput =
 const ALARM_UNKNOWN_SPEAKER = "I can't set an alarm because I can't tell who is asking. Ask me in the app, where you're signed in.";
 const ALARM_FAILED = "I couldn't set that alarm. Please try again.";
 
+/** `add_items` or `show_list` for one of remind's shopping-list patterns, else null (a plain reminder). */
+function remindListAction(pattern: string): "add_items" | "show_list" | null {
+  if ((pattern.startsWith("add ") || pattern.startsWith("put ")) && pattern.endsWith(" shopping list")) return "add_items";
+  if (pattern.startsWith("what's on ") || pattern.startsWith("what do i need to buy")) return "show_list";
+  return null;
+}
+
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
   // INITIATIVE-01: the answer to a robot offer comes first; the prepared text is the reply and no model runs.
   if (state.offer) {
@@ -162,7 +169,14 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
           continue;
         }
       }
-      const args = id === "alarm"
+      // ASSIST-LISTS-01: the shopping-list phrases belong to `remind`; the builder maps them to a structured list action.
+      const listAction = id === "remind" ? remindListAction(pattern) : null;
+      const listArgs = listAction === "add_items"
+        ? { action: listAction, list: "shopping", items: [captured.trim()], expression: captured.trim() }
+        : { action: listAction, list: "shopping", expression: "shopping list" };
+      const args = listAction
+        ? listArgs
+        : id === "alarm"
         ? {
             action: pattern.startsWith("cancel ") ? "cancel" : pattern.startsWith("what ") ? "list" : "set",
             expression: captured,

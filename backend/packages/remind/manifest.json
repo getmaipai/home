@@ -15,9 +15,21 @@
       "remind me tomorrow at noon to walk the dog",
       "remind me tonight at 8 to take out the trash",
       "remind me in an hour to check the oven",
-      "remind me at 9am to leave for work"
+      "remind me at 9am to leave for work",
+      "add milk to the shopping list",
+      "put milk on the shopping list",
+      "what's on my shopping list",
+      "what do I need to buy"
     ],
-    "patterns": ["remind me *"]
+    "patterns": [
+      "remind me *",
+      "add * to the shopping list",
+      "add * to my shopping list",
+      "put * on the shopping list",
+      "what's on my shopping list",
+      "what's on the shopping list",
+      "what do i need to buy"
+    ]
   },
   "args": {
     "type": "object",
@@ -33,10 +45,10 @@
   "min_role": "child",
   "consequential": false,
   "offline": "full",
-  "returns_blocks": ["schedule_card", "confirmation"],
+  "returns_blocks": ["schedule_card", "confirmation", "todo_list"],
   "config": [],
   "data_sources": [],
-  "permissions": ["reminders:write"],
+  "permissions": ["reminders:write", "lists:write", "lists:read"],
   "notifications": [
     {
       "id": "remind.due",
@@ -49,7 +61,9 @@
   ],
   "backup": "exclude",
   "background": false,
-  "contributes": {},
+  "contributes": {
+    "widgets": [{ "id": "shopping", "title": "Shopping List", "size": "card", "refresh_s": 60, "inputs": { "action": "show_list", "expression": "shopping list" } }]
+  },
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",
