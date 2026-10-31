@@ -58,7 +58,6 @@ import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pic
 import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { getOfferedVoices, voiceMatchesLanguage } from "@/lib/voiceResolve";
-import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
 import { roleHealth } from "@/lib/roleHealth";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
