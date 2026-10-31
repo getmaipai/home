@@ -7,6 +7,7 @@ import { api, type Roster } from "@/lib/api";
 import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
 import { AMBIENT_QUICK_ACTIONS, ambientHistoryItems, ambientQuickActionPrompt, ambientQuickActionsForApp, createAmbientAskQueue, isProtectedReply, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import type { useSideChat } from "@/shell/useSideChat";
+import { useSideChat as useRealSideChat } from "@/shell/useSideChat";
 import { Suggestions } from "@maipai/ui/src/elements/suggestions";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { assistantStreamWriter, ASSISTANT_STREAM_HEADERS } from "../../tests/assistantStreamBody";
@@ -90,12 +91,47 @@ describe("ambient companion pane controls", () => {
     const find = mock(async () => ({ id: "command-1" } as never));
     api.findRobot = find as never;
     try {
-      const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
-      const { result } = renderHook(() => usePane(side, noop, undefined, { id: "robot-1", name: "Rover", online: false }), { wrapper });
-      const view = render(<>{result.current.headerActions}</>, { wrapper });
-      fireEvent.click(view.getByRole("button", { name: "Find me Rover" }));
+      const { result } = renderHook(() => {
+        const realSide = useRealSideChat(person, "companion-1", false, undefined, undefined, "robot-1");
+        return usePane(realSide, noop, undefined, { id: "robot-1", name: "Rover", online: false });
+      }, { wrapper });
+      expect(result.current.title).toBe("Rover");
+      expect(render(<>{result.current.headerActions}</>, { wrapper }).queryByRole("button", { name: "Find me Rover" })).toBeNull();
+      const view = render(<>{result.current.companionTab.content}</>, { wrapper });
+      const button = view.getByRole("button", { name: "Find me" });
+      expect(button.closest('[data-slot="companion-stage-actions"]')).toBeTruthy();
+      expect(view.queryByText("Rover", { selector: "p" })).toBeNull();
+      fireEvent.click(button);
       await waitFor(() => expect(find).toHaveBeenCalledWith("robot-1"));
     } finally { api.findRobot = original; }
+  });
+
+  test("bot Settings has one robot settings link for owners and admins only and labels the picker", async () => {
+    const originals = { companions: api.companions, robotDevices: api.robotDevices };
+    api.companions = async () => ({ companions: [{ id: "companion-1", name: "Companion" }] } as never);
+    api.robotDevices = async () => [];
+    try {
+      const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
+      const ownerPerson = { ...person, role: "owner" } as Roster;
+      const { result, rerender } = renderHook(() => useAmbientCompanionPane({ person: ownerPerson, companionName: "Rover", companionId: "companion-1", avatar: null, bot: { id: "robot-1", name: "Rover" } as never, incognito: false, state: { open: true, pinned: false }, onStateChange: noop, onContinue: noop, onRing: noop, side }), { wrapper });
+      act(() => result.current.onActiveTabChange("settings"));
+      const settings = result.current.tabs.find((tab) => tab.id === "settings")!.content;
+      const view = render(<>{settings}</>, { wrapper });
+      expect(view.getByText("Companion or bot")).toBeTruthy();
+      const link = await view.findByRole("link", { name: "Robot settings" });
+      expect(link.getAttribute("href")).toBe("/settings/devices");
+      expect(view.getAllByRole("link")).toHaveLength(1);
+      const adminPerson = { ...person, role: "admin" } as Roster;
+      cleanup();
+      const admin = renderHook(() => useAmbientCompanionPane({ person: adminPerson, companionName: "Rover", companionId: "companion-1", avatar: null, bot: { id: "robot-1", name: "Rover" } as never, incognito: false, state: { open: true, pinned: false }, onStateChange: noop, onContinue: noop, onRing: noop, side }), { wrapper });
+      const adminView = render(<>{admin.result.current.tabs.find((tab) => tab.id === "settings")!.content}</>, { wrapper });
+      expect(await adminView.findByRole("link", { name: "Robot settings" })).toBeTruthy();
+      cleanup();
+      void rerender;
+    } finally {
+      api.companions = originals.companions;
+      api.robotDevices = originals.robotDevices;
+    }
   });
 
   test("Settings links to companion voice, appearance and presence pages and saves the selected companion", async () => {
