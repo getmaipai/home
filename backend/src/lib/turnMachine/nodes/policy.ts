@@ -25,6 +25,7 @@ import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
 import { brakeFor, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { recordToolAudit } from "@/lib/toolAudit";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -509,6 +510,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         const mode: BrakeMode = rawMode === "ask" || rawMode === "never" ? rawMode : "do";
         const itemCount = typeof args.itemCount === "number" ? args.itemCount : typeof args.item_count === "number" ? args.item_count : undefined;
         const brake = brakeFor({ tool: call.tool as BrakeTool, action, args, itemCount, actor: { id: state.actor.id, role: String(state.actor.role), band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) }, listScope: scope, tainted: state.context.some((item) => item.source === "search_result" || item.source === "page"), mode });
+        const auditBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
+        recordToolAudit({ personId: state.actor.id, tool: call.tool, action, decision: brake.decision, band: auditBand });
         if (brake.reason === "parent_required") {
           noteRefusal("parent_required");
           entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });

@@ -1,3 +1,5 @@
+import { createBenchPeople } from "../../scripts/bench/conversationRunner";
+import { listOwnToolAudit } from "@/lib/toolAudit";
 // U2 (the owner's ruling, state record "Grounding, stated exactly",
 // 2a28e4e8): argsGrounded() is term-level, not substring, after a live
 // run caught the substring version refusing every real, naturally-
@@ -237,9 +239,12 @@ describe("policyNode: structured brake confirmation", () => {
   test("an adult removal of more than five items parks confirm_needed", async () => {
     const original = loadManifestOnly("remind");
     if (!original.ok) throw new Error("remind manifest failed to load");
-    const state = { actor: { id: "adult-1", role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "move several things" } as unknown as TurnState;
+    resetDb();
+    const owner = createBenchPeople().owner;
+    const state = { actor: { id: owner.id, role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "move several things" } as unknown as TurnState;
     const outcome = await policyNode(state, { calls: [{ id: "call-1", tool: "remind", args: { action: "move", itemCount: 6 } }] }, new AbortController().signal);
     expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "confirm_needed" });
+    expect(listOwnToolAudit(owner.id, 5)).toMatchObject([{ tool: "remind", action: "move", decision: "ask" }]);
   });
 });
 

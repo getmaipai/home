@@ -74,6 +74,7 @@ import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, settleAnswerBlocks, settleAnswe
 import { reAskForShowImages } from "./nodes/model";
 import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
+import { recordToolAudit } from "@/lib/toolAudit";
 import { readLook } from "@/lib/companionLook";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
 import type { GateDecision } from "@/lib/gate/types";
@@ -528,6 +529,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const isFormAsk = pendingAsk?.kind === "ask" && pendingAsk.fields !== undefined;
   if (askAnswer && (!pendingAsk || pendingAsk.turnId !== askAnswer.turn_id || ("values" in askAnswer) !== isFormAsk)) {
     return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
+  }
+  if (askAnswer && pendingAsk?.kind === "confirm" && "approved" in askAnswer) {
+    recordToolAudit({ personId: actor.id, tool: pendingAsk.packageId ?? "unknown", action: typeof pendingAsk.args.action === "string" ? pendingAsk.args.action : "unknown", decision: askAnswer.approved ? "answered_yes" : "answered_no", band });
   }
   let resumedFormProposal: ActionProposal | undefined;
   if (fieldAnswer && pendingAsk?.fields) {

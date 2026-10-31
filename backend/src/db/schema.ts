@@ -2288,3 +2288,14 @@ export const worldPlaces = sqliteTable("world_places", {
 export const quickTimers = sqliteTable("quick_timers", {
   id: text("id").primaryKey(), person: text("person").notNull().references(() => people.id), name: text("name").notNull(), minutes: integer("minutes").notNull(), position: integer("position").notNull(), source: text("source").notNull(), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), deletedAt: text("deleted_at"), hlc: text("hlc").notNull(), defaultsInitialized: integer("defaults_initialized", { mode: "boolean" }).notNull().default(false),
 });
+
+export const toolAudit = sqliteTable("tool_audit", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  tool: text("tool").notNull(),
+  action: text("action").notNull(),
+  decision: text("decision").notNull(),
+  band: text("band").notNull(),
+  count: integer("count").notNull().default(1),
+  at: text("at").notNull(),
+}, (table) => [index("tool_audit_person_at_idx").on(table.personId, table.at)]);
