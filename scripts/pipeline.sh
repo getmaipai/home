@@ -262,5 +262,17 @@ case "${1:-}" in
     else rm -f "$watch_pidfile"; echo "watcher already stopped"; fi
     (( failed == 0 ))
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | start | stop | install-service [--load] | uninstall-service"; exit 2 ;;
+  stack)
+    # The Stack holds the chat engine (about 32 GB) and picture workers; while the queue is deep and nobody uses the app,
+    # stopping it frees memory and CPU for landings and the watcher. MAIPAI_STACK_LABEL / MAIPAI_STACK_PLIST are test seams.
+    stack_label="${MAIPAI_STACK_LABEL:-com.maipai.stack}"; stack_plist="${MAIPAI_STACK_PLIST:-$agents_dir/com.maipai.stack.plist}"; stack_uid="$(id -u)"
+    stack_loaded() { "$launchctl_cmd" print "gui/$stack_uid/$stack_label" >/dev/null 2>&1; }
+    case "${2:-status}" in
+      off) if stack_loaded; then "$launchctl_cmd" bootout "gui/$stack_uid/$stack_label" && echo "stack stopped; bring it back with: bash scripts/pipeline.sh stack on"; else echo "stack already stopped"; fi ;;
+      on) if stack_loaded; then echo "stack already running"; else "$launchctl_cmd" bootstrap "gui/$stack_uid" "$stack_plist" && echo "stack started"; fi ;;
+      status) if stack_loaded; then echo "stack: running"; else echo "stack: stopped"; fi ;;
+      *) error "usage: bash scripts/pipeline.sh stack off | on | status"; exit 2 ;;
+    esac
+    ;;
+  *) error "usage: bash scripts/pipeline.sh status | start | stop | stack off|on|status | install-service [--load] | uninstall-service"; exit 2 ;;
 esac

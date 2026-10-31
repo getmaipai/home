@@ -202,6 +202,7 @@ A pin that lands without its tag worktree makes the watcher red on unrelated tes
 | `main:` is red | `watch/reds/<sha>.md` names the culprit and the failing files. Fix forward; nothing is reverted automatically. |
 | A ship failed | It rolled back and said so. Read `ship/<time>-<sha7>.log`; the hub is on the previous tag. |
 | Daemon runs old code | `pipeline.sh status` says "older than origin/main": restart it with the `pipeline.sh` from `origin/main` (section 8). |
+| Queue deeper than 5 or the watcher says `stalled`, and nobody is using the app | `bash scripts/pipeline.sh stack off` stops the Stack (its chat engine holds about 32 GB), which frees memory and CPU for landings and the watcher. Bring it back with `stack on` before a ship's post-checks, an eval or a chat check, and say so in the session that needs it. `stack status` shows which. The owner's call whenever the family is using the hub. |
 | Leftover temp directories | They sweep themselves; a manual clean is safe for `maipai-run-*` directories older than two hours whose pid is gone. |
 
 ## 14. Test suite facts
