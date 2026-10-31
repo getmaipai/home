@@ -4,6 +4,7 @@
 import { createAlarm, deleteAlarm, listAlarms } from "@/lib/alarms";
 import { parseAlarmRequest } from "@/lib/reminderParsing";
 import { cancelJob, listJobs, scheduleCoreJob } from "@/lib/scheduler";
+import type { UndoInverse } from "@/lib/toolUndo";
 import type { PersonRow } from "@/types";
 
 export interface AlarmChatResult {
@@ -11,6 +12,8 @@ export interface AlarmChatResult {
   schedule_task?: string;
   when_text: string;
   action: string;
+  /** How to reverse a set or a cancel: ids only. */
+  undo?: { action: string; inverse: UndoInverse };
 }
 
 type Mapped = { kind: "record" | "job"; id: string; label: string; minutes: number | null; line: string };
@@ -109,7 +112,15 @@ function cancelAlarmAnswer(actor: PersonRow, query: string): AlarmChatResult {
   const done = target.kind === "record" ? deleteAlarm(actor, target.id) : cancelJob(actor, target.id);
   if (!done.ok) return { task: "There is nothing matching that to cancel.", when_text: "", action: "cancel" };
   const noun = target.line.startsWith("Reminder") ? "Reminder" : "Alarm";
-  return { task: `${noun} cancelled: ${target.label || "Alarm"}.`, when_text: "", action: "cancel" };
+  const inverse: UndoInverse = target.kind === "record"
+    ? { kind: "restore_alarm", alarmId: target.id }
+    : { kind: "restore_reminder", id: target.id };
+  return {
+    task: `${noun} cancelled: ${target.label || "Alarm"}.`,
+    when_text: "",
+    action: "cancel",
+    undo: { action: "cancel_alarm", inverse },
+  };
 }
 
 function setAlarmAnswer(actor: PersonRow, request: string): AlarmChatResult {
@@ -121,11 +132,23 @@ function setAlarmAnswer(actor: PersonRow, request: string): AlarmChatResult {
     const made = createAlarm(actor, { time, days: parsed.days, label });
     if (!made.ok) return { task: "I couldn't set that alarm. Please try again.", when_text: "", action: "set" };
     const when = `${daysPhrase(parsed.days)} at ${clockText(time)}`;
-    return { task: `Okay, alarm set: ${parsed.task} (${when}).`, schedule_task: parsed.task, when_text: when, action: "set" };
+    return {
+      task: `Okay, alarm set: ${parsed.task} (${when}).`,
+      schedule_task: parsed.task,
+      when_text: when,
+      action: "set",
+      undo: { action: "set_alarm", inverse: { kind: "remove_alarm", alarmId: made.value.id } },
+    };
   }
   const scheduled = scheduleCoreJob(actor, "alarms.fire", parsed.when, { task: parsed.task });
   if (!scheduled.ok) return { task: "I couldn't set that alarm. Please try again.", when_text: "", action: "set" };
-  return { task: `Okay, alarm set: ${parsed.task} (${parsed.when_text}).`, schedule_task: parsed.task, when_text: parsed.when_text, action: "set" };
+  return {
+    task: `Okay, alarm set: ${parsed.task} (${parsed.when_text}).`,
+    schedule_task: parsed.task,
+    when_text: parsed.when_text,
+    action: "set",
+    undo: { action: "set_alarm", inverse: { kind: "cancel_reminder", id: scheduled.value.id } },
+  };
 }
 
 export function handleAlarmChat(actor: PersonRow, text: string): AlarmChatResult {

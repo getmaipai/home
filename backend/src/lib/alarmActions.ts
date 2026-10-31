@@ -4,10 +4,11 @@
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { Alarm } from "@maipai/spec/gen/ts/alarm.js";
 import { clockText, daysPhrase } from "@/lib/alarmChat";
-import { deleteAlarm, listAlarms, skipNext, updateAlarm } from "@/lib/alarms";
+import { alarmStateOf, deleteAlarm, listAlarms, skipNext, updateAlarm } from "@/lib/alarms";
 import { fuzzy } from "@/lib/listResolver";
 import { parseAlarmRequest } from "@/lib/reminderParsing";
 import { tokenize, wordsOf } from "@/lib/text";
+import type { UndoInverse } from "@/lib/toolUndo";
 import type { PersonRow } from "@/types";
 
 export const ALARM_ACTION_NAMES = ["edit_alarm", "enable_alarm", "disable_alarm", "skip_next_alarm", "delete_alarm"] as const;
@@ -22,6 +23,8 @@ export interface AlarmActionResult {
   schedule_task?: string;
   /** True when the alarm engine did the change; false for a question or a refusal. */
   done: boolean;
+  /** How to put the alarm back, when the action changed one (ids and small state values only). */
+  undo?: { action: string; inverse: UndoInverse };
 }
 
 type AlarmWithNext = Alarm & { next_at: string | null };
@@ -148,8 +151,16 @@ export function runAlarmAction(actor: PersonRow, action: AlarmActionName, text: 
   if (action === "delete_alarm") {
     const done = deleteAlarm(actor, alarm.id);
     if (!done.ok) return { reply: "I couldn't delete that alarm.", action: "cancel", when_text: "", done: false };
-    return { reply: `Alarm deleted: ${label}.`, action: "cancel", when_text: "", schedule_task: label, done: true };
+    return {
+      reply: `Alarm deleted: ${label}.`,
+      action: "cancel",
+      when_text: "",
+      schedule_task: label,
+      done: true,
+      undo: { action, inverse: { kind: "restore_alarm", alarmId: alarm.id } },
+    };
   }
+  const back: UndoInverse = { kind: "alarm_state_back", alarmId: alarm.id, state: alarmStateOf(alarm) };
   if (action === "enable_alarm" || action === "disable_alarm") {
     const enabled = action === "enable_alarm";
     const done = updateAlarm(actor, alarm.id, { enabled });
@@ -159,12 +170,13 @@ export function runAlarmAction(actor: PersonRow, action: AlarmActionName, text: 
       action: enabled ? "enable" : "disable",
       when_text: "",
       done: true,
+      undo: { action, inverse: back },
     };
   }
   if (action === "skip_next_alarm") {
     const done = skipNext(actor, alarm.id);
     if (!done.ok) return { reply: `That alarm is off or has no next ring to skip: ${label}.`, action: "skip", when_text: "", done: false };
-    return { reply: `Okay, I'll skip the next ring of ${label}.`, action: "skip", when_text: "", done: true };
+    return { reply: `Okay, I'll skip the next ring of ${label}.`, action: "skip", when_text: "", done: true, undo: { action, inverse: back } };
   }
   const change = changeFrom(edit!.change, now);
   if ("error" in change) return { reply: change.error, action: "edit", when_text: "", done: false };
@@ -177,5 +189,6 @@ export function runAlarmAction(actor: PersonRow, action: AlarmActionName, text: 
     when_text: phraseOf(updated),
     schedule_task: labelOf(updated) || "Alarm",
     done: true,
+    undo: { action, inverse: back },
   };
 }

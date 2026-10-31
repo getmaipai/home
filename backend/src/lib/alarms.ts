@@ -15,7 +15,7 @@ function shape(row: AlarmRow): AlarmT { return Alarm.parse({ id: row.id, person:
 function rowOf(a: AlarmT) { return { id: a.id, person: a.person, time: a.time, days: JSON.stringify(a.days), label: a.label, tag: a.tag, enabled: a.enabled, skipUntil: a.skip_until, sound: a.sound, snoozeMinutes: a.snooze_minutes, source: a.source, createdAt: a.created_at, updatedAt: a.updated_at, deletedAt: a.deleted_at, hlc: a.hlc }; }
 function zoneFor(person: string): string { const z = getSettingValueForPerson(person, "time.time_zone"); return typeof z === "string" && z ? z : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }
 function nextAt(a: AlarmT): string | null { return a.enabled ? nextOccurrence({ time: a.time, days: a.days, zone: zoneFor(a.person), after: new Date(), skipUntil: a.skip_until })?.toISOString() ?? null : null; }
-function owned(actor: PersonRow, id: string): AlarmRow | undefined { return db.select().from(alarms).where(and(eq(alarms.id, id), eq(alarms.person, actor.id), isNull(alarms.deletedAt))).get(); }
+function owned(actor: Pick<PersonRow, "id">, id: string): AlarmRow | undefined { return db.select().from(alarms).where(and(eq(alarms.id, id), eq(alarms.person, actor.id), isNull(alarms.deletedAt))).get(); }
 
 export function syncAlarmJob(alarm: AlarmT): void {
   const existing = db.select().from(scheduledJobs).all().filter((j) => j.job === "alarms.fire" && j.status === "pending" && JSON.parse(j.inputs || "{}").alarmId === alarm.id);
@@ -62,4 +62,48 @@ export function skipNext(actor: PersonRow, id: string): Result<AlarmT> {
 export function deleteAlarm(actor: PersonRow, id: string): Result<{ id: string }> {
   const row = owned(actor, id); if (!row) return { ok: false, status: 404, error: "no such alarm" };
   const now = new Date().toISOString(); db.update(alarms).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(alarms.id, id)).run(); syncAlarmJob(Alarm.parse({ ...shape(row), deleted_at: now, updated_at: now, hlc: nextHlc() })); return { ok: true, value: { id } };
+}
+
+/** The fields an Undo puts back after an alarm edit, turn on or off, or skip. */
+export interface AlarmState {
+  enabled: boolean;
+  skipUntil: string | null;
+  time: string;
+  days: number[];
+  label: string;
+}
+
+export function alarmStateOf(alarm: Pick<AlarmT, "enabled" | "skip_until" | "time" | "days" | "label">): AlarmState {
+  return { enabled: alarm.enabled, skipUntil: alarm.skip_until, time: alarm.time, days: [...alarm.days], label: alarm.label };
+}
+
+/** Undo for edit, enable, disable and skip: the person's own live alarm goes back to the saved state. */
+export function restoreAlarmState(actor: Pick<PersonRow, "id">, id: string, state: AlarmState): boolean {
+  const row = owned(actor, id);
+  if (!row) return false;
+  const parsed = Alarm.safeParse({
+    ...shape(row),
+    enabled: state.enabled,
+    skip_until: state.skipUntil,
+    time: state.time,
+    days: state.days,
+    label: state.label,
+    updated_at: new Date().toISOString(),
+    hlc: nextHlc(),
+  });
+  if (!parsed.success) return false;
+  db.update(alarms).set(rowOf(parsed.data)).where(eq(alarms.id, id)).run();
+  syncAlarmJob(parsed.data);
+  return true;
+}
+
+/** Undo for delete: the person's own deleted alarm is live again. */
+export function undeleteAlarm(actor: Pick<PersonRow, "id">, id: string): boolean {
+  const row = db.select().from(alarms).where(and(eq(alarms.id, id), eq(alarms.person, actor.id))).get();
+  if (!row || row.deletedAt === null) return false;
+  const parsed = Alarm.safeParse({ ...shape(row), deleted_at: null, updated_at: new Date().toISOString(), hlc: nextHlc() });
+  if (!parsed.success) return false;
+  db.update(alarms).set(rowOf(parsed.data)).where(eq(alarms.id, id)).run();
+  syncAlarmJob(parsed.data);
+  return true;
 }

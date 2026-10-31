@@ -121,7 +121,9 @@ function ownPendingRow(personId: string, id: string): JobRow | undefined {
 
 /** Undo for complete and delete: the reminder is pending again. Only the person's own, and only if it was closed. */
 export function restoreReminder(actor: Pick<PersonRow, "id">, id: string): boolean {
-  const row = ownPendingRow(actor.id, id);
+  // A cancelled one-time alarm (a plain alarms.fire job) comes back the same way a reminder does.
+  const found = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, id)).get();
+  const row = found && found.personId === actor.id && (found.job === "reminders.fire" || found.job === "alarms.fire") ? found : undefined;
   if (!row || row.status === "pending") return false;
   db.update(scheduledJobs).set({ status: "pending", lastRunAt: null }).where(eq(scheduledJobs.id, id)).run();
   return true;

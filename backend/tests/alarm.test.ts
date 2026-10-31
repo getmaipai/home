@@ -311,7 +311,8 @@ describe("the alarm port into timer", () => {
     expect(weekdays.value.reply?.text).toBe("Okay, alarm set: gym (weekdays at 6:30 AM).");
     expect(weekdays.value.data).toMatchObject({ action: "set", schedule_task: "gym", when_text: "weekdays at 6:30 AM" });
     const card = (weekdays.value as { blocks?: Array<{ kind: string; producer: string; props: Record<string, unknown> }> }).blocks ?? [];
-    expect(card).toHaveLength(1);
+    // ASSIST-UNDO-02: the card is followed by the receipt with Undo.
+    expect(card.map((block) => block.kind)).toEqual(["schedule_card", "confirmation"]);
     expect(card[0]).toMatchObject({ kind: "schedule_card", producer: "timer", props: { name: "gym", cadence: "Weekdays", nextRun: "weekdays at 6:30 AM" } });
     const once = await runPlugin("timer", await person("Sage"), { action: "set_alarm", expression: "for 6:30 am tomorrow called run" });
     const onceCard = (once.ok ? (once.value as { blocks?: Array<{ props: Record<string, unknown> }> }).blocks : undefined) ?? [];

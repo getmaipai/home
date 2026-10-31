@@ -15,6 +15,12 @@ function touched(inverse: UndoInverse): { listId: string; itemIds: string[] } | 
   if (inverse.kind === "remove_item") return { listId: inverse.listId, itemIds: [inverse.itemId] };
   if (inverse.kind === "set_items_done") return { listId: inverse.listId, itemIds: inverse.itemIds };
   if (inverse.kind === "move_items_back") return { listId: inverse.fromListId, itemIds: inverse.itemIds };
+  if (inverse.kind === "list_context") return { listId: inverse.listId, itemIds: inverse.itemIds };
+  if (inverse.kind === "restore_items") {
+    return { listId: inverse.listId, itemIds: inverse.removed.map((entry) => entry.item.id) };
+  }
+  if (inverse.kind === "edit_item_back") return { listId: inverse.listId, itemIds: [inverse.itemId] };
+  if (inverse.kind === "reorder_back") return { listId: inverse.listId, itemIds: inverse.order };
   if (inverse.kind === "restore_list" || inverse.kind === "remove_list" || inverse.kind === "rename_list") {
     return { listId: inverse.listId, itemIds: [] };
   }

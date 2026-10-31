@@ -1,5 +1,6 @@
 import type { PersonRow } from "@/types";
 import type { List as ListT } from "@maipai/spec/gen/ts/list.js";
+import type { RemovedItem } from "@/lib/lists";
 import { addItem, clearDoneItems, copyList, createList, deleteList, editItem, moveItems, removeItem, reorderItems, updateList } from "@/lib/lists";
 import { isListPronoun, resolveItems, resolveList, visibleListById } from "@/lib/listResolver";
 import type { UndoInverse } from "@/lib/toolUndo";
@@ -16,6 +17,10 @@ function resolve(actor: PersonRow, words?: string, lastListId?: string) {
   if (!words) return fail("Which list do you mean?");
   const result = resolveList(actor, words, { lastListId });
   return result.ok ? result.list : result.reason === "ambiguous" ? fail(`I found ${result.candidates} lists called that; which one?`) : fail("I couldn't find that list.");
+}
+/** The items a removal takes, with the place each held, so an Undo puts them back where they were. */
+function removedEntries(items: ListT["items"], taken: (item: ListT["items"][number]) => boolean): RemovedItem[] {
+  return items.flatMap((item, index) => (taken(item) ? [{ index, item }] : []));
 }
 function operationError(error: string): string { return error === "no such list" ? "I couldn't find that list." : "I couldn't update that list."; }
 export function runListAction(actor: PersonRow, band: "child" | "teen" | "adult", input: ListActionInput): ListActionResult {
@@ -61,10 +66,19 @@ export function runListAction(actor: PersonRow, band: "child" | "teen" | "adult"
   }
   if (action === "reorder") {
     const ids = (input.order ?? []).map((word) => resolveItems(target, word, { lastItemIds: input.lastItemIds })).filter((r) => r.ok).flatMap((r) => r.ok ? r.items.map((item) => item.id) : []);
-    const out = reorderItems(actor, target.id, ids); return out.ok ? success("I reordered the list.", target.id) : fail("I couldn't reorder the list.");
+    const before = target.items.map((item) => item.id);
+    const out = reorderItems(actor, target.id, ids);
+    if (!out.ok) return fail("I couldn't reorder the list.");
+    const changed = out.value.items.some((item, index) => item.id !== before[index]);
+    const inverse: UndoInverse[] = changed ? [{ kind: "reorder_back", listId: target.id, order: before }] : [];
+    return success("I reordered the list.", target.id, undefined, inverse);
   }
   if (action === "clear_done") {
-    const out = clearDoneItems(actor, target.id); return out.ok ? success("I cleared the completed items.", target.id) : fail("I couldn't clear the completed items.");
+    const removed = removedEntries(target.items, (item) => item.done);
+    const out = clearDoneItems(actor, target.id);
+    if (!out.ok) return fail("I couldn't clear the completed items.");
+    const inverse: UndoInverse[] = removed.length > 0 ? [{ kind: "restore_items", listId: target.id, removed }] : [];
+    return success("I cleared the completed items.", target.id, undefined, inverse);
   }
   const phrases = input.items ?? [];
   const selected = [] as ListT["items"];
@@ -98,20 +112,29 @@ export function runListAction(actor: PersonRow, band: "child" | "teen" | "adult"
       : fail("I couldn't move those items.");
   }
   if (action === "remove_items") {
-    for (const id of itemIds) removeItem(actor, target.id, id);
-    return success("I removed the items.", target.id, itemIds);
+    const wanted = new Set(itemIds);
+    const removed = removedEntries(target.items, (item) => wanted.has(item.id));
+    const gone = removed.filter((entry) => removeItem(actor, target.id, entry.item.id).ok);
+    const inverse: UndoInverse[] = gone.length > 0 ? [{ kind: "restore_items", listId: target.id, removed: gone }] : [];
+    const noun = gone.length === 1 ? "item" : "items";
+    return success(`Removed ${gone.length} ${noun}.`, target.id, itemIds, inverse);
   }
   if (["check_items", "uncheck_items", "edit_item"].includes(action)) {
     if (action === "edit_item" && !input.name) return fail("What should I change the item to?");
     const changed: string[] = [];
+    const renamed: UndoInverse[] = [];
     for (const item of selected) {
       const edit = action === "check_items" ? { done: true } : action === "uncheck_items" ? { done: false } : { text: input.name! };
       const out = editItem(actor, target.id, item.id, edit);
       if (!out.ok) return fail("I couldn't update that item.");
       if ("done" in edit && item.done !== edit.done) changed.push(item.id);
+      if ("text" in edit && item.text !== edit.text) {
+        renamed.push({ kind: "edit_item_back", listId: target.id, itemId: item.id, previousText: item.text });
+      }
     }
     const wasDone = action === "uncheck_items";
     const inverse: UndoInverse[] = changed.length > 0 ? [{ kind: "set_items_done", listId: target.id, itemIds: changed, done: wasDone }] : [];
+    inverse.push(...renamed);
     return success("I updated the items.", target.id, itemIds, inverse);
   }
   return fail("I couldn't do that list action.");

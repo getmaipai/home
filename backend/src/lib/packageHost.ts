@@ -90,7 +90,7 @@ import { lastListContextFor } from "@/lib/listContext";
 import { ALARM_ACTION_NAMES, runAlarmAction, type AlarmActionName } from "@/lib/alarmActions";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
-import { recordUndo, type UndoInverse } from "@/lib/toolUndo";
+import { recordListContext, recordUndo, type UndoInverse } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
 import { parseAlarmCall, parseListCall, parseReminderPayload, type AlarmCall, type ListCall } from "@/lib/alarmCalls";
 import { lastReminderIdFor, runReminderAction } from "@/lib/reminderActions";
@@ -2081,6 +2081,16 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       }
     }
     capture.listReply = reply;
+    if (reads && result.listId) {
+      recordListContext({
+        personId: actor.id,
+        turnId: turn?.id,
+        tool: manifest.id,
+        action: call.action,
+        listId: result.listId,
+        itemIds: call.action === "show_list" ? (capture.listItems ?? []).map((item) => item.id) : [],
+      });
+    }
     const inverses: UndoInverse[] = result.undo?.inverse ?? [];
     if (inverses.length > 0) {
       const inverse: UndoInverse = inverses.length === 1 ? inverses[0]! : { kind: "batch", inverses };
@@ -2098,21 +2108,31 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
     // ASSIST-WIRE-01: edit, turn on, turn off, skip and delete resolve among the person's own alarm records (alarmActions.ts).
     if ((ALARM_ACTION_NAMES as readonly string[]).includes(call.action)) {
       const outcome = runAlarmAction(actor, call.action as AlarmActionName, call.rest);
-      // A question or a refusal changed nothing, so it writes no audit row.
+      // A question or a refusal changed nothing, so it writes no audit row and no Undo.
       if (outcome.done) recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });
+      const receipt = outcome.done && outcome.undo
+        ? recordUndo({ personId: actor.id, turnId: turn?.id, tool: manifest.id, action: outcome.undo.action, inverse: outcome.undo.inverse })
+        : undefined;
       if (runtime.capture) {
         runtime.capture.alarm = {
           task: outcome.reply,
           ...(outcome.schedule_task ? { schedule_task: outcome.schedule_task } : {}),
           when_text: outcome.when_text,
           action: outcome.done ? outcome.action : "list",
+          ...(receipt ? { undo_id: receipt.id } : {}),
         };
       }
       return;
     }
     const result = handleAlarmChat(actor, call.chatText);
     recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });
-    if (runtime.capture) runtime.capture.alarm = result;
+    const receipt = result.undo
+      ? recordUndo({ personId: actor.id, turnId: turn?.id, tool: manifest.id, action: result.undo.action, inverse: result.undo.inverse })
+      : undefined;
+    if (runtime.capture) {
+      const { undo: _undo, ...shown } = result;
+      runtime.capture.alarm = { ...shown, ...(receipt ? { undo_id: receipt.id } : {}) };
+    }
   }
 
   // ASSIST-REMIND-01 part B: every reminder action of `remind` (edit, snooze, complete, delete, show, and the older cancel

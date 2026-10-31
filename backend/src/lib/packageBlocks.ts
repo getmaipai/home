@@ -86,17 +86,27 @@ function alarmBlocks(
   alarm: NonNullable<BlockCapture["alarm"]>,
   allowed: readonly string[],
 ): Record<string, unknown>[] {
-  if (!allowed.includes("schedule_card")) return [];
   // A card only for an alarm set or a cancel; a list, snooze, edit or complete is answered in words.
-  if (alarm.action !== "set" && alarm.action !== "cancel") return [];
-  return scheduleCard(
-    producer,
-    provenance,
-    alarm.action === "cancel" ? "Alarm or reminder cancelled" : "Alarm set",
-    text(alarm.schedule_task) || text(alarm.task),
-    text(alarm.when_text),
-    alarmCadence(text(alarm.when_text)),
-  );
+  const cardWanted = allowed.includes("schedule_card") && (alarm.action === "set" || alarm.action === "cancel");
+  const blocks = cardWanted
+    ? scheduleCard(
+        producer,
+        provenance,
+        alarm.action === "cancel" ? "Alarm or reminder cancelled" : "Alarm set",
+        text(alarm.schedule_task) || text(alarm.task),
+        text(alarm.when_text),
+        alarmCadence(text(alarm.when_text)),
+      )
+    : [];
+  // The receipt: a plain sentence with Undo, when the change left an Undo row that is still open.
+  const undo = alarm.undo_id && allowed.includes("confirmation") ? undoPropsFor(alarm.undo_id) : undefined;
+  if (undo) {
+    const sentence = clip(alarm.task, 300) || "Done.";
+    const confirmation = blockEnvelope("confirmation", producer, sentence, provenance, { icon: "clock", sentence, undo });
+    confirmation.id = alarm.undo_id!;
+    blocks.push(confirmation);
+  }
+  return blocks;
 }
 
 function todoList(

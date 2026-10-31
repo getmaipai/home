@@ -49,7 +49,8 @@ describe("snooze_reminder", () => {
     expect(Date.parse(job(id).nextRunAt) - before).toBe(15 * 60_000);
     expect(job(id).status).toBe("pending");
     expect(db.select().from(toolAudit).all().map((row) => `${row.tool}:${row.action}:${row.decision}`)).toEqual(["remind:snooze_reminder:do"]);
-    expect(out.blocks ?? []).toEqual([]);
+    // No card, only the receipt with Undo (ASSIST-UNDO-02).
+    expect((out.blocks as Array<{ kind: string }>).map((block) => block.kind)).toEqual(["confirmation"]);
   });
 
   test("with no minutes it uses the household snooze setting, else 10", async () => {

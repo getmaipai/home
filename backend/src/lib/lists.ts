@@ -360,3 +360,27 @@ export function reorderItems(actor: { id: string; role: string }, listId: string
   db.update(lists).set(toRow(candidate)).where(eq(lists.id, listId)).run();
   return { ok: true, status: 200, value: candidate };
 }
+
+export type RemovedItem = { index: number; item: ListT["items"][number] };
+
+/** Puts removed items back by their old position, keeping their ids and fields. Items already on the list are skipped.
+ * The list shape has no tombstone field and is shared (commons spec), so the removed items ride in the Undo row. */
+export function restoreItems(actor: { id: string; role: string }, listId: string, removed: RemovedItem[]): OpResult<ListT> {
+  const existing = getList(actor, listId);
+  if (!existing.ok) return existing;
+  const items = [...existing.value.items];
+  const ordered = [...removed].sort((a, b) => a.index - b.index);
+  let restored = 0;
+  for (const entry of ordered) {
+    if (items.some((item) => item.id === entry.item.id)) continue;
+    items.splice(Math.min(Math.max(entry.index, 0), items.length), 0, entry.item);
+    restored += 1;
+  }
+  if (restored === 0) return { ok: false, status: 404, error: "no items to restore" };
+  const candidate = List.safeParse({ ...existing.value, items, updated_at: new Date().toISOString(), hlc: nextHlc() });
+  if (!candidate.success) return { ok: false, status: 400, error: candidate.error.issues.map((i) => i.message).join("; ") };
+  const problems = validateList(candidate.data);
+  if (problems.length > 0) return { ok: false, status: 400, error: problems.join("; ") };
+  db.update(lists).set(toRow(candidate.data)).where(eq(lists.id, listId)).run();
+  return { ok: true, status: 200, value: candidate.data };
+}
