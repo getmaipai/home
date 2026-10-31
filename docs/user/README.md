@@ -34,6 +34,7 @@ day the hub arrives; the rest are for when you need them.
 - [Offline data](reference-library.md): choose and manage offline books (Wikipedia, health and more) for your household.
 - [Ease of use](ease-of-use.md): make words bigger, buttons roomier and colors clearer for yourself.
 
+- [Lists, reminders and alarms](lists-reminders-alarms.md): what to say to add to your shopping list, set a reminder, set an alarm or start a timer.
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.
 - [Privacy](privacy.md): see exactly what, if anything, leaves your house.
 - [What Home looks up for you](what-home-looks-up.md): every outside service a feature can ask, what it sends, and how to clear what it saved.
