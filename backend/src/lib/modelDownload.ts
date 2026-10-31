@@ -13,9 +13,10 @@
 // `resolve/<revision>/...` URL) both serve a plain redirect chain `fetch`
 // already follows.
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync, statSync, unlinkSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { mkdirSync, renameSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { enginesDir, modelsDir } from "@/lib/paths";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 
 export interface DownloadProgress {
@@ -39,6 +40,32 @@ export interface DownloadOptions {
 // generous, the same figure the legacy code calibrated.
 const STREAM_IDLE_TIMEOUT_MS = 90_000;
 const MAX_ATTEMPTS = 6;
+const STALE_DOWNLOAD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Removes abandoned download files (a `.part` sibling or a `.download.tmp` archive older than a week) under the
+ * models and engines roots, a few folders deep, without touching recent transfers or anything else. */
+export function sweepStaleDownloads(now = Date.now()): { removed: number; bytes: number } {
+  let removed = 0;
+  let bytes = 0;
+  const visit = (dir: string, depth: number): void => {
+    let entries: import("node:fs").Dirent[];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) { if (depth < 4) visit(path, depth + 1); continue; }
+      if (!entry.isFile() || !(entry.name.endsWith(".part") || entry.name === ".download.tmp")) continue;
+      try {
+        const info = statSync(path);
+        if (now - info.mtimeMs <= STALE_DOWNLOAD_AGE_MS) continue;
+        unlinkSync(path);
+        removed++;
+        bytes += info.size;
+      } catch { /* a concurrent download or removal is already handled */ }
+    }
+  };
+  for (const root of [modelsDir, enginesDir]) visit(root, 0);
+  return { removed, bytes };
+}
 
 /** A complete download that failed its post-download integrity check
  * (wrong size or checksum) - distinct from a network error so the retry

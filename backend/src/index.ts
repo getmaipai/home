@@ -5,6 +5,7 @@ import { resumeMusicJobs } from "@/lib/music/jobs";
 import { instanceLock } from "@/lib/bootGuard";
 import { startLiveArtSweep } from "@/lib/companionArtCheck";
 import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
+import { sweepStaleDownloads } from "@/lib/modelDownload";
 import { startTrashSweeper } from "@/lib/trash/sweep";
 import { startMediaScanner } from "@/lib/media/scan";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
@@ -123,6 +124,14 @@ warmSpokenPrefixAtBoot(() => turnWarmupRequest("spoken"));
 startLiveArtSweep();
 try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ }
 setInterval(() => { try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ } }, 60 * 60 * 1000).unref();
+function sweepDownloads(): void {
+  try {
+    const { removed, bytes } = sweepStaleDownloads();
+    if (removed) appendLogLine(JSON.stringify({ event: "sweep.downloads", removed, bytes }));
+  } catch { /* maintenance sweep is disposable */ }
+}
+sweepDownloads();
+setInterval(sweepDownloads, 60 * 60 * 1000).unref();
 await recordBootGap();
 void recordStatusSample();
 

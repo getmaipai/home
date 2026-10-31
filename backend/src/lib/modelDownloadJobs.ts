@@ -174,8 +174,16 @@ async function downloadArchiveVerified(
     onProgress: (p) => onProgress(p.completedBytes, p.totalBytes),
   });
   upsertJob(modelId, { status, phase: `extracting ${archive.label}` });
-  await extractArchive(archivePath, destDir);
-  rmSync(archivePath, { force: true });
+  await extractDownloadedArchive(archivePath, destDir);
+}
+
+/** Extracts a downloaded archive and removes it afterwards, on success and on failure alike, so a failed extraction never leaves gigabytes behind. */
+export async function extractDownloadedArchive(archivePath: string, destDir: string): Promise<void> {
+  try {
+    await extractArchive(archivePath, destDir);
+  } finally {
+    rmSync(archivePath, { force: true });
+  }
 }
 
 /** Runs the whole select flow for one catalog model id. Never throws:

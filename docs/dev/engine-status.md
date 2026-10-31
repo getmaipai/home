@@ -40,3 +40,5 @@ Children get the same one line where they act, in their own words, and no header
 `frontend/src/apps/chat/useMakingAvailability.test.tsx` (band lines, recovery toast once) and
 `frontend/src/shell/pages/companionFlow/makingPaused.test.tsx` (one disabled control per screen). To see it by hand on a dev hub,
 point `bun run dev` at a Stack whose `/stack/v1/memory` reports `generation_paused: true`; a real memory pause cannot be forced safely.
+Home removes abandoned `.part` downloads and `.download.tmp` archives older than seven days during its hourly maintenance sweep; a failed archive extraction removes its archive immediately.
+

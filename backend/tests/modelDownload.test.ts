@@ -1,9 +1,11 @@
 import { describe, expect, test, afterAll, afterEach } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { downloadUrl, sha256OfFile } from "@/lib/modelDownload";
+import { downloadUrl, sha256OfFile, sweepStaleDownloads } from "@/lib/modelDownload";
+import { enginesDir, modelsDir } from "@/lib/paths";
 
 const CONTENT = Buffer.from("x".repeat(50_000), "utf8");
 const SHA256 = createHash("sha256").update(CONTENT).digest("hex");
@@ -106,5 +108,44 @@ describe("sha256OfFile", () => {
     const destPath = dest();
     writeFileSync(destPath, CONTENT);
     expect(await sha256OfFile(destPath)).toBe(SHA256);
+  });
+});
+
+describe("sweepStaleDownloads", () => {
+  test("removes only old partial and archive files and reports their bytes", () => {
+    mkdirSync(modelsDir, { recursive: true });
+    const now = Date.now();
+    const oldPart = join(modelsDir, `stale-${randomUUID()}.gguf.part`);
+    const oldArchive = join(modelsDir, `.download.tmp`);
+    const newPart = join(modelsDir, `fresh-${randomUUID()}.gguf.part`);
+    const unrelated = join(modelsDir, `keep-${randomUUID()}.bin`);
+    const nestedDir = join(enginesDir, `engine-${randomUUID()}`);
+    const nestedArchive = join(nestedDir, ".download.tmp");
+    try {
+      mkdirSync(nestedDir, { recursive: true });
+      writeFileSync(nestedArchive, "1234567");
+      writeFileSync(oldPart, "1234");
+      writeFileSync(oldArchive, "123456");
+      writeFileSync(newPart, "12");
+      writeFileSync(unrelated, "12345678");
+      const old = new Date(now - 8 * 24 * 60 * 60 * 1000);
+      utimesSync(oldPart, old, old);
+      utimesSync(oldArchive, old, old);
+      utimesSync(nestedArchive, old, old);
+      utimesSync(newPart, new Date(now), new Date(now));
+
+      expect(sweepStaleDownloads(now)).toEqual({ removed: 3, bytes: 17 });
+      expect(existsSync(nestedArchive)).toBe(false);
+      expect(existsSync(oldPart)).toBe(false);
+      expect(existsSync(oldArchive)).toBe(false);
+      expect(existsSync(newPart)).toBe(true);
+      expect(existsSync(unrelated)).toBe(true);
+    } finally {
+      rmSync(oldPart, { force: true });
+      rmSync(oldArchive, { force: true });
+      rmSync(newPart, { force: true });
+      rmSync(unrelated, { force: true });
+      rmSync(nestedDir, { recursive: true, force: true });
+    }
   });
 });

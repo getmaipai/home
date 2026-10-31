@@ -1,9 +1,12 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getJob, startSelectJob, recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
+import { getJob, startSelectJob, recoverInterruptedJobsAtBoot, extractDownloadedArchive } from "@/lib/modelDownloadJobs";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { modelDownloadJobs } from "@/db/schema";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -29,6 +32,18 @@ describe("modelDownloadJobs", () => {
     expect(() => startSelectJob("qwen3-8b-instruct-q4-k-m")).toThrow("Model changes are made through the MaiPai Stack.");
     expect(getJob("qwen3-8b-instruct-q4-k-m")).toBeNull();
   });
+});
+
+test("removes the downloaded archive when extraction fails", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "maipai-extract-failure-"));
+  const archive = join(dir, ".download.tmp");
+  writeFileSync(archive, "archive bytes");
+  try {
+    await expect(extractDownloadedArchive(archive, dir)).rejects.toThrow();
+    expect(existsSync(archive)).toBe(false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // COR-8 (code review, 2026-09-06): activeJob is in-memory only and
