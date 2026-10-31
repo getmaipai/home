@@ -26,7 +26,6 @@ import { StackVideoError } from "./stack";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 
-export const VIDEO_SIZES: Record<string, string> = { landscape: "832x480", portrait: "480x832" };
 
 /** The audience a turn presents to the video policy. */
 export function videoAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): VideoAudience {

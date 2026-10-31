@@ -190,11 +190,6 @@ export function sceneFor(deviceId: string, now = Date.now()): RobotScene | null 
   return scene;
 }
 
-export function clearScene(deviceId: string): void {
-  scenes.delete(deviceId);
-  lastFrameAt.delete(deviceId);
-  lastSceneFrameAt.delete(deviceId);
-}
 
 /** Expired descriptions leave memory on a timer even if nobody asks for them. */
 const sweeper = setInterval(() => {

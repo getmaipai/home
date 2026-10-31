@@ -8,7 +8,7 @@ import { maybeRefreshConversationSummary } from "@/lib/conversationHistory";
 import { DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 
 // One pending timer per conversation, not one per turn - see
-// the retired turn engine's logTurnSafely() comment for the bug this fixes. Exported only for
+// the turn machine comment for the bug this fixes. Exported only for
 // __clearPendingSummaryRefreshesForTests() below.
 const pendingSummaryRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
 

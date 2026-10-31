@@ -353,7 +353,7 @@ export interface TurnValue {
   crisis_support?: CrisisSupport;
   /** Session A step 3 (conversations): every real turn resolves or
    * creates a conversation and mints its own turn id up front
-   * (the retired turn engine's prepareTurn(), also step 2's provenance carrier for
+   * (the turn machine, also step 2's provenance carrier for
    * anything a plugin remembered mid-turn) - both are always real by the
    * time a TurnValue exists, never optional. */
   conversation_id: string;
@@ -418,7 +418,7 @@ export interface TurnValue {
    * carrying its body inline. Written by `lib/composer.ts`'s
    * `artifactForOutcomes()` (ARTIFACT-02), the bundled `write_document`
    * package's own outcome, hooked into the retired turn engine's
-   * `logTurnSafely()` beside `structured_part`; a client fetches the
+   * turn persistence in `lib/turnMachine/` beside `structured_part`; a client fetches the
    * full version from GET /api/artifacts/:id. */
   artifact?: { id: string; version: number };
   /** PROJECT-PROGRESS-01: this turn's own `start_project` tool call

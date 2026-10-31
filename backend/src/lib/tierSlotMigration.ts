@@ -9,11 +9,12 @@ import { settingsValues } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { getHouseholdSettingSource, getHouseholdSettingValue, onHouseholdWrite, setHouseholdSettingValue } from "@/lib/settings";
 import { readSlot, slotKey } from "@/lib/tiers";
+import { QUICK_MODEL } from "@/lib/pictures/quality";
 
 const MARKER_KEY = "__migration.tier_slots_home_02";
 export const QUICK_MODEL_KEY = "generation.picture_quick_model";
 export const DETAILED_ENABLED_KEY = "generation.picture_detailed.enabled";
-const MODEL_OF_CHOICE: Record<string, string> = { ernie: "ernie-image-turbo", klein: "flux2-klein-4b" };
+const MODEL_OF_CHOICE: Record<string, string> = { ernie: "ernie-image-turbo", klein: QUICK_MODEL };
 
 function writeModel(tier: "standard" | "boost", model: string): void {
   const slot = readSlot("image", tier);

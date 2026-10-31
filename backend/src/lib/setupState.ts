@@ -51,8 +51,6 @@ export function codingClientLater(): boolean {
   return setupCodingChoice() === "later";
 }
 /** Compatibility alias for code written against the earlier setup helper name. */
-export const getCodingClientLater = codingClientLater;
-
 function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined; memoryAnswerGb: number | undefined; installSelection: string[] | undefined; codingChoice: SetupCodingChoice | undefined } {
   const { [STORAGE_CHOICE_KEY]: storageChoice, [MEMORY_ANSWER_KEY]: memoryAnswerGb, [INSTALL_SELECTION_KEY]: installSelection, [CODING_CHOICE_KEY]: rawCodingChoice, ...rest } = JSON.parse(value) as Record<string, unknown>;
   return {

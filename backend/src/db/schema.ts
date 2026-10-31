@@ -643,7 +643,7 @@ export const conversationTurns = sqliteTable(
     // referencing parentTurnId) as much as it would leak a blank reply
     // into the model's own context window. Defaults to "done" so every
     // pre-existing row, and every test that inserts a complete row
-    // directly (bypassing prepareTurn()/logTurn() entirely), keeps
+    // directly (bypassing the turn machine/logTurn() entirely), keeps
     // reading as finished history with no migration backfill needed.
     status: text("status").notNull().default("done"), // "running" | "done" | "failed" (CHAT-CALM-ERRORS-01b: the engine went away before a reply; readers that skip "running" skip it too)
     // getmaipai/home#130: the turn's structured part (lib/composer.ts's

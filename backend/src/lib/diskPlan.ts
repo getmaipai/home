@@ -19,7 +19,6 @@ export { diskVerdict, selectionTotals, tierForLevel, tierForMemoryGb };
 export type { DiskLevel, DiskPlan, DiskVerdict, DiskVolume };
 
 const tiers = (table as unknown as { tiers: Record<DiskPlan["tier"], DiskPlan> }).tiers;
-export const SHIPPED_DISK_PLAN_DATE = (table as { measured_on: string }).measured_on;
 
 /** The shipped plan of one tier (a copy of the Stack's table, so it names the sizes the Stack pinned when this Home was released). */
 export function shippedDiskPlan(tier: DiskPlan["tier"]): DiskPlan { return structuredClone(tiers[tier]); }

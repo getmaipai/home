@@ -144,6 +144,3 @@ export function referenceDrift(): { missing: string[]; extra: string[] } {
 }
 
 // Kept so a caller outside this module can ask which records share one stored copy.
-export function recordsSharingContent(sha256: string): string[] {
-  return db.select({ id: attachments.id }).from(attachments).where(eq(attachments.sha256, sha256)).all().map((r) => r.id);
-}

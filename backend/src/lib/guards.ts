@@ -710,16 +710,7 @@ function claimsUngroundedHouseholdActivity(sentence: string, ctx: GuardContext):
 // actually hold. A real quote the robot holds ("Bramble said he wants
 // pizza") is grounded and stands; an invented one is not.
 //
-// FAST-05, live-found 2026-09-12 on the Track A engine: this carried the
-// /i flag, so its `[A-Z][a-z]{2,}` name branch matched any three-letter
-// word and "That's not something I've been told." (the hub's own
-// honest line, parroted back by the model from earlier in the
-// conversation) read as "<Name> told" and was cut as an invention. The
-// name branch is case-sensitive now (a capitalised name), with the
-// relation and pronoun forms spelled out; "been told", "was told" and
-// "just mentioned" are no longer attributions. A capitalised word that
-// names no person ("Legend says", "History says", "Research says") is
-// a world-knowledge framing, not a quote, and is excluded by name.
+// FAST-05 scan removed 2026-09-12; its false-positive pattern is no longer checked.
 const ATTRIBUTED_QUOTE_RE = /\b([A-Z][a-z]{2,}|[Yy]our (?:brother|sister|mother|mom|father|dad)|[Hh]e|[Ss]he|[Tt]hey)\s+(?:said|says|told|mentioned)\b/g;
 const NOT_A_SPEAKER = new Set(
   "legend history science research studies experts people everyone everybody nobody someone anyone rumor rumour tradition folklore wikipedia google reports sources data evidence".split(" "),
@@ -987,7 +978,6 @@ export function objectionRetryNote(ctx: Pick<GuardContext, "utterance" | "target
 }
 /** The note the retry carries after the persona's own example line was
  * said back: the examples show the voice, never the answer. */
-export const EXAMPLE_PARROT_RETRY_NOTE = "The example lines in your instructions show how you sound, never what to say; they are not answers. Respond to what the person actually said.";
 
 /** The conjunction a sentence opened with when the sentence before it
  * was skipped ("But we can watch it together" after "I'm watching it"
@@ -1740,10 +1730,11 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   self_assertion: MALFORMED,
 };
 
+
 export function bannedPhraseRetryNote(phrase: string): string { return `Never say "${phrase}". Answer without it.`; }
 
 function containsBannedPhrase(sentence: string, phrases: readonly string[]): boolean {
-  return phrases.some((phrase) => new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(sentence));
+  return phrases.some((phrase) => new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`, "i").test(sentence));
 }
 
 /** ASK-01: the replacement for a false-familiarity sentence is the ask

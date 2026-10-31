@@ -154,13 +154,3 @@ export function guardRule(reason: string): string {
 
 /** A turn's rule list: the signal's source first, the engine's rules in
  * the order they fired, then the guard hits, each once. */
-export function rulesFired(engineRules: readonly string[], guardHits: readonly string[], signalSource?: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const r of [...(signalSource ? [`signal.${signalSource}`] : []), ...engineRules, ...guardHits.map(guardRule)]) {
-    if (seen.has(r)) continue;
-    seen.add(r);
-    out.push(r);
-  }
-  return out;
-}

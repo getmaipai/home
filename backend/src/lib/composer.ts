@@ -55,7 +55,6 @@ type CurrencyData = { amount: number; from: string; to: string; converted: numbe
  * (the model failed, or the budget was spent with no direct reply). */
 export const COMPOSE_FALLBACK_LINE = "I found information, but couldn't put the answer together.";
 /** The status channel's line before the composition's first token. */
-export const COMPOSING_STATUS_TEXT = "Putting that together.";
 /** A turn's model-call budget: the initial answer or decision and one
  * corrective or composing completion. */
 export const COMPOSER_MAX_CALLS = 2;
@@ -820,7 +819,7 @@ export function usableReply(outcome: Pick<ToolExecutionOutcome, "result">): { te
 
 /** Whether one succeeded result needs the composer's call: no usable
  * reply, or a `synthesis_hint`. The direct routes read this before
- * deciding to build the model context (prepareTurn). */
+ * deciding to build the model context (the turn machine). */
 export function needsComposition(result: ToolExecutionOutcome["result"] | undefined): boolean {
   if (!result) return false;
   if (typeof result.synthesis_hint === "string") return true;

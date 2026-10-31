@@ -354,6 +354,7 @@ syncTailscaleRenewalSetting();
 // Daily guest expiry and a compatibility no-op for retired birthday jobs.
 ensureCoreJob("people.disable_expired_guests", "every:1d");
 ensureCoreJob("people.apply_age_band_changes", "every:1d");
+ensureCoreJob("sessions.prune_expired", "every:1d");
 // CHAT-TITLE-02: repair pass for chats found with no title or only a provisional one (small cap, backs off while the engine is down).
 startConversationTitleSweep();
 // MEDIA-LIB-01: the media library's scan intervals (one per root).

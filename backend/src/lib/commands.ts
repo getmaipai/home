@@ -204,7 +204,7 @@ export function deleteCommand(actor: PersonRow, id: string): CommandOpResult<{ i
 }
 
 /** The deterministic command floor (checked before the plugin floor in
- * the retired turn engine's prepareTurn(), same "a real trigger always wins"
+ * the turn machine, same "a real trigger always wins"
  * posture route()'s own pattern match already has - a command IS
  * exactly that, just household-authored instead of bundled). Exact
  * match only, gated by whether the speaker's own role clears this

@@ -211,7 +211,7 @@ export interface RecallEpisodesOptions {
    * side by default (RECALL-02b: the assistant side is opt-in): the
    * hub's prose is output, not evidence, and a recalled first-person
    * sentence was being copied into new replies. The prompt
-   * (prepareTurn) asks for `both` only when the utterance asks what the
+   * (the turn machine) asks for `both` only when the utterance asks what the
    * hub said (asksWhatHubSaid()), and then the hub's side is rendered
    * as a reported note beside its paired user side, never as a line.
    * The conversations search and the memory bench ask for `both`

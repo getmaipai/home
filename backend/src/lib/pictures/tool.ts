@@ -13,7 +13,7 @@ import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultAdaptersAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { allowedQuality, tierArgument } from "@/lib/tiers";
-import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
+import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from "./quality";
 import { StackPicturesError } from "./stack";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
@@ -114,7 +114,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "image", arg: args.tier, band: audience.band });
-  const choice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
+  const choice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: QUICK_MODEL, note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
   const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
   // The allowance is taken now, in one step with the check, so two asks at once cannot both pass; it goes back only if nothing started.

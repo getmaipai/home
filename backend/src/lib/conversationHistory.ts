@@ -306,7 +306,7 @@ export function packageLatencyFromRecentOutcomes(packageId: string): { count: nu
  * the model being unavailable) since nothing was actually said.
  *
  * `value.turn_id`/`value.conversation_id` (step 3): the retired turn engine's
- * prepareTurn() resolves the conversation and mints this turn's own id
+ * the turn machine resolves the conversation and mints this turn's own id
  * up front now, before the reply is generated (step 2's provenance
  * carrier too), so this row uses those exact ids rather than minting a
  * second, different turn id - the two would otherwise silently diverge,
@@ -424,7 +424,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   // wrote one (turning "running" into "done"); inserts fresh when
   // nothing did (a test calling logTurn() directly, or any future
   // caller that skips insertProvisionalTurn() - never expected to
-  // happen in production, since prepareTurn() always calls it first,
+  // happen in production, since the turn machine always calls it first,
   // but not something this write should silently corrupt if it does).
   const storedRow = { ...row, branchChosen, status: "done" as const };
   db.insert(conversationTurns).values(storedRow).onConflictDoUpdate({ target: conversationTurns.id, set: storedRow }).run();
@@ -433,7 +433,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
 });
 
 /** getmaipai/home#131: called once, at the very start of the retired turn engine's
- * `prepareTurn()` (right after `newConversationTurnId()` mints the id),
+ * `the turn machine` (right after `newConversationTurnId()` mints the id),
  * before anything else - including the safety check - runs. Writes a
  * real, minimal row so the turn's own id satisfies `artifacts.turnId`'s
  * hard FK the moment a package's recipe might call `host.artifact.create()`
@@ -483,7 +483,7 @@ export function insertProvisionalTurn(actor: PersonRow, surface: Surface, conver
  * caught that the claim used to sit here unenforced. A bogus or
  * cross-conversation id is dropped to null, not thrown: a malformed edit
  * hint on an otherwise-real, otherwise-successful turn should never cost
- * the household their reply, the same posture logTurnSafely()'s own
+ * the household their reply, the same posture turn persistence in lib/turnMachine/'s own
  * try/catch already takes for this whole function. */
 export function resolveSupersedes(supersedes: string | null | undefined, conversationId: string): string | null {
   if (!supersedes) return null;
@@ -647,7 +647,7 @@ function buildTurnRow(
     // (listConversationTurns()/list() below).
     reasoning: minorSpeaker ? null : (value.reasoning ?? proseReasoning ?? null),
     // getmaipai/home#130: the same structured part the done event already
-    // carries (the retired turn engine's logTurnSafely() sets value.structured_part
+    // carries (the turn machine sets value.structured_part
     // from structuredPartForOutcomes() beside this exact row), persisted
     // as JSON so the reload path can rebuild the identical tool-call part
     // chatModelAdapter.ts builds live. Null for every prose reply and
@@ -732,7 +732,7 @@ export function logTurn(
 // CLAUDE.md principle 1 rules out), not a second kind of state.
 //
 // Every existing `conversation.mode === "temporary"` gate already
-// scattered through this file and the retired turn engine (logTurnSafely's turn-row
+// scattered through this file and the retired turn engine (turn persistence in lib/turnMachine/'s turn-row
 // skip, insertProvisionalTurn's skip, the rolling-summary skip,
 // appendedAsk's skip, crisis-continuity's skip) fires correctly the
 // moment the `Conversation` object passed around has `mode: "temporary"`
@@ -840,7 +840,7 @@ function createTemporaryConversation(actor: PersonRow, surface: Surface, compani
   return record;
 }
 
-/** logTurnSafely()'s (the retired turn engine) own persistence point for a
+/** turn persistence in lib/turnMachine/'s (the retired turn engine) own persistence point for a
  * temporary turn: never the DB, but still remembered for the rest of
  * this session so the next turn in the same temporary chat has real
  * context - the gap a naive "just skip persistence" design would have
@@ -940,20 +940,12 @@ export function turnPlanOf(row: Pick<ConversationTurnRow, "plan">): ReplyPlan | 
   try { const parsed = ReplyPlanSchema.safeParse(JSON.parse(row.plan)); return parsed.success ? parsed.data : null; } catch { return null; }
 }
 
-export function speakerEvidenceOf(row: Pick<ConversationTurnRow, "speakerEvidence">): SpeakerEvidence | null {
-  if (!row.speakerEvidence) return null;
-  try { return JSON.parse(row.speakerEvidence) as SpeakerEvidence; } catch { return null; }
-}
 
-export function presentOf(row: Pick<ConversationTurnRow, "present">): PresentPerson[] {
-  if (!row.present) return [];
-  try { const parsed = JSON.parse(row.present); return Array.isArray(parsed) ? parsed as PresentPerson[] : []; } catch { return []; }
-}
 
 /** SAFETY-01: the safety action, source and reply of the conversation's
  * latest turns, newest first, for the crisis state and the stop rule. */
 // getmaipai/home#131: excludes status="running" for the same reason
-// lastTurnSubjects() does - called from inside prepareTurn(), after
+// lastTurnSubjects() does - called from inside the turn machine, after
 // this turn's own provisional row already exists, to check the
 // CONVERSATION's recent safety history (the crisis-state and stop-rule
 // checks) - a placeholder safetyAction/replyText from this same turn's
@@ -987,14 +979,6 @@ export function recentTurnSafety(conversationId: string, limit: number): { safet
  * composed package reply (source `plugin`, its text on the row and not
  * in the retained result) can be read back for the turns whose
  * outcomes were read. */
-export function turnRowsById(ids: readonly string[]): { id: string; source: string; replyText: string }[] {
-  if (ids.length === 0) return [];
-  return db
-    .select({ id: conversationTurns.id, source: conversationTurns.source, replyText: conversationTurns.replyText })
-    .from(conversationTurns)
-    .where(inArray(conversationTurns.id, [...ids]))
-    .all();
-}
 
 /** ASK-01: the SubjectRefs off a turn row, each parsed through the
  * generated schema; an empty list for a row without any or one that
@@ -1015,7 +999,7 @@ export function turnSubjectsOf(row: Pick<ConversationTurnRow, "subjects">): Subj
  * one did).
  *
  * getmaipai/home#131: excludes status="running" - this reads "the
- * previous turn" from INSIDE prepareTurn(), after insertProvisionalTurn()
+ * previous turn" from INSIDE the turn machine, after insertProvisionalTurn()
  * has already written the CURRENT turn's own row (a real one, but
  * status "running", `subjects: null` until logTurn() finishes it).
  * Without this filter, since that row is now the newest by createdAt,
@@ -1037,16 +1021,6 @@ export function lastTurnSubjects(conversationId: string): SubjectRef[] {
  * turn row's bounded media JSON, never in prompt history. Excludes a
  * "running" row for the same reason `lastTurnSubjects()` does
  * (getmaipai/home#131). */
-export function lastTurnMedia(conversationId: string): { media?: Media; media_items?: Media[] } {
-  const row = db
-    .select({ media: conversationTurns.media })
-    .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
-    .orderBy(desc(conversationTurns.createdAt))
-    .limit(1)
-    .get();
-  return mediaFields(row?.media ?? null);
-}
 
 /** CHAT-13 (chunk C): the subjects of the conversation's last two turns,
  * newest first, for the carried-unresolved decay (dev.md section 16
@@ -1195,7 +1169,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
     // vanished between session validation and this call, a lock) block
     // the turn itself - the exact "logging must never turn a successful
     // generation into a reported failure" contract logTurn() already
-    // holds (see logTurnSafely()'s own comment in the retired turn engine),
+    // holds (see turn persistence in lib/turnMachine/'s own comment in the retired turn engine),
     // extended here since conversation resolution now runs before a
     // reply is even generated (step 3), not only after. The in-memory
     // record is returned anyway so the turn can still proceed - a real
@@ -1206,7 +1180,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
 }
 
 /** The implicit path every real turn goes through (the retired turn engine's
- * prepareTurn()): `conversationId` absent resolves to the actor's own
+ * the turn machine): `conversationId` absent resolves to the actor's own
  * currently open conversation for this surface, creating one if none
  * exists yet; given, it must be a real, non-deleted conversation
  * belonging to this actor - never someone else's, and never a stale id
@@ -1452,9 +1426,6 @@ export function queueOpenQuestion(input: { person: string; conversationId?: stri
 }
 
 /** The person's oldest pending question, or null. */
-export function nextOpenQuestionFor(personId: string): OpenQuestionRow | null {
-  return pendingOpenQuestionsFor(personId)[0] ?? null;
-}
 
 /** Every pending question of the person's, oldest first, the stale
  * ones expired first (the engine picks the one in play). */
@@ -3430,7 +3401,7 @@ export interface RoutingStats {
   plugin: number;
   pluginError: number;
   /** A command primitive fires before the plugin floor even runs
-   * (the retired turn engine's prepareTurn(), "checked before the plugin floor"),
+   * (the turn machine, "checked before the plugin floor"),
    * but for this metric's purposes it's the same kind of thing plugin/
    * pluginError are: a deterministic match that never reached the model.
    * A code review (2026-09-05) found the original version of this
@@ -3446,7 +3417,7 @@ export interface RoutingStats {
   /** model / (plugin + pluginError + command + commandError + model) -
    * the exact number 4.5's own plan names as the decision input ("count
    * fall-throughs... and decide on tier 2 from the eval number").
-   * `safety_refuse` never reaches routing at all (prepareTurn() checks
+   * `safety_refuse` never reaches routing at all (the turn machine checks
    * safety before the deterministic floor even runs), so it's excluded
    * from both sides of this ratio - counting it would understate the
    * real fall-through rate against everything routing actually had a

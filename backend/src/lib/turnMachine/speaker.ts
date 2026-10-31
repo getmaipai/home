@@ -15,7 +15,7 @@ export function speakerIsAnonymous(state: Pick<TurnState, "surface" | "actor" | 
 
 /** THIN-0N (rules 0 and 12): the band every moderation and shaping read
  * uses, effectiveBand()'s own result exactly as the old engine file's
- * prepareTurn() derives it. An unidentified robot speaker is the child
+ * the turn machine derives it. An unidentified robot speaker is the child
  * band even when the signed-in person is an adult, unless the robot has a
  * companion assigned (ROBOT-COMPANION-01, owner's ruling 2026-10-21): then it
  * is that companion's type. Every other turn is the signed-in person's own

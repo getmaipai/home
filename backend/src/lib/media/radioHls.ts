@@ -101,7 +101,6 @@ export async function openHlsResource(personId: string, station: SavedStation, r
   } finally { clearTimeout(timer); }
 }
 
-export function hlsResourceUrl(station: SavedStation, routeBase = "/api/plugins/music/radio/hls"): string { return `${routeBase}/${encodeURIComponent(station.id)}/playlist`; }
 export const decodeHlsResource = (token: string): string | null => {
   try { const normalized = token.replace(/-/g, "+").replace(/_/g, "/"); return decodeURIComponent(escape(atob(normalized + "=".repeat((4 - normalized.length % 4) % 4)))); }
   catch { return null; }

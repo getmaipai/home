@@ -24,7 +24,6 @@ import { StackPicturesError, submitEdit } from "./stack";
 import { QUICK_MODEL } from "./quality";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
-export const EDIT_KINDS = ["remove_background", "upscale", "change"] as const;
 
 /** Every Stack edit operation, including reference edits, is handled by Klein. */
 export function nameEditModel(form: FormData): void {

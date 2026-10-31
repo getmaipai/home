@@ -1,5 +1,5 @@
 // THIN-7C (rule 12): document attachments on the default path, ported from
-// the old path's prepareTurn() (the old engine file) with the same rules.
+// the turn machine (the old engine file) with the same rules.
 // Each document is checked for capacity (before it is parsed), parsed to text
 // and refused with one safe line if it cannot be read; only when every
 // document has passed is anything written: the turn's provisional row (the

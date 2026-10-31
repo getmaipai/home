@@ -389,10 +389,6 @@ export function syncMediaScanner(deps: ScanDeps = {}): void {
   }
 }
 
-export function stopMediaScanner(): void {
-  for (const entry of timers.values()) clearInterval(entry.timer);
-  timers.clear();
-}
 
 
 /** Boot: one interval per root, and a first pass a minute later for any root not scanned within its own interval. */

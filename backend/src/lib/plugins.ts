@@ -502,7 +502,7 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
  * see recipe-interpreter.ts and packageHost.ts.
  *
  * `turnId`, when this run is happening inside a conversation turn
- * (the retired turn engine's prepareTurn(), the only real caller that has one),
+ * (the turn machine, the only real caller that has one),
  * is handed straight to createHost() so anything the recipe remembers
  * is attributed to that turn (step 2's provenance rule) rather than the
  * package id. Omitted for every other caller (a direct
@@ -537,12 +537,6 @@ export function validatePackageArgs(manifest: PackageManifest, inputs: unknown):
 /** CHAT-15: the household-safe line for a failed run, never the
  * diagnostic: a Tier 1 handler's own fallback line (502), the error
  * catalogue's spoken fallback for a typed code, or the plain apology. */
-export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>, { ok: false }>): string {
-  if (result.status === 502 && result.fallback_reply?.reply?.text) return result.fallback_reply.reply.text;
-  const code = (result as { code?: string }).code;
-  const catalogued = code ? ERROR_CATALOG.find((e) => e.code === code) : undefined;
-  return catalogued?.spoken_fallback ?? "Sorry, I couldn't do that.";
-}
 
 /** Weather with no place to look up. Mirrors the almanac's set-the-home-place note. */
 export const WEATHER_NO_PLACE_NOTE = "I don't know where you are yet, so I can't look up the weather. Tell me a city, or an owner or admin can set the Home location in Settings.";
@@ -595,7 +589,7 @@ function timerInputs(inputs: Record<string, unknown>): Record<string, unknown> {
  * one read both share.
  *
  * `turn`, when this run is happening inside a conversation turn
- * (the retired turn engine's prepareTurn(), the only real caller that has one), is
+ * (the turn machine, the only real caller that has one), is
  * handed straight to createHost() so anything the recipe remembers is
  * attributed to that turn (step 2's provenance rule) rather than the
  * package id. Omitted for every other caller (a direct

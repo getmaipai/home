@@ -303,10 +303,6 @@ export function recentProgress(personId: string, limit: number): MediaProgress[]
   return db.select().from(mediaProgress).where(eq(mediaProgress.personId, personId)).orderBy(desc(mediaProgress.updatedAt)).limit(limit).all().map(progressFromRow);
 }
 
-export function itemKindsFor(ids: readonly string[]): Map<string, ProgressKind> {
-  if (ids.length === 0) return new Map();
-  return new Map(db.select({ id: mediaItems.id, kind: mediaItems.kind }).from(mediaItems).where(inArray(mediaItems.id, [...ids])).all().map((r) => [r.id, r.kind as ProgressKind]));
-}
 
 export function __resetProgressForTests(): void {
   pending.clear();

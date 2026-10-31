@@ -159,7 +159,6 @@ export function decideForLane(input: LaneDecisionInput): AgeDecision {
 }
 
 /** Whether any image of the check shows a possible minor (for the admin's log line). */
-export function anyPossibleMinor(checks: readonly ImageCheck[]): boolean { return checks.some((check) => check.ok && showsPossibleMinor(check.verdict)); }
 
 /** The lane a finished item is held to: the person's own band (the surface it was asked on is decided at the gate before it was made). */
 export function laneOfPerson(actor: PersonRow): Lane { return laneOf({ actor, band: speakerAgeBand(actor, new Date()) }); }

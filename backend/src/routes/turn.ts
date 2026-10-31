@@ -687,7 +687,7 @@ export async function* streamTurnEvents(
   }
   try {
     const iterator = result.tokens[Symbol.asyncIterator]();
-    // FAST-04: start the timer from startedAt (when prepareTurn() began),
+    // FAST-04: start the timer from startedAt (when the turn machine began),
     // not from when we enter this function, so the cue fires 900 ms after
     // the utterance arrived when nothing has streamed yet.
     const elapsedMs = Date.now() - result.startedAt;

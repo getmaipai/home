@@ -19,17 +19,8 @@
 // for hypothetical future requirements" warns against - documented as
 // deferred in docs/BACKLOG.md, not silently skipped.
 //
-// lib/selfUpdate.ts (verify, back up, stage into releases/<version>,
-// swap, restart, health-check-or-roll-back) is NOT built here either:
-// it needs a real service to restart under (step 11, not built yet - no
-// release has ever been cut, so `main`'s own `releases/` layout has
-// never existed on a real machine either) and cross-cutting "never
-// during a conversation/generation/download/playback" checks into
-// the retired turn engine, packageHost.ts and voice playback - all other
-// sessions' files. Attempting it now would be unverifiable by
-// construction (nothing real to restart, nothing real to roll back to)
-// and risks stepping on infrastructure step 11 hasn't decided the shape
-// of yet.
+// Updates are installed by the household owner from this computer with
+// the installer, or promoted through scripts/ship.sh.
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { appUpdateState } from "@/db/schema";
@@ -92,11 +83,10 @@ export interface UpdateProjection {
   /** No other channel exists yet - GitHub Releases has no beta/nightly
    * concept this project uses today. */
   channel: "stable";
-  /** No download/apply mechanism exists yet (lib/selfUpdate.ts, not
-   * built - see this file's own header) - always null. */
+  /** Home does not install from this projection; the household owner
+   * runs the install command from this computer. */
   progress: null;
-  /** Nothing this hub can name is required before an update could apply
-   * today, since nothing applies updates yet. */
+  /** No prerequisites are currently represented in the update projection. */
   needs: string[];
   blockedBy: string | null;
   checkedAt: string | null;
@@ -270,8 +260,7 @@ async function checkRelease(target: ReleaseTarget): Promise<boolean> {
     // Fires once per genuine transition to a new version, never once
     // per check - a code review (2026-09-06) found the original version
     // re-notifying every single day forever for the same still-
-    // unapplied release, since nothing here ever advances
-    // installedVersion() (self-update isn't built). The same "notify on
+    // unapplied release, since installation is an owner-run action. The same "notify on
     // open, not on every recheck" discipline lib/issues.ts's
     // raiseIssue() already applies to Repairs items.
     if (projection.latest && isNewerVersion(projection.installed, projection.latest) && currentNotifiedVersion() !== projection.latest) {
@@ -312,11 +301,8 @@ function projectionFromState(state: StoredState): UpdateProjection {
     channel: "stable",
     progress: null,
     needs: [],
-    // Nothing can actually apply an update yet (lib/selfUpdate.ts isn't
-    // built), so a real update being available is itself the block -
-    // never null when one exists, so a future UI never implies a
-    // ready-to-click "update now" button that would do nothing.
-    blockedBy: needsUpdate ? "self-update is not built yet - update by hand from the GitHub release" : null,
+    // Installation is an owner-run action from this computer.
+    blockedBy: needsUpdate ? "Updates are installed by the household owner from this computer. Open Settings, Updates for the current release and the one-line install command." : null,
     checkedAt: state.checkedAt,
     error: state.error,
   };

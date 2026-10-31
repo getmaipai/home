@@ -84,7 +84,6 @@ interface Active { personId: string; stationId: string; stop: () => void }
 const active = new Set<Active>();
 const titles = new Map<string, string>();
 
-export function activeStreamCount(): number { return active.size; }
 export function __resetRadioStreamsForTests(): void {
   for (const entry of [...active]) entry.stop();
   active.clear();
@@ -109,7 +108,6 @@ export function claimRadioSlot(personId: string, stationId: string, stopNew: (st
   return release;
 }
 
-export function releaseRadioSlot(release: () => void): void { release(); }
 
 /** Whether this person's play would be refused for the home's cap (their own current stream does not count: it is replaced). */
 function homeFull(personId: string): boolean {

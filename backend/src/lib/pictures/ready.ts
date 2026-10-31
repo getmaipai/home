@@ -5,6 +5,7 @@
 import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { imageStatus, type StackImageStatus } from "./stack";
+import { QUICK_MODEL } from "./quality";
 
 let cached: { at: number; status: StackImageStatus | null } | null = null;
 let forTests: StackImageStatus | null | undefined;
@@ -46,8 +47,8 @@ export async function pictureEngineReady(): Promise<boolean> {
 /** A test status that is ready. */
 export function readyStatusForTests(overrides: Partial<StackImageStatus> = {}): StackImageStatus {
   return {
-    state: "idle", phase: null, available: true, reason: null, default_model: "flux2-klein-4b",
-    models: [{ id: "flux2-klein-4b", family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 }],
+    state: "idle", phase: null, available: true, reason: null, default_model: QUICK_MODEL,
+    models: [{ id: QUICK_MODEL, family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 }],
     loras_supported: true, edit: { generative: true, masked: true, references: 2 },
     limits: { min_side: 256, max_side: 2048, size_step: 16, max_n: 4, max_prompt_chars: 2000, max_loras: 3, queue_max: 8 }, idle_unload_s: 600,
     memory: { fits: true, reason: null, peak_gb: 13.5 },

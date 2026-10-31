@@ -20,6 +20,7 @@ import type { Surface } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readSlot, slotIsOff } from "@/lib/tiers";
+import { QUICK_MODEL } from "@/lib/pictures/quality";
 // Registers the mirror from the legacy Quick and Detailed keys into the slots this file reads.
 import "@/lib/tierSlotMigration";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -104,7 +105,7 @@ export function householdPictureQuality(): "quick" | "detailed" {
 /** The picture Standard slot (`engines.image.tier.standard`; migrated from `generation.picture_quick_model`): "ernie" (default) or "klein", the model behind Quick pictures. */
 export function householdQuickModel(): "ernie" | "klein" {
   try {
-    return readSlot("image", "standard").model === "flux2-klein-4b" ? "klein" : "ernie";
+    return readSlot("image", "standard").model === QUICK_MODEL ? "klein" : "ernie";
   } catch {
     return "ernie";
   }

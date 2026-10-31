@@ -34,7 +34,9 @@ export function sessionSignInSource(c: Context<AppEnv>, deviceId?: string | null
 /** Sessions past expiry just stop authenticating; sweep them so the table
  * doesn't grow unbounded. Call from a boot/scheduled sweep. */
 export function pruneExpiredSessions() {
-  return db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString()));
+  const expired = db.select({ id: sessions.id }).from(sessions).where(lt(sessions.expiresAt, new Date().toISOString())).all();
+  if (expired.length) db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString())).run();
+  return expired.length;
 }
 
 export function issueSession(c: Context<AppEnv>, personId: string, source: SessionSignInSourceType, deviceId?: string | null): void {

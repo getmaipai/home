@@ -58,7 +58,3 @@ export function findFolderArt(names: readonly string[]): string | null {
   }
   return null;
 }
-
-export function isImageName(name: string): boolean {
-  return IMAGE_EXTENSIONS.includes(extensionOf(name));
-}

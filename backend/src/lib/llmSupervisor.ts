@@ -636,9 +636,6 @@ export function getEngineStatus(): EngineStatus {
  * and configured Stack follow complete()'s own routing decision and do
  * not use this supervisor; `none` and `starting` remain valid because
  * the local engine starts on demand. */
-export function chatEngineDown(): boolean {
-  return chatAvailabilityState().availability === "unavailable";
-}
 
 /** Ask the supervisor to retry a refused turn in the background, rate
  * limited so repeated messages cannot cause a spawn storm. */
@@ -692,9 +689,6 @@ export function getLastPostLoadCheck(): (PostLoadCheckResult & { modelId: string
  * kills, so a `bun --hot` reload's own re-run of that sweep never SIGKILLs
  * the still-healthy engine this same registry (see the `state` object
  * above) is about to hand right back to the fresh module instance. */
-export function getChatLivePid(): number | null {
-  return state.chatBackend?.pid ?? null;
-}
 
 /** Test-only: stop whatever backend is running (spawned process or stub
  * server) and clear the cached client, the same reset-between-test-files

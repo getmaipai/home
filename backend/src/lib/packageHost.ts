@@ -26,7 +26,7 @@
 // real, permissioned paths for that). This was the one thing genuinely
 // blocking every fetch-based plugin until the interpreter itself could
 // await a host call at all (recipe-interpreter.ts, both languages, made
-// async the same day this landed) - `runPlugin()`/`prepareTurn()` now
+// async the same day this landed) - `runPlugin()`/`the turn machine` now
 // await through to here.
 //
 // Everything else (speak.sentence, camera.still, ocr.read, files.*,
@@ -439,7 +439,7 @@ async function attemptHttpFetch(
         // spec/errors/errors.json, not an unreachable network: the host
         // answered and the resource does not exist. A Tier 0 pattern
         // winner reporting it falls through to the model
-        // (the retired turn engine's prepareTurn()); every other status stays the
+        // (the turn machine); every other status stays the
         // upstream failure it is.
         const code = response.status === 404 || response.status === 410 ? "not_found" : "network_unreachable";
         return {
@@ -2387,7 +2387,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // deeper gap this fix alone didn't: `createArtifact()` below
         // used to fail its own foreign-key constraint against
         // conversationTurns, since that row genuinely didn't exist yet
-        // at this point in a real turn - the retired turn engine's `prepareTurn()`
+        // at this point in a real turn - the turn machine
         // now writes a real, minimal row for this exact turn id before
         // anything else runs (conversationHistory.ts's
         // `insertProvisionalTurn()`), so the FK this insert needs is

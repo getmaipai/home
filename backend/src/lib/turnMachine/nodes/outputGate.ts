@@ -714,7 +714,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     return { outcome: { ok: true }, output: { refused: false, text: failureLine("other", state.plan?.age_band !== "adult"), sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
   }
 
-  // THIN-0N: the speaker's effective band, as the old path's prepareTurn().
+  // THIN-0N: the speaker's effective band, as the turn machine.
   const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
 
   // STREAM-NEXT-01 (b), ruling point 1: on a streamed turn output_gate

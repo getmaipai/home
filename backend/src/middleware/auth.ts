@@ -45,9 +45,8 @@ export function __clearSessionCacheForTests(): void {
 // deleting a device's `sessions` rows in the DB isn't enough on its own
 // while this 10s in-memory cache could still hand back a cached hit for
 // one of them, the same staleness gap this comment already describes
-// for the `enabled` flag below. Also ready for a future delete-person or
-// role-change route (see docs/dev.md's deferred list), which would need
-// the identical invalidation.
+// for the `enabled` flag below. Person deletion and role changes invalidate
+// the same cache when their routes update a profile.
 export function invalidateSessionCacheForPerson(personId: string): void {
   for (const [key, entry] of sessionCache) {
     if (entry.person.id === personId) sessionCache.delete(key);
@@ -59,8 +58,8 @@ export function invalidateSessionCacheForPerson(personId: string): void {
 // filter deletedAt: a deleted person's existing session would keep
 // authenticating for up to 7 days, and a deleted person's PIN/password
 // would keep signing them in fresh via /verify-secret. No route in this
-// slice sets deletedAt yet (delete-person is deferred), but the read path
-// is fixed now so the invariant holds the moment one does. The 10s cache
+// personLifecycle.ts soft-deletes people, and the read path enforces it.
+// The 10s cache
 // TTL still bounds how fast a DB-side deletion propagates to an
 // already-cached session, the same staleness window profile edits have.
 //

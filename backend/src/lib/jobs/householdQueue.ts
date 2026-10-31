@@ -87,9 +87,6 @@ export async function endMaxWindow(): Promise<boolean> {
 }
 
 let queuePolicy: ScorePolicy = DEFAULT_POLICY;
-export function setQueuePolicy(policy: ScorePolicy): void { queuePolicy = policy; }
-export function getQueuePolicy(): ScorePolicy { return queuePolicy; }
-
 type UsageCredit = { personId: string; seconds: number; at: number };
 const usageCredits: UsageCredit[] = [];
 export function recordUsage(personId: string, runningSeconds: number, now: number): void {

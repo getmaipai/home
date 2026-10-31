@@ -61,6 +61,7 @@ import { sweepFavicons } from "@/lib/favicons";
 import { sweepAnswerImages } from "@/lib/answerImages/cache";
 import { sweepFetchCache } from "@/lib/retrieval/fetchCache";
 import { sweepPackageCache } from "@/lib/packageCache";
+import { pruneExpiredSessions } from "@/lib/session";
 import { prefetchNewsText } from "@/lib/news/prefetch";
 import { prefetchNewsPictures } from "@/lib/news/prefetchPictures";
 import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
@@ -392,6 +393,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // Retired date-driven aging job: keep persisted schedules harmless.
   "people.apply_age_band_changes": async () => {
     await applyAgeBandChanges();
+  },
+  "sessions.prune_expired": () => {
+    pruneExpiredSessions();
   },
   // SRC-ICON-01: the favicon cache's own daily sweep (lib/favicons.ts) -
   // an entry nobody has opened in 30 days goes, and the whole cache

@@ -212,7 +212,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
     reasoning,
-    // home#147: the old engine file's own logTurnSafely() (the old path)
+    // home#147: the old engine file's own turn persistence in lib/turnMachine/ (the old path)
     // sets both of these from the identical outcomes list - never
     // called here, so the new path built no structured part (the
     // weather/almanac card) and no artifact (write_document's own
@@ -300,7 +300,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // THIN-0L: the row marks a self-harm signal on this turn's input or on
   // its reply, whatever the reply's own action, so the conversation stays
   // in the crisis state for the next CRISIS_STATE_TURNS turns. The same
-  // expression the old path's logTurnSafely() uses; state.crisis is not
+  // expression the turn machine uses; state.crisis is not
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
@@ -330,7 +330,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   state.askCommit?.(value.reply.text);
   // PROJECT-START-01 (lib/projects/post.ts's own header): this turn's
   // own conversation_turns row is only ever written here, at the very
-  // end - unlike the legacy the old engine file's prepareTurn(), nothing on
+  // end - unlike the legacy the old engine file's the turn machine, nothing on
   // this path writes a provisional row up front. A project that finishes
   // fast enough (every scripted test; a real one-step project on a fast
   // engine) can reach its terminal state, and try to attach its result to
@@ -496,7 +496,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
 
   // THIN-0N: the speaker's effective band (an unidentified robot speaker
   // is the child band), for the signal, the plan and the stream gate,
-  // as the old path's prepareTurn() derives it.
+  // as the turn machine derives it.
   const turnId = opts.turnId ?? newConversationTurnId();
   const supersedes = resolveSupersedes(opts.supersedes, conversation.id) ?? undefined;
   // Old path: a continued turn that does not resolve keeps the id the client

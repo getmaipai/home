@@ -7,7 +7,7 @@
 // chat-history/episode write a parent might otherwise review - real,
 // even though a genuinely flagged message still notifies independently
 // (the retired turn engine's notifyOncePerTurn(), which never goes through
-// logTurnSafely()). `weatherCardQuestion()` (../homeCardQuestions.ts,
+// turn persistence in lib/turnMachine/). `weatherCardQuestion()` (../homeCardQuestions.ts,
 // alias-free so HomePage.tsx's WeatherCard can import the identical
 // function - a first draft hand-duplicated the template string here
 // instead, which a second review pass caught) is the one place that

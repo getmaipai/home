@@ -213,9 +213,6 @@ const refusals = new Map<string, StackRefusal>();
  * engine still loading says to give it a moment. The check reads the
  * engine's own diagnostic, never a household member's words (the same
  * footing nodes/model.ts's "could not reach" check already stands on). */
-export function householdStackRefusalLine(offline_reason: string | undefined, state?: string): string {
-  return FAILURE_COPY[stackRefusalKind(state, offline_reason)].adult;
-}
 
 /** CHAT-CALM-ERRORS-01b (design section 10): the raw facts of a failed
  * Stack call, kept beside the household line for an admin. Never shown to

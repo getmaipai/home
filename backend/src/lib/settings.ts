@@ -1026,10 +1026,6 @@ export function readLayerRow(personId: string, key: string): string | undefined 
     .where(and(eq(settingsValues.scope, `person:${personId}`), eq(settingsValues.key, key))).get()?.value;
 }
 
-export function readLayerSetBy(personId: string, key: string): string | undefined {
-  return db.select({ setBy: settingsValues.setBy }).from(settingsValues)
-    .where(and(eq(settingsValues.scope, `person:${personId}`), eq(settingsValues.key, key))).get()?.setBy ?? undefined;
-}
 
 export function writeLayerRow(personId: string, key: string, jsonText: string, setBy?: string): void {
   const scope = `person:${personId}`;

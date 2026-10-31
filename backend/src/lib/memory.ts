@@ -448,7 +448,7 @@ export interface RecallOptions extends ListOptions {
    /** The query's own embedding (step 5), pre-computed by the caller:
     * recall() itself stays synchronous (pure scoring given a vector it's
     * handed is CPU work, not I/O), so any caller that can afford the
-    * async embed() round trip (the retired turn engine's prepareTurn, already
+    * async embed() round trip (the retired turn engine's the turn machine, already
     * async; packageHost.ts's Host.memory.recall, made async for exactly
     * this) computes it first. Omitted (or when the embed backend is
     * down) falls back to keyword overlap for every candidate - the exact
@@ -550,7 +550,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  * embed backend, a down one, a malformed response) - recall() itself
  * already treats a missing queryVector as "fall back to keyword
  * overlap," so a caller never needs its own try/catch around this.
- * Shared by the retired turn engine's prepareTurn() and packageHost.ts's
+ * Shared by the turn machine and packageHost.ts's
  * Host.memory.recall, the two real async callers.
  *
  * Still no nomic query/passage instruction prefix here, deliberately
@@ -559,7 +559,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  * path is retired. Prefixing this file's own writes would need every ALREADY-
  * STORED `memoryEmbeddings` row re-embedded to match - a real migration
  * over a household's actual memories, not a hash-bump-and-forget the
- * way package examples could take. the retired turn engine's prepareTurn() also
+ * way package examples could take. the turn machine also
  * reuses the IDENTICAL utterance vector for recall (avoiding a second
  * HTTP round trip, a 2026-09-06 review fix), so a
  * query prefix here would silently mismatch routing.ts's own document

@@ -539,9 +539,6 @@ export function listSidecars(nowMs: number = Date.now()): Array<{
   return rows;
 }
 
-export function getSidecarLogs(id: string): string[] {
-  return registry.get(id)?.logRing ?? [];
-}
 
 /** Kills whatever's listening on `port`, best-effort. Moved here from
  * llmSupervisor.ts (2026-09-04's original home, see that file's `git log`
@@ -1439,12 +1436,6 @@ export async function startAllSidecars(): Promise<void> {
 
 /** Reverse startupOrder: whatever started last (most likely to depend on
  * something earlier) stops first. */
-export async function stopAllSidecars(): Promise<void> {
-  const ordered = [...registry.values()].sort(
-    (a, b) => (b.config.startupOrder ?? 0) - (a.config.startupOrder ?? 0),
-  );
-  for (const entry of ordered) await stopSidecar(entry.config.id);
-}
 
 let gracefulExitRegistered = false;
 

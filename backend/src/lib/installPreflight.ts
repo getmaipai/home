@@ -145,7 +145,3 @@ export async function checkInstallPreflight(opts: InstallPreflightOptions = {}):
       : row(opts, "release.unreachable", "warning", "Release host is unreachable", `Home could not reach the public release host ${releaseHost}.`, `A plain TCP connection to ${releaseHost}:443 failed or timed out.`, "Check the internet connection, then try again."),
   ];
 }
-
-export function installPreflightBlockers(rows: readonly InstallPreflightRow[]): InstallPreflightRow[] {
-  return rows.filter((item) => item.severity === "critical" || item.severity === "error");
-}

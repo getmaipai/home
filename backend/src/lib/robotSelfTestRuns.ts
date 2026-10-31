@@ -62,10 +62,6 @@ export function pruneRobotSelfTests(now = Date.now()): void {
   }
 }
 
-export function getRobotSelfTestResult(runId: string): RobotSelfTestResultShape | null {
-  pruneRobotSelfTests();
-  return results.get(runId)?.result ?? null;
-}
 
 export function __resetRobotSelfTestsForTests(): void {
   for (const run of pending.values()) {

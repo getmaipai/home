@@ -141,7 +141,6 @@ export async function reconcileServiceBlockIssues(now = new Date(), observedInte
   } else resolveIssue("internet-service", "internet");
 }
 
-export const resolveServiceBlockIssues = (now = new Date()) => reconcileServiceBlockIssues(now);
 export function __setInternetStateForTests(state: "up" | "down" | null): void { internetState = state; }
 
 export function knownServiceComponents(): string[] {

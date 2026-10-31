@@ -362,12 +362,9 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
-  // HOME-STACK-03: the Stack event bridge (lib/stack/events.ts) fires these
-  // for the four feed ids that mean something to a person. The Stack's own
-  // docs say "the one thing the stack does is notify" is Home's job, and
-  // this is the declaration side of that: `engines.` namespace keeps them
-  // apart from `updates.` (Home's own updater) while both are engine
-  // health. All four are `time_sensitive`: a Stack that updated, failed to
+  // HOME-STACK-03 declares these four adult-facing engine notifications
+  // in the `engines.` namespace, apart from `updates.` (Home's own updater).
+  // All four are `time_sensitive`: a Stack that updated, failed to
   // update, or has an open warning/critical item is something an admin
   // should see soon, but none is urgent the way a safety flag or a
   // failing backup is, and none is `immediate`. All `adults` audience:

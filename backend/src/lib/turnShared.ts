@@ -37,7 +37,7 @@ const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat", "robot"]);
 
 /** Shared by TurnOpResult and TurnStreamResult: runTurn() and
  * runTurnStream() run the identical validation/safety/plugin-floor logic
- * (prepareTurn(), below) and so must report the identical error
+ * (the turn machine, below) and so must report the identical error
  * vocabulary for the identical failure states - a code review
  * (2026-09-04) found the two had drifted into independently-hand-typed
  * copies of the same union, one bad refactor away from silently
@@ -98,7 +98,7 @@ import { CRISIS_RESOURCES_TEXT } from "@/lib/failureCopy";
 export { CRISIS_SUPPORT_TITLE, CRISIS_SUPPORT_ACTIONS, crisisSupportFor } from "@/lib/failureCopy";
 
 /** The one derivation of `crisis_resources` from a SafetyResult, shared
- * by prepareTurn()'s own input-side use below and step 9's two
+ * by the turn machine's own input-side use below and step 9's two
  * output-side call sites (runTurn(), runTurnStream()'s finalize()) - a
  * review (2026-09-05) found the streaming path's own fix for "an
  * output-side flag needs its own crisis_resources, not just the input
@@ -570,7 +570,7 @@ export type TurnStreamResult =
       answerMetadata?: import("@/wire").AnsweredBy;
       signal: TurnSignal;
       /** FAST-04: `Date.now()` at the top of runTurnStream(), before
-       * prepareTurn() ran. streamTurnEvents() counts its 900 ms
+       * the turn machine ran. streamTurnEvents() counts its 900 ms
        * spoken-cue timer from here, not from its own first `.next()`,
        * so the cue means "900 ms since the utterance arrived with
        * nothing said yet", whatever routing and prefill cost. */

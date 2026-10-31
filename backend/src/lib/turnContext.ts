@@ -1,7 +1,7 @@
 // CHAT-01 (docs/dev/session-a.md): one ephemeral turn context, the
 // decision record's "One ephemeral turn context" (docs/dev.md,
 // 2026-09-07) made real. Runtime views over existing records, built once
-// per turn by the retired turn engine's prepareTurn() and read by both the prompt
+// per turn by the turn machine and read by both the prompt
 // and the guards, never persisted and never a second record system.
 // The point: the prompt's context message and guards.ts's GuardContext
 // used to be assembled from the same retrieval results by two separate
@@ -437,7 +437,7 @@ export function intentFor(utterance: string, signal: TurnSignal): TurnIntent {
 
 /** Sets `includedEvidenceIds` to the items whose rendered text appears
  * intact in the context message the model will actually see: the rule
- * prepareTurn()'s `actuallyInjected` already applied to memory bullets
+ * the turn machine's `actuallyInjected` already applied to memory bullets
  * (a section cap or the outer budget can drop or cut a line), applied to
  * every kind. The utterance is always included. */
 export function markIncluded(ctx: TurnContext, contextMessage: string): void {

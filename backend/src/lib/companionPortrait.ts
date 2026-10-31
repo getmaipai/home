@@ -15,10 +15,6 @@ export function portraitPath(companionId: string, versionId: string): string | n
   return join(portraitRoot(), companionId, `${versionId}.webp`);
 }
 
-export function retainedPortraitExists(companionId: string, versionId: string): boolean {
-  const path = portraitPath(companionId, versionId);
-  return Boolean(path && existsSync(path));
-}
 
 export function readRetainedPortrait(companionId: string, versionId: string): Uint8Array | null {
   const path = portraitPath(companionId, versionId);

@@ -42,9 +42,6 @@ export function __resetDdgsForTests(): void {
 export function __setDdgsClockForTests(now: () => number): void {
   clock = now;
 }
-export function ddgsQuietUntil(): number {
-  return quietUntil;
-}
 
 function openQuietMode(): void {
   quietUntil = clock() + QUIET_WINDOWS_MS[Math.min(blockCount, QUIET_WINDOWS_MS.length - 1)]!;

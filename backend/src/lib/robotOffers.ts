@@ -220,7 +220,3 @@ export function declineRobotOfferFromChannel(deviceId: string, offerId: string, 
   closeOffer(offer, "declined", "", now);
   return true;
 }
-
-export function getRobotOffer(id: string): OfferRow | undefined {
-  return db.select().from(robotOffers).where(eq(robotOffers.id, id)).get();
-}

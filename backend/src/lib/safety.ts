@@ -25,7 +25,7 @@ function isMinorBand(band: AgeBand): boolean {
 }
 
 /** The one, real caller in a running conversation turn (the retired turn engine's
- * prepareTurn(), runTurn(), and runTurnStream()'s gateOutputSafety() all
+ * the turn machine, runTurn(), and runTurnStream()'s gateOutputSafety() all
  * pass the actor's real AgeBand, computed once via lib/ageBand.ts's
  * speakerAgeBand()) - also exercised directly (routes/safety.ts,
  * tests/safety.test.ts) so the wiring is proven independent of any one

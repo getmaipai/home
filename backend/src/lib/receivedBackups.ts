@@ -85,10 +85,6 @@ export function deleteReceivedBackup(deviceId: string, id: string): boolean {
  * rest of this backup story insists on (lib/backup.ts's own restore path
  * actually opens and queries a restored file rather than assuming a
  * successful decrypt proves it). */
-export function receivedBackupFileExists(deviceId: string, filename: string): boolean {
-  const path = join(deviceDir(deviceId), filename);
-  return existsSync(path) && statSync(path).isFile();
-}
 
 /** Called by lib/devices.ts's deleteDevice() and lib/personLifecycle.ts's
  * revokeAllCredentialsAndSessions() before they delete the owning device

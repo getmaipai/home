@@ -18,10 +18,7 @@ const isObj = (v: unknown): v is Json => v !== null && typeof v === "object" && 
 export class CodeRequestError extends Error {}
 
 /** The same list the Stack drops (stack lib/codingWire.ts DROPPED_CLIENT_SAMPLING): the model's own settings decide, not the client's defaults. */
-export const DROPPED_SAMPLING = [
-  "temperature", "top_p", "top_k", "min_p", "presence_penalty", "frequency_penalty",
-  "repeat_penalty", "repeat_last_n", "typical_p", "mirostat", "mirostat_tau", "mirostat_eta",
-] as const;
+
 
 // ---- request ------------------------------------------------------------------------------------------------------------------------
 

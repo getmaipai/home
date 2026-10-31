@@ -132,7 +132,6 @@ hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
 // denoHost.ts's registerGracefulExit() and index.ts's own Wyoming
 // shutdown all hook `process.on("exit", ...)`, which runs no matter how
 // the process ends - so nothing extra needs calling here.
-export const RESTART_EXIT_CODE = HUB_RESTART_EXIT_CODE;
 
 hostRoutes.post("/restart", requireRole("owner", "admin"), async (c) => {
   const response = c.json({ ok: true as const, restarting: true as const });

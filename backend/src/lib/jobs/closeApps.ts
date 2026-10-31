@@ -99,5 +99,4 @@ export function closedAppsLines(): string[] {
 }
 /** Jobs that closed apps and have not yet reopened them. */
 export function jobsAwaitingReopen(): string[] { return [...closedByJob.entries()].filter(([, record]) => !record.done).map(([id]) => id); }
-export function forgetClosedForJob(jobId: string): void { closedByJob.delete(jobId); }
 export function resetCloseAppsForTests(): void { closedByJob.clear(); lastFrontmost.clear(); }

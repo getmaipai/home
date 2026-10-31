@@ -281,8 +281,8 @@ auth.openapi(verifySecretRoute, async (c) => {
   // A code review (2026-09-04) found this route never checked
   // people.deletedAt, unlike /select and /profiles: a soft-deleted
   // person's credentials would keep working. No route in this slice sets
-  // deletedAt yet (delete-person is deferred, see docs/dev.md), but the
-  // check is added now so the invariant already holds when one lands.
+  // personLifecycle.ts soft-deletes people, so credentials for a deleted
+  // profile must stop working here as well.
   const person = db.select().from(people).where(eq(people.id, personId)).get();
   if (!person || person.deletedAt || !person.enabled) return c.json({ error: "Profile not found" }, 404);
 
@@ -347,8 +347,8 @@ auth.openapi(meRoute, (c) => {
 
 // A person changing (or, for a PIN-free profile, first setting) their own
 // PIN or password. Never another person's: routes/people.ts has no
-// edit-person route yet (docs/dev.md's own deferred list), and this
-// isn't that - self-service only, requireAuth's actor is always the
+// routes/people.ts supports profile edits, while this route is self-service
+// only; requireAuth's actor is always the
 // target. Reuses /verify-secret's exact throttle/lockout shape (both the
 // per-profile exponential backoff and the per-IP throttle) for the
 // current-secret check: a stolen session cookie alone must not be enough

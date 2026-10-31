@@ -40,9 +40,6 @@ export async function listStackModelDownloadJobs(): Promise<HomeJob[]> {
   } catch { return []; }
 }
 
-export function registerProducerJob(job: Omit<HomeJob, "createdAt" | "updatedAt">): HomeJob { return createJob(job); }
-export function updateProducerJob(id: string, patch: Parameters<typeof updateJob>[1]): boolean { return updateJob(id, patch); }
-
 /** Submit and mirror a Stack-owned image job; the Stack remains the executor and event authority. */
 export async function startImageProducerJob(input: { actorId: string; prompt: string; conversationId?: string | null }): Promise<HomeJob> {
   if (!isStackConfigured()) throw new Error("image generation requires a configured MaiPai Stack");
@@ -61,6 +58,7 @@ export async function startImageProducerJob(input: { actorId: string; prompt: st
     return job;
   }
 }
+
 
 /** Reconcile active image projections after a Stack link reconnect. The
  * Stack owns execution; Home only polls the persisted original job id. */

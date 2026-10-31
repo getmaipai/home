@@ -19,9 +19,6 @@ export const BLOCKLIST_KEYS: Record<AgeBand, string> = {
   adult: "search.blocklists.adult",
 };
 
-export function blocklistRow(id: string): BlocklistRow | undefined {
-  return BLOCKLIST_POLICY.lists.find((row) => row.id === id);
-}
 
 export function blocklistIds(): string[] {
   return BLOCKLIST_POLICY.lists.map((row) => row.id);
