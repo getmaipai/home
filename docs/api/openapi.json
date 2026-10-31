@@ -25493,6 +25493,13 @@
                         "cards"
                       ],
                       "description": "The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."
+                    },
+                    "cannot_run": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."
                     }
                   },
                   "required": [

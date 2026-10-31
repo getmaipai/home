@@ -20,6 +20,19 @@ const jobs = (view: ReturnType<typeof render>) => view.getByRole("group", { name
 const sw = (view: ReturnType<typeof render>, title: string) => view.getByRole("switch", { name: new RegExp(`^${title}: `) });
 
 describe("the plan step's job cards", () => {
+  test("a job the Stack says no tier can run stays off, cannot be switched on, and is not sent to download", async () => {
+    const start = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { cannot_run: ["videos"] })} start={start} onInstalled={() => {}} />);
+    await view.findByRole("group", { name: "What gets installed" });
+    const videos = sw(view, "Videos");
+    expect(videos.getAttribute("aria-checked")).toBe("false");
+    expect((videos as HTMLButtonElement).disabled).toBe(true);
+    expect(within(view.getByTestId("plan-job-videos")).getByText(/can't run this/)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
+    await waitFor(() => expect(start).toHaveBeenCalled());
+    const rows = (start.mock.calls[0] as unknown[])[1] as string[];
+    expect(rows.some((id) => id.startsWith("videos"))).toBe(false);
+  });
   test("shows a card per job with the chosen model's size, the total, the free space and a check", async () => {
     const plan = plans.p128!;
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB)} start={async () => ({})} onInstalled={() => {}} />);

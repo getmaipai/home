@@ -944,7 +944,7 @@ export interface PlanWording {
   disk?: PlanDiskView | null;
 }
 /** The setup plan read: Home's words, the licences and the job cards Settings also shows (AIMODELS-SETUP-01). */
-export interface PlanRead { plan?: unknown; wording: PlanWording; licences?: import("../../../shared/licensedRows").PlanLicence[]; choices?: import("../../../shared/aiChoices").AiChoicesResult | null }
+export interface PlanRead { plan?: unknown; wording: PlanWording; licences?: import("../../../shared/licensedRows").PlanLicence[]; choices?: import("../../../shared/aiChoices").AiChoicesResult | null; cannot_run?: string[] }
 export interface InstallStatusView {
   state: "none" | "installing_engine" | "engine_failed" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
   chatReady: boolean; complete: boolean; percent: number; completedBytes: number; totalBytes: number;

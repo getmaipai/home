@@ -52,6 +52,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const [engine, setEngine] = useState<InstallStatusView | null>(null);
   // One pick per job card (AIMODELS-SETUP-01): starts at the plan's defaults; the rows to install, the total and the disk check follow it.
   const [picks, setPicks] = useState<Picks>({});
+  // MEM-SPACE-05: jobs no tier can ever run on this computer stay off and download nothing.
+  const [cannotRun, setCannotRun] = useState<ReadonlySet<string>>(new Set());
   // Licensed rows (Detailed video): the notice is shown plainly and the install waits for the accept; unticking the row drops the need.
   const [licences, setLicences] = useState<PlanLicence[]>([]);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
@@ -59,7 +61,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   useEffect(() => {
     let active = true;
     setFailed(false);
-    readPlan(vram).then((result) => { if (active) { setRead(result); setLicences(result.licences ?? []); const plan = result.wording.disk?.plan; setPicks(plan && result.choices ? defaultPicks(setupJobs(result.choices.cards, plan), plan) : {}); } }).catch(() => { if (active) setFailed(true); });
+    readPlan(vram).then((result) => { if (active) { setRead(result); setLicences(result.licences ?? []); const plan = result.wording.disk?.plan; const no = new Set(result.cannot_run ?? []); setCannotRun(no); const base = plan && result.choices ? defaultPicks(setupJobs(result.choices.cards, plan), plan) : {}; setPicks(Object.fromEntries(Object.entries(base).map(([job, pick]) => [job, no.has(job) ? { ...pick, on: false } : pick]))); } }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
@@ -138,7 +140,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
         {disk ? <>
-          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label="What gets installed">{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack"))}</ItemGroup> : null}
+          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label="What gets installed">{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack", cannotRun.has(job.job) && !job.required))}</ItemGroup> : null}
           <PlanDiskSummary disk={disk} selected={selected} />
         </> : (
           <>
@@ -173,7 +175,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
 }
 
 /** One job, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
-function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choiceId: string }) => void, missingOnly: boolean) {
+function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choiceId: string }) => void, missingOnly: boolean, cannot: boolean) {
   const Icon = getIcon(JOB_ICONS[job.job]);
   const pick = picks[job.job];
   const chosen = job.options.find((option) => option.id === pick?.choiceId) ?? job.options[0]!;
@@ -184,7 +186,7 @@ function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choi
       <ItemMedia variant="icon"><Icon /></ItemMedia>
       <ItemContent>
         <ItemTitle>{job.title}</ItemTitle>
-        <ItemDescription clamp={false}>{on ? `${chosen.label}. ${chosen.description}` : job.summary}</ItemDescription>
+        <ItemDescription clamp={false}>{cannot ? "This computer can't run this, so nothing is downloaded for it." : on ? `${chosen.label}. ${chosen.description}` : job.summary}</ItemDescription>
         {job.options.length > 1 && on ? (
           <RadioGroup value={chosen.id} onValueChange={(value) => onPick({ on: true, choiceId: value })} aria-label={`${job.title}: which one`}>
             {job.options.map((option) => (
@@ -195,7 +197,7 @@ function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choi
       </ItemContent>
       <ItemActions>
         {on ? <span className="text-base text-muted-foreground">{size(chosen)}</span> : null}
-        <Switch checked={on} disabled={job.required} onCheckedChange={(next) => onPick({ on: next, choiceId: chosen.id })} aria-label={`${job.title}: ${on ? "on" : "off"}`} />
+        <Switch checked={on} disabled={job.required || cannot} onCheckedChange={(next) => onPick({ on: next, choiceId: chosen.id })} aria-label={`${job.title}: ${on ? "on" : "off"}`} />
       </ItemActions>
     </Item>
   );

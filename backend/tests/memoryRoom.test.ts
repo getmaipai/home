@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { capabilityView, readCapabilities, readReclaim, runReclaim } from "@/lib/memoryRoom";
+import { capabilityView, cannotRunJobs, readCapabilities, readReclaim, runReclaim } from "@/lib/memoryRoom";
 
 describe("reclaim", () => {
   test("counts idle models and bytes without ids", async () => {
@@ -28,5 +28,15 @@ describe("capability table", () => {
   });
   test("an older Stack reads as not available", async () => {
     expect((await readCapabilities(async () => undefined)).available).toBe(false);
+  });
+  test("cannotRunJobs lists only categories where no listed tier fits", () => {
+    const none = { machine_class: "p16", total_bytes: 1, rows: [
+      { category: "video" as const, tier: "standard" as const, fits_ever: false, needs_bytes: 20, cap_bytes: 9, model: null },
+      { category: "video" as const, tier: "max" as const, fits_ever: false, needs_bytes: 80, cap_bytes: 9, model: null },
+      { category: "image" as const, tier: "standard" as const, fits_ever: true, needs_bytes: 8, cap_bytes: 9, model: "i" },
+      { category: "chat" as const, tier: "standard" as const, fits_ever: false, needs_bytes: 10, cap_bytes: 9, model: null },
+    ] };
+    expect(cannotRunJobs(capabilityView(none))).toEqual(["videos"]);
+    expect(cannotRunJobs(capabilityView(undefined))).toEqual([]);
   });
 });

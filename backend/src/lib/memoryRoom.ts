@@ -45,3 +45,10 @@ export function capabilityView(raw: StackCapabilities | undefined): CapabilityVi
 export async function readCapabilities(read: () => Promise<StackCapabilities | undefined> = () => stackCall((client) => client.capabilities?.())): Promise<CapabilityView> {
   return capabilityView(await read());
 }
+
+/** MEM-SPACE-05: the setup jobs no tier of the capability table can ever run on this computer; the wizard leaves them off and downloads nothing for them. Chat is never listed (it is always installed). */
+const JOBS_OF_CATEGORY: Partial<Record<CapabilityRow["category"], string[]>> = { image: ["pictures", "picturesdetailed"], video: ["videos"], music: ["music"], voice: ["voice"] };
+export function cannotRunJobs(view: CapabilityView): string[] {
+  if (!view.available) return [];
+  return view.rows.filter((row) => row.cells.length > 0 && row.cells.every((cell) => !cell.fits)).flatMap((row) => JOBS_OF_CATEGORY[row.category] ?? []);
+}

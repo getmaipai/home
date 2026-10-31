@@ -29,6 +29,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems, webSearchNeedsSetup } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
+import { cannotRunJobs, readCapabilities } from "@/lib/memoryRoom";
 import { beginInstall, engineNeedsInstall, previewPlan } from "@/lib/installActions";
 import { startEngineInstall } from "@/lib/stackInstall";
 import { getStackClient } from "@/lib/stackEngine";
@@ -150,14 +151,14 @@ const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).op
 const planRoute = createRoute({
   method: "get", path: "/plan", tags: ["Setup"], summary: "What Home would install on the AI computer",
   request: { query: planQuery },
-  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), choices: z.object({ cards: z.array(z.unknown()), alwaysOn: z.unknown() }).nullable().optional().describe("The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from.") }) } }, description: "The Stack's plan and Home's words for it." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), choices: z.object({ cards: z.array(z.unknown()), alwaysOn: z.unknown() }).nullable().optional().describe("The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say.") }) } }, description: "The Stack's plan and Home's words for it." } },
 });
 setupRoutes.openapi(planRoute, async (c) => {
   const { vram_gb: vramGb } = c.req.valid("query");
   const preview = await previewPlan(vramGb);
   const disk = preview.wording.disk?.plan as DiskPlan | undefined;
   // The wizard shows the same job cards as Settings, so they come from the same builder (shared/aiChoices.ts).
-  return c.json({ ...preview, choices: disk ? await setupCards(disk) : null }, 200);
+  return c.json({ ...preview, choices: disk ? await setupCards(disk) : null, cannot_run: cannotRunJobs(await readCapabilities()) }, 200);
 });
 
 const installStartRoute = createRoute({
