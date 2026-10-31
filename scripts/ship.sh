@@ -105,7 +105,8 @@ before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
 # anything is stopped, when what it would still copy is large, so a new kind of big data cannot do the same again.
 snapshot_skip_min="${MAIPAI_SNAPSHOT_SKIP_MIN:-512M}"; max_copy_bytes="${MAIPAI_SHIP_MAX_COPY_BYTES:-$((5 * 1024 * 1024 * 1024))}"; copy_bytes=0
 if [[ -d "$live_data" ]]; then
-  copy_bytes="$(find "$live_data" -type f ! -size "+$snapshot_skip_min" ! -path '*/logs/*' -exec stat -f %z {} + 2>/dev/null | awk '{s+=$1} END {print s+0}')"
+  # A folder the shipping user cannot read (root-only keys, say) makes find exit non-zero; that must not end the script (pipefail, set -e).
+  copy_bytes="$( { find "$live_data" -type f ! -size "+$snapshot_skip_min" ! -path '*/logs/*' -exec stat -f %z {} + 2>/dev/null || true; } | awk '{s+=$1} END {print s+0}')"
 fi
 if (( copy_bytes > max_copy_bytes )); then
   finding="The installer's data copy before this upgrade would hold $((copy_bytes / 1048576)) MB (the limit is $((max_copy_bytes / 1048576)) MB), so the release would run long. Move the large downloaded data out of $live_data or make the installer skip it, then ship again."

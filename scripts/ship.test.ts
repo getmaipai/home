@@ -140,6 +140,14 @@ describe("ship pipeline", () => {
       expect(allowed.status).toBe(0);
     } finally { rmSync(dataDir, { recursive: true, force: true }); }
   }, 60_000);
+  test("a data folder the shipping user cannot read does not end the ship silently", () => {
+    const dataDir = join(live, "data"); const locked = join(dataDir, "keys"); mkdirSync(locked, { recursive: true });
+    writeFileSync(join(dataDir, "hub.db"), "x"); writeFileSync(join(locked, "secret"), "x"); chmodSync(locked, 0o000);
+    try {
+      const out = run([sha, "--before-green", "--dry-run"], { MAIPAI_HUB_LOCK_PATH: join(scratch, "missing.lock") });
+      expect(out.status).toBe(0); expect(out.stdout).toContain("sha=");
+    } finally { chmodSync(locked, 0o700); rmSync(dataDir, { recursive: true, force: true }); }
+  }, 60_000);
   test("preflight names one-time setup when helper is missing", () => {
     const out = run([sha, "--before-green"], { MAIPAI_PROMOTE_BIN: join(scratch, "missing-helper") }); expect(out.status).toBe(2); expect(out.stderr).toContain("install-promote.sh");
   }, 60_000);
