@@ -47,3 +47,5 @@ Missing, each its own small row:
 - **S6 per-category quiet windows** for pictures and music are not separate from chat's.
 - **Pins as settings:** `resources.pins` as named in section 7 does not exist; "never lower" lives under `resources.close_apps.never` and
   the profile rows. Confirm the spec name before building the Priorities panel.
+
+TIER-PRIO-03 landed with the lease slices: `decideDownshift` runs at every admission that lowers chat (acceptance test in `householdQueue.test.ts`).
