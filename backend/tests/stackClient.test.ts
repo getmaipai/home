@@ -196,6 +196,12 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
       body: {
         totalMemoryBytes: 16_000_000_000,
         capBytes: 12_000_000_000,
+        margin_bytes: 1_500_000_000,
+        profile: "fixture-p64",
+        slots: [
+          { category: "chat", tier: "standard", model: "qwen3-8b", peak_bytes: 5_000_000_000, verified: true },
+          { category: "video", tier: "boost", model: "wan-14b", peak_bytes: 8_000_000_000, verified: false },
+        ],
         freeMemoryBytes: 4_000_000_000,
         availablePercent: 25,
         pressure: "normal",

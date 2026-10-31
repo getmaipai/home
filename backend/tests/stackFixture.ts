@@ -170,7 +170,7 @@ export function startDefaultScriptedStack(): StackFixture {
       if (pathname === "/stack/v1/health") return Response.json({ health: [] });
       if (pathname === "/stack/v1/settings" || pathname === "/stack/v1/settings/apply") return Response.json({ sections: [], settings: [] });
       if (pathname === "/stack/v1/search/preview" || pathname === "/stack/v1/search/revert") return Response.json({ ok: true, enabled: false });
-      if (pathname === "/stack/v1/hardware/budget") return Response.json({ totalMemoryBytes: 0, capBytes: 0, freeMemoryBytes: 0, availablePercent: 0, pressure: "normal", memoryReadingDegraded: true, loaded: [], queue: [] });
+      if (pathname === "/stack/v1/hardware/budget") return Response.json({ totalMemoryBytes: 0, capBytes: 0, freeMemoryBytes: 0, availablePercent: 0, pressure: "normal", memoryReadingDegraded: true, margin_bytes: 1_073_741_824, profile: "fixture-p64", slots: [{ category: "chat", tier: "standard", model: "fixture-chat", peak_bytes: 4_294_967_296, verified: true }], loaded: [{ id: "image-tools", kind: "resident", peakBytes: 536_870_912, measured: true, lastUsedAt: now, idleTtlSeconds: 300, pinned: false, pid: null }], queue: [] });
       if (pathname === "/stack/v1/hardware") return Response.json({});
       if (pathname === "/stack/v1/fit-plan") return Response.json({ schema: 1, model: "scripted-model", context_tokens: 1, kv_cache_type: "f16", roles: [], total: unknownRange, cap: unknownRange, margin: unknownRange, paths: [{ path: "cpu", fits: false, verdict: "unknown" }], verdict: "unknown", bottleneck: "unknown" });
       if (pathname === "/stack/v1/updates" || pathname === "/stack/v1/updates/check") return Response.json(updates);

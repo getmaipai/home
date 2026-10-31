@@ -258,6 +258,9 @@ export interface BudgetResponse {
   freeMemoryBytes: number;
   availablePercent: number;
   pressure: "normal" | "warn" | "critical";
+  margin_bytes?: number;
+  profile?: string | null;
+  slots?: Array<{ category: "chat" | "pictures" | "video" | "music"; tier: "reduced" | "standard" | "boost" | "max"; model: string; peak_bytes: number; verified: boolean }>;
   memoryReadingDegraded: boolean;
   loaded: Array<{
     id: string;

@@ -9,6 +9,7 @@ import { sweepStaleDownloads } from "@/lib/modelDownload";
 import { startTrashSweeper } from "@/lib/trash/sweep";
 import { startMediaScanner } from "@/lib/media/scan";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
+import { startStackHardwareRefresh } from "@/lib/jobs/stackHardware";
 import { startChatLease } from "@/lib/chatLeaseRuntime";
 import { setQuietConfigSource } from "@/lib/jobs/householdQueue";
 import { profileSourceFromSettings } from "@/lib/jobs/profileSource";
@@ -369,6 +370,7 @@ startConversationTitleSweep();
 // MEDIA-LIB-01: the media library's scan intervals (one per root).
 startMediaScanner();
 setProfileSource(() => profileSourceFromSettings(getHouseholdSettingValue));
+startStackHardwareRefresh();
 startChatLease();
 setQuietConfigSource(() => {
   const number = (key: string, fallback: number) => { const value = getHouseholdSettingValue(key); return typeof value === "number" && Number.isFinite(value) ? value : fallback; };

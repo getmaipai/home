@@ -1,26 +1,30 @@
 import type { Category, CellState, Hardware, ProfileRow, Tier } from "./profileTable";
 import type { ProfileSource } from "./admissionFit";
 import { closeSettingsFrom } from "./closeApps";
+import type { BudgetResponse } from "../stack/types";
+import { currentHardware } from "./stackHardware";
 
-// The Studio hardware class (resource-tiers note section 4): budget 116.8 GB, margin 20 GB. Every figure below is a measured peak or
-// resident size from docs/design/tier-evaluations-2026-10-30.md; a slot with no measurement has no figure, so its row is not fitted.
-export const STUDIO_HARDWARE: Hardware = {
-  budgetGb: 116.8,
-  marginGb: 20,
-  residentGb: {
-    chat: { reduced: 5.7, standard: 19, boost: 16.6 },
-    picture: { standard: 18.8, boost: 25.8, max: 37.4 },
-    video: { standard: 44, boost: 46 },
-    music: { standard: 16.4 },
-    tools: { standard: 1.75 },
-  },
-  peakGb: {
-    picture: { standard: 18.8, boost: 25.8, max: 37.4 },
-    video: { standard: 44, boost: 46 },
-    music: { standard: 16.4 },
-    tools: { standard: 1.75 },
-  },
-};
+const GIB = 1_073_741_824;
+const gb = (bytes: number) => Math.round(bytes / GIB * 100) / 100;
+
+export function hardwareFromBudget(budget: BudgetResponse): Hardware | null {
+  if (!budget.slots?.length || budget.margin_bytes === undefined) return null;
+  const residentGb: Hardware["residentGb"] = {};
+  const peakGb: Hardware["peakGb"] = {};
+  const categoryMap = { chat: "chat", pictures: "picture", video: "video", music: "music" } as const;
+  for (const slot of budget.slots) {
+    if (!slot.verified) continue;
+    const category = categoryMap[slot.category];
+    (residentGb[category] ??= {})[slot.tier] = gb(slot.peak_bytes);
+    if (slot.tier !== "reduced") (peakGb[category] ??= {})[slot.tier] = gb(slot.peak_bytes);
+  }
+  const tools = budget.loaded.find((item) => item.id === "image-tools");
+  if (tools) {
+    (residentGb.tools ??= {}).standard = gb(tools.peakBytes);
+    (peakGb.tools ??= {}).standard = gb(tools.peakBytes);
+  }
+  return { budgetGb: gb(budget.capBytes), marginGb: gb(budget.margin_bytes), residentGb, peakGb };
+}
 
 const LEADS: Record<string, Category> = { image: "picture", video: "video", chat: "chat", music: "music", tools: "tools" };
 const TIERS = new Set<string>(["standard", "boost", "max"]);
@@ -58,7 +62,8 @@ export function weightsFromPriority(raw: unknown): Partial<Record<Category, numb
   return weights;
 }
 
-export function profileSourceFromSettings(read: (key: string) => unknown, hw: Hardware = STUDIO_HARDWARE): ProfileSource | null {
+export function profileSourceFromSettings(read: (key: string) => unknown, hw: Hardware | null = currentHardware()): ProfileSource | null {
+  if (!hw) return null;
   const table = rowsFromSetting(read("resources.profiles"));
   if (table.length === 0) return null;
   const lowerWithoutAsking: Partial<Record<Category, boolean>> = {};
