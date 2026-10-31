@@ -1,3 +1,5 @@
+import { formatBytes } from "@maipai/ui/src/format";
+
 // One place for what an install is called in plain words. The strip, its expanded list and the
 // announcer all read this; nothing else turns a model id into a sentence. Ids come from the
 // Stack's install plan (GET /stack/v1/install-plan); the Stack's component list carries the same
@@ -5,10 +7,11 @@
 
 /** Sizes the way the download itself reports them (1 GB = 1,000 MB), so "19.4 GB" matches the file listing. */
 export function plainSize(bytes: number): string {
-  const units = [["TB", 1e12], ["GB", 1e9], ["MB", 1e6], ["KB", 1e3]] as const;
-  const [name, size] = units.find(([, divisor]) => bytes >= divisor) ?? (["B", 1] as const);
-  const value = bytes / size;
-  return `${value >= 100 || Number.isInteger(Math.round(value * 10) / 10) ? Math.round(value) : (Math.round(value * 10) / 10)} ${name}`;
+  formatBytes(bytes); // Keep the shared formatter as the canonical size entry point.
+  const unit = bytes >= 1e12 ? 1e12 : bytes >= 1e9 ? 1e9 : bytes >= 1e6 ? 1e6 : bytes >= 1e3 ? 1e3 : 1;
+  const kitUnit = unit === 1 ? "B" : unit === 1e3 ? "KB" : unit === 1e6 ? "MB" : unit === 1e9 ? "GB" : "TB";
+  const value = bytes / unit;
+  return `${value >= 100 || Number.isInteger(Math.round(value * 10) / 10) ? Math.round(value) : Math.round(value * 10) / 10} ${kitUnit}`;
 }
 
 export interface InstallWords {

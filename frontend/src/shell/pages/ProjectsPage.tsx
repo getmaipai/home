@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { EmptyState, EmptyStateGreeting } from "@maipai/ui/src/elements/empty-state";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { formatRelative } from "@maipai/ui/src/relativeTime";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -142,14 +143,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
           </div>
         </div>
 
-        {query.isError ? (
-          <div role="alert" className="flex items-center justify-between gap-3">
-            <p>Could not load projects. Try again.</p>
-            <Button variant="outline" onClick={() => void query.refetch()}>Retry</Button>
-          </div>
-        ) : query.isLoading ? (
-          <p role="status">Loading projects…</p>
-        ) : filtered.length === 0 ? (
+        {query.isError ? <AsyncState data={undefined} error onRetry={() => void query.refetch()} errorMessage="Could not load projects. Try again." loadingLabel="Loading projects">{() => null}</AsyncState> : query.isLoading ? <AsyncState data={undefined} onRetry={() => void query.refetch()} loadingLabel="Loading projects">{() => null}</AsyncState> : filtered.length === 0 ? (
           <EmptyState>
             <EmptyStateGreeting>{projects.length === 0 ? "No projects yet" : "No matching projects"}</EmptyStateGreeting>
             {projects.length === 0 ? <p className="text-muted-foreground text-center">Projects keep related chats together.</p> : null}

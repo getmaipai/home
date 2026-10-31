@@ -1,4 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
@@ -41,8 +42,7 @@ export function LayersBody({ layers }: { layers: PerformanceLayers }) {
         <WorkflowIcon size={16} />
       </div>
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">No traced turns yet</p>
-        <p className="text-sm text-muted-foreground">No turn on this hub has left a per-layer trace yet.</p>
+        <EmptyState icon="workflow" text="No traced turns yet. No turn on this hub has left a per-layer trace yet." />
       </div>
     </div>
   ) : (

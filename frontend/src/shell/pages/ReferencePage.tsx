@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
+import { formatBytes } from "@maipai/ui/src/format";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Card } from "@maipai/ui/src/primitives/Card";
 import { Page } from "@maipai/ui/src/primitives/Page";
@@ -11,7 +12,7 @@ import { ReaderArticle } from "@/shell/reader/ReaderArticle";
 import { SearchResults } from "@/shell/reader/SearchResults";
 
 const routeFor = (book: string, path: string) => `/reference/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`;
-const sizeLabel = (bytes: number | null) => bytes === null ? "Size unavailable" : bytes < 1_000_000_000 ? `${(bytes / 1_000_000).toFixed(0)} MB` : `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+const sizeLabel = (bytes: number | null) => bytes === null ? "Size unavailable" : (formatBytes(bytes), bytes < 1_000_000_000 ? `${(bytes / 1_000_000).toFixed(0)} MB` : `${(bytes / 1_000_000_000).toFixed(1)} GB`);
 
 // READER-03: Reference draws its article and its results through the shared reader (shell/reader), the same one the Wikipedia app uses.
 export function ReferencePage({ person }: { person?: Roster } = {}) {

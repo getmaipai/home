@@ -22,6 +22,13 @@ describe("theme color lint", () => {
     expect(findings).toEqual([]);
   });
 
+  test("flags arbitrary token utility classes", () => {
+    const findings = colorFindings(SRC, {
+      "fixture.tsx": `const styles = "text-[var(--muted-foreground)] border-[var(--border)]";`,
+    });
+    expect(findings.map(({ pattern }) => pattern)).toEqual(["text-[var(--muted-foreground)]", "border-[var(--border)]"]);
+  });
+
   test("frontend source contains no undocumented fixed colors", () => {
     expect(colorFindings(SRC)).toEqual([]);
   });

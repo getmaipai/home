@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatBytes } from "@/apps/settings/formatBytes";
+import { formatBytes } from "@maipai/ui/src/format";
 
 describe("formatBytes", () => {
   test("bytes under 1024 show as bytes", () => {

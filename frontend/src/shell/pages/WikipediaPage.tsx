@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { api, type ReferenceBookView, type Roster } from "@/lib/api";
@@ -83,6 +84,7 @@ function ExploreGrid({ book }: { book: string }) {
 
 function SavedList() {
   const { saves, isPending, isError, remove } = useReferenceSaves();
+  const [confirming, setConfirming] = useState<string | null>(null);
   return (
     <section aria-label="Saved" className="flex flex-col gap-3">
       <h2 className="text-xl font-semibold">Saved</h2>
@@ -93,7 +95,7 @@ function SavedList() {
         {saves.map((save) => (
           <li key={save.id} className="min-w-0">
             <ArticleCard book={save.book} path={save.path} title={save.title} to={articleRoute(save.book, save.path)}
-              action={<Button variant="ghost" size="sm" aria-label={`Remove ${save.title} from Saved`} onClick={() => remove(save.id)}>Remove</Button>} />
+              action={confirming === save.id ? <DestructiveConfirm message={`Remove “${save.title}” from Saved?`} confirmLabel="Remove" busyLabel="Removing…" onConfirm={() => { remove(save.id); setConfirming(null); }} onCancel={() => setConfirming(null)} /> : <Button variant="destructive" size="sm" aria-label={`Remove ${save.title} from Saved`} onClick={() => setConfirming(save.id)}>Remove</Button>} />
           </li>
         ))}
       </ul>

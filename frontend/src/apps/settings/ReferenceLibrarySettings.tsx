@@ -14,6 +14,7 @@ import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import presetsData from "@maipai/spec/vocab/reference-presets.json";
 import { api, ApiError, type ReferenceCatalogSet, type ReferenceJob } from "@/lib/api";
 import { sizeGb } from "../../../../shared/diskPlanMath";
@@ -198,7 +199,7 @@ export function ReferenceLibrarySettings() {
         <p className="text-base text-muted-foreground">{presets.find((preset) => preset.id === activePreset)?.copy ?? "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below."}</p>
       </section>
 
-      {catalog.isLoading || state.isLoading ? <p role="status">Loading offline books…</p> : null}
+      {catalog.isLoading || state.isLoading ? <RouteSkeleton label="Loading offline books" /> : null}
       {sourceRows(sets).map((group) => (
         <section key={group.topic} aria-label={group.topic} className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">{group.topic}</h2>

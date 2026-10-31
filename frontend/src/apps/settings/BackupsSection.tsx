@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
-import { formatBytes } from "@/apps/settings/formatBytes";
+import { formatBytes } from "@maipai/ui/src/format";
 
 interface BackupsSectionProps {
   person: Roster;
@@ -77,11 +78,11 @@ function EmergencyBackupKeyRow() {
     <div>
       <p className="text-base font-medium">Save your backup key</p>
       {savedAt ? (
-        <p className="text-base text-[var(--muted-foreground)]">Saved on {whenText(savedAt)}</p>
+        <p className="text-base text-muted-foreground">Saved on {whenText(savedAt)}</p>
       ) : (
-        <p className="text-base text-[var(--muted-foreground)]">If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.</p>
+        <p className="text-base text-muted-foreground">If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.</p>
       )}
-      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+      {error ? <p className="text-base text-destructive">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={download} disabled={busy}>Download</Button>
         <Button variant="secondary" onClick={print} disabled={busy}>Print</Button>
@@ -190,16 +191,16 @@ export function BackupsSection({ person }: BackupsSectionProps) {
 
   return (
     <Section heading="Backups">
-      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+      {error ? <p className="text-base text-destructive">{error}</p> : null}
 
       {canRestore ? (
         <EmergencyBackupKeyRow />
       ) : null}
 
       {pending ? (
-        <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--primary)] p-3">
+        <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-primary p-3">
           <p className="text-base font-medium">Ready to restore</p>
-          <p className="text-base text-[var(--muted-foreground)]">
+          <p className="text-base text-muted-foreground">
             {/* The backup's own date, not `stagedAt`. Naming a backup by
                 the minute someone pressed the button tells a parent
                 nothing about which point in time they are going back to,
@@ -227,14 +228,14 @@ export function BackupsSection({ person }: BackupsSectionProps) {
       {backups === null ? (
         <Progress mode="spinner" label="Loading backups" />
       ) : backups.length === 0 ? (
-        <p className="text-base text-[var(--muted-foreground)]">No backups yet.</p>
+        <EmptyState icon="inbox" text="No backups yet." />
       ) : (
         <div className="flex flex-col divide-y divide-[var(--border)]">
           {backups.map((b) =>
             confirming === b.filename ? (
               <div key={b.filename} className="flex flex-col gap-2 py-3">
                 <p className="text-base font-medium">Restore the backup from {whenText(b.createdAt)}?</p>
-                <p className="text-base text-[var(--muted-foreground)]">
+                <p className="text-base text-muted-foreground">
                   Everyone in your household, everything MaiPai remembers, and every conversation will go back to
                   how they were then. Anything added since will be gone. This takes effect the next time MaiPai
                   Home starts.
@@ -256,7 +257,7 @@ export function BackupsSection({ person }: BackupsSectionProps) {
               <div key={b.filename} className="flex items-center justify-between gap-3 py-2 text-base">
                 <span>{whenText(b.createdAt)}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-[var(--muted-foreground)]">{formatBytes(b.bytes)}</span>
+                  <span className="text-muted-foreground">{formatBytes(b.bytes)}</span>
                   {canRestore && !pending ? (
                     <Button
                       variant="ghost"

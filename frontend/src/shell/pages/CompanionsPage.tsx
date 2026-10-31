@@ -100,7 +100,6 @@ function CompanionsDirectory() {
       {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="sr-only">Companions</h1>
           <p className="text-sm text-muted-foreground">Familiar faces. Different ways to help.</p>
         </div>
         {query.data?.can_create ? <Link to="/companions/create"><Button>New companion</Button></Link> : null}

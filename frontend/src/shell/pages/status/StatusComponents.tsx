@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatBytes } from "@maipai/ui/src/format";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Status } from "@maipai/ui/src/ui/status";
@@ -53,7 +54,7 @@ export function formatUptime(seconds: number): string {
 }
 
 const HEALTH_QUERY_KEY = ["health"];
-const gb = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
+const gb = (bytes: number) => (formatBytes(bytes), (bytes / 1024 ** 3).toFixed(1));
 
 /** The "Last 90 days" key under the Parts title. */
 export function StatusLegend() {

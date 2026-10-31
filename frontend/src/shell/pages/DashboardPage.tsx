@@ -55,7 +55,6 @@ export function DashboardPage({ person }: { person: Roster }) {
 
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <h1 className="sr-only">Home</h1>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
       {!widgets.data && !widgets.isError ? <div className="md:col-span-2 lg:col-span-12"><RouteSkeleton label="Loading Home" /></div> : null}
       {widgets.isError ? <p role="alert" className="md:col-span-2 lg:col-span-12 text-sm text-muted-foreground">Could not load Home cards. Refresh Home to try again.</p> : null}

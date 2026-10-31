@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@maipai/ui/src/dashboard/components/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -55,7 +56,7 @@ export function ChatSkillsSection({ person }: { person: Roster }) {
   const minor = isChild || person.role === "teen";
   const skillsQuery = useQuery({ queryKey: ["skills"], queryFn: () => api.skills(), enabled: !isChild });
   if (isChild) return null;
-  if (skillsQuery.isLoading) return <p role="status" className="text-muted-foreground text-sm">Loading skills</p>;
+  if (skillsQuery.isLoading || skillsQuery.isError) return <AsyncState data={skillsQuery.data} error={skillsQuery.isError} isFetching={skillsQuery.isFetching} onRetry={() => void skillsQuery.refetch()} errorMessage="Could not load skills." loadingLabel="Loading skills">{() => null}</AsyncState>;
   if (skillsQuery.isError) return <p role="alert" className="text-destructive text-sm">Could not load skills. Try again in a moment.</p>;
 
   const skills = skillsQuery.data ?? [];

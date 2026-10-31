@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError } from "@/lib/api";
@@ -28,6 +29,7 @@ export function HuggingFaceTokenSection() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   async function load() {
     setLoadError(null);
@@ -67,6 +69,7 @@ export function HuggingFaceTokenSection() {
     setSuccess(false);
     try {
       await api.removeHfToken();
+      setConfirmRemove(false);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not remove it.");
@@ -77,13 +80,13 @@ export function HuggingFaceTokenSection() {
 
   return (
     <Section heading="Hugging Face token (for voice cloning)">
-      <p className="text-base text-[var(--muted-foreground)]">
+      <p className="text-base text-muted-foreground">
         Needed by the Stack to clone a voice from a recording. Create a
         read token at huggingface.co/settings/tokens and paste it below.
       </p>
-      {loadError ? <p className="text-base text-[var(--destructive)]">{loadError}</p> : null}
+      {loadError ? <p className="text-base text-destructive">{loadError}</p> : null}
       {isSet !== null ? (
-        <p className="text-base text-[var(--muted-foreground)]">
+        <p className="text-base text-muted-foreground">
           {isSet ? "A token is connected." : "No token connected yet."}
         </p>
       ) : null}
@@ -96,19 +99,15 @@ export function HuggingFaceTokenSection() {
           disabled={submitting}
           required
         />
-        {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
-        {success ? <p className="text-base text-[var(--primary)]">Saved.</p> : null}
+        {error ? <p className="text-base text-destructive">{error}</p> : null}
+        {success ? <p className="text-base text-primary">Saved.</p> : null}
         <div className="flex gap-2">
           <Button type="submit" disabled={submitting}>
             {submitting ? "Saving…" : "Save"}
           </Button>
-          {isSet ? (
-            <Button type="button" variant="secondary" disabled={submitting} onClick={handleRemove}>
-              Remove
-            </Button>
-          ) : null}
         </div>
       </form>
+      {isSet ? confirmRemove ? <DestructiveConfirm message="Remove the connected Hugging Face token?" detail="Voice cloning will no longer be able to use this token." confirmLabel="Remove token" busyLabel="Removing…" busy={submitting} onConfirm={() => void handleRemove()} onCancel={() => setConfirmRemove(false)} /> : <Button type="button" variant="destructive" disabled={submitting} onClick={() => setConfirmRemove(true)}>Remove</Button> : null}
     </Section>
   );
 }

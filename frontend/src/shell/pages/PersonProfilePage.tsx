@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MediaGrid, type MediaGridItem } from "@maipai/ui/src/primitives/MediaGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -151,7 +152,7 @@ function SharedMediaSection({ profile }: { profile: ProfileEntry }) {
             .filter(({ shared }) => shared)
             .filter(({ file }) => file.kind === "image" || file.kind === "video")
             .map(({ file }) => ({ id: file.id, thumbnailUrl: api.fileContentUrl(file.id), mediaType: file.kind as "image" | "video", altText: file.kind === "video" ? `A video ${profile.display_name} shared` : `A photo ${profile.display_name} shared` }));
-          return items.length === 0 ? <p className="text-sm text-muted-foreground">Nothing shared yet.</p> : <MediaGrid items={items} emptyMessage="Nothing shared yet." />;
+          return items.length === 0 ? <EmptyState icon="inbox" text="Nothing shared yet." /> : <MediaGrid items={items} emptyMessage="Nothing shared yet." />;
         }}
       </AsyncState>
     </div>

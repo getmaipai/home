@@ -10,6 +10,7 @@ const ALLOWLIST = JSON.parse(readFileSync(ALLOWLIST_PATH, "utf8")) as AllowEntry
 const LITERAL_COLOR = /(?<![\w-])#[\da-f]{3,8}\b|\b(?:rgba?|hsla?|oklch)\s*\(/gi;
 const NAMED_COLOR = /\b(?:black|white|red|navy|blue|green|yellow|purple|orange|pink|gray|grey|maroon|lime|aqua|teal|fuchsia|olive|silver)\b/gi;
 const PALETTE_CLASS = /\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to)-(?:blue|slate|zinc|gray|stone|neutral|red|green|emerald|lime|yellow|amber|orange|pink|purple|violet|indigo|cyan|teal|sky|rose)-\d{2,3}\b|\b(?:bg|text|border|ring)-\[#(?:[\da-f]{3,8})\]/gi;
+const ARBITRARY_TOKEN_CLASS = /\b(?:text|border)-\[var\(--(?!hue-)[^)]+\)\]/g;
 
 function filesUnder(root: string, directory = root): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -37,7 +38,7 @@ export function colorFindings(srcRoot: string, fixtures?: Record<string, string>
     source.split(/\r?\n/).forEach((raw, index) => {
       const line = stripComments(raw);
       const matches: Array<{ pattern: string; at: number }> = [];
-      for (const regex of [LITERAL_COLOR, PALETTE_CLASS]) {
+      for (const regex of [LITERAL_COLOR, PALETTE_CLASS, ARBITRARY_TOKEN_CLASS]) {
         regex.lastIndex = 0;
         for (const match of line.matchAll(regex)) {
           if (regex === LITERAL_COLOR && match[0].startsWith("#") && (/[-\w]\[$/.test(line.slice(0, match.index)) || /(?:#\d|\w)\s*$/.test(line.slice(0, match.index)))) continue;

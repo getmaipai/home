@@ -11,6 +11,7 @@ import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
@@ -327,8 +328,7 @@ export function PicturesLibrary() {
   const overview = useQuery({ queryKey: OVERVIEW_KEY, queryFn: picturesAdminApi.overview, refetchInterval: 15_000 });
   const [error, setError] = useState<string | null>(null);
   const refresh = () => { void client.invalidateQueries({ queryKey: OVERVIEW_KEY }); };
-  if (overview.isError) return <p role="alert" className="text-sm text-destructive">Home could not load the picture settings. Check the Home connection, then reload this page.</p>;
-  if (!overview.data) return <p className="text-sm text-muted-foreground">Loading the picture settings…</p>;
+  if (overview.isError || !overview.data) return <AsyncState data={overview.data} error={overview.isError} isFetching={overview.isFetching} onRetry={() => void overview.refetch()} errorMessage="Home could not load the picture settings. Check the Home connection, then reload this page." loadingLabel="Loading the picture settings">{() => null}</AsyncState>;
   const data = overview.data;
   return (
     <div className="flex min-w-0 flex-col gap-10">

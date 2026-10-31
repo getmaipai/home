@@ -11,7 +11,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
-import { formatBytes } from "@/apps/settings/formatBytes";
+import { formatBytes } from "@maipai/ui/src/format";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 

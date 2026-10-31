@@ -1,4 +1,5 @@
 import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { formatBytes } from "@maipai/ui/src/format";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
 import type { PerformanceDisk, PerformanceHardware } from "@/lib/api";
@@ -9,6 +10,7 @@ interface AreaRow extends Record<string, unknown> {
 }
 
 function toGb(bytes: number): string {
+  formatBytes(bytes);
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 

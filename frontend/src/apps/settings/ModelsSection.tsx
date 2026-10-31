@@ -9,7 +9,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { ComparisonCard } from "@maipai/ui/src/elements/comparison-card";
 import { api, ApiError, type ChatModelChoice, type HardwareInfo, type ModelFit } from "@/lib/api";
-import { formatBytes } from "@/apps/settings/formatBytes";
+import { formatBytes } from "@maipai/ui/src/format";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
@@ -76,12 +76,12 @@ export function ModelsSection() {
     <>
       {downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="full" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}
       <div className="flex flex-col gap-4">
-        {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+        {error ? <p className="text-base text-destructive">{error}</p> : null}
         {hardware === null ? (
           <Progress mode="spinner" label="Checking this computer" />
         ) : (
           <div className="flex flex-col gap-4">
-            <p className="text-base text-[var(--muted-foreground)]">{describeHardware(hardware)}</p>
+            <p className="text-base text-muted-foreground">{describeHardware(hardware)}</p>
             {computerMemory ? <ComputerMemory response={computerMemory} /> : null}
             <ChatModelCard
               fits={chatFits}
@@ -142,20 +142,20 @@ function ChatModelCard({
         <div className="flex items-center justify-between gap-2">
           <span className="text-base font-medium">{stackName ?? "No chat model selected in the MaiPai Stack"}</span>
           {stackState === "ready" || stackState === "loaded" ? (
-            <span className="flex items-center gap-1 text-base text-[var(--primary)]">
+            <span className="flex items-center gap-1 text-base text-primary">
               <CheckIcon className="h-4 w-4" aria-hidden /> {stackState === "ready" ? "Ready" : "Loaded"}
             </span>
-          ) : <span className="text-base text-[var(--muted-foreground)]">{stackState}</span>}
+          ) : <span className="text-base text-muted-foreground">{stackState}</span>}
         </div>
         {primary ? <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} /> : null}
         <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label="Details" icon={ChevronIcon}>
           <div className="flex flex-col gap-1 pt-1">
-            <p className="text-base text-[var(--muted-foreground)]">Chat runs through the MaiPai Stack.</p>
+            <p className="text-base text-muted-foreground">Chat runs through the MaiPai Stack.</p>
             {primary ? fitDetails ? <>
               <SpecSheet title="Fit details" rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
               {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
               {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
-            </> : <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(primary.requiredBytes)} of memory.</p> : <p className="text-base text-[var(--muted-foreground)]">The Stack has not reported a chat model.</p>}
+            </> : <p className="text-base text-muted-foreground">Uses about {formatBytes(primary.requiredBytes)} of memory.</p> : <p className="text-base text-muted-foreground">The Stack has not reported a chat model.</p>}
           </div>
         </Disclosure>
       </div>
@@ -172,11 +172,11 @@ function FitLine({ fitPlan, legacyWarning }: { fitPlan: ReturnType<typeof useFit
   }
   if (!legacyWarning) return null;
   const AlertIcon = getIcon("alert-triangle");
-  return <p className="flex items-start gap-1.5 text-base text-[var(--muted-foreground)]"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.</p>;
+  return <p className="flex items-start gap-1.5 text-base text-muted-foreground"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.</p>;
 }
 
 function FitResult({ headline, detail, verdict, sizedModel }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown"; sizedModel?: string | null }) {
-  return <div className="flex flex-col items-start gap-1"><FitVerdictBadge verdict={verdict} /><p className="text-base text-[var(--muted-foreground)]">{headline}</p><p className="text-base text-[var(--muted-foreground)]">{detail}</p>{sizedModel ? <p className="text-base text-[var(--muted-foreground)]">Sized from {sizedModel}.</p> : null}</div>;
+  return <div className="flex flex-col items-start gap-1"><FitVerdictBadge verdict={verdict} /><p className="text-base text-muted-foreground">{headline}</p><p className="text-base text-muted-foreground">{detail}</p>{sizedModel ? <p className="text-base text-muted-foreground">Sized from {sizedModel}.</p> : null}</div>;
 }
 
 function FitVerdictBadge({ verdict }: { verdict: "yes" | "slow" | "no" | "unknown" }) {
@@ -219,12 +219,12 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
 
   return (
     <RoleCardShell title="Check a model">
-      <p className="mb-3 text-base text-[var(--muted-foreground)]">Paste a Hugging Face link to see if a model will run on this computer before you download it.</p>
+      <p className="mb-3 text-base text-muted-foreground">Paste a Hugging Face link to see if a model will run on this computer before you download it.</p>
       <form className="flex flex-col items-start gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void check(); }}>
         <Input value={value} onChange={(event) => setValue(event.target.value)} aria-label="Hugging Face model link" />
         <Button type="submit" disabled={busy}>{busy ? "Checking…" : "Check"}</Button>
       </form>
-      {error ? <p className="mt-2 text-base text-[var(--muted-foreground)]">{error}</p> : null}
+      {error ? <p className="mt-2 text-base text-muted-foreground">{error}</p> : null}
       {busy ? <div className="mt-2"><Progress mode="spinner" label="Checking this computer" /></div> : null}
       {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan && fitDetails ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}>
         <SpecSheet title="Fit details" rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
@@ -276,14 +276,14 @@ function ModelComparison({ recommended, checked, hardware }: { recommended: { na
       <h2 className="text-base font-medium">Compare</h2>
       <ComparisonCard traitLabels={["Memory it needs"]} options={options} />
       <Button type="button" variant="secondary" onClick={() => void copySummary()}>{copied ? "Copied" : "Copy summary"}</Button>
-      {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-[var(--muted-foreground)]">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
+      {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-muted-foreground">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
     </>
   );
 }
 
 function FitSource({ row }: { row: FitPanelRow }) {
   if (!row.source) return null;
-  return <p className="text-sm text-[var(--muted-foreground)]">{row.label}: {fitSourceSentence(row.source, row.asOf)}</p>;
+  return <p className="text-sm text-muted-foreground">{row.label}: {fitSourceSentence(row.source, row.asOf)}</p>;
 }
 
 function ComputerMemory({ response }: { response: ComputerMemoryResponse }) {
@@ -294,10 +294,10 @@ function ComputerMemory({ response }: { response: ComputerMemoryResponse }) {
     <RoleCardShell title="Memory right now">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3"><IconTile icon="cpu" hue="--hue-blue" /><p className="text-lg font-medium tabular-nums">{memory.usedGb} GB in use of {memory.usableGb} GB</p></div>
-        <p className="text-base text-[var(--muted-foreground)]">{memory.pressureText}</p>
+        <p className="text-base text-muted-foreground">{memory.pressureText}</p>
         <Progress mode="determinate" value={percent} label="Memory used" />
-        {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-[var(--muted-foreground)]">{memory.homeOwnedRoles.length ? "The Stack has nothing loaded." : "Nothing is loaded right now."}</p>}
-        {memory.homeOwnedRoles.length ? <p className="text-sm text-[var(--muted-foreground)]">This counts only what the Stack has loaded. Home&apos;s own engines still run: {describeHomeOwnedRoles(memory.homeOwnedRoles)}.</p> : null}
+        {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-muted-foreground">{memory.homeOwnedRoles.length ? "The Stack has nothing loaded." : "Nothing is loaded right now."}</p>}
+        {memory.homeOwnedRoles.length ? <p className="text-sm text-muted-foreground">This counts only what the Stack has loaded. Home&apos;s own engines still run: {describeHomeOwnedRoles(memory.homeOwnedRoles)}.</p> : null}
       </div>
     </RoleCardShell>
   );
@@ -340,7 +340,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
 
   return (
     <RoleCardShell title="Chat models">
-      <p className="mb-3 text-base text-[var(--muted-foreground)]">Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart.</p>
+      <p className="mb-3 text-base text-muted-foreground">Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart.</p>
       <ul className="flex flex-col gap-3">
         {choices.map((fit) => {
           const model = fit.model;
@@ -348,7 +348,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
           const installed = installedIds.includes(model.id);
           const busy = working !== null;
           return (
-            <li key={model.id} className="flex flex-col gap-1 rounded-md border border-[var(--border)] p-3">
+            <li key={model.id} className="flex flex-col gap-1 rounded-md border border-border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-base font-medium">{model.label}</span>
@@ -360,7 +360,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
                   <Button type="button" variant="outline" disabled={busy || downloading} onClick={() => void choose(fit)}>Download ({formatBytes(model.download!.approx_bytes)})</Button>
                 )}
               </div>
-              <ul className="list-disc pl-5 text-base text-[var(--muted-foreground)]">
+              <ul className="list-disc pl-5 text-base text-muted-foreground">
                 {(model.pros ?? []).map((line) => <li key={line}>{line}</li>)}
                 {(model.cons ?? []).map((line) => <li key={line}>{line}</li>)}
               </ul>
@@ -369,7 +369,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
           );
         })}
       </ul>
-      {message ? <p className="mt-2 text-base text-[var(--destructive)]">{message}</p> : null}
+      {message ? <p className="mt-2 text-base text-destructive">{message}</p> : null}
     </RoleCardShell>
   );
 }
@@ -378,14 +378,14 @@ function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | nu
   if (fits === null || fits.length === 0) return null;
   return (
     <RoleCardShell title={title}>
-      <p className="text-base text-[var(--muted-foreground)]">Not available on this computer yet.</p>
+      <p className="text-base text-muted-foreground">Not available on this computer yet.</p>
     </RoleCardShell>
   );
 }
 
 function RoleCardShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] p-4">
+    <div className="rounded-lg border border-border p-4">
       <h2 className="mb-2 text-base font-medium">{title}</h2>
       {children}
     </div>
