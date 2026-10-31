@@ -207,7 +207,8 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.
-    stats: { ...stats, nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}), ...(state.weatherAssist ? { weather_assist: state.weatherAssist } : {}) },
+    // MEM-AUDIT-05: the memory trace rides here too (ids and scores, no text).
+    stats: { ...stats, nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}), ...(state.weatherAssist ? { weather_assist: state.weatherAssist } : {}), ...(state.memoryTrace ? { memory: state.memoryTrace } : {}) },
     // REASONING-02's own field, populated only when `context` allowed
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
@@ -324,7 +325,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // VISION-02d (ATT-01's rule): a child's or teen's picture turn never
   // enters the memory judge; an adult's follows the existing policy.
   const minorPictureTurn = (state.images?.length ?? 0) > 0 && state.plan.age_band !== "adult";
-  logTurn(actor, surface, text, value, { ...opts, answeredBy: value.answered_by ?? null, judgeStatus: state.bare || minorPictureTurn ? "skipped" : judgeStatusAtInsert(value, state.signal) });
+  logTurn(actor, surface, text, value, { ...opts, answeredBy: value.answered_by ?? null, judgeStatus: state.bare || minorPictureTurn ? "skipped" : judgeStatusAtInsert(value, state.signal, text) });
   // THIN-7E (ASK-01): the question the reply ended with stands as the conversation's pending ask only
   // now that the delivered text is known to carry it (a refusal that lost it commits nothing).
   state.askCommit?.(value.reply.text);

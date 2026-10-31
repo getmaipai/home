@@ -5,7 +5,7 @@
 // presence on this surface." Per U2b's own brief, "context builds the
 // ContextItem list from what the old path assembles" - this reuses the
 // same real assembly functions the old path calls (buildConversationWindow,
-// memory.recall, getProfileParagraph, subjectRosterFor), never a
+// memory.recall, memoryProfile.buildProfileCard, subjectRosterFor), never a
 // reimplementation of memory retrieval or disclosure filtering: those
 // stay in memory.ts's own canRead() (RULES-AND-LEARNED-COMPONENTS.md,
 // "household privacy and disclosure ... filtered before the prompt,
@@ -22,8 +22,10 @@ import { toolSpecFor, replyMaxTokensFor } from "./model";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
 import { runWeatherAssistShadow } from "@/lib/searchAssist/weatherAssist";
-import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
-import { subjectRosterFor } from "@/lib/subjects";
+import { recall, embedQueryForRecall, bumpUsage } from "@/lib/memory";
+import { buildProfileCard } from "@/lib/memoryProfile";
+import { entityForSpeaker, subjectRosterFor } from "@/lib/subjects";
+import type { PersonRow } from "@/types";
 import { subjectsForTurn } from "@/lib/askNames";
 import { autoLeadImageAllowed } from "@/lib/answerImages/turn";
 import type { SubjectRef } from "@/lib/unknownNames";
@@ -119,6 +121,10 @@ export interface ContextOutput {
   /** ROUTER-BUILD-01d: the search assist's shadow record (numbers and closed names only). */
   searchAssist?: import("@/wire").SearchAssistStats;
   weatherAssist?: import("@/wire").SearchAssistStats;
+  /** MEM-AUDIT-05: the profile card line ids and the recalled memory ids
+   * (with scores) that became context items. Set on every non-temporary,
+   * non-bare turn, empty arrays included; absent otherwise. */
+  memoryTrace?: import("@/wire").MemoryTraceStats;
 }
 
 /** KS-02E: the household's chat model's `model_cutoff` from its catalog
@@ -250,6 +256,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // own rule - and nothing here should ground a temporary answer in a
   // durable record that outlives it).
   let recallVector: Awaited<ReturnType<typeof embedQueryForRecall>>;
+  let memoryTrace: import("@/wire").MemoryTraceStats | undefined;
   if (!temporary) {
     // CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)):
     // carries the old path's own recall call whole (the old engine file
@@ -310,25 +317,24 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // WEIGHT/RECENCY_WEIGHT) plus a flat entity-match bonus, so it
     // isn't a pure similarity number DURABLE_MIN_COSINE/EPISODIC_
     // MIN_COSINE could be compared against directly - measured
-    // instead, against scripts/bench/memory-eval.ts's own 11 probes
-    // (a resident engine, embed url, 2026-09-24): every genuinely
-    // wanted match in the currently-passing rows scores 0.125 or
-    // higher (the weakest, episodic-relevant's own baseball-game
-    // recall); a pinned or entity-matched record can legitimately
-    // score near 0.000 against an unrelated remark and still has to
-    // surface (pinned-identity's own row - "the household said
-    // 'always surface this'"; a named entity, "the plan's own words
-    // for the exact same treatment" per memory.ts's own comment) -
-    // the exemption is recall()'s own `forceInclude` flag (RecallMatch,
-    // a review caught the first cut of this floor checking only
-    // `record.pinned`, silently dropping a weak-cosine entity match
-    // recall() itself force-included - fixed by exporting the flag
-    // instead of half-reproducing recall()'s own decision here). 0.1
-    // sits with real margin under 0.125, never moved a single one of
-    // the bench's 7 passing rows (verified twice), and already drops
-    // the noise a weak, non-forced entity match rides in on
-    // (entity-recall's own row: 12 candidates including six at
-    // 0.056-0.059 down to the 4 that actually matter, still passing).
+    // instead, on 2026-09-24, against the 11 probes of the memory bench
+    // of that time (since retired; the floors themselves are measured by
+    // scripts/bench/recall-floor.ts and the recall rows live in
+    // scripts/bench/memory-recall-01.ts): every genuinely wanted match
+    // in the then-passing rows scored 0.125 or higher (the weakest, the
+    // episodic-relevant row's own baseball-game recall); a pinned
+    // record can legitimately score near 0.000 against an unrelated
+    // remark and still has to surface ("the household said 'always
+    // surface this'") - the exemption is recall()'s own `forceInclude`
+    // flag (RecallMatch; exported rather than half-reproducing recall()'s
+    // own decision here). MEM-AUDIT-03: an entity-name match is no longer
+    // exempt; it reaches here only once it cleared ENTITY_MIN_COSINE in
+    // recall(), and its boosted composite score clears 0.1 with margin.
+    // 0.1 sits with real margin under 0.125, never moved a single one of
+    // that bench's 7 passing rows (verified twice), and already drops
+    // the noise a weak entity match used to ride in on (the entity-recall
+    // row: 12 candidates including six at 0.056-0.059 down to the 4 that
+    // actually matter, still passing).
     // THIN-0B: the old path's own derivation (the old engine file, basePlan's
     // `disclosureWithheld: memoryMatches.withheldForBand > 0`), limited
     // here to a child or teen: an adult is never told something is held
@@ -356,16 +362,35 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
         subjects: r.subject_id ? [r.subject_id] : [],
         disclosure: r.child_disclosure ?? "adult_only",
         at: r.created_at,
+        // MEM-AUDIT-03: the injected line says whom the fact is about.
+        about: aboutNameFor(r, state.actor),
         ...memoryCertainty(r.fact_confidence, r.created_at, now, ageBand, state.safety?.flagged === true),
       });
     }
 
-    // The old path's own `anonymous || temporary ? undefined`: the profile
-    // is the signed-in person's.
-    const profile = anonymous ? null : getProfileParagraph(state.actor);
-    if (profile) {
-      items.push({ id: `profile-${profile.id}`, text: profile.text, source: "profile", subjects: [], disclosure: profile.child_disclosure ?? "adult_only", at: profile.created_at });
+    // MEM-AUDIT-01: the profile card (lib/memoryProfile.ts) in place of
+    // the weekly profile paragraph: the signed-in person's own standing
+    // facts (identity, instructions to the assistant, pinned
+    // preferences), at most 8 dated lines under 400 characters, behind
+    // one rule line. It changes rarely, so it stays in the stable
+    // prefix (messages.ts's isStableContext), the same slot the
+    // paragraph had. Never for an unidentified speaker (the old path's
+    // own `anonymous || temporary ? undefined`), and a robot or minor
+    // turn withholds sensitive lines the way recall above does.
+    const card = anonymous ? null : buildProfileCard(state.actor, now, { withholdSensitive });
+    if (card && card.lines.length > 0) {
+      items.push({ id: "profile-rule", text: card.ruleLine, source: "profile", subjects: [], disclosure: "child_ok" });
+      for (const line of card.lines) {
+        items.push({ id: `profile-${line.id}`, text: line.text, source: "profile", subjects: [], disclosure: line.disclosure, at: line.at });
+      }
     }
+    // MEM-AUDIT-05: what reached the prompt, by id and score, for the
+    // turn row's stats JSON. Scores are recall()'s composite number,
+    // rounded so the trace stays readable.
+    memoryTrace = {
+      profile: card ? card.lines.map((line) => line.id) : [],
+      injected: matches.map((m) => ({ id: m.record.id, score: Math.round(m.score * 1000) / 1000 })),
+    };
 
     // THIN-0F (rules 4 and 12, ported from the old engine file's episode
     // recall): what the person actually said earlier, verbatim, beside the
@@ -589,7 +614,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     recallVector,
   );
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -608,6 +633,7 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   state.pictureParts = output.pictureParts;
   if (output.searchAssist) state.searchAssist = output.searchAssist;
   if (output.weatherAssist) state.weatherAssist = output.weatherAssist;
+  if (output.memoryTrace) state.memoryTrace = output.memoryTrace;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question
@@ -619,6 +645,22 @@ export function applyContext(state: import("../contract").TurnState, output: Con
     state.planBasis = { ...state.planBasis, disclosureWithheld: true, deferred };
     state.plan = planFor({ ...state.planBasis, evidence: { choices: 0, sources: 0, deliverable: false } });
   }
+}
+
+/** MEM-AUDIT-03: whom a remembered fact is about, for its injected line
+ * ("(2026-10-28, about Sage) ..."): the record's subject's display name
+ * when the speaker may see that entity (the speaker's own entity reads
+ * as their display name), else the speaker for a person-scope record,
+ * else "the household". Never a relationship phrase: subjects.ts's
+ * subjectLabel() already says "Quill (your coworker)" on the subjects
+ * line, and the memory line is one name. */
+function aboutNameFor(record: { subject_id?: string | null; scope: string }, actor: PersonRow): string {
+  if (record.subject_id) {
+    const entity = entityForSpeaker(actor, record.subject_id);
+    if (entity) return sanitizeForPrompt(entity.account_person_id === actor.id ? actor.displayName : entity.name);
+  }
+  if (record.scope === "person") return sanitizeForPrompt(actor.displayName);
+  return "the household";
 }
 
 /** NAT-03: the gated certainty band for one remembered fact, as spread-able item fields. */

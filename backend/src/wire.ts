@@ -153,6 +153,21 @@ export interface TurnStats {
   search_assist?: SearchAssistStats;
   /** RECENCY-02: the weather detector's record on the same turn (same shape: numbers and closed names only). */
   weather_assist?: SearchAssistStats;
+  /** MEM-AUDIT-05: which memories reached this turn's prompt (ids and
+   * scores only, never text), so "why did it say that" is answered from
+   * the turn row. Present on every non-temporary turn the new path ran;
+   * empty arrays when nothing was injected. */
+  memory?: MemoryTraceStats;
+}
+
+/** MEM-AUDIT-05 (docs/design/memory-audit-and-redesign-2026-10-31.md,
+ * decision 8): the per-turn memory trace. `profile` is the profile card's
+ * line ids (memory record ids) in rendered order; `injected` is each
+ * recalled record that became a context item, with recall()'s composite
+ * score, in prompt order. */
+export interface MemoryTraceStats {
+  profile: string[];
+  injected: { id: string; score: number }[];
 }
 
 /** Shared vocabulary for measured turn context segments. */

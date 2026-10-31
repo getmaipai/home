@@ -56,15 +56,17 @@
 // round failure never does (it just defaults to ADD, matching legacy's
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
-import { eq, and, or, isNull, isNotNull, notInArray, ne, asc, lt, desc } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, notInArray, inArray, ne, asc, lt, desc } from "drizzle-orm";
 import { hasEligibleClause, isEligibleClause } from "@/lib/turnSignal";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SignalClause } from "@/lib/turnSignal";
-import { turnSignalOf } from "@/lib/conversationHistory";
+import { turnSignalOf, speakerEvidenceOf } from "@/lib/conversationHistory";
+import { speakerIsAnonymous } from "@/lib/turnMachine/speaker";
+import type { Surface } from "@/lib/turnShared";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
-import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, writeRelation } from "@/lib/subjects";
+import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, subjectRosterFor, writeRelation } from "@/lib/subjects";
 import { candidateQuestion, relationPhraseFor, speakerStatedKind, statedPronounFor, twoTurnStatedKind } from "@/lib/unknownNames";
 import { updateEntity } from "@/lib/entities";
 import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion, turnSubjectsOf } from "@/lib/conversationHistory";
@@ -81,7 +83,6 @@ import {
   cosineSimilarity,
   demoteNeverRecalledDurables,
   supersedeInFavorOfExisting,
-  list,
   PROFILE_SOURCE,
   isPrivilegedRecordKind,
   type SimilarMatch,
@@ -119,12 +120,17 @@ const CATEGORY_VALUES = [
   "relationship",
   "fact",
   "state",
+  // MEM-AUDIT-02 (decision 2): how this assistant should behave for this
+  // person ("keep spoken replies short", "don't call me buddy"). Durable,
+  // person scope, importance 0.8; the profile card shows it. The spec's
+  // own enum (commons/spec memory-record) carries the same value.
+  "instruction",
 ] as const;
 // Exported alongside categoryToRecordKind (step 10) for the same reason:
 // lib/legacyImport.ts validates a legacy `memories.category` value
-// against this exact list rather than re-declaring it, since the legacy
-// enum and this one are the identical 11 values (confirmed against
-// home-legacy.git's own schema.ts).
+// against this exact list rather than re-declaring it: the legacy enum
+// is this list's first 11 values (confirmed against home-legacy.git's own
+// schema.ts); `instruction` is this platform's own addition.
 export type Category = (typeof CATEGORY_VALUES)[number];
 
 // Durable vs episodic is derived from category here, not asked of the
@@ -135,7 +141,7 @@ export type Category = (typeof CATEGORY_VALUES)[number];
 // counterpart) is never picked by the judge, matching the same call
 // recall()'s own tier-floor code already made for it.
 function categoryToTier(category: Category): "durable" | "episodic" {
-  const durable: Category[] = ["identity", "relationship", "person", "preference"];
+  const durable: Category[] = ["identity", "relationship", "person", "preference", "instruction"];
   return durable.includes(category) ? "durable" : "episodic";
 }
 
@@ -273,7 +279,29 @@ export function promptExampleTexts(speakerName: string, turnDate: string): strin
     `the wifi password is written on the fridge`,
     `The wifi password is Juniper2026`,
     `${speakerName} was in Brazil visiting his wife's family, ${turnDate}`,
+    requestExampleText(speakerName),
+    instructionExampleText(speakerName),
+    `${speakerName} is programming a robot`,
+    questionExampleText(speakerName),
   ];
+}
+
+/** MEM-AUDIT-02: the fact inside a request, one source for the prompt
+ * and the echo filter. "DDR" stays as said: the grounding rejector keeps
+ * only words the person used, so an expansion the person never spoke
+ * ("Dance Dance Revolution") would be dropped. */
+export function requestExampleText(speakerName: string): string {
+  return `Rover, ${speakerName}'s friend, has a DDR arcade cabinet at home`;
+}
+
+/** MEM-AUDIT-02: the instruction example, in the person's own words. */
+export function instructionExampleText(speakerName: string): string {
+  return `${speakerName} does not want responses typed out in full`;
+}
+
+/** MEM-AUDIT-02: the relationship fact inside a question. */
+export function questionExampleText(speakerName: string): string {
+  return `Nova, ${speakerName}'s daughter, loves horses`;
 }
 
 /** The month after the turn's day, spelled "October 2026": the TIME RULE
@@ -322,44 +350,56 @@ export function buildExtractionPrompt(speakerName: string, turnTimestamp: string
   // made the written memory text differ between runs. Two turns on the
   // same day now build the identical prompt.
   const exampleFutureDate = exampleDateFor(turnDateObj);
-  return `You are a long-term memory manager for a family's private AI. Review the exchange below and extract durable facts worth remembering.
+  // MEM-AUDIT-02 (decision 5): shorter, in the Honcho and Mem0 pattern.
+  // The speaker's own words only; a closed category list; one fact per
+  // item; every pronoun and relative date resolved; an empty list is a
+  // valid answer; few-shot negatives. A request carries facts but is
+  // never itself stored; an instruction to the assistant is its own
+  // category; an explicit "make a note" is always a fact. The example
+  // sentences are the echo filter's own list (promptExampleTexts).
+  return `You are the memory manager for a family's private AI. Read one exchange between ${speakerName} and the Assistant and return the facts worth keeping about ${speakerName}'s life, as JSON.
 
-SOURCE RULE - extract ONLY facts ${speakerName} asserted or explicitly confirmed. The Assistant's own statements are context, never a source: if the Assistant guessed something and ${speakerName} didn't confirm it, do NOT store it.
+SOURCE: extract only from ${speakerName}'s own words. The Assistant's lines are context, never a source: a guess or a lookup the Assistant made that ${speakerName} did not confirm is not a fact. Short or messy wording still counts ("im still programming the robot" is a project fact). Use ${speakerName}'s own words where you can; a fact in words ${speakerName} never said is thrown away.
 
-TIME RULE - this exchange happened on ${turnDate}. Resolve relative time into absolute terms in the fact text: "The recycling pickup moves to next month" said on ${turnDate} becomes "${timeExampleText(turnDate)}". Never store a bare "next week" or "yesterday" - those rot. A clock time or weekday ${speakerName} gave ("before ten", "on Friday") stays as spoken.
+WHAT COUNTS:
+- A lasting fact about ${speakerName}: who they are, who they know, what they like, what they are working on or planning, where things are.
+- A fact inside a request. A request can carry facts about people and things ("write a song about my friend Rover who has a DDR arcade cabinet at home" gives "${requestExampleText(speakerName)}"). The request itself (write a song, set a timer, add milk) is never stored.
+- An instruction about how this assistant should behave for ${speakerName} ("stop saying that", "keep spoken replies short", "check the weather when I say it is cold", "don't call me buddy"): category "instruction", written as a standing rule in the third person ("${speakerName} wants spoken replies kept short"), importance 0.8.
+- An explicit "make a note that ...", "remember that ..." or "keep in mind ..." is always a fact; never drop it.
 
-POSSESSIVE RULE - every "my"/"her"/"his" in what ${speakerName} says refers to ${speakerName}. Resolve it to ${speakerName}'s own name in the fact text, from ${speakerName}'s point of view: "my neighbor Quill" becomes "${possessiveExampleText(speakerName)}", never a guess about whose relative someone is. When ${speakerName} states how a person relates to them, keep that relationship in the fact text and name ${speakerName} in it ("my cousin Iris lives in Lisbon" becomes "${speakerName}'s cousin Iris lives in Lisbon"), not only in the relation field. Keep every other name exactly as stated - never blur a named person into "someone".
+WHAT NEVER COUNTS: a one-off question or lookup; a passing mood ("I'm tired today"); trivia about the world that says nothing about ${speakerName}; small talk ("${speakerName} said hi"); a password, key or token (the household keeps those in Credentials); anything only the Assistant said.
 
-STATE AND TRIP RULE - an ongoing situation ("stressed about a deadline", "recovering from surgery") is category "state". Where ${speakerName} IS during a trip ("I'm in Brazil for two weeks") is also category "state", written in the PAST tense with the actual dates: "${speakerName} was in Brazil, ${turnDate}" with valid_to set to when it ends if stated. Never write a trip as still-current: an undated present-tense whereabouts would have this AI treating someone as abroad long after they came home.
+HOW TO WRITE EACH FACT:
+- One independent fact per item, with its own qualifiers (who, when, where) inside it. Two things said together are two items.
+- Resolve every pronoun to a name. Every "my", "her", "his" in ${speakerName}'s words refers to ${speakerName}: "my neighbor Quill" becomes "${possessiveExampleText(speakerName)}". Keep a stated relationship in the text and name ${speakerName} in it ("my cousin Iris lives in Lisbon" becomes "${speakerName}'s cousin Iris lives in Lisbon"), not only in the relation field. Keep every other name exactly as said; never blur a named person into "someone".
+- Resolve every relative date to an absolute one. This exchange happened on ${turnDate}: "The recycling pickup moves to next month" becomes "${timeExampleText(turnDate)}". Never store a bare "next week" or "yesterday". A clock time or weekday ${speakerName} gave ("before ten", "on Friday") stays as spoken.
+- An ongoing situation ("stressed about a deadline", "recovering from surgery") is category "state". Where ${speakerName} is during a trip is also "state", written in the past tense with the date ("${speakerName} was in Brazil, ${turnDate}") and valid_to set when the end is stated. Never write a trip as still current.
+- valid_from and valid_to, when set, are a full timestamp with a timezone exactly like "${exampleFutureDate}"; omit the field or use null rather than guess.
+- "subject": the named person, pet, place, organization or thing the fact is about, with its kind, whenever that is anyone or anything other than ${speakerName} ("${requestExampleText(speakerName)}" has subject {"name": "Rover", "kind": "person"}); null only when the fact is about ${speakerName} alone or about the world.
+- "relation": when ${speakerName}'s own words state how a named person or thing relates to ${speakerName} ("my coworker ...", "our dog ..." before the name), the vocabulary type read from ${speakerName}'s side (${RELATION_PHRASE_GUIDE}), the name, and "stated": true; "stated": false when you worked it out from context; null when there is none.
+- "offer_withheld": true on a health matter or appointment, money owed or money trouble, a quarrel or strain with someone close, a loss or a death, or anything ${speakerName} would rather bring up themselves. Leave it out for the ordinary (an interview, a trip, a hobby project).
+- "scope": "person" for a fact about ${speakerName}; "household" only for what a new family member would need to be told too (the wifi note, the dog's name, the trash pickup day).
+- "robot_memory": "shared" for a fact about the person or the home (always on a non-robot turn); "rapport" for a running relationship between ${speakerName} and this robot (person scope); "own" for a fact about this robot itself (household scope).
 
-DATE FORMAT RULE - valid_from and valid_to (when you set them) MUST be a full timestamp with a timezone, exactly like "${exampleFutureDate}" - never a bare date like "2026-09-20" and never a relative phrase. Omit the field (or use null) rather than guess a malformed one.
+Categories: ${CATEGORY_VALUES.join(", ")}.
+Importance 0 to 1: identity or relationship 0.9 to 1.0, instruction 0.8, strong preference 0.7 to 0.8, project or goal 0.5 to 0.6, minor fact 0.3 to 0.4.
 
-CRITICAL - do NOT extract:
-- Questions asked or information looked up (one-off curiosity, not an assertion)
-- One-moment moods and feelings ("I'm tired today")
-- Trivia or facts about the world that reveal nothing about ${speakerName}
-- Trivially-true or contentless observations ("${speakerName} said hi")
-- Requests or commands to the assistant ("add oat milk to the list", "set a timer"): those are actions to carry out, not facts about ${speakerName}
-
-SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker ...", "my sister ...", "our dog ..." followed by the name), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: ${RELATION_PHRASE_GUIDE}), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
-
-OFFER RULE - set "offer_withheld": true on a fact about a health matter or appointment, money owed or money trouble, a quarrel or strain with someone close, a loss or a death, or anything else ${speakerName} would rather bring up themselves than be asked about later. Leave it out for everything ordinary (an interview, a trip, a school event, a hobby project).
-
-SCOPE - "person": a fact about ${speakerName} specifically. "household": a fact the whole family should know (the wifi password, the dog's name, the trash pickup day) - use household only when a new family member would need to be told it too.
-ROBOT MEMORY - set robot_memory to "shared" for facts about the person or home; "rapport" for a running relationship between ${speakerName} and this robot; "own" for a fact about this robot itself. Use shared on non-robot turns. Keep the scope for shared facts as above; rapport is person scope; own is household scope.
-
-Category options: ${CATEGORY_VALUES.join(", ")}.
-Importance 0 to 1: identity/relationship = 0.9-1.0, strong preference = 0.7-0.8, project/goal = 0.5-0.6, minor fact = 0.3-0.4.
-
-Examples (these exact names never recur in a real household - never copy them into a real fact):
+Examples (these exact names never recur in a real household; never copy them into a real fact):
 - "How long until bacteria grows on meat left out?" -> nothing (a one-off question)
-- "My brother Rover loves horror movies" -> {"text": "Rover loves horror movies, ${speakerName}'s brother", "category": "relationship", "scope": "person", "importance": 0.7}
-- "I hate cilantro" -> {"text": "${speakerName} dislikes cilantro", "category": "preference", "scope": "person", "importance": 0.7}
-- "The wifi password is written on the fridge" -> {"text": "the wifi password is written on the fridge", "category": "fact", "scope": "household", "importance": 0.6}
-- "The wifi password is Juniper2026" -> nothing (a password, a key or a token is never a memory; the household keeps those in Credentials)
-- "We're in Brazil until next week visiting my wife's family" -> {"text": "${speakerName} was in Brazil visiting his wife's family, ${turnDate}", "category": "state", "scope": "person", "importance": 0.5, "valid_to": "${exampleFutureDate}"}
+- "what's the weather like today" -> nothing (a lookup)
+- "hey, good morning, how are you" -> nothing (small talk)
+- "set a timer for ten minutes" -> nothing (a request with no fact in it)
+- "The wifi password is Juniper2026" -> nothing (a credential)
+- "My brother Rover loves horror movies" -> {"text": "Rover loves horror movies, ${speakerName}'s brother", "category": "relationship", "scope": "person", "importance": 0.7, "subject": {"name": "Rover", "kind": "person"}}
+- "I hate cilantro" -> {"text": "${speakerName} dislikes cilantro", "category": "preference", "scope": "person", "importance": 0.7, "subject": null}
+- "The wifi password is written on the fridge" -> {"text": "the wifi password is written on the fridge", "category": "fact", "scope": "household", "importance": 0.6, "subject": null}
+- "We're in Brazil until next week visiting my wife's family" -> {"text": "${speakerName} was in Brazil visiting his wife's family, ${turnDate}", "category": "state", "scope": "person", "importance": 0.5, "subject": null, "valid_to": "${exampleFutureDate}"}
+- "write a song about my friend Rover who has a DDR arcade cabinet at home" -> {"text": "${requestExampleText(speakerName)}", "category": "relationship", "scope": "person", "importance": 0.7, "subject": {"name": "Rover", "kind": "person"}}
+- "I don't understand why you typed out all your responses" -> {"text": "${instructionExampleText(speakerName)}", "category": "instruction", "scope": "person", "importance": 0.8, "subject": null}
+- "im still programming the robot" -> {"text": "${speakerName} is programming a robot", "category": "project", "scope": "person", "importance": 0.5, "subject": null}
+- "what should I get my daughter Nova for her birthday, she loves horses" -> {"text": "${questionExampleText(speakerName)}", "category": "relationship", "scope": "person", "importance": 0.9, "subject": {"name": "Nova", "kind": "person"}}
 
-Return ONLY a JSON object: {"facts": [...]} (an empty array if nothing qualifies). At most ${MAX_FACTS_PER_TURN} facts.`;
+Return only a JSON object: {"facts": [...]}. An empty list is a valid answer. At most ${MAX_FACTS_PER_TURN} facts.`;
 }
 
 export type EntityKind = "person" | "pet" | "place" | "organization" | "thing";
@@ -417,13 +457,23 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
   const importance = typeof r.importance === "number" && Number.isFinite(r.importance) ? Math.min(1, Math.max(0, r.importance)) : 0.5;
   const subject = normalizeSubject(r.subject);
   const relation = normalizeRelation(r.relation);
+  const validFrom = normalizeDate(r.valid_from);
+  let validTo = normalizeDate(r.valid_to);
+  // MEM-AUDIT-04 (decision 7): a dated event leaves recall EVENT_GRACE_DAYS
+  // after its date, and both the recall read (eventWithinGrace) and the
+  // maintenance pass (event_passed) key on `valid_to`, which the model
+  // fills for a span ("away until Friday") but not for a day ("the
+  // recital is on the 12th", valid_from alone). The event's date is its
+  // end when no end is given. An event with neither date stays undated:
+  // an ordinary episodic record under decay, never archived as passed.
+  if (r.category === "event" && validFrom !== null && validTo === null) validTo = validFrom;
   return {
     text: r.text.trim().slice(0, 500),
     category: r.category,
     scope,
     importance,
-    valid_from: normalizeDate(r.valid_from),
-    valid_to: normalizeDate(r.valid_to),
+    valid_from: validFrom,
+    valid_to: validTo,
     subject,
     relation,
     offer_withheld: r.offer_withheld === true,
@@ -676,25 +726,116 @@ export function rejectPassing(
   return { kept, dropped };
 }
 
-const THIRD_PERSON_RE = /\b(he|she|they|him|her|them|his|their)\b/i;
+/** Who a fact is about, read from the fact itself (MEM-AUDIT-02). The
+ * model fills `subject` rarely (0 of 29 live candidates), so `null` is
+ * unknown, never "the speaker". Third-party evidence: a subject slot
+ * naming someone else; a household roster name in the text; the cited
+ * clause's own named subject in the text; a leading name set off by an
+ * apposition or a possessive ("Vincent, Sage's friend, plays drums";
+ * "Nova's boyfriend ..."); or a capitalized word the speaker introduced
+ * with a kind or relation noun ("my friend Vincent"). Speaker evidence: a
+ * subject slot naming the speaker, or the speaker's name in the text with
+ * no third party found. Neither is `unknown`, and an unknown fact never
+ * fails the subject check. A place name alone ("was in Brazil") is no
+ * third party. */
+export type FactAboutness = { who: "speaker" | "third_party" | "unknown"; names: string[] };
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const wholeWord = (name: string) => new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?![\\p{L}])`, "iu");
+/** The nouns a person or a pet is introduced with ("my friend Vincent",
+ * "my daughter Nova", "our neighbor Quill", "my dog Rover"): the last word
+ * of the vocabulary's own "my ..." phrases for every relation type whose
+ * far end is a person (spec/vocab/relationship-types.json's `said_as`),
+ * plus the everyday person and pet nouns the vocabulary has no edge for.
+ * A place or a thing is never introduced this way ("my new home Lisbon"
+ * names a place, and a place is no third party). */
+const KIND_NOUNS: ReadonlySet<string> = new Set([
+  ...RELATION_TYPE_IDS.filter((id) => kindForRelation(id) === "person")
+    .flatMap((id) => saidAs(id))
+    .filter((phrase) => /^(?:my|our)\s+(?:[a-z-]+\s+)?[a-z-]+$/.test(phrase))
+    .map((phrase) => phrase.split(/\s+/).pop()!),
+  "neighbor", "neighbour", "roommate", "housemate", "flatmate", "classmate", "bandmate", "teammate", "teacher", "coach", "doctor",
+  "nurse", "babysitter", "nanny", "ex", "godmother", "godfather", "stepsister", "stepbrother", "nephew", "niece", "twin", "crush",
+  "dog", "cat", "pet", "puppy", "pup", "kitten", "rabbit", "bunny", "hamster", "bird", "parrot", "horse", "pony", "fish", "lizard", "turtle",
+]);
+const KIND_NOUN_ALT = [...KIND_NOUNS].map(escapeRe).join("|");
+/** "my friend Vincent", "our oldest daughter Nova", "the neighbor Quill",
+ * "my dog named Rover", "Dr. Quill": the name is introduced as a person
+ * or a pet. Any other noun before a capitalized word ("my new home
+ * Lisbon", "the city Lisbon") introduces nothing. */
+const introducedName = (name: string) =>
+  new RegExp(`\\b(?:my|our|his|her|their|the|a|an)\\s+(?:[a-z-]+\\s+)?(?:${KIND_NOUN_ALT})s?\\s+(?:(?:named|called)\\s+)?${escapeRe(name)}\\b|\\b(?:mr|mrs|ms|dr)\\.?\\s+${escapeRe(name)}\\b`, "i");
+export function factAboutness(
+  fact: Pick<ExtractedFact, "text" | "subject">,
+  speakerName: string,
+  userText: string,
+  roster: readonly string[] = [],
+  clauseName: string | null = null,
+): FactAboutness {
+  const speakerWords = contentWords(speakerName);
+  const isSpeaker = (name: string) => speakerWords.has(name.toLowerCase().replace(/'s$/, "")) || name.toLowerCase() === speakerName.toLowerCase();
+  if (fact.subject !== null) {
+    return isSpeaker(fact.subject.name) ? { who: "speaker", names: [] } : { who: "third_party", names: [fact.subject.name.toLowerCase()] };
+  }
+  const text = fact.text;
+  const lower = text.toLowerCase();
+  const names = new Set<string>();
+  for (const name of [...roster, ...(clauseName ? [clauseName] : [])]) {
+    const n = name.trim().toLowerCase();
+    if (!n || isSpeaker(n)) continue;
+    if (wholeWord(n).test(lower)) names.add(n);
+  }
+  const userLower = userText.toLowerCase();
+  // A leading possessive or apposition ("Vincent, Sage's friend, ..."; "Nova's
+  // boyfriend ...") names a third party only when the roster knows the name
+  // (the loop above) or the person introduced it with a person or pet kind
+  // noun somewhere in the utterance. "Lisbon, Sage's new home city" leads
+  // with a place, and a place is no third party: the roster holds no places
+  // (subjectRosterFor), so the fact reads as the speaker's own when the
+  // text names them, else as unknown.
+  const lead = /^\s*([A-Z][a-z]+)(?:'s\s|,\s)/.exec(text);
+  if (lead && !isSpeaker(lead[1]!) && tokenize(lead[1]!).size > 0 && introducedName(lead[1]!.toLowerCase()).test(userLower)) names.add(lead[1]!.toLowerCase());
+  for (const match of text.matchAll(/\b[A-Z][a-z]+\b/g)) {
+    const word = match[0]!;
+    if (isSpeaker(word) || tokenize(word).size === 0) continue;
+    const n = word.toLowerCase();
+    if (introducedName(n).test(userLower)) names.add(n);
+  }
+  if (names.size > 0) return { who: "third_party", names: [...names] };
+  if ([...contentWords(text)].some((w) => speakerWords.has(w))) return { who: "speaker", names: [] };
+  return { who: "unknown", names: [] };
+}
 
-/** MEM-06 (c): ground each extracted fact in the eligible clause it came
- * from. For every fact, find the eligible clause (inform/commissive with
- * stance asserted or reported) whose text shares the most content words
+/** A question or a directive clause grounds a fact only when the clause
+ * carries at least half of the fact's content words (MEM-AUDIT-02): the
+ * fact inside "what should I get my daughter Nova for her birthday" or
+ * "write a song about my friend Rover who has a DDR cabinet" is real, a
+ * fact that merely brushes a question is not. */
+function isCarrierClause(clause: SignalClause): boolean {
+  return (clause.act === "question" || clause.act === "directive") && clause.stance === "asserted";
+}
+
+/** MEM-06 (c): ground each extracted fact in the clause it came from. For
+ * every fact, find the clause whose text shares the most content words
  * with the fact (after the skip set: speaker name, pronouns, calendar
- * words, stopwords). Drop `ineligible_act` if no eligible clause or the
- * best clause shares zero content words; `unknown_grounding` if proper
- * nouns or numbers (except the turn date's year) are not all in the cited
- * clause's text; `subject_mismatch` if the fact's subject names a
- * household member or third party but the clause's subject kind is
- * `speaker`, or vice versa (`subject: null` = the speaker). When the
- * signal is missing or has no clauses, keep every fact with `clause: null`. */
+ * words, stopwords): an inform or commissive clause with stance asserted
+ * or reported at any overlap, a question or directive clause at half the
+ * fact's content words or more (MEM-AUDIT-02). Drop `ineligible_act` if
+ * no such clause shares content; `unknown_grounding` if a proper noun or
+ * a number (except the turn date's year) in the fact is said nowhere in
+ * the utterance's clauses; `subject_mismatch` if the fact is about the
+ * speaker but the cited clause is about a named third party, or the fact
+ * is about a third party the cited speaker clause is not about: it
+ * neither introduces the name with a person or pet kind noun nor makes
+ * it the subject of a clause of its own (`factAboutness()`,
+ * `clauseIsAbout()`; an unknown fact never mismatches). When the signal
+ * is missing or has no clauses, keep every fact with `clause: null`. */
 export function citeClause(
   facts: ExtractedFact[],
   signal: TurnSignal | null,
   userText: string,
   speakerName: string,
   turnDate: string,
+  roster: readonly string[] = [],
 ): {
   kept: { fact: ExtractedFact; clause: SignalClause | null }[];
   dropped: { fact: ExtractedFact; reason: "ineligible_act" | "quoted" | "hypothetical" | "joking" | "unknown_grounding" | "subject_mismatch" }[];
@@ -704,73 +845,125 @@ export function citeClause(
   }
   const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
   const year = turnDate.match(/(\d{4})/)?.[1] ?? null;
-  const eligible = signal.clauses.filter(isEligibleClause);
+  const clauseTextOf = (clause: SignalClause) => userText.slice(clause.range.start, clause.range.end);
+  // Each clause's text, lowercase text and content words once, not once
+  // per fact: a twelve-fact turn over a six-clause utterance tokenized
+  // every clause seventy times before this.
+  const clauses = signal.clauses.map((clause) => {
+    const text = clauseTextOf(clause);
+    return { clause, lower: text.toLowerCase(), words: contentWords(text), stanceReason: stanceReason(clause.stance), carrier: isCarrierClause(clause), eligible: isEligibleClause(clause) };
+  });
+  const utteranceLower = clauses.map((c) => c.lower).join("\n");
+  const isSpeakerClause = (c: SignalClause) => c.subject === null || c.subject.kind === "speaker";
+  const speakerWords = contentWords(speakerName);
+  const isSpeakerName = (name: string) => speakerWords.has(name.toLowerCase().replace(/'s$/, "")) || name.toLowerCase() === speakerName.toLowerCase();
   const kept: { fact: ExtractedFact; clause: SignalClause | null }[] = [];
   const dropped: { fact: ExtractedFact; reason: "ineligible_act" | "quoted" | "hypothetical" | "joking" | "unknown_grounding" | "subject_mismatch" }[] = [];
-  const stanceReason = (stance: SignalClause["stance"]): "quoted" | "hypothetical" | "joking" | null =>
-    stance === "quoted" ? "quoted" : stance === "hypothetical" ? "hypothetical" : stance === "joke" ? "joking" : null;
   for (const fact of facts) {
     const words = contentWords(fact.text);
     const content = [...words].filter((w) => !skip.has(w));
-    let best: { clause: SignalClause; shared: number } | null = null;
-    for (const clause of signal.clauses) {
-      const clauseText = userText.slice(clause.range.start, clause.range.end);
-      const clauseWords = contentWords(clauseText);
-      const shared = content.filter((w) => clauseWords.has(w)).length;
-      if (!best || shared > best.shared) best = { clause, shared };
+    const half = Math.ceil(content.length / 2);
+    const sharedWith = (c: (typeof clauses)[number]) => content.filter((w) => c.words.has(w)).length;
+    let best: { clause: (typeof clauses)[number]; shared: number } | null = null;
+    for (const c of clauses) {
+      const shared = sharedWith(c);
+      if (!best || shared > best.shared) best = { clause: c, shared };
     }
-    if (best && best.shared > 0) {
-      const reason = stanceReason(best.clause.stance);
-      if (reason) {
-        dropped.push({ fact, reason });
-        continue;
-      }
+    if (best && best.shared > 0 && best.clause.stanceReason) {
+      dropped.push({ fact, reason: best.clause.stanceReason });
+      continue;
     }
-    const factIsThirdParty = fact.subject !== null && fact.subject.name.toLowerCase() !== speakerName.toLowerCase();
-    let bestEligible: { clause: SignalClause; shared: number } | null = null;
-    for (const clause of eligible) {
-      const clauseText = userText.slice(clause.range.start, clause.range.end);
-      const clauseWords = contentWords(clauseText);
-      const shared = content.filter((w) => clauseWords.has(w)).length;
-      // A tie goes to the clause whose subject kind agrees with the fact's
-      // (checked after), so "Jesse plays guitar" cites "I play guitar", not
-      // the equally matching "He plays drums".
-      const agrees = (c: SignalClause) => (c.subject === null || c.subject.kind === "speaker") === !factIsThirdParty;
-      if (!bestEligible || shared > bestEligible.shared || (shared === bestEligible.shared && agrees(clause) && !agrees(bestEligible.clause))) bestEligible = { clause, shared };
+    // Who the fact is about, read once per fact from its subject slot, its
+    // text and the roster; the cited clause's own named subject joins the
+    // names below without a second pass over the text.
+    const about = factAboutness(fact, speakerName, userText, roster, null);
+    // A question or a directive carries a fact only on its own words: when
+    // a quoted, hypothetical or joking clause of the same turn shares any
+    // of the fact's content, the fact drew on that clause ("Do you know my
+    // friend Dan? If he played drums I would cheer" never yields "Dan plays
+    // drums") and no carrier clause may ground it.
+    const tainted = clauses.some((c) => c.stanceReason !== null && content.some((w) => c.words.has(w)));
+    // A tie goes to the clause whose subject kind agrees with the fact's
+    // (checked after), so "Jesse plays guitar" cites "I play guitar", not
+    // the equally matching "He plays drums".
+    const agrees = (c: SignalClause) => about.who === "unknown" || (about.who === "speaker") === isSpeakerClause(c);
+    let bestEligible: { clause: (typeof clauses)[number]; shared: number } | null = null;
+    for (const c of clauses) {
+      if (!c.carrier && !c.eligible) continue;
+      const shared = sharedWith(c);
+      if (c.carrier && (tainted || shared === 0 || shared < half)) continue;
+      if (!bestEligible || shared > bestEligible.shared || (shared === bestEligible.shared && agrees(c.clause) && !agrees(bestEligible.clause.clause))) bestEligible = { clause: c, shared };
     }
     if (!bestEligible || bestEligible.shared === 0) {
       dropped.push({ fact, reason: "ineligible_act" });
       continue;
     }
-    const clauseText = userText.slice(bestEligible.clause.range.start, bestEligible.clause.range.end);
-    const clauseLower = clauseText.toLowerCase();
+    const clauseLower = bestEligible.clause.lower;
     const properNouns = properNounsIn(fact.text).filter((w) => !skip.has(w));
     const numbers = [...fact.text.matchAll(/\d+/g)].map((m) => m[0]!).filter((n) => n !== year);
-    // MEM-06 (c) coreference: "Do you know my friend Dan Campos? ... He
-    // plays drums" grounds "Dan Campos plays drums" in the clause with the
-    // pronoun, which never repeats the name. A proper noun the cited clause
-    // lacks still counts when one of the two clauses just before it (same
-    // utterance only) names it AND the cited clause holds a third-person
-    // pronoun that can point back. A name said nowhere stays ungrounded.
-    const citedAt = signal.clauses.indexOf(bestEligible.clause);
-    const lookBack = THIRD_PERSON_RE.test(clauseText)
-      ? signal.clauses.slice(Math.max(0, citedAt - 2), Math.max(0, citedAt)).map((c) => userText.slice(c.range.start, c.range.end).toLowerCase())
-      : [];
-    const allPresent =
-      properNouns.every((w) => clauseLower.includes(w) || lookBack.some((t) => t.includes(w))) &&
-      numbers.every((n) => clauseLower.includes(n));
+    // A fact may join two clauses ("make a note that Marlow is human, and
+    // shouldn't be judged by what Nova does"), and a name said one clause
+    // earlier grounds a pronoun in the cited one ("Do you know my friend
+    // Dan Campos? ... He plays drums"), so a proper noun or a number counts
+    // when any clause of this utterance says it. A name said nowhere in
+    // the utterance stays ungrounded (rejectUngrounded() reads the whole
+    // turn the same way).
+    const allPresent = properNouns.every((w) => utteranceLower.includes(w)) && numbers.every((n) => utteranceLower.includes(n));
     if (!allPresent) {
       dropped.push({ fact, reason: "unknown_grounding" });
       continue;
     }
-    const clauseIsSpeaker = bestEligible.clause.subject?.kind === "speaker" || bestEligible.clause.subject === null;
-    if (factIsThirdParty !== !clauseIsSpeaker) {
+    // The cited clause's own named subject joins the fact's third parties
+    // when the fact text says that name (what factAboutness() does with a
+    // `clauseName`, folded in here so the text is read once per fact); a
+    // fact with a filled subject slot keeps that slot's answer.
+    const clauseName = bestEligible.clause.clause.subject?.kind === "named" ? bestEligible.clause.clause.subject.name : null;
+    const clauseNameLower = clauseName?.trim().toLowerCase() ?? "";
+    const cited: FactAboutness =
+      fact.subject === null && clauseNameLower && !isSpeakerName(clauseNameLower) && !about.names.includes(clauseNameLower) && wholeWord(clauseNameLower).test(fact.text.toLowerCase())
+        ? { who: "third_party", names: [...about.names, clauseNameLower] }
+        : about;
+    // A speaker fact cited to a clause about a named person is that
+    // person's fact misattributed; a household, world or hub clause
+    // ("we're getting a puppy", "the dishwasher is broken", "keep your
+    // replies short") is the speaker talking about their own life. A
+    // third-party fact cited to a speaker clause stands only when that
+    // clause is about the third party: it introduces the name with a
+    // person or pet kind noun ("my friend vincent plays drums", "what
+    // should I get my daughter Nova") or the name is the subject of a
+    // clause of its own ("Dana works at the bakery"). A name the speaker
+    // merely spoke to or sat with ("I told Dana I like jazz", "I had
+    // coffee with Nova and I love jazz") is no ground for a fact about
+    // them (MEM-06-COREF-02).
+    const clauseIsSpeaker = isSpeakerClause(bestEligible.clause.clause);
+    const mismatch =
+      (cited.who === "speaker" && clauseName !== null) ||
+      (cited.who === "third_party" && clauseIsSpeaker && !cited.names.some((n) => clauseIsAbout(clauseLower, n)));
+    if (mismatch) {
       dropped.push({ fact, reason: "subject_mismatch" });
       continue;
     }
-    kept.push({ fact, clause: bestEligible.clause });
+    kept.push({ fact, clause: bestEligible.clause.clause });
   }
   return { kept, dropped };
+}
+
+function stanceReason(stance: SignalClause["stance"]): "quoted" | "hypothetical" | "joking" | null {
+  return stance === "quoted" ? "quoted" : stance === "hypothetical" ? "hypothetical" : stance === "joke" ? "joking" : null;
+}
+
+/** Whether a speaker clause is about `name` (lowercase) rather than
+ * mentioning them in passing: the clause introduces the name with a
+ * person or pet kind noun ("my friend vincent", "our oldest daughter
+ * nova", "vincent, my friend,"), or the name opens the clause or a
+ * clause of its own inside it ("dana works at the bakery", "..., and
+ * nova loves horses", "nova's boyfriend is nice"). "i told dana i like
+ * jazz" and "i had coffee with nova" do neither. */
+function clauseIsAbout(clauseLower: string, name: string): boolean {
+  const n = escapeRe(name);
+  if (introducedName(name).test(clauseLower)) return true;
+  if (new RegExp(`\\b${n},?\\s+(?:my|our|his|her|their)\\s+(?:[a-z-]+\\s+)?(?:${KIND_NOUN_ALT})\\b`, "i").test(clauseLower)) return true;
+  return new RegExp(`(?:^|[,;:]|\\b(?:and|but|so|because|then|while|since|although|that)\\s)\\s*${n}(?:'s)?\\s+(?!(?:and|or)\\b)[a-z]`, "i").test(clauseLower);
 }
 
 // MEM-06 (b): a fact about the turn's WORLD subject - a lookup's title
@@ -1006,11 +1199,15 @@ export function sharesAttribute(oldText: string, newText: string): boolean {
  * legacy's own catch block used. Dedupe asks the model only for cosine
  * similarity in the ambiguous band (0.60 to 0.92); outside that band,
  * the decision is deterministic: near-identical is SUPERSEDE, clearly
- * new is ADD. */
-async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promise<DedupeDecision> {
+ * new is ADD. The near-identical band runs the same `sharesAttribute`
+ * guard as the model band (MEM-AUDIT-04, decision 7): two facts about
+ * one person and different things can score 0.92 and above on the embed
+ * model, and a supersede there would silently lose the older fact. */
+export async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promise<DedupeDecision> {
   if (candidates.length === 0) return { action: "ADD" };
   const topCandidate = candidates[0]!;
   if (topCandidate.cosine >= DEDUPE_COSINE_BAND_HIGH) {
+    if (!sharesAttribute(topCandidate.record.text, newText)) return { action: "ADD" };
     return { action: "SUPERSEDE", id: topCandidate.record.id, mergedText: newText, contradiction: false };
   }
   if (topCandidate.cosine < DEDUPE_COSINE_BAND_LOW) {
@@ -1224,6 +1421,25 @@ function memberNicknames(personId: string): string[] {
   return row?.nickname ? [row.nickname] : [];
 }
 
+/** The names `citeClause()` and `factAboutness()` read a fact's third
+ * party from when the model left `subject` empty (MEM-AUDIT-02): the
+ * guards' own roster (subjectRosterFor: the people and pets in the
+ * speaker's registry, members and a friend who exists as an entity
+ * alike, never a place or a thing, never an unconfirmed candidate), plus
+ * every member's display name and nickname from the people table, which
+ * the registry does not carry (a member's nickname is not an alias on
+ * their person entity, and a member has no entity until the first fact
+ * names them). The speaker's own name is in the list; factAboutness()
+ * skips it. */
+function judgeRoster(speaker: PersonRow): string[] {
+  const names = new Set<string>(subjectRosterFor(speaker));
+  for (const row of db.select({ displayName: people.displayName, nickname: people.nickname }).from(people).where(isNull(people.deletedAt)).all()) {
+    names.add(row.displayName);
+    if (row.nickname) names.add(row.nickname);
+  }
+  return [...names];
+}
+
 export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnResult> {
   // isNull(deletedAt) matters here the same way it does everywhere else
   // a person id becomes a write target (remember()'s own person-exists
@@ -1250,12 +1466,23 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     return { ok: true, factsWritten: 0 };
   }
   if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: 0 };
+  // MEM-AUDIT-02 (the architect's note): with the three-word gate every
+  // robot turn is queued, so the speaker check lives here too. A robot
+  // turn whose speaker evidence does not name the signed-in person is
+  // anonymous (THIN-0D's own derivation, turnMachine/speaker.ts), and an
+  // unknown speaker's words are never written as the signed-in person's
+  // memory (RULES.md: an unknown speaker reaches no memory). Marked
+  // skipped, the same as a turn the gate refused.
+  if (speakerIsAnonymous({ surface: turn.surface as Surface, actor: speaker, speakerEvidence: speakerEvidenceOf(turn) })) {
+    markSkipped(turn.id);
+    return { ok: true, factsWritten: 0 };
+  }
   // ACT-01 (section 12 part 6): the stored signal decides whether the
   // turn's speech can be evidence at all. logTurn() already skipped a
   // turn with no eligible clause at insert; this is the same test on
   // read, for a row whose status was cleared or written another way.
   const signal = turnSignalOf(turn);
-  if (signal && !hasEligibleClause(signal)) {
+  if (signal && !hasEligibleClause(signal, turn.userText)) {
     markSkipped(turn.id);
     return { ok: true, factsWritten: 0 };
   }
@@ -1302,7 +1529,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // from; a fact whose best eligible clause shares no content, whose
   // proper nouns or numbers are absent from the cited clause, or whose
   // subject kind disagrees with the clause's subject, is dropped.
-  const { kept: cited, dropped: citeDropped } = citeClause(facts, signal, turn.userText, speakerName, turnDateFor(turn.createdAt));
+  const { kept: cited, dropped: citeDropped } = citeClause(facts, signal, turn.userText, speakerName, turnDateFor(turn.createdAt), judgeRoster(speaker));
   // MEM-06 (d): the clause shapes the record - a reported clause writes
   // about the third party only, capped at 0.4 with the source named; a
   // commissive clause writes a goal, a project or a dated event and
@@ -1373,6 +1600,26 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // follows). The re-assertion is counted on the turn's drop line
     // beside MEM-06's own reasons.
     const reassert = exactActiveMatch(speaker, fact, robotBound ? robotDeviceId : null);
+    // MEM-AUDIT-02 (decision 3): an explicit save ("make a note that Marlow
+    // is allergic to peanuts") is stored by the remember package as a plain
+    // `fact` the moment it is said, under this turn's id, and the better
+    // category arrives through this judge's pass over the same turn. With
+    // the same wording the recipe's row takes the judge's category and
+    // tier in place: ingestion keys an active row on its text
+    // (memoryIngestion.ts), so a supersede with the same words would hand
+    // back the same row. With different wording the dedupe fold-in below
+    // supersedes the row with the judge's record (and its category). One
+    // active record either way, never a second.
+    if (reassert && reassert.source === turn.id && reassert.category !== fact.category) {
+      const subject = resolveSubject(speaker, fact, turn);
+      db.update(memoryRecords)
+        .set({ category: fact.category, tier: categoryToTier(fact.category), importance: Math.max(reassert.importance, fact.importance), ...(subject && !reassert.subjectId ? { subjectId: subject.id } : {}), hlc: nextHlc() })
+        .where(eq(memoryRecords.id, reassert.id))
+        .run();
+      if (fact.relation) writeFactRelation(speaker, fact, subject, turn);
+      console.log(`[memoryJudge] turn ${turn.id}: the turn's own explicit save ${reassert.id} takes the judge's category ${fact.category}`);
+      continue;
+    }
     if (reassert) {
       if (fact.category === "state") {
         const newValidTo =
@@ -1462,6 +1709,11 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       // has the reasoning): that one only ever writes a person's own
       // pinned summary of themselves, this one can target ANY household
       // or person-scope candidate similarByVector() turned up.
+      // The turn's own explicit save (the remember package's `fact` row)
+      // takes the judge's category and tier when it is the row superseded
+      // (decision 3: category from the judge when one is available); an
+      // older record keeps its own, as before.
+      const ownWrite = ownWrites.some((own) => own.record.id === decision.id);
       const result = supersede(
         speaker,
         decision.id,
@@ -1474,6 +1726,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           valid_to: fact.valid_to,
           subject_id: subject?.id,
           offer_withheld: fact.offer_withheld ? true : null,
+          ...(ownWrite ? { category: fact.category, tier: categoryToTier(fact.category) } : {}),
         },
         { ...(decision.contradiction ? { closeValidTo: turn.createdAt } : {}), enforcePrivilegedRoute: true },
       );
@@ -1615,8 +1868,11 @@ function isSkippedTurn(turnId: string): boolean {
 }
 // ACT-01: the queue is keyed on the stored signal, not on the reply's
 // source: any unjudged turn that carries one is the judge's (logTurn()
-// marked the ineligible ones skipped at insert), so a disclosure beside
-// a package answer is judged (CHAT-07's gap). A row written before the
+// marked the ineligible ones skipped at insert: under three words, or only
+// greeting, closing and backchannel clauses, MEM-AUDIT-02's decision 4;
+// judgeTurn() applies the same `hasEligibleClause()` on read), so a
+// disclosure beside a package answer and a question that names a family
+// member are both judged (CHAT-07's gap). A row written before the
 // signal existed keeps the old rule, model turns only.
 // getmaipai/home#131: excludes status="running" - insertProvisionalTurn()
 // (conversationHistory.ts) writes a real row with source: "model" (a
@@ -1735,143 +1991,24 @@ async function checkContradiction(older: string, newer: string): Promise<boolean
   }
 }
 
-// ==== Step 7: the profile paragraph (written only here, per the plan's
-// own "never by the extractor directly") ====
-
-const PROFILE_MAX_CHARS = 600; // the plan's own cap, enforced in code, not just asked of the model
-const MAX_PROFILE_INPUT_FACTS = 20; // bounds prompt size regardless of how many facts a long-lived household member accumulates
-const MAX_PROFILE_REWRITES_PER_RUN = 20; // one consolidate tick amortizes over a household this large before the next weekly run picks up the rest
-
-const PROFILE_SCHEMA = {
-  name: "profile_paragraph",
-  schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
-} as const;
-
-// PROFILE-CHANNEL-01: the paragraph this function writes is injected into
-// EVERY turn's prompt unconditionally (getProfileParagraph(), read
-// straight off the pinned PROFILE_SOURCE row - the retired turn engine never sends
-// it through recall() at all), so it is the one memory channel MEM-ELIG-01's
-// query-eligibility gate can never reach, whatever the person's utterance
-// is. A fact that reads as an event (something that happened or is
-// scheduled) must never be folded into this paragraph's prose for
-// exactly that reason: once woven into pinned always-on text, it is
-// recallable by a bare topic-free remark ("wrong") the same way the live
-// leak on conv-19awhetzdf was. The extractor's own "event" category is
-// only the narrowest case of this - a code review on this item's first
-// pass found the SAME shape in "fact" (memory-eval.ts's own fixture
-// seeds a literal event, "Marlow's car got an oil change in March", as
-// category "fact"), and the extraction prompt's own STATE AND TRIP RULE
-// writes a dated, already-happened trip as category "state" on purpose
-// ("Sage was in Brazil ... [date]"). Rather than enumerate categories by
-// hand and risk missing the next one, this keys off tier instead -
-// categoryToTier() (above) already computes the identical durable/
-// episodic split from category at write time, and its durable set
-// (identity, relationship, person, preference) is word-for-word the
-// backlog's own definition of "identity" (who the person is: name,
-// role, preferences, standing facts); everything else is episodic and
-// stays out of the paragraph. An episodic fact needs no separate write
-// here to become "an episode": it is already stored as its own
-// episodic-tier memory record at extraction time, well before any
-// consolidation pass runs, reachable by an ordinary recall() query
-// under MEM-ELIG-01's gate like any other episodic fact - excluding it
-// from this prompt is the whole fix. Because the paragraph is fully
-// resynthesized (never appended to) on every consolidation pass, a fact
-// that leaked into an earlier paragraph is moved, not duplicated, the
-// moment it is excluded here: the next paragraph simply stops narrating
-// it (nothing new is written for it - it was never anything but its own
-// already-existing record).
-function isProfileEligible(tier: string): boolean {
-  return tier === "durable";
-}
-
-/** Synthesizes and writes/rewrites one person's profile paragraph from
- * their own active person-scope facts (never household-shared ones - a
- * profile is inherently personal). Returns whether it actually wrote
- * something; a person with no eligible facts yet, or a model call that
- * fails, is a real, silent no-op - there's nothing this run could say
- * about them that wouldn't be invented. */
-async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
-  // list()'s own ordering (pinned, then importance, then recency) already
-  // picks the most representative facts first - reusing it here is the
-  // same "don't re-invent a second ranking" the rest of this file already
-  // leans on. The profile's own prior record is excluded by source,
-  // record_kind is restricted to plain facts (an entity record's "Name:
-  // description" text isn't a fact ABOUT this person), and an episodic
-  // fact is excluded too (PROFILE-CHANNEL-01, isProfileEligible() above) -
-  // it stays exactly where categoryToTier() already put it, an episodic
-  // record recall() can reach, never this paragraph's prose.
-  const facts = list(personRow, { scope: "person", person: personRow.id })
-    .filter((r) => r.source !== PROFILE_SOURCE && r.record_kind === "memory" && isProfileEligible(r.tier))
-    .slice(0, MAX_PROFILE_INPUT_FACTS);
-  if (facts.length === 0) return false;
-
-  const factLines = facts.map((f) => `- ${f.text}`).join("\n");
-  // sanitizeForPrompt (SEC-8, code review, 2026-09-06): personRow.displayName
-  // is free text the person set on their own profile - see extractFacts()'s
-  // own call above for the identical reasoning.
-  const safeDisplayName = sanitizeForPrompt(personRow.displayName);
-  const prompt = `Write a single plain-prose paragraph (at most ${PROFILE_MAX_CHARS} characters) summarizing who ${safeDisplayName} is, what they like, and what's going on with them this week, based ONLY on the facts below - never invent anything not listed, and never mention a fact that isn't there. No bullet points or headings, third person, plain prose.\n\nKnown facts about ${safeDisplayName}:\n${factLines}`;
-
-  let text: string;
-  try {
-    const result = await completeBackground(
-      [
-        { role: "system", content: prompt },
-        { role: "user", content: "Write the paragraph now." },
-      ],
-      { temperature: 0.3, response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA } },
-    );
-    if (!result.ok) return false;
-    const parsed = JSON.parse(result.text) as { text?: unknown };
-    if (typeof parsed.text !== "string" || !parsed.text.trim()) return false;
-    const raw = parsed.text.trim();
-    // A code review (2026-09-05) found a bare slice() could cut mid-word
-    // or mid-sentence with no indication anything was truncated - the
-    // household would read a paragraph that just stops. Same "the
-    // ellipsis counts INSIDE the cap" contract capSection() already
-    // established for prompt sections (step 4), applied here since a
-    // reused import across these two files isn't warranted for three
-    // lines of string slicing.
-    text = raw.length > PROFILE_MAX_CHARS ? raw.slice(0, PROFILE_MAX_CHARS - 3) + "..." : raw;
-  } catch {
-    return false;
-  }
-
-  const existing = db
-    .select()
-    .from(memoryRecords)
-    .where(and(eq(memoryRecords.person, personRow.id), eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
-    .get();
-
-  if (existing) {
-    const result = supersede(personRow, existing.id, {
-      text,
-      category: "identity",
-      tier: "durable",
-      pinned: true,
-      importance: 0.9,
-      source: PROFILE_SOURCE,
-    });
-    return result.ok;
-  }
-  const result = remember(personRow, {
-    text,
-    category: "identity",
-    tier: "durable",
-    scope: "person",
-    person: personRow.id,
-    source: PROFILE_SOURCE,
-    importance: 0.9,
-    pinned: true,
-  });
-  return result.ok;
-}
+// ==== The profile rows (MEM-AUDIT-01, decision 1) ====
+//
+// The weekly LLM profile paragraph (step 7's rewriteProfileParagraph and
+// its prompt) is gone: the paragraph was injected into every turn's
+// prompt with no relevance check, narrated "this week" events and a
+// child's name into the stable prefix, and produced the "wear jackets"
+// reply. The profile is now a deterministic card the context node builds
+// from the person's own durable facts (lib/memoryProfile.ts), so no row
+// with source PROFILE_SOURCE is written any more; runConsolidation()
+// below archives the ones the paragraph pass left behind, with the
+// reason "profile_card_replaced", so the Memory page still shows them.
 
 export interface ConsolidateResult {
   contradictionsSuperseded: number;
   contradictionPairsVisited: number;
   demoted: number;
-  profilesRewritten: number;
+  /** Profile-paragraph rows (source PROFILE_SOURCE) archived this run, MEM-AUDIT-01. */
+  profilesArchived: number;
 }
 
 /** Groups active durable records by (scope, person, category) and checks
@@ -1880,23 +2017,21 @@ export interface ConsolidateResult {
  * pairs have independent per-run ceilings; the persisted scan cursor
  * resumes the next run rather than dropping busy-household coverage.
  * Then demotes never-recalled durable records separately (pure code, no
- * LLM). No actor: this is a household-wide sweep, same shape as
- * runMaintenance(). */
+ * LLM), and archives any profile-paragraph row still active
+ * (MEM-AUDIT-01). No actor: this is a household-wide sweep, same shape
+ * as runMaintenance(). */
 export async function runConsolidation(): Promise<ConsolidateResult> {
   // Raw rows, no actor/canRead filtering - a household-wide sweep has to
   // see every person's durable records, including scope=person ones no
   // single actor could browse together, the same reason runMaintenance()
   // above queries memoryRecords directly instead of going through list().
-  // Never the profile paragraph itself: it's category:"identity",
+  // Never a profile paragraph row: it's category:"identity",
   // tier:"durable", scope:"person" - the exact same bucket as a
   // person's own real identity facts - so without this exclusion a
   // code review (2026-09-05) found it could land in the SAME
-  // contradiction-check group as those facts. A real fact superseded
-  // "in favor of" a synthesized paragraph (or the profile row itself
-  // marked superseded outside rewriteProfileParagraph()'s own
-  // supersede-or-remember logic, silently breaking "written and
-  // rewritten only by this pass") is a genuine correctness risk, not
-  // just noise.
+  // contradiction-check group as those facts, and a real fact could be
+  // superseded "in favor of" a synthesized paragraph. The rows are
+  // archived at the end of this run instead (MEM-AUDIT-01).
   const durable = db
     .select()
     .from(memoryRecords)
@@ -2019,52 +2154,31 @@ export async function runConsolidation(): Promise<ConsolidateResult> {
   }
 
   const demoted = demoteNeverRecalledDurables();
+  const profilesArchived = archiveProfileParagraphs();
 
-  // Every distinct person with at least one eligible fact gets their
-  // profile paragraph rewritten this run, bounded the same way the
-  // passes above are. A person with zero eligible facts is never a
-  // candidate at all (the WHERE clause below), so a fresh household
-  // member with nothing said yet costs nothing here.
-  const profileCandidates = db
-    .selectDistinct({ person: memoryRecords.person })
-    .from(memoryRecords)
-    .where(
-      and(
-        eq(memoryRecords.status, "active"),
-        eq(memoryRecords.scope, "person"),
-        isNotNull(memoryRecords.person),
-        ne(memoryRecords.source, PROFILE_SOURCE),
-      ),
-    )
-    .all();
+  return { contradictionsSuperseded, contradictionPairsVisited, demoted, profilesArchived };
+}
 
-  // Least-recently-profiled first (never-profiled sorts first of all,
-  // via the empty-string default): a code review (2026-09-05) found the
-  // un-ordered query above left MAX_PROFILE_REWRITES_PER_RUN's own
-  // cutoff arbitrary once a household has more eligible people than
-  // that - not just non-deterministic, but potentially starving the
-  // same people every single week if SQLite's own row order happens to
-  // stay stable. This costs one extra query, not a join, and turns
-  // "arbitrary" into "fair rotation."
-  const existingProfiles = db
-    .select({ person: memoryRecords.person, createdAt: memoryRecords.createdAt })
+/** MEM-AUDIT-01: every still-active profile-paragraph row leaves the
+ * active set on the next consolidation run, archived (never deleted: the
+ * Memory page keeps it, the same status archive() and runMaintenance()
+ * use) with the reason "profile_card_replaced". The deterministic card
+ * (lib/memoryProfile.ts) reads the person's own facts directly, so no
+ * row with this source is written again. Exported for the test. */
+export function archiveProfileParagraphs(): number {
+  const rows = db
+    .select({ id: memoryRecords.id })
     .from(memoryRecords)
     .where(and(eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
     .all();
-  const profiledAt = new Map(existingProfiles.map((p) => [p.person, p.createdAt]));
-  const orderedCandidates = [...profileCandidates].sort((a, b) => {
-    const aTime = (a.person && profiledAt.get(a.person)) || "";
-    const bTime = (b.person && profiledAt.get(b.person)) || "";
-    return aTime.localeCompare(bTime);
-  });
-
-  let profilesRewritten = 0;
-  for (const row of orderedCandidates.slice(0, MAX_PROFILE_REWRITES_PER_RUN)) {
-    if (!row.person) continue;
-    const personRow = db.select().from(people).where(and(eq(people.id, row.person), isNull(people.deletedAt))).get();
-    if (!personRow) continue; // soft-deleted since - nothing to profile
-    if (await rewriteProfileParagraph(personRow)) profilesRewritten++;
-  }
-
-  return { contradictionsSuperseded, contradictionPairsVisited, demoted, profilesRewritten };
+  if (rows.length === 0) return 0;
+  const now = new Date().toISOString();
+  db.update(memoryRecords)
+    .set({ status: "archived", archivedReason: PROFILE_ARCHIVED_REASON, expiredAt: now, hlc: nextHlc() })
+    .where(inArray(memoryRecords.id, rows.map((r) => r.id)))
+    .run();
+  console.log(`[memory.consolidate] archived ${rows.length} profile paragraph row(s): the profile card replaced them`);
+  return rows.length;
 }
+export const PROFILE_ARCHIVED_REASON = "profile_card_replaced";
+

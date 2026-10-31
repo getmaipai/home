@@ -605,15 +605,35 @@ export function shapeOf(signal: TurnSignal, text: string): UtteranceShape {
   return "statement";
 }
 
-/** MEM-06's eligibility, the structural half ACT-01 lands: only an
- * inform or a commissive clause with stance asserted or reported can
- * yield a memory. A question asks, a directive acts, a greeting, a
- * closing or a backchannel says nothing about anyone, and a quoted,
- * hypothetical, joking or unknown clause writes nothing. */
+/** MEM-06's clause eligibility, the structural half ACT-01 lands: an
+ * inform or a commissive clause with stance asserted or reported is the
+ * clause a fact cites first. The judge's `citeClause()` reads this; a
+ * question or a directive clause may still ground a fact when it carries
+ * the fact's own words (MEM-AUDIT-02), and a quoted, hypothetical,
+ * joking or unknown clause writes nothing. */
 export function isEligibleClause(clause: SignalClause): boolean {
   return (clause.act === "inform" || clause.act === "commissive") && (clause.stance === "asserted" || clause.stance === "reported");
 }
 
-export function hasEligibleClause(signal: TurnSignal): boolean {
-  return signal.clauses.some(isEligibleClause);
+/** The turn gate's floor: a turn of fewer words than this is never judged
+ * (MEM-AUDIT-02, decision 4). Three, not four: "I hate cilantro" and "I
+ * like tea" are the shortest statements people make about themselves,
+ * and a four-word floor dropped every one of them. */
+export const JUDGE_MIN_WORDS = 3;
+const SOCIAL_ACTS: ReadonlySet<Act> = new Set(["greeting", "closing", "backchannel"]);
+
+/** The turn gate (MEM-AUDIT-02, decision 4; replaces MEM-06's
+ * clause-only rule for the queue): a turn is the judge's when its text
+ * has at least three words and its clauses are not all greetings,
+ * closings or backchannels. A question and a directive are judged, because
+ * that is where people name their family ("whose my daughter Nova's
+ * boyfriend") and tell the assistant how to behave ("stop saying that");
+ * the live hub skipped 190 of 337 turns on the old rule and lost three
+ * instructions. The clause rule above still decides which clause a fact
+ * cites inside the judge. */
+export function hasEligibleClause(signal: TurnSignal, userText: string): boolean {
+  const words = userText.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  if (words < JUDGE_MIN_WORDS) return false;
+  if (signal.clauses.length === 0) return false;
+  return !signal.clauses.every((c) => SOCIAL_ACTS.has(c.act));
 }

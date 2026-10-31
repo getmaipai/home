@@ -722,6 +722,42 @@ describe("turnNext.ts: a matched bundled package reports plugin_id, never comman
   });
 });
 
+// MEM-AUDIT-02 (decision 3): the explicit-save phrasings beside "remember
+// that" reach the `remember` package, with the opener stripped from what is
+// saved; a reminder phrasing ("don't forget to lock up") is not a save.
+describe("turnNext.ts: the wider explicit-save phrasings reach the remember package", () => {
+  const saved = () => db.select().from(memoryRecords).all().filter((r) => r.status === "active").map((r) => r.text);
+  const say = (text: string) => withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", text));
+
+  test.each([
+    ["make a note that Marlow is allergic to peanuts", "Marlow is allergic to peanuts"],
+    ["make a note of the spare key under the mat", "the spare key under the mat"],
+    ["note that trash day moved to Wednesday", "trash day moved to Wednesday"],
+    ["keep in mind that Nova goes to bed at eight", "Nova goes to bed at eight"],
+    ["keep in mind Nova goes to bed at eight", "Nova goes to bed at eight"],
+    ["don't forget that Nova's recital is on Friday", "Nova's recital is on Friday"],
+    ["for future reference, the spare key is with the neighbor", "the spare key is with the neighbor"],
+    ["remember: pizza night is Friday", "pizza night is Friday"],
+    ["note: the garden hose lives in the shed", "the garden hose lives in the shed"],
+  ])("%s", async (text, stored) => {
+    const { REMEMBER_CONFIRM_VARIANTS } = await import("@/lib/replyVariation");
+    const result = await say(text);
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.plugin_id).toBe("remember");
+    expect(["Got it, I'll remember that.", ...REMEMBER_CONFIRM_VARIANTS]).toContain(result.value.reply.text);
+    expect(saved()).toEqual([stored]);
+  });
+
+  test("a reminder phrasing is not a save: 'don't forget to lock up' stores nothing through the remember package", async () => {
+    const result = await say("don't forget to lock up tonight");
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.plugin_id).not.toBe("remember");
+    expect(saved()).toEqual([]);
+  });
+});
+
 describe("turnNext.ts: budget.model_transitions false", () => {
   test("no tool call is ever offered, whatever the model would otherwise choose", async () => {
     const noToolsBudget = { ...NO_RECORD_BUDGET, background_turns: false, always_search: false, model_transitions: false, rounds: 0 as const };
@@ -1355,13 +1391,15 @@ describe("turnNext.ts: temporary chat", () => {
   test("temporary turns use the default persona, withhold the profile, and keep tool availability", async () => {
     expect(setValue(people.owner, `person:${people.owner.id}`, "persona.active_id", "tutor").ok).toBe(true);
     const profileText = "Sage is a night-shift paramedic who loves hiking.";
+    // MEM-AUDIT-01: the profile card shows the speaker's own identity
+    // facts; a legacy PROFILE_SOURCE paragraph is shown nowhere any more.
     const profile = remember(people.owner, {
       text: profileText,
       category: "identity",
       tier: "durable",
       scope: "person",
       person: people.owner.id,
-      source: PROFILE_SOURCE,
+      source: "test",
       importance: 0.9,
       pinned: true,
     });
@@ -4120,13 +4158,16 @@ describe("turnNext.ts: THIN-2C, the turn signal keeps its four jobs and has no s
     expect(text).toContain("sentence");
   });
 
-  test("judge eligibility: the signal a turn carries marks a statement eligible and a question not", async () => {
+  test("judge eligibility: the signal a turn carries marks a statement and a four-word question eligible, a greeting not", async () => {
     const { hasEligibleClause } = await import("@/lib/turnSignal");
     const statement = await withStub({ reply: () => "Nice." }, () => runTurnNext(people.owner, "chat", "sprout plays the violin on tuesdays"));
     const question = await withStub({ reply: () => "Paris." }, () => runTurnNext(people.owner, "chat", "what is the capital of france"));
-    if (!statement.ok || statement.kind !== "immediate" || !question.ok || question.kind !== "immediate") throw new Error("expected immediate results");
-    expect(hasEligibleClause(statement.signal)).toBe(true);
-    expect(hasEligibleClause(question.signal)).toBe(false);
+    const greeting = await withStub({ reply: () => "Hello." }, () => runTurnNext(people.owner, "chat", "good morning"));
+    if (!statement.ok || statement.kind !== "immediate" || !question.ok || question.kind !== "immediate" || !greeting.ok || greeting.kind !== "immediate") throw new Error("expected immediate results");
+    expect(hasEligibleClause(statement.signal, "sprout plays the violin on tuesdays")).toBe(true);
+    // MEM-AUDIT-02 (decision 4): a question of three or more words is judged; the clause citation inside the judge decides what it yields.
+    expect(hasEligibleClause(question.signal, "what is the capital of france")).toBe(true);
+    expect(hasEligibleClause(greeting.signal, "good morning")).toBe(false);
   });
 
   test("wire event: the streamed result carries the same frozen signal the route sends as the signal event", async () => {

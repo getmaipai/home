@@ -106,6 +106,38 @@ export function validAt(
   return true;
 }
 
+/** MEM-AUDIT-04 (decision 7): a dated `event` stays in recall this many
+ * days past its own `valid_to`, then runMaintenance() archives it as
+ * "event_passed". A state has no grace: its `valid_to` wins outright. */
+export const EVENT_GRACE_DAYS = 2;
+
+/** The instant a bare-date or timestamp `valid_to` ends, by validAt()'s
+ * own convention (a bare date ends at the end of its local day), or
+ * null when it is unset or not a real calendar time. */
+function validToEndMs(validTo: string | null): number | null {
+  if (!validTo) return null;
+  if (validTo.length === 10) {
+    const [y = 0, m = 0, d = 0] = validTo.split("-").map(Number);
+    const endMs = new Date(y, m - 1, d + 1, 0, 0, 0).getTime();
+    return Number.isNaN(endMs) ? null : endMs;
+  }
+  const toMs = new Date(validTo).getTime();
+  return Number.isNaN(toMs) ? null : toMs;
+}
+
+/** Whether an `event` record whose `valid_to` has passed is still inside
+ * EVENT_GRACE_DAYS as of `asOf` (and was valid before it ended: a
+ * `valid_from` in the future is still not readable). */
+export function eventWithinGrace(record: Pick<MemoryRecordRow, "category" | "validFrom" | "validTo" | "status">, asOf: Date): boolean {
+  if (record.category !== "event") return false;
+  const endMs = validToEndMs(record.validTo);
+  if (endMs === null) return false;
+  const asOfMs = asOf.getTime();
+  if (asOfMs < endMs) return false;
+  if (asOfMs >= endMs + EVENT_GRACE_DAYS * 86_400_000) return false;
+  return validAt({ ...record, validTo: null }, asOf);
+}
+
 function assertCanWrite(
   actor: PersonRow,
   scope: string,
@@ -380,12 +412,13 @@ export interface RecallMatch {
   score: number;
   /** MEMORY-FLOOR-01: whether this match cleared its tier's own cosine
    * floor (or the keyword-fallback branch that has none) on its own
-   * merit, or is here as a deterministic override - pinned, or a
-   * named entity the utterance itself mentions (this function's own
-   * `forceInclude`, above). A caller adding its OWN, stricter floor on
-   * `score` (recall()'s own composite number, not a pure similarity)
-   * needs this to give the same overrides recall() itself already
-   * gives them, not just the pinned half. Optional because the type
+   * merit, or is here as a deterministic override: pinned (recall()'s
+   * own `forceInclude`, below). MEM-AUDIT-03: an entity-name match is
+   * no longer an override; it is a boost on a record that still had to
+   * clear ENTITY_MIN_COSINE, so it reads false here. A caller adding
+   * its OWN, stricter floor on `score` (recall()'s own composite number,
+   * not a pure similarity) needs this to give the same override recall()
+   * itself already gives a pinned row. Optional because the type
    * shouldn't force every future `RecallMatch` site to set it -
    * `recall()` itself is the only construction site today and always
    * does; an unset field reads as `undefined`, which every caller so
@@ -398,8 +431,9 @@ export type RecallResult = RecallMatch[] & { withheldForBand: number };
 
 // "Entity-first recall then scored vectors" (4.4), real as of step 5:
 // entity-first (does the query mention a known entity's name? if so,
-// records mentioning that entity are boosted, and bypass the cosine
-// floor below the same way a pinned record does) then real cosine
+// records mentioning that entity are boosted by ENTITY_BOOST once they
+// clear ENTITY_MIN_COSINE; MEM-AUDIT-03 ended the floor bypass they
+// used to share with a pinned record) then real cosine
 // similarity over each candidate's stored embedding (memory_embeddings,
 // `embedMemoryRecordSafely()` above) when both a query vector and a
 // stored one exist. Keyword overlap is now only the fallback for a
@@ -496,14 +530,38 @@ export interface RecallOptions extends ListOptions {
 // come along and the model has to abstain on the attribute (the guards
 // hold it to that); and an indirect fact ("what should I cook for
 // dinner" against "Marlow is vegetarian") scores 0.40 to 0.54, inside
-// the null band, so it is not recalled by cosine (an entity record or a
-// pinned fact is how it surfaces).
+// the null band, so it is not recalled by cosine (a pinned fact, or a
+// message that names Marlow and still lands at ENTITY_MIN_COSINE or
+// above, is how it surfaces).
 const COSINE_WEIGHT = 0.7;
 const IMPORTANCE_WEIGHT = 0.2;
 const RECENCY_WEIGHT = 0.1;
 const RECENCY_DECAY_PER_DAY = 0.05;
 export const EPISODIC_MIN_COSINE = 0.62;
 export const DURABLE_MIN_COSINE = 0.62;
+/** MEM-AUDIT-03 (decision 6 of the 2026-10-31 memory audit): a record
+ * matched by an entity name the message carries still needs this much
+ * cosine on the vector path. Below the tier floors on purpose (the name
+ * is real evidence the floor alone would discount: the "what is Pippa's
+ * favorite color" band measured 0.64 to 0.86, and the indirect band 0.40
+ * to 0.54, so 0.50 keeps the named-person case and still drops the
+ * message that merely mentions someone), but never zero: before this,
+ * the name alone bypassed the floor and any message naming a known
+ * person pulled that person's whole file. The test stub's bag-of-words
+ * embedding has its own calibrated tier floors below (0.37 durable,
+ * 0.55 episodic); STUB_ENTITY_MIN_COSINE is its twin, measured the same
+ * way: a suite query that names a subject and shares that one word with
+ * a three-word fact ("what does Quill drink" against "Quill likes
+ * seltzer", tests/subjects.test.ts) measures 0.26 under the stub, and
+ * a query sharing no word measures near 0, so 0.25 keeps the named
+ * case the way the real model's 0.64-and-up band does and still drops
+ * the mention-only one. */
+export const ENTITY_MIN_COSINE = 0.5;
+const STUB_ENTITY_MIN_COSINE = 0.25;
+/** The boost an entity match adds to the composite score once it has
+ * cleared ENTITY_MIN_COSINE (vector path) or shares a content word beyond
+ * the name (keyword path). Was a flat +0.5 on top of a floor bypass. */
+export const ENTITY_BOOST = 0.15;
 /** MEM-ELIG-01's own eligibility floor, same value as episodes.ts's
  * MIN_CONTENT_WORDS (episodeQueryEligible()) but declared separately -
  * recall()'s own eligibility check below reuses this file's own
@@ -523,6 +581,11 @@ const STUB_DURABLE_MIN_COSINE = 0.37;
 function minCosineForTier(tier: string): number {
   if (__hasInjectedStackClientForTests()) return tier === "durable" ? STUB_DURABLE_MIN_COSINE : STUB_EPISODIC_MIN_COSINE;
   return tier === "durable" ? DURABLE_MIN_COSINE : EPISODIC_MIN_COSINE;
+}
+
+/** ENTITY_MIN_COSINE, or its stub-calibrated twin under a test-injected client (the same switch minCosineForTier() makes). */
+function entityMinCosine(): number {
+  return __hasInjectedStackClientForTests() ? STUB_ENTITY_MIN_COSINE : ENTITY_MIN_COSINE;
 }
 
 function recencyScore(tier: string, createdAt: string, nowMs: number): number {
@@ -630,17 +693,22 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   ];
   if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
   if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
-  let rows = db.select().from(memoryRecords).where(and(...conditions)).all().filter((r) => validAt(r, asOf));
+  // MEM-AUDIT-04: a dated event stays recallable for EVENT_GRACE_DAYS
+  // past its own end ("how was the dentist" the day after), then
+  // leaves; runMaintenance() archives it as "event_passed" on the same
+  // boundary. Every other record reads as of the moment (CHAT-08).
+  let rows = db.select().from(memoryRecords).where(and(...conditions)).all().filter((r) => validAt(r, asOf) || eventWithinGrace(r, asOf));
   rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
-  // Never the profile paragraph: the retired turn engine's buildSystemPrompt()
-  // already injects it unconditionally via getProfileParagraph(), "not
-  // a recall() candidate... never something that competes with other
-  // facts for a cosine-scored slot" (step 7's own design). Without this
-  // exclusion, its own `pinned: true` sets `forceInclude` below and it
-  // would surface a SECOND time as an ordinary scored match - a
-  // post-hoc review (2026-09-05) found this duplicate-injection bug,
-  // the read-side twin of the dedupe-candidate bug similarByVector()
-  // below has the identical fix for.
+  // Never a legacy profile paragraph (PROFILE_SOURCE: the weekly
+  // LLM-written row the profile card in lib/memoryProfile.ts replaced,
+  // MEM-AUDIT-01). The consolidation pass archives those rows; until it
+  // has, one must not come back as a scored match: its own `pinned:
+  // true` would set `forceInclude` below and inject the whole "this
+  // week" paragraph on any eligible message, the exact leak the audit
+  // traced the jacket reply to. A post-hoc review (2026-09-05) first
+  // found this duplicate-injection shape, the read-side twin of the
+  // dedupe-candidate bug similarByVector() below has the identical
+  // fix for.
   rows = rows.filter((r) => r.source !== PROFILE_SOURCE);
   // CHAT-03, the read side: a record written before the policy existed
   // that carries a credential is hidden from recall, not deleted (the
@@ -673,19 +741,17 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // is a candidate, not knowledge (the design pass's amendment to
   // step 3a): its records are found by their words like any other,
   // never by the guessed identity.
-  const subjectIds = new Set(
-    db
-      .select({ id: entities.id, name: entities.name, aliases: entities.aliases, scope: entities.scope, person: entities.person, source: entities.source, confirmedByPersonId: entities.confirmedByPersonId })
-      .from(entities)
-      .where(isNull(entities.deletedAt))
-      .all()
-      .filter((e) => (e.scope === "household" || e.person === actor.id) && !(e.source === "inferred" && e.confirmedByPersonId === null))
-      .filter((e) => [e.name, ...(JSON.parse(e.aliases) as string[])].some((n) => {
-        const words = tokenize(n);
-        return words.size > 0 && [...words].every((w) => queryWords.has(w));
-      }))
-      .map((e) => e.id),
-  );
+  const matchedRegistryEntities = db
+    .select({ id: entities.id, name: entities.name, aliases: entities.aliases, scope: entities.scope, person: entities.person, source: entities.source, confirmedByPersonId: entities.confirmedByPersonId })
+    .from(entities)
+    .where(isNull(entities.deletedAt))
+    .all()
+    .filter((e) => (e.scope === "household" || e.person === actor.id) && !(e.source === "inferred" && e.confirmedByPersonId === null))
+    .filter((e) => [e.name, ...(JSON.parse(e.aliases) as string[])].some((n) => {
+      const words = tokenize(n);
+      return words.size > 0 && [...words].every((w) => queryWords.has(w));
+    }));
+  const subjectIds = new Set(matchedRegistryEntities.map((e) => e.id));
 
   // MEM-ELIG-01: whether this query has anything to recall about at all -
   // the same shape episodes.ts's episodeQueryEligible() already gives
@@ -693,10 +759,13 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // exact rule needs to differ: episodes.ts's own contentTerms() treats
   // "there" as a stopword (built for "what were we talking about there"),
   // which would leave "hi there!" with a single content word and mark it
-  // ineligible - but the memory bench's own pinned-identity probe
-  // (scripts/bench/memory-eval.ts) uses exactly that query and expects a
-  // pinned identity fact to still surface for it, a bare greeting being a
-  // conversational opener rather than a topic-free reaction. So this
+  // ineligible - but the pinned-identity probe of the retired memory
+  // bench used exactly that query ("hi there!") and expected a pinned
+  // identity fact to still surface for it, a bare greeting being a
+  // conversational opener rather than a topic-free reaction; the
+  // greeting test in tests/memory.test.ts (MEM-ELIG-01) keeps that rule,
+  // and scripts/bench/recall-floor.ts is where the floors themselves
+  // are measured. So this
   // reuses queryWords (this function's own tokenize() call above, text.ts's
   // smaller stopword list, no "there") instead of a second tokenizer. A
   // query that names a known entity is eligible on its own: every one of
@@ -727,45 +796,62 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   const vectorsByMemoryId = new Map(vectorRows.map((v) => [v.memoryId, bufferToVector(v.vector)]));
   const nowMs = Date.now();
 
+  // The words every matched entity name is made of: on the keyword path
+  // an entity match earns its boost only by sharing a content word
+  // BEYOND these (MEM-AUDIT-03, below).
+  const matchedNameWords = new Set([
+    ...matchedEntityNameWords.flatMap((nameWords) => [...nameWords]),
+    ...matchedRegistryEntities.flatMap((e) => [e.name, ...(JSON.parse(e.aliases) as string[])].flatMap((n) => [...tokenize(n)])),
+  ]);
+
   const scored: RecallMatch[] = [];
   for (const row of rows) {
     const words = tokenize(row.text);
     const isEntityMatch = matchedEntityNameWords.some((nameWords) => [...nameWords].every((w) => words.has(w))) || (row.subjectId !== null && subjectIds.has(row.subjectId));
     const storedVector = vectorsByMemoryId.get(row.id);
 
-    // Pinned and entity-matched candidates are deterministic overrides
-    // that always surface, regardless of what cosine or keyword scoring
-    // comes back with (pinned: the household said "always surface
-    // this"; entity match: "keep the entity-name boost" - the plan's
-    // own words for the exact same treatment this file already gave it
-    // before any vector existed). Real cosine similarity can be
-    // negative (unlike keyword overlap, which is always >= 0), so a
-    // code review (2026-09-05) found that the plain `score > 0` filter
-    // below could silently drop one of these overrides anyway when its
-    // cosine came back negative enough to pull the whole weighted score
-    // under zero - forceInclude keeps the override real all the way to
-    // the final push, not just past the floor check.
+    // A pinned candidate is a deterministic override that always
+    // surfaces, regardless of what cosine or keyword scoring comes back
+    // with: the household said "always surface this". Real cosine
+    // similarity can be negative (unlike keyword overlap, which is
+    // always >= 0), so a code review (2026-09-05) found that the plain
+    // `score > 0` filter below could silently drop the override anyway
+    // when its cosine came back negative enough to pull the whole
+    // weighted score under zero - forceInclude keeps the override real
+    // all the way to the final push, not just past the floor check.
     //
-    // MEM-ELIG-01: the override itself only fires for an eligible query.
-    // `isEntityMatch` already implies `queryEligibleForRecall` (see
-    // above), so this only ever changes behavior for a pinned record
-    // against an ineligible (topic-free) query - the measured leak
-    // (docs/dev.md "MEMORY-RELEVANCE-01... (c)"): a pinned record's
-    // composite score tracks its own importance and recency, not the
-    // query, so without this it surfaced on "okay" and "thanks" exactly
-    // as readily as on a real question.
-    const forceInclude = (row.pinned || isEntityMatch) && queryEligibleForRecall;
+    // MEM-ELIG-01: the override itself only fires for an eligible query
+    // - the measured leak (docs/dev.md "MEMORY-RELEVANCE-01... (c)"): a
+    // pinned record's composite score tracks its own importance and
+    // recency, not the query, so without this it surfaced on "okay" and
+    // "thanks" exactly as readily as on a real question.
+    //
+    // MEM-AUDIT-03 (docs/design/memory-audit-and-redesign-2026-10-31.md,
+    // decision 6, superseding MEMORY-RELEVANCE-01's entity half): an
+    // entity-name match no longer shares this bypass. On the live hub
+    // any message naming a known person pulled every fact about that
+    // person whatever the topic, and a small model cannot leave an
+    // in-topic distractor alone. It is now a boost of ENTITY_BOOST on
+    // the composite score, and the record must still be about the
+    // message: cosine at or above ENTITY_MIN_COSINE on the vector path
+    // (a lower bar than the tier floor, since the name is real evidence,
+    // but not none), or at least one shared content word beyond the
+    // name on the keyword path.
+    const forceInclude = row.pinned && queryEligibleForRecall;
 
     let score: number;
     const vectorRow = vectorRows.find((v) => v.memoryId === row.id);
     const identityMatch = vectorRow && opts.queryVector && vectorRow.space === opts.queryVector.space && vectorRow.dims === opts.queryVector.dims && vectorRow.preprocess === opts.queryVector.preprocess;
+    let entityBoost = false;
     if (opts.queryVector && storedVector && identityMatch) {
       const cosine = cosineSimilarity(opts.queryVector.vector, storedVector);
+      entityBoost = isEntityMatch && cosine >= entityMinCosine();
       // The floor excludes outright, it doesn't down-weight (legacy's
       // real behavior, confirmed against the mirror rather than
       // assumed): a candidate below its tier's floor never enters the
-      // ranking at all, UNLESS it's pinned or an entity match.
-      if (!forceInclude && cosine < minCosineForTier(row.tier)) continue;
+      // ranking at all, UNLESS it's pinned, or an entity match that
+      // clears ENTITY_MIN_COSINE on its own.
+      if (!forceInclude && !entityBoost && cosine < minCosineForTier(row.tier)) continue;
       const recency = recencyScore(row.tier, row.createdAt, nowMs);
       score = COSINE_WEIGHT * cosine + IMPORTANCE_WEIGHT * row.importance + RECENCY_WEIGHT * recency;
     } else {
@@ -779,8 +865,9 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
       const overlap = [...queryWords].filter((w) => words.has(w)).length;
       const union = new Set([...queryWords, ...words]).size || 1;
       score = overlap / union;
+      entityBoost = isEntityMatch && [...queryWords].some((w) => words.has(w) && !matchedNameWords.has(w));
     }
-    if (isEntityMatch) score += 0.5;
+    if (entityBoost) score += ENTITY_BOOST;
     if (forceInclude || score > 0) scored.push({ record: toMemoryRecord(row), score, forceInclude });
   }
 
@@ -1316,7 +1403,12 @@ const DECAY_FACTOR = 0.995; // score = DECAY_FACTOR ^ hours-since-last-used
 const ARCHIVE_SCORE_THRESHOLD = 0.1;
 const ARCHIVE_MIN_AGE_DAYS = 30;
 const EPISODIC_CAP_PER_SCOPE = 200;
-export const STATE_EXPIRY_DAYS = 7; // category "state" always expires hard after this, any tier
+/** MEM-AUDIT-04 (decision 7 of the 2026-10-31 memory audit): a `state`
+ * record with no `valid_to` of its own expires this many days after
+ * `created_at`, any tier; one with a `valid_to` ends there instead (the
+ * end-date pass below), earlier or later. Was 7 days from `created_at`
+ * whatever `valid_to` said. */
+export const STATE_EXPIRY_DAYS = 14;
 
 function decayScore(importance: number, uses: number, lastUsedAt: string): number {
   const hoursSince = (Date.now() - new Date(lastUsedAt).getTime()) / 3_600_000;
@@ -1373,12 +1465,14 @@ export function runMaintenance(): { archived: number } {
   // records are archived here too. A bare date (no time part) ends at
   // the end of its day in local time, not its start: compare its local
   // date string against the local day that is strictly before today.
+  // An `event` is the one category not ended here: it keeps
+  // EVENT_GRACE_DAYS past its date (the pass after this one).
   const localNowMs = now.getTime() - now.getTimezoneOffset() * 60_000;
   const lastFullLocalDay = new Date(localNowMs - 86_400_000).toISOString().slice(0, 10);
   const expiredByValidTo = db
     .select({ id: memoryRecords.id, validTo: memoryRecords.validTo })
     .from(memoryRecords)
-    .where(and(eq(memoryRecords.status, "active"), isNotNull(memoryRecords.validTo)))
+    .where(and(eq(memoryRecords.status, "active"), isNotNull(memoryRecords.validTo), ne(memoryRecords.category, "event")))
     .all()
     .filter((r) =>
       r.validTo!.length === 10
@@ -1390,10 +1484,34 @@ export function runMaintenance(): { archived: number } {
     archived++;
   }
 
+  // MEM-AUDIT-04: a dated event (the judge stores the event's date in
+  // `valid_to`) leaves recall EVENT_GRACE_DAYS after that date: the day
+  // after a dentist visit "how did it go" still finds it; a week later
+  // it is history, archived as "event_passed" so an audit can tell it
+  // from a decayed or ended record. recall() reads the same boundary
+  // (eventWithinGrace), so the two never disagree about an event that
+  // this pass has not reached yet.
+  const passedEvents = db
+    .select({ id: memoryRecords.id, validTo: memoryRecords.validTo })
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.status, "active"), eq(memoryRecords.category, "event"), isNotNull(memoryRecords.validTo)))
+    .all()
+    .filter((r) => {
+      const endMs = validToEndMs(r.validTo);
+      return endMs !== null && now.getTime() >= endMs + EVENT_GRACE_DAYS * 86_400_000;
+    });
+  for (const row of passedEvents) {
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "event_passed", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
+    archived++;
+  }
+
   // "state" memories (an ongoing situation, e.g. "stressed about a
-  // deadline") expire hard after a week regardless of tier or score: the
-  // future judge's promise that states auto-expire lives here, ported
-  // ahead of the judge itself existing.
+  // deadline") expire hard after STATE_EXPIRY_DAYS regardless of tier or
+  // score, unless the record carries its own `valid_to`: then that date
+  // wins, in either direction (the end-date pass above archives it when
+  // it passes, and a state whose `valid_to` is still ahead stays past
+  // the default). MEM-AUDIT-04, decision 7; the judge's promise that
+  // states auto-expire lives here.
   const stateCutoff = new Date(now.getTime() - STATE_EXPIRY_DAYS * 86_400_000).toISOString();
   const staleStates = db
     .select({ id: memoryRecords.id })
@@ -1403,6 +1521,7 @@ export function runMaintenance(): { archived: number } {
         eq(memoryRecords.status, "active"),
         eq(memoryRecords.pinned, false),
         eq(memoryRecords.category, "state"),
+        isNull(memoryRecords.validTo),
         lt(memoryRecords.createdAt, stateCutoff),
       ),
     )
@@ -1482,10 +1601,19 @@ export function supersedeInFavorOfExisting(oldId: string, existingId: string, cl
 // eventually archive it the normal way.
 const NEVER_RECALLED_DEMOTE_DAYS = 30;
 
+/** MEM-AUDIT-01: the categories the profile card carries on every turn
+ * (lib/memoryProfile.ts). The card reads them straight from the store and
+ * never bumps `uses` (a card line is background, not a recall hit), so
+ * their `uses` stays 0 for as long as they stand; by design they are
+ * standing facts about the person, never "mis-tiered junk", and the
+ * demote pass leaves them alone. A pinned preference is already exempt
+ * through the pinned check. */
+const STANDING_CATEGORIES: readonly string[] = ["identity", "instruction"];
+
 /** Demotes every unpinned, never-recalled (uses = 0) durable record
- * older than NEVER_RECALLED_DEMOTE_DAYS to episodic. Returns the count
- * demoted, the same "what did this sweep actually do" shape
- * runMaintenance() returns. */
+ * older than NEVER_RECALLED_DEMOTE_DAYS to episodic, except the standing
+ * categories above. Returns the count demoted, the same "what did this
+ * sweep actually do" shape runMaintenance() returns. */
 export function demoteNeverRecalledDurables(now: Date = new Date()): number {
   const cutoff = new Date(now.getTime() - NEVER_RECALLED_DEMOTE_DAYS * 86_400_000).toISOString();
   const stale = db
@@ -1498,6 +1626,7 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
         eq(memoryRecords.tier, "durable"),
         eq(memoryRecords.uses, 0),
         lt(memoryRecords.createdAt, cutoff),
+        notInArray(memoryRecords.category, [...STANDING_CATEGORIES]),
       ),
     )
     .all();
@@ -1507,35 +1636,20 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
   return stale.length;
 }
 
-// ==== Step 7: the profile paragraph ====
+// ==== Step 7, retired: the profile paragraph ====
 //
 // "One pinned, person-scoped record per person... written and rewritten
-// only by the consolidate job... never by the extractor directly"
-// (session-a-intelligence.md). Exported from here, not lib/memoryJudge.ts
-// (which does the actual writing, in its own runConsolidation() pass),
-// so the retired turn engine's read side and memoryJudge.ts's write side agree on
-// exactly one definition of "which record IS the profile" without a
-// circular import between the two files - this constant is the shape of
-// the store, not a judge-specific concern.
+// only by the consolidate job" (session-a-intelligence.md) was the
+// weekly LLM-written paragraph. MEM-AUDIT-01 (docs/design/memory-audit-
+// and-redesign-2026-10-31.md, decision 1) replaced it with the
+// deterministic profile card in lib/memoryProfile.ts, read from the
+// store on every turn, after the live hub's "you and your daughter
+// better wear jackets" reply was traced to the paragraph's "this week"
+// prose in the stable prefix. The constant stays: recall() above still
+// excludes rows that carry it, lib/memoryProfile.ts refuses them as
+// card members, and memoryJudge.ts's consolidation pass archives every
+// one of them. Nothing reads a profile paragraph any more.
 export const PROFILE_SOURCE = "memory.consolidate:profile";
-
-/** the retired turn engine's own read side (buildSystemPrompt(): "injected whole
- * at the top of the memory block before recalled items"). A targeted
- * lookup by (person, source), not a recall() candidate: the profile
- * paragraph is unconditional context about who's speaking, not
- * something that competes with other facts for a cosine-scored slot. */
-export function getProfileParagraph(actor: PersonRow, opts: { withholdSensitive?: boolean } = {}): MemoryRecord | undefined {
-  const row = db
-    .select()
-    .from(memoryRecords)
-    .where(and(eq(memoryRecords.person, actor.id), eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
-    .get();
-  if (!row) return undefined;
-  if (opts.withholdSensitive && row.sensitive) return undefined;
-  // CHAT-03, the read side: a profile paragraph carrying a credential
-  // (derived before the policy existed) is withheld, not deleted.
-  return detectCredential(row.text).detected ? undefined : toMemoryRecord(row);
-}
 
 // Not built this pass, deliberately (see docs/dev.md):
 // - Mood and unfinished-business reads (the robot's reflect jobs):

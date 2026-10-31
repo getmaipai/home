@@ -6,7 +6,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq, and, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork, people } from "@/db/schema";
-import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, getProfileParagraph, PROFILE_SOURCE } from "@/lib/memory";
+import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS } from "@/lib/memory";
+import { buildProfileCard } from "@/lib/memoryProfile";
 import { ingestMemory, supersedeMemory, drainPendingWork } from "@/lib/memoryIngestion";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { nextHlc } from "@/lib/hlc";
@@ -1272,7 +1273,10 @@ describe("POST /api/memory/maintenance/run", () => {
     expect(row.status).toBe("active");
   });
 
-  test("a state-category memory expires hard after 7 days regardless of importance", async () => {
+  // MEM-AUDIT-04 (decision 7): 14 days from created_at when the record
+  // has no valid_to of its own; the two valid_to cases are below.
+  test("a state-category memory with no valid_to expires hard after STATE_EXPIRY_DAYS (14) regardless of importance", async () => {
+    expect(STATE_EXPIRY_DAYS).toBe(14);
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const created = await owner.post("/api/memory", {
@@ -1284,9 +1288,9 @@ describe("POST /api/memory/maintenance/run", () => {
       importance: 0.9,
     });
     const record = (await created.json()) as MemoryRecord;
-    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
     db.update(memoryRecords)
-      .set({ createdAt: eightDaysAgo, lastUsedAt: eightDaysAgo })
+      .set({ createdAt: fifteenDaysAgo, lastUsedAt: fifteenDaysAgo })
       .where(eq(memoryRecords.id, record.id))
       .run();
 
@@ -1295,7 +1299,7 @@ describe("POST /api/memory/maintenance/run", () => {
     expect(row.status).toBe("archived");
   });
 
-  test("a fresh state-category memory (under 7 days) survives maintenance", async () => {
+  test("a state-category memory ten days old (past the old 7, under 14) survives maintenance", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const created = await owner.post("/api/memory", {
@@ -1307,18 +1311,64 @@ describe("POST /api/memory/maintenance/run", () => {
       importance: 0.9,
     });
     const record = (await created.json()) as MemoryRecord;
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(memoryRecords).set({ createdAt: tenDaysAgo, lastUsedAt: tenDaysAgo }).where(eq(memoryRecords.id, record.id)).run();
 
     await owner.post("/api/memory/maintenance/run", {});
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
     expect(row.status).toBe("active");
   });
 
+  test("a state with its own valid_to ends there: a future valid_to keeps a 20-day-old state, a past one ends a 2-day-old state", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const day = 24 * 60 * 60 * 1000;
+    const longRunning = remember(ownerRow, { text: "Sage is on crutches until the cast comes off", category: "state", tier: "observation", scope: "person", person: ownerRow.id, source: "test", importance: 0.6, valid_to: new Date(Date.now() + 10 * day).toISOString() });
+    const shortLived = remember(ownerRow, { text: "Sage has a cold this week", category: "state", tier: "observation", scope: "person", person: ownerRow.id, source: "test", importance: 0.6, valid_to: new Date(Date.now() - 1 * day).toISOString() });
+    if (!longRunning.ok || !shortLived.ok) throw new Error("setup failed");
+    const twentyDaysAgo = new Date(Date.now() - 20 * day).toISOString();
+    db.update(memoryRecords).set({ createdAt: twentyDaysAgo, lastUsedAt: twentyDaysAgo }).where(eq(memoryRecords.id, longRunning.value.id)).run();
+    const twoDaysAgo = new Date(Date.now() - 2 * day).toISOString();
+    db.update(memoryRecords).set({ createdAt: twoDaysAgo, lastUsedAt: twoDaysAgo }).where(eq(memoryRecords.id, shortLived.value.id)).run();
+
+    runMaintenance();
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, longRunning.value.id)).get()!.status).toBe("active");
+    const ended = db.select().from(memoryRecords).where(eq(memoryRecords.id, shortLived.value.id)).get()!;
+    expect(ended.status).toBe("archived");
+    expect(ended.archivedReason).toBe("end_date");
+  });
+
+  // MEM-AUDIT-04 (decision 7): a dated event keeps EVENT_GRACE_DAYS past
+  // its date, in recall and in the store, then leaves as "event_passed".
+  test("an event stays active and recallable the day after its date, and is archived as event_passed once the grace has passed", async () => {
+    expect(EVENT_GRACE_DAYS).toBe(2);
+    const { ownerRow } = await ownerAndChildRows();
+    const day = 24 * 60 * 60 * 1000;
+    const yesterday = remember(ownerRow, { text: "Sage had a dentist appointment", category: "event", tier: "episodic", scope: "person", person: ownerRow.id, source: "test", importance: 0.5, valid_to: new Date(Date.now() - 1 * day).toISOString() });
+    const lastWeek = remember(ownerRow, { text: "Sage went to the dentist for a filling", category: "event", tier: "episodic", scope: "person", person: ownerRow.id, source: "test", importance: 0.5, valid_to: new Date(Date.now() - 3 * day).toISOString() });
+    if (!yesterday.ok || !lastWeek.ok) throw new Error("setup failed");
+
+    // Before maintenance: recall (the keyword path, no vector) still
+    // finds the one inside the grace and not the one past it.
+    const ids = recall(ownerRow, "how did the dentist appointment go", { selfOnly: true, bumpUsage: false }).map((m) => m.record.id);
+    expect(ids).toContain(yesterday.value.id);
+    expect(ids).not.toContain(lastWeek.value.id);
+    expect(eventWithinGrace(db.select().from(memoryRecords).where(eq(memoryRecords.id, yesterday.value.id)).get()!, new Date())).toBe(true);
+
+    runMaintenance();
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, yesterday.value.id)).get()!.status).toBe("active");
+    const passed = db.select().from(memoryRecords).where(eq(memoryRecords.id, lastWeek.value.id)).get()!;
+    expect(passed.status).toBe("archived");
+    expect(passed.archivedReason).toBe("event_passed");
+    expect(passed.expiredAt).not.toBeNull();
+  });
+
   test("a record past its valid_to is archived with provenance intact", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    // A fact, not an event: an event keeps EVENT_GRACE_DAYS past its date (the test above).
     const created = await owner.post("/api/memory", {
-      text: "the dentist appointment that already happened",
-      category: "event",
+      text: "the loaner car Sage is driving until the repair is done",
+      category: "fact",
       tier: "observation",
       scope: "household",
       source: "test",
@@ -1362,8 +1412,9 @@ describe("POST /api/memory/maintenance/run", () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const created = await owner.post("/api/memory", {
-      text: "the dentist on Thursday",
-      category: "event",
+      // A state, not an event: an event keeps EVENT_GRACE_DAYS past its date (MEM-AUDIT-04).
+      text: "Sage is covering the Thursday shift",
+      category: "state",
       tier: "observation",
       scope: "household",
       source: "test",
@@ -1391,8 +1442,9 @@ describe("POST /api/memory/maintenance/run", () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const created = await owner.post("/api/memory", {
-      text: "a pinned appointment that already happened",
-      category: "event",
+      // A pinned state, not an event: an event keeps EVENT_GRACE_DAYS past its date (MEM-AUDIT-04).
+      text: "a pinned temporary arrangement that already ended",
+      category: "state",
       tier: "observation",
       scope: "household",
       source: "test",
@@ -1687,7 +1739,14 @@ describe("MEM-ELIG-01: forceInclude only bypasses the floor for an eligible quer
     }
   });
 
-  test("an entity-named query still force-includes a matching record even though the query is a single word", async () => {
+  // MEM-AUDIT-03 (decision 6) rewrote this test's premise: an
+  // entity-named query is still eligible on its own (one word, no
+  // bare-acknowledgment check), but the name no longer rescues a
+  // record from the cosine floor. A record about the named entity needs
+  // cosine ENTITY_MIN_COSINE (0.50) or more; then it enters with the
+  // ENTITY_BOOST on top of its composite score.
+  test("an entity-named one-word query is eligible, but a record about that entity still needs cosine >= ENTITY_MIN_COSINE", async () => {
+    expect(ENTITY_MIN_COSINE).toBe(0.5);
     const { ownerRow } = await ownerAndChildRows();
     const entity = remember(ownerRow, {
       record_kind: "entity",
@@ -1698,7 +1757,7 @@ describe("MEM-ELIG-01: forceInclude only bypasses the floor for an eligible quer
       source: "test",
       importance: 0.3,
     });
-    const detail = remember(ownerRow, {
+    const offTopic = remember(ownerRow, {
       text: "Rover is allergic to peanuts",
       category: "relationship",
       tier: "episodic",
@@ -1706,21 +1765,34 @@ describe("MEM-ELIG-01: forceInclude only bypasses the floor for an eligible quer
       source: "test",
       importance: 0.7,
     });
-    if (!entity.ok || !detail.ok) throw new Error("setup failed");
-    // Same shape as the acknowledgment test above: cosine 0, below the
-    // episodic floor - only the entity-name match can rescue this one.
+    const nearTopic = remember(ownerRow, {
+      text: "Rover plays bass in a weekend band",
+      category: "relationship",
+      tier: "episodic",
+      scope: "household",
+      source: "test",
+      importance: 0.7,
+    });
+    if (!entity.ok || !offTopic.ok || !nearTopic.ok) throw new Error("setup failed");
+    // cosine 0 for the entity row and the off-topic record: under 0.50,
+    // so the name alone no longer brings them in. The near-topic record
+    // sits at cosine 0.52: under the stub's own 0.55 episodic floor, at
+    // or above ENTITY_MIN_COSINE, so the name is what carries it.
     injectVector(entity.value.id, [0, 1, 0, 0]);
-    injectVector(detail.value.id, [0, 1, 0, 0]);
+    injectVector(offTopic.value.id, [0, 1, 0, 0]);
+    injectVector(nearTopic.value.id, [0.52, Math.sqrt(1 - 0.52 * 0.52), 0, 0]);
     const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
 
-    // "Rover" alone is one word - below the generic two-content-word
-    // floor a topic-free query would fail on - but it names a known
-    // entity, which implies eligibility on its own (docs/dev.md,
-    // MEM-ELIG-01's design comment in memory.ts's recall()).
     const matches = recall(ownerRow, "Rover", { queryVector, bumpUsage: false });
     const ids = matches.map((m) => m.record.id);
-    expect(ids).toContain(entity.value.id);
-    expect(ids).toContain(detail.value.id);
+    expect(ids).not.toContain(entity.value.id);
+    expect(ids).not.toContain(offTopic.value.id);
+    expect(ids).toContain(nearTopic.value.id);
+    const kept = matches.find((m) => m.record.id === nearTopic.value.id)!;
+    // 0.7 * cosine + 0.2 * importance + 0.1 * recency (1 for a record made now), plus the boost.
+    expect(kept.score).toBeCloseTo(0.7 * 0.52 + 0.2 * 0.7 + 0.1 + ENTITY_BOOST, 2);
+    // Not an override any more: a caller's own floor sees a plain match.
+    expect(kept.forceInclude).toBeFalsy();
   });
 
   test("an eligible query with real content still force-includes the same pinned record as before", async () => {
@@ -1863,9 +1935,16 @@ describe("CHAT-03: credentials never enter memory", () => {
         .run(id, text, ownerRow.id, source, now, now, nextHlc());
     insert("mem-cred-1", `the router password is ${value}`, "test");
     insert("mem-prof-1", `Sage is a nurse; the api key is ${value}`, PROFILE_SOURCE);
+    // MEM-AUDIT-01: the profile card reads identity rows straight from
+    // the store, so the same read-side withholding applies there.
+    sqlite
+      .query(
+        "INSERT INTO memory_records (id, record_kind, text, category, tier, status, scope, person, source, importance, pinned, sensitive, uses, created_at, last_used_at, hlc) VALUES (?, 'memory', ?, 'identity', 'durable', 'active', 'person', ?, 'test', 0.9, 0, 0, 0, ?, ?, ?)",
+      )
+      .run("mem-ident-1", `Sage is a nurse whose badge pin is ${value}`, ownerRow.id, now, now, nextHlc());
     const matches = recall(ownerRow, "what is the router password", { selfOnly: true, bumpUsage: false });
     expect(matches.some((m) => m.record.text.includes(value))).toBe(false);
-    expect(getProfileParagraph(ownerRow)).toBeUndefined();
+    expect(buildProfileCard(ownerRow).lines.some((line) => line.text.includes(value))).toBe(false);
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-cred-1")).get()).toBeDefined(); // still there for the Memory page
   });
 });
@@ -2447,5 +2526,76 @@ describe("CHAT-06: idempotent memory ingestion", () => {
       ))
       .all();
     expect(activeAfter.filter((r) => r.text.toLowerCase().includes("biscuit")).length).toBe(1);
+  });
+});
+
+// MEM-AUDIT-03 (docs/design/memory-audit-and-redesign-2026-10-31.md,
+// decisions 6 and 9): the jacket regression. The live hub answered
+// "Starting to get cold out" with "you and your daughter better wear
+// jackets" because a relationship fact about the child reached the
+// prompt on a message that was not about the child. The vector path is
+// driven with hand-injected vectors (the same shape as the cosine tests
+// above), the keyword path with no vector at all.
+describe("MEM-AUDIT-03: the jacket case, recall injects nothing about the child on a weather remark", () => {
+  async function jacketStore() {
+    const { ownerRow } = await ownerAndChildRows();
+    const identity = remember(ownerRow, { text: "Sage is a software engineer who works from home", category: "identity", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.9 });
+    const relationship = remember(ownerRow, { text: "Sage's daughter Nova is seven and loves the playground", category: "relationship", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.8 });
+    const state = remember(ownerRow, { text: "this week Sage is stressed about a product launch", category: "state", tier: "episodic", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 });
+    if (!identity.ok || !relationship.ok || !state.ok) throw new Error("setup failed");
+    return { ownerRow, identity: identity.value, relationship: relationship.value, state: state.value };
+  }
+
+  test("vector path: a relationship fact under ENTITY_MIN_COSINE is not injected, even though the household knows the child by name", async () => {
+    const { ownerRow, identity, relationship, state } = await jacketStore();
+    // Nova is a known entity record too, the shape the live hub had.
+    const nova = remember(ownerRow, { record_kind: "entity", text: "Nova: Sage's daughter", category: "person", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.8 });
+    if (!nova.ok) throw new Error("setup failed");
+    // A weather remark shares nothing with any of these: cosine 0.3 for
+    // the relationship fact (the indirect band the floors were measured
+    // on), 0 for the rest.
+    injectVector(identity.id, [0, 1, 0, 0]);
+    injectVector(relationship.id, [0.3, Math.sqrt(1 - 0.09), 0, 0]);
+    injectVector(state.id, [0, 0, 1, 0]);
+    injectVector(nova.value.id, [0, 0, 0, 1]);
+    const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
+
+    const matches = recall(ownerRow, "Starting to get cold out", { selfOnly: true, queryVector, bumpUsage: false });
+    expect(matches.some((m) => /nova|daughter/i.test(m.record.text))).toBe(false);
+    expect(matches.map((m) => m.record.id)).not.toContain(relationship.id);
+  });
+
+  test("keyword path: the same remark shares no content word with the child fact, so nothing about the child is recalled", async () => {
+    const { ownerRow } = await jacketStore();
+    const matches = recall(ownerRow, "Starting to get cold out", { selfOnly: true, bumpUsage: false });
+    expect(matches.some((m) => /nova|daughter/i.test(m.record.text))).toBe(false);
+  });
+
+  test("a message that names the child and is about her still finds the fact (cosine at or above ENTITY_MIN_COSINE, boosted)", async () => {
+    const { ownerRow, relationship } = await jacketStore();
+    const nova = remember(ownerRow, { record_kind: "entity", text: "Nova: Sage's daughter", category: "person", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.8 });
+    if (!nova.ok) throw new Error("setup failed");
+    injectVector(relationship.id, [0.55, Math.sqrt(1 - 0.55 * 0.55), 0, 0]);
+    injectVector(nova.value.id, [0, 0, 0, 1]);
+    const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
+    const matches = recall(ownerRow, "does Nova like the playground", { selfOnly: true, queryVector, bumpUsage: false });
+    expect(matches.map((m) => m.record.id)).toContain(relationship.id);
+  });
+
+  test("keyword path: an entity match earns the boost only by sharing a content word beyond the name", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const rover = remember(ownerRow, { record_kind: "entity", text: "Rover: a family friend", category: "person", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+    const allergy = remember(ownerRow, { text: "Rover is allergic to peanuts", category: "relationship", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+    const walks = remember(ownerRow, { text: "Rover likes long walks", category: "relationship", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+    if (!rover.ok || !allergy.ok || !walks.ok) throw new Error("setup failed");
+    const matches = recall(ownerRow, "is Rover allergic to anything", { bumpUsage: false });
+    const allergyMatch = matches.find((m) => m.record.id === allergy.value.id);
+    const walksMatch = matches.find((m) => m.record.id === walks.value.id);
+    expect(allergyMatch).toBeDefined();
+    // "walks" shares only the name: no boost, and its plain overlap
+    // score is all it has. The allergy fact shares "allergic" too.
+    if (walksMatch) expect(allergyMatch!.score - walksMatch.score).toBeGreaterThan(ENTITY_BOOST);
+    expect(allergyMatch!.score).toBeGreaterThan(ENTITY_BOOST);
+    expect(allergyMatch!.forceInclude).toBeFalsy();
   });
 });

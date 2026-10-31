@@ -529,7 +529,8 @@ describe("recall and the prompt know whose fact it is", () => {
     expect(matches.length).toBe(1);
     expect(matches[0]!.record.text).toBe("Quill likes seltzer");
     const context = await promptFor(actor, "what does Quill drink");
-    expect(context).toMatch(/\[remembered \([\d-]+\)(?:, certainty: \w+)?\] Quill likes seltzer/);
+    // MEM-AUDIT-03: the injected line is "(date, about Quill) ..." with the certainty band inside the parentheses.
+    expect(context).toMatch(/\(\d{4}-\d{2}-\d{2}, about Quill(?:, certainty: \w+)?\) Quill likes seltzer/);
     expect(context).toContain("<untrusted_data>\nAbout: Quill (your coworker).\n</untrusted_data>");
   });
 

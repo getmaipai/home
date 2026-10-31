@@ -37764,3 +37764,31 @@ main checkout.
 **NEWS-DEDUPE-01 (2026-10-27): near-duplicate stories collapse on a mixed News page.** Verdict: rebuild as a cheap local rule, not a model call. `backend/src/lib/news/nearDuplicates.ts` merges items published within 24 hours that share a topic and at least 3 content words with a Jaccard of 0.5 or more; the card with a picture, then more outlets, then the newest stays. A topic page does not collapse, so every outlet's story stays reachable there. No network or model call is added to feed assembly.
 
 **Stack port guards (2026-10-28).** After an upgrade on the Mac Studio the Stack ran on 8771 while Home still pointed at 8770, and the new service file was written but never loaded, so chat was down until both were fixed by hand. Three guards now cover it. (1) The installer reuses the port in `stack/.port` when the old Stack still answers `/healthz` there or the port is free, and only calls `find_free_port` when a stranger holds it. (2) If the Stack has not answered halfway through the install's health wait, the installer runs the Stack's `start` command once as the console user and logs it. (3) `stackSelfHeal.ts` probes for a Stack once Home has been unable to reach it for a minute: it tries the recorded `stack/.port` and 8770 to 8780, and when exactly one Stack answers on a different local port it repoints `engines.stack.url`, drops the cached client, logs `[self-heal] ... repointed` and sends one admin notice. Two answers, none, a remote Stack, or an address the household typed leave the setting alone. The Repairs text now names the address Home tried and the "installed but not loaded" case. `ship.sh` and `release-home.sh` read the live `stack/.port` instead of assuming 8770. Home cannot run `launchctl` safely as the root daemon, so it detects and describes rather than starting the service.
+
+## Memory audit and redesign (2026-10-31)
+
+Design note: [docs/design/memory-audit-and-redesign-2026-10-31.md](design/memory-audit-and-redesign-2026-10-31.md) (MEM-AUDIT-01 to 06). What the
+live hub's memory did in its first two weeks: 337 turns (205 chat, 132 robot) over 74 conversations; the judge skipped 190 and judged 146; it wrote
+4 turn-sourced memories plus 2 weekly profile paragraphs, and every one of the 6 had `uses = 0`: the relevance path never injected a memory in
+production. Only the profile paragraph, injected into the stable prefix on every turn with no relevance check, ever reached a prompt, and that is
+the jacket cause: "Starting to get cold out" was answered with "you and your daughter better wear jackets" because the paragraph named the child and
+the owner's "this week" state. Small local models cannot ignore an in-topic distractor, so what is injected matters more than any rule beside it.
+
+What changed in this slice (the judge, the eligibility gate, the explicit-save phrasings and the fixture are the judge slice's):
+
+- **Profile card** (`backend/src/lib/memoryProfile.ts`, `buildProfileCard`): a deterministic list of the speaker's own active, durable, person-scope
+  `identity`, `instruction` and pinned `preference` records, most important first then newest, at most 8 lines and 400 characters, rendered in
+  the stable prefix as one rule line ("Background about Sage. Use it only when it changes your answer; never mention or allude to it otherwise.")
+  and one "(YYYY-MM-DD) fact" line each. Relationship, state, event, project, goal, person, place, thing and fact never enter it. `getProfileParagraph`
+  is gone; `PROFILE_SOURCE` rows are never card members and the consolidation pass archives them.
+- **Recall** (`memory.ts`): an entity-name match no longer bypasses the cosine floor. It is a +0.15 boost (`ENTITY_BOOST`) on a record that still
+  reaches cosine 0.50 (`ENTITY_MIN_COSINE`; 0.25 under the test stub's bag-of-words embedding) on the vector path, or shares a content word beyond
+  the name on the keyword path. Pinned rows keep their bypass. Top-5 and the 0.62 floors stay.
+- **Injected line** (`turnMachine/messages.ts`): "(2026-10-28, about Sage) Sage dislikes sweaters.", the certainty band inside the parentheses; the
+  about-name is the record's subject, else the speaker for a person-scope record, else "the household".
+- **Lifecycle** (`runMaintenance`): a `state` ends at its own `valid_to`, else 14 days after `created_at` (`STATE_EXPIRY_DAYS`, was 7); a dated
+  `event` stays in recall `EVENT_GRACE_DAYS` (2) past its date, then is archived as `event_passed`. The opener's pick-up thread reads both.
+  `MOOD_WINDOW_DAYS` in `conversationOpening.ts` stays at 7 on its own.
+- **Trace**: every non-temporary turn's stats JSON carries `memory: { profile: [ids], injected: [{ id, score }] }`. Turn row only: the operator
+  diagnose views never select it (`tests/operatorDiagnose.test.ts`).
+- Regression tests for the jacket case: `tests/memoryProfile.test.ts`, `tests/memory.test.ts` (MEM-AUDIT-03) and `tests/turnMachine/context.test.ts`.

@@ -49,6 +49,10 @@ export interface ContextItem {
   at?: string;
   /** NAT-03: the certainty band shown beside a remembered fact (lib/certainty.ts memoryBand), already gated for the listener. */
   certainty?: import("@/lib/certainty").CertaintyBand;
+  /** MEM-AUDIT-03: whom a remembered fact is about, as the injected line
+   * says it ("about Sage"): the record's subject's display name, else the
+   * person it belongs to, else "the household". Set by nodes/context.ts. */
+  about?: string;
 }
 
 export interface ToolRequest {
@@ -186,6 +190,10 @@ export interface TurnState {
   searchAssist?: import("@/wire").SearchAssistStats;
   /** RECENCY-02: the weather detector's record. */
   weatherAssist?: import("@/wire").SearchAssistStats;
+  /** MEM-AUDIT-05: which profile card lines and recalled memories reached
+   * this turn's prompt (set by applyContext; absent on a temporary or bare
+   * turn, which injects none). Written into the turn's stats JSON. */
+  memoryTrace?: import("@/wire").MemoryTraceStats;
   images?: import("@/wire").ChatImagePart[];
   /** VISION-02c: the turn's pictures as picture parts for a chat model
    * that reads them (the context node decides, from the Stack's chat row

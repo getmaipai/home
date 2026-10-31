@@ -94,6 +94,23 @@ describe("turns and summary", () => {
     generations: [{ reason: "first", prompt_n: 4800, cache_n, prompt_ms: 3000, predicted_n: 40, request_sent_ms: 5, first_delta_ms: ttft }] as never,
     nodes: [{ node: "model", startMs: 0, endMs: ttft }] as never,
   });
+  // MEM-AUDIT-05: the turn row's memory trace (profile card line ids and injected memory ids with scores) is for the turn row
+  // alone. A diagnose view never carries a stable record id beside an activity (rule 6a), so neither view selects it.
+  test("the memory trace on a turn's stats never reaches the turns or summary view", async () => {
+    const sage = person("owner");
+    insertTurn(sage.id, "2026-10-01T10:00:00.000Z", { ...stats(0, 5000), memory: { profile: ["mem-0000001-abcdef"], injected: [{ id: "mem-0000002-abcdef", score: 0.731 }] } });
+    const { secret } = diagnoseKey(sage);
+    for (const path of ["/api/operator/diagnose/turns?limit=5", "/api/operator/diagnose/summary?limit=5"]) {
+      const res = await call("GET", path, secret);
+      const text = await res.text();
+      expect([path, res.status]).toEqual([path, 200]);
+      expect(text).not.toContain("mem-0000001-abcdef");
+      expect(text).not.toContain("mem-0000002-abcdef");
+      expect(text).not.toContain("\"memory\"");
+      expect(text).not.toContain("\"profile\"");
+      expect(text).not.toContain("\"injected\"");
+    }
+  });
   test("returns timings and counts only: the message and reply text never appear", async () => {
     const sage = person("owner");
     insertTurn(sage.id, "2026-10-01T10:00:00.000Z", stats(0, 5000), "my secret grocery list for Nova");

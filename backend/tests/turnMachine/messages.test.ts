@@ -10,6 +10,7 @@ import { planFor, type PlanInput } from "@/lib/register";
 import { buildStablePrefix } from "@/lib/turnShared";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER } from "@/lib/memoryFraming";
+import { renderProfileCardLine } from "@/lib/memoryProfile";
 
 function item(source: ContextItem["source"], text: string, id = `${source}-1`): ContextItem {
   return { id, text, source, subjects: [], disclosure: "child_ok" };
@@ -27,19 +28,24 @@ function render(context: ContextItem[], utterance: string, surfaceClass: "writte
 describe("contextToMessages(): CHAT-LATE-SYSTEM-01", () => {
   test("the first system message is unchanged, followed by the raw window and one final user message", () => {
     const context: ContextItem[] = [
-      item("profile", "Sage likes hiking."),
+      // MEM-AUDIT-01: the profile card is one bare rule line, then dated fact lines, in the stable prefix.
+      item("profile", "Background about Sage. Use it only when it changes your answer; never mention or allude to it otherwise.", "profile-rule"),
+      { ...item("profile", "Sage likes hiking.", "profile-mem-1"), at: "2026-10-20T09:00:00.000Z" },
       item("roster", "Sage", "roster-0"),
       item("window", "Earlier words", "window-user-1"),
       item("window", "Earlier reply", "window-assistant-2"),
-      item("memory", "Sage likes tea."),
+      // MEM-AUDIT-03: a recalled fact says its date and whom it is about.
+      { ...item("memory", "Sage likes tea."), at: "2026-10-28T09:00:00.000Z", about: "Sage" },
       item("clock", "Monday 9:00 AM"),
     ];
     const out = render(context, "what is technical benchmarking and why do you need it");
     expect(out.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
-    expect(out[0]).toEqual({ role: "system", content: `${stablePrefix}\n\n[profile] Sage likes hiking.\n[household] Sage` });
+    expect(out[0]).toEqual({ role: "system", content: `${stablePrefix}\n\nBackground about Sage. Use it only when it changes your answer; never mention or allude to it otherwise.\n(2026-10-20) Sage likes hiking.\n[household] Sage` });
+    // The card's fact line is memoryProfile.ts's own renderer, so the prompt, the tests and the bench agree on its shape.
+    expect(String(out[0]?.content)).toContain(`\n${renderProfileCardLine({ text: "Sage likes hiking.", at: "2026-10-20T09:00:00.000Z" })}\n`);
     expect(out[1]).toEqual({ role: "user", content: "Earlier words" });
     expect(out[2]).toEqual({ role: "assistant", content: "Earlier reply" });
-    expect(out[3]?.content).toContain(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}`);
+    expect(out[3]?.content).toContain(`${MEMORY_SECTION_HEADER}\n(2026-10-28, about Sage) Sage likes tea.\n${MEMORY_TRUST_REMINDER}`);
     expect(out[3]?.content).toContain("Clock:\n[clock] Monday 9:00 AM");
     expect(out[3]?.content.endsWith("The person's words:\nwhat is technical benchmarking and why do you need it")).toBe(true);
   });
