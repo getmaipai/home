@@ -30,6 +30,14 @@ describe("toArticleViewData", () => {
     expect(toArticleViewData({ ...base, description: "American actor and producer", reading_minutes: 3 }, opts).description).toBe("American actor and producer");
   });
 
+  test("the category chip opens its category when the page can show one", () => {
+    const seen: string[] = [];
+    const data = toArticleViewData({ ...base, kicker: "Actor" }, { ...opts, onCategory: (category) => seen.push(category) });
+    data.onKicker?.();
+    expect(seen).toEqual(["Actor"]);
+    expect(toArticleViewData({ ...base, kicker: "Actor" }, opts).onKicker).toBeUndefined();
+  });
+
   test("an infobox picture means a top action row, no hero, a floated first figure and a kicker chip", () => {
     const data = toArticleViewData({ ...base, kicker: "Actor · Producer", lead_image: { src: "/api/reference/media/wiki/z.jpg", alt: "Z" }, infobox: { title: "Zendaya", image: { src: "/api/reference/media/wiki/z.jpg", alt: "Z" }, rows: [{ label: "Born", value: "1996" }] } }, opts);
     expect(data.actionRow).toBe("top");

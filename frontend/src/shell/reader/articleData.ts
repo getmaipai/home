@@ -74,6 +74,7 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
   return {
     title: article.title,
     ...(kicker ? { kicker, kickerStyle: "chip" as const } : {}),
+    ...(kicker && options.onCategory ? { onKicker: () => options.onCategory!(kicker) } : {}),
     description: article.description ?? (article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label),
     ...(standfirst ? { lead: standfirst } : {}),
     breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker, ...(options.onCategory ? { onClick: () => options.onCategory!(kicker) } : {}) }] : []), { label: article.title }],
