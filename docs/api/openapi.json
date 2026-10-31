@@ -28868,6 +28868,320 @@
         }
       }
     },
+    "/api/ai/chat-lease": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Whether the big chat model is leased, whether you hold it and whether you may (TIER-HOME-05)",
+        "responses": {
+          "200": {
+            "description": "Your view of the Max chat lease.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "can_use": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "can_use",
+                    "releases_in_seconds"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Take the Max chat lease: Home loads the big chat model and gives it back by itself when you go quiet (TIER-HOME-05)",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pinned": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The lease is yours.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "can_use": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "can_use",
+                    "releases_in_seconds"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Give the Max chat lease back; chat returns to the standard model between requests (TIER-HOME-05)",
+        "responses": {
+          "200": {
+            "description": "The lease after release.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "can_use": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "can_use",
+                    "releases_in_seconds"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ai/tiers/{job}": {
       "get": {
         "tags": [
