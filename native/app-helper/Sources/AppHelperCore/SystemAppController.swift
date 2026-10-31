@@ -28,6 +28,8 @@ public final class SystemAppController: AppController {
     public func isRunning(bundleId: String) -> Bool { !apps(bundleId).isEmpty }
 
     public func reopen(bundleId: String) -> Bool {
+        // A moment after a quit the system can still list the app; give it one beat to catch up.
+        if isRunning(bundleId: bundleId) { pump(seconds: 0.5) }
         guard !isRunning(bundleId: bundleId),
               let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return false }
         let cfg = NSWorkspace.OpenConfiguration()
