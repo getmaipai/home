@@ -197,6 +197,7 @@ function cleanup(): void {
   sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(BENCH_SOURCE);
   sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(BENCH_SOURCE);
+  sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(BENCH_SOURCE);
   sqlite.query("DELETE FROM memory_records WHERE source = ?").run(BENCH_SOURCE);
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
 }
