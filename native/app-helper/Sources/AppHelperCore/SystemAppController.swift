@@ -39,7 +39,11 @@ public final class SystemAppController: AppController {
     }
 
     public func pump(seconds: Double) {
-        RunLoop.current.run(until: Date().addingTimeInterval(seconds))
+        // run(until:) returns at once when the loop has no sources, so wait out the full time ourselves.
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if !RunLoop.current.run(mode: .default, before: end) { Thread.sleep(forTimeInterval: 0.02) }
+        }
     }
 
     func footprint(_ pid: pid_t) -> Int64 {

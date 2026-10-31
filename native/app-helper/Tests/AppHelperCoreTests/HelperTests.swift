@@ -118,3 +118,10 @@ let floorIds = ["com.apple.finder", "com.apple.dock", "com.apple.loginwindow", "
         for b in banned { #expect(!text.contains(b), "\(f.lastPathComponent) contains \(b)") }
     }
 }
+
+@Test func systemPumpReallyWaitsEvenWithAnEmptyRunLoop() {
+    // 2026-10-31: run(until:) returned at once, so a slow quit was reported as still_running instantly.
+    let t0 = Date()
+    SystemAppController().pump(seconds: 0.3)
+    #expect(Date().timeIntervalSince(t0) >= 0.28)
+}
