@@ -19,11 +19,11 @@ import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/pol
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
-import { cancelMusicJob, getMusicJobFor, jobsForConversation, musicVersions, openMusicFile, plainMusicFailure, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
+import { cancelMusicJob, getMusicJobFor, jobsForConversation, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { lengthOf, prepareMusicEdit } from "@/lib/music/tool";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
-import { logTurn } from "@/lib/conversationHistory";
+import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
@@ -213,6 +213,23 @@ musicRoutes.openapi(stemsRoute, async (c) => {
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
   if (!source.temporary) logTurn(actor, "chat", "Split into stems", { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: source.conversationId, turn_id: turnId });
   return c.json(await musicCardView(actor, stemsJob!), 200);
+});
+// TIER-STEMS-02b: split an audio file the person owns in their Library. Same age and surface gate as every music action; the split is its own chat, named for the file.
+const stemsFromFileRoute = createRoute({ method: "post", path: "/stems/from-file", tags: ["Music"], summary: "Split an audio file in my Library into stems", middleware,
+  request: { body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80), temporary: z.boolean().optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 413: { description: "The file is too big." }, 422: { description: "The file cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
+musicRoutes.openapi(stemsFromFileRoute, async (c) => {
+  const actor = c.get("person"); const { file_id, temporary = false } = c.req.valid("json");
+  const prepared = await prepareOwnedStemsJob(actor, file_id);
+  if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
+  const conversation = resolveOrCreateConversation(actor, "chat", undefined, { temporary });
+  if (!conversation.ok) return c.json({ error: plainMusicFailure("stems_unavailable") }, 503) as never;
+  const turnId = newConversationTurnId();
+  let job: MusicJob;
+  try { job = await startMusicJob({ actor, conversationId: conversation.value.id, turnId, temporary, task: "stems", request: prepared.request, body: prepared.body, parentFileId: file_id }); }
+  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  if (!temporary) logTurn(actor, "chat", `Split: ${prepared.name}`, { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  return c.json(await musicCardView(actor, job), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });

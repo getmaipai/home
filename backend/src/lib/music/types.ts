@@ -6,7 +6,7 @@ export type SongLength = "quick" | "full";
 export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness" | "stems";
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
-  cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; max_seconds?: number; retried?: boolean;
+  cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; /** On a split of an audio file the person owns: the source is theirs, not a made song. */ ownedFile?: boolean; max_seconds?: number; retried?: boolean;
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];

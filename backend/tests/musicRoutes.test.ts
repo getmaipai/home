@@ -5,12 +5,13 @@ import { attachments, people } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, waitForMusic, LYRICS, testM4a } from "./musicFixture";
-import { runGenerateMusic, runEditMusic } from "@/lib/music/tool";
+import { runGenerateMusic, runEditMusic, prepareMusicEdit } from "@/lib/music/tool";
 import { musicForOutcomes } from "@/lib/composer";
 import { getMusicJobFor, type MusicJob } from "@/lib/music/jobs";
 import { sourceMusicJob } from "@/lib/music/jobs";
 import { listConversationTurns } from "@/lib/conversationHistory";
-import { MUSIC_NOTE } from "@/lib/music/types";
+import { commercialUseOf } from "@/lib/music/commercial";
+import { MUSIC_NOTE, generationOf } from "@/lib/music/types";
 import { COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -63,6 +64,43 @@ describe("music routes", () => {
     expect(stemJob.turnId).not.toBe(job.turnId);
     const history = listConversationTurns(actor, job.conversationId!);
     expect(history.ok && history.value.filter((turn) => turn.music?.id).map((turn) => turn.music!.id)).toEqual([job.id, card.id]);
+  });
+  async function uploadAudio(client: TestClient, name: string, bytes: Uint8Array = new Uint8Array([...testM4a(), ...new TextEncoder().encode(`own-${name}`)]), type = "audio/mp4") {
+    const form = new FormData(); form.set("file", new File([bytes], name, { type }));
+    return (await (await client.postForm("/api/library/upload", form)).json()) as { id: string; kind: string };
+  }
+  test("splits an audio file the person owns: its own chat, stems marked as from an upload, never an edit source", async () => {
+    const { actor, client } = await owner(); fake.stems = true;
+    const file = await uploadAudio(client, "Garage Take.m4a");
+    expect(file.kind).toBe("audio");
+    const response = await client.post("/api/music/stems/from-file", { file_id: file.id });
+    expect(response.status).toBe(200);
+    const card = await response.json() as { id: string };
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+    const stemsCard = await (await client.get(`/api/music/jobs/${card.id}`)).json() as { versions: { label: string }[]; title: string };
+    expect(stemsCard.versions.map((version) => version.label)).toEqual(["Vocals", "Drums"]);
+    expect(stemsCard.title).toBe("Garage Take (vocals)");
+    const stemJob = getMusicJobFor(actor, card.id)!;
+    const provenance = generationOf(db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, stemJob.fileId!)).get()!.provenance)!;
+    expect(provenance).toMatchObject({ source_kind: "upload", parent_file_id: file.id, commercial_use: "unknown" });
+    expect(commercialUseOf(stemJob.fileId!)).toBe("unknown");
+    const edit = prepareMusicEdit(stemJob, { track: stemJob.fileId!, change: "trim", from_s: 0, to_s: 5 });
+    expect(edit.ok).toBe(false);
+    const history = listConversationTurns(actor, stemJob.conversationId!);
+    expect(history.ok && history.value.map((turn) => (turn as unknown as { userText?: string }).userText)).toContain("Split: Garage Take");
+    const stemOfStem = await client.post(`/api/music/jobs/${card.id}/stems`, { file_id: stemJob.fileId });
+    expect(stemOfStem.status).toBe(404);
+  });
+  test("refuses to split a file that is not the person's own audio", async () => {
+    const { actor, client } = await owner(); fake.stems = true;
+    const picture = await uploadAudio(client, "Not music.txt", new TextEncoder().encode("hello"), "text/plain");
+    expect((await client.post("/api/music/stems/from-file", { file_id: picture.id })).status).toBe(404);
+    expect((await client.post("/api/music/stems/from-file", { file_id: "file-doesnotexist" })).status).toBe(404);
+    const made = await song(actor);
+    expect((await client.post("/api/music/stems/from-file", { file_id: made.job.fileId })).status).toBe(422);
+    fake.stems = false;
+    const file = await uploadAudio(client, "Garage Take.m4a");
+    expect((await client.post("/api/music/stems/from-file", { file_id: file.id })).status).toBe(503);
   });
   test("refuses splitting a stem and reports an unavailable stem engine", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor); fake.stems = true; const { response } = await makeStems(client, job);

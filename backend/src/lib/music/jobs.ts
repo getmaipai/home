@@ -1,10 +1,10 @@
 // Home owns the card and the files; the Stack owns generation. Temporary requests and audio never touch disk.
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { closeSync, fstatSync, openSync, readSync, statSync } from "node:fs";
 import { db } from "@/db";
 import { attachments, conversationTurns, people } from "@/db/schema";
-import { attachmentFilePath, createAttachment, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
+import { attachmentFilePath, createAttachment, readAttachment, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
@@ -16,6 +16,7 @@ import { sungLyricsFromLrc } from "./sections";
 import { startSongCover } from "./cover";
 import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
+import { m4aSeconds } from "./m4a";
 import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
@@ -47,7 +48,7 @@ async function releaseMusic(job: MusicJob): Promise<void> {
   try {
     const storedBody = (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody;
     const submitted = job.task === "stems"
-      ? { job: await submitStems(storedBody?.source ?? "", storedBody?.source_sha256 ?? ""), done: null }
+      ? { job: await submitStems(storedBody?.source ?? "", storedBody?.source_sha256 ?? "", storedBody?.origin), done: null }
       : await submitMusic({ ...(storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
     if (job.state !== "queued" || !liveJobs.has(job.id)) { void cancelOrDeleteMusic(submitted.job); return; }
     job.stackJob = submitted.job; saveMusicJob(job);
@@ -99,6 +100,22 @@ export async function prepareStemsJob(actor: PersonRow, source: MusicJob): Promi
   plan.body.source_sha256 = file.sha256;
   plan.body.task = "edit";
   return { ok: true, task: "stems", request: plan.request, body: plan.body };
+}
+/** TIER-STEMS-02b: an audio file in the person's own Library. Only theirs, never a song made here (that has its own card) and never a file shared with them. The bytes go to the local Stack and nowhere else. */
+export const OWNED_STEMS_MAX_BYTES = 40 * 1024 * 1024;
+export async function prepareOwnedStemsJob(actor: PersonRow, fileId: string): Promise<{ ok: true; request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; name: string } | { ok: false; status: 404 | 413 | 422 | 503; line: string }> {
+  const row = db.select().from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
+  if (!row || !row.mediaType.startsWith("audio/")) return { ok: false, status: 404, line: "That file isn't available any more." };
+  if (generationOf(row.provenance)) return { ok: false, status: 422, line: "That song was made in a chat. Open it there and choose Stems." };
+  if (row.size > OWNED_STEMS_MAX_BYTES) return { ok: false, status: 413, line: "That file is too big to split. Try one under 40 MB." };
+  if (!stemsStatusReady(await stemsStatus())) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
+  const read = readAttachment(actor, fileId);
+  if (!read.ok) return { ok: false, status: 404, line: "That file isn't available any more." };
+  const name = (row.name ?? "Audio file").replace(/\.[A-Za-z0-9]{1,5}$/, "").trim().slice(0, 80) || "Audio file";
+  const seconds = Math.min(720, Math.max(10, Math.round(row.size / 16_000)));
+  return { ok: true, name,
+    request: { description: "", instrumental: false, seconds, title: name, ownedFile: true },
+    body: { task: "edit", caption: "", duration_s: seconds, source: Buffer.from(read.value.bytes).toString("base64"), source_sha256: read.value.record.sha256, origin: "owned_file" } };
 }
 export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   if (input.task === "text2music") {
@@ -242,15 +259,21 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
   }
   if (signal.aborted || stopped(job)) return;
   if (!turn) { fail(job, "lost_turn"); return; }
-  const parent = job.parentFileId ? provenanceFor(job.parentFileId) : null;
-  if (!parent) { fail(job, "source_not_made_here"); return; }
+  const owned = job.request.ownedFile === true;
+  const ownedStill = owned && !!job.parentFileId && !!db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, job.parentFileId), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
+  // A file the person owns has no generation record of its own: its stems carry an unknown model stamp and the "upload" source, so commercial use is never claimed and no edit takes them as a source.
+  const parent: GenerationProvenance | null = owned
+    ? (ownedStill ? { kind: "music", job_id: job.id, task: "trim" /* the pinned spec has no "stems" task value yet; the model stamp below is unknown and the source is "upload" */, ...modelStampFor("stems", null, null), seed: 0, duration_s: 0, bpm: null, key: null, parent_file_id: job.parentFileId, source_kind: "upload", made_at: new Date().toISOString() } : null)
+    : (job.parentFileId ? provenanceFor(job.parentFileId) : null);
+  if (!parent) { fail(job, owned ? "lost_job" : "source_not_made_here"); return; }
   const baseTitle = job.request.title ?? "Song"; const batch = job.id;
   for (let i = 0; i < stems.length; i++) {
     const stem = stems[i]!; const bytes = await fetchStem(stem.url);
     if (signal.aborted || stopped(job)) return;
     if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
     const target = i === 0 ? job : { ...job, id: newMusicJobId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), fileId: null, stackJob: null };
-    const provenance: GenerationProvenance = { ...parent, job_id: target.id, duration_s: job.request.seconds, parent_file_id: job.parentFileId, source_kind: "made_here", made_at: new Date().toISOString() };
+    const seconds = owned ? Math.round(m4aSeconds(bytes) ?? job.request.seconds) : job.request.seconds;
+    const provenance: GenerationProvenance = { ...parent, job_id: target.id, duration_s: seconds, parent_file_id: job.parentFileId, source_kind: owned ? "upload" : "made_here", made_at: new Date().toISOString() };
     if (job.temporary) {
       target.fileId = newFileId(); temporarySongs.set(target.fileId, { bytes, jobId: target.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(target.createdAt), provenance });
     } else {
@@ -258,8 +281,8 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
       if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
       target.fileId = made.value.id;
     }
-    target.request = { ...job.request, title: `${baseTitle} (${stem.stem})`, stemsOf: batch, instrumental: stem.stem !== "vocals", seconds: job.request.seconds };
-    target.seed = parent.seed ?? job.seed ?? 0; target.durationS = job.request.seconds; target.state = "done"; target.stage = "ready"; target.progress = 1; target.etaSeconds = 0; target.errorCode = null; target.errorLine = null;
+    target.request = { ...job.request, title: `${baseTitle} (${stem.stem})`, stemsOf: batch, instrumental: stem.stem !== "vocals", seconds };
+    target.seed = parent.seed ?? job.seed ?? 0; target.durationS = seconds; target.state = "done"; target.stage = "ready"; target.progress = 1; target.etaSeconds = 0; target.errorCode = null; target.errorLine = null;
     persistMusicJob(target);
   }
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
