@@ -25,7 +25,7 @@ import { startAnswerImages } from "@/lib/answerImages/turn";
 export type PolicyRefusedReason = Exclude<Extract<PolicyDecision, { allow: false }>["reason"], "consent_needed" | "confirm_needed">;
 
 export type AnswerInput =
-  | { kind: "immediate"; text: string; speech?: string; outcome: ToolExecutionOutcome }
+  | { kind: "immediate"; text: string; speech?: string; language?: string; outcome: ToolExecutionOutcome }
   | { kind: "model_text"; text: string }
   | { kind: "from_outcomes"; text: string; outcomes: readonly ToolExecutionOutcome[] }
   // A code review (2026-09-22) caught `policy`'s own "every proposal
@@ -43,6 +43,7 @@ export type AnswerInput =
 export interface AnswerOutput {
   text: string;
   speech?: string;
+  language?: string;
   sources: Source[];
   /** COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): set when
    * `text` was drawn directly from a failed outcome's own `error`/
@@ -125,7 +126,7 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // failure, never a lookup) - tagged here rather than left for a
       // later node to guess at from the text alone.
       const provenance = input.outcome.status === "failed" ? ("outcome_error" as const) : undefined;
-      return { outcome: { ok: true }, output: { text: input.text, speech: input.speech, sources: input.outcome.sources ?? [], provenance } };
+      return { outcome: { ok: true }, output: { text: input.text, speech: input.speech, language: input.language, sources: input.outcome.sources ?? [], provenance } };
     }
     case "model_text": {
       // CHAT-AUTO-LEAD-IMAGE-01: only start after the model has chosen a

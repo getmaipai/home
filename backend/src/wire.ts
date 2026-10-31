@@ -70,6 +70,8 @@ export type StructuredPart = { kind: "spec_sheet"; tool_id: string; title: strin
 export interface TurnReply {
   text: string;
   speech?: string;
+  language?: string;
+  voice?: string;
 }
 /** ANSWER-IMG-02: one validated picture in an answer. `src` and `full` are
  * always the hub's own `/api/answer-image/` route (the browser never loads a

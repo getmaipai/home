@@ -1,13 +1,40 @@
 {
   "id": "translate",
-  "inputs": [{ "name": "expression", "selector": "text" }],
+  "inputs": [
+    {
+      "name": "expression",
+      "selector": "text"
+    }
+  ],
   "steps": [
     {
       "op": "llm_complete",
       "as": "llm_result",
       "prompt": "You translate text. The user said: \"{expression}\". This is a request to translate some text into another language, and the target language is named somewhere in what they said. Reply with ONLY the translated text - no explanation, no quotation marks, and do not restate the original or name the language."
     },
-    { "op": "pick", "as": "translation", "from": "llm_result", "path": "text" },
-    { "op": "format", "as": "reply", "text": "{translation}", "speech": "{translation}" }
+    {
+      "op": "pick",
+      "as": "translation",
+      "from": "llm_result",
+      "path": "text"
+    },
+    {
+      "op": "llm_complete",
+      "as": "language_result",
+      "prompt": "The user said: \"{expression}\". Identify the target language. Reply with ONLY its BCP-47 primary language code, such as es, fr, or ja. Include a region subtag only if the person explicitly named a region, such as es-MX. Do not return a language name or explanation."
+    },
+    {
+      "op": "pick",
+      "as": "language",
+      "from": "language_result",
+      "path": "text"
+    },
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "{translation}",
+      "speech": "{translation}",
+      "language": "{language}"
+    }
   ]
 }

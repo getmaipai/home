@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { resolveVoice } from "@/lib/voiceResolve";
+import { resolveVoice, voiceMatchesLanguage } from "@/lib/voiceResolve";
 
 const offered = [{ id: "chatterbox-turbo-voice-default" }];
 const pocket = [{ id: "pocket-tts-voice-alba" }, { id: "pocket-tts-voice-javert" }];
 
 describe("resolveVoice (VOICE-PICK-01)", () => {
+  test("matches language primary subtags", () => {
+    expect(voiceMatchesLanguage("es", "es-MX")).toBe(true);
+    expect(voiceMatchesLanguage("es", "en")).toBe(false);
+    expect(voiceMatchesLanguage("es", "")).toBe(false);
+  });
   test("default and empty send nothing", () => {
     expect(resolveVoice("default", offered)).toEqual({ voiceUrl: undefined, unavailable: false });
     expect(resolveVoice("", offered)).toEqual({ voiceUrl: undefined, unavailable: false });

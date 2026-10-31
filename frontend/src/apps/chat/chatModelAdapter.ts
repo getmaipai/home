@@ -614,7 +614,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // per-chunk normalizer above is the only correct option left.
               scheduler.enqueueSentence(
                 spokenLength === 0 ? (event.value.reply.speech ?? normalizeForSpeech(trailing)) : normalizeForSpeech(trailing),
-                { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}), visibleEnd: finalText.length },
+                { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}), ...(event.value.reply.voice ? { voice: event.value.reply.voice } : {}), visibleEnd: finalText.length },
               );
             }
             if (!speakReplies && deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;

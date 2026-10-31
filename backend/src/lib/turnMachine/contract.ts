@@ -162,6 +162,7 @@ export interface TurnBudget {
 }
 
 export interface TurnState {
+  replyLanguage?: string;
   turnId: string;
   /** Date.now() when this turn began (turnNext.ts's own `startedAt`,
    * before the first node ran) - LAT-00's `GenerationInput.requestSentMs`

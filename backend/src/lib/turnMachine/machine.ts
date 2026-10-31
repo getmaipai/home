@@ -608,7 +608,7 @@ function answerInputFrom(context: MachineContext): AnswerInput {
   }
   if (step && typeof step === "object" && "matched" in step && (step as CommandsOutput).matched) {
     const c = step as Extract<CommandsOutput, { matched: true }>;
-    return { kind: "immediate", text: c.text, speech: c.speech, outcome: c.outcome };
+    return { kind: "immediate", text: c.text, speech: c.speech, language: c.language, outcome: c.outcome };
   }
   if (step && typeof step === "object" && "kind" in step) {
     const s = step as ModelOutput;

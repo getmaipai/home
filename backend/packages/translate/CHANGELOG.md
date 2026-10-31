@@ -2,6 +2,12 @@
 
 All notable changes to the Translate package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.0] - 2026-10-31
+
+### Added
+
+- The recipe now returns the translated text with the target language's BCP-47 code so Home can choose an installed matching voice.
+
 ## [0.1.0] - 2026-09-06
 
 ### Added

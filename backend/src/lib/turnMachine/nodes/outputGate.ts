@@ -645,7 +645,7 @@ export type OutputGateOutput =
   // THIN-0M: `safety` is the whole-reply check that refused, so a refusal
   // whose text mentioned self-harm still carries the crisis resources.
   | { refused: true; text: string; safety?: SafetyResult; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } }
-  | { refused: false; text: string; speech?: string; sources: AnswerOutput["sources"]; reasoningOut?: string; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } };
+  | { refused: false; text: string; speech?: string; language?: string; sources: AnswerOutput["sources"]; reasoningOut?: string; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } };
 
 /** The reasoning span's own safety pass ("Reasoning passes the output
  * gate ... before an adult sees it") - identical whether the reply
@@ -746,17 +746,17 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     // into `content`) still gets the whole-span pass below.
     if (input.reasoningEmit && (streamed.reasoning || streamed.reasoningRefused)) {
       const reasoningOut = streamed.reasoning || undefined;
-      return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: streamed.reasoningRefused ? "gate" : null } } };
+      return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), language: input.reply.language, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: streamed.reasoningRefused ? "gate" : null } } };
     }
     const { reasoningOut, withheldFor } = gateReasoning(input, band, state.actor, state.turnId);
-    return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
+    return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), language: input.reply.language, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
   }
 
   // Home's own fixed refusal of a picture or video request that crosses the minor line names children and sexual
   // situations on purpose (the person must be told why). Exactly these lines pass the whole-reply floor; any other
   // text, including a model quoting them, is checked as usual.
   if (band !== "child" && FIXED_MINOR_REFUSAL_LINES.has(input.reply.text) && (input.reply.speech === undefined || input.reply.speech === input.reply.text)) {
-    return { outcome: { ok: true }, output: { refused: false, text: input.reply.text, speech: input.reply.speech, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningEmit ? "gate" : input.reasoningWithheldFor } } };
+    return { outcome: { ok: true }, output: { refused: false, text: input.reply.text, speech: input.reply.speech, language: input.reply.language, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningEmit ? "gate" : input.reasoningWithheldFor } } };
   }
   const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const linked = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
@@ -795,5 +795,5 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   }
 
   const reasoning ={ emitted: reasoningOut !== undefined, withheld_for: withheldFor };
-  return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: speechOut, sources: input.reply.sources, reasoningOut, reasoning } };
+  return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: speechOut, language: input.reply.language, sources: input.reply.sources, reasoningOut, reasoning } };
 };
