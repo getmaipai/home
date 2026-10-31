@@ -370,6 +370,7 @@ PY
       log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
       rm -f "$request" "$output"
       echo "landed: $branch at $sha"
+      bash "$main/scripts/worktree-map.sh" build >>"$data/lander.log" 2>&1 || true
       update_main_checkout
       sweep_worktrees
       return 0

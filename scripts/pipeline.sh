@@ -210,6 +210,7 @@ try: print(max(0,int(sys.argv[2])-int(datetime.datetime.fromisoformat(sys.argv[1
 except Exception: print(0)' "$requested" "$now")"
     echo "  $branch ${sha:0:7} ${age}s"
   done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
+  bash "$main/scripts/worktree-map.sh" counts 2>/dev/null || echo "worktrees: unknown (map build failed)"
   echo "last landings:"
   if [[ -f "$data/landings.jsonl" ]]; then
     tail -n 5 "$data/landings.jsonl" | python3 -c 'import json,sys,datetime
@@ -398,5 +399,25 @@ case "${1:-}" in
       *) error "usage: bash scripts/pipeline.sh stack off | on | status"; exit 2 ;;
     esac
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | start | stop | stack off|on|status | sweep [--dry-run] | install-service [--load] | uninstall-service"; exit 2 ;;
+  fsmonitor)
+    # Repo-local core.fsmonitor / core.untrackedCache for the main, lander and watcher checkouts only. Off by default.
+    fs_dirs=("$main" "$main/../home-lander" "$main/../home-watcher")
+    case "${2:-status}" in
+      on|off)
+        if [[ "$2" == on ]]; then fs_val=true; else fs_val=false; fi
+        for d in "${fs_dirs[@]}"; do
+          [[ -e "$d/.git" ]] || { echo "skipped (no checkout): $d"; continue; }
+          git -C "$d" config --local core.fsmonitor "$fs_val"; git -C "$d" config --local core.untrackedCache "$fs_val"
+          echo "$d: fsmonitor $fs_val"
+        done ;;
+      status)
+        for d in "${fs_dirs[@]}"; do
+          [[ -e "$d/.git" ]] || { echo "skipped (no checkout): $d"; continue; }
+          echo "$d: fsmonitor=$(git -C "$d" config --local core.fsmonitor 2>/dev/null || echo unset) untrackedCache=$(git -C "$d" config --local core.untrackedCache 2>/dev/null || echo unset)"
+        done
+        echo "fsmonitor daemons: $(ps -axo command= 2>/dev/null | grep -c 'fsmonitor--daemon' || true)" ;;
+      *) error "usage: bash scripts/pipeline.sh fsmonitor on | off | status"; exit 2 ;;
+    esac
+    ;;
+  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | fsmonitor on|off|status | start | stop | stack off|on|status | sweep [--dry-run] | install-service [--load] | uninstall-service"; exit 2 ;;
 esac
