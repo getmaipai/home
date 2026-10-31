@@ -88,7 +88,7 @@ describe("the All apps page with 60 apps", () => {
     const view = open();
     await view.findByRole("heading", { name: /^Favorites/ });
     const headings = [...view.container.querySelectorAll('[data-slot="app-directory"] h2')].map((h) => h.textContent?.replace(/\s+/g, " ").trim());
-    expect(headings[0]).toBe("Favorites 3 of 6 in the left rail");
+    expect(headings[0]).toBe("Favorites");
     expect(headings.slice(1)).toEqual(["Everyday", "Games", "Media", "Utilities", "Built in"]);
     expect(page(view).getByRole("button", { name: "Remove App 00 from favorites" })).toBeTruthy();
   });
@@ -117,13 +117,14 @@ describe("the All apps page with 60 apps", () => {
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/apps/app5"]) }));
   });
 
-  test("with six favorites the rest hold their star with the reason, and removing one frees it", async () => {
+  test("there is no cap: with six favorites a seventh star adds it, and clicking a star never opens the app", async () => {
     start(["/apps/app0", "/apps/app1", "/apps/app2", "/apps/app3", "/apps/app4", "/apps/app5"]);
     const view = open();
-    const held = (await view.findByRole("button", { name: /Add App 06 to favorites \(the rail is full, remove one first\)/ })) as HTMLButtonElement;
-    expect(held.disabled).toBe(true);
-    await act(async () => { fireEvent.click(view.getByRole("button", { name: "Remove App 01 from favorites" })); });
-    await waitFor(() => expect((view.getByRole("button", { name: "Add App 06 to favorites" }) as HTMLButtonElement).disabled).toBe(false));
+    const star = (await view.findByRole("button", { name: "Add App 06 to favorites" })) as HTMLButtonElement;
+    expect(star.disabled).toBe(false);
+    await act(async () => { fireEvent.click(star); });
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/app0", "/apps/app1", "/apps/app2", "/apps/app3", "/apps/app4", "/apps/app5", "/apps/app6"]) }));
+    expect(window.location.pathname).not.toContain("/apps/app6");
   });
 
   test("the built-in apps open from the page and carry no star", async () => {
