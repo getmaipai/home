@@ -42,18 +42,18 @@ const weatherApp = { ...packageApp, package: "weather", label: "Weather", to: "/
 const notesApp = { ...packageApp, package: "notes", label: "Notes", icon: "calendar", to: "/apps/notes" };
 const clockApp = { ...packageApp, package: "clock", label: "Clock", to: "/apps/clock", pinned_by_default: true, pin_order: 5 };
 test("default pins are the apps that ask for one, lowest pin_order first, then by name", () => {
-  expect(defaultPinnedRoutes([notesApp, weatherApp, clockApp])).toEqual(["/apps/clock", "/apps/weather"]);
-  expect(defaultPinnedRoutes([notesApp])).toEqual([]);
-  expect(defaultPinnedRoutes(undefined)).toEqual([]);
+  expect(defaultPinnedRoutes([notesApp, weatherApp, clockApp])).toEqual(["/reminders", "/clock", "/apps/clock", "/apps/weather"]);
+  expect(defaultPinnedRoutes([notesApp])).toEqual(["/reminders", "/clock"]);
+  expect(defaultPinnedRoutes(undefined)).toEqual(["/reminders", "/clock"]);
 });
-test("the rail lists package apps only, pinned first in pin order, then the rest by name; a pinned core route is not repeated", () => {
+test("the rail lists package apps and the starrable built-ins, pinned first in pin order, then the rest by name; a pinned fixed route is not repeated", () => {
   const apps = mergeAppCatalog([weatherApp, notesApp, clockApp], false);
   const list = railApps(apps, ["/chat", "/apps/weather"]);
-  expect(list.map((app) => [app.url, app.pinned])).toEqual([["/apps/weather", true], ["/apps/clock", false], ["/apps/notes", false]]);
+  expect(list.map((app) => [app.url, app.pinned])).toEqual([["/apps/weather", true], ["/clock", false], ["/apps/clock", false], ["/apps/notes", false], ["/reminders", false], ["/wikipedia", false]]);
   expect(list[0]).toMatchObject({ name: "Weather", icon: "cloud-sun" });
 });
 test("an Incognito-blocked app is in neither the rail nor the launcher while Incognito is on", () => {
   const blocked = { ...weatherApp, incognito: "blocked" as const };
-  expect(railApps(mergeAppCatalog([blocked, notesApp], true), ["/apps/weather"]).map((app) => app.url)).toEqual(["/apps/notes"]);
-  expect(railApps(mergeAppCatalog([blocked, notesApp], false), ["/apps/weather"]).map((app) => app.url)).toEqual(["/apps/weather", "/apps/notes"]);
+  expect(railApps(mergeAppCatalog([blocked, notesApp], true), ["/apps/weather"]).map((app) => app.url)).toEqual(["/clock", "/apps/notes", "/reminders", "/wikipedia"]);
+  expect(railApps(mergeAppCatalog([blocked, notesApp], false), ["/apps/weather"]).map((app) => app.url)).toEqual(["/apps/weather", "/clock", "/apps/notes", "/reminders", "/wikipedia"]);
 });

@@ -3,12 +3,13 @@ import { AppDirectory, type DirectoryApp } from "@maipai/ui/src/primitives/AppDi
 import { RAIL_APPS_MAX } from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/AppRail";
 import type { Roster } from "@/lib/api";
 import { useAppCatalog } from "@/shell/useAppCatalog";
+import { isPinnableApp } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useTabItem } from "@/shell/tabIdentity";
 
 /** APPS-DIRECTORY-01: every installed app, with search, Favorites first and a star on each. Favorites are the person's
  * pins (`ui.pinned_apps`): the same list the rail draws and the app page's own star edits, so there is one list and
- * one place that saves it. The built-in apps open from here too and are always in the rail. */
+ * one place that saves it. The built-in apps that are always in the rail (Home, Chat, Library, Family) open from here too; Wikipedia, Reminders and Clock can be starred like the rest. */
 export function AllAppsPage({ person }: { person: Roster }) {
   useTabItem("All apps");
   const catalog = useAppCatalog();
@@ -18,11 +19,11 @@ export function AllAppsPage({ person }: { person: Roster }) {
     const toApp = (entry: (typeof catalog)[number], favorite: boolean, builtIn: boolean): DirectoryApp => ({
       id: entry.to, name: entry.label, to: entry.to, icon: entry.icon, description: entry.description, category: entry.category, keywords: entry.keywords, favorite, builtIn,
     });
-    const packageApps = catalog.filter((entry) => entry.to.startsWith("/apps/"));
+    const packageApps = catalog.filter((entry) => isPinnableApp(entry.to));
     const order = [...new Set(pinned)];
     const favorites = order.flatMap((to) => packageApps.filter((entry) => entry.to === to)).map((entry) => toApp(entry, true, false));
     const rest = packageApps.filter((entry) => !order.includes(entry.to)).map((entry) => toApp(entry, false, false));
-    const builtIn = catalog.filter((entry) => !entry.to.startsWith("/apps/")).map((entry) => toApp(entry, false, true));
+    const builtIn = catalog.filter((entry) => !isPinnableApp(entry.to)).map((entry) => toApp(entry, false, true));
     return [...favorites, ...rest, ...builtIn];
   }, [catalog, pinned]);
 

@@ -26,6 +26,8 @@ export const APP_CATALOG: readonly AppEntry[] = [
   { to: "/memory", icon: "brain", label: "Memories", description: "The details you want MaiPai to remember.", category: "Personal", keywords: ["remember", "saved", "memory"] },
   { to: "/companions", icon: "bot", label: "Companions", description: "Meet the companions and pick how your assistant sounds.", category: "Personal", keywords: ["personality", "persona", "voice", "character", "sprout", "nova", "riff"] },
   { to: "/people", icon: "users", label: "Family", description: "Everyone who shares your home.", category: "Personal", keywords: ["family", "household"] },
+  { to: "/reminders", icon: "layout-list", label: "Reminders", description: "Alarms, timers and things to remember.", category: "Everyday", keywords: ["alarm", "timer", "to do", "list", "remind"] },
+  { to: "/clock", icon: "clock", label: "Clock", description: "The time, alarms and timers.", category: "Everyday", keywords: ["time", "alarm", "timer", "stopwatch"] },
   { to: "/wikipedia", icon: "book", label: "Wikipedia", description: "Read Wikipedia from your own library, no internet needed.", category: "Everyday", keywords: ["encyclopedia", "articles", "reference", "look up", "learn", "kiwix"] },
   { to: "/privacy", icon: "shield-check", label: "Privacy", description: "Understand and control what you share.", category: "System", keywords: ["data", "security"] },
   { to: "/settings", icon: "settings", label: "Settings", description: "Make MaiPai feel like yours.", category: "System", keywords: ["preferences", "voice", "models"] },
@@ -61,16 +63,22 @@ export function mergeAppCatalog(rows: readonly AppRow[] | undefined, incognito: 
  * says `pinned_by_default`, lowest `pin_order` first, then by name. The hub already left out the apps this person may
  * not open; the Incognito filter is `mergeAppCatalog`'s. */
 export function defaultPinnedRoutes(rows: readonly AppRow[] | undefined): string[] {
-  return (rows ?? [])
+  return [...DEFAULT_BUILTIN_PINS, ...(rows ?? [])
     .filter((row) => row.pinned_by_default)
     .sort((a, b) => (a.pin_order ?? 100) - (b.pin_order ?? 100) || a.label.localeCompare(b.label))
-    .map((row) => row.to);
+    .map((row) => row.to)];
 }
 
+/** The rail's fixed places are Home, Search, Chat, Media, Library and Family (Jesse, 2026-10-30). Every other app is the person's to
+ * star, built-in or package: these built-ins are pinnable, and Reminders and Clock start pinned (they used to be fixed) until the person chooses. */
+export const PINNABLE_BUILTIN_ROUTES: readonly string[] = ["/reminders", "/clock", "/wikipedia"];
+export const DEFAULT_BUILTIN_PINS: readonly string[] = ["/reminders", "/clock"];
+export const isPinnableApp = (to: string): boolean => to.startsWith("/apps/") || PINNABLE_BUILTIN_ROUTES.includes(to);
+
 /** The package apps for the left rail and its launcher: pinned ones first in pin order, then the rest by name. The core
- * destinations (Home, Chat, Library, People) are the rail's own, so a pinned core route is not repeated here. */
+ * destinations (Home, Search, Chat, Media, Library, Family) are the rail's own, so a pinned core route is not repeated here. */
 export function railApps(apps: readonly AppEntry[], pinned: readonly string[]): Array<{ name: string; url: string; icon: string; description: string; pinned: boolean }> {
-  const packageApps = apps.filter((app) => app.to.startsWith("/apps/"));
+  const packageApps = apps.filter((app) => isPinnableApp(app.to));
   const order = [...new Set(pinned)];
   const pinnedApps = order.flatMap((to) => packageApps.filter((app) => app.to === to));
   const rest = packageApps.filter((app) => !order.includes(app.to)).sort((a, b) => a.label.localeCompare(b.label));

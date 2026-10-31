@@ -79,7 +79,7 @@ describe("the All apps page with 60 apps", () => {
     fireEvent.click(await view.findByRole("link", { name: "All apps" }));
     const search = await view.findByRole("searchbox", { name: "Search apps" });
     expect(document.activeElement).toBe(search);
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(67));
+    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(69));
     expect(view.getByRole("heading", { name: "All apps" })).toBeTruthy();
   });
 
@@ -88,7 +88,7 @@ describe("the All apps page with 60 apps", () => {
     const view = open();
     await view.findByRole("heading", { name: /^Favorites/ });
     const headings = [...view.container.querySelectorAll('[data-slot="app-directory"] h2')].map((h) => h.textContent?.replace(/\s+/g, " ").trim());
-    expect(headings[0]).toBe("Favorites 1 of 6 in the left rail");
+    expect(headings[0]).toBe("Favorites 3 of 6 in the left rail");
     expect(headings.slice(1)).toEqual(["Everyday", "Games", "Media", "Utilities", "Built in"]);
     expect(page(view).getByRole("button", { name: "Remove App 00 from favorites" })).toBeTruthy();
   });
@@ -97,7 +97,7 @@ describe("the All apps page with 60 apps", () => {
     start();
     const view = open();
     const search = await view.findByRole("searchbox", { name: "Search apps" });
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(67));
+    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(69));
     fireEvent.change(search, { target: { value: "app 07" } });
     expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(1);
     fireEvent.change(search, { target: { value: "forecast" } });
@@ -105,16 +105,16 @@ describe("the All apps page with 60 apps", () => {
     fireEvent.change(search, { target: { value: "no such app" } });
     expect(view.getByText(/No apps match "no such app"/)).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Clear search" }));
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(67));
+    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(69));
   });
 
   test("a star saves the same list the rail draws, in order, and removing one saves it without that app", async () => {
     start();
     const view = open();
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Add App 05 to favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/app0", "/apps/app5"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/apps/app0", "/apps/app5"]) }));
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Remove App 00 from favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/apps/app5"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/apps/app5"]) }));
   });
 
   test("with six favorites the rest hold their star with the reason, and removing one frees it", async () => {

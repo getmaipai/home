@@ -97,10 +97,10 @@ describe("the rail's apps", () => {
     await rail(view).findByRole("link", { name: "Weather" });
     fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Add Notes to favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/weather", "/apps/notes"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/apps/weather", "/apps/notes"]) }));
     await rail(view).findByRole("link", { name: "Notes" });
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Remove Weather from favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/apps/notes"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/apps/notes"]) }));
     await waitFor(() => expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull());
   });
 
@@ -115,12 +115,15 @@ describe("the rail's apps", () => {
     expect(view.queryByRole("link", { name: /^Weather/ })).toBeNull();
   });
 
-  test("no package apps means no All apps entry at all", async () => {
+  test("with no package apps the rail still has Reminders and Clock starred, an All apps entry, and Wikipedia left for the person to star", async () => {
     rows = [];
     start();
     const view = open();
     await waitFor(() => expect(rail(view).getByRole("link", { name: "Chat" })).toBeTruthy());
-    expect(rail(view).queryByRole("link", { name: "All apps" })).toBeNull();
+    expect(rail(view).getByRole("link", { name: "All apps" })).toBeTruthy();
+    expect(rail(view).getByRole("link", { name: "Reminders" })).toBeTruthy();
+    expect(rail(view).getByRole("link", { name: "Clock" })).toBeTruthy();
+    expect(rail(view).queryByRole("link", { name: "Wikipedia" })).toBeNull();
   });
 
   test("at 744 the rail still shows the pinned app and the All apps link", async () => {

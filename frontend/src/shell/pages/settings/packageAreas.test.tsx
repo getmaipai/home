@@ -33,7 +33,7 @@ describe("an app's settings carry a Sidebar section (owner, 2026-10-25)", () => 
       const toggle = await view.findByRole("switch", { name: "Show in the sidebar" });
       await waitFor(() => expect(toggle.getAttribute("aria-disabled")).not.toBe("true"));
       await act(async () => { fireEvent.click(toggle); });
-      await waitFor(() => expect(home.puts.some((put) => put.key === "ui.pinned_apps" && put.value === JSON.stringify(["/apps/demo"]))).toBe(true));
+      await waitFor(() => expect(home.puts.some((put) => put.key === "ui.pinned_apps" && put.value === JSON.stringify(["/reminders", "/clock", "/apps/demo"]))).toBe(true));
     } finally {
       home.restore();
     }
