@@ -506,12 +506,14 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       if (call.tool === "remind" || call.tool === "timer" || call.tool === "lists") {
         const action = typeof args.action === "string" ? args.action : "";
         const scope = args.scope === "household" || args.list_scope === "household" ? "household" : args.scope === "person" || args.list_scope === "person" ? "person" : undefined;
-        const rawMode = getHouseholdSettingValue(`tools.${call.tool}.mode`);
+        const listActions = new Set(["create_list", "rename_list", "delete_list", "add_items", "remove_items", "check_items", "uncheck_items", "edit_item", "move_items", "copy_list", "reorder", "clear_done", "show_list", "find_list"]);
+        const brakeTool: BrakeTool = call.tool === "remind" && listActions.has(action) ? "lists" : call.tool as BrakeTool;
+        const rawMode = getHouseholdSettingValue(`tools.${brakeTool}.mode`);
         const mode: BrakeMode = rawMode === "ask" || rawMode === "never" ? rawMode : "do";
-        const itemCount = typeof args.itemCount === "number" ? args.itemCount : typeof args.item_count === "number" ? args.item_count : undefined;
-        const brake = brakeFor({ tool: call.tool as BrakeTool, action, args, itemCount, actor: { id: state.actor.id, role: String(state.actor.role), band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) }, listScope: scope, tainted: state.context.some((item) => item.source === "search_result" || item.source === "page"), mode });
+        const itemCount = typeof args.itemCount === "number" ? args.itemCount : typeof args.item_count === "number" ? args.item_count : Array.isArray(args.items) ? args.items.length : undefined;
+        const brake = brakeFor({ tool: brakeTool, action, args, itemCount, actor: { id: state.actor.id, role: String(state.actor.role), band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) }, listScope: scope, tainted: state.context.some((item) => item.source === "search_result" || item.source === "page"), mode });
         const auditBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
-        recordToolAudit({ personId: state.actor.id, tool: call.tool, action, decision: brake.decision, band: auditBand });
+        recordToolAudit({ personId: state.actor.id, tool: brakeTool, action, decision: brake.decision, band: auditBand });
         if (brake.reason === "parent_required") {
           noteRefusal("parent_required");
           entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });

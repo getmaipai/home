@@ -246,6 +246,32 @@ describe("policyNode: structured brake confirmation", () => {
     expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "confirm_needed" });
     expect(listOwnToolAudit(owner.id, 5)).toMatchObject([{ tool: "remind", action: "move", decision: "ask" }]);
   });
+
+  test("remind list actions read the lists brake and count items from items", async () => {
+    const original = loadManifestOnly("remind");
+    if (!original.ok) throw new Error("remind manifest failed to load");
+    resetDb();
+    const owner = createBenchPeople().owner;
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    setHouseholdSettingValue("tools.lists.mode", "never");
+    const state = { actor: { id: owner.id, role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "move several things" } as unknown as TurnState;
+    const outcome = await policyNode(state, { calls: [{ id: "call-list", tool: "remind", args: { action: "move_items", items: ["a", "b", "c", "d", "e", "f"] } }] }, new AbortController().signal);
+    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "min_role" });
+    expect(listOwnToolAudit(owner.id, 5)).toMatchObject([{ tool: "lists", action: "move_items", decision: "never" }]);
+  });
+
+  test("reminder actions keep the remind brake mode", async () => {
+    const original = loadManifestOnly("remind");
+    if (!original.ok) throw new Error("remind manifest failed to load");
+    resetDb();
+    const owner = createBenchPeople().owner;
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    setHouseholdSettingValue("tools.remind.mode", "never");
+    const state = { actor: { id: owner.id, role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [{ source: "window", id: "window-user-1", text: "tomorrow at 5 to call" }], crisis: false, temporary: false, utterance: "remind me tomorrow at 5 to call" } as unknown as TurnState;
+    const outcome = await policyNode(state, { calls: [{ id: "call-remind", tool: "remind", args: { expression: "tomorrow at 5 to call" } }] }, new AbortController().signal);
+    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "min_role" });
+    expect(listOwnToolAudit(owner.id, 5)).toMatchObject([{ tool: "remind", action: "", decision: "never" }]);
+  });
 });
 
 // THIN-0D: a model-proposed recall for an unidentified robot speaker is

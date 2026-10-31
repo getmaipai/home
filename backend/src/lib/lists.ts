@@ -314,3 +314,51 @@ export function clearDoneItems(actor: { id: string; role: string }, id: string):
   db.update(lists).set(toRow(candidate)).where(eq(lists.id, id)).run();
   return { ok: true, status: 200, value: candidate };
 }
+
+/** Moves live items to another editable list, preserving their fields and order. */
+export function moveItems(actor: { id: string; role: string }, fromListId: string, toListId: string, itemIds: string[]): OpResult<{ from: ListT; to: ListT }> {
+  const source = getList(actor, fromListId);
+  if (!source.ok) return source;
+  const target = getList(actor, toListId);
+  if (!target.ok) return target;
+  if (fromListId === toListId) return { ok: false, status: 400, error: "source and target must differ" };
+  const selected = source.value.items.filter((item) => itemIds.includes(item.id));
+  if (selected.length === 0) return { ok: false, status: 404, error: "no matching items" };
+  const now = new Date().toISOString();
+  const from = List.parse({ ...source.value, items: source.value.items.filter((item) => !itemIds.includes(item.id)), updated_at: now, hlc: nextHlc() });
+  const to = List.parse({ ...target.value, items: [...target.value.items, ...selected], updated_at: now, hlc: nextHlc() });
+  const issues = [...validateList(from), ...validateList(to)];
+  if (issues.length) return { ok: false, status: 400, error: issues.join("; ") };
+  db.update(lists).set(toRow(from)).where(eq(lists.id, fromListId)).run();
+  db.update(lists).set(toRow(to)).where(eq(lists.id, toListId)).run();
+  return { ok: true, status: 200, value: { from, to } };
+}
+
+/** Creates an actor-owned person list containing copies of selected items. */
+export function copyList(actor: { id: string; role: string }, listId: string, input: { name: string; excludeItemIds?: string[] }): OpResult<ListT> {
+  const existing = getList(actor, listId);
+  if (!existing.ok) return existing;
+  const now = new Date().toISOString();
+  const excluded = new Set(input.excludeItemIds ?? []);
+  const copied = existing.value.items.filter((item) => !excluded.has(item.id)).map((item) => ({ ...item, id: newListItemId(), created_at: now }));
+  const candidate = List.safeParse({ ...existing.value, id: newListId(), scope: "person", person: actor.id, kind: "custom", title: input.name, items: copied, source: "hub", created_at: now, updated_at: now, deleted_at: null, hlc: nextHlc() });
+  if (!candidate.success) return { ok: false, status: 400, error: candidate.error.issues.map((i) => i.message).join("; ") };
+  const issues = validateList(candidate.data);
+  if (issues.length) return { ok: false, status: 400, error: issues.join("; ") };
+  db.insert(lists).values(toRow(candidate.data)).run();
+  return { ok: true, status: 201, value: candidate.data };
+}
+
+/** Rewrites item order from given ids; unknown ids are ignored. */
+export function reorderItems(actor: { id: string; role: string }, listId: string, orderedItemIds: string[]): OpResult<ListT> {
+  const existing = getList(actor, listId);
+  if (!existing.ok) return existing;
+  const byId = new Map(existing.value.items.map((item) => [item.id, item]));
+  const ordered: typeof existing.value.items = [];
+  for (const id of orderedItemIds) { const item = byId.get(id); if (item && !ordered.some((entry) => entry.id === id)) ordered.push(item); }
+  for (const item of existing.value.items) if (!ordered.some((entry) => entry.id === item.id)) ordered.push(item);
+  const now = new Date().toISOString();
+  const candidate = List.parse({ ...existing.value, items: ordered, updated_at: now, hlc: nextHlc() });
+  db.update(lists).set(toRow(candidate)).where(eq(lists.id, listId)).run();
+  return { ok: true, status: 200, value: candidate };
+}
