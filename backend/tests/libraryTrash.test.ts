@@ -111,6 +111,37 @@ describe("delete moves a file to Trash, restore brings it back", () => {
     expect(await trashRows(h.lucia.client)).toEqual([]); // a recipient never sees the owner's Trash
   });
 
+  test("an admin can move a departed person's inherited file to Trash, while living owners keep control", async () => {
+    const h = await household();
+    const made = await h.sage.post("/api/people", { displayName: "Admin", role: "admin", secret: "0000" });
+    const adminId = ((await made.json()) as { id: string }).id;
+    const admin = new TestClient();
+    expect((await admin.post("/api/auth/verify-secret", { personId: adminId, secret: "0000" })).status).toBe(200);
+
+    const living = file(h.lucia.row(), "living owner file", { retention: "kept", detach: true });
+    expect(createShare(h.lucia.row(), { fileId: living.id, to: "household" }).ok).toBe(true);
+    expect((await admin.request(`/api/files/${living.id}`, { method: "DELETE" })).status).toBe(403);
+
+    const inherited = file(h.lucia.row(), "inherited file", { retention: "kept", detach: true });
+    createShare(h.lucia.row(), { fileId: inherited.id, to: "household" });
+    db.update(people).set({ deletedAt: new Date().toISOString() }).where(eq(people.id, h.lucia.id)).run();
+    expect((await admin.request(`/api/files/${inherited.id}`, { method: "DELETE" })).status).toBe(200);
+    expect(row(inherited.id)?.deletedAt).not.toBeNull();
+
+    expect(row(living.id)).toBeDefined();
+  });
+
+  test("a non-admin cannot delete an inherited file", async () => {
+    const h = await household();
+    const inherited = file(h.lucia.row(), "inherited file", { retention: "kept", detach: true });
+    createShare(h.lucia.row(), { fileId: inherited.id, to: "household" });
+    db.update(people).set({ deletedAt: new Date().toISOString() }).where(eq(people.id, h.lucia.id)).run();
+    const denied = await h.bramble.client.request(`/api/files/${inherited.id}`, { method: "DELETE" });
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as { error: string }).error).toContain("Only the person who added this file can delete it.");
+    expect(row(inherited.id)).toBeDefined();
+  });
+
   test("a child deletes their own file and restores it; a saved podcast copy cannot be deleted from the Library", async () => {
     const h = await household();
     const mine = file(h.bramble.row(), "child picture", { retention: "kept", detach: true });

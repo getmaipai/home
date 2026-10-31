@@ -10,7 +10,7 @@
 // exist in commons (LIBRARY-REVAMP-03).
 import { and, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { attachments, musicJobs, shares } from "@/db/schema";
+import { attachments, musicJobs, people, shares } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { LIBRARY_TRASH_DAYS_KEY } from "@/settings/libraryRetentionKeys";
@@ -72,10 +72,16 @@ function titleOf(row: Row): string {
 }
 
 /** Move one of the caller's own Library files, with its companions, into Trash. */
+/** Issue 213: an owner or admin may delete a file whose owner has left the household (their shared files stay household-held). */
+export function canDeleteInherited(actor: PersonRow, ownerPersonId: string): boolean {
+  if (actor.role !== "owner" && actor.role !== "admin") return false;
+  return Boolean(db.select({ deletedAt: people.deletedAt }).from(people).where(eq(people.id, ownerPersonId)).get()?.deletedAt);
+}
+
 export function trashFile(actor: PersonRow, id: string, now = new Date()): TrashResult<{ id: string; deleted_at: string; trash_until: string }> {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
   // Not the owner's, or already gone: the same answer, so an id never confirms a file someone else holds.
-  if (!row || row.ownerPersonId !== actor.id || row.deletedAt !== null) return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
+  if (!row || (row.ownerPersonId !== actor.id && !canDeleteInherited(actor, row.ownerPersonId)) || row.deletedAt !== null) return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
   if (row.origin === "fetched") return { ok: false, status: 403, error: "Saved media belongs to its app. Remove it there." };
   if (parentOf(row)) return { ok: false, status: 403, error: "This file belongs to another item. Delete that item instead." };
   const deletedAt = now.toISOString();

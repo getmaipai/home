@@ -7,7 +7,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { getAttachment, readAttachment } from "@/lib/attachments";
-import { trashFile } from "@/lib/libraryTrash";
+import { canDeleteInherited, trashFile } from "@/lib/libraryTrash";
 import { updateLibraryFile } from "@/lib/libraryEdit";
 import { createShare, deleteShare, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
 import { File as FileSchema } from "@maipai/spec/gen/ts/file.js";
@@ -303,7 +303,10 @@ filesRoutes.openapi(deleteFileRoute, (c) => {
   const { id } = c.req.valid("param");
   const found = getAttachment(actor, id);
   if (!found.ok) return c.json({ error: "That file is not in your Library. Refresh the page and try again." }, 404);
-  if (found.value.owner_person_id !== actor.id) return c.json({ error: "Only the person who added this file can delete it. You can stop seeing it by asking them to unshare." }, 403);
+  // Issue 213: a file inherited from someone who left the household can be deleted by an owner or admin; it goes to Trash like any other.
+  if (found.value.owner_person_id !== actor.id && !canDeleteInherited(actor, found.value.owner_person_id)) {
+    return c.json({ error: "Only the person who added this file can delete it. You can stop seeing it by asking them to unshare." }, 403);
+  }
   const result = trashFile(actor, id);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json(result.value, 200);
