@@ -16,7 +16,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | null;
   category?: JobCategory;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
@@ -258,6 +258,19 @@ export function trackChatLease<T extends { release(): void }>(personId: string, 
 
 /** The window, fairness and heavy-slot memory behind `admit`. Process memory only. */
 const tierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
+/** PRIO-03: the quiet-window settings, read at every Max admission. Null means the defaults. */
+let quietConfigSource: (() => QuietConfig) | null = null;
+export function setQuietConfigSource(source: (() => QuietConfig) | null): void { quietConfigSource = source; }
+const downshiftRequestedAt = new Map<string, number>();
+const downshiftMemory = { restoredAt: null as number | null, lastJobEndedAt: null as number | null };
+let downshiftRecheck: ReturnType<typeof setTimeout> | null = null;
+export function resetDownshiftForTests(): void { downshiftRequestedAt.clear(); downshiftMemory.restoredAt = null; downshiftMemory.lastJobEndedAt = null; if (downshiftRecheck) clearTimeout(downshiftRecheck); downshiftRecheck = null; }
+/** A held job has no event to wake it when chat goes quiet, so look again in a few seconds. */
+function scheduleDownshiftRecheck(): void {
+  if (downshiftRecheck) return;
+  downshiftRecheck = setTimeout(() => { downshiftRecheck = null; void releaseHouseholdQueue(); }, 5000);
+  downshiftRecheck.unref?.();
+}
 let chatLeaseSource: (() => boolean) | null = null;
 /** TIER-HOME-05: where the queue reads whether the Max chat lease is up (`chatLease.holdsGenerators`). Null clears it. */
 export function setChatLeaseSource(source: (() => boolean) | null): void { chatLeaseSource = source; }
@@ -271,7 +284,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
   for (const job of jobs) {
     const next = byId.get(job.id) ?? null;
     const old = previous.get(job.id) ?? null;
-    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "profile_lowered" ? job.riseReason : null;
+    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" ? job.riseReason : null;
     if (next !== null && old !== null && next > old) {
       const overtaker = positions.filter((item) => item.position < next && item.position < (previous.get(item.id) ?? Infinity)).sort((a, b) => b.position - a.position)[0];
       if (overtaker) {
@@ -372,7 +385,10 @@ export async function releaseHouseholdQueue(): Promise<void> {
         else if (!held && entry.job.riseReason === "profile_lowered") { entry.job.riseReason = null; entry.save(); }
       }
       if (runningMax && runningMax.id === reducedChatJobId) setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
-      else { reducedChatJobId = null; setReducedChat(null); }
+      else {
+        if (reducedChatJobId !== null) { downshiftMemory.restoredAt = now; downshiftMemory.lastJobEndedAt = now; }
+        reducedChatJobId = null; setReducedChat(null);
+      }
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
       const admitted = new Set(admit(jobs, now, tierState).start);
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
@@ -391,7 +407,23 @@ export async function releaseHouseholdQueue(): Promise<void> {
               const key = JSON.stringify(admission);
               if (lastFit.get(entry.job.id) !== key) { lastFit.set(entry.job.id, key); entry.applyFit?.(admission); }
               if (fit.outcome !== "run") continue;
-              if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced") reducedChatJobId = entry.job.id;
+              if (fit.applied?.cells.chat?.state === "reduced") {
+                // PRIO-03 (S1 to S4): chat is lowered only after a quiet moment, outside the cooldown; chat is never paused, so the wait is bounded.
+                const requestedAt = downshiftRequestedAt.get(entry.job.id) ?? now;
+                downshiftRequestedAt.set(entry.job.id, requestedAt);
+                const activity = chatActivity();
+                const decision = decideDownshift({ now, requesterId: entry.job.personId, config: quietConfigSource?.() ?? DEFAULT_QUIET, activity,
+                  state: { requestedAt, restoredAt: downshiftMemory.restoredAt, reducedNow: reducedChatJobId !== null, lastJobEndedAt: downshiftMemory.lastJobEndedAt }, atTurnBoundary: activity.inFlight === 0 });
+                if (decision.action === "wait") {
+                  const reason = decision.reason === "cooldown" ? "cooldown_wait" : "quiet_wait";
+                  if (entry.job.riseReason !== reason) { entry.job.riseReason = reason; entry.save(); }
+                  scheduleDownshiftRecheck();
+                  continue;
+                }
+                downshiftRequestedAt.delete(entry.job.id);
+                if (entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait") { entry.job.riseReason = null; entry.save(); }
+                if (entry.job.tier === "max") reducedChatJobId = entry.job.id;
+              }
               if (fit.applied) pendingPlan = { jobId: entry.job.id, lead: fit.applied.lead, cells: Object.fromEntries(Object.entries(fit.applied.cells).map(([category, cell]) => [category, cell.state])) };
             }
           } catch { /* Fit is advisory: admission proceeds as it did before. */ }

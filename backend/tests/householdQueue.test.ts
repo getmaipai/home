@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test, setSystemTime } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, resetDownshiftForTests, setQuietConfigSource, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 import { reducedChatState, setReducedChat } from "../src/lib/reducedChat";
 import { setProfileSource, type ProfileSource } from "../src/lib/jobs/admissionFit";
@@ -14,6 +14,8 @@ function job(id: string, personId: string, jobClass: QueueJob["jobClass"], creat
 }
 
 describe("household queue", () => {
+  beforeEach(() => { resetChatActivityForTests(); resetDownshiftForTests(); });
+
   test("fit admission gates Max release, persists counts, and leaves Standard unchanged", async () => {
     const maxRow: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "standard" }, video: { state: "max" }, picture: { state: "max" }, voice: { state: "standard" } } };
     const boostRow: ProfileRow = { ...maxRow, tier: "boost", cells: { ...maxRow.cells, video: { state: "boost" } } };
@@ -404,5 +406,29 @@ describe("household queue", () => {
       expect(song.riseReason).toBeNull();
       expect(songReleased).toBe(1);
     } finally { setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); resetActivePlanForTests(); setReducedChat(null); }
+  });
+
+  test("a second person chatting at second 50 delays the swap to Reduced chat, at second 61 it proceeds (TIER-PRIO-03)", async () => {
+    resetTierStateForTests(); resetFitMemoryForTests(); resetActivePlanForTests(); resetDownshiftForTests(); resetChatActivityForTests();
+    const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } };
+    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 30 } }, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    setQuietConfigSource(() => ({ quietSeconds: 60, quietMaxWaitSeconds: 600, cooldownSeconds: 300 }));
+    const t0 = 1_900_000_000_000;
+    const video = job("v-quiet", "p-quiet-a", "video", t0, { tier: "max" });
+    let released = 0;
+    const remove = registerQueueProvider(() => [{ job: video, save: () => undefined, applyFit: () => undefined, release: async () => { released += 1; video.state = "running"; } }]);
+    try {
+      setSystemTime(new Date(t0));
+      noteChatTurn("p-quiet-b", t0);
+      setSystemTime(new Date(t0 + 50_000));
+      await releaseHouseholdQueue();
+      expect(released).toBe(0);
+      expect(video.riseReason).toBe("quiet_wait");
+      setSystemTime(new Date(t0 + 61_000));
+      await releaseHouseholdQueue();
+      expect(released).toBe(1);
+      expect(video.riseReason).toBeNull();
+    } finally { setSystemTime(); remove(); setProfileSource(null); setBudgetReader(null); setQuietConfigSource(null); resetDownshiftForTests(); resetTierStateForTests(); resetActivePlanForTests(); resetChatActivityForTests(); setReducedChat(null); }
   });
 });

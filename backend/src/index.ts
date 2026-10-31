@@ -9,6 +9,7 @@ import { startTrashSweeper } from "@/lib/trash/sweep";
 import { startMediaScanner } from "@/lib/media/scan";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
 import { startChatLease } from "@/lib/chatLeaseRuntime";
+import { setQuietConfigSource } from "@/lib/jobs/householdQueue";
 import { profileSourceFromSettings } from "@/lib/jobs/profileSource";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
@@ -359,6 +360,11 @@ startConversationTitleSweep();
 startMediaScanner();
 setProfileSource(() => profileSourceFromSettings(getHouseholdSettingValue));
 startChatLease();
+setQuietConfigSource(() => {
+  const number = (key: string, fallback: number) => { const value = getHouseholdSettingValue(key); return typeof value === "number" && Number.isFinite(value) ? value : fallback; };
+  return { quietSeconds: number("resources.quiet_seconds", 60), cooldownSeconds: number("resources.cooldown_seconds", 300),
+    quietMaxWaitSeconds: getHouseholdSettingValue("resources.quiet_timeout") === "keep_waiting" ? "never" : number("resources.quiet_max_wait", 600) };
+});
 startTrashSweeper();
 // SRC-ICON-01: the source favicon cache's own daily sweep -
 // lib/scheduler.ts's own CORE_JOBS entry, lib/favicons.ts for the
