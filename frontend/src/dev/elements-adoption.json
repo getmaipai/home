@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T04:08:18.662Z",
+  "generatedAt": "2026-10-31T05:01:30.672Z",
   "kitTag": "ui-v0.5.432",
   "items": [
     {
@@ -1508,7 +1508,7 @@
       "name": "todo-list",
       "group": "agent/workflow",
       "verdict": "wire-after",
-      "verdictReason": "Deferred until list-view and list-add return items[] beside the text (additive).",
+      "verdictReason": "Deferred until remind returns items[] beside the text (additive).",
       "implemented": false
     },
     {
