@@ -205,6 +205,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   const tierAsked = editing ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band });
   if (tierAsked?.quality && (tierAsked.quality === "quick" || engine!.quality.includes("detailed"))) request.quality = tierAsked.quality;
   request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
+  request.tier = request.quality === "detailed" ? "boost" : "standard";
   // Check the effective request, including inherited words and a section replacement, before any job exists.
   const inherited = refuseMusicPrompt([request.description, request.lyrics, request.written_lyrics, request.title, request.key, request.language].join(" "));
   if (inherited) return refused(MUSIC_REFUSAL_LINE[inherited], inherited);

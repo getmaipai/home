@@ -7,7 +7,7 @@ export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake"
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; max_seconds?: number; retried?: boolean;
-  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; seed?: number; length?: SongLength;
+  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; /** TIER-HOME-03: read by the household queue. Music has no Max maker yet. */ tier?: "standard" | "boost"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
 }

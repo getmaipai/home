@@ -8,7 +8,7 @@ import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, LYRICS, waitForMusic } from "./musicFixture";
 import { runGenerateMusic, runEditMusic, songSecondsFor, FULL_SONG, QUICK_SONG } from "@/lib/music/tool";
-import { getMusicJobFor } from "@/lib/music/jobs";
+import { getMusicJobFor, musicVersions } from "@/lib/music/jobs";
 import { musicForOutcomes } from "@/lib/composer";
 import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -106,5 +106,40 @@ describe("the card's Make it full route", () => {
     __setMusicStatusForTests(readyMusicStatusForTests({ limits: { min_seconds: 10, max_seconds: 120 } }));
     await waitForMusic(() => fake.deleted.length >= 2);
     expect((await client.post(`/api/music/jobs/${id}/length`, { length: "full" })).status).toBe(200);
+  });
+});
+
+describe("the card's Make it Boost route (TIER-HOME-03)", () => {
+  async function aSong() {
+    resetDb();
+    const client = new TestClient();
+    expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
+    const actor = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Sage")).get()!;
+    const out = await runGenerateMusic({ state: musicState(actor), args: { description: "an original folk song", lyrics: LYRICS, tier: "standard" }, callId: "g", spoken: false });
+    const id = musicForOutcomes([out])!.id;
+    await waitForMusic(() => getMusicJobFor(actor, id)?.state === "done");
+    return { client, actor, id };
+  }
+  test("a Standard song offers Boost, and Boost makes it again with the Detailed maker, recorded as Boost for the queue", async () => {
+    const { client, actor, id } = await aSong();
+    const card = await (await client.get(`/api/music/jobs/${id}`)).json() as { quality: string; boost_offered: boolean };
+    expect(card).toMatchObject({ quality: "quick", boost_offered: true });
+    const res = await client.post(`/api/music/jobs/${id}/quality`, { tier: "boost" });
+    expect(res.status).toBe(200);
+    expect(fake.submitted.at(-1)).toMatchObject({ quality: "detailed", lyrics: LYRICS });
+    await waitForMusic(() => musicVersions(actor, getMusicJobFor(actor, id)!).filter((j) => j.state === "done").length >= 2);
+    const newest = musicVersions(actor, getMusicJobFor(actor, id)!).filter((j) => j.state === "done").at(-1)!;
+    expect(newest.request).toMatchObject({ quality: "detailed", tier: "boost" });
+  });
+  test("a Boost song asked again at Standard uses the Quick maker", async () => {
+    const { client, id } = await aSong();
+    expect((await client.post(`/api/music/jobs/${id}/quality`, { tier: "standard" })).status).toBe(200);
+    expect(fake.submitted.at(-1)).toMatchObject({ quality: "quick" });
+  });
+  test("the card does not offer Boost when the engine has no Detailed maker, and the route refuses it", async () => {
+    const { client, id } = await aSong();
+    __setMusicStatusForTests(readyMusicStatusForTests({ quality: ["quick"] }));
+    expect((await (await client.get(`/api/music/jobs/${id}`)).json() as { boost_offered: boolean }).boost_offered).toBe(false);
+    expect((await client.post(`/api/music/jobs/${id}/quality`, { tier: "boost" })).status).toBe(422);
   });
 });

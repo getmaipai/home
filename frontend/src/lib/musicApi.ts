@@ -26,6 +26,10 @@ export interface MusicCard {
   current_id: string | null;
   /** The kind of the version on show: quick (the hook) or full (every part). */
   length: "quick" | "full";
+  /** The maker the shown version used: quick is Standard, detailed is Boost. */
+  quality: "quick" | "detailed";
+  /** Whether this person may make the song again at Boost here. */
+  boost_offered: boolean;
   cut: "asked" | "ceiling" | null;
   max_seconds: number | null;
   title: string | null;
@@ -53,6 +57,8 @@ export const musicApi = {
   /** Makes an older version the one the next edit starts from. The newer versions stay. */
   /** Make it full / Make it quick: the same song made again at the other length, as a new version on this card. */
   setLength: (id: string, length: "quick" | "full", fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/length`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ length, ...(fileId ? { file_id: fileId } : {}) }) }),
+  /** Make it Boost / Make it Standard: the same song made again with the other maker, as a new version on this card. */
+  setTier: (id: string, tier: "standard" | "boost", fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/quality`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { tier, file_id: fileId } : { tier }) }),
   revise: (id: string, change: string, fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/revise`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ change, ...(fileId ? { file_id: fileId } : {}) }) }),
   stems: (id: string, fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/stems`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { file_id: fileId } : {}) }),
   newCover: (id: string, prompt: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/cover`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) }),

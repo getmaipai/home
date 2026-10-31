@@ -21,7 +21,7 @@ let card: MusicCard;
 const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/files/file-one" };
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
-  return { id: "mus-1", task: "text2music", state: "running", stage: "planning", stage_label: "Planning", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 2, progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
+  return { id: "mus-1", task: "text2music", state: "running", stage: "planning", stage_label: "Planning", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 2, quality: "quick", boost_offered: false, progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
     title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
@@ -306,6 +306,29 @@ describe("MusicToolRender", () => {
     expect(cardOf(view)!.className).toContain("max-w-none");
     expect(cardOf(view)!.getAttribute("data-width")).toBe("full");
     expect(bare.container.querySelector("[data-slot=music-track]")!.className).toContain("max-w-xl");
+  });
+});
+
+describe("Standard and Boost songs on the card (TIER-HOME-03)", () => {
+  const openQuality = async () => {
+    const view = mount();
+    fireEvent.click(await view.findByRole("button", { name: "Edit" }));
+    for (const from of ["Remix", "New cover", "Full song"]) fireEvent.keyDown(view.getByRole("tab", { name: from }), { key: "ArrowRight" });
+    await waitFor(() => expect(view.getByRole("tab", { name: "Quality" }).getAttribute("aria-selected")).toBe("true"));
+    return view;
+  };
+  test("a Standard song with Boost offered shows the segment and Boost asks for a Boost version", async () => {
+    card = done({ boost_offered: true });
+    const view = await openQuality();
+    expect(view.getByRole("radio", { name: /Standard/ }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(view.getByRole("radio", { name: /Boost/ }));
+    await waitFor(() => expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/quality" && c.method === "POST" && c.body?.includes('"boost"'))).toBe(true));
+  });
+  test("no Quality tab when Boost is not offered, and no Max choice ever", async () => {
+    card = done({ boost_offered: false });
+    const view = mount();
+    fireEvent.click(await view.findByRole("button", { name: "Edit" }));
+    expect(view.queryByRole("tab", { name: "Quality" })).toBeNull();
   });
 });
 
