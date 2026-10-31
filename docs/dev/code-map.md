@@ -296,7 +296,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/reader/SearchResults.tsx` | SearchResults |
 | `frontend/src/shell/sessionLockContext.tsx` | useSessionLocked, SessionLockGate |
 | `frontend/src/shell/useAmbientCompanion.tsx` | useAmbientCompanion |
-| `frontend/src/shell/useSideChat.tsx` | useSideChat |
+| `frontend/src/shell/useSideChat.tsx` | SPOKEN_IDLE_NEW_CONVERSATION_MS, useSideChat |
 
 ## Backend units (backend/src/lib)
 
