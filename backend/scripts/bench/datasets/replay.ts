@@ -269,7 +269,7 @@ async function ingestRow(actorId: string, conversationId: string, row: { userTex
     conversation_id: conversationId,
     turn_id: `replay-${crypto.randomUUID()}`,
   };
-  logTurn(actor, "chat", row.userText, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
+  logTurn(actor, "chat", row.userText, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal, row.userText) });
 }
 
 async function ingestSession(actorId: string, conversationId: string, session: DatasetSession, at: Date | null, isHouseholdMember: (t: DatasetSession["turns"][number]) => boolean): Promise<void> {

@@ -6,7 +6,7 @@ import { and, desc, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { conversationTurns, memoryRecords, openQuestions } from "@/db/schema";
 import { markOpenQuestionAsked, queueOpenQuestion } from "@/lib/conversationHistory";
-import { STATE_EXPIRY_DAYS } from "@/lib/memory";
+
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { threadOfferFloor } from "@/lib/threadOfferFloor";
 
@@ -78,8 +78,12 @@ export interface OpeningRecord {
 
 /** How far back a thread reaches: an event that ended, or a goal or project set, in the last 14 days. */
 export const THREAD_WINDOW_DAYS = 14;
-/** A state is a mood only this long: the maintenance expiry in memory.ts, one definition. */
-export const MOOD_WINDOW_DAYS = STATE_EXPIRY_DAYS;
+/** A state is a mood worth opening on only this long. Deliberately shorter
+ * than memory.ts's STATE_EXPIRY_DAYS (14 since MEM-AUDIT-04): a state may
+ * stay recallable for two weeks when the message is about it, but an
+ * opener that brings up a two-week-old mood unasked is the jacket reply
+ * in another coat. */
+export const MOOD_WINDOW_DAYS = 7;
 const DAY_MS = 86_400_000;
 const MAX_SUBJECT_CHARS = 140;
 
@@ -117,9 +121,13 @@ function threadOf(record: OpeningRecord, person: OpeningPerson, now: Date): { th
   const window = THREAD_WINDOW_DAYS * DAY_MS;
   if (kind === "event") {
     // Only an event whose own end date passed qualifies; person, decay, edit, forgotten and unset reasons never do.
-    if (record.status !== "archived" || record.archivedReason !== "end_date") return null;
-    // The window runs from the event's own end date; the archive time only stands in when no end date was kept.
+    // MEM-AUDIT-04: an event keeps EVENT_GRACE_DAYS past its date before maintenance archives it as "event_passed"
+    // (memory.ts), so the morning-after thread reads an active event whose own end date is behind us the same way.
     const endedAt = record.validTo ?? record.expiredAt;
+    const archivedOnEnd = record.status === "archived" && (record.archivedReason === "end_date" || record.archivedReason === "event_passed");
+    const activePastEnd = record.status === "active" && record.validTo !== null && (ageMs(record.validTo, now) ?? -1) >= 0;
+    if (!archivedOnEnd && !activePastEnd) return null;
+    // The window runs from the event's own end date; the archive time only stands in when no end date was kept.
     const age = ageMs(endedAt, now);
     if (age === null || age < 0 || age > window) return null;
     return { thread: { record_id: record.id, kind, subject: record.text, when: endedAt!.slice(0, 10) }, at: now.getTime() - age };
@@ -192,10 +200,14 @@ export function renderConversationOpening(opening: ConversationOpening, options:
 
 type CandidateRow = typeof memoryRecords.$inferSelect;
 
-/** The bounded read: this person's own event, goal, project and state rows from the last 14 days, newest first, at most 40.
- * Reads nothing in Incognito (the caller does not call it). */
+/** The bounded read: this person's own event, goal, project and state rows from the last 14 days, newest first, at most 40:
+ * a row archived in the window, a row created in the window, or an active event whose own end date lies in the window
+ * (an event told about three weeks before it happened is still "last time they told you about an event" the morning
+ * after; `threadOf` reads the same end date). Reads nothing in Incognito (the caller does not call it). */
 export function readOpeningRecords(personId: string, now: Date): OpeningRecord[] {
   const cutoff = new Date(now.getTime() - THREAD_WINDOW_DAYS * DAY_MS).toISOString();
+  // `valid_to` is a bare date or a timestamp; the date part of the cutoff compares with both as text.
+  const dayCutoff = cutoff.slice(0, 10);
   const rows: CandidateRow[] = db
     .select()
     .from(memoryRecords)
@@ -206,7 +218,11 @@ export function readOpeningRecords(personId: string, now: Date): OpeningRecord[]
         isNull(memoryRecords.deletedAt),
         isNull(memoryRecords.supersededBy),
         inArray(memoryRecords.category, ["event", "goal", "project", "state"]),
-        or(gte(memoryRecords.expiredAt, cutoff), and(eq(memoryRecords.status, "active"), gte(memoryRecords.createdAt, cutoff))),
+        or(
+          gte(memoryRecords.expiredAt, cutoff),
+          and(eq(memoryRecords.status, "active"), gte(memoryRecords.createdAt, cutoff)),
+          and(eq(memoryRecords.status, "active"), eq(memoryRecords.category, "event"), gte(memoryRecords.validTo, dayCutoff)),
+        ),
       ),
     )
     .orderBy(desc(memoryRecords.createdAt))

@@ -7,21 +7,29 @@ As you talk with MaiPai, it remembers useful details. Things like your favorite 
 
 Everything it remembers stays on your hub. It never goes anywhere else.
 
+## What the assistant keeps in mind
+
+A few standing facts about you are always in mind: who you are, and how you want your answers. For example, "Sage is a nurse" or "Sage wants short answers". Up to eight of these are shown to the assistant on every message, each with the date it learned the fact.
+
+Everything else is looked up only when your message is about it. A note about your kid's school, a trip, or how your week is going stays out of the way until you ask about it. The assistant is told to use a fact only when it changes the answer, and never to bring something up just because it knows it.
+
+A note you ask it to keep is always saved. Say "make a note that..." or "remember that..." and it goes in, no matter what. Each saved fact keeps the date it was learned, and a fact about one day (a visit, a game) drops out of the lookup a couple of days after that day.
+
 ## See what's remembered
 
 Open **Memory** in the sidebar. Each entry shows one thing MaiPai learned from a conversation.
 
 ## Forget one memory
 
-Find the memory you want gone. Tap the small icon next to it. It's gone right away, and MaiPai won't use it again.
+Find the memory you want gone. Tap the small icon next to it. The words are wiped out right away, and MaiPai won't use it again. A blank marker stays behind so a robot or a second hub that was offline knows to forget it too.
 
 ## Forget several at once
 
-Tap **Select memories** at the top of the page. Check the ones you want gone, then tap **Forget selected**. Confirm, and they're erased for good. This cannot be undone.
+Tap **Select memories** at the top of the page. Check the ones you want gone, then tap **Forget selected**. Confirm, and their words are wiped out. Only a blank marker stays. This cannot be undone.
 
 ## Clear everything
 
-Tap **Clear all**. Confirm how many memories you're about to erase, and every one of them is gone for good. This cannot be undone.
+Tap **Clear all**. Confirm how many memories you're about to erase, and the words of every one of them are wiped out. Only blank markers stay. This cannot be undone.
 
 ## Export your memories
 

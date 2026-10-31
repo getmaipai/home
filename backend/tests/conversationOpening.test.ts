@@ -150,9 +150,12 @@ describe("archive reasons, the reader and forget", () => {
     archive(actor, byPerson);
     expect(reasonOf(byPerson)).toBe("person");
 
-    const ended = mk(actor, { text: "trip", valid_to: "2020-01-01T00:00:00.000Z" });
+    // MEM-AUDIT-04: a dated event ends as "event_passed" once its grace has run; any other record ends as "end_date".
+    const ended = mk(actor, { text: "away on a trip", category: "state", valid_to: "2020-01-01T00:00:00.000Z" });
+    const passed = mk(actor, { text: "trip", valid_to: "2020-01-01T00:00:00.000Z" });
     runMaintenance();
     expect(reasonOf(ended)).toBe("end_date");
+    expect(reasonOf(passed)).toBe("event_passed");
 
     const forgotten = mk(actor, { text: "secret" });
     forgetByIds(actor, [forgotten]);
@@ -161,6 +164,25 @@ describe("archive reasons, the reader and forget", () => {
     const all = mk(actor, { text: "another" });
     forget(actor, actor.id);
     expect(reasonOf(all)).toBe("forgotten");
+  });
+
+  // MEM-AUDIT-04: an active event's own end date, not its creation date, puts
+  // it in the window. Told about three weeks ahead and ended yesterday, it is
+  // still inside the grace period, so the reader must find it by `valid_to`.
+  test("an active event created 20 days ago whose end date was yesterday is read and offered", async () => {
+    const actor = await sage();
+    const now = new Date();
+    const id = mk(actor, { text: "the recital", valid_to: new Date(now.getTime() - DAY).toISOString() });
+    const { sqlite } = await import("@/db");
+    sqlite.query("UPDATE memory_records SET created_at = ? WHERE id = ?").run(new Date(now.getTime() - 20 * DAY).toISOString(), id);
+    const rows = readOpeningRecords(actor.id, now);
+    expect(rows.map((r) => [r.id, r.status])).toEqual([[id, "active"]]);
+    const opening = conversationOpening({ id: actor.id, band: "adult", pickUpThreads: true }, now, { ...turns, lastTurnAt: new Date(now.getTime() - 3 * DAY).toISOString() }, rows);
+    expect(opening?.thread).toMatchObject({ record_id: id, kind: "event", subject: "the recital" });
+    // A stale active event (ended three weeks ago, never archived) stays out of the read, as before.
+    const old = mk(actor, { text: "an old picnic", valid_to: new Date(now.getTime() - 21 * DAY).toISOString() });
+    sqlite.query("UPDATE memory_records SET created_at = ? WHERE id = ?").run(new Date(now.getTime() - 30 * DAY).toISOString(), old);
+    expect(readOpeningRecords(actor.id, now).map((r) => r.id)).toEqual([id]);
   });
 
   test("the reader returns an ended event, marks an offered one, and forget removes the thread rows", async () => {

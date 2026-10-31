@@ -18,6 +18,7 @@
 // the plan line remains, but all volatile content now leads the final
 // user message so templates that drop later system messages still receive it.
 import type { ContextItem } from "./contract";
+import { renderProfileCardLine } from "@/lib/memoryProfile";
 import type { LlmImagePart, LlmMessage } from "@/lib/llm";
 import type { Persona } from "@/lib/persona";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
@@ -58,7 +59,31 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   opening: "opening",
 };
 
+/** MEM-AUDIT-03 (decision 6): a recalled fact is one line that says its
+ * date and whom it is about before the fact, "(2026-10-28, about Sage)
+ * Sage dislikes sweaters.", with the certainty band (NAT-03) inside the
+ * same parentheses when it applies. No "[remembered]" label: the memory
+ * block's own header already says what the lines are, and a small model
+ * reads the date and the name as the two things that decide whether the
+ * fact bears on the message. `about` falls back to "the household" for
+ * an item that reached here without one (a test-built item). */
+function renderMemoryLine(item: ContextItem): string {
+  const parts = [item.at ? item.at.slice(0, 10) : null, `about ${item.about ?? "the household"}`, item.certainty ? `certainty: ${item.certainty}` : null].filter((part): part is string => part !== null);
+  return `(${parts.join(", ")}) ${item.text}`;
+}
+
+/** MEM-AUDIT-01: the profile card's own two shapes. Its rule line
+ * ("Background about Sage. Use it only when...") carries no date and is
+ * printed bare; each fact line is memoryProfile.ts's own
+ * renderProfileCardLine ("(YYYY-MM-DD) <text>"), so the card reads the
+ * same in the prompt, the tests and the bench. */
+function renderProfileLine(item: ContextItem): string {
+  return item.at ? renderProfileCardLine({ text: item.text, at: item.at }) : item.text;
+}
+
 function renderContextLine(item: ContextItem): string {
+  if (item.source === "memory") return renderMemoryLine(item);
+  if (item.source === "profile") return renderProfileLine(item);
   const label = SOURCE_LABEL[item.source as Exclude<ContextItem["source"], "window" | "utterance">];
   const dated = item.at ? ` (${item.at.slice(0, 10)})` : "";
   const band = item.certainty ? `, certainty: ${item.certainty}` : "";

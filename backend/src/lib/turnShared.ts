@@ -76,15 +76,15 @@ export function validateTurnInput(surface: Surface, text: string): TurnFailure |
 }
 
 /** ACT-01 (section 12 part 6): the judge's queue is keyed on the stored
- * signal. A turn with no eligible clause (only questions, directives,
- * greetings, closings, backchannels, or quoted, hypothetical, joking or
- * unknown clauses) is skipped before it is queued, about a third of
- * turns; a safety refusal and a credential turn (its text redacted)
- * are never the judge's whatever the clauses say. Null leaves the turn
- * for the judge. */
-export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: TurnSignal): "skipped" | null {
+ * signal. A turn under three words, or made only of greeting, closing and
+ * backchannel clauses, is skipped before it is queued (MEM-AUDIT-02,
+ * decision 4: a question and a directive are judged, since that is where
+ * people name their family and give instructions); a safety refusal and
+ * a credential turn (its text redacted) are never the judge's whatever
+ * the clauses say. Null leaves the turn for the judge. */
+export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: TurnSignal, userText: string): "skipped" | null {
   if (value.source === "safety_refuse" || value.source === "policy") return "skipped";
-  return hasEligibleClause(signal) ? null : "skipped";
+  return hasEligibleClause(signal, userText) ? null : "skipped";
 }
 
 export type SpeakerEvidence = { person: string | null; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" };

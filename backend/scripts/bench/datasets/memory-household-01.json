@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "item": "MEM-AUDIT-06",
+  "note": "The household fixture for the memory judge (docs/design/memory-audit-and-redesign-2026-10-31.md, decision 9). Persona-roster names only, never the family: Sage the owner speaks every turn; Marlow is the teen, Nova the child, Vincent and Rover friends, Pippa, Bruno and Iris as named. The `miss` cases are the live hub's hand-labelled misses (2026-10-31) rewritten in persona names; `synthetic` are the three behavior instructions; `negative` turns must yield nothing; `assistant_only` turns put the fact in the Assistant's line, which is never a source. `expected` is one keyword set per fact, scored by scripts/bench/judgeScore.ts (whole words, case-insensitive).",
+  "household": {
+    "owner": "Sage",
+    "members": [
+      { "name": "Marlow", "role": "teen" },
+      { "name": "Nova", "role": "child" }
+    ]
+  },
+  "cases": [
+    { "id": "req-ddr", "kind": "miss", "user": "write a song about my friend Rover who has a DDR arcade cabinet at home", "assistant": "Here is a song about Rover and his arcade cabinet.", "expected": [["rover", "ddr"]] },
+    { "id": "req-story-pippa", "kind": "miss", "user": "tell me a story about Rover and his daughter Pippa", "assistant": "Once upon a time, Rover and Pippa set out for the lake.", "expected": [["rover", "pippa"]] },
+    { "id": "req-guitar", "kind": "miss", "user": "write a funny song about my son Marlow who keeps skipping his guitar lessons", "assistant": "Here is a song about a boy and his dusty guitar.", "expected": [["marlow", "guitar"]] },
+    { "id": "req-poem-nova", "kind": "miss", "user": "can you make a birthday poem for my daughter Nova who loves horses", "assistant": "Here is a poem for Nova.", "expected": [["nova", "horses"]] },
+    { "id": "req-limerick-bruno", "kind": "miss", "user": "write a limerick about my dog Bruno who steals socks", "assistant": "There once was a dog named Bruno...", "expected": [["bruno", "socks"]] },
+    { "id": "req-story-iris", "kind": "miss", "user": "my daughter Nova wants a story about her friend Iris who moved to Lisbon", "assistant": "Here is a story about two friends and a city by the sea.", "expected": [["iris", "lisbon"]] },
+    { "id": "instr-typed", "kind": "miss", "user": "I don't understand why you typed out all your responses", "assistant": "Sorry about that, I will keep my spoken replies short.", "expected": [["typed"]] },
+    { "id": "voice-robot", "kind": "miss", "user": "im still programming the robot", "assistant": "How is it going?", "expected": [["programming", "robot"]] },
+    { "id": "voice-rewatch", "kind": "miss", "user": "im rewatching breaking bad", "assistant": "Great show.", "expected": [["breaking", "bad"]] },
+    { "id": "voice-film", "kind": "miss", "user": "I really want to see the new Marsh Lantern film when it comes out", "assistant": "It opens in November.", "expected": [["marsh", "lantern"]] },
+    { "id": "note-marlow", "kind": "miss", "user": "make a note that Marlow is human and shouldn't be judged by what Nova does", "assistant": "Got it, I'll remember that.", "expected": [["marlow", "human"]] },
+    { "id": "friend-drums", "kind": "miss", "user": "my friend Vincent plays drums", "assistant": "Nice, what kind of music?", "expected": [["vincent", "drums"]] },
+    { "id": "friend-band", "kind": "miss", "user": "my friend Vincent used to be in my band", "assistant": "What did you play?", "expected": [["vincent", "band"]] },
+    { "id": "q-boyfriend", "kind": "miss", "user": "whose my daughter Nova's boyfriend", "assistant": "I don't know yet. Who is he?", "expected": [["nova", "boyfriend"]] },
+    { "id": "son-driving", "kind": "miss", "user": "my son Marlow has his driving test on Friday", "assistant": "Good luck to him.", "expected": [["marlow", "driving"]] },
+    { "id": "teacher-pippa", "kind": "miss", "user": "Nova's teacher is Mrs Pippa this year", "assistant": "Noted.", "expected": [["nova", "pippa"]] },
+    { "id": "dog-shots", "kind": "miss", "user": "our dog Bruno needs his shots next month", "assistant": "I can remind you.", "expected": [["bruno", "shots"]] },
+    { "id": "cousin-lisbon", "kind": "miss", "user": "my cousin Rover lives in Lisbon", "assistant": "Lovely city.", "expected": [["rover", "lisbon"]] },
+    { "id": "instr-stop-saying", "kind": "synthetic", "user": "please stop saying that every time", "assistant": "Understood.", "expected": [["stop"]] },
+    { "id": "instr-weather", "kind": "synthetic", "user": "why didn't you check the weather when I said it is cold", "assistant": "I should have. I will check the weather when you say it is cold.", "expected": [["weather", "cold"]] },
+    { "id": "instr-moving", "kind": "synthetic", "user": "stop moving around so much", "assistant": "Holding still.", "expected": [["moving"]] },
+    { "id": "neg-time", "kind": "negative", "user": "what time is it right now", "assistant": "It is ten past four.", "expected": [] },
+    { "id": "neg-weather", "kind": "negative", "user": "what's the weather like today", "assistant": "Cloudy, about twelve degrees.", "expected": [] },
+    { "id": "neg-greeting", "kind": "negative", "user": "hey there, good morning everyone", "assistant": "Good morning.", "expected": [] },
+    { "id": "neg-question", "kind": "negative", "user": "how long until bacteria grows on meat left out", "assistant": "About two hours at room temperature.", "expected": [] },
+    { "id": "neg-joke", "kind": "negative", "user": "lol I basically live at the office now", "assistant": "Ha, long week?", "expected": [] },
+    { "id": "neg-reminder", "kind": "negative", "user": "don't forget to lock up tonight", "assistant": "I will remind you tonight.", "expected": [] },
+    { "id": "asst-sister", "kind": "assistant_only", "user": "what should I cook tonight", "assistant": "Since you mentioned your sister Iris is vegetarian, how about a lentil curry?", "expected": [] },
+    { "id": "asst-tournament", "kind": "assistant_only", "user": "any ideas for the weekend", "assistant": "Your son Marlow has a soccer tournament on Saturday, so maybe Sunday is free for a hike.", "expected": [] },
+    { "id": "asst-dentist", "kind": "assistant_only", "user": "thanks, that helps a lot today", "assistant": "Glad to help. Your dentist appointment is Thursday at nine.", "expected": [] }
+  ]
+}

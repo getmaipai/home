@@ -142,7 +142,10 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
   // that exclusion at contextNode's own layer (the profile record still
   // reaches the prompt exactly once, via `getProfileParagraph()`'s
   // separate "profile" item, never a second time as a "memory" item).
-  test("a person whose only memory is the profile yields no memory item and exactly one profile item", async () => {
+  // MEM-AUDIT-01: the legacy paragraph row reaches the prompt through
+  // neither door now: not as a memory item (recall() excludes
+  // PROFILE_SOURCE) and not as a profile item (the card refuses it).
+  test("a person whose only memory is a legacy profile paragraph yields no memory item and no profile item", async () => {
     const text = "the household's own profile paragraph text";
     const seeded = remember(people.owner, { text, category: "identity", tier: "durable", scope: "person", person: people.owner.id, source: PROFILE_SOURCE, importance: 0.9, pinned: true });
     if (!seeded.ok) throw new Error("setup failed");
@@ -150,7 +153,56 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
 
     const { output } = await contextNode(stateFor(people.owner), { utterance: "how's it going" }, SIGNAL);
     expect(output.items.filter((item) => item.source === "memory").length).toBe(0);
-    expect(output.items.filter((item) => item.source === "profile").length).toBe(1);
+    expect(output.items.filter((item) => item.source === "profile").length).toBe(0);
+    expect(output.memoryTrace).toEqual({ profile: [], injected: [] });
+  });
+
+  // MEM-AUDIT-01 and 03 (decision 9): the jacket case at the context
+  // node, through the real stub embeddings (bag-of-words: a weather
+  // remark and a fact about the child share no vocabulary, so the
+  // relationship fact lands near-orthogonal and under every floor).
+  test("the jacket case: the profile card holds the identity fact alone, and a weather remark injects nothing about the child", async () => {
+    const identityText = "Sage is a software engineer who works from home";
+    const childText = "Sage's daughter Nova is seven and loves the playground";
+    const stateText = "this week Sage is stressed about a product launch";
+    const identity = remember(people.owner, { text: identityText, category: "identity", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.9 });
+    const child = remember(people.owner, { text: childText, category: "relationship", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.8 });
+    const state = remember(people.owner, { text: stateText, category: "state", tier: "episodic", scope: "person", person: people.owner.id, source: "test", importance: 0.6 });
+    if (!identity.ok || !child.ok || !state.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(identity.value.id, identityText);
+    await embedMemoryRecordSafely(child.value.id, childText);
+    await embedMemoryRecordSafely(state.value.id, stateText);
+
+    const { output } = await contextNode(stateFor(people.owner), { utterance: "Starting to get cold out" }, SIGNAL);
+    const profile = output.items.filter((item) => item.source === "profile");
+    expect(profile.map((item) => item.id)).toEqual(["profile-rule", `profile-${identity.value.id}`]);
+    expect(profile[0]!.text).toBe(`Background about ${people.owner.displayName}. Use it only when it changes your answer; never mention or allude to it otherwise.`);
+    expect(profile[1]!.text).toBe(identityText);
+    expect(profile[1]!.at).toBe(identity.value.created_at);
+    expect(profile.some((item) => /nova|daughter|this week/i.test(item.text))).toBe(false);
+    const memory = output.items.filter((item) => item.source === "memory");
+    expect(memory.some((item) => /nova|daughter/i.test(item.text))).toBe(false);
+    // MEM-AUDIT-05: the trace names the card line and nothing about the child.
+    expect(output.memoryTrace?.profile).toEqual([identity.value.id]);
+    expect(output.memoryTrace?.injected.map((m) => m.id)).not.toContain(child.value.id);
+  });
+
+  // MEM-AUDIT-03: the injected line says whom the fact is about.
+  test("a recalled person-scope fact carries the speaker as its about-name; a household one says the household", async () => {
+    const own = "Sage keeps the spare house key in the lockbox by the garage";
+    const shared = "the household spare house key code for the lockbox is on the fridge";
+    const a = remember(people.owner, { text: own, category: "fact", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.5 });
+    const b = remember(people.owner, { text: shared, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+    if (!a.ok || !b.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(a.value.id, own);
+    await embedMemoryRecordSafely(b.value.id, shared);
+    const { output } = await contextNode(stateFor(people.owner), { utterance: "where is the spare house key for the lockbox" }, SIGNAL);
+    const ownItem = output.items.find((item) => item.source === "memory" && item.text === own);
+    const sharedItem = output.items.find((item) => item.source === "memory" && item.text === shared);
+    expect(ownItem?.about).toBe(people.owner.displayName);
+    expect(sharedItem?.about).toBe("the household");
+    expect(output.memoryTrace?.injected.map((m) => m.id).sort()).toEqual([a.value.id, b.value.id].sort());
+    for (const m of output.memoryTrace?.injected ?? []) expect(m.score).toBeGreaterThanOrEqual(MEMORY_CONTEXT_MIN_SCORE);
   });
 
   test("caps at MAX_MEMORY_SNIPPETS (5) even when more than five records clear the floor", async () => {
@@ -237,40 +289,33 @@ describe("MEMORY-FLOOR-01: a weak match never becomes a context item, a pinned o
 
   // A review of the first cut of this floor caught it checking only
   // `record.pinned`, silently dropping a weak-cosine ENTITY match
-  // recall() itself force-included (`forceInclude = row.pinned ||
-  // isEntityMatch`, memory.ts) - the exact case a household member
-  // asking about a named entity relies on even when nothing specific
-  // is stored (memory.ts's own comment: "the model has to abstain on
-  // the attribute"). A second review pass then caught this test's own
-  // premise as false: on the keyword-fallback path (the only path
-  // reachable from contextNode in this file, per the comment above),
-  // isEntityMatch's own unconditional `score += 0.5` (memory.ts) means
-  // ANY keyword-fallback entity match scores at least 0.5 - already
-  // above MEMORY_CONTEXT_MIN_SCORE on its own, forceInclude or not - so
-  // "weak" is only constructible on the cosine path, which needs a real
-  // query vector contextNode has no test hook to control. This test
-  // therefore calls recall() directly with a hand-injected, genuinely
-  // negative cosine (injectVector, the same pattern memory.test.ts's own
-  // "a pinned record with a genuinely negative cosine score still
-  // surfaces" test already established for the pinned half of
-  // forceInclude - see that test's own comment for why cosine, unlike
-  // keyword overlap, can go negative at all), the one honest way to
-  // drive an entity match's real composite score below the floor.
-  test("a weak entity match still surfaces via recall()'s own forceInclude, not just a pinned one", () => {
+  // recall() itself force-included. MEM-AUDIT-03 (decision 6) then
+  // ended that override: the live hub pulled every fact about a named
+  // person on any message that said the name. An entity match now has
+  // to clear ENTITY_MIN_COSINE in recall() itself, so a genuinely weak
+  // one never reaches this floor at all, and one that does clear it
+  // arrives boosted, well above 0.1, as a plain (non-forced) match.
+  // The cosine is hand-injected (injectVector), the one honest way to
+  // drive an entity match's real similarity where this test needs it.
+  test("a weak entity match no longer surfaces by name alone; one at or above ENTITY_MIN_COSINE arrives boosted and clears the floor as a plain match", () => {
     const entity = remember(people.owner, { text: "Sprout: the family dog, a golden retriever", category: "thing", tier: "durable", scope: "household", source: "test", importance: 0.5, record_kind: "entity" });
     if (!entity.ok) throw new Error("setup failed");
-    const seeded = remember(people.owner, { text: "Sprout needs new dog tags engraved eventually", category: "event", tier: "episodic", scope: "household", source: "test", importance: 0 });
-    if (!seeded.ok) throw new Error("setup failed");
-    injectVector(seeded.value.id, [-1, 0, 0, 0]);
+    const weak = remember(people.owner, { text: "Sprout needs new dog tags engraved eventually", category: "event", tier: "episodic", scope: "household", source: "test", importance: 0 });
+    const near = remember(people.owner, { text: "Sprout gets a walk around the block after dinner", category: "fact", tier: "episodic", scope: "household", source: "test", importance: 0 });
+    if (!weak.ok || !near.ok) throw new Error("setup failed");
+    injectVector(weak.value.id, [-1, 0, 0, 0]);
+    injectVector(near.value.id, [0.5, Math.sqrt(0.75), 0, 0]);
 
     const matches = recall(people.owner, "Sprout", { bumpUsage: false, queryVector: { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" } });
-    const match = matches.find((m) => m.record.id === seeded.value.id);
+    expect(matches.find((m) => m.record.id === weak.value.id)).toBeUndefined();
+    const match = matches.find((m) => m.record.id === near.value.id);
     expect(match).toBeDefined();
-    expect(match!.score).toBeLessThan(MEMORY_CONTEXT_MIN_SCORE);
-    expect(match!.forceInclude).toBe(true);
+    expect(match!.forceInclude).toBeFalsy();
+    expect(match!.score).toBeGreaterThanOrEqual(MEMORY_CONTEXT_MIN_SCORE);
 
     const kept = matches.filter((m) => m.forceInclude || m.score >= MEMORY_CONTEXT_MIN_SCORE);
-    expect(kept.some((m) => m.record.id === seeded.value.id)).toBe(true);
+    expect(kept.map((m) => m.record.id)).toContain(near.value.id);
+    expect(kept.map((m) => m.record.id)).not.toContain(weak.value.id);
   });
 });
 
@@ -291,7 +336,8 @@ describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () 
       remember(people.owner, { text: PERSONAL, category: "fact", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.5 }),
       remember(people.owner, { text: SHARED, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, child_disclosure: "child_ok" }),
       remember(people.owner, { text: ADULTS_ONLY, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, child_disclosure: "adult_only" }),
-      remember(people.owner, { text: PROFILE, category: "identity", tier: "durable", scope: "person", person: people.owner.id, source: PROFILE_SOURCE, importance: 0.9, pinned: true }),
+      // MEM-AUDIT-01: a standing identity fact of the speaker's own is what the profile card shows.
+      remember(people.owner, { text: PROFILE, category: "identity", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.9, pinned: true }),
     ];
     const texts = [PERSONAL, SHARED, ADULTS_ONLY, PROFILE];
     for (const [i, row] of rows.entries()) {
@@ -328,14 +374,14 @@ describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () 
     await seedHousehold();
     const { output } = await contextNode(robotState({ person: people.owner.id, basis: "voice", level: "confirmed" }), { utterance: ASK }, SIGNAL);
     expect(texts(output.items, "memory")).toContain(PERSONAL);
-    expect(texts(output.items, "profile")).toEqual([PROFILE]);
+    expect(texts(output.items, "profile")).toContain(PROFILE);
   });
 
   test("a non-robot surface is unchanged, evidence or not", async () => {
     await seedHousehold();
     const { output } = await contextNode(withTurnDefaults({ actor: people.owner, surface: "chat", conversationId: "" } as TurnState), { utterance: ASK }, SIGNAL);
     expect(texts(output.items, "memory")).toContain(PERSONAL);
-    expect(texts(output.items, "profile")).toEqual([PROFILE]);
+    expect(texts(output.items, "profile")).toContain(PROFILE);
   });
 });
 

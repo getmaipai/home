@@ -7,7 +7,9 @@ Tell MaiPai a fact and it will hold onto it for later.
 
 - "remember that I take my medicine at 8am"
 - "remember I'm allergic to peanuts"
-- "remember that Friday is pizza night"
+- "make a note that Friday is pizza night"
+- "keep in mind that Nova goes to bed at eight"
+- "for future reference, the spare key is with the neighbor"
 
 Saves the fact to the household's memory so it can be recalled later.
 

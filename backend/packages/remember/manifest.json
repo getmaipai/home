@@ -5,7 +5,10 @@
   "category": "Utilities",
   "display": "Remember",
   "description": "Remember a fact you tell it, for later.",
-  "offer": {"mode":"base","priority":4},
+  "offer": {
+    "mode": "base",
+    "priority": 4
+  },
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -15,11 +18,26 @@
       "remember I'm allergic to peanuts",
       "please remember our wifi password is on the fridge",
       "remember that Friday is pizza night",
-      "can you remember I have a dentist appointment next week"
+      "can you remember I have a dentist appointment next week",
+      "make a note that Marlow is allergic to peanuts",
+      "keep in mind that Nova goes to bed at eight",
+      "for future reference, the spare key is with the neighbor"
     ],
     "patterns": [
       "remember that *",
+      "remember: *",
       "remember *",
+      "make a note that *",
+      "make a note of *",
+      "make a note *",
+      "note that *",
+      "note: *",
+      "keep in mind that *",
+      "keep in mind *",
+      "don't forget that *",
+      "dont forget that *",
+      "for future reference, *",
+      "for future reference *",
       "*, please remember it",
       "* please remember it",
       "*, please remember that",
@@ -30,21 +48,31 @@
   },
   "args": {
     "type": "object",
-    "required": ["fact"],
+    "required": [
+      "fact"
+    ],
     "properties": {
-      "fact": { "type": "string", "minLength": 1 }
+      "fact": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
   "incognito": "ephemeral",
   "requires": [],
   "optional": [],
-  "platforms": ["home", "bot"],
+  "platforms": [
+    "home",
+    "bot"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "full",
   "config": [],
   "data_sources": [],
-  "permissions": ["memory:write"],
+  "permissions": [
+    "memory:write"
+  ],
   "notifications": [],
   "backup": "hot",
   "background": false,

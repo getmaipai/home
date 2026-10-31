@@ -23,7 +23,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
 import { newConversationTurnId } from "@/lib/id";
 import { activeTurnCount } from "@/lib/turnActivity";
-import { remember, runMaintenance, PROFILE_SOURCE } from "@/lib/memory";
+import { remember, runMaintenance } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -508,7 +508,7 @@ function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: 
   const signal = classifyTurnSignal({ text: say, commandOpeners: commandOpeners(loadAllManifests()), ageBand: speakerAgeBand(actor, new Date()) });
   const safety = evaluateSafety(say, speakerAgeBand(actor, new Date()));
   const value: TurnValue = { reply: { text: reply }, source: "model", safety, conversation_id: conversationId, turn_id: turnId };
-  logTurn(actor, surface, say, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
+  logTurn(actor, surface, say, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal, say) });
   return { value, text: reply, timings: { firstDeltaMs: 0, firstSentenceMs: 0, totalMs: 0 }, error: null, interrupted: false, spokenCue: null };
 }
 
@@ -637,17 +637,21 @@ function seedRecords(conv: BenchConversation, owner: PersonRow, child: PersonRow
     const who = record.forChild ? child : owner;
     const subject = record.subject ? findEntityByName(who, record.subject)?.id : undefined;
     if (record.validToDaysAgo !== undefined) dated = true;
+    // MEM-AUDIT-01: a profile seed is a plain standing identity row (source
+    // "bench", durable, unpinned); the deterministic card reads it from the
+    // store like any other identity fact. The retired PROFILE_SOURCE
+    // paragraph rows are archived by consolidation and shown to nothing.
     const seeded = remember(who, {
       text: record.text,
-      category: record.category,
+      category: record.asProfile ? "identity" : record.category,
       tier: "durable",
       scope: record.scope,
       person: record.scope === "person" ? who.id : undefined,
       subject_id: subject,
       valid_to: record.validToDaysAgo === undefined ? undefined : new Date(Date.now() - record.validToDaysAgo * 86_400_000).toISOString(),
-      source: record.asProfile ? PROFILE_SOURCE : `bench:${conv.id}`,
+      source: record.asProfile ? "bench" : `bench:${conv.id}`,
       importance: 0.9,
-      pinned: record.asProfile ?? false,
+      pinned: false,
       child_disclosure: record.disclosure ?? undefined,
       sensitive: record.sensitive ?? false,
     });

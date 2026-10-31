@@ -371,11 +371,12 @@ export interface BenchSeedRecord {
   validToDaysAgo?: number;
   /** NAT-07a: seed the record for the bench child instead of the owner (person scope only). */
   forChild?: boolean;
-  /** MEMORY-RELEVANCE-01: seed this as the consolidated profile record
-   * (memory.ts's own PROFILE_SOURCE) instead of an ordinary bench
-   * memory - the one way a replay row can test what the profile line
-   * itself (getProfileParagraph(), injected every turn) puts in front
-   * of the model, as distinct from an ordinary recalled memory. */
+  /** MEM-AUDIT-01: seed this as a standing identity row (category
+   * `identity`, durable, source "bench") so the deterministic profile card
+   * (lib/memoryProfile.ts, buildProfileCard, in the stable prefix on every
+   * turn) carries it, as distinct from an ordinary recalled memory gated by
+   * the cosine floor. The retired profile paragraph (PROFILE_SOURCE) is
+   * no longer seeded or read. */
   asProfile?: boolean;
 }
 

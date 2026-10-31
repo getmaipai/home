@@ -2,7 +2,7 @@
 // 12's own (parts 4 and 6), roster names only.
 import { describe, expect, test } from "bun:test";
 import { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
-import { classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, EVERYDAY_IMPERATIVES, type SignalInput } from "@/lib/turnSignal";
+import { classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, EVERYDAY_IMPERATIVES, JUDGE_MIN_WORDS, type SignalInput } from "@/lib/turnSignal";
 import { utteranceShape } from "@/lib/utteranceShape";
 
 const openers = new Set(["add", "set", "remind", "play", "turn", "remember", "forget"]);
@@ -76,13 +76,13 @@ describe("ACT-01: the act", () => {
     expect([no.primary_act, no.source, no.repair]).toEqual(["directive", "protocol", "retraction"]);
     const value = signal("oat milk", { protocol: { kind: "ask", answer: "value" } });
     expect([value.primary_act, value.source]).toEqual(["directive", "protocol"]);
-    expect(hasEligibleClause(yes)).toBe(false);
+    expect(hasEligibleClause(yes, "yes")).toBe(false);
   });
 
   test("the fallback: empty text is an inform with unknown clauses", () => {
     const empty = signal("   ");
     expect([empty.primary_act, empty.source, empty.clauses[0]!.stance]).toEqual(["inform", "fallback", "unknown"]);
-    expect(hasEligibleClause(empty)).toBe(false);
+    expect(hasEligibleClause(empty, "   ")).toBe(false);
     expect(fallbackSignal("x", "child").age_band).toBe("child");
   });
 });
@@ -140,12 +140,19 @@ describe("ACT-01: the clauses, their stance and their subject", () => {
     expect(clauses("we're getting a new puppy")).toEqual(["inform:asserted:household"]);
   });
 
-  test("eligibility: only an asserted or reported inform or commissive clause", () => {
-    for (const text of ["I prefer quiet films", "I'll call the dentist tomorrow", "add oat milk, and I prefer that brand", "my sister Nadia says she hates cilantro", "the dishwasher is broken again"]) {
-      expect([text, hasEligibleClause(signal(text))]).toEqual([text, true]);
+  // MEM-AUDIT-02 (decision 4): the turn gate judges every turn of three or more
+  // words that is not only greeting, closing or backchannel clauses. A question
+  // and a directive carry facts and instructions ("whose my daughter Nova's
+  // boyfriend", "stop saying that please"); a three-word statement ("I hate
+  // cilantro", "I like tea") is the shortest fact people state about
+  // themselves; the clause rule still decides the citation inside the judge.
+  test("eligibility: three or more words, unless the turn is only greeting, closing or backchannel clauses", () => {
+    expect(JUDGE_MIN_WORDS).toBe(3);
+    for (const text of ["I prefer quiet films", "I'll call the dentist tomorrow", "add oat milk, and I prefer that brand", "my sister Nadia says she hates cilantro", "the dishwasher is broken again", "does Pippa prefer quiet films", "add oat milk to the list", "whose my daughter Nova's boyfriend", "stop saying that please", "if I lived in Paris I'd walk everywhere", "Quill said, 'I hate seltzer'", "I like tea", "I hate cilantro", "stop saying that"]) {
+      expect([text, hasEligibleClause(signal(text), text)]).toEqual([text, true]);
     }
-    for (const text of ["does Pippa prefer quiet films", "add oat milk to the list", "thanks, that's all tonight", "if I lived in Paris I'd walk everywhere", "ha, I'm basically a professional chef now", "ok", "good morning", "Quill said, 'I hate seltzer'"]) {
-      expect([text, hasEligibleClause(signal(text))]).toEqual([text, false]);
+    for (const text of ["thanks, that's all tonight", "ok", "good morning", "hey there, good morning everyone", "so tired", "stop that", "   "]) {
+      expect([text, hasEligibleClause(signal(text), text)]).toEqual([text, false]);
     }
   });
 
