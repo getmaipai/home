@@ -1,4 +1,5 @@
 # Companions: many per person, one shared chat, presence across the app (2026-10-24)
+> Status (2026-10-31): superseded in part by [companion-three-screens-2026-10-28.md](companion-three-screens-2026-10-28.md): the four-tab editor and four-tab detail.
 
 > **Superseded in part (Jesse, 2026-10-26, [companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) sections 3 and 6):** every reply carries a 28px face (not a marker only on change), and decision 13.6 is reversed: each reply's portrait is kept per look version. The rest stands.
 

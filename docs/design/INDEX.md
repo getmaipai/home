@@ -25,6 +25,43 @@ and a proposed design; otherwise the household IP gets blocked.
 
 | Record | Status | Owner row(s) in `docs/BACKLOG.md` |
 |---|---|---|
+| [DESIGN-chat-memory-yields-to-generators-2026-10-27.md](DESIGN-chat-memory-yields-to-generators-2026-10-27.md) | owner-approved 2026-10-27; video jobs only | RULES.md rule 4 owner decision |
+| [tier-evals-2026-10-30/](tier-evals-2026-10-30/) | raw evaluation data | TIER-EVAL-01 to -08 |
+| [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md) | owner ruling | adult-content-model-decides (RULES.md rule 10) |
+| [alarm-ring-2026-10-30.md](alarm-ring-2026-10-30.md) | design; remaining slices open | Alarm and Reminders rows |
+| [ambient-companion-2026-10-27.md](ambient-companion-2026-10-27.md) | owner ruling (RULES.md S2) | ambient companion ruling |
+| [auto-close-apps-2026-10-30.md](auto-close-apps-2026-10-30.md) | proposed, not decided, not built | MEM-SPACE-07 to -12 |
+| [chat-cards-2026-10-18.md](chat-cards-2026-10-18.md) | design and audit only; nothing built | chat cards rows |
+| [chat-engine-comparison-2026-10-17.md](chat-engine-comparison-2026-10-17.md) | built on Stack side | ENGINE-MLX-01 |
+| [clock-and-reminders-redesign-2026-10-30.md](clock-and-reminders-redesign-2026-10-30.md) | design from owner mockups | Clock and Reminders rows |
+| [coding-mode-2026-10-22.md](coding-mode-2026-10-22.md) | retired by TIER-HOME-05; readiness and rollback design reused | MODE-* superseded by TIER-HOME-05 |
+| [companions-dots-look-2026-10-25.md](companions-dots-look-2026-10-25.md) | partly superseded; Look and States restyle superseded by companion-three-screens | COMPANIONS-DOTS-01 |
+| [dynamic-companions-2026-10-21.md](dynamic-companions-2026-10-21.md) | owner ruling (RULES.md) | RULES.md decision |
+| [form-in-chat-2026-10-25.md](form-in-chat-2026-10-25.md) | design only; no schema or code | PKG-ASK-01, PKG-RESULT-01, FORM-CHAT-* |
+| [home-layouts-2026-10-25.md](home-layouts-2026-10-25.md) | proposed; architect verdict pending | HOME-LAYOUT-01 |
+| [household-voices-2026-10-20.md](household-voices-2026-10-20.md) | owner ruling; design | VOICES-02 to -04 |
+| [image-engine-2026-10-17.md](image-engine-2026-10-17.md) | decision record; engine design not built | image engine slices |
+| [look-component-2026-10-22.md](look-component-2026-10-22.md) | owner approved R1; not built beyond measurements | LOOK-* rows |
+| [maipai-control-cli-2026-10-21.md](maipai-control-cli-2026-10-21.md) | design proposal | maipai CLI slices |
+| [making-space-2026-10-30.md](making-space-2026-10-30.md) | proposed, not decided, not built | MEM-SPACE-01 to -06 |
+| [media-detail-pages-2026-10-25.md](media-detail-pages-2026-10-25.md) | design; approved slices per note | MEDIA-DETAIL-* |
+| [memory-management-2026-10-25.md](memory-management-2026-10-25.md) | built except bench slices 10 and 13 | MEMMGMT-2026-10-25 |
+| [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) | partly superseded; child and teen protections stand | MODELS-CENSOR-01 to -05 |
+| [radio-and-podcasts-port-2026-10-27.md](radio-and-podcasts-port-2026-10-27.md) | port review; rebuild decisions in note | radio and Podcasts port slices |
+| [reliability-2026-10-17.md](reliability-2026-10-17.md) | design; work split across CANARY-01 and SELFHEAL-01 | CANARY-01, SELFHEAL-01 |
+| [resource-profiles-2026-10-30.md](resource-profiles-2026-10-30.md) | proposed, not decided, not built | resource profile slices |
+| [robot-companions-2026-10-21.md](robot-companions-2026-10-21.md) | partly superseded by dynamic-companions | robot companion slices |
+| [robot-face-color-and-night-2026-10-20.md](robot-face-color-and-night-2026-10-20.md) | design note; hub, spec and bot | robot face slices |
+| [robot-own-name-and-memory-2026-10-20.md](robot-own-name-and-memory-2026-10-20.md) | design note for spec, Home and bot | robot identity and memory slices |
+| [robot-vision-2026-10-21.md](robot-vision-2026-10-21.md) | owner ruling (RULES.md) | ROBOT-VISION-01, -02 |
+| [robots-switch-and-install-2026-10-20.md](robots-switch-and-install-2026-10-20.md) | design note; hub side | robot switch/install slices |
+| [safety-factual-references-2026-10-19.md](safety-factual-references-2026-10-19.md) | investigation only; no rule change | n/a |
+| [settings-layout-revamp-2026-10-22.md](settings-layout-revamp-2026-10-22.md) | partly superseded by RULES.md S1 and S4 (2026-10-23) | settings layout slices |
+| [splash-chat-01-2026-10-28.md](splash-chat-01-2026-10-28.md) | opt-in chat engine design | SPLASH-CHAT-01 |
+| [tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md) | evaluation results; see resource tiers | TIER-EVAL-01 to -08 |
+| [tier-families-and-options-2026-10-30.md](tier-families-and-options-2026-10-30.md) | proposed, not decided, not built | TIER-FAMILY-2026-10-30 |
+| [wake-word-ux-2026-10-27.md](wake-word-ux-2026-10-27.md) | owner ruling (RULES.md S2) | WAKEUX-01 |
+| [weather-advice-port-2026-10-27.md](weather-advice-port-2026-10-27.md) | port review; rebuild decisions in note | weather port slices |
 | [child-safety-text-2026-10-19.md](child-safety-text-2026-10-19.md) | built (S1 to S3); owner-approved 2026-10-19 | CSAM-TEXT-01 |
 | [content-policy-2026-10-18.md](content-policy-2026-10-18.md) | approved by the architect 2026-10-27; NAT-03 built (certainty bands, "agreeing web sources" = at least 2 distinct hosts), other slices not built | CONTENT-POLICY-01 to -05; LIKENESS-SIMPLIFY-01 |
 | [companion-speech-style-2026-10-25.md](companion-speech-style-2026-10-25.md) | proposed, design only; architect ruling in `data-scratch/architect/SPEECH-STYLE-2026-10-25.verdict` | SPEECH-STYLE-01 to -05 |

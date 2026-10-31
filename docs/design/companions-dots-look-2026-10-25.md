@@ -1,4 +1,5 @@
 # Companions: the dots look and feel (2026-10-25)
+> Status (2026-10-31): superseded in part by [companion-three-screens-2026-10-28.md](companion-three-screens-2026-10-28.md): the Look and States tab restyle.
 
 > **Superseded in part (Jesse, 2026-10-26, [companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) section 4):** the gallery, detail page and header follow the handoff mockup, not the round-character look. The Look and States tab restyle and the chat header still stand.
 

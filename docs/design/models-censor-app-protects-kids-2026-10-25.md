@@ -1,4 +1,5 @@
 # Models censor, the app filters only to protect kids (2026-10-25)
+> Status (2026-10-31): superseded in part by [RULES.md](RULES.md): adult-side limits (rule 10).
 
 Superseded on 2026-10-26 by [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md) for adult content blocks beyond CSAM. Child and teen protections and non-content security protections remain.
 

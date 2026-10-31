@@ -1,9 +1,9 @@
 # Wake word UX (2026-10-27)
 
-Decision record for WAKEUX-01. Owner-approved 2026-10-27 ("ok i agree with your design. build it"; on the corner thing: "should we combine the ear and companion always on thing so we have 1 thing", answered "Launcher shows listening").
+Decision record for WAKEUX-01. Owner-approved 2026-10-27 ("ok i agree with your design. build it"; on the corner thing: "should we combine the ear and companion always on thing so we have 1 thing", answered "The avatar shows listening").
 
 **Supersedes** the HANDSFREE-01 acceptance line "toggling it from the composer and from the settings page moves the one same value": the composer toggle is gone (it looked like the microphone button), and the one setting is switched in Settings > AI and models > Wake word and from the indicator's Turn off.
-**Supersedes** `companions-shared-chat-and-presence-2026-10-24.md` section 7 where it hides the launcher on Chat routes and shows no status: the launcher now shows the listening state on every page, Chat included (RULES S2).
+**Supersedes** `companions-shared-chat-and-presence-2026-10-24.md` section 7 where it hides the launcher on Chat routes and shows no status: the avatar now shows the listening state on every page, Chat included (RULES S2).
 
 ## What the person sees
 

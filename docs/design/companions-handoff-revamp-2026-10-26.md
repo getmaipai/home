@@ -1,4 +1,5 @@
 # Companions revamp: the 2026-10-26 design handoff
+> Status (2026-10-31): superseded in part by [ambient-companion-2026-10-27.md](ambient-companion-2026-10-27.md): the CompanionDock (RULES.md S2).
 
 Status: proposed, design only; architect has not ruled. Owner row: COMPANIONS-REVAMP-01 in `docs/BACKLOG.md`.
 Source: `MaiPai_Companions_Design_Handoff_2026-10-26.zip` (mockups and a handoff written for Jesse; not an audit of the code).

@@ -48,17 +48,18 @@ reason; its status is `being removed` and it points at its item in the ELEMENTS 
 | ED-015 | syntax-highlighter | None; the live `shiki-highlighter` is used | Prism duplicate of the live `shiki-highlighter`; principle 1 | Owner, 2026-10-06 (Q8) | Never while shiki ships | active exception |
 | ED-016 | terminal-block | None; kept in the gallery | Nothing streams command output | Owner, 2026-10-06 (Q8) | An update or backup run log | active exception |
 | ED-017 | edit-message, message-actions, message-branches, scroll-anchor (standalone demos) | None; the kit `Thread` renders the runtime forms (`EditComposer`, `AssistantActionBar`, `BranchPicker`, `ThreadScrollToBottom`) | `elements-adoption.json` verdict reasons: the standalone files are demos of jobs the adopted Thread already does (scroll-anchor ships a `setInterval` demo) | ELT-SCANNER-01 audit (2026-10-06) | None needed: the Element is used, through Thread | active exception |
-| ED-018 | data-table | `shell/components/DataTable.tsx` (12 callers, 240 lines) | The kit `data-table` is a fixed `ModelUsage` demo, not upstream's `{columns, rows, sort, formats, card view}` (master plan D05, D06) | Audit set D (2026-10-06) | Kit K02 refresh, then ELT-T1-13a to 13d, delete in 13d | removed |
-| ED-019 | comparison-card | `CompareCard`, `apps/settings/ModelsSection.tsx:227-296` | HOME-FIT-04's row names `comparison-card`; the kit lacked optional `recommendedId` and `reason` until K03 (ui-v0.5.116) | Audit set D (2026-10-06) | ELT-T1-10 | removed |
-| ED-020 | recommendation-card, spec-sheet | `FitPanel` and `DetailsFitPanel`, `apps/settings/ModelsSection.tsx` | HOME-FIT-03 landed with hand text where `recommendation-card` ships (audit set D) | Audit set D (2026-10-06) | ELT-T1-10 | removed |
-| ED-021 | model-picker | `ChatModelCard`, `CheckModelCard`, `PlannedRoleCard`, `apps/settings/ModelsSection.tsx` | HOME-FIT-02's row names `model-picker`; the kit needed `status`, `reason` and optional `price` (K03) | Audit set B (2026-10-06) | ELT-T1-10b | being removed |
-| ED-022 | task-card, background-inbox | `ChatActivityCard`, `apps/chat/ChatActivityCard.tsx` (Alert plus Progress rows) | Audit: the hand-built activity card is in the hand-built chat baseline; `/api/jobs` data exists for `TaskCard` | Master plan D06 (2026-10-06) | ELT-T1-11 | removed |
-| ED-023 | command-palette | Hand-drawn modal overlay, `apps/chat/ChatThreadExtras.tsx` | Audit set E: the kit ships `ui/dialog` for the overlay | Audit set E (2026-10-06) | ELT-PALETTE-01 | removed |
-| ED-024 | sources | `SourcesFooterContent`, `SourcesActionBarTrigger`, a synthetic `sources` tool part and `SourcesNoopRender`, `apps/chat/chatThreadSlots.tsx` | Audit set C D4: sources drawn by hand around Element parts because Home emits a tool part, not native `source` parts; `SourceIcon` defaults to a third-party favicon URL (D15) | Audit set C (2026-10-06) | ELT-T1-23 | removed |
-| ED-025 | artifact-card | A hand-built More menu beside the Element, `ProducedArtifactCard` in `apps/chat/chatToolUis.tsx` | The kit had no actions slot; K03 adds `actions?: ReactNode` (ui-v0.5.116) | Audit set D (2026-10-06) | Pin 0.5.116 or later, then delete the menu; ADOPT-02 | being removed |
-| ED-026 | tool-error | `TurnErrorDetails`, `shell/pages/TurnErrorDetails.tsx` (admin detail popover) | Audit set C D8: `tool-error` ships but required attempt counts and always drew Retry and Skip; K03 makes them optional | Audit set C (2026-10-06) | ADOPT-02 on pin 0.5.116 or later | being removed |
-| ED-027 | voice-conversation | Gear overlay drawn around the Element, `apps/chat/liveVoiceSession.tsx:245-269` | Kit had no `extra` slot; K03 adds `extra?: ReactNode` (ui-v0.5.116) | Audit set B (2026-10-06) | ELT-T1-12 | removed |
-| ED-028 | canvas-split | `className="rounded-none border-0 border-l md:h-full"` at `shell/pages/ChatPage.tsx:115` and the `ArtifactCanvasPanel`, `BareCompareCanvasPanel` wrappers | The shipped CanvasSplit defaults to a fixed `md:h-80` card; the kit lacked a pane variant, now `variant="pane"` in ui-v0.5.116 | Owner (Jesse found it), cleanup item 2 (2026-10-06) | ELT-T1-18: pin 0.5.116 or later, delete the className and wrappers | removed |
+| ED-018 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-019 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-020 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-021 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | being removed |
+| ED-022 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-023 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-024 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-025 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | being removed |
+| ED-026 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | being removed |
+| ED-027 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-028 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+
 | ED-029 | Composer family (composer, model-selector, composer attachments and menu) | The compact composer CSS block in `shell/tokens.css`, plus `ComposerModelSelector`, `ComposerAddMenuItem` and size classes in `apps/chat/composerAddMenu.tsx` | The kit composer had no compact density; ELT-COMPOSER-KIT-01 adds it in the kit (ui-v0.5.119 carries the label-only part) | Cleanup item 1 (2026-10-06) | ELT-COMPOSER-KIT-01, then pin | being removed |
 | ED-030 | Touch targets on composer and message actions | 44 to 48 px `::before` hit areas in `shell/pages/chatTouchTargets.css` | The kit has no hit-area token or variant; K03 adds `hitArea48` | Cleanup item 7 (2026-10-06) | Pin the kit hit-area prop, delete the CSS | being removed |
 | ED-031 | thread-list, thread-search, threadlist-sidebar | History column CSS in `shell/tokens.css`, `ThreadListRoot` classes, `ChatHistoryPanel` and `ChatColumnToggle`, `shell/pages/ChatColumn.tsx` | Kit thread list has no compact variant; the column shell is custom | Cleanup item 3; COLUMN-02 (2026-10-06) | ELT-T1-20 with a kit compact variant | being removed |
@@ -71,6 +72,7 @@ reason; its status is `being removed` and it points at its item in the ELEMENTS 
 | ED-038 | Dashboard, status, performance, people and page cards | `*Card` components returning `<Card>`, `CardHeader border-b border-border`, table row borders, tab and collapsible classes | NO REASON: to be removed. Baseline text only said "retire in the Elements program" | None recorded | Cleanup item 10 | being removed |
 | ED-039 | Small sweeps (shell menus, status, dev panel) | `Button w-fit`, `Checkbox mt-*`, `Separator my-1`, `Input w-*`, shell menu Buttons, `ElementsAdoptionPanel`, `ThemeToggle` | NO REASON: to be removed | None recorded | Cleanup item 11 | being removed |
 | ED-040 | Destructive button and badge in dark mode | Background rules in `shell/tokens.css` for `[data-variant="destructive"]` | NO REASON: to be removed; belongs in kit tokens | None recorded | Cleanup item 10 | being removed |
+
 
 ## Not in the baselines
 

@@ -1,4 +1,5 @@
 # Companion characters as pregenerated video (2026-10-21)
+> Status (2026-10-31): superseded in part by [companion-three-screens-2026-10-28.md](companion-three-screens-2026-10-28.md): section 12.2 (three tabs, teen editor later).
 
 > **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
 

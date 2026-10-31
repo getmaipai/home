@@ -1,4 +1,5 @@
 # Settings information architecture: one household page set a person can read (2026-10-18)
+> Status (2026-10-31): superseded in part by [RULES.md](RULES.md): S1 and S4 (2026-10-23), where they differ.
 
 Status: design and audit only, queued behind music (MUSIC-GEN) by the owner's one-thing-at-a-time rule. Nothing here is built.
 Priority inside the queue: first after music, because Jesse called the current page overwhelming. Owner words (Jesse, 2026-10-18,

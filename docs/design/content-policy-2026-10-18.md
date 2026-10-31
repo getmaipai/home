@@ -1,4 +1,5 @@
 # One content-protection definition per person
+> Status (2026-10-31): superseded in part by [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md): the adult path; child and teen protections stand.
 
 > **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limits described here: the adult absolute lines for real people and the real-voice song limit; the child and teen floors stand.
 

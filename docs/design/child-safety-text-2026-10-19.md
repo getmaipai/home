@@ -1,4 +1,5 @@
 # Child safety in chat text: depiction is refused, discussion is not (CSAM-TEXT-01)
+> Status (2026-10-31): superseded in part by [RULES.md](RULES.md): adult-side limits (rule 10).
 
 Date: 2026-10-19. Status: owner-approved (rule wording, section 9, approved 2026-10-19); S1 (spec 0.1.192) and S2 (hub) built, S3
 docs landed with this record. Owner: Jesse. This is the long-term record of the incident, the evidence, the research, the options weighed, the decision and
