@@ -144,6 +144,13 @@ for want in glob.glob(os.path.join(wdir, '*.want')):
 PY
 }
 
+# DISK-REMOVE-01: remove finished worktrees after a landing. Best effort: errors are logged, a landing never fails because of it.
+sweep_worktrees() {
+  [[ -f "$main/scripts/pipeline.sh" ]] || return 0
+  (cd "$main" && nice -n 10 bash scripts/pipeline.sh sweep >>"$data/lander.log" 2>&1) || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) worktree sweep failed; see above" >> "$data/lander.log"
+  return 0
+}
+
 # After the fast-forward, reinstall in backend and frontend when their package files moved, so scripts in the main checkout keep working across a pin bump. Never fails the landing: it is already on main.
 reinstall_main_dependencies() {
   local before="$1" changed d done_dirs=()
@@ -264,6 +271,7 @@ PY
     log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "already on origin/main"
     rm -f "$request" "$output"
     echo "landed: $branch at $sha (already on main)"
+    sweep_worktrees
     return 0
   fi
   origin_branch="$(git -C "$checkout" rev-parse --verify "origin/$branch" 2>/dev/null || true)"
@@ -363,6 +371,7 @@ PY
       rm -f "$request" "$output"
       echo "landed: $branch at $sha"
       update_main_checkout
+      sweep_worktrees
       return 0
     fi
     if (( attempt == 3 )); then break; fi

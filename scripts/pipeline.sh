@@ -286,9 +286,69 @@ PY
   echo "$line"
 }
 
+# sweep [--dry-run]: remove finished wt/* worktrees (DISK-REMOVE-01). A worktree goes only when all of these are proven:
+# branch tip is on origin/main, nothing uncommitted (ignored files aside), no process has it as cwd, no file changed
+# in the last 10 minutes. Anything unproven stays and gets one line in reaped.md. Never uses --force.
+has_landing_record() {
+  local slug="${1//\//-}"
+  grep -q '"status": *"landed"' "$data/notes/$slug.json" 2>/dev/null && return 0
+  grep -F "\"branch\": \"$1\"" "$data/landings.jsonl" 2>/dev/null | grep -q '"status": *"landed"'
+}
+
+sweep() {
+  local dry=0 sdir pdir reaped f name path branch real reason lsout="" lsrc=0 tip porcelain
+  [[ "${1:-}" == "--dry-run" ]] && dry=1
+  sdir="${MAIPAI_WT_DATA:-$main/data-scratch}/sessions"; pdir="${MAIPAI_WT_DATA:-$main/data-scratch}/ports"
+  reaped="${MAIPAI_WT_DATA:-$main/data-scratch}/reaped.md"
+  [[ -d "$sdir" ]] || return 0
+  lsout="$(lsof -d cwd -Fn 2>/dev/null)" || lsrc=$?
+  for f in "$sdir"/*.json; do
+    [[ -f "$f" ]] || continue
+    name="$(basename "$f" .json)"
+    IFS='|' read -r path branch < <(python3 - "$f" <<'PY'
+import json,sys
+try:
+ v=json.load(open(sys.argv[1])); print('%s|%s' % (v.get('path',''),v.get('branch','')))
+except Exception: print('|')
+PY
+)
+    [[ "$branch" == wt/* && -n "$path" ]] || continue
+    if [[ ! -e "$path/.git" ]]; then continue; fi
+    real="$(cd "$path" 2>/dev/null && pwd -P)" || continue
+    [[ "$real" != "$main" && "$real" != "$(cd "$main/.." && pwd -P)/home-lander" ]] || continue
+    reason=""
+    tip="$(git -C "$main" rev-parse --verify -q "refs/heads/$branch" 2>/dev/null || true)"
+    if [[ -z "$tip" ]]; then reason="branch ref not found"
+    elif ! git -C "$main" merge-base --is-ancestor "$tip" origin/main 2>/dev/null; then reason="branch has commits not on origin/main"
+    elif ! has_landing_record "$branch"; then reason="no landing record"
+    elif ! porcelain="$(git -C "$real" status --porcelain 2>/dev/null)"; then reason="git status failed"
+    elif [[ -n "$porcelain" ]]; then reason="uncommitted or untracked files"
+    elif [[ "$lsrc" != 0 && -z "$lsout" ]]; then reason="lsof failed, cannot rule out a running process"
+    elif printf '%s\n' "$lsout" | WT_P="$real" awk 'substr($0,1,1)=="n" {d=substr($0,2); p=ENVIRON["WT_P"]; if (d==p || index(d, p "/")==1) f=1} END {exit !f}'; then reason="a process has its working directory inside"
+    elif [[ -n "$(find "$real" \( -name node_modules -o -name .git \) -prune -o -type f -mmin -10 -print -quit 2>/dev/null)" ]]; then reason="a file changed within the last 10 minutes"
+    fi
+    if [[ -n "$reason" ]]; then
+      if (( dry )); then echo "keep $name: $reason"; else
+        grep -qF "| $name | $path | kept: $reason" "$reaped" 2>/dev/null || printf '%s | %s | %s | kept: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$name" "$path" "$reason" >> "$reaped"
+      fi
+      continue
+    fi
+    if (( dry )); then echo "would remove $name ($real)"; continue; fi
+    if git -C "$main" worktree remove "$real" >/dev/null 2>&1; then
+      git -C "$main" branch -d "$branch" >/dev/null 2>&1 || true
+      rm -f "$f" "$sdir/$name.beat"
+      find "$pdir" -type f -name '*.lease' -exec grep -lF "$name" {} \; -delete 2>/dev/null || true
+      echo "removed $name"
+    else
+      grep -qF "| $name | $path | kept: git worktree remove refused" "$reaped" 2>/dev/null || printf '%s | %s | %s | kept: git worktree remove refused\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$name" "$path" >> "$reaped"
+    fi
+  done
+}
+
 case "${1:-}" in
   status) status ;;
   wait) wait_cmd "$@" ;;
+  sweep) shift; sweep "$@" ;;
   install-service) install_service "$@" ;;
   uninstall-service) uninstall_service ;;
   start)
@@ -338,5 +398,5 @@ case "${1:-}" in
       *) error "usage: bash scripts/pipeline.sh stack off | on | status"; exit 2 ;;
     esac
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | start | stop | stack off|on|status | install-service [--load] | uninstall-service"; exit 2 ;;
+  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | start | stop | stack off|on|status | sweep [--dry-run] | install-service [--load] | uninstall-service"; exit 2 ;;
 esac
