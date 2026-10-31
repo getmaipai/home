@@ -312,8 +312,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
 | `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
-| `backend/src/lib/alarmCalls.ts` | alarmFoldFor, isAlarmActionCall, neutralizeReservedPrefix, parseAlarmCall |
-| `backend/src/lib/alarmChat.ts` | daysPhrase, handleAlarmChat |
+| `backend/src/lib/alarmCalls.ts` | alarmFoldFor, isAlarmActionCall, neutralizeReservedPrefix, reminderPayloadText, parseReminderPayload, parseAlarmCall |
+| `backend/src/lib/alarmChat.ts` | daysPhrase, whenText, jobLabel, handleAlarmChat |
 | `backend/src/lib/alarms.ts` | syncAlarmJob, listAlarms, createAlarm, updateAlarm, skipNext, deleteAlarm |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |
 | `backend/src/lib/almanacCompute.ts` | WEEKDAYS, parseDateQuestion, computeDateAnswer, dateRelation |
@@ -527,7 +527,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
 | `backend/src/lib/listActions.ts` | LIST_ACTIONS, runListAction |
-| `backend/src/lib/listResolver.ts` | resolveList, resolveItems, isListPronoun |
+| `backend/src/lib/listResolver.ts` | similarity, fuzzy, resolveList, resolveItems, isListPronoun |
 | `backend/src/lib/lists.ts` | listLists, getList, createList, findOrCreateStandingList, updateList, deleteList |
 | `backend/src/lib/liveView.ts` | LIVE_VIEW_MAX_MS, LIVE_VIEW_ATTACH_GRACE_MS, LIVE_VIEW_MAX_FRAME_BYTES, liveViewAdmits, getLiveView, startLiveView |
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |
@@ -719,6 +719,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/referenceSearch.ts` | searchReference |
 | `backend/src/lib/register.ts` | planFor, planLine, planLineForTurnMachine |
 | `backend/src/lib/relationships.ts` | createRelationship, listRelationships, calledAdminForOwnSettings, updateRelationship, promoteToStated, findRelationship |
+| `backend/src/lib/reminderActions.ts` | pendingReminders, resolveReminder, lastReminderIdFor, restoreReminder, rescheduleReminder, runReminderAction |
 | `backend/src/lib/reminderParsing.ts` | parseReminder, parseQuickAddReminder, parseAlarmRequest, parseTimerDuration |
 | `backend/src/lib/remoteStackSettings.ts` | REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY, ENGINE_WHERE_KEY, REMOTE_ENGINE_ADDRESS_ERROR, REMOTE_ENGINE_TAILNET_ERROR, REMOTE_ENGINE_TAILNET_DISABLE_ERROR |
 | `backend/src/lib/replyConstraints.ts` | parseReplyConstraint, setReplyConstraint, constraintsFor, bannedPhrasesFor, clearReplyConstraints |
