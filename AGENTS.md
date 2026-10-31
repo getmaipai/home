@@ -30,6 +30,7 @@ fast-forwards from origin first; a worktree leases a free 88xx port from `script
 Land with `bash scripts/land.sh` (pushes the branch to the lander's queue; the lander runs the 15 s static check and fast-forwards
 `main`; `wt.sh land` hands off to it). `bash scripts/pipeline.sh status | start | stop` shows the queue and the last landings
 and runs the lander (`scripts/lander.sh`, one per machine, warm checkout `../home-lander`).
+Never write sleep loops for a landing; use `bash scripts/land.sh wait` or `bash scripts/pipeline.sh wait <SHA|queue-empty|main-green|branch B>` (they block on a FIFO the lander rings; DISK-WAIT-01).
 The lander and watcher run from copies of `scripts/lander.sh` and `scripts/watcher.sh` taken from `origin/main` into `data-scratch/pipeline-bin/` and replace themselves between runs, so landing a change to them updates the daemons without touching the main checkout.
 Use `bash scripts/pipeline.sh install-service --load` only when Jesse approves enabling the reboot-resilient LaunchAgents; `bash scripts/land.sh --queue-anyway` explicitly queues while the lander is stopped, and safety-surface changes receive backend and frontend sharded tests before landing.
 `bash scripts/pin.sh commons <pkg>-vX.Y.Z | stack <sha> | bot <version>` edits every file a pin lives in, reinstalls, commits and lands it.

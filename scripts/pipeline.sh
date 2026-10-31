@@ -223,8 +223,72 @@ for line in sys.stdin:
   service_state com.maipai.watcher "$watch_pidfile" "$(service_plist watcher)"
 }
 
+# DISK-WAIT-01: block on a FIFO until a condition holds; the lander (ring_waiters) writes one line when it does. No loop, no sleep.
+wait_cmd() {
+  local kind="" a1="" tmo=3600 wdir="$data/waiters" line="" result=""
+  shift
+  while (($#)); do
+    case "$1" in
+      --timeout) (($# >= 2)) && [[ "$2" =~ ^[0-9]+$ ]] || { error "usage: bash scripts/pipeline.sh wait <landed SHA|queue-empty|main-green|branch BRANCH> [--timeout S]"; return 2; }; tmo="$2"; shift 2 ;;
+      queue-empty|main-green) kind="$1"; shift ;;
+      branch) (($# >= 2)) || { error "usage: wait branch BRANCH"; return 2; }; kind=branch; a1="$2"; shift 2 ;;
+      *) [[ "$1" =~ ^[0-9a-fA-F]{7,64}$ ]] || { error "unknown wait condition '$1'; use a commit SHA, queue-empty, main-green or branch BRANCH."; return 2; }; kind=sha; a1="$1"; shift ;;
+    esac
+  done
+  [[ -n "$kind" ]] || { error "usage: bash scripts/pipeline.sh wait <landed SHA|queue-empty|main-green|branch BRANCH> [--timeout S]"; return 2; }
+  mkdir -p "$wdir"
+  wait_fifo="$wdir/$$.fifo"; wait_want="$wdir/$$.want"; wait_timer=""
+  wait_cleanup() { if [[ -n "$wait_timer" ]]; then pkill -P "$wait_timer" 2>/dev/null || true; kill "$wait_timer" 2>/dev/null || true; wait_timer=""; fi; exec 3<&- 2>/dev/null || true; rm -f "$wait_fifo" "$wait_want"; }
+  trap wait_cleanup EXIT
+  trap 'exit 130' INT TERM HUP
+  rm -f "$wait_fifo"; mkfifo "$wait_fifo"
+  exec 3<>"$wait_fifo"
+  printf '%s\t%s\n' "$kind" "$a1" > "$wait_want"
+  # Already true: print and exit.
+  result="$(python3 - "$data" "$watch_data" "$kind" "$a1" <<'PY'
+import glob, json, os, sys
+data, watch, kind, a = sys.argv[1:]
+def rd(p):
+    try: return open(p).read().strip()
+    except OSError: return ''
+notes=[]
+for f in glob.glob(os.path.join(data, 'notes', '*.json')):
+    try: notes.append(json.load(open(f)))
+    except Exception: pass
+out=''
+if kind == 'sha':
+    for n in notes:
+        if str(n.get('sha','')).startswith(a) and n.get('status') == 'landed': out = 'landed ' + a
+    try:
+        for line in open(os.path.join(data, 'landings.jsonl')):
+            try: r = json.loads(line)
+            except Exception: continue
+            if str(r.get('sha','')).startswith(a) and r.get('status') == 'landed': out = 'landed ' + a
+    except OSError: pass
+elif kind == 'branch':
+    for n in notes:
+        if n.get('branch') == a: out = n.get('status', '')
+elif kind == 'queue-empty':
+    if not glob.glob(os.path.join(data, 'queue', '*.json')): out = 'queue empty'
+elif kind == 'main-green':
+    run = rd(os.path.join(watch, 'last-run'))
+    if run and run == rd(os.path.join(watch, 'last-green')): out = 'main green at ' + run[:7]
+print(out)
+PY
+)"
+  if [[ -z "$result" && "$kind" == sha ]] && git -C "$main" fetch -q origin main >/dev/null 2>&1 && git -C "$main" merge-base --is-ancestor "$a1" origin/main 2>/dev/null; then result="landed $a1 (on origin/main)"; fi
+  if [[ -n "$result" ]]; then echo "$result"; return 0; fi
+  if (( tmo == 0 )); then echo "pipeline.sh: timed out waiting for $kind $a1" >&2; return 2; fi
+  ( sleep "$tmo"; echo TIMEOUT >&3 ) &
+  wait_timer=$!
+  IFS= read -r line <&3 || true
+  if [[ "$line" == TIMEOUT || -z "$line" ]]; then echo "pipeline.sh: timed out waiting for $kind $a1; check the lander with: bash scripts/pipeline.sh status" >&2; return 2; fi
+  echo "$line"
+}
+
 case "${1:-}" in
   status) status ;;
+  wait) wait_cmd "$@" ;;
   install-service) install_service "$@" ;;
   uninstall-service) uninstall_service ;;
   start)
@@ -274,5 +338,5 @@ case "${1:-}" in
       *) error "usage: bash scripts/pipeline.sh stack off | on | status"; exit 2 ;;
     esac
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | start | stop | stack off|on|status | install-service [--load] | uninstall-service"; exit 2 ;;
+  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | start | stop | stack off|on|status | install-service [--load] | uninstall-service"; exit 2 ;;
 esac

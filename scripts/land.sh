@@ -38,12 +38,23 @@ git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 
 wait_note() {
-  local expected="$1" start now status last_fetch=0 last_progress=0 position total f queue_file="" result
+  local expected="$1" start now last_fetch=0 last_progress=0 position total f queue_file="" result line="" wdir="$data/waiters"
   queue_file="$(find "$data/queue" -maxdepth 1 -type f -name "*-$slug.json" -print | sort | tail -n 1)"
   start="$(date +%s)"
+  # Block on a FIFO the lander rings when a note is written; one background timer sends TICK every 60 s and TIMEOUT at the deadline. No polling loop.
+  mkdir -p "$wdir"
+  wait_fifo="$wdir/$$.fifo"; wait_want="$wdir/$$.want"
+  timer=""
+  wait_cleanup() { if [[ -n "$timer" ]]; then pkill -P "$timer" 2>/dev/null || true; kill "$timer" 2>/dev/null || true; timer=""; fi; exec 3<&- 2>/dev/null || true; rm -f "$wait_fifo" "$wait_want"; }
+  trap wait_cleanup EXIT
+  trap 'exit 130' INT TERM HUP
+  rm -f "$wait_fifo"; mkfifo "$wait_fifo"
+  exec 3<>"$wait_fifo"
+  printf 'note\t%s\t%s\n' "$branch" "$expected" > "$wait_want"
+  ( rem="$timeout_seconds"; while (( rem > 0 )); do s=60; (( rem < 60 )) && s="$rem"; sleep "$s"; rem=$(( rem - s )); (( rem > 0 )) && echo TICK >&3; done; echo TIMEOUT >&3 ) &
+  timer=$!
   while :; do
     if [[ -f "$note" ]]; then
-      local result
       result="$(python3 - "$note" "$branch" "$expected" <<'PY'
 import json, sys
 try:
@@ -71,7 +82,7 @@ PY
         return 0
       fi
     fi
-    if (( now - start >= timeout_seconds )); then
+    if [[ "$line" == TIMEOUT ]]; then
       echo "land.sh: timed out waiting; the note will appear at $note_md. Check the lander with: bash scripts/pipeline.sh status" >&2
       return 2
     fi
@@ -85,7 +96,8 @@ PY
       echo "waiting: position $position of $total in the queue, $((now - start))s so far"
       last_progress="$now"
     fi
-    sleep 1
+    line=""
+    IFS= read -r line <&3 || true
   done
 }
 

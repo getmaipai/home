@@ -68,6 +68,7 @@ PY
   } > "$md_tmp"
   mv -f "$json_tmp" "$json"
   mv -f "$md_tmp" "$md"
+  ring_waiters || true
 }
 
 log_line() {
@@ -75,6 +76,71 @@ log_line() {
 import json, sys
 with open(sys.argv[1], 'a') as f:
     f.write(json.dumps(dict(ts=sys.argv[2], branch=sys.argv[3], sha=sys.argv[4], main_sha=sys.argv[5], status=sys.argv[6], seconds=int(sys.argv[7]), reason=sys.argv[8])) + '\n')
+PY
+}
+
+# DISK-WAIT-01: wake every blocked waiter whose condition now holds. Waiters (land.sh wait, pipeline.sh wait) leave <pid>.want and <pid>.fifo in $data/waiters.
+# The write opens the FIFO non-blocking, so a waiter that went away never blocks the lander; files of dead pids are removed.
+ring_waiters() {
+  local wdir="$data/waiters"
+  [[ -d "$wdir" ]] || return 0
+  ls "$wdir"/*.want >/dev/null 2>&1 || return 0
+  python3 - "$wdir" "$data" "${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}" <<'PY' || true
+import glob, json, os, sys
+wdir, data, watch = sys.argv[1:]
+def notes():
+    for f in glob.glob(os.path.join(data, 'notes', '*.json')):
+        try: yield json.load(open(f))
+        except Exception: pass
+def rd(p):
+    try: return open(p).read().strip()
+    except OSError: return ''
+def holds(kind, a):
+    if kind == 'sha':
+        for n in notes():
+            if n.get('sha') == a[0] and n.get('status') == 'landed': return 'landed ' + a[0]
+        try:
+            for line in open(os.path.join(data, 'landings.jsonl')):
+                try: r = json.loads(line)
+                except Exception: continue
+                if r.get('sha') == a[0] and r.get('status') == 'landed': return 'landed ' + a[0]
+        except OSError: pass
+    elif kind == 'note':
+        for n in notes():
+            if n.get('branch') == a[0] and n.get('sha') == a[1]: return n.get('status', '')
+    elif kind == 'branch':
+        for n in notes():
+            if n.get('branch') == a[0]: return n.get('status', '')
+    elif kind == 'queue-empty':
+        if not glob.glob(os.path.join(data, 'queue', '*.json')): return 'queue empty'
+    elif kind == 'main-green':
+        run = rd(os.path.join(watch, 'last-run'))
+        if run and run == rd(os.path.join(watch, 'last-green')): return 'main green at ' + run[:7]
+    return ''
+for want in glob.glob(os.path.join(wdir, '*.want')):
+    base = want[:-5]; fifo = base + '.fifo'
+    try: pid = int(os.path.basename(base))
+    except ValueError: continue
+    alive = True
+    try: os.kill(pid, 0)
+    except ProcessLookupError: alive = False
+    except PermissionError: pass
+    if not alive:
+        for f in (want, fifo):
+            try: os.unlink(f)
+            except OSError: pass
+        continue
+    parts = rd(want).split('\t')
+    if not parts[0]: continue
+    msg = holds(parts[0], parts[1:])
+    if not msg: continue
+    try:
+        fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+    except OSError:
+        continue
+    try: os.write(fd, (msg + '\n').encode())
+    except OSError: pass
+    finally: os.close(fd)
 PY
 }
 
@@ -327,7 +393,7 @@ PY
 run_once() {
   local request
   request="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort | head -n 1)"
-  if [[ -z "$request" ]]; then return 0; fi
+  if [[ -z "$request" ]]; then ring_waiters || true; return 0; fi
   local oldest_branch oldest_slug newer newer_branch newest
   oldest_branch="$(python3 - "$request" <<'PY'
 import json,sys
@@ -364,6 +430,7 @@ PY
     if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer"; fi
   done
   run_one "$request"
+  ring_waiters || true
 }
 
 serve() {
@@ -393,6 +460,7 @@ serve() {
         exec bash "$bin/lander.sh" "$@"
       fi
     fi
+    ring_waiters || true
     run_once || echo "lander.sh: run-once failed; inspect the request and lander.log, then restart with bash scripts/pipeline.sh start." >&2
     if (( stop_requested )); then break; fi
     sleep "$poll" & sleep_pid=$!
