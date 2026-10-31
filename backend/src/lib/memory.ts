@@ -178,6 +178,7 @@ export interface RememberInput {
    * the text being stored. */
   precomputed_embedding?: { space: string; vector: readonly number[]; preprocess: string };
   device_id?: string | null;
+  created_by?: string | null;
 }
 
 export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult<MemoryRecord> {
@@ -200,6 +201,7 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     validTo: input.valid_to,
     precomputedEmbedding: input.precomputed_embedding,
     deviceId: input.device_id,
+    createdBy: input.created_by ?? actor.id,
   });
   if (!result.ok) return { ok: false, status: result.status, error: result.error };
   return { ok: true, value: toMemoryRecord(result.record) };

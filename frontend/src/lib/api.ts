@@ -429,6 +429,7 @@ export interface CompanionStateRun { state: "queued" | "running" | "done" | "fai
 export interface CompanionStateJob { state: "running" | "done" | "failed"; label: string; report?: { ok: boolean; reasons: string[]; seconds: number; bytes: { h264: number; av1: number | null }; colour_distance: number | null; area_ratio: number; loop_gap: number; opaque_share: { min: number; max: number } }; failure?: string }
 
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
+export type MemoryRecordWithProvenance = MemoryRecord & { created_by?: string | null };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
 // reachability, hand-typed to match backend/src/routes/devices.ts's
 // DeviceSchema.state.
