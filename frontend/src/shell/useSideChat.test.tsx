@@ -173,4 +173,32 @@ describe("useSideChat lifecycle", () => {
     expect(localStorage.getItem("maipai.ambient.side.person-1.companion-1")).toBeNull();
     expect(currentSide.runtime.thread.export().messages).toHaveLength(0);
   });
+
+  test("a call after 30 idle minutes starts with a fresh side conversation", async () => {
+    const oldId = "remembered-1";
+    localStorage.setItem("maipai.ambient.side.person-1.companion-1", oldId);
+    restoreApi(); stubTurns();
+    spyOn(api, "conversationList").mockResolvedValue([{ id: oldId, last_turn_at: new Date(Date.now() - 45 * 60_000).toISOString(), created_at: new Date(Date.now() - 60 * 60_000).toISOString() }] as never);
+    const create = spyOn(api, "createConversation").mockResolvedValue({ id: "fresh-1" } as never);
+    const { view } = mount(); currentView = view;
+    await waitFor(() => expect(currentSide.conversationId).toBe(oldId));
+    await act(async () => { await currentSide.prepareCall(); });
+    expect(currentSide.conversationId).toBeUndefined();
+    await act(async () => { expect(await currentSide.ensureConversationId()).toBe("fresh-1"); });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("maipai.ambient.side.person-1.companion-1")).toBe("fresh-1");
+  });
+
+  test("a call within 30 idle minutes keeps its side conversation", async () => {
+    const oldId = "remembered-1";
+    localStorage.setItem("maipai.ambient.side.person-1.companion-1", oldId);
+    restoreApi(); stubTurns();
+    spyOn(api, "conversationList").mockResolvedValue([{ id: oldId, last_turn_at: new Date(Date.now() - 10 * 60_000).toISOString(), created_at: new Date(Date.now() - 60 * 60_000).toISOString() }] as never);
+    const create = spyOn(api, "createConversation");
+    const { view } = mount(); currentView = view;
+    await waitFor(() => expect(currentSide.conversationId).toBe(oldId));
+    await act(async () => { await currentSide.prepareCall(); });
+    expect(currentSide.conversationId).toBe(oldId);
+    expect(create).not.toHaveBeenCalled();
+  });
 });

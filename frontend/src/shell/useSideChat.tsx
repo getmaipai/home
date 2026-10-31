@@ -13,6 +13,9 @@ import { api, type Roster } from "@/lib/api";
 import { INCOGNITO_DISCARDED_EVENT } from "@/shell/incognitoContext";
 import { useAmbientPageContext } from "@/shell/pageContext";
 
+/** Keep ambient voice calls aligned with backend SPOKEN_IDLE_NEW_CONVERSATION_MS. */
+export const SPOKEN_IDLE_NEW_CONVERSATION_MS = 30 * 60 * 1000;
+
 function rememberedKey(personId: string, companionId: string) { return `maipai.ambient.side.${personId}.${companionId}`; }
 function readRemembered(key: string) {
   try { return window.localStorage.getItem(key) || undefined; } catch { return undefined; }
@@ -164,6 +167,17 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
   }, [clear]);
 
   const newSideChat = useCallback(() => clear(true), [clear]);
+  const prepareCall = useCallback(async () => {
+    if (restorePromiseRef.current) await restorePromiseRef.current;
+    const id = conversationIdRef.current;
+    if (!id) return;
+    const generation = generationRef.current;
+    const rows = await api.conversationList(undefined, undefined, "include", "all");
+    if (generationRef.current !== generation || conversationIdRef.current !== id) return;
+    const row = rows.find((entry) => entry.id === id);
+    const lastActivity = row?.last_turn_at ?? row?.created_at;
+    if (lastActivity && Date.now() - Date.parse(lastActivity) >= SPOKEN_IDLE_NEW_CONVERSATION_MS) newSideChat();
+  }, [newSideChat]);
   const openConversation = useCallback(async (id: string) => {
     if (incognito) return false;
     const generation = generationRef.current + 1;
@@ -191,5 +205,5 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     return target;
   }, [newSideChat]);
   useEffect(() => { try { window.localStorage.setItem(`maipai.ambient.readaloud.${person.id}`, String(readAloud)); } catch { /* local storage may be unavailable */ } }, [person.id, readAloud]);
-  return { runtime, conversationId, newSideChat, openConversation, handOff, registerThreadActions, ensureConversationId: resolveConversationId, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, readAloud, setReadAloud, ttsAvailable, sttInstalled, callActive, setCallActive };
+  return { runtime, conversationId, newSideChat, prepareCall, openConversation, handOff, registerThreadActions, ensureConversationId: resolveConversationId, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, readAloud, setReadAloud, ttsAvailable, sttInstalled, callActive, setCallActive };
 }

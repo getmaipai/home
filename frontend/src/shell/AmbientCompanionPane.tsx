@@ -203,7 +203,9 @@ function StageBody({ person, personId, companionName, clips, still, registerCall
   }, idleCloseMs: wakeOpened ? WAKE_SESSION_IDLE_CLOSE_MS : null, turnSchedulerRef: side.turnSchedulerRef, liveVoiceActiveRef: side.liveVoiceActiveRef, pendingSpeechRef: side.pendingSpeechRef, activeTurnRef: side.activeTurnRef, cancelRun: aui.thread.cancelRun, voiceBargeIn: true, isSpeaking: side.isSpeaking, speakingEndedAt: side.speakingEndedAt, speechFailed: side.speechFailed });
   const statusReady = useChatAvailability() === "ready";
   const sttInstalled = side.sttInstalled;
-  const openCall = useCallback(() => { if (!statusReady || !sttInstalled) return; setWakeOpened(true); void requestMic(); }, [requestMic, statusReady, sttInstalled]);
+  const prepareCall = side.prepareCall;
+  // Issue 275: a call after 30 idle minutes starts a fresh chat; if that check fails the call still opens on the current one.
+  const openCall = useCallback(() => { if (!statusReady || !sttInstalled) return; void prepareCall().catch(() => undefined).then(() => { setWakeOpened(true); void requestMic(); }); }, [prepareCall, requestMic, statusReady, sttInstalled]);
   useEffect(() => { registerCall(openCall); return () => registerCall(null); }, [openCall, registerCall]);
   const signals = useCompanionSignals({ personId, messages: messages as never, running, jobRunning: false, jobWaiting: false, runningJobIds: new Set(), doneJobIds: new Set(), isSpeaking: side.isSpeaking || (voiceOpen && session.mode === "speaking"), listening: voiceOpen && session.mode === "listening" || dictating });
   const mode: StageMode = voiceOpen ? (session.mode === "listening" ? "listening" : session.mode === "speaking" ? "speaking" : "thinking") : signals.wanted.listening ? "listening" : signals.wanted.speaking ? "speaking" : signals.wanted.working ? "working" : signals.wanted.thinking ? "thinking" : "idle";
