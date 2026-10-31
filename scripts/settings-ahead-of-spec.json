@@ -12,5 +12,8 @@
   "notifications.timer.done.telegram",
   "alarms.sound",
   "alarms.volume",
-  "alarms.snooze_minutes"
+  "alarms.snooze_minutes",
+  "tools.remind.mode",
+  "tools.timer.mode",
+  "tools.lists.mode"
 ]

@@ -233,6 +233,16 @@ describe("policyNode: a manifest that fails validation is refused as manifest_in
   });
 });
 
+describe("policyNode: structured brake confirmation", () => {
+  test("an adult removal of more than five items parks confirm_needed", async () => {
+    const original = loadManifestOnly("remind");
+    if (!original.ok) throw new Error("remind manifest failed to load");
+    const state = { actor: { id: "adult-1", role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "move several things" } as unknown as TurnState;
+    const outcome = await policyNode(state, { calls: [{ id: "call-1", tool: "remind", args: { action: "move", itemCount: 6 } }] }, new AbortController().signal);
+    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "confirm_needed" });
+  });
+});
+
 // THIN-0D: a model-proposed recall for an unidentified robot speaker is
 // refused (the recall package reads the signed-in person's memories).
 describe("policyNode: THIN-0D, a recall proposal is refused for an unidentified robot speaker", () => {

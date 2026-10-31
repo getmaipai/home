@@ -966,6 +966,49 @@ describe("turnNext.ts: APPROVE-CARD-01, the confirm card's wire shape and its st
   });
 });
 
+describe("turnNext.ts: tool brake confirmations resume through existing paths", () => {
+  async function parkBrakeAsk() {
+    return withStub({
+      calls: (request) => request.tools?.some((t) => t.function.name === "remind") ? [{ id: "brake-1", name: "remind", args: JSON.stringify({ action: "move", itemCount: 6 }) }] : undefined,
+      reply: () => "unused",
+    }, () => runTurnNext(people.owner, "chat", "move six items"));
+  }
+  test("typed yes and a tap resume the parked brake ask", async () => {
+    for (const viaTap of [false, true]) {
+      const parked = await parkBrakeAsk();
+      if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(getPendingAsk(parked.value.conversation_id)?.turnId).toBe(parked.value.turn_id);
+      const resumed = await withStub({ reply: () => "done" }, () => runTurnNext(people.owner, "chat", "yes", {
+        conversationId: parked.value.conversation_id,
+        ...(viaTap ? { ask_answer: { turn_id: parked.value.turn_id, approved: true } } : {}),
+      }));
+      expect(resumed.ok).toBe(true);
+      if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected resumed result");
+      expect(resumed.value.plugin_id).toBe("remind");
+    }
+  });
+  test("a spoken yes resumes the ask and a stale tap remains 409", async () => {
+    const parked = await parkBrakeAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    const spoken = await withStub({ reply: () => "done" }, () => runTurnNext(people.owner, "chat", "yes", { conversationId: parked.value.conversation_id, spoken: true }));
+    expect(spoken.ok).toBe(true);
+    const another = await parkBrakeAsk();
+    if (!another.ok || another.kind !== "immediate") throw new Error("expected an immediate result");
+    const stale = await runTurnNext(people.owner, "chat", "yes", { conversationId: another.value.conversation_id, ask_answer: { turn_id: "old-turn", approved: true } });
+    expect(stale).toMatchObject({ ok: false, status: 409, code: "ask_stale" });
+  });
+  test("a child's yes cannot approve an adult-scope ask", async () => {
+    const parked = await parkBrakeAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    const childConversation = resolveOrCreateConversation(people.child, "chat");
+    if (!childConversation.ok) throw new Error("expected child's conversation");
+    setPendingAsk(childConversation.value.id, { kind: "confirm", prompt: "Change six items?", packageId: "remind", args: { action: "move", itemCount: 6 }, turnId: parked.value.turn_id, actorId: people.owner.id });
+    const result = await runTurnNext(people.child, "chat", "yes", { conversationId: childConversation.value.id });
+    expect(result).toMatchObject({ ok: false, status: 403, code: "ask_not_allowed" });
+    expect(getPendingAsk(parked.value.conversation_id)?.turnId).toBe(parked.value.turn_id);
+  });
+});
+
 describe("turnNext.ts: PROJECT-REPLY-01, a resumed start_project confirmation surfaces its own outcome text (live incident 2026-09-27)", () => {
   // Jesse confirmed a real start_project ask with "yes" and got back a
   // bare "Yes." instead of anything about the project that actually
