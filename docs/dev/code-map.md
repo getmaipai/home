@@ -595,8 +595,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
-| `backend/src/lib/modelDownload.ts` | sha256OfFile, downloadUrl |
-| `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, startSelectJob |
+| `backend/src/lib/modelDownload.ts` | sweepStaleDownloads, sha256OfFile, downloadUrl |
+| `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, plainMusicFailure, prepareStemsJob, startMusicJob, cancelMusicJob, resumeMusicJobs |
