@@ -1698,6 +1698,7 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
     surface: row.surface,
     placement: row.placement as ConversationSummary["placement"],
     companion_id: row.companionId,
+    device_id: row.deviceId ?? null,
     title: row.title,
     pinned: row.pinned,
     archived: row.archived,

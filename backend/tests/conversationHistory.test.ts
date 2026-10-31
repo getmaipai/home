@@ -2282,6 +2282,23 @@ describe("PATCH /api/conversations/:id settings", () => {
     expect(mismatch.status).toBe(400);
     expect(await mismatch.json()).toEqual({ error: "That is not this robot's companion." });
   });
+
+  test("conversation list returns device_id for side chats and null when absent", async () => {
+    const { client, actor } = await owner();
+    const robot = issueDeviceToken(actor.id, "robot", "Rover").deviceId;
+    setValue(actor, `device:${robot}`, "robot.controls", "adult");
+    setValue(actor, `device:${robot}`, "robot.companion.id", "rivet");
+    const withDevice = await client.post("/api/conversations", { placement: "side", companion_id: "rivet", device_id: robot });
+    expect(withDevice.status).toBe(201);
+    const withDeviceConversation = await withDevice.json() as { id: string };
+    const withoutDevice = await client.post("/api/conversations", { placement: "side", companion_id: "rivet" });
+    expect(withoutDevice.status).toBe(201);
+    const withoutDeviceConversation = await withoutDevice.json() as { id: string };
+
+    const rows = await (await client.get("/api/conversations?placement=all")).json() as Array<{ id: string; device_id?: string | null }>;
+    expect(rows.find((row) => row.id === withDeviceConversation.id)?.device_id).toBe(robot);
+    expect(rows.find((row) => row.id === withoutDeviceConversation.id)?.device_id).toBeNull();
+  });
 });
 
 describe("resolveOrCreateConversation() surface check (step 3, code review 2026-09-05)", () => {
