@@ -454,7 +454,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/genLive.ts` | getLive, clearLive, __clearLiveForTests, previewVersionOf, updateLive, liveCardFields |
 | `backend/src/lib/generationFailure.ts` | classifyGenerationFailure, RETRY_BACKOFF_MS |
 | `backend/src/lib/grants.ts` | grantActionClassificationIsComplete, createGrant, listGrants, revokeGrant, isGrantActive, personIsGranted |
-| `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, OBJECTION_RE, isObjectionTurn |
+| `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, trimClosers, OBJECTION_RE |
 | `backend/src/lib/healthSnapshot.ts` | __resetChatPauseTrackingForTests, collectHealth |
 | `backend/src/lib/hlc.ts` | nextHlc, seedHlc, __resetHlcForTests, HLC_BEARING_TABLES, seedHlcFromDatabase |
 | `backend/src/lib/homeCardQueries.ts` | isFixedHomeCardQuery |
@@ -956,7 +956,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, hoursOf, outlookLine, factualLine, summaryFor |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs |
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
-| `backend/src/lib/wellFormed.ts` | visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit, flushThinkSplit |
+| `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, orderHomeCards, getWidgetData |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_ID, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
