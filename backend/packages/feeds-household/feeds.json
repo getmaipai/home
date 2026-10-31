@@ -659,15 +659,6 @@
       ]
     },
     {
-      "url": "https://hnrss.org/frontpage",
-      "title": "Hacker News",
-      "publisher": "Hacker News",
-      "lang": "en",
-      "topics_hint": [
-        "technology"
-      ]
-    },
-    {
       "url": "https://www.theregister.com/headlines.atom",
       "title": "The Register",
       "publisher": "The Register",
@@ -689,15 +680,6 @@
       "url": "https://www.tomsguide.com/feeds/all",
       "title": "Tom's Guide",
       "publisher": "Tom's Guide",
-      "lang": "en",
-      "topics_hint": [
-        "technology"
-      ]
-    },
-    {
-      "url": "https://rss.slashdot.org/Slashdot/slashdotMain",
-      "title": "Slashdot",
-      "publisher": "Slashdot",
       "lang": "en",
       "topics_hint": [
         "technology"

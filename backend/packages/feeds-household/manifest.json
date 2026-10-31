@@ -1,6 +1,6 @@
 {
   "id": "feeds-household",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "kind": "module",
   "category": "Info",
   "display": "Household news feeds",
@@ -236,15 +236,6 @@
       "retention": "unknown, see the publisher's own policy"
     },
     {
-      "id": "feed-hnrss-org",
-      "destination": "hnrss.org's own public news feed (hnrss.org)",
-      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
-      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
-      "who": "Hacker News",
-      "opt_in": true,
-      "retention": "unknown, see the publisher's own policy"
-    },
-    {
       "id": "feed-mashable-com",
       "destination": "mashable.com's own public news feed (mashable.com)",
       "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
@@ -286,15 +277,6 @@
       "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
       "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
       "who": "The New York Times",
-      "opt_in": true,
-      "retention": "unknown, see the publisher's own policy"
-    },
-    {
-      "id": "feed-rss-slashdot-org",
-      "destination": "rss.slashdot.org's own public news feed (rss.slashdot.org)",
-      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
-      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
-      "who": "Slashdot",
       "opt_in": true,
       "retention": "unknown, see the publisher's own policy"
     },
@@ -630,13 +612,11 @@
     "net:feeds.skynews.com",
     "net:fortune.com",
     "net:gizmodo.com",
-    "net:hnrss.org",
     "net:mashable.com",
     "net:moxie.foxnews.com",
     "net:phys.org",
     "net:rss.dw.com",
     "net:rss.nytimes.com",
-    "net:rss.slashdot.org",
     "net:search.cnbc.com",
     "net:seekingalpha.com",
     "net:sports.yahoo.com",

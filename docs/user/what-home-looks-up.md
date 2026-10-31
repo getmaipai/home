@@ -52,7 +52,6 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 - France 24
 - Gizmodo
 - Grist
-- Hacker News
 - Inc.
 - Los Angeles Times
 - MacRumors
@@ -72,7 +71,6 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 - ScienceDaily
 - Seeking Alpha
 - Sky News
-- Slashdot
 - Smithsonian
 - Space.com
 - Sports Illustrated

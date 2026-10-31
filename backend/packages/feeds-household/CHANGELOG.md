@@ -2,6 +2,12 @@
 
 All notable changes to the Household news feeds package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.5.1] - 2026-10-31
+
+### Removed
+
+- Hacker News and Slashdot feeds because their story content, images, icons, or feed access are unreliable.
+
 ## [0.5.0] - 2026-10-18
 
 ### Added
