@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import * as fixtures from "./tests/watcherFixtures";
-const { roots, git, fixture, run } = fixtures.createWatcherFixtures();
+const { roots, git, fixture, run, records } = fixtures.createWatcherFixtures();
 
 describe("watcher suite scheduling", () => {
   test("runs legs in order, continues after a failure, and defaults to 8/10/12 shards", () => {
@@ -95,6 +95,49 @@ describe("watcher suite scheduling", () => {
       expect(existsSync(join(f.data, "watcher.log"))).toBe(false);
     }
   }, 60_000);
+
+  test("stalls a leg that exceeds its watchdog without red or green side effects", () => {
+    const f = fixture();
+    const bin = join(f.scratch, "fake-bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "bun"), "#!/usr/bin/env bash\nsleep 30\n");
+    chmodSync(join(bin, "bun"), 0o755);
+    const result = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      PATH: bin + ":" + (process.env.PATH ?? ""),
+      MAIPAI_WATCH_SUITE_CMD: "",
+      MAIPAI_WATCH_LEGS: "backend",
+      MAIPAI_WATCH_LEG_MAX_SECONDS: "2",
+    });
+    const sha = git(f.warm, "rev-parse", "origin/main");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`stalled at ${sha.slice(0, 7)}: leg backend timed out`);
+    expect(records(f).at(-1).result).toBe("stalled");
+    expect(readFileSync(join(f.data, "last-run"), "utf8").trim()).toBe(sha);
+    expect(existsSync(join(f.data, "reds", `${sha}.md`))).toBe(false);
+    expect(existsSync(join(f.data, "green", sha))).toBe(false);
+    expect(existsSync(join(f.scratch, "issue.calls"))).toBe(false);
+  }, 20_000);
+
+  test("ignores a queued lander after its configurable busy window", () => {
+    const f = fixture();
+    const queue = join(f.env.MAIPAI_LAND_DATA!, "queue");
+    mkdirSync(queue, { recursive: true });
+    writeFileSync(join(queue, "pending.json"), "{}\n");
+    const count = join(f.scratch, "cpu.calls");
+    const started = Date.now();
+    const result = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      MAIPAI_WATCH_QUIET_MAX_SECONDS: "5",
+      MAIPAI_WATCH_LANDER_BUSY_SECONDS: "1",
+      MAIPAI_WATCH_QUIET_POLL_SECONDS: "1",
+      MAIPAI_WATCH_CPU_CMD: `n=0; [[ ! -f '${count}' ]] || n=$(cat '${count}'); n=$((n+1)); echo $n > '${count}'; echo 0`,
+      MAIPAI_WATCH_FREE_GB_CMD: "echo 100",
+    });
+    expect(result.status).toBe(0);
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("waiting: lander busy");
+  }, 10_000);
 });
 
 afterAll(() => {

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # MAIPAI_WATCH_LEGS selects real sharder legs; they run scripts, backend, frontend.
 # Quiet check sums CPU used by suite-related processes; MAIPAI_WATCH_MAX_CPU defaults to 200.
+# Bounds: MAIPAI_WATCH_QUIET_MAX_SECONDS=300, MAIPAI_WATCH_LANDER_BUSY_SECONDS=120,
+# MAIPAI_WATCH_LEG_MAX_SECONDS=1500, MAIPAI_WATCH_BISECT_MAX_SECONDS=600,
+# MAIPAI_WATCH_BISECT_CANDIDATES=4, MAIPAI_WATCH_BISECT_RERUNS=1.
 # Worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=10,
 # MAIPAI_WATCH_FRONTEND_SHARDS=12, MAIPAI_WATCH_SCRIPTS_SHARDS=8.
 set -euo pipefail
@@ -84,7 +87,7 @@ run_suite() {
   if [[ -n "$command" ]]; then
     (cd "$checkout" && bash -c "$command") >"$output" 2>&1
   else
-    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds wait_rc
+    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds wait_rc timed_out leg_limit
     local requested configured="${MAIPAI_WATCH_LEGS:-backend frontend scripts}"
     local -a requested_legs=() legs=()
     read -r -a requested_legs <<< "$configured"
@@ -106,32 +109,41 @@ run_suite() {
         frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-12}"; root=. ;;
         scripts) shards="${MAIPAI_WATCH_SCRIPTS_SHARDS:-8}"; root=. ;;
       esac
-      (
-        local_started="$(date +%s)"
-        if (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && nice -n 10 bun scripts/gate/shardTests.ts --dir "$leg" --root "$root" --shards "$shards"); then
-          leg_rc=0
-        else
-          leg_rc=$?
-        fi
-        leg_seconds=$(( $(date +%s) - local_started ))
-        printf '%s %s\n' "$leg_rc" "$leg_seconds" > "$leg_status"
-        exit "$leg_rc"
-      ) >"$leg_output" 2>&1 &
-      if wait "$!"; then wait_rc=0; else wait_rc=$?; rc=1; fi
+      leg_limit="${MAIPAI_WATCH_LEG_MAX_SECONDS:-1500}"
+      [[ "$leg_limit" =~ ^[0-9]+$ ]] || leg_limit=1500
+      timed_out=""
+      local_started="$(date +%s)"
+      (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && exec perl -e 'setpgrp(0, 0); exec @ARGV' -- bash -c 'started=$(date +%s); nice -n 10 bun scripts/gate/shardTests.ts --dir "$1" --root "$2" --shards "$3"; rc=$?; printf "%s %s\n" "$rc" "$(( $(date +%s) - started ))" > "$4"; exit "$rc"' _ "$leg" "$root" "$shards" "$leg_status") >"$leg_output" 2>&1 &
+      leg_pid=$!
+      if (( leg_limit > 0 )); then
+        ( sleep "$leg_limit"; if kill -0 "$leg_pid" 2>/dev/null; then : > "$leg_status.timeout"; kill -TERM -"$leg_pid" 2>/dev/null || true; sleep 10; kill -KILL -"$leg_pid" 2>/dev/null || true; fi ) &
+        watchdog_pid=$!
+        if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; rc=1; fi
+        pkill -P "$watchdog_pid" 2>/dev/null || true
+        kill "$watchdog_pid" 2>/dev/null || true
+        wait "$watchdog_pid" 2>/dev/null || true
+      else
+        if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; rc=1; fi
+      fi
+      if [[ -e "$leg_status.timeout" ]]; then
+        printf '124 %s timed_out\n' "$(( $(date +%s) - local_started ))" > "$leg_status"
+        printf '== leg: %s (exit 124, timed out after %s s)\n' "$leg" "$leg_limit" >> "$output"
+      fi
       leg_output="$output.$leg"
       leg_status="$output.$leg.status"
-      if [[ -s "$leg_status" ]] && read -r leg_rc leg_seconds < "$leg_status"; then
+      if [[ -s "$leg_status" ]] && read -r leg_rc leg_seconds timed_out < "$leg_status"; then
         :
       else
         leg_rc=137
         leg_seconds=0
       fi
-      printf '== leg: %s (exit %s, %s s)\n' "$leg" "$leg_rc" "$leg_seconds" >> "$output"
+      if [[ "$timed_out" == timed_out ]]; then :
+      else printf '== leg: %s (exit %s, %s s)\n' "$leg" "$leg_rc" "$leg_seconds" >> "$output"; fi
       if [[ "$leg_rc" -eq 137 && ! -s "$leg_status" ]]; then
         printf 'shard: failing files: unknown\n' >> "$output"
       fi
       cat "$leg_output" >> "$output"
-      rm -f "$leg_output" "$leg_status"
+      rm -f "$leg_output" "$leg_status" "$leg_status.timeout"
       (( leg_rc == 0 )) || rc=1
     done
     return "$rc"
@@ -164,21 +176,20 @@ failing_files() {
 
 rerun_file() {
   local file="$1" command="${MAIPAI_WATCH_RERUN_CMD:-}"
-  if [[ -n "$command" ]]; then (cd "$checkout" && bash -c "$command \"\$1\"" _ "$file")
-  elif [[ "$file" == backend/* ]]; then (cd "$checkout/backend" && bun test --timeout 20000 "${file#backend/}")
-  elif [[ "$file" == frontend/* ]]; then (cd "$checkout/frontend" && bun test --timeout 20000 "${file#frontend/}")
-  elif [[ "$file" == scripts/* ]]; then (cd "$checkout" && bun test --timeout 20000 "$file")
+  if [[ -n "$command" ]]; then (cd "$checkout" && nice -n 10 bash -c "$command \"\$1\"" _ "$file")
+  elif [[ "$file" == backend/* ]]; then (cd "$checkout/backend" && nice -n 10 bun test --timeout 20000 "${file#backend/}")
+  elif [[ "$file" == frontend/* ]]; then (cd "$checkout/frontend" && nice -n 10 bun test --timeout 20000 "${file#frontend/}")
+  elif [[ "$file" == scripts/* ]]; then (cd "$checkout" && nice -n 10 bun test --timeout 20000 "$file")
   else return 1
   fi
 }
 
 candidate_is_red() {
-  local candidate="$1" files="$2" file reruns="${MAIPAI_WATCH_RERUNS:-3}" attempt
-  [[ "$reruns" =~ ^[1-9][0-9]*$ ]] || reruns=3
+  local candidate="$1" files="$2" file reruns="${MAIPAI_WATCH_BISECT_RERUNS:-1}" attempt
+  [[ "$reruns" =~ ^[1-9][0-9]*$ ]] || reruns=1
   git -C "$checkout" checkout --detach "$candidate" >/dev/null 2>&1 || return 1
   for file in $files; do
     for (( attempt=1; attempt<=reruns; attempt++ )); do
-      wait_for_quiet || return 1
       if rerun_file "$file" >/dev/null 2>&1; then break; fi
       if (( attempt == reruns )); then return 0; fi
     done
@@ -190,7 +201,6 @@ file_is_red() {
   local file="$1" reruns="${MAIPAI_WATCH_RERUNS:-3}" attempt
   [[ "$reruns" =~ ^[1-9][0-9]*$ ]] || reruns=3
   for (( attempt=1; attempt<=reruns; attempt++ )); do
-    wait_for_quiet || return 2
     if rerun_file "$file" >/dev/null 2>&1; then return 1; fi
   done
   return 0
@@ -245,26 +255,35 @@ PY
 
 find_culprit() {
   local head="$1" last_green="$2" files="$3" candidates count lo hi mid candidate culprit="unknown"
+  local started budget max_candidates spent
+  budget="${MAIPAI_WATCH_BISECT_MAX_SECONDS:-600}"; [[ "$budget" =~ ^[0-9]+$ ]] || budget=600
+  max_candidates="${MAIPAI_WATCH_BISECT_CANDIDATES:-4}"; [[ "$max_candidates" =~ ^[1-9][0-9]*$ ]] || max_candidates=4
+  started="$(date +%s)"
   [[ -n "$last_green" ]] || { echo unknown; return 0; }
   candidates="$(git -C "$checkout" rev-list --first-parent --reverse "$last_green..$head" 2>/dev/null || true)"
   count="$(printf '%s\n' "$candidates" | sed '/^$/d' | wc -l | tr -d ' ')"
   if (( count == 1 )); then printf '%s\n' "$candidates"; return 0; fi
-  if (( count > 8 )); then
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) more than 8 first-parent candidates between $last_green and $head; testing newest candidates in order" >> "$data/watcher.log"
+  if (( count > max_candidates )); then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) more than $max_candidates first-parent candidates between $last_green and $head; testing newest candidates in order" >> "$data/watcher.log"
     while IFS= read -r candidate; do
       [[ -n "$candidate" ]] || continue
+      spent=$(( $(date +%s) - started )); if (( spent >= budget )); then break; fi
       if candidate_is_red "$candidate" "$files"; then culprit="$candidate"; break; fi
-    done < <(printf '%s\n' "$candidates" | awk 'NF { a[NR]=$0 } END { for (i=NR;i>NR-8 && i>0;i--) print a[i] }')
+    done < <(printf '%s\n' "$candidates" | awk -v cap="$max_candidates" 'NF { a[NR]=$0 } END { for (i=NR;i>NR-cap && i>0;i--) print a[i] }')
+    spent=$(( $(date +%s) - started )); if (( spent >= budget )); then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) bisect budget spent after ${spent} s; culprit unknown" >> "$data/watcher.log"; echo unknown; return 0; fi
     echo "$culprit"
     return 0
   fi
   local -a list=()
   while IFS= read -r candidate; do [[ -n "$candidate" ]] && list+=("$candidate"); done <<< "$candidates"
   lo=0; hi=$((${#list[@]} - 1))
+  [[ -n "$files" ]] || { echo unknown; return 0; }
   while (( lo <= hi )); do
+    spent=$(( $(date +%s) - started )); if (( spent >= budget )); then break; fi
     mid=$(((lo + hi) / 2)); candidate="${list[$mid]}"
     if candidate_is_red "$candidate" "$files"; then culprit="$candidate"; hi=$((mid - 1)); else lo=$((mid + 1)); fi
   done
+  spent=$(( $(date +%s) - started )); if (( spent >= budget )); then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) bisect budget spent after ${spent} s; culprit unknown" >> "$data/watcher.log"; echo unknown; return 0; fi
   echo "$culprit"
 }
 
@@ -330,12 +349,14 @@ free_memory_gb() {
 
 wait_for_quiet() {
   local land_data="${MAIPAI_LAND_DATA:-$main/data-scratch/land}"
-  local max_seconds="${MAIPAI_WATCH_QUIET_MAX_SECONDS:-1800}"
+  local max_seconds="${MAIPAI_WATCH_QUIET_MAX_SECONDS:-300}"
+  local busy_seconds="${MAIPAI_WATCH_LANDER_BUSY_SECONDS:-120}"
   local poll_seconds="${MAIPAI_WATCH_QUIET_POLL_SECONDS:-15}"
   local max_cpu="${MAIPAI_WATCH_MAX_CPU:-200}"
   local min_free_gb="${MAIPAI_WATCH_MIN_FREE_GB:-40}"
   local started now cpu free_gb free_display lander_busy reason last_log=0 remaining sleep_for
-  [[ "$max_seconds" =~ ^[0-9]+$ ]] || max_seconds=1800
+  [[ "$max_seconds" =~ ^[0-9]+$ ]] || max_seconds=300
+  [[ "$busy_seconds" =~ ^[0-9]+$ ]] || busy_seconds=120
   [[ "$poll_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] || poll_seconds=15
   [[ "$min_free_gb" =~ ^[0-9]+([.][0-9]+)?$ ]] || min_free_gb=40
   # Zero is used by tests and operators to disable waiting.
@@ -348,7 +369,8 @@ wait_for_quiet() {
     cpu="$(work_cpu_percent)"
     free_gb="$(free_memory_gb)"
     reason=""
-    if (( lander_busy )); then reason="waiting: lander busy"
+    now="$(date +%s)"
+    if (( lander_busy && now - started < busy_seconds )); then reason="waiting: lander busy"
     elif [[ "$cpu" != unknown ]] && awk -v cpu="$cpu" -v max="$max_cpu" 'BEGIN { exit !(cpu >= max) }'; then
       reason="waiting: our work uses ${cpu}% cpu, above ${max_cpu}%"
     elif [[ "$free_gb" != unknown ]] && awk -v free="$free_gb" -v min="$min_free_gb" 'BEGIN { exit !(free < min) }'; then
@@ -390,7 +412,8 @@ file_issue() {
 }
 
 run_once() {
-  local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note rerun_rc
+  local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
+  local bisect_started bisect_budget bisect_spent
   git -C "$checkout" fetch origin || { echo "watcher.sh: fetch failed" >> "$data/watcher.log"; return 0; }
   head="$(git -C "$checkout" rev-parse origin/main)"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
@@ -418,6 +441,16 @@ run_once() {
   set -e
   if (( watcher_lock_held )); then bash "$gate_lock" release "watcher-$$" || true; watcher_lock_held=0; fi
   seconds=$(( $(date +%s) - started ))
+  timed_leg="$(awk '$1=="==" && $2=="leg:" && /timed out after/ { print $3; exit }' "$output")"
+  timed_seconds="$(sed -nE 's/^== leg: [^ ]+ \(exit 124, timed out after ([0-9]+) s\).*/\1/p' "$output" | head -n 1)"
+  if [[ -n "$timed_leg" ]]; then
+    append_run "$head" stalled "$seconds" "" ""
+    atomic_value "$data/last-run" "$head"
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stalled at $head: leg $timed_leg timed out after $timed_seconds s" >> "$data/watcher.log"
+    rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
+    echo "stalled at ${head:0:7}: leg $timed_leg timed out"
+    return 0
+  fi
   if (( rc == 0 )); then
     mark_green "$head"
     atomic_value "$data/last-green" "$head"
@@ -428,10 +461,9 @@ run_once() {
     return 0
   fi
   files="$(failing_files "$output")"
+  [[ -z "$files" ]] || wait_for_quiet || true
   for file in $files; do
-    if file_is_red "$file"; then rerun_rc=0; else rerun_rc=$?; fi
-    if (( rerun_rc == 0 )); then all_pass=0
-    elif (( rerun_rc == 2 )); then all_pass=0; fi
+    if file_is_red "$file"; then all_pass=0; red_files="${red_files:+$red_files }$file"; fi
   done
   if [[ -n "$files" && "$all_pass" -eq 1 ]]; then
     mark_green "$head"
@@ -444,20 +476,25 @@ run_once() {
     echo "flaky at ${head:0:7}: $files"
     return 0
   fi
-  culprit="$(find_culprit "$head" "$last_green" "$files")"
+  bisect_started="$(date +%s)"
+  culprit="$(find_culprit "$head" "$last_green" "$red_files")"
+  bisect_budget="${MAIPAI_WATCH_BISECT_MAX_SECONDS:-600}"
+  bisect_spent=$(( $(date +%s) - bisect_started ))
+  if [[ "$culprit" == unknown ]] && (( bisect_spent >= bisect_budget )); then budget_spent=1; fi
   git -C "$checkout" checkout --detach "$head" >/dev/null 2>&1 || true
   subject="unknown"
   if [[ "$culprit" != unknown ]]; then subject="$(git -C "$checkout" show -s --format=%s "$culprit" 2>/dev/null || echo unknown)"; fi
   note="$data/reds/$head.md"; note_tmp="$(mktemp "$data/reds/.red.XXXXXX")"
   {
     printf '# Main test failure: %s\n\n' "$head"
-    printf -- '- Main SHA: `%s`\n- Culprit: `%s` (%s)\n- Failing files: %s\n\n' "$head" "$culprit" "$subject" "${files:-unknown}"
+    if (( budget_spent )); then printf -- '- Main SHA: `%s`\n- Culprit: unknown (bisect budget spent)\n- Failing files: %s\n\n' "$head" "${files:-unknown}"
+    else printf -- '- Main SHA: `%s`\n- Culprit: `%s` (%s)\n- Failing files: %s\n\n' "$head" "$culprit" "$subject" "${files:-unknown}"; fi
     printf '## Last 60 lines of suite output\n\n```text\n'
     tail -n 60 "$output"
     printf '\n```\n'
   } > "$note_tmp"
   mv -f "$note_tmp" "$note"
-  append_run "$head" red "$seconds" "$files" "$culprit"
+  append_run "$head" red "$seconds" "$files" "$([[ "$culprit" == unknown ]] || printf %s "$culprit")"
   atomic_value "$data/last-run" "$head"
   file="${files%% *}"; title="Watcher: main red at ${head:0:7}: ${file:-unknown}"
   file_issue "$title" "${file:-unknown}" "$note"

@@ -22,6 +22,7 @@ describe("main watcher", () => {
       ...f.env,
       MAIPAI_WATCH_RERUN_CMD: `bash ${rerunScript}`,
       MAIPAI_WATCH_RERUNS: "3",
+      MAIPAI_WATCH_BISECT_RERUNS: "3",
     });
     expect(out.status).toBe(0);
     expect(records(f).at(-1).culprit).toBe(culprit);
@@ -75,6 +76,41 @@ describe("main watcher", () => {
     expect(out.stdout).toContain("lander already stopped");
     expect(out.stdout).toContain("watcher already stopped");
   });
+
+  test("bisect budget exhaustion records an unknown culprit in the red note", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    for (let i = 1; i <= 3; i++) commit(f, `slow candidate ${i}`, { [`slow-${i}.txt`]: `${i}\n` });
+    const sha = commit(f, "break with slow isolated rerun", { RED: "red\n" });
+    const out = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      MAIPAI_WATCH_RERUN_CMD: "sleep 1; exit 1",
+      MAIPAI_WATCH_RERUNS: "1",
+      MAIPAI_WATCH_BISECT_MAX_SECONDS: "1",
+    });
+    expect(out.status).toBe(0);
+    expect(records(f).at(-1).culprit).toBeNull();
+    expect(readFileSync(join(f.data, "reds", `${sha}.md`), "utf8")).toContain("unknown (bisect budget spent)");
+  }, 20_000);
+
+  test("bisect candidate cap limits rerun calls", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    for (let i = 1; i <= 6; i++) commit(f, `candidate ${i}`, { [`candidate-${i}.txt`]: `${i}\n` });
+    const sha = commit(f, "break after candidates", { RED: "red\n" });
+    const calls = join(f.scratch, "bisect.calls");
+    const stub = join(f.scratch, "bisect-rerun.sh");
+    writeFileSync(stub, `#!/usr/bin/env bash\necho "$(git rev-parse HEAD)" >> '${calls}'\nexit 1\n`);
+    const out = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      MAIPAI_WATCH_RERUN_CMD: `bash ${stub}`,
+      MAIPAI_WATCH_RERUNS: "1",
+      MAIPAI_WATCH_BISECT_CANDIDATES: "2",
+    });
+    expect(out.status).toBe(0);
+    expect(readFileSync(calls, "utf8").trim().split(/\r?\n/)).toHaveLength(2);
+    expect(records(f).at(-1).sha).toBe(sha);
+  }, 20_000);
 });
 
 afterAll(() => {
