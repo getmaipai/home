@@ -45,6 +45,14 @@ describe("readShardLog", () => {
 });
 
 describe("chooseShardCount", () => {
+  test("a loaded host gets fewer workers: cores left after the load, never below two, no cap when the load is unknown", () => {
+    const base = { cores: 18, freeGb: 100, files: 100 };
+    expect(chooseShardCount({ ...base })).toBe(16);
+    expect(chooseShardCount({ ...base, load: 4 })).toBe(14);
+    expect(chooseShardCount({ ...base, load: 90 })).toBe(2);
+    expect(chooseShardCount({ ...base, load: Number.NaN })).toBe(16);
+    expect(chooseShardCount({ ...base, env: "10", load: 70 })).toBe(2);
+  });
   test("MAIPAI_GATE_SHARDS wins, but never exceeds the file count", () => {
     expect(chooseShardCount({ env: "6", cores: 14, freeGb: 20, files: 100 })).toBe(6);
     expect(chooseShardCount({ env: "6", cores: 14, freeGb: 20, files: 2 })).toBe(2);

@@ -21,7 +21,7 @@ import "../runTemp";
 //   --record     rewrites scripts/gate/test-timings.json for this workspace
 //                from the junit reports of this run
 import { Glob } from "bun";
-import { cpus, freemem, tmpdir, totalmem } from "node:os";
+import { cpus, freemem, loadavg, tmpdir, totalmem } from "node:os";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import flakesFile from "./flakes.json";
@@ -135,12 +135,16 @@ export function chooseShardCount(opts: {
   osReserveGb?: number;
   files: number;
   gbPerShard?: number;
+  /** The one-minute load average. Workers are capped at the cores the host has left, never below two, so a Studio already at
+   * load 60 to 90 (2026-10-30) is not handed ten more test processes by every gate and the watcher at once. */
+  load?: number;
 }): number {
   const reclaimableGb = Math.min(opts.freeGb, Math.max(0, (opts.totalGb ?? Number.POSITIVE_INFINITY) - (opts.engineGb ?? 0) - (opts.osReserveGb ?? 0)));
   const gbPerShard = opts.gbPerShard ?? 1.25;
   const byCores = Math.max(1, opts.cores - 2);
   const byMem = Math.max(1, Math.floor(reclaimableGb / gbPerShard));
-  const safeMaximum = Math.max(1, Math.min(byCores, byMem, opts.files, 16));
+  const byLoad = opts.load === undefined || !Number.isFinite(opts.load) ? Number.POSITIVE_INFINITY : Math.max(2, opts.cores - Math.round(opts.load));
+  const safeMaximum = Math.max(1, Math.min(byCores, byMem, byLoad, opts.files, 16));
   const forced = Number.parseInt(opts.env ?? "", 10);
   if (Number.isInteger(forced) && forced > 0) return Math.min(forced, safeMaximum);
   return safeMaximum;
@@ -422,7 +426,7 @@ export async function run(opts: RunOptions): Promise<number> {
   const initialReservedGb = workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0;
   const maxWorkers = files.length === 0 ? 0 : chooseShardCount({
     env: process.env.MAIPAI_GATE_SHARDS,
-    cores: cpus().length,
+    cores: cpus().length, load: loadavg()[0],
     freeGb: initialResources.reclaimableGb + initialReservedGb,
     totalGb: initialResources.totalGb,
     engineGb,
@@ -574,7 +578,7 @@ export async function run(opts: RunOptions): Promise<number> {
         continue;
       }
       const reservedGb = workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0;
-      const capacity = chooseShardCount({ cores: cpus().length, freeGb: resources.reclaimableGb + reservedGb, totalGb: resources.totalGb, engineGb, osReserveGb: 3, files: 6, gbPerShard: shardPeakGb });
+      const capacity = chooseShardCount({ cores: cpus().length, load: loadavg()[0], freeGb: resources.reclaimableGb + reservedGb, totalGb: resources.totalGb, engineGb, osReserveGb: 3, files: 6, gbPerShard: shardPeakGb });
       const slot = reserveSharedSlot(capacity);
       if (slot !== null) return slot;
       console.log("shard: waiting for a shared worker slot");
@@ -591,7 +595,7 @@ export async function run(opts: RunOptions): Promise<number> {
     }
     const resources = await probe();
     const currentCap = chooseShardCount({
-      cores: cpus().length,
+      cores: cpus().length, load: loadavg()[0],
       freeGb: resources.reclaimableGb + (workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0),
       totalGb: resources.totalGb,
       engineGb,
@@ -600,7 +604,7 @@ export async function run(opts: RunOptions): Promise<number> {
       gbPerShard: shardPeakGb,
     });
     const globalCap = chooseShardCount({
-      cores: cpus().length,
+      cores: cpus().length, load: loadavg()[0],
       freeGb: resources.reclaimableGb + (workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0),
       totalGb: resources.totalGb,
       engineGb,
