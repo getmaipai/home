@@ -149,14 +149,28 @@ role), once before and once after MEM-AUDIT-02's capture changes:
 
 | Run | Precision | Recall | Skipped at the gate |
 |---|---|---|---|
-| before (chain as it was, 2026-10-31) | not run | not run | not run |
-| after (three-word gate, rewritten prompt, text-derived subject, carrier clauses, widened saves) | not run | not run | not run |
+| before (chain as it was, 2026-10-31) | 75.0% (tp 6, fp 2) | 28.6% (tp 6, missed 15) | 13/30 |
+| after (three-word gate, rewritten prompt, text-derived subject, carrier clauses, widened saves) | 87.5% (tp 14, fp 2) | 66.7% (tp 14, missed 7) | 1/30 |
 
-Neither run completed on 2026-10-31: the Stack on `127.0.0.1:8770` stopped answering (connection refused on `/healthz` and
-`/v1/models`) between the fixture being written and the first judge call, and the bench refuses to start without a judge
-(CHAT-22). The two rows are filled by the first session that finds the Stack answering: the command is in the header of
-`backend/scripts/bench/judge-eval.ts`, run once with `main` as it was before MEM-AUDIT-02 and once after, never in a loop,
-because the judge role is shared with the live hub. The deterministic half of the measurement is in `bun test` already:
+Both runs on 2026-10-31, each exactly once, against the Stack on `127.0.0.1:8770` with the judge role reporting
+`Qwen3-4B-Q4_K_M.gguf` (llama-server b10797, the model it shares with chat): 2.55 s per judged turn after, 3.49 s before.
+The before arm is HEAD's bench and dataset with the seven capture files (`memoryJudge.ts`, `turnSignal.ts`, `turnShared.ts`,
+`turnNext.ts`, `memory.ts`, `nodes/context.ts`, the `remember` manifest) at the `main` before MEM-AUDIT-02. Before, the gate
+skipped 13 of 30 (the 6 negatives and 2 assistant-only cases rightly, and 5 real facts: `req-poem-nova`, `q-boyfriend`,
+`instr-stop-saying`, `instr-weather`, `instr-moving`) and the judge then missed 10 of the 18 it saw (`req-ddr`, `req-story-pippa`,
+`req-guitar`, `instr-typed`, `voice-robot`, `voice-rewatch`, `voice-film`, `note-marlow`, `friend-band`, `teacher-pippa`; two
+candidates died in `subject_mismatch`). After, the gate skips only `neg-greeting`, the 6 negatives and 3 assistant-only cases
+write nothing, and 7 misses remain: the four instructions (`instr-typed`, `instr-stop-saying`, `instr-weather`, `instr-moving`),
+`voice-rewatch`, `q-boyfriend` and `teacher-pippa`. The instruction misses are mostly one defect, not the judge: the log
+shows three inserts refused with "Invalid option: expected one of person, place, thing, preference, identity, event, project,
+goal, relationship, fact, state" (two `remember failed`, one `supersede failed`), the judge having returned category
+`instruction`, which the pinned `@maipai/spec` 0.1.281 `memory-record` schema does not carry yet. The bench does not print
+which turn each refusal belonged to; the spec change goes first, then a rerun says how many of the four it clears. The false captures are the same two in both arms, on `req-story-iris`: the judge adds
+"Iris is Nova's friend" and "Nova, Sage's daughter, wants a story about her friend Iris" beside the expected fact; the fixture
+expects one record for that turn. The bench's own cleanup fails after the numbers print (`FOREIGN KEY constraint failed`
+deleting the household people rows from its disposable database); the scores are complete before that line.
+
+The deterministic half of the measurement is in `bun test` already:
 every fixture shape (the song request, the boyfriend question, the two-clause "make a note", the lowercase friend, the
 instruction category, the joke, the hypothetical, the anonymous robot speaker) has a case in `backend/tests/memoryJudge.test.ts`
 under "MEM-AUDIT-02: capture what people actually say".
