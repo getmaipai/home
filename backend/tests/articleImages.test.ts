@@ -121,3 +121,12 @@ describe("extractArticleImages path resolution (ZIM-IMG-01)", () => {
     expect(found.map((image) => image.imagePath)).toEqual(["I/x.jpg"]);
   });
 });
+
+describe("extractArticleImages real build markers (ZIM-IMG-01)", () => {
+  test("a drawing (logo, diagram) is skipped and a bitmap with a ./ relative src is kept, as in the live English Wikipedia build", () => {
+    const html = '<table class="infobox"><tr><td><img src="./_assets_/aa/Logo.svg.png" data-file-type="drawing" width="120" height="154"></td></tr><tr><td><img src="./_assets_/bb/Tower.jpg" data-file-type="bitmap" width="280" height="466"></td></tr></table>';
+    const found = extractArticleImages(html, { book: BOOK, articlePath: "Eiffel_Tower" });
+    expect(found.map((image) => image.imagePath)).toEqual(["_assets_/bb/Tower.jpg"]);
+    expect(found[0]?.lead).toBe(true);
+  });
+});

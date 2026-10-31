@@ -97,7 +97,8 @@ async function readLimited(response: Response, limit: number, signal: AbortSigna
 const platformFetch = globalThis.fetch;
 
 /** ZIM-IMG-01: the `library:` leg of fetchOne - one request to the
- * household's own kiwix-serve (`/raw/<book>/<path>`), nothing more. The
+ * household's own kiwix-serve (`/content/<book>/<path>`, the route that serves an
+ * entry's own bytes; `/raw/<book>/<path>` is a 404 on the live server), nothing more. The
  * sidecar is loopback and pinned, so this path never re-runs the web
  * guards (validateUrl, the host limiter, quiet, guardedFetch); a missing
  * sidecar or any failure drops the picture as library_unavailable. */
@@ -110,7 +111,7 @@ async function fetchLibrary(library: { book: string; imagePath: string }, source
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, Math.min(1_200, deadline - now()));
   try {
-    const url = `${base.replace(/\/+$/, "")}/raw/${encodeURIComponent(library.book)}/${library.imagePath.split("/").map(encodeURIComponent).join("/")}`;
+    const url = `${base.replace(/\/+$/, "")}/content/${encodeURIComponent(library.book)}/${library.imagePath.split("/").map(encodeURIComponent).join("/")}`;
     const response = await fetcher(url, {
       method: "GET", redirect: "manual", signal: controller.signal,
       headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },

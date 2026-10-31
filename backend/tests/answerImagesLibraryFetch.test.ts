@@ -1,5 +1,5 @@
 // ZIM-IMG-01 task 1: fetchAnswerImages reads a `library:` source from the
-// household's own kiwix-serve sidecar (`/raw/<book>/<path>`) instead of the
+// household's own kiwix-serve sidecar (`/content/<book>/<path>`) instead of the
 // open web, offline and deterministic - the injected fetch stands in for the
 // sidecar, the sidecar's own base URL comes from the registry the same way
 // production's does (registerSidecar, never a setting or env).
@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe("fetchAnswerImages reads library: sources from the sidecar", () => {
-  test("a library: picture comes from the sidecar's own /raw endpoint", async () => {
+  test("a library: picture comes from the sidecar's own /content endpoint", async () => {
     sidecarUp();
     const bytes = await syntheticPhoto(7);
     const seen: string[] = [];
@@ -40,7 +40,7 @@ describe("fetchAnswerImages reads library: sources from the sidecar", () => {
       return new Response(bytes, { status: 200, headers: { "content-type": "image/jpeg" } });
     };
     const result = await fetchAnswerImages([{ id: "lib", url: SOURCE }], { fetch: fetcher as unknown as typeof fetch });
-    expect(seen).toEqual([`${BASE}/raw/wikipedia_en_all_maxi/I/cat.jpg`]);
+    expect(seen).toEqual([`${BASE}/content/wikipedia_en_all_maxi/I/cat.jpg`]);
     expect(result.images).toHaveLength(1);
     expect(result.images[0]?.id).toBe("lib");
     expect(result.originals["lib"]).toBe(SOURCE);

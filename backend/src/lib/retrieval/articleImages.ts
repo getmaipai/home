@@ -57,6 +57,8 @@ export function extractArticleImages(html: string, opts: { book: string; article
       if (/^(?:data:|https?:|\/\/)/i.test(src)) continue;
       if ((img.getAttribute("class") ?? "").includes("mwe-math")) continue;
       if (src.includes("/math/render")) continue;
+      // ZIM-IMG-01: current Wikipedia builds mark a logo, flag, map or diagram (a drawing) apart from a photograph.
+      if (img.getAttribute("data-file-type") === "drawing") continue;
       const imagePath = resolveImagePath(src, base, bookPrefix);
       if (imagePath === null) continue;
       const width = declaredSize(img.getAttribute("width"));

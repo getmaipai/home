@@ -50,7 +50,7 @@ function use(subjects: FixtureSubject[], library: (title: string, band: AgeBand,
   const worldFetch = world.deps.fetchOptions!.fetch!;
   const fetcher = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = input.toString();
-    if (url.startsWith(`${BASE}/raw/`)) {
+    if (url.startsWith(`${BASE}/content/`)) {
       raw.push(url);
       const seed = 200 + Number(/pic(\d+)\.jpg/.exec(url)?.[1] ?? 0);
       return new Response(await syntheticPhoto(seed), { status: 200, headers: { "content-type": "image/jpeg" } });
@@ -76,7 +76,7 @@ describe("ZIM-IMG-01: library pictures lead the row", () => {
       expect(item.source.url).toBe("/api/reference/wikipedia_en_all_maxi/A%2FEiffel_Tower");
     }
     expect(raw.length).toBeGreaterThan(0);
-    expect(raw.every((u) => u.startsWith(`${BASE}/raw/wikipedia_en_all_maxi/I/pic`))).toBe(true);
+    expect(raw.every((u) => u.startsWith(`${BASE}/content/wikipedia_en_all_maxi/I/pic`))).toBe(true);
     expect(log.pictures).toEqual([]);
     expect(result.trace.sources?.library).toBe(7);
   });
