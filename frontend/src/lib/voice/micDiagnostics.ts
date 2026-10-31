@@ -58,9 +58,6 @@ export function lastMicFailure(): MicFailure | null {
   return last;
 }
 
-export function clearMicFailure(): void {
-  last = null;
-}
 
 /** One line for the toast: "Step: worklet load. NotSupportedError: ...". */
 export function micFailureLine(failure: MicFailure): string {

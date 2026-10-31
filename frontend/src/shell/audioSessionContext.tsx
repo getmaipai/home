@@ -15,7 +15,6 @@ import {
   type AudioSnapshot,
   type MiniBarState,
   type SpeedKind,
-  type TimeSnapshot,
 } from "@/shell/audioSession";
 
 const AudioSessionContext = createContext<AudioSession>(audioSession);
@@ -56,12 +55,6 @@ export function useAudioSession(): AudioSession {
 export function useAudioSessionState(): AudioSnapshot {
   const session = useAudioSession();
   return useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
-}
-
-/** Position and duration of the focused item in seconds, updated with the element's `timeupdate`. */
-export function useAudioPosition(): TimeSnapshot {
-  const session = useAudioSession();
-  return useSyncExternalStore(session.subscribeTime, session.getTime, session.getTime);
 }
 
 /** The state and controls a media app needs to place the kit Player's `mini` layout. `state` is null when nothing is

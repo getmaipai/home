@@ -25,7 +25,7 @@ import {
 import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/updatesData";
 import { api, ApiError, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
-import { useDataTableControls } from "@/shell/pages/dataTableControls";
+import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 
 /** /updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through the kit's

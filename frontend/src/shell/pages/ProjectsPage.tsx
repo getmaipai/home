@@ -17,7 +17,6 @@ import { useIncognitoContext } from "@/shell/incognitoContext";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 
-export const ProjectsIcon = getIcon("folder");
 const SearchIcon = getIcon("search");
 const PinIcon = getIcon("pin");
 const PlusIcon = getIcon("plus");

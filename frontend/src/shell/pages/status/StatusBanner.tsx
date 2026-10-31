@@ -2,16 +2,11 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { statusSummary } from "@/shell/statusSummary";
 import { formatUptime } from "@/shell/pages/status/StatusComponents";
+import { joinNames } from "@/shell/pages/status/statusBoardFormat";
 import "@/shell/pages/status/statusBanner.css";
 
 type Summary = ReturnType<typeof statusSummary>;
 const icons = { online: getIcon("check"), degraded: getIcon("alert-triangle"), offline: getIcon("alert-triangle"), maintenance: getIcon("wrench") };
-
-function joinNames(names: string[]) {
-  if (names.length < 2) return names[0] ?? "Parts";
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
 
 export function StatusBanner({ summary, uptimeSeconds, maintenanceEndsAt, message }: { summary: Summary; uptimeSeconds?: number; maintenanceEndsAt?: string; message?: string }) {
   const Icon = icons[summary.level];

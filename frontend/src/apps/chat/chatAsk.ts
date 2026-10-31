@@ -54,4 +54,3 @@ export function parseTurnAsk(raw: unknown): TurnAsk | null {
 }
 
 /** The `ask` tool part's result: the validated ask, nothing else. */
-export type AskPartResult = TurnAsk;

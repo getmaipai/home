@@ -122,6 +122,3 @@ export const canAddFiles = (person: Pick<Roster, "role">): boolean => person.rol
 export const canShareFiles = canAddFiles;
 /** Who may be offered "Mark all-ages": an adult who owns the picture. The hub decides again. */
 export const isAdultRole = (person: Pick<Roster, "role">): boolean => person.role === "owner" || person.role === "admin" || person.role === "adult";
-export function describeError(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}

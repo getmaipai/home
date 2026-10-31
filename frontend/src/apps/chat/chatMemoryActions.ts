@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext } from "react";
 import { api, type MemoryRecord } from "@/lib/api";
 import { addMemoryId, removeMemoryId } from "@/apps/chat/chatMemoryState";
 
@@ -8,12 +8,6 @@ import { addMemoryId, removeMemoryId } from "@/apps/chat/chatMemoryState";
 // who's signed in, so ChatPage.tsx provides it once via context rather
 // than threading a prop through every layer assistant-ui owns.
 export const ChatActorContext = createContext<string | null>(null);
-
-export function useChatActorId(): string {
-  const id = useContext(ChatActorContext);
-  if (!id) throw new Error("ChatActorContext.Provider is missing an actor id");
-  return id;
-}
 
 // backend/src/lib/memory.ts's remember() defaults for a one-click "remember
 // this" from a chat message, decided 2026-09-05 (checked against

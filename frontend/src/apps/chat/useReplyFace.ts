@@ -15,7 +15,7 @@ export function useReplyFace(): NonNullable<ThreadComponents["replyFace"]> {
   const stills = useCompanionStills(ids);
   // The same query the chat page and the directory use (one key, one fetch): its cards carry each companion's portrait key.
   const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions, retry: false });
-  const companions = companionList.data?.companions ?? [];
+  const companions = useMemo(() => companionList.data?.companions ?? [], [companionList.data?.companions]);
   const clipsById = useReplyCompanionClips(ids);
   const lastAssistantId = [...messages].reverse().find((message) => message.role === "assistant")?.id ?? null;
   return useMemo(() => ({

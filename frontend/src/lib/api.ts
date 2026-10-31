@@ -1825,7 +1825,7 @@ export const api = {
   //
   // An options object, not five more positional params (a code review,
   // 2026-09-13, found the growing positional list already forced
-  // `runFixedTurn.ts` into four throwaway `undefined`s just to reach
+  // the retired `runFixedTurn.ts` into four throwaway `undefined`s just to reach
   // `ephemeral`, with two same-typed optional booleans a silent reorder
   // away from swapping): every param but `text` and `signal` (the two
   // every real caller passes) lives here instead.

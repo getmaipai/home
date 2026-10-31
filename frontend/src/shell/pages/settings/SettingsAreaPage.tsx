@@ -133,7 +133,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   const registryQuery = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
   const robotQuery = useQuery<DeviceInfo[]>({ queryKey: ["robot-devices"], queryFn: () => api.robotDevices(), enabled: area.id === "settings" && sectionId === "apps" && Boolean(detailId) });
   const { capabilities, ready } = useSettingsCapabilities(person, true);
-  const viewer: SettingsViewer = { ...baseViewer(person), capabilities };
+  const viewer: SettingsViewer = useMemo(() => ({ ...baseViewer(person), capabilities }), [person, capabilities]);
   const packageKeys = registryQuery.data ? packageAreaKeySet(packageAreas, registryQuery.data) : undefined;
   const registry = registryQuery.data
     ? visibleRegistry(registryQuery.data, viewer.band, area.id === "settings" && sectionId === "advanced" ? ["network.hub_port"] : [], packageKeys)
@@ -148,11 +148,11 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
     })),
   });
 
-  const policyViewer: SettingsViewer = { ...viewer, role: person.role === "owner" ? "admin" : viewer.role, capabilities: ready ? capabilities : [] };
+  const policyViewer: SettingsViewer = useMemo(() => ({ ...viewer, role: person.role === "owner" ? "admin" : viewer.role, capabilities: ready ? capabilities : [] }), [viewer, person.role, ready, capabilities]);
   const groups = registry ? visibleGroups(area, policyViewer, registry, "home") : [];
   const active = groups.flatMap((group) => group.sections).find((section) => section.id === sectionId);
   const sectionDefinition = area.sections.find((section) => section.id === sectionId);
-  const tabs = useMemo(() => active ? (detailId && active.detail ? active.detail.tabs ?? [] : visibleTabs(active, policyViewer)) : [], [active, detailId, viewer.band, viewer.role, person.role, ready, capabilities]);
+  const tabs = useMemo(() => active ? (detailId && active.detail ? active.detail.tabs ?? [] : visibleTabs(active, policyViewer)) : [], [active, detailId, policyViewer]);
   const tab = resolveTab(tabs, params.get("tab") ?? undefined);
   const currentTab = params.get("tab") ?? tab;
   const first = registry ? firstVisibleSection(area, policyViewer, registry, "home") : undefined;
