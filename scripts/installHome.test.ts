@@ -31,6 +31,22 @@ describe("upgrade data copy and rollback", () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  test("snapshot_data leaves the offline books out, and restore_snapshot brings them back from the set-aside data", () => {
+    const root = fixture();
+    try {
+      mkdirSync(join(root, "data", "reference"), { recursive: true });
+      writeFileSync(join(root, "data", "reference", "wikipedia_en_all_maxi.zim"), "huge book");
+      writeFileSync(join(root, "data", "reference", "library.xml"), "<library/>");
+      expect(bash(`snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
+      const names = readdirSync(join(root, "upgrade-backups"));
+      const listing = Bun.spawnSync(["tar", "-tzf", join(root, "upgrade-backups", names[0] as string, "data.tar.gz")]).stdout.toString();
+      expect(listing).toContain("data/reference/library.xml");
+      expect(listing).not.toContain(".zim");
+      expect(bash(`restore_snapshot "${root}" v0.0.9`).exitCode).toBe(0);
+      expect(readFileSync(join(root, "data", "reference", "wikipedia_en_all_maxi.zim"), "utf8")).toBe("huge book");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   test("record_previous_tag points --rollback at the version live before this upgrade", () => {
     const root = fixture();
     try {
