@@ -37,6 +37,7 @@ import { Avatar, AvatarImage } from "@maipai/ui/src/elements/ui/avatar";
 import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { Button } from "@maipai/ui/src/elements/ui/button";
 import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
+import { RobotFace } from "@maipai/ui/src/elements/robot-face";
 import { AmbientRingProvider, ambientRingFromWake, effectiveAmbientRing, type AmbientRing, type AmbientWakeIndicator } from "@/shell/ambientRing";
 import { ChatAvailabilityContext, useChatAvailability } from "@/apps/chat/useChatAvailability";
 import { RailProfile } from "@/shell/RailProfile";
@@ -233,7 +234,9 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     setLastLine(text.split(/(?<=[.!?])\s+/).filter(Boolean).at(-1) ?? text.trim());
   }, []);
   const onPaneRing = useCallback((next: AmbientRing | undefined) => setPaneRing(next ?? null), []);
-  const sideChat = useSideChat(person, ambient?.companion.id ?? "", incognito, onSideReply);
+  const ambientCompanionId = ambient?.kind === "bot" ? ambient.companionId : ambient?.companion.id ?? "";
+  const ambientDeviceId = ambient?.kind === "bot" ? ambient.device.id : undefined;
+  const sideChat = useSideChat(person, ambientCompanionId, incognito, onSideReply, undefined, ambientDeviceId);
   const updatePaneState = (next: AmbientPaneState) => {
     setPaneState(next);
     try { window.localStorage.setItem("maipai.ambient.pane", JSON.stringify(next)); } catch { /* local storage may be unavailable */ }
@@ -268,34 +271,36 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const effectiveRing = effectiveAmbientRing(paneRing, ring, ambientRingFromWake(shellListeningLine ? { listening: shellListeningLine } : null));
   const currentApp = appCatalog.find((app) => location.pathname === app.to || location.pathname.startsWith(`${app.to}/`));
   const appName = currentApp?.label ?? (location.pathname === "/" ? "Home" : undefined);
-  const ambientTrigger = ambient ? <button type="button" className="flex size-12 items-center justify-center" aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambient.companion.name}, listening` : ambient.companion.name} onClick={() => {
+  const ambientName = ambient?.kind === "bot" ? ambient.name : ambient?.companion.name;
+  const botRingClass = ambient?.kind === "bot" ? effectiveRing === "listening" ? "rounded-xl ring-2 ring-muted-foreground/50" : effectiveRing === "thinking" ? "rounded-xl ring-2 ring-primary/60" : effectiveRing === "speaking" ? "rounded-xl ring-2 ring-primary" : "" : "";
+  const ambientTrigger = ambient ? <button type="button" className={`flex size-12 items-center justify-center ${botRingClass}`} aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambientName}, listening` : ambientName} onClick={() => {
     if (coarse && wakeIndicator) { setPreviewOpen((value) => !value); return; }
     updatePaneState({ ...paneState, open: true });
   }}>
-    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing ?? "idle"} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+    {ambient.kind === "bot" ? <RobotFace size="header" color={ambient.face.color as never} night={ambient.face.night} expression={ambient.presence === "sleeping" ? "sleeping" : ambient.presence === "offline" ? "offline" : "idle"} name={ambient.name} /> : ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing ?? "idle"} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientTopRight = ambient ? <CompanionPreview
-    name={ambient.companion.name}
+    name={ambientName!}
     trigger={ambientTrigger}
     ready={chatAvailability === "ready"}
-    context={appName ? `You're on ${appName}` : undefined}
+    context={ambient.kind === "bot" ? (ambient.online ? ambient.room ? `In the ${ambient.room.toLowerCase()}${ambient.battery != null ? `, on battery ${ambient.battery}%` : ambient.onBattery === false ? ", plugged in" : ""}` : "Online" : `Offline since ${new Date(ambient.device.lastSeenAt ?? ambient.device.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`) : appName ? `You're on ${appName}` : undefined}
     lastLine={lastLine || undefined}
-    askPlaceholder={`Ask ${ambient.companion.name}`}
+    askPlaceholder={`Ask ${ambientName}`}
     onAsk={(text) => {
       paneControlRef.current?.ask(text);
     }}
-    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : undefined}
+    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : ambient.kind === "bot" ? <Button type="button" onClick={() => { void api.findRobot(ambient.device.id).then(() => toast.success(ambient.online ? `${ambient.name} is chirping` : `Queued for when ${ambient.name} is back`)).catch(() => toast.error(`Could not reach ${ambient.name}. Try again.`)); }}>Find me</Button> : undefined}
     listeningLine={wakeIndicator?.listening}
     onTurnOff={wakeIndicator?.onTurnOff}
     open={lastLine ? previewOpen : coarse ? (wakeIndicator ? true : previewOpen) : undefined}
     onOpenChange={setPreviewOpen}
   /> : undefined;
-  const ambientAvatar = ambient ? <button type="button" className="flex size-12 items-center justify-center" aria-label={ambient.companion.name} onClick={() => { updatePaneState({ ...paneState, open: true }); }}>
-    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing ?? "idle"} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+  const ambientAvatar = ambient ? <button type="button" className={`flex size-12 items-center justify-center ${botRingClass}`} aria-label={ambientName} onClick={() => { updatePaneState({ ...paneState, open: true }); }}>
+    {ambient.kind === "bot" ? <RobotFace size="header" color={ambient.face.color as never} night={ambient.face.night} expression={ambient.presence === "sleeping" ? "sleeping" : ambient.presence === "offline" ? "offline" : "idle"} name={ambient.name} /> : ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing ?? "idle"} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientPaneProps = useAmbientCompanionPane({
-    person, companionName: ambient?.companion.name ?? "Companion", companionId: ambient?.companion.id ?? "",
-    avatar: ambientAvatar, clips: ambient?.clips, still: ambient?.still, incognito, state: paneState, onStateChange: updatePaneState,
+    person, companionName: ambientName ?? "Companion", companionId: ambientCompanionId,
+    avatar: ambientAvatar, clips: ambient?.kind === "companion" ? ambient.clips : undefined, still: ambient?.kind === "companion" ? ambient.still : undefined, bot: ambient?.kind === "bot" ? ambient.device : undefined, action: ambient?.action, incognito, state: paneState, onStateChange: updatePaneState,
     onRing: onPaneRing, wake: wakeIndicator,
     onContinue: (id) => { if (id) navigate(`/chat?conversation=${encodeURIComponent(id)}`); },
     side: sideChat,

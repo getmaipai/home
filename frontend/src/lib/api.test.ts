@@ -42,3 +42,13 @@ test("requestJson returns the same 401 ApiError path as request", async () => {
   expect(error).toBeInstanceOf(ApiError);
   expect(error).toMatchObject({ status: 401, message: "Sign in again" });
 });
+
+test("findRobot posts find_me with optional seconds", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+    return Response.json({ id: "command-1" });
+  }) as typeof fetch;
+  await api.findRobot("robot/1", 8);
+  expect(requests).toEqual([{ url: "/api/devices/robot%2F1/commands", body: { kind: "find_me", seconds: 8 } }]);
+});

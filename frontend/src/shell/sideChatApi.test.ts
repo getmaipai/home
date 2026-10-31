@@ -17,6 +17,16 @@ describe("side conversation API", () => {
     expect(requestBody).toEqual({ surface: "chat", placement: "side", mode: "temporary", companion_id: "companion-1" });
   });
 
+  test("creates a bot side chat with device_id", async () => {
+    let requestBody: unknown;
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "bot-side-1" });
+    }) as unknown as typeof fetch;
+    await api.createConversation(undefined, undefined, undefined, "companion-1", "side", "robot-1");
+    expect(requestBody).toEqual({ surface: "chat", placement: "side", companion_id: "companion-1", device_id: "robot-1" });
+  });
+
   test("lists all placements and hands a side conversation to Chat", async () => {
     const requested: Array<{ url: string; method: string; body?: unknown }> = [];
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {

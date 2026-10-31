@@ -58,6 +58,39 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
   if (!sage || !marlow || !nova) throw new Error("the seeded roster is missing Sage, Marlow, or Nova");
   const people = { sage: sage.id, marlow: marlow.id, nova: nova.id };
 
+  await requireOk(await request(options.baseUrl, "/api/settings", {
+    method: "PUT", cookie, body: JSON.stringify({ scope: "household", key: "home.robots.enabled", value: true }),
+  }), "enabling robots for the demo household failed");
+  const robotRequest = await request(options.baseUrl, "/api/auth/quick-connect/code", {
+    method: "POST", body: JSON.stringify({ label: "Rover", kind: "robot", capabilities: [] }),
+  });
+  await requireOk(robotRequest, "requesting demo robot pairing failed");
+  const pairing = await robotRequest.json() as { code: string; poll_token: string };
+  await requireOk(await request(options.baseUrl, "/api/auth/quick-connect/approve", {
+    method: "POST", cookie, body: JSON.stringify({ code: pairing.code }),
+  }), "approving demo robot pairing failed");
+  const robotPoll = await request(options.baseUrl, `/api/auth/quick-connect/poll?poll_token=${encodeURIComponent(pairing.poll_token)}`);
+  await requireOk(robotPoll, "pairing demo robot failed");
+  const paired = await robotPoll.json() as { status: string; device_token?: string };
+  if (paired.status !== "approved" || !paired.device_token) throw new Error("demo robot pairing was not approved");
+  const robotsResponse = await request(options.baseUrl, "/api/devices/robots", { cookie });
+  await requireOk(robotsResponse, "listing demo robots failed");
+  const robots = await robotsResponse.json() as Array<{ id: string; name: string }>;
+  const rover = robots.find((device) => device.name === "Rover");
+  if (!rover) throw new Error("paired demo robot Rover was not listed");
+  const companionsResponse = await request(options.baseUrl, "/api/companions", { cookie });
+  await requireOk(companionsResponse, "listing demo companions failed");
+  const companionList = await companionsResponse.json() as { default_id?: string };
+  if (!companionList.default_id) throw new Error("demo household has no default companion for Rover");
+  await requireOk(await request(options.baseUrl, `/api/devices/${encodeURIComponent(rover.id)}`, {
+    method: "PATCH", cookie, body: JSON.stringify({ area: "Living room" }),
+  }), "setting Rover's room failed");
+  for (const [key, value] of [["robot.companion.id", companionList.default_id], ["robot.face.color", "mint"]] as const) {
+    await requireOk(await request(options.baseUrl, "/api/settings", {
+      method: "PUT", cookie, body: JSON.stringify({ scope: `device:${rover.id}`, key, value }),
+    }), `setting Rover's ${key} failed`);
+  }
+
   const db = new Database(join(options.dataDir, "hub.db"));
   try {
     seedToursDisabledForCapture(db, Object.values(people));

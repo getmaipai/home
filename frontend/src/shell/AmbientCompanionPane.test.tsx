@@ -19,9 +19,9 @@ function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return <QueryClientProvider client={client}><MemoryRouter>{children}</MemoryRouter></QueryClientProvider>;
 }
-function usePane(side: ReturnType<typeof useSideChat>, onContinue: (id: string) => void, wake?: { listening: string; onTurnOff: () => void }) {
+function usePane(side: ReturnType<typeof useSideChat>, onContinue: (id: string) => void, wake?: { listening: string; onTurnOff: () => void }, bot?: { id: string; name: string; online?: boolean }) {
   const [state, setState] = useState<AmbientPaneState>({ open: false, pinned: false });
-  return useAmbientCompanionPane({ person, companionName: "Companion", companionId: "companion-1", avatar: null, incognito: false, state, onStateChange: setState, onContinue, onRing: noop, side, wake });
+  return useAmbientCompanionPane({ person, companionName: bot?.name ?? "Companion", companionId: "companion-1", avatar: null, bot: bot as never, incognito: false, state, onStateChange: setState, onContinue, onRing: noop, side, wake });
 }
 
 afterEach(() => { cleanup(); mock.restore(); });
@@ -85,10 +85,24 @@ describe("ambient companion pane controls", () => {
     expect(onContinue).toHaveBeenCalledWith("side-1");
   });
 
+  test("bot pane exposes Find me and sends the device command", async () => {
+    const original = api.findRobot;
+    const find = mock(async () => ({ id: "command-1" } as never));
+    api.findRobot = find as never;
+    try {
+      const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
+      const { result } = renderHook(() => usePane(side, noop, undefined, { id: "robot-1", name: "Rover", online: false }), { wrapper });
+      const view = render(<>{result.current.headerActions}</>, { wrapper });
+      fireEvent.click(view.getByRole("button", { name: "Find me Rover" }));
+      await waitFor(() => expect(find).toHaveBeenCalledWith("robot-1"));
+    } finally { api.findRobot = original; }
+  });
+
   test("Settings links to companion voice, appearance and presence pages and saves the selected companion", async () => {
-    const originals = { companions: api.companions, setSetting: api.setSetting };
+    const originals = { companions: api.companions, robotDevices: api.robotDevices, setSetting: api.setSetting };
     const save = mock(async () => ({} as never));
     api.companions = async () => ({ companions: [{ id: "companion-1", name: "Companion" }, { id: "companion-2", name: "Another companion" }] } as never);
+    api.robotDevices = async () => [];
     api.setSetting = save as never;
     try {
       const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
@@ -102,8 +116,32 @@ describe("ambient companion pane controls", () => {
       fireEvent.click(view.getByRole("combobox", { name: "Choose companion" }));
       fireEvent.click(await view.findByRole("option", { name: "Another companion" }));
       await waitFor(() => expect(save).toHaveBeenCalledWith("person:person-1", "persona.active_id", "companion-2"));
+      await waitFor(() => expect(save).toHaveBeenCalledWith("person:person-1", "companions.ambient_bot", ""));
     } finally {
       api.companions = originals.companions;
+      api.robotDevices = originals.robotDevices;
+      api.setSetting = originals.setSetting;
+    }
+  });
+
+  test("choosing a bot writes ambient_bot without changing the active companion", async () => {
+    const originals = { companions: api.companions, robotDevices: api.robotDevices, setSetting: api.setSetting };
+    const save = mock(async () => ({} as never));
+    api.companions = async () => ({ companions: [{ id: "companion-1", name: "Companion" }] } as never);
+    api.robotDevices = async () => [{ id: "robot-1", name: "Rover", area: "Living room", companion_id: "companion-1", face_color: "mint" }] as never;
+    api.setSetting = save as never;
+    try {
+      const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
+      const { result } = renderHook(() => usePane(side, noop), { wrapper });
+      act(() => { result.current.onOpenChange(true); result.current.onActiveTabChange("settings"); });
+      const view = render(<>{result.current.tabs.find((tab) => tab.id === "settings")!.content}</>, { wrapper });
+      fireEvent.click(await view.findByRole("combobox", { name: "Choose companion" }));
+      fireEvent.click(await view.findByRole("option", { name: "Rover, living room" }));
+      await waitFor(() => expect(save).toHaveBeenCalledWith("person:person-1", "companions.ambient_bot", "robot-1"));
+      expect(save).not.toHaveBeenCalledWith("person:person-1", "persona.active_id", expect.anything());
+    } finally {
+      api.companions = originals.companions;
+      api.robotDevices = originals.robotDevices;
       api.setSetting = originals.setSetting;
     }
   });
