@@ -29,6 +29,8 @@ import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { companionsForControls, robotCompanionOf, robotControlsOf } from "@/lib/robotCompanion";
+import { mayUseCompanion } from "@/lib/companionsApp";
+import { resolvePersona } from "@/lib/persona";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { listRobotPeople } from "@/lib/robotPeople";
 import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTestRuns";
@@ -129,7 +131,19 @@ devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   const ownerNames = new Map(db.select({ id: people.id, name: people.displayName }).from(people).all().map((row) => [row.id, row.name] as const));
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(admin && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), ...(ownerNames.has(d.personId) ? { ownerName: ownerNames.get(d.personId)!, ownerId: d.personId } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), viewer) })),
+    robots.map((d) => {
+      const companion = robotCompanionOf(d.id);
+      const companionUsable = companion && mayUseCompanion(viewer, resolvePersona(companion.id)) ? companion : null;
+      const named = (value: unknown): string | null => typeof value === "string" && value && value !== "default" ? value : null;
+      const own = named(getDeviceSettingValue(d.id, "robot.voice.id"));
+      const chosen = companionUsable ? named(getHouseholdSettingValue(companionVoiceKey(companionUsable.id))) : null;
+      const speaking = own ? { voice_id: own, source: "robot" as const }
+        : chosen ? { voice_id: chosen, source: "companion" as const, companion_name: companionUsable!.name }
+        : { voice_id: named(getHouseholdSettingValue("tts.home_voice")) ?? "default", source: "home" as const };
+      const faceColor = getDeviceSettingValue(d.id, "robot.face.color");
+      const night = getDeviceSettingValue(d.id, "robot.night.mode");
+      return { id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(admin && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), ...(ownerNames.has(d.personId) ? { ownerName: ownerNames.get(d.personId)!, ownerId: d.personId } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), viewer), ...(companionUsable ? { companion_id: companionUsable.id, companion_name: companionUsable.name, ...(typeof faceColor === "string" ? { face_color: faceColor } : {}), ...(typeof night === "boolean" ? { night } : {}), speaking } : {}) };
+    }),
     200,
   );
 });
@@ -416,26 +430,29 @@ const sendCommandRoute = createRoute({
   middleware: [requireAuth] as const,
   request: {
     params: idParamSchema("id", "device-a1b2c3"),
-    body: { content: { "application/json": { schema: z.object({ kind: z.enum(["mute", "unmute"]) }) } } },
+    body: { content: { "application/json": { schema: z.object({ kind: z.enum(["mute", "unmute", "find_me"]), seconds: z.number().int().min(1).max(30).optional() }) } } },
   },
   responses: {
     202: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Persisted for delivery to the robot." },
-    ...errorResponses({ 400: "Not a robot", 401: "Not signed in", 404: "No such device (or it is not yours to control)" }),
+    ...errorResponses({ 400: "Not a robot", 401: "Not signed in", 403: "You cannot use this robot", 404: "No such device (or it is not yours to control)" }),
   },
 });
 devicesRoutes.openapi(sendCommandRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
-  const { kind } = c.req.valid("json");
+  const { kind, seconds = 5 } = c.req.valid("json");
   // ROBOT-ADMIN-PLACE-01: a robot is the household's. Anyone but a child or guest may ask it to mute (the privacy-safe
   // direction); unmuting stays with the person who paired it and admins.
   const mayMuteAnyRobot = kind === "mute" && actor.role !== "child" && actor.role !== "guest";
-  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin" && !(mayMuteAnyRobot && device.kind === "robot"))) {
+  const companion = device?.kind === "robot" ? robotCompanionOf(device.id) : null;
+  const mayFind = kind === "find_me" && actor.role !== "guest" && !!companion && mayUseCompanion(actor, resolvePersona(companion.id));
+  if (kind === "find_me" && device?.kind === "robot" && !mayFind && device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin") return c.json({ error: "You cannot use this robot." }, 403);
+  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin" && !(mayMuteAnyRobot && device.kind === "robot") && !mayFind)) {
     return c.json({ error: "No such device" }, 404);
   }
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
-  const command = issueDeviceCommand(device.id, kind, {});
+  const command = issueDeviceCommand(device.id, kind, kind === "find_me" ? { seconds } : {});
   return c.json({ id: command.id }, 202);
 });
 

@@ -21,6 +21,8 @@ import type { TurnErrorDetail, TurnValue } from "@/wire";
 import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
 import { stripCueTags } from "@/lib/voiceCues";
+import { getDeviceById } from "@/lib/devices";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import { trackChatLease } from "@/lib/jobs/householdQueue";
@@ -82,6 +84,7 @@ import type { GateDecision } from "@/lib/gate/types";
 export interface RunTurnNextOpts {
   robotName?: string;
   deviceId?: string;
+  replyVoiceId?: string;
   conversationId?: string;
   pageContext?: unknown;
   mentionCompanionId?: string;
@@ -658,6 +661,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     actor,
     surface,
     ...(surface === "robot" && opts.robotName ? { robotName: opts.robotName } : {}),
+    ...(surface === "chat" && conversation.device_id ? { deviceId: conversation.device_id, robotName: getDeviceById(conversation.device_id)?.name, replyVoiceId: voiceForSpeech({ actor, deviceId: conversation.device_id }) } : {}),
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
     ...(offerTurn ? { offer: offerTurn } : {}),

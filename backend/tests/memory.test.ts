@@ -81,10 +81,19 @@ describe("POST /api/memory (remember)", () => {
     const robotB = issueDeviceToken(ownerRow.id, "robot", "Bruno").deviceId;
     expect(remember(ownerRow, { text: "Pippa and Rover tell the moon joke", category: "fact", tier: "durable", scope: "person", person: ownerRow.id, device_id: robotA, source: "test", importance: 0.8 }).ok).toBe(true);
     expect(remember(ownerRow, { text: "Pippa's birthday is in May", category: "fact", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.8 }).ok).toBe(true);
-    expect(list(ownerRow, { deviceId: robotA }).map((m) => m.text)).toContain("Pippa and Rover tell the moon joke");
-    expect(list(ownerRow, { deviceId: robotB }).map((m) => m.text)).not.toContain("Pippa and Rover tell the moon joke");
+    expect(list(ownerRow, { deviceId: robotA, robotBound: "all" }).map((m) => m.text)).toContain("Pippa and Rover tell the moon joke");
+    expect(list(ownerRow, { deviceId: robotB, robotBound: "all" }).map((m) => m.text)).not.toContain("Pippa and Rover tell the moon joke");
     expect(list(ownerRow).map((m) => m.text)).not.toContain("Pippa and Rover tell the moon joke");
     expect(list(ownerRow, { deviceId: robotB }).map((m) => m.text)).toContain("Pippa's birthday is in May");
+  });
+
+  test("chat-surface device metadata never admits robot-bound records to recall", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const robot = issueDeviceToken(ownerRow.id, "robot", "Rover").deviceId;
+    const saved = remember(ownerRow, { text: "Rover's private moon joke", category: "fact", tier: "durable", scope: "person", person: ownerRow.id, device_id: robot, source: "test", importance: 0.8 });
+    if (!saved.ok) throw new Error(saved.error);
+    expect(recall(ownerRow, "Rover private moon joke", { selfOnly: true, deviceId: robot, surface: "chat", bumpUsage: false }).map((row) => row.record.text)).not.toContain("Rover's private moon joke");
+    expect(recall(ownerRow, "Rover private moon joke", { selfOnly: true, deviceId: robot, surface: "robot", bumpUsage: false }).map((row) => row.record.text)).toContain("Rover's private moon joke");
   });
 
   // Step 10 (session-a-intelligence.md): "every write sets a monotonic

@@ -175,6 +175,7 @@ export interface TurnState {
   surface: Surface;
   /** Current paired robot name; only used to replace the identity line on robot turns. */
   robotName?: string;
+  replyVoiceId?: string;
   /** THIN-0D: the robot body's own speaker_evidence and present list,
    * honored on the robot surface only (routes/turn.ts); absent for every
    * other surface. An unidentified robot speaker is anonymous

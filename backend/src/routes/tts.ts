@@ -8,7 +8,7 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, isProtectedSentence, planForPerson, sentenceIndexFor, type HesitationLevel } from "@/lib/voiceCues";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnUtterance } from "@/routes/turn";
+import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnUtterance, voiceForTurn } from "@/routes/turn";
 import { chooseDelivery } from "@/lib/deliveryChoice";
 
 export const ttsRoutes = apiRouter();
@@ -59,7 +59,7 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
-  const voiceId = voiceForSpeech({ actor, deviceId: c.get("deviceId") });
+  const voiceId = (body.turn_id ? voiceForTurn(body.turn_id, actor.id) : undefined) ?? voiceForSpeech({ actor, deviceId: c.get("deviceId") });
   const startedAt = Date.now();
   // REG-02: the composer adds a spoken cue to a model-worded spoken turn's sentence, never to the written text.
   let spoken = body.text;

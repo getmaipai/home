@@ -7,13 +7,17 @@ import { hasRotatedRobotCredential, getRobotCredential, storeRobotCredential } f
 import { db } from "@/db";
 import { people, memoryRecords, memoryEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { privacyConnections } from "@/lib/privacy";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { addManagedEndpoint } from "@/lib/hubEndpoints";
 import { getDeviceById } from "@/lib/devices";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { buildStablePrefix } from "@/lib/turnShared";
+import { loadManifestOnly } from "@/lib/plugins";
+import { createHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
+import { __reloadPersonasForTests } from "@/lib/persona";
+import { __resetSettingsCacheForTests } from "@/lib/settings";
 
 beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
@@ -346,6 +350,27 @@ describe("GET /api/devices/robots", () => {
     expect((await (await ownerClient.get("/api/devices/robots")).json() as Array<{ ownerName?: string }>)[0]!.ownerName).toBe("Sage");
   });
 
+  test("adult owners receive companion presentation fields and children do not see an adult companion", async () => {
+    const { client: ownerClient, personId } = await owner();
+    const robot = issueDeviceToken(personId, "robot", "Rover").deviceId;
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `device:${robot}`, "robot.controls", "adult");
+    const loaded = loadManifestOnly("rivet");
+    if (!loaded.ok || !loaded.value.companion) throw new Error("rivet fixture missing");
+    const adultCompanion = createHouseholdCompanion({ ...loaded.value.companion, display_name: "Adult fixture" }, { display_name: "Sage", person_id: personId });
+    if (!adultCompanion.ok) throw new Error(adultCompanion.error);
+    setHouseholdCompanionAudience(adultCompanion.value.id, "adult", { display_name: "Sage" });
+    setHouseholdCompanionStatus(adultCompanion.value.id, "ready");
+    __reloadPersonasForTests(); __resetSettingsCacheForTests();
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `device:${robot}`, "robot.companion.id", adultCompanion.value.id);
+    const nova = await ownerClient.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" }).then((r) => r.json()) as { id: string };
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `person:${nova.id}`, "companions.allowed", true);
+    const ownerRows = await ownerClient.get("/api/devices/robots").then((r) => r.json()) as Array<Record<string, unknown>>;
+    expect(ownerRows[0]).toMatchObject({ companion_id: adultCompanion.value.id, companion_name: "Adult fixture", face_color: "mint", night: true, speaking: { source: "home" } });
+    const child = new TestClient(); await child.post("/api/auth/verify-secret", { personId: nova.id, secret: "0000" });
+    const childRows = await child.get("/api/devices/robots").then((r) => r.json()) as Array<Record<string, unknown>>;
+    expect(childRows[0]).not.toHaveProperty("companion_id");
+  });
+
   test("an adult may mute someone else's robot but not unmute it; a child may do neither", async () => {
     const { client: ownerClient, personId } = await owner();
     const robot = issueDeviceToken(personId, "robot", "Reachy Mini").deviceId;
@@ -359,6 +384,22 @@ describe("GET /api/devices/robots", () => {
     const child = await signIn("Nova", "child");
     expect((await adult.post(`/api/devices/${robot}/commands`, { kind: "mute" })).status).toBe(202);
     expect((await adult.post(`/api/devices/${robot}/commands`, { kind: "unmute" })).status).toBe(404);
+    expect((await child.post(`/api/devices/${robot}/commands`, { kind: "mute" })).status).toBe(404);
+  });
+
+  test("a child can queue find_me for a usable companion robot, while a guest cannot", async () => {
+    const { client: ownerClient, personId } = await owner();
+    const robot = issueDeviceToken(personId, "robot", "Rover").deviceId;
+    const make = async (name: string, role: string) => {
+      const created = await ownerClient.post("/api/people", { displayName: name, role, secret: "0000" }).then((r) => r.json()) as { id: string };
+      const client = new TestClient(); await client.post("/api/auth/verify-secret", { personId: created.id, secret: "0000" }); return client;
+    };
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `device:${robot}`, "robot.controls", "adult");
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `device:${robot}`, "robot.companion.id", "rivet");
+    const child = await make("Nova", "child");
+    expect((await child.post(`/api/devices/${robot}/commands`, { kind: "find_me" })).status).toBe(202);
+    const guest = await make("Guest", "guest");
+    expect((await guest.post(`/api/devices/${robot}/commands`, { kind: "find_me" })).status).toBe(403);
     expect((await child.post(`/api/devices/${robot}/commands`, { kind: "mute" })).status).toBe(404);
   });
 

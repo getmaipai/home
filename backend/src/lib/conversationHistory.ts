@@ -1547,7 +1547,7 @@ const VALID_MODES = new Set(modeEnum.options);
 
 export function createConversation(
   actor: PersonRow,
-  opts: { surface?: Surface; placement?: Conversation["placement"]; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null; folderId?: string | null } = {},
+  opts: { surface?: Surface; placement?: Conversation["placement"]; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null; folderId?: string | null; deviceId?: string | null } = {},
 ): ConversationOpResult<Conversation> {
   const surface = opts.surface ?? "chat";
   const placement = opts.placement ?? "chat";
@@ -1608,7 +1608,8 @@ export function createConversation(
   // turn-level `temporary` flag uses, so there is one way to get a
   // temporary conversation, not two designs that happen to agree today
   // and drift apart later.
-  let value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId, placement) : insertNewConversation(actor, surface, opts.companionId, mode, placement);
+  if (opts.deviceId && (placement !== "side" || surface !== "chat")) return { ok: false, status: 400, error: "device_id is only allowed on a side chat." };
+  let value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId, placement) : insertNewConversation(actor, surface, opts.companionId, mode, placement, opts.deviceId ?? null);
   if (carried) {
     // Seeded, never anchored: the summary covers no turn of this chat, and
     // the window carries it from the first turn (held out of that first

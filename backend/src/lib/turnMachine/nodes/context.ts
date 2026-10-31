@@ -53,6 +53,10 @@ import { surfaceClassOf } from "@/lib/surfaceClass";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
 import { resolvePageContext } from "@/lib/pageContext";
+import { getDeviceById } from "@/lib/devices";
+import { getRobotCheckin } from "@/lib/robotCheckin";
+import { getDeviceState } from "@/lib/deviceStates";
+import { getRobotSoftware } from "@/lib/robotSoftware";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -176,6 +180,22 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
   const pageContext = resolvePageContext(state.actor, state.pageContextRaw);
   if (pageContext) items.push(pageContext);
+  if (state.surface === "chat" && state.deviceId) {
+    const device = getDeviceById(state.deviceId);
+    if (device?.kind === "robot") {
+      const checkin = getRobotCheckin(device.id);
+      const robotState = getDeviceState(device.id);
+      const software = getRobotSoftware(device.id);
+      const lines = [
+        `Robot status for ${device.name} (read-only record):`,
+        `Battery: ${checkin?.battery_level ?? robotState?.battery_level ?? "unknown"}%${checkin?.charging === true ? ", charging" : checkin?.charging === false ? ", not charging" : ""}.`,
+        `Presence: ${checkin?.online ? robotState?.activity ?? "online" : "offline"}. Room: ${device.area ?? "unknown"}.`,
+        `Last seen: ${device.lastSeenAt ?? "unknown"}.`,
+        `Firmware: ${checkin?.firmware_version ?? software.firmware.installed?.version ?? "unknown"}; app: ${checkin?.bot_version ?? software.bot.running ?? "unknown"}.`,
+      ];
+      items.push({ id: "robot-status", text: lines.join("\n"), source: "page", subjects: [], disclosure: "child_ok" });
+    }
+  }
   // UPLOAD-IMG-02: pictures sent with this message. Not for a bare turn
   // (the route refuses pictures there). VISION-02c: when the chat model
   // reads pictures and this person may send them, they go to the model as
@@ -281,7 +301,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       queryVector,
       withholdSensitive,
       anonymous,
-      deviceId: state.deviceId ?? null,
+      deviceId: state.surface === "robot" ? state.deviceId ?? null : null,
+      surface: state.surface,
       // #88's own excludeSource (THIN-7C): an edited turn's own resend never
       // recalls what the replaced turn put in memory.
       excludeSource: state.supersedes,
