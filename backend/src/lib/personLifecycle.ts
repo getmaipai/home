@@ -23,7 +23,7 @@
 //    silently undo itself on the next sync. A tombstone transfers.
 import { revokeAllApiKeys } from "@/lib/apiKeys";
 import { and, eq, isNull, ne, lt } from "drizzle-orm";
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, unlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { db, sqlite } from "@/db";
 import {
@@ -41,8 +41,9 @@ import {
   relationships,
   grants,
   approvals,
+  projects,
 } from "@/db/schema";
-import { clonedVoicesDir } from "@/lib/paths";
+import { clonedVoicesDir, projectsDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { TOMBSTONE_TEXT } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -265,6 +266,7 @@ export interface ErasureCounts {
   /** FACE-01: prints tombstoned (embedding scrubbed), not hard-deleted -
    * see erasePersonData()'s own comment on why. */
   biometricPrints: number;
+  projects: number;
 }
 
 /** Everything the household holds about one person, deleted for real.
@@ -273,7 +275,7 @@ export interface ErasureCounts {
  * test walks the schema to prove none is missed: a table added later
  * that keeps person data, and is not handled here, is exactly how a
  * delete quietly stops being a delete. */
-export function erasePersonData(personId: string, blobsAfterCommit: string[]): ErasureCounts {
+export function erasePersonData(personId: string, blobsAfterCommit: string[], projectDirsAfterCommit: string[] = []): ErasureCounts {
   // STORE-DELETE-01, the one files step: files nobody else can see are
   // purged, record and blob; a file with a live share stays and passes
   // to the household (lib/storage/personFiles.ts has the rule). It runs
@@ -336,6 +338,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   const memoryIds = sqlite
     .query("SELECT id FROM memory_records WHERE scope = 'person' AND person = ?")
     .all(personId) as { id: string }[];
+  sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)").run(personId);
   const tombstonedAt = new Date().toISOString();
   for (const row of memoryIds) {
     sqlite
@@ -401,6 +404,18 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   // the conversations above, which reference them.
   eraseChatFolderReferences(personId);
   const chatFolderRows = sqlite.query("DELETE FROM chat_folders WHERE person_id = ?").run(personId).changes;
+  // Issue 209: each project's folder goes too, but only after the transaction commits (like the file blobs), so a rollback keeps it.
+  const ownedProjects = db.select({ id: projects.id }).from(projects).where(eq(projects.person, personId)).all();
+  projectDirsAfterCommit.push(...ownedProjects.map((project) => join(projectsDir, project.id)));
+  const projectRows = sqlite.query("DELETE FROM projects WHERE person = ?").run(personId).changes;
+  // Lists belong to an individual only when explicitly person-scoped.
+  // Household lists can carry an incidental person value and remain.
+  sqlite.query("DELETE FROM lists WHERE scope = 'person' AND person = ?").run(personId);
+  sqlite.query("DELETE FROM commands WHERE creator_id = ?").run(personId);
+  sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ? OR subject_person_id = ?").run(personId, personId);
+  sqlite.query("DELETE FROM notification_holds WHERE recipient_id = ?").run(personId);
+  sqlite.query("DELETE FROM reply_constraints WHERE person = ?").run(personId);
+  sqlite.query("DELETE FROM music_jobs WHERE person_id = ?").run(personId);
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id
   // column this table does not have.
@@ -417,6 +432,9 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   // row would keep their id around in a table this function exists to
   // clear out.
   const jobs = sqlite.query("DELETE FROM scheduled_jobs WHERE person_id = ?").run(personId).changes;
+  // Device commands are owned through the device that sent them. Clear
+  // them before revokeAllCredentialsAndSessions() removes those devices.
+  sqlite.query("DELETE FROM device_commands WHERE device_id IN (SELECT id FROM devices WHERE person_id = ?)").run(personId);
   // Issue #37: this used to hand-roll only the sessions/person_credentials
   // half of what a deleted person's access needs erasing, leaving
   // passkeys, paired devices, device tokens and the TOTP secret behind -
@@ -484,6 +502,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
     attachments: files.purged,
     filesKeptForHousehold: files.keptForHousehold,
     biometricPrints: biometricPrintRows,
+    projects: projectRows,
   };
 }
 
@@ -507,7 +526,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
 // tolerant of a leftover orphan, before this fix (that function's own
 // header explains why), and stay exactly that tolerant now, just with
 // the SQL side genuinely atomic underneath.
-const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: string, blobsAfterCommit: string[]): PersonOpResult<ErasureCounts> => {
+const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: string, blobsAfterCommit: string[], projectDirsAfterCommit: string[]): PersonOpResult<ErasureCounts> => {
   const target = livingPerson(personId);
   if (!target) return { ok: false, status: 404, error: "no such person" };
 
@@ -523,7 +542,7 @@ const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: strin
   const lastOwnerError = lastOwnerGuardError(personId, target.role === "owner");
   if (lastOwnerError) return lastOwnerError;
 
-  const counts = erasePersonData(personId, blobsAfterCommit);
+  const counts = erasePersonData(personId, blobsAfterCommit, projectDirsAfterCommit);
   // The tombstone. Nickname and birthdate go with the rest of their
   // data; the display name stays, because a tombstone that cannot say
   // who it was is not much of a record for a robot reconciling later.
@@ -541,8 +560,12 @@ const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: strin
  * whose bytes are already gone (attachments.ts's purgeFileRecord). */
 export function deletePerson(actor: PersonRow, personId: string): PersonOpResult<ErasureCounts> {
   const blobsAfterCommit: string[] = [];
-  const result = commitDeletePerson(actor, personId, blobsAfterCommit);
-  if (result.ok) removeFileBlobs(blobsAfterCommit);
+  const projectDirsAfterCommit: string[] = [];
+  const result = commitDeletePerson(actor, personId, blobsAfterCommit, projectDirsAfterCommit);
+  if (result.ok) {
+    removeFileBlobs(blobsAfterCommit);
+    for (const dir of projectDirsAfterCommit) rmSync(dir, { recursive: true, force: true });
+  }
   return result;
 }
 

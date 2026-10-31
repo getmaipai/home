@@ -4,7 +4,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { sqlite, db } from "@/db";
-import { passkeyCredentials, devices, deviceTokens, totpSecrets, people, biometricPrints } from "@/db/schema";
+import { passkeyCredentials, devices, deviceTokens, totpSecrets, people, biometricPrints, projects, lists, commands, notificationDeliveries, notificationHolds, replyConstraints, musicJobs, memoryRecords, pendingMemoryWork, deviceCommands } from "@/db/schema";
 import { newPersonId, newBiometricPrintId } from "@/lib/id";
 import { remember } from "@/lib/memory";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -13,6 +13,9 @@ import { scheduleJob } from "@/lib/scheduler";
 import { createArtifact } from "@/lib/artifacts";
 import { createJob } from "@/lib/jobs";
 import { compareHlc } from "@/lib/hlc";
+import { projectsDir } from "@/lib/paths";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import type { PersonRow } from "@/types";
 
 /** The real PersonRow for someone already created through the API, so
@@ -989,6 +992,40 @@ describe("deleting a person erases what the household held about them", () => {
     expect(printTombstone.embedding_encrypted).toBeNull();
     expect(printTombstone.deleted_at).not.toBeNull();
     expect(printTombstone.consented_by_person_id).toBe(ownerRow.id);
+  });
+
+  test("erases projects and person-owned operational rows but keeps household lists", async () => {
+    const owner = await ownerClient();
+    const person = await addPerson(owner, "Project owner", "teen");
+    const now = new Date().toISOString();
+    const projectId = "project-erasure-209-210";
+    db.insert(projects).values({ id: projectId, person: person.id, type: "research", title: "Notes", state: "done", plan: "{}", steps: "[]", artifacts: "[]", provenance: "{}", hlc: now, createdAt: now, updatedAt: now }).run();
+    const projectPath = join(projectsDir, projectId);
+    mkdirSync(projectPath, { recursive: true });
+    writeFileSync(join(projectPath, "result.txt"), "private project output");
+    db.insert(lists).values({ id: "list-person-erasure", scope: "person", person: person.id, kind: "todo", title: "Personal", items: "[]", source: "hub", createdAt: now, updatedAt: now, hlc: now }).run();
+    db.insert(lists).values({ id: "list-household-erasure", scope: "household", person: person.id, kind: "shopping", title: "Shared", items: "[]", source: "hub", createdAt: now, updatedAt: now, hlc: now }).run();
+    db.insert(commands).values({ id: "command-erasure", creatorId: person.id, trigger: "private phrase", minRole: "teen", actionKind: "reply", actionData: "{}", createdAt: now }).run();
+    db.insert(notificationDeliveries).values({ id: "delivery-erasure", typeId: "test", recipientId: person.id, text: "private", channels: "[]", createdAt: now }).run();
+    db.insert(notificationHolds).values({ id: "hold-erasure", typeId: "test", recipientId: person.id, text: "private", options: "[]", deliverAfter: now }).run();
+    db.insert(replyConstraints).values({ id: "constraint-erasure", conversationId: "none", person: person.id, kind: "tone", value: "quiet", setAt: now, hlc: now }).run();
+    db.insert(musicJobs).values({ id: "music-erasure", personId: person.id, task: "generate", request: JSON.stringify({ prompt: "private request" }), state: "queued", createdAt: now, updatedAt: now, hlc: now }).run();
+    const memoryId = "memory-pending-erasure";
+    db.insert(memoryRecords).values({ id: memoryId, recordKind: "memory", text: "private memory", category: "fact", tier: "durable", status: "active", scope: "person", person: person.id, source: "hub", importance: 0.5, createdAt: now, lastUsedAt: now, hlc: now }).run();
+    db.insert(pendingMemoryWork).values({ memoryId, reason: "embed_failed", queuedAt: now }).run();
+    db.insert(devices).values({ id: "device-command-erasure", kind: "phone", name: "Phone", personId: person.id, createdAt: now, updatedAt: now, hlc: now }).run();
+    db.insert(deviceCommands).values({ id: "device-command-row-erasure", deviceId: "device-command-erasure", kind: "notify", payload: "{}", issuedAt: now }).run();
+
+    const result = await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
+    expect(result.status).toBe(200);
+    for (const [table, column, value] of [
+      ["projects", "id", projectId], ["lists", "id", "list-person-erasure"], ["commands", "id", "command-erasure"],
+      ["notification_deliveries", "id", "delivery-erasure"], ["notification_holds", "id", "hold-erasure"],
+      ["reply_constraints", "id", "constraint-erasure"], ["music_jobs", "id", "music-erasure"],
+      ["pending_memory_work", "memory_id", memoryId], ["device_commands", "id", "device-command-row-erasure"],
+    ] as const) expect(countRows(table, column, value)).toBe(0);
+    expect(existsSync(projectPath)).toBe(false);
+    expect(countRows("lists", "id", "list-household-erasure")).toBe(1);
   });
 });
 
