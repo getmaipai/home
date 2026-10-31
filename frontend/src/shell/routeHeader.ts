@@ -1,4 +1,5 @@
 import { isActiveNavPath } from "@maipai/ui/src/nav";
+import { NAV_ENTRIES } from "@/shell/nav";
 import { greetingFor } from "@/apps/home/greeting";
 import { APP_CATALOG, type AppEntry } from "@/shell/appCatalog";
 import type { Roster } from "@/lib/api";
@@ -25,6 +26,13 @@ const ROUTE_HEADER_OVERRIDES: RouteHeaderOverride[] = [
 export interface RouteHeader {
   title: string;
   subtitle: string;
+}
+
+/** The catalog title for a route (overrides first), or undefined when no catalog entry covers it. */
+export function routeTitle(pathname: string, apps: readonly AppEntry[] = APP_CATALOG): string | undefined {
+  const override = [...ROUTE_HEADER_OVERRIDES].sort((a, b) => b.to.length - a.to.length).find((candidate) => isActiveNavPath(pathname, candidate.to));
+  if (override) return override.title;
+  return [...apps, ...NAV_ENTRIES].sort((a, b) => b.to.length - a.to.length).find((entry) => isActiveNavPath(pathname, entry.to) && entry.to !== "/")?.label;
 }
 
 export function routeHeader(pathname: string, person: Roster, apps: readonly AppEntry[] = APP_CATALOG): RouteHeader {

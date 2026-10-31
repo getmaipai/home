@@ -64,6 +64,7 @@ import { useAmbientCompanionPane, readAmbientPaneState, type AmbientPaneControl,
 import { useSideChat } from "@/shell/useSideChat";
 import { AmbientHeaderProvider } from "@/shell/ambientHeaderContext";
 import { AmbientPageContextProvider, ambientPageContextForRoute } from "@/shell/pageContext";
+import { routeTitle } from "@/shell/routeHeader";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
@@ -136,24 +137,24 @@ const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ def
 // this, not live) - a true sibling route means only one of the two
 // is ever mounted for a given `//*` path, so each owns the slot
 // cleanly for its own lifetime, the same pattern chat already proves.
+const PAGE_ONLY_TITLES: Record<string, string> = {
+  "/storage": "Storage",
+  "/performance": "Performance",
+  "/updates": "Updates",
+  "/repairs": "Repairs",
+  "/status": "Status",
+  "/backups": "Backups",
+  "/commands": "Commands",
+  "/users": "Users",
+  "/dev/ui": "Chat showcase",
+};
+
 function PageHeaderLayout() {
   const { pathname } = useLocation();
   useHeaderExtra(PageHeaderTitle, PageHeaderActions);
-  const titleByPath: Record<string, string> = {
-    "/people": "Family",
-    "/storage": "Storage",
-    "/performance": "Performance",
-    "/updates": "Updates",
-    "/repairs": "Repairs",
-    "/status": "Status",
-    "/backups": "Backups",
-    "/commands": "Commands",
-    "/privacy": "Privacy",
-    "/users": "Users",
-    "/reference": "Reference",
-    "/dev/ui": "Chat showcase",
-  };
-  const title = titleByPath[pathname.replace(/\/$/, "") || "/"];
+  // Issue 187: a page in the app catalog takes its title from there (one definition); only pages outside the catalog name themselves here.
+  const path = pathname.replace(/\/$/, "") || "/";
+  const title = PAGE_ONLY_TITLES[path] ?? routeTitle(path);
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}

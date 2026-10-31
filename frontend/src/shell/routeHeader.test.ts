@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { routeHeader } from "./routeHeader";
+import { routeHeader, routeTitle } from "./routeHeader";
 import { mergeAppCatalog } from "./appCatalog";
 import type { Roster } from "@/lib/api";
 
@@ -31,6 +31,13 @@ test("the Home route's subtitle greets the signed-in person", () => {
 test("every primary destination gets its own title and subtitle", () => {
   expect(routeHeader("/chat", person).title).toBe("Chat");
   expect(routeHeader("/settings", person).title).toBe("Settings");
+});
+
+test("catalog pages take their header title from the catalog (issue 187)", () => {
+  expect(routeTitle("/people")).toBe("Family");
+  expect(routeTitle("/privacy")).toBe("Privacy");
+  expect(routeTitle("/reference")).toBe("Reference");
+  expect(routeTitle("/storage")).toBeUndefined();
 });
 
 test("a nested route matches its ancestor destination, not the root", () => {
