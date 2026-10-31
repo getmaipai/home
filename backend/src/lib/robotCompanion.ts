@@ -6,6 +6,7 @@
 import type { AgeBand } from "@/lib/ageBand";
 import { getDeviceSettingValue } from "@/lib/settings";
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import { getHouseholdCompanion } from "@/lib/householdCompanions";
 
 export const ROBOT_CONTROLS_KEY = "robot.controls";
 export const ROBOT_COMPANION_KEY = "robot.companion.id";
@@ -33,9 +34,10 @@ export function companionFloor(audience: CompanionAudience): AgeBand {
 
 export function companionInfo(id: string): CompanionInfo | null {
   const loaded = loadManifestOnly(id);
-  if (!loaded.ok || loaded.value.kind !== "companion" || !loaded.value.companion) return null;
-  const audience = companionAudienceOf(loaded.value.companion.audience, loaded.value.min_role);
-  return { id, name: loaded.value.companion.display_name, audience, floor: companionFloor(audience) };
+  const manifest = loaded.ok ? loaded.value : getHouseholdCompanion(id);
+  if (!manifest || manifest.kind !== "companion" || !manifest.companion) return null;
+  const audience = companionAudienceOf(manifest.companion.audience, manifest.min_role);
+  return { id, name: manifest.companion.display_name, audience, floor: companionFloor(audience) };
 }
 
 export function allCompanions(): CompanionInfo[] {

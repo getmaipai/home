@@ -367,6 +367,8 @@ export interface ListOptions {
    * parental-view routes. */
   selfOnly?: boolean;
   deviceId?: string | null;
+  /** Turn surface. Robot-bound records are admitted only on robot turns. */
+  surface?: "chat" | "robot" | string;
   /** "all": also list robot-bound records for any robot. Only the Memory
    * page's list route sets it, so a person sees their own rapport with each
    * robot and each robot's own facts, still through canRead. Recall and
@@ -399,7 +401,7 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => validAt(r, asOf));
-  if (opts.robotBound !== "all") rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
+  rows = rows.filter((r) => r.deviceId === null || (opts.robotBound === "all" && opts.deviceId != null && r.deviceId === opts.deviceId));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
   rows.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -700,7 +702,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // leaves; runMaintenance() archives it as "event_passed" on the same
   // boundary. Every other record reads as of the moment (CHAT-08).
   let rows = db.select().from(memoryRecords).where(and(...conditions)).all().filter((r) => validAt(r, asOf) || eventWithinGrace(r, asOf));
-  rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
+  rows = rows.filter((r) => r.deviceId === null || (opts.surface === "robot" && opts.deviceId != null && r.deviceId === opts.deviceId));
   // Never a legacy profile paragraph (PROFILE_SOURCE: the weekly
   // LLM-written row the profile card in lib/memoryProfile.ts replaced,
   // MEM-AUDIT-01). The consolidation pass archives those rows; until it
@@ -926,7 +928,7 @@ export function similarByVector(
   const roleOf = rolesById();
   const asOf = opts.asOf ?? new Date();
   let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all().filter((r) => validAt(r, asOf));
-  rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
+  rows = rows.filter((r) => r.deviceId === null || (opts.surface === "robot" && opts.deviceId != null && r.deviceId === opts.deviceId));
   // A plain fact ("Rover: a family friend" vs. free-text prose) must
   // never dedupe against an existing entity record - a code review
   // (2026-09-05) found that without this exclusion, a fact whose

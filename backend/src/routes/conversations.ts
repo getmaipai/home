@@ -46,6 +46,9 @@ import {
 import { recallEpisodes } from "@/lib/episodes";
 import { ensureConversationTitleScheduled, ensureProvisionalTitle } from "@/lib/conversationTitle";
 import { embedQueryForRecall } from "@/lib/memory";
+import { getDeviceById } from "@/lib/devices";
+import { robotCompanionOf } from "@/lib/robotCompanion";
+import { resolvePersona as resolvePersonaRecord } from "@/lib/persona";
 import type { AppEnv, PersonRow } from "@/types";
 import type { Surface } from "@/lib/turnShared";
 
@@ -165,6 +168,7 @@ const CreateConversationBody = z.object({
   surface: z.string().optional().describe("Where the chat happens; defaults to chat."),
   placement: Conversation.shape.placement.optional().describe("Where the conversation is shown; defaults to Chat."),
   companion_id: z.string().nullable().optional().describe("The companion for this chat."),
+  device_id: z.string().optional().describe("A robot this side chat is about."),
   mode: z.unknown().optional().describe("chat, research or temporary."),
   carry_from: z.unknown().optional().describe("A conversation id whose summary seeds this chat (THIN-3G)."),
   folder_id: z.unknown().optional().describe("A project (chat folder) id to start the chat inside (PROJECTS-01a). Never for a temporary chat."),
@@ -185,16 +189,22 @@ const createConversationRoute = createRoute({
 
 conversationsRoutes.openapi(createConversationRoute, (c) => {
   const actor = c.get("person");
-  const body = (c.req.valid("json") ?? {}) as { surface?: Surface; placement?: Conversation["placement"]; companion_id?: string | null; mode?: unknown; carry_from?: unknown; folder_id?: unknown };
+  const body = (c.req.valid("json") ?? {}) as { surface?: Surface; placement?: Conversation["placement"]; companion_id?: string | null; device_id?: string; mode?: unknown; carry_from?: unknown; folder_id?: unknown };
   const mode = body.mode === undefined ? undefined : Conversation.shape.mode.safeParse(body.mode);
   if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
   if (body.carry_from !== undefined && body.carry_from !== null && typeof body.carry_from !== "string") return c.json({ error: "carry_from must be a conversation id" }, 400);
   if (body.folder_id !== undefined && body.folder_id !== null && typeof body.folder_id !== "string") return c.json({ error: "folder_id must be a project id" }, 400);
   if (body.companion_id !== undefined && body.companion_id !== null && typeof body.companion_id !== "string") return c.json({ error: "Choose a companion from the list." }, 400);
+  if (body.device_id !== undefined) {
+    const device = getDeviceById(body.device_id);
+    const assigned = device?.kind === "robot" ? robotCompanionOf(device.id) : null;
+    if (body.placement !== "side" || body.surface && body.surface !== "chat" || !assigned || !mayUseCompanion(actor, resolvePersonaRecord(assigned.id))) return c.json({ error: "That robot is not available for this side chat." }, 403);
+    if (body.companion_id !== assigned.id) return c.json({ error: "That is not this robot's companion." }, 400);
+  }
   if (typeof body.companion_id === "string" && (resolvePersona(body.companion_id).id !== body.companion_id || !mayUseCompanion(actor, resolvePersona(body.companion_id)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
   // THIN-3G: carry_from seeds the new chat with that chat's summary.
   // PROJECTS-01a: folder_id starts the chat inside one of the person's projects.
-  const result = createConversation(actor, { surface: body.surface, placement: body.placement, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null });
+  const result = createConversation(actor, { surface: body.surface, placement: body.placement, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null, deviceId: body.device_id ?? null });
   if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
   return c.json(result.value, 201);
 });

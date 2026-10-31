@@ -1588,7 +1588,8 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   const conversation = turn.conversationId
     ? db.select({ deviceId: conversations.deviceId }).from(conversations).where(eq(conversations.id, turn.conversationId)).get()
     : undefined;
-  const robotDeviceId = conversation?.deviceId ?? null;
+  const turnSurface = turn.conversationId ? db.select({ surface: conversations.surface }).from(conversations).where(eq(conversations.id, turn.conversationId)).get()?.surface : null;
+  const robotDeviceId = turnSurface === "robot" ? conversation?.deviceId ?? null : null;
   const extraction = await extractFacts(speakerName, turn);
   if (extraction.facts === null) {
     // A transport failure (the Stack unreachable, offline for a restart or
@@ -1755,7 +1756,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       ? similarByVector(
           speaker,
           vector,
-          fact.scope === "person" ? { scope: "person", person: speaker.id, deviceId: robotBound ? robotDeviceId : null } : { scope: "household", deviceId: robotBound ? robotDeviceId : null },
+          fact.scope === "person" ? { scope: "person", person: speaker.id, deviceId: robotBound ? robotDeviceId : null, surface: "robot" } : { scope: "household", deviceId: robotBound ? robotDeviceId : null, surface: "robot" },
           categoryToRecordKind(fact.category),
         )
       : [];

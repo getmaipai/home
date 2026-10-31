@@ -10,6 +10,7 @@ import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
 import { quickReaction, type QuickCue } from "@/lib/quickReaction";
 import { getTtsTags } from "@/lib/ttsCapabilities";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -25,7 +26,7 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation } from "@/lib/conversationHistory";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { attachments, conversationTurns } from "@/db/schema";
 import { db } from "@/db";
@@ -118,6 +119,7 @@ interface ResumeSession {
   cueBlocked?: boolean;
   modelStatus?: ModelSelectionStatus;
   conversationId: string;
+  deviceId?: string;
   turnId: string;
   answerMetadata?: import("@/wire").AnsweredBy;
   controller: AbortController;
@@ -163,6 +165,12 @@ function previousReply(conversationId: string): string | undefined {
 export function turnUtterance(turnId: string, ownerId: string): string | undefined {
   const session = inFlightTurns.get(turnId);
   return session && session.ownerId === ownerId ? session.utterance : undefined;
+}
+
+/** Voice selected for a turn, including a robot-bound ambient side chat. */
+export function voiceForTurn(turnId: string, ownerId: string): string | undefined {
+  const session = inFlightTurns.get(turnId);
+  return session && session.ownerId === ownerId ? voiceForSpeech({ actor: session.viewer, ...(session.deviceId ? { deviceId: session.deviceId } : {}) }) : undefined;
 }
 
 export function turnAllowsVoiceCues(turnId: string, ownerId: string): boolean {
@@ -1167,6 +1175,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     reactionTags: spokenTurn && speakerAgeBand(actor, new Date()) === "adult" ? await getTtsTags() : [],
     modelStatus: modelSelection.status,
     conversationId: result.conversationId,
+    ...(typeof body.conversation_id === "string" ? (() => { const conversation = getConversation(actor, body.conversation_id); return conversation.ok && conversation.value.device_id ? { deviceId: conversation.value.device_id } : {}; })() : {}),
     turnId: result.turnId,
     answerMetadata: !body.temporary && body.bare !== true && !ephemeral ? result.answerMetadata : undefined,
     controller: abortController,

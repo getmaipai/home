@@ -3,7 +3,8 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture as makeStackFixture, type StackFixture, offlineResponse } from "./stackFixture";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { issueDeviceToken } from "@/lib/deviceTokens";
 import { useDefaultScriptedStack } from "./stackFixture";
 import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { countTokens } from "@/lib/tokenCount";
@@ -2267,6 +2268,19 @@ describe("PATCH /api/conversations/:id settings", () => {
     const cleared = updateConversationSettings(actor, created.value.id, { thinking: null });
     expect(cleared.ok).toBe(true);
     if (cleared.ok) expect(cleared.value.settings).toBeUndefined();
+  });
+
+  test("a side chat stores device_id and rejects a mismatched robot companion", async () => {
+    const { client, actor } = await owner();
+    const robot = issueDeviceToken(actor.id, "robot", "Rover").deviceId;
+    setValue(actor, `device:${robot}`, "robot.controls", "adult");
+    setValue(actor, `device:${robot}`, "robot.companion.id", "rivet");
+    const created = await client.post("/api/conversations", { placement: "side", companion_id: "rivet", device_id: robot });
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({ device_id: robot, placement: "side", companion_id: "rivet" });
+    const mismatch = await client.post("/api/conversations", { placement: "side", companion_id: "buddy", device_id: robot });
+    expect(mismatch.status).toBe(400);
+    expect(await mismatch.json()).toEqual({ error: "That is not this robot's companion." });
   });
 });
 
