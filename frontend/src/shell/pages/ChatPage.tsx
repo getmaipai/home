@@ -93,6 +93,7 @@ import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlot
 import { discardDraft } from "@/apps/chat/draftStore";
 import { chatFoldersQueryKey, useChatProjects } from "@/apps/chat/chatProjects";
 import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
+import { useControlledConversationId } from "./useControlledConversationId";
 
 const VoiceSettingsIcon = getIcon("settings");
 const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
@@ -266,6 +267,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // this instead of `isSpeaking` alone to notice "speaking is over."
   const [connection, setConnection] = useState<ConnectionState>({ phase: "online" });
   const [searchParams, setSearchParams] = useSearchParams();
+  const { threadId: controlledConversationId, adopt: adoptConversationId } = useControlledConversationId(searchParams.get("conversation") ?? undefined);
   // Archive first switches an active remote thread to the blank thread
   // before calling the adapter. Keep the identity of that just-deselected
   // conversation so the adapter's synchronous unsupported-action signal
@@ -284,8 +286,9 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     setDraftConversationId(remoteId);
     deselectedConversationIdRef.current = undefined;
     previousThreadIdRef.current = remoteId;
+    adoptConversationId(remoteId);
     setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
-  }, [setDraftConversationId]);
+  }, [setDraftConversationId, adoptConversationId]);
   // PERSIST-CONV-01 / RESP-04: Thinking hydrates from the active
   // conversation settings and saves when changed. The model comes from
   // Stack and is not a chat-facing choice.
@@ -657,8 +660,9 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: useChatRuntimeHook,
     adapter: threadListAdapter,
-    threadId: searchParams.get("conversation") ?? undefined,
+    threadId: controlledConversationId,
     onThreadIdChange: (id) => {
+      adoptConversationId(id);
       if (id === undefined) {
         deselectedConversationIdRef.current = visibleConversationIdRef.current;
         visibleConversationIdRef.current = undefined;

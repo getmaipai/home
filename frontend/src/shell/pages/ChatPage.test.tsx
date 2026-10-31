@@ -3574,11 +3574,7 @@ describe("ChatPage (INCOGNITO-01 session flag wiring)", () => {
     }
   });
 
-  // Issue #165: the strengthened assertions reproduced the missing-create
-  // race under the frontend suite. Keep the regression in place, but skip
-  // it until the New Thread transition can be investigated with contention
-  // instrumentation; remove `.skip` once the underlying fix lands.
-  test.skip("Incognito stays on across separate new threads and marks each first turn temporary", async () => {
+  test("Incognito stays on across separate new threads and marks each first turn temporary", async () => {
     const restore = stubMultiTurnFetch();
     try {
       localStorage.setItem("maipai.incognito-explanation-seen", "true");
@@ -3601,7 +3597,7 @@ describe("ChatPage (INCOGNITO-01 session flag wiring)", () => {
       expect(bodies[1]!.temporary).toBe(true);
       expect(bodies[0]!.conversation_id).not.toBe(bodies[1]!.conversation_id);
       const conversationPosts = conversationCreateBodies();
-      expect(conversationPosts).toHaveLength(2);
+            expect(conversationPosts).toHaveLength(2);
       expect(bodies[0]!.conversation_id).toBe("conv-temp-1");
       expect(bodies[1]!.conversation_id).toBe("conv-temp-2");
     } finally {
