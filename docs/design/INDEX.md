@@ -91,6 +91,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (to be cut; today the Integrations rows it supersedes) |
 | [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) | current, built 2026-10-17 | LIKENESS-01; closes the VIDEO-GEN-12 owner question |
 | [music-generation-2026-10-17.md](music-generation-2026-10-17.md) | new 2026-10-17, measured; chat first, studio later | MUSIC-SPEC-01, MUSIC-GEN-01 to -14, MUSIC-STUDIO-01 (Music generation) |
+| [music-studio-2026-10-31.md](music-studio-2026-10-31.md) | proposed (architect ruling pending) | MUSIC-STUDIO-01 |
 | [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) | new 2026-10-27, decided, not built; Standard, Boost, Max and system-only Reduced for every generating feature; evaluations first | TIER-EVAL-01 to -08, TIER-SPEC-01, TIER-STACK-01 to -03, TIER-HOME-01 to -05, TIER-UI-01, TIER-STEMS-01, TIER-BENCH-01, TIER-DOC-01, TIER-SHIP-01 (Resource tiers) |
 | [resource-management-review-2026-10-31.md](resource-management-review-2026-10-31.md) | review 2026-10-31 of the governor, watchdog, heavy gate and household queue as built and as they run on the live hub; 14 findings, work order in its section 5; no rule change | none yet (section 5 names nine slices) |
 | [stem-splitting-2026-10-30.md](stem-splitting-2026-10-30.md) | new 2026-10-30, APPROVED, not built; stems as a task of `edit_music`, Standard `htdemucs` | TIER-STEMS-01, 01a to 01d, TIER-STEMS-02 (Resource tiers) |
