@@ -30,11 +30,11 @@ function clockText(time: string): string {
   return `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
 }
 
-function whenText(date: Date): string {
+export function whenText(date: Date): string {
   return date.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" });
 }
 
-function jobLabel(inputs: string): string {
+export function jobLabel(inputs: string): string {
   try {
     const task = (JSON.parse(inputs) as { task?: unknown }).task;
     return typeof task === "string" ? task : "";

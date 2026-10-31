@@ -12,7 +12,7 @@
 // own). See docs/dev.md's "Naming: skill, plugin, command, connector"
 // entry for the full research and reasoning.
 import { readFileSync, readdirSync } from "node:fs";
-import { alarmFoldFor, neutralizeReservedPrefix } from "@/lib/alarmCalls";
+import { alarmFoldFor, neutralizeReservedPrefix, reminderPayloadText } from "@/lib/alarmCalls";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import ERROR_CATALOG from "@maipai/spec/errors/errors.json" with { type: "json" };
@@ -539,7 +539,11 @@ function remindInputs(inputs: Record<string, unknown>): Record<string, unknown> 
   const { action, list: _list, items: _items, ...rest } = inputs;
   if (action === "add_items" || action === "show_list") return { ...rest, action: `list:${action}:` };
   const reminderFold = alarmFoldFor("remind", action);
-  if (reminderFold) return { ...rest, action: reminderFold };
+  if (reminderFold) {
+    // ASSIST-REMIND-01 part B: which reminder, and any new time, task or snooze minutes, ride in the op text after the prefix.
+    const { reminder: _reminder, minutes: _minutes, task: _task, when: _when, ...kept } = rest;
+    return { ...kept, expression: reminderPayloadText(rest), action: reminderFold };
+  }
   // The `list:` and `reminder:` prefixes are the host's private signal for a list or reminder-engine call. A reminder whose
   // own text starts with one must never be read as one, or a model-supplied expression could reach the engine without the
   // brake and audit.
@@ -701,6 +705,7 @@ export async function runPlugin(
         schedule_task: capture.alarm.schedule_task ?? "",
         when_text: capture.alarm.when_text,
         action: capture.alarm.action,
+        ...(capture.alarm.undo_id ? { undo_id: capture.alarm.undo_id } : {}),
       };
     }
     // The package's blocks come from this run's own data; a failure to build

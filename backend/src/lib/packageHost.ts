@@ -90,7 +90,8 @@ import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { recordUndo } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
-import { parseAlarmCall, type AlarmCall } from "@/lib/alarmCalls";
+import { parseAlarmCall, parseReminderPayload, type AlarmCall } from "@/lib/alarmCalls";
+import { lastReminderIdFor, runReminderAction } from "@/lib/reminderActions";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
 import { backoffSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
@@ -2049,6 +2050,27 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
     if (runtime.capture) runtime.capture.alarm = result;
   }
 
+  // ASSIST-REMIND-01 part B: every reminder action of `remind` (edit, snooze, complete, delete, show, and the older cancel
+  // and list names) runs through one function. Which reminder is meant is resolved in code, among this person's own.
+  function runReminderCall(call: AlarmCall): void {
+    requirePermission("reminders:write");
+    const band = runtime.band ?? speakerAgeBand(actor, new Date());
+    const result = runReminderAction(actor, call.action, parseReminderPayload(call.rest), { lastReminderId: lastReminderIdFor(actor.id) });
+    recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });
+    const receipt = result.undo
+      ? recordUndo({ personId: actor.id, turnId: turn?.id, tool: manifest.id, action: result.undo.action, inverse: result.undo.inverse })
+      : undefined;
+    if (runtime.capture) {
+      runtime.capture.alarm = {
+        task: result.reply,
+        ...(result.schedule_task ? { schedule_task: result.schedule_task } : {}),
+        when_text: result.when_text,
+        action: result.action,
+        ...(receipt ? { undo_id: receipt.id } : {}),
+      };
+    }
+  }
+
   // capability_missing is the closest fit errors.json has ("A required
   // capability... is not present on this node"), used here for "the
   // real host hasn't wired this RPC at all yet" too, which is a
@@ -2593,7 +2615,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           if (listCall) return runRemindListCall(listCall);
           const reminderCall = parseAlarmCall("remind", text);
           if (reminderCall) {
-            runAlarmCall(reminderCall);
+            runReminderCall(reminderCall);
             return { task: "", when_text: "", action: reminderCall.action };
           }
         }

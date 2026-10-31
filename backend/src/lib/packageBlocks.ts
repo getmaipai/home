@@ -24,7 +24,7 @@ export interface BlockCapture {
   /** The reply a shopping-list phrase run through `remind` gives; plugins.ts uses it in place of the reminder reply. */
   listReply?: string;
   /** The alarm engine's answer to an alarm phrase run through `timer` (or a reminder cancel or list run through `remind`). */
-  alarm?: { task: string; schedule_task?: string; when_text: string; action: string };
+  alarm?: { task: string; schedule_task?: string; when_text: string; action: string; undo_id?: string };
 }
 
 type RecipeResult = { reply?: { text: string }; data?: Record<string, unknown> };
@@ -83,7 +83,8 @@ function alarmBlocks(
   allowed: readonly string[],
 ): Record<string, unknown>[] {
   if (!allowed.includes("schedule_card")) return [];
-  if (alarm.action === "list") return [];
+  // A card only for an alarm set or a cancel; a list, snooze, edit or complete is answered in words.
+  if (alarm.action !== "set" && alarm.action !== "cancel") return [];
   return scheduleCard(
     producer,
     provenance,

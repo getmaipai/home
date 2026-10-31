@@ -21,7 +21,9 @@
       "what's on my shopping list",
       "what do I need to buy",
       "cancel the reminder to call Nadia",
-      "what reminders do I have"
+      "what reminders do I have",
+      "snooze my reminder",
+      "snooze that reminder"
     ],
     "patterns": [
       "remind me *",
@@ -32,7 +34,9 @@
       "what's on the shopping list",
       "what do i need to buy",
       "cancel the reminder *",
-      "what reminders do I have"
+      "what reminders do I have",
+      "snooze my reminder",
+      "snooze that reminder"
     ]
   },
   "args": {

@@ -7,13 +7,13 @@ import { tokenize } from "@/lib/text";
 
 type Resolution<T> = { ok: true; value: T } | { ok: false; reason: "none" | "ambiguous"; candidates: number };
 const pronouns = new Set(["that", "those", "it", "this list", "them"]);
-function similarity(a: string, b: string): number {
+export function similarity(a: string, b: string): number {
   const left = tokenize(a), right = tokenize(b);
   if (!left.size || !right.size) return 0;
   let shared = 0; for (const word of left) if (right.has(word)) shared++;
   return shared / Math.max(left.size, right.size);
 }
-function fuzzy<T>(rows: T[], words: string, label: (row: T) => string): Resolution<T> {
+export function fuzzy<T>(rows: T[], words: string, label: (row: T) => string): Resolution<T> {
   const scored = rows.map((row) => ({ row, score: similarity(words, label(row)) })).filter((entry) => entry.score >= 0.5).sort((a,b) => b.score-a.score);
   if (!scored.length) return { ok: false, reason: "none", candidates: 0 };
   const best = scored[0]!.score;

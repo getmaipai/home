@@ -52,8 +52,16 @@ function alarmPatternAction(id: string, pattern: string): string | null {
   if (id === "remind") {
     if (pattern.startsWith("cancel the reminder")) return "cancel_reminder";
     if (pattern.startsWith("what reminders")) return "list_reminders";
+    if (pattern.startsWith("snooze ")) return "snooze_reminder";
   }
   return null;
+}
+
+/** The words a fixed alarm or reminder phrase stands for when it captures nothing (the tool's expression is never empty). */
+function alarmPatternWords(action: string, pattern: string): string {
+  if (action === "list_reminders") return "reminders";
+  if (action === "snooze_reminder") return pattern.includes("that") ? "that reminder" : "my reminder";
+  return "alarms";
 }
 
 /** `add_items` or `show_list` for one of remind's shopping-list patterns, else null (a plain reminder). */
@@ -192,7 +200,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
         ? listArgs
         : alarmAction
         // A list phrase captures nothing, and the tool's expression is never empty.
-        ? { action: alarmAction, expression: captured || (alarmAction === "list_reminders" ? "reminders" : "alarms") }
+        ? { action: alarmAction, expression: captured || alarmPatternWords(alarmAction, pattern) }
         : captured ? { [firstArgName(manifest)]: captured } : {};
       // An alarm is private to the identified person, even when a robot has a signed-in owner. The answer is a fixed line,
       // never the model, which once claimed it would "set a reminder" when nothing was set. A plain timer is not an alarm

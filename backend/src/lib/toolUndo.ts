@@ -4,6 +4,7 @@ import { toolUndo, scheduledJobs, lists } from "@/db/schema";
 import { newToolUndoId } from "@/lib/id";
 import { cancelJob } from "@/lib/scheduler";
 import { removeItem } from "@/lib/lists";
+import { rescheduleReminder, restoreReminder } from "@/lib/reminderActions";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
@@ -11,7 +12,9 @@ import type { PersonRow } from "@/types";
 export type UndoInverse =
   | { kind: "cancel_reminder"; id: string }
   | { kind: "remove_item"; listId: string; itemId: string }
-  | { kind: "restore_list"; listId: string };
+  | { kind: "restore_list"; listId: string }
+  | { kind: "restore_reminder"; id: string }
+  | { kind: "reschedule_reminder"; id: string; nextRunAt: string; task?: string };
 
 export function recordUndo(
   input: {
@@ -67,6 +70,8 @@ export function runUndo(
   }
   let ok = false;
   if (inverse.kind === "cancel_reminder") ok = cancelJob(actor, inverse.id).ok;
+  else if (inverse.kind === "restore_reminder") ok = restoreReminder(actor, inverse.id);
+  else if (inverse.kind === "reschedule_reminder") ok = rescheduleReminder(actor, inverse.id, inverse.nextRunAt, inverse.task);
   else if (inverse.kind === "remove_item") ok = removeItem(actor, inverse.listId, inverse.itemId).ok;
   else if (inverse.kind === "restore_list") {
     const list = db.select().from(lists).where(eq(lists.id, inverse.listId)).get();

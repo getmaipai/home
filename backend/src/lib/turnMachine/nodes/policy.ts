@@ -530,6 +530,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         if (brake.decision === "ask") {
           const prompt = action === "delete_list" || action === "clear_list"
             ? `Delete this list and its ${itemCount ?? 0} items?`
+            : action === "delete_reminder" || action === "cancel_reminder"
+            ? "Delete this reminder?"
             : itemCount !== undefined && itemCount > 5
               ? `Change ${itemCount} items?`
               : `Go ahead and ${manifest.display.toLowerCase()}?`;
