@@ -31263,6 +31263,24 @@
           "Devices"
         ],
         "summary": "Devices paired to my own profile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "robot",
+                "pod",
+                "tv",
+                "phone",
+                "desktop",
+                "browser"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Every device with a live or once-live token paired to me.",
