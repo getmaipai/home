@@ -83,12 +83,13 @@ The per-slot peaks come from the Stack's tier catalog and are published on the b
 
 | Item | State |
 |---|---|
-| One governor tick instead of one loop per process | The bodies run one at a time (done). Merging the loops needs the supervisor's `busy` check to take the item id first, because the current closure answers for its own process only |
+| One governor tick instead of one loop per process | The bodies run one at a time (done), which removes the race. Merging the loops is a refactor of option ownership, not only of `busy`: the Stack's own loop and each process loop pass different global options (`unload`, `busy`, the chat shrink and restore hooks), and the supervisor's `busy` closure answers for its own process only, so a shared tick first needs one global configuration. Deferred; the payoff is fewer redundant polls |
 | SIGSTOP pause of a running worker | Built and measured in the isolation note; the making-space note lists it as rejected. The code uses it. Owner to rule |
 | The 30-60 s a context shrink costs the person chatting | R8 limits when it happens; "chat is never paused" and the shrink still disagree. Owner to rule |
 | When the full chat window comes back | RULES.md rule 4 restores it when the video job ends; R8 restores it at the next quiet moment, which can be later. Rule 4 wins unless the owner rules otherwise: the code follows R8 today, so this is a code difference to settle |
-| A daily resource line for admins (restarts by cause, pauses, evictions, re-queues, first-token time) | Not built (review slice 8) |
-| Chat engine first-token time under load | No measured week yet on the hub |
+| A daily resource line for admins | Built: the Stack serves `GET /stack/v1/memory/daily` (restarts by cause, stops, pauses, watchdog actions, shrinks, survivors, sweeps, from the log lines, which now carry `at`), and the Status page's admin memory block shows yesterday's line. Not counted: evictions by the governor, re-queues and first-token time (no log event yet) |
+| Chat engine first-token time under load | No measured week yet on the hub; the daily line has no first-token figure |
+| Search sidecar and Splash server in the owned registry | Registered (10f); confirm on the hub that `stack.unregistered` reads 0 after the next ship |
 
 ## 6. The older notes, in the order they supersede each other
 
