@@ -296,3 +296,47 @@ quiet window. Rule 11 (only the Stack's own tested components run models): nothi
 existing Status row; no new surface. Rule 6a: the resource line carries counts, never a person or a prompt. Owner rulings
 of 2026-10-21 (chat first, never kill by broad pattern) and 2026-10-30 (chat is never paused, only lowered) stand; F1 and
 F2 bring the code closer to them.
+
+## Addendum 2026-10-31 (afternoon): slice 10, recapture after a job, and the coordination record
+
+Owner requirement added 2026-10-31: when a job raises memory, CPU or disk use, something takes it back when the job
+is done, and something probes for stray, unaccounted-for use regularly, in real time.
+
+**What the audit found (read-only, Stack and Home, live hub numbers).** Memory is probed in real time (the watchdog
+samples every 5 s; the runaway watch reads each engine; `reapOrphans` runs each tick for launchd orphans under the
+engines directory). Nothing probes for processes left below the Stack, and disk is swept only at Stack start. Gaps,
+by impact: (1) video, music and stems workers outlive their admission (10, 5 and 1 minutes) with no ledger entry;
+(2) every worker is killed by single pid, and the Python workers run ffmpeg as a child, so a cancel can orphan an
+ffmpeg; (3) the stems source stash has no TTL; (4) partial downloads (`.part`, `.partial-N`, Home's `.download.tmp`)
+are never swept; (5) voice-clone clip folders in the system temp are never removed (18 on the hub). The hub's Stack
+data is 355 GB, almost all models; `tmp` was empty at the time of the audit.
+
+**Slice 10, one Codex brief each, in this order.**
+
+| # | Repo | Change | Done when |
+|---|---|---|---|
+| 10a (Stack 7f07a65) | Stack | workers stopped as process trees (`TreeSnapshot`), their ffmpeg children at background priority, idle workers on the ledger as warm items until they exit (`retainWarm` like `image-pool`), stems stash TTL, music edit admitted | Per-worker test: child and grandchild gone within 3 s of cancel; governor test: an idle video worker is evicted for a waiting picture |
+| 10b (Stack 422d5c5) | Stack | one `runSweeps` at start, every 10 minutes and when `tmp` passes 2 GB; partial downloads older than 7 days and voice clips older than a day go; `sweep.done` log line; `disk-temp-grew` health item | Sweep test with old and new files; watchdog test for the bound |
+| 10c (Stack 7211f4f) | Stack | owned-process registry (pid, start time, command of every process the Stack spawned or found below one); the watchdog tick stops only a registered member whose job finished and that survived the tree stop (two sightings, start time and command re-verified, TERM then KILL); unregistered descendants are only counted; `unaccounted_bytes` on the memory report with a 4 GB for 2 minutes rule that unloads idle workers; `stray-process` and `memory-unaccounted` health items | Watchdog tests for stray, owned, young and once-seen rows; the report field |
+| 10d (Home 3e0bf421c, queued) | Home | a failed model extraction removes its archive; `.part` and `.download.tmp` older than 7 days swept hourly | Download tests |
+| 10e (Stack e9a69a1) | Stack | `resourceRecapture.test.ts` per job kind and outcome (processes, ledger, temp size, unaccounted bytes back to baseline within 8 s); `bench:recapture` script for before and after numbers on a live Stack | The test in the gate; the bench run on the hub is owed once the hub runs a Stack with 10a to 10e |
+
+**Coordination (2026-10-31).** The "Dynamic model load balancing system" session coordinates the tier family
+(tier-stack, tier-queue, tier-grants, tier-spec, tier-evals). Its ruling on this review's work order: nothing landed
+contradicts the tier design; slices 3, 4, 6, 6a, 7 and 10 are built by the review session through Codex; slice 5
+after the tier-queue tip (2e54a6d9d) lands, with tier-queue told before `householdQueue.ts` is touched; slice 7 with
+tier-stack told the file list first. Conditions: one Stack worktree at a time, heavy runs only under load 50, land
+through the lander where one exists, a test for every behaviour change, chat never paused (lowered to Reduced only),
+landings reported to the coordinator.
+
+**Landed since the morning addendum.** Stack 7e44a93 RESOURCE-FIX-02 (every stop, unload and restart carries a
+required `RetireCause`); Home pins it in 6ef821d7f. Stack ca2fc15 RESOURCE-FIX-03 (slice 3: the video shrink waits for
+the reclaim ladder and a quiet window, restores at the next quiet moment, warms chat after both, counted on the memory
+report; `quiet_seconds` and `quiet_max_wait_seconds` accepted on the video route, Home sends them in slice 5).
+
+**Where it all is (2026-10-31, afternoon).** Stack GitHub main holds slice 2 (7e44a93), slice 3 (ca2fc15), 10a
+(7f07a65), 10b (422d5c5), 10c (7211f4f) and 10e (e9a69a1). Home pins Stack 6a36b64 on the live hub (v0.2.159); the
+7e44a93 pin and the e9a69a1 pin go through the lander and `ship.sh` in that order, each a release. Still open from the
+work order: 4 and 5 (after the tier-queue tip), 6 and 6a, 7 (tier-stack told first), 8, 9. A stray lesson from today
+for the pipeline: killing a Codex tmux session does not stop the Codex process; a corrected brief waits for the run to
+end.
