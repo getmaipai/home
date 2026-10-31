@@ -266,6 +266,11 @@ export function contentTerms(text: string): string[] {
   return [...new Set((text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).flatMap((t) => t.split("'")))].filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 
+/** Quote each token so punctuation and FTS operators in user text cannot alter the query. */
+export function ftsQuery(terms: string[], joiner: " AND " | " OR "): string | null {
+  return terms.length ? terms.map((term) => `"${term}"`).join(joiner) : null;
+}
+
 /** getmaipai/home#79: how many of a person's newest embedded episodes the
  * vector half reads and scores per turn (or, for a dated question, up to
  * this many inside its window). 2,000 is about a thousand turns, or a
@@ -356,9 +361,7 @@ export function ftsQueryFor(query: string): string | null {
   // Split on apostrophes rather than deleting them: the index's default
   // unicode61 tokenizer splits "Rover's" into "rover" and "s", so the
   // query must too or a possessive never matches its own subject.
-  const terms = contentTerms(query);
-  if (terms.length === 0) return null;
-  return terms.map((t) => `"${t}"`).join(" OR ");
+  return ftsQuery(contentTerms(query), " OR ");
 }
 
 /** RECALL-02, the lexical floor: a lexical candidate needs two content

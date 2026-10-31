@@ -385,15 +385,8 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   deleteArtifactsForTurns((sqlite.query("SELECT id FROM conversation_turns WHERE person_id = ?").all(personId) as { id: string }[]).map((t) => t.id));
   sqlite.query("DELETE FROM artifacts WHERE conversation_id IN (SELECT id FROM conversations WHERE person_id = ?)").run(personId);
   sqlite.query("DELETE FROM jobs WHERE conversation_id IN (SELECT id FROM conversations WHERE person_id = ?)").run(personId);
-  // Counted BEFORE the delete, not from `.changes` (SHELL-SEARCH-03,
-  // found live): conversation_turns_fts's own sync triggers turn one
-  // logical row delete into several more writes against its shadow
-  // tables, and SQLite's own `sqlite3_changes()` counts every one of
-  // them, not just the row this statement deleted from
-  // conversation_turns itself (reproduced in isolation: a single row
-  // delete under an otherwise-identical FTS5 trigger read back
-  // `changes: 7`).
-  const conversations = (sqlite.query("SELECT count(*) AS n FROM conversation_turns WHERE person_id = ?").get(personId) as { n: number }).n;
+  const conversationTurnIds = sqlite.query("SELECT id FROM conversation_turns WHERE person_id = ?").all(personId) as { id: string }[];
+  const conversations = conversationTurnIds.length;
   sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId);
   // The thread record itself (step 3's `conversations` table), not just
   // its turns: left alone, this table's own person_id column would keep

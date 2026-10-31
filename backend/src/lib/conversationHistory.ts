@@ -59,7 +59,7 @@ import { resolveTurnBudgetWithStack } from "@/lib/turnMachine/budget";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
-import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
+import { recordEpisodes, deleteEpisodesForTurns, contentTerms, ftsQuery } from "@/lib/episodes";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { artifactsByTurn, deleteArtifactsForTurns } from "@/lib/artifacts";
 import { projectsByTurn } from "@/lib/projects/store";
@@ -1709,25 +1709,9 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
  * real logTurn() and by createConversation()'s own close-the-old-one
  * step), with pinned conversations first and updated_at descending within
  * each pin state. */
-/** SHELL-SEARCH-03: an FTS5 MATCH string from free text, terms AND-
- * joined - a narrowing search box, every word has to appear (episodes.
- * ts's own ftsQueryFor() OR-joins the identical tokenizer's terms
- * instead, a broadening recall candidate generator; the two jobs need
- * the two operators, so this is its own thin builder over the shared
- * contentTerms(), never a second tokenizer). The real injection guard
- * is contentTerms() itself: its `[\p{L}\p{N}']+` character class can
- * never produce a term containing an FTS5 operator, a quote, or any
- * other query-syntax character, so a query can never inject one (AND/
- * OR/NOT/NEAR, a bare leading `-`) - a review confirmed a term can
- * never contain `"`, so this function's own quote-doubling for a
- * hypothetical embedded quote is unreachable defense in depth, not
- * the mechanism actually doing the work. `null` when every word was
- * filtered (a stopword, a single character) - the caller skips the
- * body search entirely rather than matching nothing, or everything. */
+/** SHELL-SEARCH-03: a narrowing, AND-joined FTS5 query; null means all terms were filtered. */
 export function matchQueryFor(query: string): string | null {
-  const terms = contentTerms(query);
-  if (terms.length === 0) return null;
-  return terms.map((t) => `"${t.replace(/"/g, '""')}"`).join(" AND ");
+  return ftsQuery(contentTerms(query), " AND ");
 }
 
 /** CONV-ARCHIVE-01: which shelved chats a listing carries. `exclude` (the

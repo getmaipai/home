@@ -1051,6 +1051,13 @@
       "when": 1793333349238,
       "tag": "0149_coding_token_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "6",
+      "when": 1793333349239,
+      "tag": "0150_conversation_turns_fts_update",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,8 @@ import { resetDb } from "./reset-db";
 
 const MIGRATION_SQL = readFileSync(join(import.meta.dir, "../src/db/migrations/0063_conversation_turns_fts.sql"), "utf-8");
 const MIGRATION_STATEMENTS = MIGRATION_SQL.split("--> statement-breakpoint").map((s) => s.trim());
+const UPDATE_MIGRATION_SQL = readFileSync(join(import.meta.dir, "../src/db/migrations/0150_conversation_turns_fts_update.sql"), "utf-8");
+const UPDATE_MIGRATION_STATEMENTS = UPDATE_MIGRATION_SQL.split("--> statement-breakpoint").map((s) => s.trim());
 
 // The real database connection is shared across every test file in one
 // `bun test` run (resetDb() only ever clears rows, never re-runs the
@@ -35,6 +37,10 @@ const MIGRATION_STATEMENTS = MIGRATION_SQL.split("--> statement-breakpoint").map
 // missing.
 function runMigration(): void {
   for (const statement of MIGRATION_STATEMENTS) db.run(statement);
+}
+
+function runUpdateMigration(): void {
+  for (const statement of UPDATE_MIGRATION_STATEMENTS) db.run(statement);
 }
 
 function undoMigration(): void {
@@ -87,6 +93,7 @@ beforeEach(() => {
 afterEach(() => {
   undoMigration();
   runMigration();
+  runUpdateMigration();
 });
 
 describe("0063_conversation_turns_fts: run against a copy of a populated database", () => {
