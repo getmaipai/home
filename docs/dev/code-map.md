@@ -881,6 +881,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
 | `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, mirrorLegacyIntoSlot, migrateTierSlots |
 | `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, slotIsOff |
+| `backend/src/lib/timerStatus.ts` | timerStatusReply |
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
 | `backend/src/lib/toolAudit.ts` | recordToolAudit, listOwnToolAudit, toolAuditCounts |
