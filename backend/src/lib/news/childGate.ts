@@ -134,23 +134,27 @@ function speakableUnits(block: ArticleBlock): string[] {
   }
 }
 
-/** Listen speaks one chunk at a time and the voice takes about as long to make a chunk as it takes to say it, so a chunk is a paragraph
- * or two, not a page (2026-10-27: 4,000-character chunks meant three minutes of silence before the first word). The first chunk is
- * the headline plus at most a short lead, so sound starts within seconds. */
+/** Listen speaks one chunk at a time and the voice makes a chunk in about 0.6 of the time it takes to say it (measured 2026-10-31: 450
+ * characters, 24 s of speech, 15 s to make). The next chunk is made while the current one plays, so it must not be much longer than the
+ * one playing, or the bar sits silent between them (issue 260: a headline of 2 s, then a 900-character chunk that took 35 s to arrive,
+ * heard as "only the headline is read"). So the first chunk is the headline plus a short lead, and each chunk may be up to 1.5 times the
+ * length of the one before it, until SPEECH_CHUNK_MAX. */
 export const SPEECH_CHUNK_MAX = 900;
-export const SPEECH_FIRST_CHUNK_MAX = 400;
+export const SPEECH_FIRST_CHUNK_MAX = 200;
+export const SPEECH_CHUNK_GROWTH = 1.5;
 
-/** What Listen speaks: the headline first, then the body, one chunk per paragraph (short paragraphs share a chunk up to
- * SPEECH_CHUNK_MAX characters; a longer paragraph is cut at sentences, a longer sentence at a word). Built from the same blocks the
- * page shows, so a sentence the gate dropped is in neither. */
+/** What Listen speaks: the headline and a short lead first, then the body in chunks that grow (short paragraphs share a chunk; a longer
+ * paragraph is cut at sentences, a longer sentence at a word). Built from the same blocks the page shows, so a sentence the gate dropped
+ * is in neither. */
 export function speechFor(title: string, blocks: readonly ArticleBlock[]): string[] {
   const units = [title, ...blocks.flatMap(speakableUnits)].map((unit) => unit.trim()).filter(Boolean);
+  const headline = units[0] ?? "";
   const chunks: string[] = [];
   let current = "";
-  const limit = (): number => (chunks.length === 0 ? SPEECH_FIRST_CHUNK_MAX : SPEECH_CHUNK_MAX);
-  const push = (piece: string): void => {
-    if (current && current.length + 2 + piece.length > limit()) { chunks.push(current); current = ""; }
-    current = current ? `${current}\n\n${piece}` : piece;
+  // The room the chunk being filled has: 1.5 times the one before it (never less than the first chunk's, never more than the maximum).
+  const limit = (): number => {
+    const before = chunks[chunks.length - 1];
+    return before === undefined ? SPEECH_FIRST_CHUNK_MAX : Math.max(SPEECH_FIRST_CHUNK_MAX, Math.min(SPEECH_CHUNK_MAX, Math.floor(before.length * SPEECH_CHUNK_GROWTH)));
   };
   // A single sentence longer than the limit is cut at a space, never dropped.
   const wordsCut = (sentence: string, max: number): string[] => {
@@ -165,15 +169,24 @@ export function speechFor(title: string, blocks: readonly ArticleBlock[]): strin
     if (rest) cuts.push(rest);
     return cuts;
   };
-  for (const unit of units) {
-    if (unit.length <= SPEECH_CHUNK_MAX) { push(unit); continue; }
-    let piece = "";
-    for (const sentence of sentencesOf(unit).flatMap((one) => (one.length > SPEECH_CHUNK_MAX ? wordsCut(one, SPEECH_CHUNK_MAX) : [one]))) {
-      if (piece && piece.length + 1 + sentence.length > limit()) { push(piece); piece = ""; }
-      piece = piece ? `${piece} ${sentence}` : sentence;
+  // Sentences fill each chunk up to its room; a paragraph break is kept as a blank line inside a chunk. The headline is never alone:
+  // the first sentence of the body always joins it, however long the headline is.
+  const add = (piece: string, separator: string): void => {
+    const headlineOnly = chunks.length === 0 && current === headline;
+    if (current && !headlineOnly && current.length + separator.length + piece.length > limit()) { chunks.push(current); current = piece; return; }
+    current = current ? `${current}${separator}${piece}` : piece;
+  };
+  units.forEach((unit, index) => {
+    if (index === 0) { current = unit; return; }
+    const pending = sentencesOf(unit);
+    let first = true;
+    while (pending.length > 0) {
+      const sentence = pending.shift()!;
+      if (sentence.length > limit()) { pending.unshift(...wordsCut(sentence, limit())); continue; }
+      add(sentence, first ? "\n\n" : " ");
+      first = false;
     }
-    if (piece) push(piece);
-  }
+  });
   if (current) chunks.push(current);
   return chunks;
 }

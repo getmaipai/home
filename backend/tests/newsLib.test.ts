@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { extractEntries } from "@/lib/shelf/shelfPoller";
 import { type ArticleBlock } from "@/lib/retrieval/extractArticle";
-import { gateBlocks, gateFor, sentencesOf, speechFor, SPEECH_CHUNK_MAX } from "@/lib/news/childGate";
+import { gateBlocks, gateFor, sentencesOf, speechFor, SPEECH_CHUNK_MAX, SPEECH_FIRST_CHUNK_MAX } from "@/lib/news/childGate";
 import { openShelfStore } from "@/lib/shelf/shelfStore";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
 import { itemIdFrom, publishedAtOf, storyIdOf } from "@/lib/news/cards";
@@ -43,14 +43,17 @@ describe("the child gate", () => {
     expect(out).toHaveLength(3);
     expect(out[2]).toMatchObject({ type: "list", items: [[{ type: "text", text: "Kept item." }]] });
   });
-  test("speech is chunked small so the first sound starts fast: the title alone first, then paragraphs of at most 900 characters, nothing dropped", () => {
-    const mid = `${"Word ".repeat(100)}end.`; // 504 characters: one chunk each, two never share
-    const blocks = Array.from({ length: 8 }, () => para(mid));
+  test("speech is chunked so the next chunk is ready when one ends: the headline with a short lead first, then chunks that grow to at most 900 characters, nothing dropped", () => {
+    const sentence = "A barn burned on Tuesday night and crews stayed until dawn. "; // 60 characters
+    const blocks = Array.from({ length: 12 }, () => para(sentence.repeat(10).trim())); // 12 paragraphs of 599 characters
     const speech = speechFor("The title", blocks);
-    expect(speech[0]).toBe("The title");
-    expect(speech.length).toBe(9);
+    // Issue 260: the headline alone was a 2 s chunk and the next one a 900 character chunk that took 35 s to make: silence, "only the headline is read".
+    expect(speech[0]!.startsWith("The title\n\nA barn burned")).toBe(true);
+    expect(speech[0]!.length).toBeLessThanOrEqual("The title".length + 2 + SPEECH_FIRST_CHUNK_MAX);
     expect(speech.every((chunk) => chunk.length <= SPEECH_CHUNK_MAX)).toBe(true);
-    expect(speech.slice(1).every((chunk) => chunk === mid)).toBe(true);
+    // Each chunk is at most 1.5 times the one before it (plus the headline on the first), so the voice keeps ahead of the playing chunk.
+    for (let i = 1; i < speech.length - 1; i++) expect(speech[i]!.length).toBeLessThanOrEqual(Math.max(SPEECH_FIRST_CHUNK_MAX, Math.floor(speech[i - 1]!.length * 1.5)));
+    expect(speech.join(" ").split("A barn burned").length - 1).toBe(120);
     const shorts = speechFor("T", [para("One."), para("Two."), para("Three.")]);
     expect(shorts).toEqual(["T\n\nOne.\n\nTwo.\n\nThree."]);
     const giant = speechFor("T", [para(`${"A sentence of some length goes here. ".repeat(300)}`)]);
