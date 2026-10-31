@@ -108,7 +108,7 @@ The installer installs the **latest published release**, never the main branch. 
 
 ### Upgrade, resume and roll back
 
-Running it again upgrades in place. Order: stop Home and the Stack, save `data/` to `upgrade-backups/<time>-from-<tag>/data.tar.gz` (the last two are kept), replace the program files, rebuild, start, wait for Home (`/`) and the Stack (`/healthz`), then write `.installed-tag`. The Stack's `stack/data/` (models and settings) and the Bun runtime are never replaced.
+Running it again upgrades in place. Order: stop Home and the Stack, save `data/` to `upgrade-backups/<time>-from-<tag>/data.tar` (a plain tar, at most 4 GB, with files over 512 MB and the engines, models and cache folders left out and listed in `excluded.txt`; the last two are kept), replace the program files, rebuild, start, wait for Home (`/`) and the Stack (`/healthz`), then write `.installed-tag`. The Stack's `stack/data/` (models and settings) and the Bun runtime are never replaced.
 
 An upgrade of an install that already has a Stack rebuilds the Stack too. A run that stopped part way is finished by running the same command again. It sees no `.installed-tag`, treats the folder as unfinished and continues. If a run fails after the old Home was stopped but before any file changed, Home is started again on the old version.
 

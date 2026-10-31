@@ -601,15 +601,24 @@ snapshot_data() {
   dest="${root}/upgrade-backups/${ts}-from-${from_tag:-unknown}"
   mkdir -p "$dest" || return 1
   chmod 0700 "${root}/upgrade-backups" "$dest" 2>/dev/null || true
-  # Big downloaded files (the offline books, models, anything over MAIPAI_SNAPSHOT_SKIP_MIN, 512 MB by default) are not copied: they are
-  # already compressed, can be downloaded again, and copying a 127 GB Wikipedia held the hub's upgrade for an hour on 2026-10-30.
-  # Their paths go in excluded.txt so a rollback puts them back from the data that was set aside.
-  ( cd "$root" && find data -type f -size "+${MAIPAI_SNAPSHOT_SKIP_MIN:-512M}" 2>/dev/null ) > "${dest}/excluded.txt" || : > "${dest}/excluded.txt"
-  if ! tar -czf "${dest}/data.tar.gz" --exclude='data/logs' -X "${dest}/excluded.txt" -C "$root" data; then
+  # The hub is down while this runs, so the copy is bounded (SHIP-BACKUP-01, after the 2026-10-30 ship held the hub down 40 minutes
+  # gzipping a 120 GB data folder). Three limits: any file over MAIPAI_SNAPSHOT_SKIP_MIN (512 MB) is left out, regenerable bulk folders
+  # (engines, models, caches) are left out, and if the rest is still over MAIPAI_SNAPSHOT_MAX_MB (4096) the biggest files go until it fits.
+  # The copy is a plain tar (no gzip: the database is the bulk and compressing it costs more time than disk). Everything left out is
+  # listed in excluded.txt so a rollback puts it back from the data that was set aside.
+  ( cd "$root" && find data \( -path 'data/engines' -o -path 'data/models' -o -path 'data/cache' -o -path 'data/logs' \) -prune -o -type f -size "+${MAIPAI_SNAPSHOT_SKIP_MIN:-512M}" -print 2>/dev/null ) > "${dest}/excluded.txt" || : > "${dest}/excluded.txt"
+  ( cd "$root" && for d in data/engines data/models data/cache; do [ -e "$d" ] && echo "$d"; done; true ) >> "${dest}/excluded.txt"
+  # Still over the budget: leave out the biggest remaining files until what is left fits.
+  ( cd "$root" && find data \( -path 'data/engines' -o -path 'data/models' -o -path 'data/cache' -o -path 'data/logs' \) -prune -o -type f -exec du -k {} + 2>/dev/null ) \
+    | awk -F'\t' -v budget="$(( ${MAIPAI_SNAPSHOT_MAX_MB:-4096} * 1024 ))" -v skip="${dest}/excluded.txt" '
+        BEGIN { while ((getline line < skip) > 0) out[line] = 1 }
+        !($2 in out) { kb[$2] = $1; total += $1 }
+        END { while (total > budget) { big = ""; for (f in kb) if (big == "" || kb[f] > kb[big]) big = f; if (big == "") break; print big; total -= kb[big]; delete kb[big] } }' >> "${dest}/excluded.txt" || true
+  if ! tar -cf "${dest}/data.tar" --exclude='data/logs' -X "${dest}/excluded.txt" -C "$root" data; then
     rm -rf "$dest"
     return 1
   fi
-  log "Saved a copy of your data to ${dest}/data.tar.gz"
+  log "Saved a copy of your data to ${dest}/data.tar"
   prune_snapshots "${root}/upgrade-backups"
 }
 
@@ -639,7 +648,9 @@ restore_snapshot() {
     mv "${root}/data" "${root}/data.rolled-back-${ts}" || return 1
     log "Your newer data was kept at ${root}/data.rolled-back-${ts}"
   fi
-  tar -xzf "${root}/upgrade-backups/${snap}/data.tar.gz" -C "$root" || return 1
+  # Copies from before SHIP-BACKUP-01 are gzipped data.tar.gz; newer ones are a plain data.tar.
+  if [ -f "${root}/upgrade-backups/${snap}/data.tar" ]; then tar -xf "${root}/upgrade-backups/${snap}/data.tar" -C "$root" || return 1
+  else tar -xzf "${root}/upgrade-backups/${snap}/data.tar.gz" -C "$root" || return 1; fi
   # The big downloaded files were not in the copy; they come back from the data that was set aside.
   if [ -s "${root}/upgrade-backups/${snap}/excluded.txt" ] && [ -d "${root}/data.rolled-back-${ts}" ]; then
     while IFS= read -r rel; do

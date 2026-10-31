@@ -93,7 +93,7 @@ A few things only you can do, so they sit in a closed list called "things to do 
 Run the same install line again. If the AI engine is already installed, it is rebuilt too, so the Mac must have someone logged in. It does these steps in order:
 
 1. Stops MaiPai Home and the engine.
-2. Saves a copy of your data in `/usr/local/maipai-home/upgrade-backups`. It keeps the last two copies.
+2. Saves a quick copy of your data in `/usr/local/maipai-home/upgrade-backups`, in a minute or two. Big downloads such as offline books and models stay where they are. It keeps the last two copies.
 3. Replaces the program files. Your data, backups and engine models stay where they are.
 4. Starts everything again and waits until it answers.
 

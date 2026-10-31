@@ -25,7 +25,7 @@ describe("upgrade data copy and rollback", () => {
       const names = readdirSync(join(root, "upgrade-backups"));
       expect(names).toHaveLength(1);
       expect(names[0]).toMatch(/^\d{8}-\d{6}-from-v0\.0\.9$/);
-      const listing = Bun.spawnSync(["tar", "-tzf", join(root, "upgrade-backups", names[0] as string, "data.tar.gz")]).stdout.toString();
+      const listing = Bun.spawnSync(["tar", "-tf", join(root, "upgrade-backups", names[0] as string, "data.tar")]).stdout.toString();
       expect(listing).toContain("data/home.db");
       expect(listing).not.toContain("big.log");
     } finally { rmSync(root, { recursive: true, force: true }); }
@@ -39,13 +39,59 @@ describe("upgrade data copy and rollback", () => {
       writeFileSync(join(root, "data", "reference", "library.xml"), "<library/>");
       expect(bash(`MAIPAI_SNAPSHOT_SKIP_MIN=8k; export MAIPAI_SNAPSHOT_SKIP_MIN; snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
       const names = readdirSync(join(root, "upgrade-backups"));
-      const listing = Bun.spawnSync(["tar", "-tzf", join(root, "upgrade-backups", names[0] as string, "data.tar.gz")]).stdout.toString();
+      const listing = Bun.spawnSync(["tar", "-tf", join(root, "upgrade-backups", names[0] as string, "data.tar")]).stdout.toString();
       expect(listing).toContain("data/reference/library.xml");
       expect(listing).not.toContain(".zim");
       expect(readFileSync(join(root, "upgrade-backups", names[0] as string, "excluded.txt"), "utf8")).toContain("data/reference/wikipedia_en_all_maxi.zim");
       expect(bash(`restore_snapshot "${root}" v0.0.9`).exitCode).toBe(0);
       expect(readFileSync(join(root, "data", "reference", "wikipedia_en_all_maxi.zim"), "utf8")).toHaveLength(20_000);
       expect(readFileSync(join(root, "data", "reference", "library.xml"), "utf8")).toBe("<library/>");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("snapshot_data is a plain tar, leaves out engines, models and caches, and rollback puts them back (SHIP-BACKUP-01)", () => {
+    const root = fixture();
+    try {
+      for (const d of ["engines/pocket-tts", "models", "cache"]) { mkdirSync(join(root, "data", d), { recursive: true }); writeFileSync(join(root, "data", d, "blob.bin"), "bulk"); }
+      expect(bash(`snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
+      const dir = join(root, "upgrade-backups", readdirSync(join(root, "upgrade-backups"))[0] as string);
+      expect(existsSync(join(dir, "data.tar"))).toBe(true);
+      expect(existsSync(join(dir, "data.tar.gz"))).toBe(false);
+      const listing = Bun.spawnSync(["tar", "-tf", join(dir, "data.tar")]).stdout.toString();
+      expect(listing).toContain("data/home.db");
+      for (const d of ["engines", "models", "cache"]) expect(listing).not.toContain(`data/${d}`);
+      expect(bash(`restore_snapshot "${root}" v0.0.9`).exitCode).toBe(0);
+      expect(readFileSync(join(root, "data", "home.db"), "utf8")).toBe("v1 data");
+      for (const p of ["engines/pocket-tts/blob.bin", "models/blob.bin", "cache/blob.bin"]) expect(readFileSync(join(root, "data", p), "utf8")).toBe("bulk");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("snapshot_data keeps what it copies under MAIPAI_SNAPSHOT_MAX_MB by leaving out the biggest files", () => {
+    const root = fixture();
+    try {
+      writeFileSync(join(root, "data", "big-a.dat"), "x".repeat(3 * 1024 * 1024));
+      writeFileSync(join(root, "data", "big-b.dat"), "x".repeat(2 * 1024 * 1024));
+      expect(bash(`MAIPAI_SNAPSHOT_MAX_MB=1; export MAIPAI_SNAPSHOT_MAX_MB; snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
+      const dir = join(root, "upgrade-backups", readdirSync(join(root, "upgrade-backups"))[0] as string);
+      const listing = Bun.spawnSync(["tar", "-tf", join(dir, "data.tar")]).stdout.toString();
+      expect(listing).toContain("data/home.db");
+      expect(listing).not.toContain("big-a.dat");
+      expect(listing).not.toContain("big-b.dat");
+      expect(readFileSync(join(dir, "excluded.txt"), "utf8")).toContain("data/big-a.dat");
+      expect(bash(`restore_snapshot "${root}" v0.0.9`).exitCode).toBe(0);
+      expect(readFileSync(join(root, "data", "big-a.dat"), "utf8")).toHaveLength(3 * 1024 * 1024);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("restore_snapshot still reads a gzipped copy made before SHIP-BACKUP-01", () => {
+    const root = fixture();
+    try {
+      const dir = join(root, "upgrade-backups", "20260101-000000-from-v1");
+      mkdirSync(dir, { recursive: true });
+      expect(Bun.spawnSync(["tar", "-czf", join(dir, "data.tar.gz"), "-C", root, "data"]).exitCode).toBe(0);
+      writeFileSync(join(root, "data", "home.db"), "newer");
+      expect(bash(`restore_snapshot "${root}" v1`).exitCode).toBe(0);
+      expect(readFileSync(join(root, "data", "home.db"), "utf8")).toBe("v1 data");
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
