@@ -21,11 +21,19 @@ export function fuzzy<T>(rows: T[], words: string, label: (row: T) => string): R
   return winners.length === 1 ? { ok: true, value: winners[0]!.row } : { ok: false, reason: "ambiguous", candidates: winners.length };
 }
 export type ListResolution = { ok: true; list: ListT } | { ok: false; reason: "none" | "ambiguous"; candidates: number };
-export function resolveList(actor: Pick<PersonRow, "id" | "role">, words: string, options: { lastListId?: string } = {}): ListResolution {
-  const available = db.select().from(lists).where(isNull(lists.deletedAt)).all().filter((row) => row.scope === "household" || row.person === actor.id).map((row) => ({
+/** The lists this person may see: their own and the household's, never anyone else's, whatever their role. */
+function visibleLists(actor: Pick<PersonRow, "id" | "role">): ListT[] {
+  return db.select().from(lists).where(isNull(lists.deletedAt)).all().filter((row) => row.scope === "household" || row.person === actor.id).map((row) => ({
     id: row.id, scope: row.scope, person: row.person, kind: row.kind, title: row.title, icon: row.icon ?? undefined,
     items: JSON.parse(row.items), source: row.source, created_at: row.createdAt, updated_at: row.updatedAt, deleted_at: row.deletedAt, hlc: row.hlc,
   })) as ListT[];
+}
+/** One visible list by its id (a fresh read), or null. Ids are matched exactly, never as words. */
+export function visibleListById(actor: Pick<PersonRow, "id" | "role">, id: string): ListT | null {
+  return visibleLists(actor).find((list) => list.id === id) ?? null;
+}
+export function resolveList(actor: Pick<PersonRow, "id" | "role">, words: string, options: { lastListId?: string } = {}): ListResolution {
+  const available = visibleLists(actor);
   const exact = available.filter((list) => list.title.trim().toLowerCase() === words.trim().toLowerCase());
   if (exact.length === 1) return { ok: true, list: exact[0]! };
   if (exact.length > 1) return { ok: false, reason: "ambiguous", candidates: exact.length };

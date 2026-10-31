@@ -66,6 +66,22 @@
           "type": "string"
         },
         "description": "Item words in the order they should appear for reorder."
+      },
+      "reminder": {
+        "type": "string",
+        "description": "Which reminder, in the person's words, for edit_reminder, snooze_reminder, complete_reminder and cancel_reminder. Omit it when they said that."
+      },
+      "minutes": {
+        "type": "number",
+        "description": "For snooze_reminder: how many minutes to move the reminder later."
+      },
+      "task": {
+        "type": "string",
+        "description": "For edit_reminder: the new words of the reminder."
+      },
+      "when": {
+        "type": "string",
+        "description": "For edit_reminder: the new time, in the person's words."
       }
     }
   }

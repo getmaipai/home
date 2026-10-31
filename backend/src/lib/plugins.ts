@@ -12,7 +12,14 @@
 // own). See docs/dev.md's "Naming: skill, plugin, command, connector"
 // entry for the full research and reasoning.
 import { readFileSync, readdirSync } from "node:fs";
-import { alarmFoldFor, neutralizeReservedPrefix, reminderPayloadText } from "@/lib/alarmCalls";
+import {
+  alarmFoldFor,
+  isListAction,
+  isShoppingPatternCall,
+  listCallText,
+  neutralizeReservedPrefix,
+  reminderPayloadText,
+} from "@/lib/alarmCalls";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import ERROR_CATALOG from "@maipai/spec/errors/errors.json" with { type: "json" };
@@ -545,7 +552,15 @@ export const WEATHER_NO_PLACE_NOTE = "I don't know where you are yet, so I can't
  * reminder carries none, so its op text is unchanged. */
 function remindInputs(inputs: Record<string, unknown>): Record<string, unknown> {
   const { action, list: _list, items: _items, ...rest } = inputs;
-  if (action === "add_items" || action === "show_list") return { ...rest, action: `list:${action}:` };
+  if ((action === "add_items" || action === "show_list") && isShoppingPatternCall(inputs)) {
+    return { ...rest, action: `list:${action}:` };
+  }
+  if (isListAction(action)) {
+    // ASSIST-WIRE-01: every other list action carries its fields as one JSON payload after the private prefix, built here
+    // from the validated arguments and nowhere else. The expression is folded into the payload, never left as op text.
+    const { to_list: _to, name: _name, exclude: _exclude, order: _order, ...kept } = rest;
+    return { ...kept, expression: listCallText(action, inputs), action: "" };
+  }
   const reminderFold = alarmFoldFor("remind", action);
   if (reminderFold) {
     // ASSIST-REMIND-01 part B: which reminder, and any new time, task or snooze minutes, ride in the op text after the prefix.
@@ -556,7 +571,7 @@ function remindInputs(inputs: Record<string, unknown>): Record<string, unknown> 
   // own text starts with one must never be read as one, or a model-supplied expression could reach the engine without the
   // brake and audit.
   const expression = typeof rest.expression === "string"
-    ? (neutralizeReservedPrefix(rest.expression) as string).replace(/^(\s*)list:/i, "$1list ")
+    ? (neutralizeReservedPrefix(rest.expression) as string).replace(/^(\s*)(lists?):/i, "$1$2 ")
     : rest.expression;
   return { ...rest, expression, action: "" };
 }
@@ -702,7 +717,7 @@ export async function runPlugin(
     // ASSIST-LISTS-01: a shopping-list phrase run through remind answers in the list's own words, not a reminder's.
     if (id === "remind" && capture.listReply !== undefined) {
       value.reply = { text: capture.listReply, speech: capture.listReply };
-      value.data = { action: "list" };
+      value.data = { action: "list", ...(capture.listUndoId ? { undo_id: capture.listUndoId } : {}) };
     }
     // ASSIST-REMIND-01: an alarm phrase run through timer (or a reminder cancel or list through remind) answers in the
     // alarm engine's own words, with the same data the alarm package gave.

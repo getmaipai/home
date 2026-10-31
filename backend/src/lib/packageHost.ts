@@ -84,13 +84,15 @@ import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
-import { findOrCreateStandingList } from "@/lib/lists";
-import { runListAction } from "@/lib/listActions";
+import { findOrCreateStandingList, getList } from "@/lib/lists";
+import { PARENT_CAN_DO_THAT, runListAction } from "@/lib/listActions";
+import { lastListContextFor } from "@/lib/listContext";
+import { ALARM_ACTION_NAMES, runAlarmAction, type AlarmActionName } from "@/lib/alarmActions";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
-import { recordUndo } from "@/lib/toolUndo";
+import { recordUndo, type UndoInverse } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
-import { parseAlarmCall, parseReminderPayload, type AlarmCall } from "@/lib/alarmCalls";
+import { parseAlarmCall, parseListCall, parseReminderPayload, type AlarmCall, type ListCall } from "@/lib/alarmCalls";
 import { lastReminderIdFor, runReminderAction } from "@/lib/reminderActions";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
@@ -2039,12 +2041,75 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
     return { task: "", when_text: "", action: "list" };
   }
 
+  // ASSIST-WIRE-01: every list action beyond the shopping-list patterns reaches `remind` as one private JSON payload after
+  // the "lists:<action>:" prefix (built by plugins.ts from validated arguments, parsed here against a closed schema). The
+  // list action engine resolves the person's words among their own and the household's lists only; this function adds the
+  // permission, the audit row (counts only), the Undo receipt and the reply.
+  const SHOPPING_WORDS = /^(?:my |the |our )?shopping(?: list)?$/i;
+
+  function runStructuredListCall(call: ListCall): { task: string; when_text: string; action: string } {
+    const done = { task: "", when_text: "", action: "list" };
+    if (!call.ok) {
+      if (runtime.capture) runtime.capture.listReply = call.reply;
+      return done;
+    }
+    const reads = call.action === "show_list" || call.action === "find_list";
+    requirePermission(reads ? "lists:read" : "lists:write");
+    const band = runtime.band ?? speakerAgeBand(actor, new Date());
+    for (const words of [call.payload.list, call.payload.to_list]) {
+      if (words && SHOPPING_WORDS.test(words.trim())) findOrCreateStandingList("shopping");
+    }
+    const result = runListAction(actor, band, { action: call.action, ...call.payload, ...lastListContextFor(actor.id) });
+    if (!result.ok) {
+      if (result.reply === PARENT_CAN_DO_THAT) recordToolAudit({ personId: actor.id, tool: "lists", action: call.action, decision: "never", band });
+      if (runtime.capture) runtime.capture.listReply = result.reply;
+      return done;
+    }
+    recordToolAudit({ personId: actor.id, tool: "lists", action: call.action, decision: "do", band, count: Math.max(1, result.itemIds?.length ?? 1) });
+    const capture = runtime.capture;
+    if (!capture) return done;
+    let reply = result.reply;
+    const shown = result.listId ? getList(actor, result.listId) : undefined;
+    if (shown?.ok && reads) {
+      const open = shown.value.items.filter((item) => !item.done);
+      if (call.action === "show_list") {
+        reply = open.length > 0 ? `${shown.value.title}: ${open.map((item) => item.text).join(", ")}` : `${shown.value.title} is empty.`;
+        capture.listItems = open.map((item) => ({ id: item.id, text: item.text }));
+        capture.listTitle = shown.value.title;
+      } else {
+        reply = `I found the list: ${shown.value.title}.`;
+      }
+    }
+    capture.listReply = reply;
+    const inverses: UndoInverse[] = result.undo?.inverse ?? [];
+    if (inverses.length > 0) {
+      const inverse: UndoInverse = inverses.length === 1 ? inverses[0]! : { kind: "batch", inverses };
+      capture.listUndoId = recordUndo({ personId: actor.id, turnId: turn?.id, tool: manifest.id, action: call.action, inverse }).id;
+    }
+    return done;
+  }
+
   // ASSIST-REMIND-01: an alarm phrase reaches `timer` (a reminder cancel or list reaches `remind`) as a structured action
   // folded into the op text ("alarm:set:...", written by plugins.ts), the way the list phrases do. The alarm engine does
   // the work; its answer rides the capture so the reply and the card keep the old alarm wording.
   function runAlarmCall(call: AlarmCall): void {
     requirePermission("reminders:write");
     const band = runtime.band ?? speakerAgeBand(actor, new Date());
+    // ASSIST-WIRE-01: edit, turn on, turn off, skip and delete resolve among the person's own alarm records (alarmActions.ts).
+    if ((ALARM_ACTION_NAMES as readonly string[]).includes(call.action)) {
+      const outcome = runAlarmAction(actor, call.action as AlarmActionName, call.rest);
+      // A question or a refusal changed nothing, so it writes no audit row.
+      if (outcome.done) recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });
+      if (runtime.capture) {
+        runtime.capture.alarm = {
+          task: outcome.reply,
+          ...(outcome.schedule_task ? { schedule_task: outcome.schedule_task } : {}),
+          when_text: outcome.when_text,
+          action: outcome.done ? outcome.action : "list",
+        };
+      }
+      return;
+    }
     const result = handleAlarmChat(actor, call.chatText);
     recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });
     if (runtime.capture) runtime.capture.alarm = result;
@@ -2613,6 +2678,8 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         if (manifest.id === "remind") {
           const listCall = parseRemindListCall(text);
           if (listCall) return runRemindListCall(listCall);
+          const structuredList = parseListCall(text);
+          if (structuredList) return runStructuredListCall(structuredList);
           const reminderCall = parseAlarmCall("remind", text);
           if (reminderCall) {
             runReminderCall(reminderCall);

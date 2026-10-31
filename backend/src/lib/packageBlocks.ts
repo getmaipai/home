@@ -23,6 +23,10 @@ export interface BlockCapture {
   listItems?: { id: string; text: string }[];
   /** The reply a shopping-list phrase run through `remind` gives; plugins.ts uses it in place of the reminder reply. */
   listReply?: string;
+  /** ASSIST-WIRE-01: the shown list's own name, when a list other than the shopping list is shown. */
+  listTitle?: string;
+  /** ASSIST-WIRE-01: the Undo receipt of a list action run through `remind`. */
+  listUndoId?: string;
   /** The alarm engine's answer to an alarm phrase run through `timer` (or a reminder cancel or list run through `remind`). */
   alarm?: { task: string; schedule_task?: string; when_text: string; action: string; undo_id?: string };
 }
@@ -95,16 +99,21 @@ function alarmBlocks(
   );
 }
 
-function todoList(producer: string, provenance: string, items: readonly { id: string; text: string }[]): Record<string, unknown>[] {
+function todoList(
+  producer: string,
+  provenance: string,
+  items: readonly { id: string; text: string }[],
+  listTitle = "Shopping list",
+): Record<string, unknown>[] {
   const rows = items.filter((item) => item.id.length > 0 && item.text.trim().length > 0).slice(0, LIST_ITEMS_MAX);
   if (rows.length === 0) return [];
   const count = rows.length === 1 ? "1 item" : `${rows.length} items`;
   return [blockEnvelope(
     "todo_list",
     producer,
-    `Shopping list, ${count}: ${rows.map((row) => row.text.trim()).join(", ")}.`,
+    `${listTitle}, ${count}: ${rows.map((row) => row.text.trim()).join(", ")}.`,
     provenance,
-    { title: "Shopping list", items: rows.map((row) => ({ id: row.id, text: row.text.trim(), status: "pending" })) },
+    { title: listTitle, items: rows.map((row) => ({ id: row.id, text: row.text.trim(), status: "pending" })) },
   )];
 }
 
@@ -314,7 +323,17 @@ export function blocksForRecipeRun(
       if (capture.alarm) return alarmBlocks(manifest.id, provenance, capture.alarm, allowed);
       // A shopping-list phrase run through remind: the list's block, never a reminder card.
       if (capture.listReply !== undefined) {
-        return capture.listItems && allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems) : [];
+        const blocks = capture.listItems && allowed.includes("todo_list")
+          ? todoList(manifest.id, provenance, capture.listItems, capture.listTitle)
+          : [];
+        const undo = capture.listUndoId ? undoPropsFor(capture.listUndoId) : undefined;
+        if (undo && allowed.includes("confirmation")) {
+          const sentence = clip(capture.listReply, 300) || "Done.";
+          const confirmation = blockEnvelope("confirmation", manifest.id, sentence, provenance, { icon: "list", sentence, undo });
+          confirmation.id = capture.listUndoId!;
+          blocks.push(confirmation);
+        }
+        return blocks;
       }
       const blocks = allowed.includes("schedule_card")
         ? scheduleCard(

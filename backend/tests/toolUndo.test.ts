@@ -177,4 +177,48 @@ describe("tool undo", () => {
       expect(db.select().from(toolUndo).where(eq(toolUndo.id, confirmation!.id)).get()?.personId).toBe(actor.id);
     }
   });
+  // ASSIST-WIRE-01: the list inverse kinds.
+  test("a batch undo runs every inverse, and a nested batch is refused", () => {
+    const list = createList(people.owner, { kind: "custom", title: "Batch" });
+    if (!list.ok) throw new Error("list create failed");
+    const first = addItem(people.owner, list.value.id, { text: "one" });
+    if (!first.ok) throw new Error("item add failed");
+    const second = addItem(people.owner, list.value.id, { text: "two" });
+    if (!second.ok) throw new Error("item add failed");
+    const inverses = second.value.items.map((item) => ({ kind: "remove_item" as const, listId: list.value.id, itemId: item.id }));
+    const receipt = recordUndo({ personId: people.owner.id, tool: "remind", action: "add_items", inverse: { kind: "batch", inverses } });
+    expect(runUndo(people.owner, receipt.id)).toMatchObject({ ok: true });
+    expect(JSON.parse(db.select().from(lists).where(eq(lists.id, list.value.id)).get()!.items)).toEqual([]);
+    const nested = recordUndo({
+      personId: people.owner.id,
+      tool: "remind",
+      action: "add_items",
+      inverse: { kind: "batch", inverses: [{ kind: "batch", inverses: [] }] },
+    });
+    expect(runUndo(people.owner, nested.id)).toMatchObject({ ok: false, status: 409 });
+  });
+
+  test("remove_list only removes a person list the person made, never a household list or another person's", () => {
+    const household = db.insert(lists).values({
+      id: "list-household1",
+      scope: "household",
+      person: null,
+      kind: "shopping",
+      title: "Shared",
+      icon: null,
+      items: "[]",
+      source: "hub",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+      hlc: "0",
+    }).returning().get();
+    const receipt = recordUndo({ personId: people.owner.id, tool: "remind", action: "create_list", inverse: { kind: "remove_list", listId: household.id } });
+    expect(runUndo(people.owner, receipt.id)).toMatchObject({ ok: false, status: 409 });
+    const teenList = createList(people.teen!, { kind: "custom", title: "Teen only" });
+    if (!teenList.ok) throw new Error("list create failed");
+    const foreign = recordUndo({ personId: people.owner.id, tool: "remind", action: "create_list", inverse: { kind: "remove_list", listId: teenList.value.id } });
+    expect(runUndo(people.owner, foreign.id)).toMatchObject({ ok: false, status: 409 });
+    expect(db.select().from(lists).where(eq(lists.id, teenList.value.id)).get()?.deletedAt).toBeNull();
+  });
 });

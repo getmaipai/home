@@ -3,9 +3,21 @@
 // and runs the alarm engine (alarmChat.ts). The prefix is the host's own signal: a person's or a model's expression that
 // starts with one is neutralized before it can look like a call, so no wording can reach the engine around the brake.
 
+import { z } from "zod";
+import { LIST_ACTIONS, type ListAction } from "@/lib/listActions";
+
 /** Structured action to private op-text prefix, per tool. */
 const FOLDS: Record<string, Record<string, string>> = {
-  timer: { set_alarm: "alarm:set:", cancel_alarm: "alarm:cancel:", list_alarms: "alarm:list:" },
+  timer: {
+    set_alarm: "alarm:set:",
+    cancel_alarm: "alarm:cancel:",
+    list_alarms: "alarm:list:",
+    edit_alarm: "alarm:edit:",
+    enable_alarm: "alarm:enable:",
+    disable_alarm: "alarm:disable:",
+    skip_next_alarm: "alarm:skip:",
+    delete_alarm: "alarm:delete:",
+  },
   remind: {
     cancel_reminder: "reminder:cancel:",
     list_reminders: "reminder:list:",
@@ -24,10 +36,112 @@ export function alarmFoldFor(tool: string, action: unknown): string | null {
   return folds && Object.hasOwn(folds, action) ? folds[action]! : null;
 }
 
-/** Whether this call is an alarm action on `timer` or a reminder-cancel or list action on `remind`. Such a call is refused
- * for an unidentified speaker, because the alarm engine answers for the signed-in person. */
+/** Whether this call is an alarm action on `timer`, a reminder action on `remind`, or one of the list actions on `remind`.
+ * Such a call is refused for an unidentified speaker, because these engines answer for the signed-in person. */
 export function isAlarmActionCall(tool: string, args: Record<string, unknown> | undefined): boolean {
-  return alarmFoldFor(tool, args?.action) !== null;
+  if (alarmFoldFor(tool, args?.action) !== null) return true;
+  return tool === "remind" && isListAction(args?.action);
+}
+
+const LIST_ACTION_NAMES: ReadonlySet<string> = new Set(LIST_ACTIONS);
+
+/** Whether `action` is one of the list actions `remind` runs through the list engine. */
+export function isListAction(action: unknown): action is ListAction {
+  return typeof action === "string" && LIST_ACTION_NAMES.has(action);
+}
+
+/** The private prefix of a structured list call. The old closed-pattern prefix is `list:`; this one is different on
+ * purpose, so text a person says after "add" can never be read as a structured call. */
+export const LIST_CALL_PREFIX = "lists:";
+
+/** Longest list name, item or word the payload accepts, and the most items in one call. */
+export const LIST_WORDS_MAX = 200;
+export const LIST_ITEMS_MAX = 50;
+
+const listWords = z.string().trim().min(1).max(LIST_WORDS_MAX);
+const listWordsArray = z.array(listWords).max(LIST_ITEMS_MAX);
+
+/** What a structured list call carries after its prefix. Unknown fields are rejected; sizes are bounded. */
+export const ListPayload = z.object({
+  list: listWords.optional(),
+  to_list: listWords.optional(),
+  items: listWordsArray.optional(),
+  name: listWords.optional(),
+  exclude: listWordsArray.optional(),
+  order: listWordsArray.optional(),
+}).strict();
+export type ListPayloadT = z.infer<typeof ListPayload>;
+
+function wordsOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function wordsArrayOf(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
+}
+
+/** Whether a `remind` call is exactly the shape the shopping-list closed patterns and the widget build: the plain
+ * `list:` fold keeps their reply byte-identical. */
+export function isShoppingPatternCall(inputs: Record<string, unknown>): boolean {
+  const expression = wordsOf(inputs.expression);
+  if (!expression) return false;
+  const others = ["to_list", "name", "exclude", "order"].some((key) => inputs[key] !== undefined);
+  if (others) return false;
+  const list = wordsOf(inputs.list);
+  if (list !== undefined && list !== "shopping") return false;
+  const items = wordsArrayOf(inputs.items);
+  if (inputs.action === "add_items") return items === undefined || (items.length === 1 && items[0] === expression);
+  return inputs.action === "show_list" && items === undefined && expression === "shopping list";
+}
+
+const LIST_FROM_EXPRESSION = new Set<string>(["delete_list", "show_list", "find_list", "clear_done"]);
+const NAME_FROM_EXPRESSION = new Set<string>(["create_list", "rename_list", "copy_list"]);
+const ITEMS_FROM_EXPRESSION = new Set<string>(["add_items", "remove_items", "check_items", "uncheck_items"]);
+
+/** The op text after a structured list prefix: a JSON object of the call's own fields. Built only here, from the call's
+ * validated arguments. The expression stands in for the one field an action needs when the model left it out. */
+export function listCallText(action: string, inputs: Record<string, unknown>): string {
+  const expression = wordsOf(inputs.expression);
+  const payload: Record<string, unknown> = {};
+  const list = wordsOf(inputs.list) ?? (LIST_FROM_EXPRESSION.has(action) ? expression : undefined);
+  const name = wordsOf(inputs.name) ?? (NAME_FROM_EXPRESSION.has(action) ? expression : undefined);
+  const items = wordsArrayOf(inputs.items) ?? (ITEMS_FROM_EXPRESSION.has(action) && expression ? [expression] : undefined);
+  const toList = wordsOf(inputs.to_list);
+  const exclude = wordsArrayOf(inputs.exclude);
+  const order = wordsArrayOf(inputs.order);
+  if (list) payload.list = list;
+  if (toList) payload.to_list = toList;
+  if (items) payload.items = items;
+  if (name) payload.name = name;
+  if (exclude) payload.exclude = exclude;
+  if (order) payload.order = order;
+  return `${LIST_CALL_PREFIX}${action}:${JSON.stringify(payload)}`;
+}
+
+export type ListCall =
+  | { ok: true; action: ListAction; payload: ListPayloadT }
+  | { ok: false; reply: string };
+
+/** Reads an op text back into a structured list call, or null when the text is not one. */
+export function parseListCall(text: string): ListCall | null {
+  const match = /^lists:([a-z_]+):([\s\S]*)$/.exec(text);
+  if (!match || !isListAction(match[1])) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(match[2]!);
+  } catch {
+    return { ok: false, reply: "I couldn't read that list request." };
+  }
+  const parsed = ListPayload.safeParse(raw);
+  if (parsed.success) return { ok: true, action: match[1], payload: parsed.data };
+  const tooMany = parsed.error.issues.some((issue) => issue.code === "too_big" && (issue as { origin?: string }).origin === "array");
+  return {
+    ok: false,
+    reply: tooMany
+      ? `That is too many at once. Please give me ${LIST_ITEMS_MAX} items or fewer.`
+      : "I couldn't read that list request.",
+  };
 }
 
 /** Stops an expression that starts with a reserved prefix from being read as a host call. */

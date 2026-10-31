@@ -24,7 +24,7 @@ export function daysPhrase(days: number[]): string {
   return days.map((day) => DAY_SHORT[day]).join(", ");
 }
 
-function clockText(time: string): string {
+export function clockText(time: string): string {
   const [hourText, minute] = time.split(":");
   const hour = Number(hourText);
   return `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
