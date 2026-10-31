@@ -65,7 +65,6 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     title: article.title,
     ...(kicker ? { kicker, kickerStyle: "chip" as const } : {}),
     description: article.description ?? (article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label),
-    ...(article.hatnote ? { hatnote: article.hatnote } : {}),
     ...(article.lead ? { lead: article.lead } : {}),
     breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker }] : []), { label: article.title }],
     ...(article.infobox && article.infobox.rows.length ? { infobox: article.infobox } : {}),

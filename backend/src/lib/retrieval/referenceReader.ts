@@ -187,7 +187,8 @@ async function suggest(ctx: Ctx, book: string, term: string): Promise<Hit | null
     if (!e || typeof e !== "object") continue;
     const entry = e as { value?: unknown; label?: unknown; kind?: unknown; path?: unknown };
     if (entry.kind === "pattern") continue;
-    const label = typeof entry.label === "string" ? entry.label : typeof entry.value === "string" ? entry.value : "";
+    // `label` is the match-highlighted HTML ("&lt;b&gt;Albert&lt;/b&gt; ..."); `value` is the plain title.
+    const label = typeof entry.value === "string" && entry.value.length > 0 ? entry.value : typeof entry.label === "string" ? decodeEntities(entry.label).replace(/<[^>]+>/g, "") : "";
     const path = typeof entry.path === "string" && entry.path.length > 0 ? entry.path : label.length > 0 ? `A/${label.replace(/ /g, "_")}` : "";
     if (label.length === 0 || path.length === 0) continue;
     const hit: Hit = { title: label, path, exact: norm(label) === want };

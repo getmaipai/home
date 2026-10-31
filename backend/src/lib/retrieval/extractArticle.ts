@@ -30,6 +30,15 @@ export type ArticleBlock =
 export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; infobox?: { title?: string; rows: Array<{ label: string; value: string }> }; summary?: string; description?: string; hatnote?: string; kicker?: string; redirectTo?: string }
 
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
+/** An infobox value: line breaks and list items become ", " ("Oakland, California" rather than "OaklandCalifornia"), and the hidden machine-readable dates are dropped. */
+function cellText(el: Element): string {
+  const copy = el.cloneNode(true) as Element;
+  for (const hidden of Array.from(copy.querySelectorAll("[style*='display:none'], [style*='display: none'], .bday, .sr-only")) as Element[]) hidden.remove();
+  const doc = copy.ownerDocument;
+  for (const br of Array.from(copy.querySelectorAll("br")) as Element[]) br.replaceWith(doc.createTextNode(", "));
+  for (const li of Array.from(copy.querySelectorAll("li")) as Element[]) li.append(doc.createTextNode(", "));
+  return cleanText(copy.textContent ?? "").replace(/(?:\s*,)+\s*/g, ", ").replace(/^,\s*|,\s*$/g, "").trim();
+}
 
 // A figure in a publisher article counts as a picture of the story, not an ad or a tracker. A block is an ad (or a
 // recommendation) when its own or an ancestor's class or id names one; a picture is not worth drawing under 200 pixels
@@ -83,12 +92,15 @@ export function safeOutboundHref(raw: string, baseUrl?: string): string | null {
   } catch { return null; }
 }
 
+/** The notice box a disambiguation page carries. A real article only links to its disambiguation page (class `mw-disambig` on that link, in the hatnote), so the class is never matched loosely. */
+const DISAMBIG_BOX = ".dmbox-disambig, #disambigbox, table.disambigbox";
+
 const NEWS_DROP = "nav, aside, footer, button, [role=navigation], [role=complementary], [aria-hidden=true]";
 
 export function extractFullArticle(html: string, opts: FullArticleOptions): FullArticle {
   const news = opts.mode === "news";
   const { document } = parseHTML(html);
-  const detectedBeforeClean = document.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*=\"disambig\"]") !== null || /\bmay (?:also )?refer to\b/i.test(document.body?.textContent ?? "");
+  const detectedBeforeClean = document.querySelector(DISAMBIG_BOX) !== null;
   const category = (Array.from(document.querySelectorAll("#catlinks a, .catlinks a")) as Element[]).map(plain).find((text) => text && !/\bhidden\b/i.test(text));
   const kicker = category ? cutAtBoundary(category, 40) : undefined;
   const redirectTo = document.querySelector(".redirectMsg a, .redirectText a, #redirectedfrom a")?.getAttribute("href") ?? null;
@@ -113,7 +125,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   let infobox: FullArticle["infobox"];
   if (infoboxEl) {
     const caption = infoboxEl.querySelector("caption") ?? infoboxEl.querySelector("tr th[colspan]");
-    const rows = (Array.from(infoboxEl.querySelectorAll("tr")) as Element[]).flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && plain(td); return label && value ? [{ label: label.slice(0, INFOBOX_VALUE_MAX), value: value.slice(0, INFOBOX_VALUE_MAX) }] : []; }).slice(0, INFOBOX_MAX_ROWS);
+    const rows = (Array.from(infoboxEl.querySelectorAll("tr")) as Element[]).flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && cellText(td); return label && value ? [{ label: label.slice(0, INFOBOX_VALUE_MAX), value: value.slice(0, INFOBOX_VALUE_MAX) }] : []; }).slice(0, INFOBOX_MAX_ROWS);
     infobox = { ...(caption && plain(caption) ? { title: plain(caption).slice(0, INFOBOX_VALUE_MAX) } : {}), rows };
     if (opts.mode !== "news") infoboxEl.remove();
   }
@@ -159,8 +171,8 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
     return out.filter((entry) => entry.text !== "");
   };
   const root = content;
-  const disambig = root.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*='disambig']");
-  const detectedDisambiguation = detectedBeforeClean || disambig !== null || /\bmay (?:also )?refer to\b/i.test(root.textContent ?? "") || /\(disambiguation\)\s*$/i.test(title);
+  const disambig = root.querySelector(DISAMBIG_BOX);
+  const detectedDisambiguation = detectedBeforeClean || disambig !== null || /\bmay (?:also )?refer to\b/i.test((root.textContent ?? "").trim().slice(0, 600)) || /\(disambiguation\)\s*$/i.test(title);
   if (detectedDisambiguation) blocks.push({ type: "note", text: "Several articles share this name." });
   if (detectedDisambiguation) {
     const options = (Array.from(root.querySelectorAll("li")) as Element[]).slice(0, 8).map((li) => cleanText(li.textContent ?? "")).filter(Boolean);
@@ -191,7 +203,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
     else if (tag === "table") {
       const trs = Array.from(el.querySelectorAll("tr")) as Element[];
       const rows = trs.map((tr) => (Array.from(tr.querySelectorAll(":scope > th,:scope > td")) as Element[]).map(plain)).filter((r) => r.length);
-      if (el.matches(".infobox,.infobox_v2,.infobox_v3")) { const pairs = trs.flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && plain(td); return label && value ? [{ label, value }] : []; }); if (pairs.length) blocks.push({ type: "rows", rows: pairs }); }
+      if (el.matches(".infobox,.infobox_v2,.infobox_v3")) { const pairs = trs.flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && cellText(td); return label && value ? [{ label, value }] : []; }); if (pairs.length) blocks.push({ type: "rows", rows: pairs }); }
       else if (rows.length) { const first = rows[0]!; blocks.push({ type: "table", headers: first, rows: rows.slice(1) }); }
     } else if (tag === "figure" && opts.allowImages) {
       if (news) { const figure = newsFigureOf(el, opts.baseUrl); if (figure) blocks.push(figure); continue; }
@@ -260,6 +272,20 @@ export function cutAtSentence(text: string, max: number): string {
   const space = slice.lastIndexOf(" ");
   return (space > 0 ? slice.slice(0, space) : slice).trim();
 }
+/** A one-line dek from the lead sentence, in the book's own words: "X (born 1958) is an American singer" gives "American singer". The real
+ * ZIMs carry no short description, so this is what the mockup's "American actor and producer" line is built from. Nothing here is invented:
+ * a lead that does not read "<name> is/was a ..." gives no dek. */
+export function deriveDescription(lead: string, max = 90): string | undefined {
+  const flat = lead.replace(/\s*\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "").replace(/\s+/g, " ").trim();
+  const match = /^.{1,160}?\b(?:is|was|are|were)\s+(?:an?|the)\s+(.+)$/i.exec(flat);
+  if (!match) return undefined;
+  let rest = match[1]!.replace(/[.!?]+$/, "");
+  const stop = [", ", " best ", " who ", " that ", " which ", " known ", " from ", " in the "].map((word) => rest.indexOf(word)).filter((at) => at > 12);
+  if (stop.length) rest = rest.slice(0, Math.min(...stop)).trim();
+  if (rest.length > max) rest = rest.slice(0, rest.slice(0, max).lastIndexOf(" ")).trim();
+  return rest.length >= 4 ? rest.charAt(0).toUpperCase() + rest.slice(1) : undefined;
+}
+
 function cutAtBoundary(text: string, max: number): string {
   if (text.length <= max) return text;
   const slice = text.slice(0, max);
@@ -286,7 +312,7 @@ export function extractArticle(html: string): ExtractedArticle {
       const td = row.querySelector("td");
       if (!th || !td) continue;
       const label = textOf(th);
-      const value = cutAtBoundary(textOf(td), INFOBOX_VALUE_MAX);
+      const value = cutAtBoundary(cellText(td), INFOBOX_VALUE_MAX);
       if (label.length === 0 || value.length === 0) continue;
       infobox.push({ label, value });
       if (infobox.length >= INFOBOX_MAX_ROWS) break;
@@ -318,7 +344,7 @@ export function extractArticle(html: string): ExtractedArticle {
   }
   lead = cutAtBoundary(lead, LEAD_MAX_CHARS);
 
-  const markupDisambiguation = document.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*='disambig']") !== null;
+  const markupDisambiguation = document.querySelector(DISAMBIG_BOX) !== null;
   const disambiguation = markupDisambiguation || /\bmay (?:also )?refer to\b/i.test(lead.slice(0, 400)) || /\(disambiguation\)\s*$/i.test(title);
   const options: string[] = [];
   if (disambiguation) {

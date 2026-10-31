@@ -76,7 +76,7 @@ referenceRoutes.openapi(SUGGEST_ROUTE, async (c) => {
     const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return c.json([], 200);
     const res = await libraryRequest(base, `/suggest?content=${encodeURIComponent(book)}&term=${encodeURIComponent(q)}&count=10`); if (!res.ok) return c.json([], 200);
     const data: unknown = await res.json(); if (!Array.isArray(data)) return c.json([], 200);
-    const suggestions = data.filter((x: any) => x?.kind === "path" && typeof x.label === "string" && typeof x.path === "string" && x.path && !x.path.split("/").includes("..")).filter((x: any) => band === "adult" || !tripsMinorFloor(x.label)).slice(0, 10).map((x: any) => ({ title: x.label, book, path: x.path }));
+    const suggestions = data.filter((x: any) => x?.kind === "path" && typeof x.label === "string" && typeof x.path === "string" && x.path && !x.path.split("/").includes("..")).filter((x: any) => band === "adult" || !tripsMinorFloor(x.label)).slice(0, 10).map((x: any) => ({ title: typeof x.value === "string" && x.value.length > 0 ? x.value : String(x.label).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/<[^>]+>/g, ""), book, path: x.path }));
     return c.json(suggestions, 200);
   } catch { return c.json([], 200); }
 });

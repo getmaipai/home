@@ -85,6 +85,8 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
         contentInFlight++; maxContent = Math.max(maxContent, contentInFlight);
         try {
         const book = books.find((b) => b.id === decodeURIComponent(content[1]!));
+        const img = book?.images?.[decodeURIComponent(content[2]!)];
+        if (img) return new Response(img.bytes, { headers: { "content-type": img.type } });
         const article = book?.articles[decodeURIComponent(content[2]!)];
         return article ? new Response(article.html, { headers: { "content-type": "text/html" } }) : new Response("not found", { status: 404 });
         } finally { contentInFlight--; }

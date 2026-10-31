@@ -8,6 +8,37 @@ import { extractFullArticle } from "@/lib/retrieval/extractArticle";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { installed, libraryRequest } from "@/lib/kiwixClient";
 
+/** A full-text search over a whole-encyclopedia ZIM can take a second or two cold; the shared 2.5 s default is for suggestions. */
+const SEARCH_TIMEOUT_MS = 8000;
+
+/** Pages that are not articles: the real ZIM carries its category, template and project pages, and a full-text search finds them. */
+const NAMESPACE_TITLE = /^(?:Category|Template|Wikipedia|File|Help|Portal|Draft|Talk|User|Module|MediaWiki|Special|Book|TimedText)\b\s*:/i;
+function isNamespacePage(title: string, path: string): boolean {
+  return NAMESPACE_TITLE.test(title) || path.startsWith("_") || /^(?:Category|Template|Wikipedia|File|Help|Portal|Draft|Talk|User|Module):/i.test(path);
+}
+
+function decodeText(text: string): string {
+  return text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, "&").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
+/** A snippet is plain words: markup and entities removed, the engine's leading ellipsis and trailing citation marks dropped. */
+function cleanSnippet(snippet: string): string {
+  return decodeText(snippet).replace(/^\.{3}\s*/, "").replace(/\s*[↑^]\s.*$/u, "").trim();
+}
+
+/** Title matches from the book's own suggest list, best first: "prince" should open Prince (musician) before any page that merely says "prince". */
+async function titleMatches(base: string, book: string, q: string): Promise<Array<{ title: string; snippet: string; path: string }>> {
+  try {
+    const res = await libraryRequest(base, `/suggest?content=${encodeURIComponent(book)}&term=${encodeURIComponent(q)}&count=10`); if (!res.ok) return [];
+    const data: unknown = await res.json(); if (!Array.isArray(data)) return [];
+    const found = data.flatMap((x: any) => x?.kind === "path" && typeof x.path === "string" && x.path && !x.path.split("/").includes("..") ? [{ title: decodeText(typeof x.value === "string" && x.value ? x.value : String(x.label ?? "")), snippet: "", path: x.path as string }] : [])
+      .filter((entry) => /^[\p{L}\p{N}]/u.test(entry.title));
+    const want = q.trim().toLowerCase();
+    const rank = (title: string) => (title === q.trim() ? 0 : title.toLowerCase() === want ? 1 : title.toLowerCase().startsWith(`${want} (`) ? 2 : title.toLowerCase().startsWith(want) ? 3 : 4);
+    return found.map((entry, index) => ({ entry, index })).sort((a, b) => rank(a.entry.title) - rank(b.entry.title) || a.entry.title.length - b.entry.title.length || a.index - b.index).map((x) => x.entry);
+  } catch { return []; }
+}
+
 export interface ReferenceHit { title: string; snippet: string; book: string; path: string }
 
 /** Hits for `q` across the books this person may read, at most 20, and the sidecar's own total for adults. Never throws. */
@@ -20,17 +51,24 @@ export async function searchReference(person: PersonRow, q: string, book?: strin
     const hits: Array<{ title: string; snippet: string; book: string; path: string }> = []; let sidecarTotal = 0;
     for (const rb of books) {
       if (hits.length >= 20) break;
-      const res = await libraryRequest(base, `/search?content=${encodeURIComponent(rb.book)}&pattern=${encodeURIComponent(q)}&count=20`); if (!res.ok) continue;
-      const xml = await res.text();
-      const totalText = /<(?:\w+:)?totalResults\b[^>]*>(\d+)<\/(?:\w+:)?totalResults>/i.exec(xml)?.[1];
-      if (totalText) sidecarTotal += Number(totalText);
+      const [res, titles] = await Promise.all([
+        libraryRequest(base, `/search?content=${encodeURIComponent(rb.book)}&pattern=${encodeURIComponent(q)}&format=xml&pageLength=30`, { timeoutMs: SEARCH_TIMEOUT_MS }).catch(() => null),
+        titleMatches(base, rb.book, q),
+      ]);
+      if (!res?.ok && titles.length === 0) continue;
+      const xml = res?.ok ? await res.text() : "";
+      const totalText = /<(?:\w+:)?totalResults\b[^>]*>([\d,]+)<\/(?:\w+:)?totalResults>/i.exec(xml)?.[1];
+      if (totalText) sidecarTotal += Number(totalText.replace(/,/g, ""));
       const candidates: Array<{ title: string; snippet: string; path: string }> = [];
+      const seenPaths = new Set<string>();
+      const take = (entry: { title: string; snippet: string; path: string }) => { if (candidates.length >= 20 || seenPaths.has(entry.path) || isNamespacePage(entry.title, entry.path)) return; seenPaths.add(entry.path); candidates.push(entry); };
+      for (const hit of titles) take(hit);
       for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
         const item = m[1]!; const title = /<title>([\s\S]*?)<\/title>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim(); const href = /<link>([^<]+)<\/link>/i.exec(item)?.[1]?.trim(); const snippet = /<description>([\s\S]*?)<\/description>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
         if (!title || !href) continue;
         let path = ""; try { path = new URL(href, base).pathname.split("/").slice(3).map(decodeURIComponent).join("/"); } catch { continue; }
         if (!path || path.split("/").includes("..")) continue;
-        candidates.push({ title, snippet, path }); if (candidates.length >= 20) break;
+        take({ title: decodeText(title), snippet: cleanSnippet(snippet), path });
       }
       if (band === "adult") hits.push(...candidates.map((hit) => ({ ...hit, book: rb.book })));
       else {

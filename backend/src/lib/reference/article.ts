@@ -3,7 +3,7 @@ import { readReferencePage } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
 import { licenceLabel, readableBooks } from "@/lib/retrieval/referenceSources";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
-import { extractArticle, extractFullArticle, cutAtSentence } from "@/lib/retrieval/extractArticle";
+import { extractArticle, extractFullArticle, cutAtSentence, deriveDescription } from "@/lib/retrieval/extractArticle";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { getPersonSettingValue } from "@/lib/settings";
 import { extractArticleImages } from "@/lib/retrieval/articleImages";
@@ -62,7 +62,7 @@ export async function articlePayloadFor(person: PersonRow, result: NonNullable<A
       related.push(...loaded.filter((x): x is NonNullable<typeof x> => x !== null).slice(0, 5 - related.length));
     }
   }
-  return { title: result.title, book: result.book, path: result.path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, result.book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: { ...result.full.infobox, ...(result.infoboxImage ? { image: result.infoboxImage } : {}) } } : {}), ...(result.full.description ? { description: result.full.description } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}), ...(result.lead ? { lead: result.lead } : {}), reading_minutes: result.reading_minutes, ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.quick_fact ? { quick_fact: result.quick_fact } : {}), ...(result.badge ? { badge: result.badge } : {}), ...(related ? { related } : {}) };
+  return { title: result.title, book: result.book, path: result.path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, result.book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: { ...result.full.infobox, ...(result.infoboxImage ? { image: result.infoboxImage } : {}) } } : {}), ...((result.full.description ?? (result.lead ? deriveDescription(result.lead) : undefined)) ? { description: result.full.description ?? deriveDescription(result.lead!) } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}), ...(result.lead ? { lead: result.lead } : {}), reading_minutes: result.reading_minutes, ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.quick_fact ? { quick_fact: result.quick_fact } : {}), ...(result.badge ? { badge: result.badge } : {}), ...(related ? { related } : {}) };
 }
 
 async function dateFor(base: string, book: string): Promise<string | null> {
@@ -75,7 +75,7 @@ export async function readArticleImage(person: PersonRow, book: string, imagePat
   try {
     const names = await installed(base); if (!readableBooks(names, band).books.some((row) => row.book === book)) return null;
     const safePath = decodeURIComponent(imagePath); if (/^(?:https?:|data:|javascript:)/i.test(safePath)) return null;
-    const res = await libraryRequest(base, `/raw/${encodeURIComponent(book)}/${safePath.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return null;
+    const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${safePath.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return null;
     const type = (res.headers.get("content-type") ?? "").split(";")[0]!.toLowerCase(); if (!["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(type)) return null;
     return { bytes: await res.arrayBuffer(), type };
   } catch { return null; }

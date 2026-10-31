@@ -130,7 +130,7 @@ export function WikipediaPage() {
     <Page title="Wikipedia" hideTitle>
       <div className="flex min-h-0 flex-1" data-workspace-fill="">
       <SectionSidebar standalone density="compact" groups={[{ id: "wikipedia-sections", items: sectionItems }]} />
-      <div className="flex min-w-0 flex-1 flex-col gap-5 p-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
         {booksQuery.isPending ? <p role="status">Opening Wikipedia…</p> : null}
         {booksQuery.isError ? <p role="alert">Could not open your library. Check that Home is running, then try again.</p> : null}
         {booksQuery.data && !book ? (
