@@ -175,6 +175,10 @@ describe("MusicToolRender", () => {
     expect(result.container.textContent).toContain("Pancakes (vocals)");
     expect(result.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(result.queryByRole("button", { name: /use this version/i })).toBeNull();
+    fireEvent.click(result.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(result.container.textContent).toContain("Track 2 of 4"));
+    expect(result.container.textContent).toContain("Pancakes (drums)");
+    expect(result.container.textContent).not.toContain("Pancakes (vocals)");
   });
 
   test("Edit shows a plain next step when a song change fails", async () => {

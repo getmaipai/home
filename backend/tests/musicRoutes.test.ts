@@ -9,6 +9,7 @@ import { runGenerateMusic, runEditMusic } from "@/lib/music/tool";
 import { musicForOutcomes } from "@/lib/composer";
 import { getMusicJobFor, type MusicJob } from "@/lib/music/jobs";
 import { sourceMusicJob } from "@/lib/music/jobs";
+import { listConversationTurns } from "@/lib/conversationHistory";
 import { MUSIC_NOTE } from "@/lib/music/types";
 import { COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
@@ -56,6 +57,12 @@ describe("music routes", () => {
     await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
     const stemsCard = await (await client.get(`/api/music/jobs/${card.id}`)).json() as { versions: { id: string; label: string }[]; title: string };
     expect(stemsCard.versions.map((version) => version.label)).toEqual(["Vocals", "Drums"]);
+    // The card opens on the first track, and the split is its own message: the chat lists one music card per turn, so it must not share the song's turn.
+    expect((stemsCard as unknown as { current_id: string }).current_id).toBe((stemsCard.versions[0] as unknown as { file_id?: string; id: string }).file_id ?? stemsCard.versions[0]!.id);
+    const stemJob = getMusicJobFor(actor, card.id)!;
+    expect(stemJob.turnId).not.toBe(job.turnId);
+    const history = listConversationTurns(actor, job.conversationId!);
+    expect(history.ok && history.value.filter((turn) => turn.music?.id).map((turn) => turn.music!.id)).toEqual([job.id, card.id]);
   });
   test("refuses splitting a stem and reports an unavailable stem engine", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor); fake.stems = true; const { response } = await makeStems(client, job);

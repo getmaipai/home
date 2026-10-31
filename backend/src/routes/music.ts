@@ -23,6 +23,8 @@ import { cancelMusicJob, getMusicJobFor, jobsForConversation, musicVersions, ope
 import { lengthOf, prepareMusicEdit } from "@/lib/music/tool";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
+import { logTurn } from "@/lib/conversationHistory";
+import { newConversationTurnId } from "@/lib/id";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { refusePrompt } from "@/lib/pictures/policy";
@@ -116,7 +118,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
       .sort((a, b) => (stemOrder[stemName(a)] ?? 9) - (stemOrder[stemName(b)] ?? 9))
     : [];
   const versions = stemSet.length ? stemSet : musicVersions(actor, root);
-  const current = stemSet.length ? (stemSet.find((job) => job.id === root.id) ?? stemSet[0]) : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
+  const current = stemSet.length ? stemSet[0] : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
   const shown = current ?? root;
   const versionLabel = (job: MusicJob, index: number) => stemSet.length ? stemName(job).replace(/^./, (c) => c.toUpperCase()) : `Version ${index + 1}`;
   let covers: { id: string; url: string }[] = [];
@@ -205,8 +207,11 @@ musicRoutes.openapi(stemsRoute, async (c) => {
   const prepared = await prepareStemsJob(actor, source);
   if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
   let stemsJob: MusicJob;
-  try { stemsJob = await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: prepared.task, request: prepared.request, body: prepared.body, parentFileId: source.fileId }); }
+  // The split is its own message in the chat ("Split into stems" and a card of its tracks): the chat lists one music card per turn, so reusing the song's turn would never show it.
+  const turnId = source.temporary ? source.turnId : newConversationTurnId();
+  try { stemsJob = await startMusicJob({ actor, conversationId: source.conversationId, turnId, temporary: source.temporary, task: prepared.task, request: prepared.request, body: prepared.body, parentFileId: source.fileId }); }
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  if (!source.temporary) logTurn(actor, "chat", "Split into stems", { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: source.conversationId, turn_id: turnId });
   return c.json(await musicCardView(actor, stemsJob!), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },

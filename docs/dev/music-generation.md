@@ -33,7 +33,7 @@ It is a task of the existing tool, so the turn's tool count stays 16. Home sends
 Demucs `htdemucs`, MIT; the pinned checkpoint and its sha256 are in the Stack's `modelCatalog.ts`), then `finishStems` in `lib/music/jobs.ts` stores each stem as a
 song with `provenance.parent_file_id`, so the commercial-use check follows the parent. One `music_jobs` row per stem (task `stems`, `request.stemsOf` is the
 split's job id); a stem is never a version of its song (`musicVersions`) and the card of a finished split steps through its stems. The song card's
-Edit popover has a Stems tab that calls `POST /api/music/jobs/{id}/stems`. Only songs made here are accepted; uploaded audio waits on MUSIC-GEN-14 (TIER-STEMS-02).
+Edit popover has a Stems tab that calls `POST /api/music/jobs/{id}/stems`; that route logs its own "Split into stems" turn (the chat lists one music card per turn) and the card reloads the thread, then opens on the first track with its title following the shown stem. First real Home-to-Stack run: 2026-10-30, scratch Stack, a 20 s song split in four tracks. Only songs made here are accepted; uploaded audio waits on MUSIC-GEN-14 (TIER-STEMS-02).
 
 ## Try it on a scratch Stack and Home
 

@@ -698,7 +698,8 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   const navigate = useNavigate();
   const me = useContext(WakeWordPersonContext);
   const card = query.data ?? { id: result?.id ?? "", task: "text2music", state: "queued" as const, stage: null, stage_label: "", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 0, progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "full" as const, cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: 0 };
-  const trackProps = useMusicTrackProps({ card, navigate, onRefresh: () => { void query.refetch(); }, onStop: () => { void musicApi.stop(card.id).then(() => query.refetch()).catch(() => query.refetch()); } });
+  const reloadThread = useContext(ReloadMainThreadContext);
+  const trackProps = useMusicTrackProps({ card, navigate, onRefresh: () => { void query.refetch(); }, onStemsStarted: reloadThread, onStop: () => { void musicApi.stop(card.id).then(() => query.refetch()).catch(() => query.refetch()); } });
   const byline = useSongByline(card, me ?? null);
   if (!result) return null;
   if (!query.data) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
