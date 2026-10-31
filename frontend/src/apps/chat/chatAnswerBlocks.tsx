@@ -15,6 +15,8 @@ import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import { splitAfterParagraph } from "@maipai/spec/interpreters/ts/paragraphs.js";
+import { useState } from "react";
+import { request } from "@/lib/api";
 
 /** The data part's `name`. */
 export const ANSWER_BLOCK_PART = "answer_block";
@@ -83,6 +85,7 @@ export function textWithAnswerParts(text: string, visuals: { blocks?: readonly u
  * business (it decided where this part sits), and the kit's own copy of the strict block schema may be pinned before
  * that field existed, so the kit is handed the block without it: otherwise it would draw the `alt` fallback. */
 export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ data }) => {
+  const [undoAvailable, setUndoAvailable] = useState(data.kind === "confirmation" && Boolean(data.props.undo));
   const block: Record<string, unknown> = { ...data };
   delete block.after_paragraph;
   // IMGTOOLS-05: a picture gallery shows the kit's Edit button only when every picture in it is one the person
@@ -93,5 +96,24 @@ export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ d
   const targets = images.map((image) => ({ id: String(image.id ?? ""), name: String(image.alt ?? "picture"), src: String(image.src ?? "") }));
   const editable = edit !== null && targets.length > 0 && targets.every((target) => target.id !== "" && (edit.canEdit ? edit.canEdit(target) : true));
   const onImageEdit = editable ? (_blockId: string, imageId: string) => { const target = targets.find((candidate) => candidate.id === imageId); if (target) edit.onEdit(target); } : undefined;
-  return <AnswerBlockView block={block} {...(onImageEdit ? { onImageEdit } : {})} />;
+  const onAction = data.kind === "confirmation" && undoAvailable
+    ? async (id: string, action: string) => {
+        if (action !== "undo") return;
+        await request(`/api/tool-undo/${encodeURIComponent(id)}`, { method: "POST" });
+        setUndoAvailable(false);
+      }
+    : undefined;
+  let renderedBlock = block;
+  if (data.kind === "confirmation" && !undoAvailable) {
+    const props = { ...(block.props as Record<string, unknown>) };
+    delete props.undo;
+    renderedBlock = { ...block, props };
+  }
+  return (
+    <AnswerBlockView
+      block={renderedBlock}
+      {...(onImageEdit ? { onImageEdit } : {})}
+      {...(onAction ? { onAction } : {})}
+    />
+  );
 };

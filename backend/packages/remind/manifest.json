@@ -33,7 +33,7 @@
   "min_role": "child",
   "consequential": false,
   "offline": "full",
-  "returns_blocks": ["schedule_card"],
+  "returns_blocks": ["schedule_card", "confirmation"],
   "config": [],
   "data_sources": [],
   "permissions": ["reminders:write"],

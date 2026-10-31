@@ -14,6 +14,7 @@
 import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import { nextHlc } from "@/lib/hlc";
 import { adviceChips, adviceFromRecipeData } from "@/lib/weatherAdvice";
+import { undoPropsFor } from "@/lib/toolUndo";
 
 /** Rows a host read already holds, handed to the block producers of the same
  * run. Filled by packageHost.ts (never by a package). */
@@ -285,18 +286,67 @@ export function blocksForRecipeRun(
   const allowed = manifest.returns_blocks ?? [];
   const provenance = `${manifest.id} result${turnId ? ` in turn ${turnId}` : ""}`;
   switch (manifest.id) {
-    case "remind":
-      return allowed.includes("schedule_card")
-        ? scheduleCard(manifest.id, provenance, "Reminder set", text(result.data?.task), text(result.data?.when_text))
+    case "remind": {
+      const blocks = allowed.includes("schedule_card")
+        ? scheduleCard(
+            manifest.id,
+            provenance,
+            "Reminder set",
+            text(result.data?.task),
+            text(result.data?.when_text),
+          )
         : [];
+      const undoId = text(result.data?.undo_id);
+      if (undoId && allowed.includes("confirmation")) {
+        const undo = undoPropsFor(undoId);
+        if (undo) {
+          const whenText = text(result.data?.when_text) ?? "later";
+          const sentence = `Reminder set for ${whenText}.`;
+          const confirmation = blockEnvelope(
+            "confirmation",
+            manifest.id,
+            sentence,
+            provenance,
+            { icon: "clock", sentence, undo },
+          );
+          confirmation.id = undoId;
+          blocks.push(confirmation);
+        }
+      }
+      return blocks;
+    }
     case "alarm":
       if (!allowed.includes("schedule_card")) return [];
       if (text(result.data?.action) === "list") return [];
       return scheduleCard(manifest.id, provenance, text(result.data?.action) === "cancel" ? "Alarm or reminder cancelled" : "Alarm set", text(result.data?.schedule_task) || text(result.data?.task), text(result.data?.when_text), alarmCadence(text(result.data?.when_text)));
-    case "timer":
-      return allowed.includes("schedule_card")
-        ? scheduleCard(manifest.id, provenance, "Timer set", text(result.data?.label), text(result.data?.when_text))
+    case "timer": {
+      const blocks = allowed.includes("schedule_card")
+        ? scheduleCard(
+            manifest.id,
+            provenance,
+            "Timer set",
+            text(result.data?.label),
+            text(result.data?.when_text),
+          )
         : [];
+      const undoId = text(result.data?.undo_id);
+      if (undoId && allowed.includes("confirmation")) {
+        const undo = undoPropsFor(undoId);
+        if (undo) {
+          const sentence = `Timer set for ${text(result.data?.when_text) ?? "later"}.`;
+          const confirmation = blockEnvelope(
+            "confirmation",
+            manifest.id,
+            sentence,
+            provenance,
+            { icon: "clock", sentence, undo },
+          );
+          confirmation.id = undoId;
+          blocks.push(confirmation);
+        }
+      }
+      return blocks;
+    }
     case "list-view":
       return allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems ?? []) : [];
     case "weather":

@@ -2299,3 +2299,14 @@ export const toolAudit = sqliteTable("tool_audit", {
   count: integer("count").notNull().default(1),
   at: text("at").notNull(),
 }, (table) => [index("tool_audit_person_at_idx").on(table.personId, table.at)]);
+
+export const toolUndo = sqliteTable("tool_undo", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  turnId: text("turn_id"),
+  tool: text("tool").notNull(),
+  action: text("action").notNull(),
+  inverseJson: text("inverse_json").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+}, (table) => [index("tool_undo_person_idx").on(table.personId)]);

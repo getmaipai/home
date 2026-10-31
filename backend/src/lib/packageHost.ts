@@ -86,6 +86,7 @@ import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
+import { recordUndo } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
@@ -2543,13 +2544,27 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // "core" job (scheduleCoreJob, lib/scheduler.ts), never a "plugin"
       // one: firing later raises `remind.due` directly (CORE_JOBS'
       // `reminders.fire`), it never re-runs this recipe.
-      set(text: string): { task: string; schedule_task?: string; when_text: string; action: string } {
+      set(text: string): {
+        task: string;
+        schedule_task?: string;
+        when_text: string;
+        action: string;
+        undo_id?: string;
+      } {
         requirePermission("reminders:write");
         if (manifest.id === "alarm") return handleAlarmChat(actor, text);
         const parsed = parseReminder(text);
         const result = scheduleCoreJob(actor, "reminders.fire", parsed.when, { task: parsed.task });
         if (!result.ok) mapWriteFailure(result.status, result.error);
-        return { task: parsed.task, when_text: parsed.when_text, action: "set" };
+        const jobId = result.value.id;
+        const receipt = recordUndo({
+          personId: actor.id,
+          turnId: turn?.id,
+          tool: manifest.id,
+          action: "remind",
+          inverse: { kind: "cancel_reminder", id: jobId },
+        });
+        return { task: parsed.task, when_text: parsed.when_text, action: "set", undo_id: receipt.id };
       },
     },
     timers: {
@@ -2557,12 +2572,23 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // language model - see that file's own header for why a timer's
       // precision needs exact arithmetic. Same core-job shape as
       // reminders.set above; firing raises `timer.done` directly.
-      set(text: string): { label: string; when_text: string } {
+      set(text: string): {
+        label: string;
+        when_text: string;
+        undo_id?: string;
+      } {
         requirePermission("timers:write");
         const parsed = parseTimerDuration(text);
         const result = scheduleCoreJob(actor, "timers.fire", parsed.when, { label: parsed.label });
         if (!result.ok) mapWriteFailure(result.status, result.error);
-        return { label: parsed.label, when_text: parsed.when_text };
+        const receipt = recordUndo({
+          personId: actor.id,
+          turnId: turn?.id,
+          tool: manifest.id,
+          action: "timer",
+          inverse: { kind: "cancel_reminder", id: result.value.id },
+        });
+        return { label: parsed.label, when_text: parsed.when_text, undo_id: receipt.id };
       },
     },
     files: {

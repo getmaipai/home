@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { AnswerBlockDataRender, drawableBlocks } from "@/apps/chat/chatAnswerBlocks";
+import * as api from "@/lib/api";
 import newsFeedFixture from "@maipai/spec/fixtures/answer-block/valid-story_feed.json";
 
 afterEach(cleanup);
@@ -23,6 +24,41 @@ describe("the answer_block part draws the kit Element, not the alt sentence", ()
     const { container } = render(<Render data={{ ...block, after_paragraph: 0 }} />);
     expect(container.querySelector('[data-slot="spec-sheet"]')).not.toBeNull();
     expect(container.querySelector("[data-fallback]")).toBeNull();
+  });
+
+  test("Undo posts the block id to the undo route", async () => {
+    const request = spyOn(api, "request").mockResolvedValue({ ok: true });
+    const Render = AnswerBlockDataRender as unknown as (props: { data: unknown }) => React.ReactElement;
+    const confirmation = {
+      ...block,
+      id: "blk-undo12345",
+      kind: "confirmation",
+      producer: "remind",
+      props: {
+        icon: "clock",
+        sentence: "Reminder set.",
+        undo: { label: "Undo", action: "undo" },
+      },
+    };
+    const { getByText } = render(<Render data={confirmation} />);
+
+    await act(async () => {
+      fireEvent.click(getByText("Undo"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(request).toHaveBeenCalledWith("/api/tool-undo/blk-undo12345", { method: "POST" });
+    request.mockRestore();
+  });
+
+  test("confirmation without undo does not show an Undo button", () => {
+    const Render = AnswerBlockDataRender as unknown as (props: { data: unknown }) => React.ReactElement;
+    const confirmation = {
+      ...block,
+      kind: "confirmation",
+      props: { icon: "clock", sentence: "Reminder set." },
+    };
+    const { queryByText } = render(<Render data={confirmation} />);
+    expect(queryByText("Undo")).toBeNull();
   });
 
   test("the pinned UI validator keeps News stories with sourceIconUrl", () => {

@@ -34,6 +34,12 @@ export function newConversationTurnId(): string {
   return `turn-${randomSuffix(10)}`;
 }
 
+/** Answer block ids use the spec's `blk-` pattern. Undo receipts share the
+ * confirmation block id because the kit reports that id with its action. */
+export function newToolUndoId(): string {
+  return `blk-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/reply-feedback.schema.json's `^rf-[a-z0-9]{6,}$`. */
 export function newReplyFeedbackId(): string {
   return `rf-${randomSuffix(10)}`;

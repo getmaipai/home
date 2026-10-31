@@ -103,6 +103,7 @@ import {
   projects,
   setupState,
   toolAudit,
+  toolUndo,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -148,6 +149,7 @@ export function resetDb(): void {
   db.delete(approvals).run();
   db.delete(setupState).run();
   db.delete(toolAudit).run();
+  db.delete(toolUndo).run();
   db.delete(memoryConsolidationCursor).run();
   db.delete(grants).run();
   db.delete(openQuestions).run(); // ASK-01: references people
