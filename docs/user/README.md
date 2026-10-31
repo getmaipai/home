@@ -24,6 +24,9 @@ day the hub arrives; the rest are for when you need them.
 - [Books](books.md): read EPUB and PDF books, and listen to audiobooks.
 - [Shows and Films](shows.md): browse local shows and films, and keep a watchlist.
 - [Songs](songs.md): ask chat to write and make a song, change it by asking, play it, and choose who can make songs.
+- [Standard, Boost and Max](levels.md): what the levels mean for pictures, video and songs, and who can use each.
+- [Share the computer during big jobs](performance.md): choose whether chat or big jobs get the room, and free up memory.
+- [Let Home close apps](close-apps.md): pick the apps Home may close when a big job needs room.
 - [Watch videos](watch-videos.md): open the Videos app, play a video from your hub, pick up where you stopped, and save videos for later.
 - [What MaiPai remembers](memory.md): see, export, or forget what MaiPai has remembered from your conversations.
 - [People and parental controls](people.md): see who is in your household, manage accounts, and check in on a child.

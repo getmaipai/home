@@ -63,6 +63,12 @@ Ask in the same chat. For example:
 
 Each change is a new version. Nothing is lost. The card shows "Version 2 of 2" with arrows to go back. To build on an older version, go back to it and press **Use this version**.
 
+## Split a song into stems
+
+Press **Edit** on a song you made here, open **Stems**, then press **Split into stems**. Home makes four tracks: vocals, drums, bass and other. They show on one card, and you step through them as Track 1 of 4 and so on. Each track is its own song in your Library.
+
+You can split only songs made in Home. Wait for the song to finish first.
+
 ## Who can make songs
 
 Adults can, on their own screen, in a written chat. Children and teens cannot make songs. Spoken answers, the TV and other shared screens never make songs. A guest cannot.
