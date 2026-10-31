@@ -124,13 +124,43 @@ function cleanup(): void {
   for (const id of createdTurnIds) {
     sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(id);
     sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(id);
     sqlite.query("DELETE FROM memory_records WHERE source = ?").run(id);
     deleteEpisodesForTurns([id]); // MEM-03: the turn's verbatim episodes carry a FK to it
     sqlite.query("DELETE FROM conversation_turns WHERE id = ?").run(id);
   }
-  sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ?").run(testPersonId);
-  sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
-  for (const id of [testPersonId, ...createdPersonIds]) sqlite.query("DELETE FROM people WHERE id = ?").run(id);
+  // Dependents first, people last: the judge writes entities and
+  // relationships for the household people (both reference people rows),
+  // and a memory record it re-stamped may no longer carry a turn source.
+  for (const id of [testPersonId, ...createdPersonIds]) {
+    sqlite.query("DELETE FROM relationships WHERE person = ? OR stated_by_person_id = ? OR confirmed_by_person_id = ?").run(id, id, id);
+    sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(id);
+    sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(id);
+    sqlite.query("DELETE FROM memory_records WHERE person = ?").run(id);
+    sqlite.query("DELETE FROM entities WHERE person = ? OR confirmed_by_person_id = ? OR account_person_id = ?").run(id, id, id);
+    sqlite.query("DELETE FROM open_questions WHERE person = ?").run(id);
+    sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ? OR subject_person_id = ?").run(id, id);
+    sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(id);
+    sqlite.query("DELETE FROM people WHERE id = ?").run(id);
+  }
+}
+
+/** A refused write is logged by the judge with its turn id only
+ * (`[memoryJudge] remember failed for turn <id>: ...`); while the batch
+ * runs, every such line is reprinted with the case id it belongs to, so a
+ * refusal can be read back to its fixture case. */
+function attributeRefusals<T>(labels: Map<string, string>, work: () => Promise<T>): Promise<T> {
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    const line = args.map((a) => (typeof a === "string" ? a : String(a))).join(" ");
+    const match = line.match(/(?:remember|supersede) failed for turn (turn-[A-Za-z0-9_-]+)/);
+    original(...args);
+    if (match) original(`  refused write belongs to case ${labels.get(match[1]!) ?? "(not a fixture turn)"}`);
+  };
+  return work().finally(() => {
+    console.error = original;
+  });
 }
 
 /** MEM-AUDIT-06: the household fixture. One owner speaks every case; the
@@ -171,7 +201,7 @@ async function runDataset(name: string): Promise<{ executed: number; engine: str
   }
   const engine = `judge at ${sanitizeEngineUrl(judgeUrl)}`;
   const startTime = Date.now();
-  const batchResult = await runJudgeBatch();
+  const batchResult = await attributeRefusals(new Map(seededCases.map((c) => [c.turnId, c.label])), () => runJudgeBatch());
   const elapsedMs = Date.now() - startTime;
   console.log(`Judge batch: processed=${batchResult.processed} factsWritten=${batchResult.factsWritten} elapsed=${(elapsedMs / 1000).toFixed(2)}s (${(elapsedMs / 1000 / Math.max(1, batchResult.processed)).toFixed(3)}s/turn)`);
 

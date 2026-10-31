@@ -101,6 +101,22 @@ function seedMemory(actor: Awaited<ReturnType<typeof owner>>, text: string, pers
 }
 
 describe("packageHost memory.remember", () => {
+  // MEM-AUDIT-02 (the preview, 2026-10-31): the model's tool call said
+  // "Nova's daughter loves horses" for "my daughter Nova loves horses".
+  test("a model paraphrase is stored as the person's own clause when that clause carries every content word of it", async () => {
+    const { userClauseFor } = await import("@/lib/packageHost");
+    expect(userClauseFor("Nova's daughter loves horses.", "my daughter Nova loves horses")).toBe("my daughter Nova loves horses");
+    expect(userClauseFor("Vincent plays drums", "make a note that my friend Vincent plays drums")).toBe("my friend Vincent plays drums");
+    // Two clauses, or words the person never said: the paraphrase stands.
+    expect(userClauseFor("Nova loves horses", "my daughter Nova loves horses and Marlow hates them")).toBe("Nova loves horses");
+    expect(userClauseFor("Nova rides at Willow Farm", "my daughter Nova loves horses")).toBe("Nova rides at Willow Farm");
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }), [], { id: "turn-userclause", userText: "my daughter Nova loves horses" });
+    const id = host.memory.remember("Nova's daughter loves horses.", "fact");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect([row.text, row.source]).toEqual(["my daughter Nova loves horses", "turn-userclause"]);
+  });
+
   // CHAT-03: the one content policy reaches a package's own write too.
   test("a credential is refused with the fixed line, and nothing is stored", async () => {
     const actor = await owner();

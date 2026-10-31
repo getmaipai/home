@@ -607,7 +607,7 @@ export async function runPlugin(
   id: string,
   actor: PersonRow,
   inputs: Record<string, unknown>,
-  turn?: { id: string; conversationId?: string },
+  turn?: { id: string; conversationId?: string; userText?: string },
   options: { signal?: AbortSignal; deadlineAt?: number; hostInputs?: Record<string, unknown>; uncached?: boolean; spoken?: boolean; band?: "child" | "teen" | "adult" } = {},
 ): Promise<PluginOpResult<PluginResult>> {
   // PLACE-WEATHER-01: latitude and longitude are host-only recipe inputs. A model
