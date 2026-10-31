@@ -53,3 +53,11 @@ Never against the live Stack (8770) or Home (3000). Take `mkdir /private/tmp/cla
 `backend/tests/music*.test.ts` (gate, tools, routes, commercial check, the Stack status shape, the section rewrite), `backend/tests/toolOffers.test.ts`
 (the 16-tool cap), `frontend/src/apps/chat/chatMusic.test.tsx`, Stack `backend/tests/musicGen.test.ts` (a real-worker case runs only with
 `MUSIC_REAL=1`).
+
+## Model-choice row for `edit_music` (MUSIC-GEN-07, 2026-10-30)
+
+Four short turns through a dev Home against the live chat model, with a stand-in for the music routes, in a conversation holding one song made there:
+"split this song into stems" and "can you give me just the vocals and the drums as separate tracks" each called `edit_music` with `change: "stems"` (2 of 2);
+"make it slower" called `edit_music` for a remake, not stems; "what does a stem mean in music production?" called no tool. The budget row (16 tools, `edit_music`
+offered only once a song exists) is pinned by `toolOffers.test.ts` and `toolOfferInventory.test.ts`; the age, surface, minor-line and voice-line rows by `musicSafety.test.ts`
+and `musicTool.test.ts`. Four turns is a smoke measurement, not a rate: the wider tool-calling corpus lives in `commons`.
