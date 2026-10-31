@@ -4,7 +4,7 @@
 # --tag labels a shipped commit afterwards;
 # the live .installed-tag remains sha-<first 7> so update checks do not treat it as a release.
 set -euo pipefail
-usage() { echo "usage: bash scripts/ship.sh status | bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--reinstall] [--retry]" >&2; }
+usage() { echo "usage: bash scripts/ship.sh status | bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--allow-big-copy] [--reinstall] [--retry]" >&2; }
 die() { echo "ship.sh: $1" >&2; exit "${2:-1}"; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a Home checkout."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
@@ -45,8 +45,8 @@ if [[ "${1:-}" == status ]]; then
   fi
   exit 0
 fi
-before_green=0; tag_after=0; dry=0; adopt_empty_live=0; reinstall=0; retry=0; target=main
-while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
+before_green=0; tag_after=0; dry=0; adopt_empty_live=0; allow_big_copy=0; reinstall=0; retry=0; target=main
+while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --allow-big-copy) allow_big_copy=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
 git fetch origin || die "could not fetch origin; check network access and retry."
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
@@ -100,6 +100,18 @@ if (( guard_finding )); then
   (( adopt_empty_live )) || die "$finding Pass --adopt-empty-live only to override this guard."
 fi
 before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
+# The installer stops the hub, then copies the data before it upgrades (a rollback needs it), and the hub stays stopped until the copy ends.
+# 2026-10-30: a 127 GB Wikipedia in the copy held the release for over an hour. The installer now skips big files; this refuses, before
+# anything is stopped, when what it would still copy is large, so a new kind of big data cannot do the same again.
+snapshot_skip_min="${MAIPAI_SNAPSHOT_SKIP_MIN:-512M}"; max_copy_bytes="${MAIPAI_SHIP_MAX_COPY_BYTES:-$((5 * 1024 * 1024 * 1024))}"; copy_bytes=0
+if [[ -d "$live_data" ]]; then
+  copy_bytes="$(find "$live_data" -type f ! -size "+$snapshot_skip_min" ! -path '*/logs/*' -exec stat -f %z {} + 2>/dev/null | awk '{s+=$1} END {print s+0}')"
+fi
+if (( copy_bytes > max_copy_bytes )); then
+  finding="The installer's data copy before this upgrade would hold $((copy_bytes / 1048576)) MB (the limit is $((max_copy_bytes / 1048576)) MB), so the release would run long. Move the large downloaded data out of $live_data or make the installer skip it, then ship again."
+  if (( dry )); then echo "ship.sh: $finding" >&2; exit 1; fi
+  (( allow_big_copy )) || die "$finding Nothing was stopped. Pass --allow-big-copy only when the owner accepts the wait."
+fi
 # One ship at a time (2026-10-29: two sessions shipped at once, both installs and both rollbacks collided and the hub was down for minutes).
 # The lock is a directory in the shared ship data folder, so every worktree and session sees it. A second ship waits for the first, then
 # looks again at what is live: a hub that already runs this commit, or a newer one that includes it, needs no install.

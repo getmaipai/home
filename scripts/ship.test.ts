@@ -125,6 +125,21 @@ describe("ship pipeline", () => {
     const clean = run([sha, "--before-green", "--reinstall"], { MAIPAI_HUB_LOCK_PATH: join(scratch, "missing.lock") });
     expect(clean.status).toBe(0); expect(clean.stdout).toContain("shipped:");
   }, 60_000);
+  test("refuses before stopping anything when the installer's data copy would be large, and an explicit flag allows it", () => {
+    const dataDir = join(live, "data"); mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, "records.bin"), "x".repeat(30_000));
+    const env = { MAIPAI_SHIP_MAX_COPY_BYTES: "10000", MAIPAI_SNAPSHOT_SKIP_MIN: "1M", MAIPAI_HUB_LOCK_PATH: join(scratch, "missing.lock") };
+    try {
+      const refused = run([sha, "--before-green"], env);
+      expect(refused.status).toBe(1); expect(refused.stderr).toContain("data copy"); expect(refused.stderr).toContain("Nothing was stopped");
+      const dry = run([sha, "--before-green", "--dry-run"], env);
+      expect(dry.status).toBe(1); expect(dry.stderr).toContain("data copy");
+      const skipped = run([sha, "--before-green", "--dry-run"], { ...env, MAIPAI_SNAPSHOT_SKIP_MIN: "8k" });
+      expect(skipped.status).toBe(0);
+      const allowed = run([sha, "--before-green", "--allow-big-copy"], env);
+      expect(allowed.status).toBe(0);
+    } finally { rmSync(dataDir, { recursive: true, force: true }); }
+  }, 60_000);
   test("preflight names one-time setup when helper is missing", () => {
     const out = run([sha, "--before-green"], { MAIPAI_PROMOTE_BIN: join(scratch, "missing-helper") }); expect(out.status).toBe(2); expect(out.stderr).toContain("install-promote.sh");
   }, 60_000);
