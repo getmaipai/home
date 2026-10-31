@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { AppDirectory, type DirectoryApp } from "@maipai/ui/src/primitives/AppDirectory";
-import { RAIL_APPS_MAX } from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/AppRail";
 import type { Roster } from "@/lib/api";
 import { useAppCatalog } from "@/shell/useAppCatalog";
 import { isPinnableApp } from "@/shell/appCatalog";
@@ -31,7 +30,6 @@ export function AllAppsPage({ person }: { person: Roster }) {
     <AppDirectory
       apps={apps}
       hideTitle
-      favoritesLimit={RAIL_APPS_MAX}
       busy={isLoading || isSaving}
       onToggleFavorite={(app) => togglePin(app.to)}
     />
