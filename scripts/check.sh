@@ -479,6 +479,34 @@ if [ "$SCOPE" != "docs" ]; then
   SPEC_DIR="$(ensure_pin spec "$SPEC_TAG")"
 fi
 
+# run_parallel_stages "<stage name>" "<shell command>" ...: runs every command at once in its own subshell, output to its own
+# temp file, waits on each pid separately, then prints each command's output under its stage line, passing ones first and
+# failing ones last (so the last "== " line is a failing stage). Returns 1 if any failed. Safe under set -e.
+run_parallel_stages() {
+  local tmp i n=0 rc any=0
+  local -a names=() pids=() rcs=()
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/parallel-stages.XXXXXX")"
+  while [ "$#" -ge 2 ]; do
+    names+=("$1")
+    ( eval "$2" ) >"$tmp/$n.out" 2>&1 &
+    pids+=($!)
+    n=$((n+1)); shift 2
+  done
+  for ((i=0; i<n; i++)); do
+    rc=0; wait "${pids[$i]}" || rc=$?
+    rcs+=("$rc")
+    if [ "$rc" -ne 0 ]; then any=1; fi
+  done
+  for ((i=0; i<n; i++)); do
+    if [ "${rcs[$i]}" -eq 0 ]; then stage "${names[$i]}"; cat "$tmp/$i.out"; fi
+  done
+  for ((i=0; i<n; i++)); do
+    if [ "${rcs[$i]}" -ne 0 ]; then stage "${names[$i]}"; cat "$tmp/$i.out"; fi
+  done
+  rm -rf "$tmp"
+  return "$any"
+}
+
 preflight_stage() { stage "$1"; }
 run_preflight() {
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
@@ -531,14 +559,18 @@ NODE
   preflight_stage "pre: UI rules and shrinking baselines"
   (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)
 
+  # The typechecks are independent, so they run at once (about 170 s serial, the longest one alone in parallel).
+  local -a tc_args=()
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
-    preflight_stage "pre: backend and scripts typecheck"
-    (cd backend && bunx tsc --noEmit)
-    (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
+    tc_args+=("pre: backend and scripts typecheck" "cd backend && bunx tsc --noEmit")
+    tc_args+=("pre: backend and scripts typecheck" "cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json")
   fi
   if [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
-    preflight_stage "pre: frontend typecheck"
-    (cd frontend && bunx tsc --noEmit)
+    tc_args+=("pre: frontend typecheck" "cd frontend && bunx tsc --noEmit")
+  fi
+  if [ "${#tc_args[@]}" -gt 0 ]; then
+    preflight_stage "pre: typechecks (running at once)"
+    run_parallel_stages "${tc_args[@]}" || return 1
   fi
 
   preflight_stage "pre: secrets scan"
