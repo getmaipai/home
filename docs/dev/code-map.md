@@ -520,7 +520,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/libraryMultipart.ts` | libraryMultipart |
 | `backend/src/lib/libraryProvenance.ts` | libraryProvenance, libraryProvenanceSql, isGeneratedFile |
 | `backend/src/lib/libraryRetention.ts` | expiringLibraryFiles, previewLibraryRetention, runLibraryRetention |
-| `backend/src/lib/libraryTrash.ts` | trashDays, companionsOf, parentOf, trashFile, listTrashedFiles, trashTotals |
+| `backend/src/lib/libraryTrash.ts` | trashDays, companionsOf, parentOf, canDeleteInherited, trashFile, listTrashedFiles |
 | `backend/src/lib/libraryUpload.ts` | MAX_LIBRARY_UPLOAD_BYTES, UNSUPPORTED_UPLOAD |
 | `backend/src/lib/libraryUploadStream.ts` | LIBRARY_CHUNK_BYTES, UploadError, __setLibraryUploadCapForTests, assertLibraryUploadAllowed, beginLibraryUpload, appendLibraryUpload |
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
