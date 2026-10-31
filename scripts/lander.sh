@@ -6,6 +6,7 @@ error() { echo "lander.sh: $1" >&2; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || { error "not inside a git checkout; run this from the main checkout."; exit 1; }
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
 main="$(cd "$(dirname "$common")" && pwd -P)"
+export GATE_HEAVY_HELD=1
 bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 data="${MAIPAI_LAND_DATA:-$main/data-scratch/land}"
 checkout="${MAIPAI_LAND_CHECKOUT:-$(cd "$main/.." && pwd -P)/home-lander}"
@@ -174,6 +175,15 @@ PY
     rm -f "$output"; return 0
   fi
   if ! git -C "$checkout" fetch origin; then bounce "$request" "$branch" "$sha" "could not fetch origin; check network and git credentials, then land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
+  if git -C "$checkout" merge-base --is-ancestor "$sha" origin/main; then
+    main_sha="$(git -C "$checkout" rev-parse origin/main)"
+    seconds=$(( $(date +%s) - started ))
+    atomic_json_note "$branch" "$sha" landed "already on origin/main" "$main_sha" "$output" "$seconds" "$landing_note"
+    log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "already on origin/main"
+    rm -f "$request" "$output"
+    echo "landed: $branch at $sha (already on main)"
+    return 0
+  fi
   origin_branch="$(git -C "$checkout" rev-parse --verify "origin/$branch" 2>/dev/null || true)"
   if [[ "$origin_branch" != "$sha" ]]; then bounce "$request" "$branch" "$sha" "branch not on origin at $sha; run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
   prev_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo origin/main)"
@@ -244,9 +254,9 @@ PY
   fi
   check_cmd="${MAIPAI_LAND_CHECK_CMD:-}"
   if [[ -n "$check_cmd" ]]; then
-    (cd "$checkout" && eval "$check_cmd") >"$output" 2>&1 || { bounce "$request" "$branch" "$sha" "static check failed" "$started" "$output"; rm -f "$output"; return 0; }
+    (cd "$checkout" && eval "$check_cmd") >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
   else
-    (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { bounce "$request" "$branch" "$sha" "static check failed" "$started" "$output"; rm -f "$output"; return 0; }
+    (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
   fi
 
   changed_files="$(git -C "$checkout" diff --name-only origin/main...HEAD 2>/dev/null || true)"
@@ -288,9 +298,9 @@ PY
     fi
     if [[ -n "$intersect" ]]; then
       if [[ -n "$check_cmd" ]]; then
-        (cd "$checkout" && eval "$check_cmd") >"$output" 2>&1 || { bounce "$request" "$branch" "$sha" "static check failed" "$started" "$output"; rm -f "$output"; return 0; }
+        (cd "$checkout" && eval "$check_cmd") >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
       else
-        (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { bounce "$request" "$branch" "$sha" "static check failed" "$started" "$output"; rm -f "$output"; return 0; }
+        (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
       fi
     fi
   done
@@ -301,7 +311,42 @@ PY
 run_once() {
   local request
   request="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort | head -n 1)"
-  if [[ -z "$request" ]]; then echo "queue empty"; return 0; fi
+  if [[ -z "$request" ]]; then return 0; fi
+  local oldest_branch oldest_slug newer newer_branch newest
+  oldest_branch="$(python3 - "$request" <<'PY'
+import json,sys
+try: print(json.load(open(sys.argv[1])).get('branch',''))
+except Exception: pass
+PY
+)"
+  oldest_slug="${oldest_branch//\//-}"
+  newest="$request"
+  while IFS= read -r newer; do
+    [[ "$newer" == "$request" ]] && continue
+    newer_branch="$(python3 - "$newer" <<'PY'
+import json,sys
+try: print(json.load(open(sys.argv[1])).get('branch',''))
+except Exception: pass
+PY
+)"
+    if [[ "$newer_branch" == "$oldest_branch" ]]; then
+      newest="$newer"
+    fi
+  done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
+  if [[ "$newest" != "$request" ]]; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) superseded request $(basename "$request") by $(basename "$newest")" >> "$data/lander.log"
+    request="$newest"
+  fi
+  for newer in "$data/queue"/*-"$oldest_slug".json; do
+    [[ -f "$newer" && "$newer" != "$request" ]] || continue
+    newer_branch="$(python3 - "$newer" <<'PY'
+import json,sys
+try: print(json.load(open(sys.argv[1])).get('branch',''))
+except Exception: pass
+PY
+)"
+    if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer"; fi
+  done
   run_one "$request"
 }
 

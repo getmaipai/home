@@ -168,6 +168,8 @@ elif record.get("result")=="red":
     print("main: red at %s: %s (culprit %s)" % (last_run[:7], files, culprit[:7]))
 elif record.get("result")=="flaky":
     print("main: flaky at %s: %s" % (last_run[:7], ", ".join(record.get("failing",[])) or "unknown"))
+elif record.get("result")=="stalled":
+    print("main: stalled at %s: %s" % (last_run[:7], ", ".join(record.get("failing",[])) or "a test leg timed out"))
 elif last_run==last_green:
     try:
         ts=datetime.datetime.fromisoformat(record["ts"].replace("Z","+00:00"))
@@ -196,21 +198,17 @@ status() {
   now="$(date +%s)"
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
-    vals="$(python3 - "$f" <<'PY'
+    IFS='|' read -r branch sha requested < <(python3 - "$f" <<'PY'
 import json,sys
 try:
- v=json.load(open(sys.argv[1])); print('%s\t%s\t%s' % (v.get('branch','unknown'), v.get('sha','unknown'), v.get('requested_at','')))
-except Exception: print('invalid\tunknown\t')
+ v=json.load(open(sys.argv[1])); print('%s|%s|%s' % (v.get('branch','unknown'),v.get('sha','unknown'),v.get('requested_at','')))
+except Exception: print('invalid|unknown|')
 PY
 )
-    IFS=$'\t' read -r branch sha requested <<< "$vals"
-    age="$(python3 - "$requested" "$now" <<'PY'
-import datetime,sys
-try: print(max(0,int(sys.argv[2])-int(datetime.datetime.fromisoformat(sys.argv[1].replace('Z','+00:00')).timestamp())))
-except Exception: print(0)
-PY
-)
-    echo "$branch ${sha:0:7} ${age}s"
+    age="$(python3 -c 'import datetime,sys
+try: print(max(0,int(sys.argv[2])-int(datetime.datetime.fromisoformat(sys.argv[1].replace("Z","+00:00")).timestamp())))
+except Exception: print(0)' "$requested" "$now")"
+    echo "  $branch ${sha:0:7} ${age}s"
   done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
   echo "last landings:"
   if [[ -f "$data/landings.jsonl" ]]; then

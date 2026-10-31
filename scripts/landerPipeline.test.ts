@@ -81,6 +81,47 @@ describe("lander pipeline", () => {
     expect(git(origin, "rev-parse", "main")).toBe(gammaMain);
   }, 60_000);
 
+  test("newest duplicate request supersedes older request", () => {
+    const wt = makeWorktree("dupe");
+    writeFileSync(join(wt, "file.txt"), "newest request\n");
+    const sha = commit(wt, "duplicate newest");
+    expect(run("land.sh", ["--detach"], wt).status).toBe(0);
+    const newestFile = join(data, "queue", "9999999999-wt-dupe.json");
+    const priorFile = join(data, "queue", "0000000001-wt-dupe.json");
+    const request = JSON.parse(readFileSync(join(data, "queue", awaitQueueName()), "utf8"));
+    writeFileSync(priorFile, JSON.stringify({ ...request, sha: "0".repeat(40) }));
+    writeFileSync(newestFile, JSON.stringify(request));
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(note("dupe").sha).toBe(sha);
+    expect(note("dupe").status).toBe("landed");
+    expect(queueFiles()).toHaveLength(0);
+    expect(readFileSync(join(data, "lander.log"), "utf8")).toContain("superseded request 0000000001-wt-dupe.json by 9999999999-wt-dupe.json");
+  }, 60_000);
+
+  test("already-main request lands instead of bouncing", () => {
+    const wt = makeWorktree("already_main");
+    writeFileSync(join(wt, "file.txt"), "already main\n");
+    const sha = commit(wt, "already-main change");
+    expect(run("land.sh", ["--detach"], wt).status).toBe(0);
+    git(origin, "push", origin, `${sha}:refs/heads/main`);
+    git(main, "fetch", "origin");
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(note("already_main").status).toBe("landed");
+    expect(note("already_main").reason).toBe("already on origin/main");
+    expect(queueFiles()).toHaveLength(0);
+  }, 60_000);
+
+  test("static check bounce names the failed stage", () => {
+    const wt = makeWorktree("stage_failure");
+    writeFileSync(join(wt, "file.txt"), "stage failure\n");
+    commit(wt, "stage failure change");
+    env.MAIPAI_LAND_CHECK_CMD = "echo '== pre: frontend typecheck'; exit 1";
+    expect(run("land.sh", ["--detach"], wt).status).toBe(0);
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(note("stage_failure").reason).toBe("static check failed at pre: frontend typecheck");
+    env.MAIPAI_LAND_CHECK_CMD = "bash scripts/check.sh --pre";
+  }, 60_000);
+
   test("land.sh refuses tracked dirt and a branch with no commit ahead", () => {
     const dirty = makeWorktree("dirty");
     writeFileSync(join(dirty, "file.txt"), "dirty\n");
@@ -179,6 +220,26 @@ describe("lander pipeline", () => {
     expect(out.stdout).toContain("queue: 0");
     expect(out.stdout).toContain("landed");
     expect(out.stdout).toContain("bounced");
+  }, 60_000);
+
+  test("pipeline status prints queue fields and stalled main run", () => {
+    const wt = makeWorktree("status_queue");
+    writeFileSync(join(wt, "file.txt"), "queued\n");
+    const sha = commit(wt, "status queue");
+    expect(run("land.sh", ["--detach"], wt).status).toBe(0);
+    const requested = queueFiles()[0];
+    const requestPath = join(data, "queue", requested!);
+    const request = JSON.parse(readFileSync(requestPath, "utf8"));
+    request.requested_at = new Date().toISOString();
+    writeFileSync(requestPath, JSON.stringify(request));
+    const lastRun = git(main, "rev-parse", "origin/main");
+    mkdirSync(watchData, { recursive: true });
+    writeFileSync(join(watchData, "last-run"), `${lastRun}\n`);
+    writeFileSync(join(watchData, "runs.jsonl"), `${JSON.stringify({ sha: lastRun, result: "stalled", failing: [] })}\n`);
+    const out = run("pipeline.sh", ["status"]);
+    expect(out.stdout).toContain(`  wt/status_queue ${sha.slice(0, 7)} `);
+    expect(out.stdout).toContain(`main: stalled at ${lastRun.slice(0, 7)}: a test leg timed out`);
+    for (const file of queueFiles()) rmSync(join(data, "queue", file), { force: true });
   }, 60_000);
 });
 
