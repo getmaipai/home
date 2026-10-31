@@ -160,6 +160,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
 | `frontend/src/apps/setup/CloseAppsStep.tsx` | openStarterApps, useCloseAppsQuestion, CloseAppsStep |
 | `frontend/src/apps/setup/HostTuneStep.tsx` | hostTuneFailure, useHostTuneSupported, HostTuneStep |
+| `frontend/src/apps/setup/PerformanceStep.tsx` | PerformanceStep |
 | `frontend/src/apps/setup/PlanDiskSummary.tsx` | liveVerdict, PlanDiskSummary |
 | `frontend/src/apps/setup/PlanStep.tsx` | VRAM_CHOICES, PlanStep |
 | `frontend/src/apps/setup/SetupReviewPage.tsx` | SetupReviewPage |
@@ -583,7 +584,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryId.ts` | newMemoryRecordId |
 | `backend/src/lib/memoryIngestion.ts` | canonicalKey, storeEmbeddingInTx, supersedeInTx, ingestMemory, supersedeMemory, drainPendingWork |
 | `backend/src/lib/memoryJudge.ts` | categoryToRecordKind, exampleDateFor, promptExampleTexts, nextMonthLabel, timeExampleText, possessiveExampleText |
-| `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities |
+| `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | sha256OfFile, downloadUrl |
