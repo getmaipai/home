@@ -13,7 +13,7 @@ function descendants(root: number): number[] {
   const out = spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" }).stdout;
   const kids = new Map<number, number[]>();
   for (const line of out.trim().split("\n")) {
-    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    const [pid = 0, ppid = 0] = line.trim().split(/\s+/).map(Number);
     kids.set(ppid, [...(kids.get(ppid) ?? []), pid]);
   }
   const found: number[] = [];
