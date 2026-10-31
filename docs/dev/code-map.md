@@ -502,8 +502,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobs/householdQueue.ts` | activeProfileLine, resetActivePlanForTests, openMaxWindow, endMaxWindow, recordUsage, usageLastHour |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
 | `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, appliedProfile, stagesFor, chatMayReturnBetweenStages |
-| `backend/src/lib/jobs/profileSource.ts` | STUDIO_HARDWARE, rowsFromSetting, weightsFromPriority, profileSourceFromSettings |
+| `backend/src/lib/jobs/profileSource.ts` | hardwareFromBudget, rowsFromSetting, weightsFromPriority, profileSourceFromSettings |
 | `backend/src/lib/jobs/profileTable.ts` | validateProfileTable |
+| `backend/src/lib/jobs/stackHardware.ts` | refreshStackHardware, currentHardware, startStackHardwareRefresh, __setHardwareForTests |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
 | `backend/src/lib/kiwixCatalog.ts` | KIWIX_BINARIES, KIWIX_READY_MARKER, selectKiwixBinary |
 | `backend/src/lib/kiwixClient.ts` | KIWIX_REQUEST_TIMEOUT_MS, libraryRequest, installed |
