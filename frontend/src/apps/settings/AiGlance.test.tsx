@@ -16,6 +16,7 @@ describe("AiGlance first paint", () => {
     localStorage.setItem("maipai.ai-choices.v1", JSON.stringify(overview));
     globalThis.fetch = ((input: RequestInfo | URL) => {
       const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (path.endsWith("/api/ai/tier-window")) return Promise.resolve(Response.json({ open: false, minutes_left: null, line: null, profile: null, closed_apps: [] }));
       if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
       return new Promise<Response>(() => {});
     }) as typeof fetch;
@@ -33,6 +34,7 @@ describe("AiGlance Apply", () => {
       const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
       if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return new Promise((resolve) => { release = () => resolve(Response.json({ ok: true, started: [] })); }); }
       if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json(overview));
+      if (path.endsWith("/api/ai/tier-window")) return Promise.resolve(Response.json({ open: false, minutes_left: null, line: null, profile: null, closed_apps: [] }));
       if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
       if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
@@ -57,6 +59,7 @@ describe("AiGlance Apply", () => {
       globalThis.fetch = ((input: RequestInfo | URL) => {
         const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
         if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [{ ...overview.cards[0]!, choices: [choice] }] }));
+        if (path.endsWith("/api/ai/tier-window")) return Promise.resolve(Response.json({ open: false, minutes_left: null, line: null, profile: null, closed_apps: [] }));
         if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
         if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
         return Promise.resolve(Response.json({}));
@@ -81,6 +84,7 @@ describe("AiGlance Apply", () => {
       globalThis.fetch = ((input: RequestInfo | URL) => {
         const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
         if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [{ id: "chat", title: "Chat", summary: "", chip: "", choices, notReady: false, unavailable: null }] }));
+        if (path.endsWith("/api/ai/tier-window")) return Promise.resolve(Response.json({ open: false, minutes_left: null, line: null, profile: null, closed_apps: [] }));
         if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
         if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
         return Promise.resolve(Response.json({}));
