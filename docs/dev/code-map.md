@@ -292,7 +292,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
 | `frontend/src/shell/phoneMenuLinks.tsx` | PhoneMenuLinks, coreAppsGroup, searchWithCoreApps |
 | `frontend/src/shell/reader/ArticleCard.tsx` | useSeen, useArticlePreview, ArticleCard |
-| `frontend/src/shell/reader/ReaderArticle.tsx` | ReaderArticle |
+| `frontend/src/shell/reader/ReaderArticle.tsx` | discussMessage, ReaderArticle |
 | `frontend/src/shell/reader/SearchBox.tsx` | ReaderSearchBox |
 | `frontend/src/shell/reader/SearchResults.tsx` | SearchResults |
 | `frontend/src/shell/sessionLockContext.tsx` | useSessionLocked, SessionLockGate |
@@ -637,7 +637,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/records.ts` | defaultTopicsFor, followedChannels, isFollowing, setFollow, resetMix, interestRowsOf |
 | `backend/src/lib/news/search.ts` | SEARCH_ALL, SEARCH_SAVED, SEARCH_TODAY, searchData, recentRows |
 | `backend/src/lib/news/spread.ts` | ROWS_PER_PUBLISHER_PER_GROUP, spreadPublishers |
-| `backend/src/lib/news/summary.ts` | __setNewsSummaryModelForTests, storedKeyPoints, summaryArticleText, summarizeStory, runNewsSummaryTick |
+| `backend/src/lib/news/summary.ts` | Summary, __setNewsSummaryModelForTests, safe, storedKeyPoints, summaryArticleText, summarizeStory |
 | `backend/src/lib/news/tail.ts` | trimArticleTail |
 | `backend/src/lib/news/text.ts` | decodeEntities, plainSummary |
 | `backend/src/lib/news/topicTagger.ts` | TOPIC_OVERRIDE_MARGIN, cosine, chooseTopic, __resetTopicTaggerForTests, classifyPendingTopics |
@@ -719,6 +719,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, receivedBackupFileExists, deleteReceivedBackupsForDevice |
 | `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice |
 | `backend/src/lib/reference/article.ts` | loadArticleFor, articlePayloadFor, readArticleImage |
+| `backend/src/lib/reference/keyPoints.ts` | __setReferenceKeyPointsModelForTests, articleText, referenceKeyPoints, referenceItemId, readReferenceArticle |
 | `backend/src/lib/reference/saves.ts` | listReferenceSaves, getReferenceSave, addReferenceSave, removeReferenceSave |
 | `backend/src/lib/referenceLibrary.ts` | KIWIX_CATALOG_URL, resolveReferenceFlavour, removeInstalledReferenceFlavour, installReferenceFlavour, listInstalledReferenceFlavours, getReferenceUpdates |
 | `backend/src/lib/referencePresetEngine.ts` | __setReferenceCatalogUrlForTests, planReference, listReferenceCatalog, getReferenceState, applyReference, resumeReferenceJobsOnBoot |
