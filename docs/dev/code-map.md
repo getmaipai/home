@@ -581,12 +581,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
-| `backend/src/lib/memory.ts` | validAt, isPrivilegedRecordKind, isPrivilegedRecord, remember, embedMemoryRecordSafely, drainPendingEmbeddings |
+| `backend/src/lib/memory.ts` | validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord, remember |
 | `backend/src/lib/memoryContentPolicy.ts` | CREDENTIAL_SAFE_MESSAGE, CREDENTIAL_REDACTION, detectCredential, hasDeclaredCredentialField, redactCredentials |
 | `backend/src/lib/memoryFraming.ts` | MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE |
 | `backend/src/lib/memoryId.ts` | newMemoryRecordId |
 | `backend/src/lib/memoryIngestion.ts` | canonicalKey, storeEmbeddingInTx, supersedeInTx, ingestMemory, supersedeMemory, drainPendingWork |
-| `backend/src/lib/memoryJudge.ts` | categoryToRecordKind, exampleDateFor, promptExampleTexts, nextMonthLabel, timeExampleText, possessiveExampleText |
+| `backend/src/lib/memoryJudge.ts` | categoryToRecordKind, exampleDateFor, promptExampleTexts, requestExampleText, instructionExampleText, questionExampleText |
+| `backend/src/lib/memoryProfile.ts` | PROFILE_CARD_MAX_LINES, PROFILE_CARD_MAX_CHARS, profileCardRuleLine, isProfileCardCategory, renderProfileCardLine, renderProfileCard |
 | `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
