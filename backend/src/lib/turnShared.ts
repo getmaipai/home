@@ -12,6 +12,7 @@ import { COMPUTED_WILDCARD_RESOLVERS } from "@/lib/manifestLint";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { hasEligibleClause } from "@/lib/turnSignal";
 import { splitIntoSentences } from "@/lib/guards";
+import { EMOJI_RE } from "@/lib/wellFormed";
 import { hubTimeZone } from "@/lib/news/dayParts";
 import { promptNow } from "@/lib/benchSampling";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
@@ -534,9 +535,9 @@ function spokenClock(clockStyle?: "formal" | "plain" | "loose") {
  * turnMachine/turnNext.ts calls this function (THIN-0J, rule 12). The
  * output is for TTS only; the visible text is never replaced by it. */
 export function speechTextFor(surface: Surface, text: string, authoredSpeech: string | undefined, clockStyle?: "formal" | "plain" | "loose"): string {
-  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech, spokenClock(clockStyle));
+  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech.replace(EMOJI_RE, ""), spokenClock(clockStyle));
   const spoken = surface === "robot" && authoredSpeech === undefined ? splitIntoSentences(text)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : text;
-  return normalizeForSpeech(spoken, spokenClock(clockStyle));
+  return normalizeForSpeech(spoken.replace(EMOJI_RE, ""), spokenClock(clockStyle));
 }
 
 /** FAST-04: what a turn's token stream resolves to once its deltas are

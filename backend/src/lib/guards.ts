@@ -22,6 +22,7 @@
 // never rewritten by anything here, only the model's own words are ever
 // second-guessed.
 import { tokenize } from "@/lib/text";
+import { EMOJI_RE } from "@/lib/wellFormed";
 import { asksAboutEarlierTalk } from "@/lib/recallShapes";
 import { pickVariant } from "@/lib/replyVariation";
 import { utteranceShape, type UtteranceShape } from "@/lib/utteranceShape";
@@ -934,6 +935,27 @@ export function isCloserSentence(sentence: string): boolean {
   // Nothing left: a closer that names a subject ("Feel free to ask
   // about Tempo") is a line about that subject, and the guard reads it.
   return tokenize(residual).size === 0;
+}
+
+/** Issue 95: drop the stock closing lines ("Let me know if you need
+ * anything else. \u{1F60A}") from the end of a finished model reply. Walks
+ * back from the end over closer sentences (isCloserSentence, one
+ * definition) and the emoji beside them; the first sentence always stays,
+ * so a reply that is only "You're welcome!" is unchanged, and an emoji
+ * with no closer is the model's own and stays too. The kept text is the
+ * original string cut at a sentence boundary, never re-joined. */
+export function trimClosers(text: string): string {
+  const full = text.trimEnd().length;
+  const boundaries = [...text.matchAll(/(?<=[.!?])\s+/g)].map((m) => m.index!); // rule: signal.rule (Issue 95)
+  let end = full;
+  let cutCloser = false;
+  for (let i = boundaries.length - 1; i >= 0; i--) {
+    const tail = text.slice(boundaries[i]!, end).replace(EMOJI_RE, "").trim();
+    if (tail && !isCloserSentence(tail)) break;
+    if (tail) cutCloser = true;
+    end = boundaries[i]!;
+  }
+  return cutCloser ? text.slice(0, end) : text;
 }
 
 // ==== Objection handling ====

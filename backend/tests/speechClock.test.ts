@@ -25,4 +25,8 @@ describe("speechTextFor with the household clock", () => {
     expect(speechTextFor("phone", "Dinner is at 4:00 pm.", undefined, "plain")).toContain("four o'clock");
     expect(speechTextFor("phone", "Dinner is at 4:00 pm.", undefined, "loose")).toContain("four o'clock");
   });
+
+  test("emoji are removed from spoken text", () => {
+    expect(speechTextFor("phone", "Hello 😊!", undefined)).not.toContain("😊");
+  });
 });

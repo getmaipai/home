@@ -179,6 +179,20 @@ describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn
     expect(result.text).toBe("Water it when the soil feels dry. How much space do you have?");
   });
 
+  test("holds a trailing closer for trim and preserves a closer in the middle", () => {
+    const trailing = drive();
+    trailing.gate.push("Good morning. Let me know if you need anything else.");
+    trailing.gate.finish();
+    expect(trailing.released.join("")).toBe("Good morning.");
+    expect(trailing.gate.result().text).toBe("Good morning.");
+
+    const middle = drive();
+    middle.gate.push("Good morning. Let me know if you need anything else. Paris is lovely.");
+    middle.gate.finish();
+    expect(middle.released.join("")).toBe("Good morning. Let me know if you need anything else. Paris is lovely.");
+    expect(middle.gate.result().text).toBe(middle.released.join(""));
+  });
+
   test("a sentence the floor refuses stops the release - nothing after it is ever released, on an adult turn", () => {
     const { gate, released, refusals } = drive("adult");
     for (const word of `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`.split(/(?<= )/)) gate.push(word);

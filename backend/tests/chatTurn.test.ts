@@ -270,7 +270,7 @@ describe("runTurnNextStream()", () => {
     // proves real MULTI-DELTA streaming at the new, correct granularity,
     // not the old "one delta per raw token" one this test asserted
     // before that step.
-    const result = await runTurnNextStream(actor, "chat", "Good morning. How is it going today? Let me know.");
+    const result = await runTurnNextStream(actor, "chat", "Good morning. How is it going today? Tell me about the garden.");
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "stream") return;
 
@@ -2096,7 +2096,7 @@ describe("POST /api/turn/stream", () => {
     // means a delta is now a whole sentence, not a raw model token) - see
     // the retired turn engine's own test for why one short line no longer
     // proves multi-delta streaming.
-    const res = await client.post("/api/turn/stream", { text: "Good morning. How is it going today? Let me know." });
+    const res = await client.post("/api/turn/stream", { text: "Good morning. How is it going today? Tell me about the garden." });
     expect(res.status).toBe(200);
     const events = await readNdjson(res);
 

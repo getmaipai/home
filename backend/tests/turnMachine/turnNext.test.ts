@@ -129,6 +129,15 @@ async function withStub<T>(
 }
 
 describe("turnNext.ts: a plain question, no tools", () => {
+  test("a model closer is removed from the stored final reply", async () => {
+    const result = await withStub({ reply: () => "Paris is the capital of France. Let me know if you need anything else." }, () => runTurnNext(people.owner, "chat", "what is the capital of France"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe("Paris is the capital of France.");
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    expect(row?.replyText).toBe("Paris is the capital of France.");
+  });
+
   test('"hi" is a text answer with every node in the trace', async () => {
     const result = await withStub({ reply: () => "Hello! How can I help?" }, () => runTurnNext(people.owner, "chat", "hi"));
     expect(result.ok).toBe(true);
@@ -3505,10 +3514,10 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
     // (`state.streamGate?.result().done`) never fires for an ordinary
     // immediate turn - the exact same whole-reply evaluateReply() path
     // as before STREAM-NEXT-01 landed.
-    const result = await withStub({ reply: () => "Hello! How can I help?" }, () => runTurnNext(people.owner, "chat", "hi"));
+    const result = await withStub({ reply: () => "Hello! Nice to see you." }, () => runTurnNext(people.owner, "chat", "hi"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe("Hello! How can I help?");
+    expect(result.value.reply.text).toBe("Hello! Nice to see you.");
   });
 
   // STREAM-PARTIAL-01's own review noted this gap: outputGate.test.ts's

@@ -21,6 +21,7 @@ import type { TurnErrorDetail, TurnValue } from "@/wire";
 import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
 import { stripCueTags } from "@/lib/voiceCues";
+import { trimClosers } from "@/lib/guards";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import { trackChatLease } from "@/lib/jobs/householdQueue";
@@ -956,7 +957,8 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * is exactly what it was before this port. */
 function finalizeNextReply(state: TurnState, rawValue: TurnValue): TurnValue {
   // REG-02: the composer, never the model, adds nonverbal cues, and only to the spoken rendering; a tag the model wrote is dropped from the reply.
-  const cleanText = stripCueTags(rawValue.reply.text);
+  const taggedText = stripCueTags(rawValue.reply.text);
+  const cleanText = rawValue.source === "model" ? trimClosers(taggedText) : taggedText;
   const cleanSpeech = rawValue.reply.speech === undefined ? undefined : stripCueTags(rawValue.reply.speech);
   const value = cleanText === rawValue.reply.text && cleanSpeech === rawValue.reply.speech ? rawValue : { ...rawValue, reply: { ...rawValue.reply, text: cleanText, ...(cleanSpeech === undefined ? {} : { speech: cleanSpeech }) } };
   const { text, speech } = value.reply;

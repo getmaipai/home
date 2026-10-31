@@ -22,7 +22,8 @@
 // claim a regex would have to invent (RULES-AND-LEARNED-COMPONENTS.md's
 // "No hacky rules": understanding language is the model's job, and a
 // text reply here was never granted an action result to misrepresent).
-import { analysisLead, assessReply, repairReply, repairTail } from "@/lib/wellFormed";
+import { analysisLead, assessReply, repairReply, repairTail, EMOJI_RE } from "@/lib/wellFormed";
+import { isCloserSentence } from "@/lib/guards";
 import { evaluateReply, evaluateSafety, forOutput } from "@/lib/safety";
 import type { AgeBand } from "@/lib/ageBand";
 import { turnAgeBand } from "../speaker";
@@ -241,6 +242,10 @@ export class StreamGate {
   /** A child's or teen's clause-split front half (the chunker flushes a long sentence at a comma): held until the sentence ends, so a
    * cut sentence is never left as a fragment. */
   private heldClause = "";
+  /** Sentence grain only: a possible stock closer stays private until a
+   * later sentence proves it was in the middle, or finish decides to trim. */
+  private heldCloser = { shown: "", raw: "" };
+  private releasedSentence = false;
   private envelopeDecided = false;
   private heldAsEnvelope = false;
   /** ANALYSIS-LEAK-01: the reply opened in the model's own task-analysis voice ("The user is asking ..."): reasoning, held whole and never released. */
@@ -306,6 +311,8 @@ export class StreamGate {
     this.markupText = "";
     this.methodCut = false;
     this.heldClause = "";
+    this.heldCloser = { shown: "", raw: "" };
+    this.releasedSentence = false;
     // Per sentence, an abandoned round released nothing, so the record
     // starts clean. As it arrives, what the round showed stays shown and
     // stays in the record; the next round continues after it.
@@ -437,13 +444,30 @@ export class StreamGate {
         continue;
       }
       const shown = this.shownText(rawSpan);
+      const classification = rawSpan.replace(EMOJI_RE, "").trim();
+      if (isCloserSentence(classification)) {
+        this.heldCloser = { shown: this.heldCloser.shown + shown, raw: this.heldCloser.raw + rawSpan };
+        continue;
+      }
+      this.releaseHeldCloser();
       this.delivered += shown;
       this.checked += rawSpan;
       this.release(shown);
+      this.releasedSentence = true;
     }
   }
 
   /** A minor's reply that told a suicide without its method: one fixed note, released last (never refused, never a parent alert). */
+  /** Issue 95: a held closer that a later sentence proved was in the middle goes out as it would have. */
+  private releaseHeldCloser(): void {
+    if (!this.heldCloser.raw) return;
+    this.delivered += this.heldCloser.shown;
+    this.checked += this.heldCloser.raw;
+    this.release(this.heldCloser.shown);
+    this.heldCloser = { shown: "", raw: "" };
+    this.releasedSentence = true;
+  }
+
   private releaseMethodNote(): void {
     if (!this.methodCut) return;
     this.methodCut = false;
@@ -581,9 +605,18 @@ export class StreamGate {
       }
       const repaired = repairTail(this.delivered, this.pending);
       const shown = this.shownText(repaired);
+      const classification = repaired.replace(EMOJI_RE, "").trim();
+      if (classification && isCloserSentence(classification)) {
+        // Issue 95: the reply ends on closers; they go only when nothing else was said.
+        this.heldCloser = { shown: this.heldCloser.shown + shown, raw: this.heldCloser.raw + repaired };
+        if (!this.releasedSentence) this.releaseHeldCloser();
+        return;
+      }
+      this.releaseHeldCloser();
       this.delivered += shown;
       this.checked += repaired;
       this.release(shown);
+      this.releasedSentence = true;
     } finally {
       if (!this.refused) this.releaseMethodNote();
       this.onDone();

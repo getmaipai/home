@@ -4,11 +4,37 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, dropConjunctionLead, ACTION_FAMILIES, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, dropConjunctionLead, ACTION_FAMILIES, MALFORMED, EMPTIED_LINES, trimClosers, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
 }
+
+describe("trimClosers", () => {
+  test("trims trailing closing sentences and emoji", () => {
+    expect(trimClosers("Paris is the capital of France. Let me know if you need anything else. 😊")).toBe("Paris is the capital of France.");
+  });
+
+  test("keeps at least the answer when the reply begins with a closer", () => {
+    expect(trimClosers("You're welcome! Let me know if you need anything else.")).toBe("You're welcome!");
+    expect(trimClosers("You're welcome!")).toBe("You're welcome!");
+  });
+
+  test("keeps a subject-specific ending and a closer in the middle", () => {
+    expect(trimClosers("Feel free to ask about Tempo.")).toBe("Feel free to ask about Tempo.");
+    expect(trimClosers("Let me know if you need anything else. Paris is lovely.")).toBe("Let me know if you need anything else. Paris is lovely.");
+  });
+
+  test("an emoji earlier in the reply does not move the cut, and an emoji with no closer stays", () => {
+    expect(trimClosers("Pippa loved it 😊. The cake was lemon. Hope this helps!")).toBe("Pippa loved it 😊. The cake was lemon.");
+    expect(trimClosers("The cake was lemon. 😊")).toBe("The cake was lemon. 😊");
+  });
+
+  test("preserves a markdown list before a closing sentence", () => {
+    const text = "Try these:\n- Paris.\n- Lyon.\n\nHope this helps!";
+    expect(trimClosers(text)).toBe("Try these:\n- Paris.\n- Lyon.");
+  });
+});
 
 describe("CONS-01: a banned phrase is cut", () => {
   test("cuts a banned phrase while preserving the rest of the reply", () => {

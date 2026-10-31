@@ -25,6 +25,7 @@ const HAS_CONTROL_MARKER_RE = new RegExp(CONTROL_MARKER_RE.source, "i");
 // An emoji with what may follow it: a variation selector, a skin tone,
 // a keycap, or a flag's second regional indicator.
 const TERMINATOR_RE = /(?:[.!?…][)\]"'”’]*|[:;]-?[()DPp]|\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}]|\u20E3|\p{Regional_Indicator})*|\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3|`)\s*$/u;
+export const EMOJI_RE = /\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}]|\u20E3|\p{Regional_Indicator})*|\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3/gu;
 const PICTOGRAPH_RE = /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3/u;
 const THINK_BLOCK_RE = /<think>[\s\S]*?<\/think>\s*/gi;
 const OPEN_THINK_RE = /<think>[\s\S]*$/i;
@@ -243,7 +244,7 @@ function words(text: string): string[] {
  * found the first cut stripping one character of a doubled dash. */
 export function closeDanglingClause(text: string): string {
   const trimmed = text.trimEnd();
-  const stripped = trimmed.replace(/\s*[,;:\-–—]+$/, "");
+  const stripped = trimmed.replace(/\s*[,;:\-–\u2014]+$/, "");
   return stripped === trimmed ? text : `${stripped}.`;
 }
 
