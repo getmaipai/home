@@ -12,6 +12,7 @@ import {
   phrasingInstruction,
   picturesOnlyInstruction,
   toolResultContent,
+  buildSearchSources,
   needsComposition,
   questionOf,
   composedLog,
@@ -467,6 +468,18 @@ describe("the grounding", () => {
 });
 
 describe("the tool message", () => {
+  test("numbered sources say whether page text, a snippet, or a video's description was seen", () => {
+    const sources = buildSearchSources([
+      { title: "Article", url: "https://example.com/article", snippet: "Article summary" },
+      { title: "Result", url: "https://example.com/result", snippet: "Short summary" },
+      { title: "Video", url: "https://www.youtube.com/watch?v=abc", snippet: "Video description" },
+    ], [{ url: "https://example.com/article", text: "Full article text" }]);
+    expect(sources[0]).toMatchObject({ page_text: "Full article text", read_status: "page text was read" });
+    expect(sources[1]).toMatchObject({ snippet: "Short summary", page_read: false, read_status: "only the title and a short snippet were seen" });
+    expect(sources[2]).toMatchObject({ snippet: "Video description", read_status: "a video; only its title and description were seen, not what is said in it" });
+    expect(sources[2]).not.toHaveProperty("page_text");
+  });
+
   test("bounds a wide result: rows capped at eight, long strings cut, the content itself capped", () => {
     const rows = Array.from({ length: 20 }, (_, i) => ({ title: `Row ${i}`, url: `https://example.com/${i}`, snippet: "x".repeat(2000) }));
     const content = toolResultContent(outcome({ callId: "c", packageId: "websearch", status: "succeeded", result: { actions: [], data: { rows } } }));

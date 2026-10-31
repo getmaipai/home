@@ -708,7 +708,7 @@ interface SearxngInfobox {
 // reference this instead of each carrying their own copy of the same
 // literal, the exact class of drift SEARCH-ROWS-01 fixes between `text`
 // and `rows` in the first place.
-type SearxngRow = { title: string; url: string | null; snippet: string | null; image?: string | null; thumbnail?: string | null };
+type SearxngRow = { title: string; url: string | null; snippet: string | null; category?: string | null; template?: string | null; image?: string | null; thumbnail?: string | null };
 /** ANSWER-IMG-02: one SearXNG image result, read by the same resultToRow()
  * image fields the model-set `category: "images"` search used before that
  * argument was removed from websearch's manifest (rule 12, port first). */
@@ -1230,7 +1230,7 @@ function safeRowUrl(value: unknown): string | null {
 // reads formatResult() uses for `text`, plus the image fields `rows`
 // alone carries for an image search.
 function resultToRow(raw: unknown, isImages: boolean): SearxngRow | null {
-  const row = raw as { title?: unknown; url?: unknown; content?: unknown; img_src?: unknown; thumbnail_src?: unknown };
+  const row = raw as { title?: unknown; url?: unknown; content?: unknown; category?: unknown; template?: unknown; img_src?: unknown; thumbnail_src?: unknown };
   if (typeof row.title !== "string" || typeof row.url !== "string") return null;
   const url = safeRowUrl(row.url);
   if (!url) return null;
@@ -1238,6 +1238,8 @@ function resultToRow(raw: unknown, isImages: boolean): SearxngRow | null {
     title: row.title,
     url,
     snippet: typeof row.content === "string" ? row.content : null,
+    ...(typeof row.category === "string" ? { category: row.category } : {}),
+    ...(typeof row.template === "string" ? { template: row.template } : {}),
     ...(isImages ? { image: safeRowUrl(row.img_src), thumbnail: safeRowUrl(row.thumbnail_src) } : {}),
   };
 }
