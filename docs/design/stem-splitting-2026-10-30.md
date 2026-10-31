@@ -1,6 +1,6 @@
 # Stem splitting: a tool on a song Home made (2026-10-30)
 
-Status: proposed 2026-10-30, not built. Item id TIER-STEMS-01. Parents: [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) section 5.5,
+Status: APPROVED 2026-10-30 for TIER-STEMS-01 (built); section 10 added 2026-10-31 after Jesse ruled "You can build out stems" (TIER-STEMS-02 and 03, APPROVED 2026-10-31). Item id TIER-STEMS-01. Parents: [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) section 5.5,
 [tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md) (TIER-EVAL-07), [music-generation-2026-10-17.md](music-generation-2026-10-17.md).
 Design only: no code is written until the architect rules APPROVED.
 
@@ -120,3 +120,96 @@ retention and the nightly cleanup (`kept` honoured like any made file).
 | TIER-STEMS-01c | Card rendering and the Split into stems action, Elements decision row, preview at 1440 and 390 | `home` frontend, `commons` only if a prop is missing |
 | TIER-STEMS-01d | Bench rows, privacy page pin, docs | `home` |
 | TIER-STEMS-02 | Decision for Jesse: split a file the person uploaded (MUSIC-GEN-14 neighbour) | none until he rules |
+
+## 10. Ruling of 2026-10-31: split files the person owns, and the other models as options
+
+Jesse, 2026-10-31: "You can build out stems." That rules on TIER-STEMS-02 (split a file the person uploaded) and on the rest of stem
+splitting. Section 5 point 3 and the "no uploads" line of section 1 point 5 are replaced by this section. Rows: TIER-STEMS-02 and
+TIER-STEMS-03. Nothing here changes MUSIC-GEN-14: a recording still cannot be a cover, reference or voice source.
+
+### 10.1 The source: an audio file in the person's own Library
+
+1. **Source kinds.** `stems` accepts (a) a song made here, as before, and (b) an audio file the person owns in their Library (`kind: "audio"`,
+   uploaded or imported through the Library routes; a file shared with them does not count, `ownsMusicAttachment`-style ownership). A file in a
+   chat or on another person's shelf is not a source.
+2. **Entry points, no new surface.** "Split into stems" on the Library file detail of an audio file, and on Now playing for a song that is the
+   person's own Library file; both start the same job as the song card's Stems tab (`POST /api/music/stems/from-file`, body `file_id`). The model
+   still decides from chat for songs made in that chat only (rule 1; no new tool and no file picker tool: a chat tool that reads the Library is a
+   privacy surface this ruling does not open).
+3. **The card.** The job and its finished card are the same job card and one stems card that steps through its tracks (section 4); a split of a
+   file starts a conversation of its own named for the file ("Split: <file name>") so the chat history shows it like a song split. Tracks are
+   titled "<file name> (vocals)". On the music page the stems appear under Created by you like any made song.
+4. **Phone width.** The card and the Library action are the existing kit controls; mobile is previewed at 390 and judged before landing.
+
+### 10.2 Gates and privacy (RULES.md applies, nothing leaves the home)
+
+1. **Age and surface gates run first, unchanged.** The same `musicDenial` and audience check as `edit_music`: any child or teen (music is adult-only, `musicViewDenial`), a guest, a spoken turn and a shared screen cannot split a file either; teens have no music lane, so
+   no model or tier choice ever reaches a minor (rule 8). The from-file route uses the same `musicRouteAudience` and `musicDenial` as the existing stems route in
+   `routes/music.ts`, and refuses before any bytes are read. Started in Incognito (a temporary conversation), the split and its stems are temporary, as `source.temporary` does on the song route.
+2. **Local only.** The file's bytes go from Home to the Stack on the same machine over loopback and nowhere else; the worker has no network at
+   run time; no new outbound connection (docs/PRIVACY.md unchanged). Rule 6a: the bytes are not logged, the Stack keeps the source only for the
+   job and deletes it on completion, failure or cancel, and Home stores only the stems. The Stack request carries no file name; no log line, queue reason, music
+   job Status row (TIER-HOME-03) or admin view carries the file name, file id or the "Split: <file name>" title, which lives only in the person's own conversation.
+3. **The ledger stays closed to uploads.** The Stack's made-here ledger still refuses an unknown source for every edit and cover. A new request
+   field `source: "owned_file"` is accepted by `POST /v1/audio/stems` only, with the declared sha256 of the bytes. Stems of an owned file are
+   **not** recorded in the ledger, so a stem of a person's recording can never be a trim, edit or cover source, and `generate_music` still has no
+   source argument. A song made here keeps today's path (ledger check, stems recorded).
+4. **Provenance.** A stem of an owned file carries `provenance.parent_file_id` of the Library file and no generation record, so commercial use
+   is not asserted (the person's file is not ours to clear) and the file is `private` until the owner shares it. The card says "Made from your file".
+5. **Voices.** The vocals of a recording may be a household member's voice. Splitting does not make a voice, and Home never uses a stem as a voice or
+   music source (point 3). No consent step is added (SAFETY.md 2026-10-18 has none for making a voice from a clip either). The muted line on the card
+   and the Library action says in plain words "Stays on this home server. Splitting does not make a voice." as constant text (no per-person first-use flag), and docs/user/music.md says it too.
+6. **Limits.** The Stack limit stays 40 MB and adds 12 minutes of audio; a larger file gets the plain line "That file is too long to split. Try
+   one under 12 minutes." Storage counts the stems like any Library file and the caps already apply.
+7. **No age loosening on the output.** Stems of an owned file are not content-checked (no text is added and the person owns the audio); adult
+   unlock rules for explicit lyrics do not apply because Home neither writes nor reads lyrics here.
+
+### 10.3 The other models as options of one family (TIER-STEMS-03)
+
+Per [tier-families-and-options-2026-10-30.md](tier-families-and-options-2026-10-30.md), the category is the Demucs family and a slot is
+`{ model, options }`:
+
+The stems category has no options (family only, like Voice). `parts` is fixed by the checkpoint (`htdemucs` and `htdemucs_ft` give four, `htdemucs_6s` gives
+six), so it lives on the catalog entry, not in the slot options. If an option-only Boost is wanted later it uses real same-weights Demucs options
+(`shifts`, `overlap`), each measured per F3.
+
+| Slot | Model | Notes |
+|---|---|---|
+| Standard | `htdemucs` | unchanged, 3 GB admission |
+| Boost | `off` by default | `htdemucs_ft` (fine-tuned bag, about four times the time) is a candidate an admin can pick in the slot dialog (tiers 3a, TIER-HOME-04) until Jesse's listen makes it the default |
+| Max | `off` | no permissive weights and no Mac path |
+
+`htdemucs_6s` is not a tier. It is a typed variant of the `stems` task, "More parts" (guitar and piano), offered when its catalog entry is installed
+(the approved sections 1.2 and 8 call it a feature choice). All three catalog entries carry `family: "demucs"` (F1).
+
+1. The Stack catalog gets `htdemucs_ft` and `htdemucs_6s` as pinned entries of the same `stems` component (URL, size, sha256, licence MIT, revision),
+   downloaded at install like `htdemucs`; each is its own optional download, not part of the base install. The two new pins go into the Stack's `/stack/v1/privacy` rows in the same commit as 03a.
+2. `POST /v1/audio/stems` takes `model` (default `htdemucs`); the worker loads the named checkpoint offline. Admission: `htdemucs` 3 GB as measured;
+   the other two use the measured peak when the evaluation numbers exist, else 6 GB marked unverified (F3), and queue behind the governor like any tool job.
+3. Outputs are named by part (`vocals, drums, bass, other`, plus `guitar, piano` for six). Silent tracks are left out of the card as in section 1.
+4. Boost and Max follow the tier collapse rule of F2: a tier is shown only when its model and options differ from the tier below. Max stays empty
+   (BS-RoFormer SW has no permissive weights and no Mac path).
+
+### 10.4 Rows
+
+| Row | Slice | Where |
+|---|---|---|
+| TIER-STEMS-02a | Stack: `source: "owned_file"`, no ledger for those stems, source deleted after the job, 12 minute limit, tests | `stack` |
+| TIER-STEMS-02b | Home backend: `POST /api/music/stems/from-file`, gates, ownership, provenance, job and conversation, tests | `home` |
+| TIER-STEMS-02c | Home frontend: Library audio action, Now playing action, card text, mobile preview, docs/user/music.md | `home` |
+| TIER-STEMS-03a | Stack: pins for `htdemucs_ft` and `htdemucs_6s`, `model` field, admission figures, tests | `stack` |
+| TIER-STEMS-03b | Home: the existing typed `tier` argument and kit tier segment (TIER-UI-01, when landed) and "More parts" on the stems card, the slot row. Both are new controls on a kit Element, so rule 9(c): a prop in `commons` first with an Elements decision row; the same for the Library and Now playing actions if those Elements lack an action. If `edit_music` gains a `parts` or `tier` argument, its bench row gets a case (rule 1) | `home`, `commons` |
+
+### 10.5 Supersedes
+
+- Section 1 point 2 "nobody sees a stem tier control" (Boost may show once `htdemucs_ft` is installed and picked), section 2's "refuses any source not in the ledger" (now except `owned_file`), section 3's 2 GB admission (now 3 GB), section 4's entry points (Library and Now playing added) and section 5 point 2 "That is the whole of v1".
+- Section 1 point 5 ("no uploads") and section 5 point 3 ("deferred") of this note.
+- Backlog TIER-STEMS-02 "decision for Jesse": ruled 2026-10-31, rows above.
+- The made-here-only sentence of `stack/backend/src/music/provenance.ts` stays true for every task except `stems` with `source: "owned_file"`.
+- Nothing in `docs/design/RULES.md` is superseded.
+
+### 10.6 Build notes from the architect
+
+- `ownsMusicAttachment` needs a generation record, so stems of an owned file need their own ownership test (owner and `parent_file_id` of an owned Library file) in the music routes and the file route, and must still never pass as an edit source.
+- "Created by you" may list only rows with a generation record; widen its filter or label these "Made from your file".
+- Backlog gets TIER-STEMS-03 (none exists yet). Reuse rows added: the Library and Now playing actions are existing kit actions or a commons prop; the Stack downloader serves the two pins.
