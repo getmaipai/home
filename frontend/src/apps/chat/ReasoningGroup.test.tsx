@@ -66,6 +66,36 @@ describe("reasoning group", () => {
     values.mockRestore();
   });
 
+  test("opens while running without changing the saved preference", async () => {
+    const values = spyOn(api, "settingsValues").mockResolvedValue([] as never);
+    const set = spyOn(api, "setSetting").mockResolvedValue(undefined as never);
+    let release!: () => void;
+    const adapter: ChatModelAdapter = { run: async function* () {
+      yield { content: [{ type: "reasoning", text: "Still thinking." }] };
+      await new Promise<void>((resolve) => { release = resolve; });
+      yield { content: [{ type: "reasoning", text: "Still thinking." }, { type: "text", text: "Answer." }] };
+    } };
+    const view = renderWithQueryClient(<MemoryRouter><Harness adapter={adapter} messages={[]} /></MemoryRouter>);
+    const input = await waitFor(() => {
+      const el = view.container.querySelector("textarea");
+      expect(el).not.toBeNull();
+      return el as HTMLTextAreaElement;
+    });
+    fireEvent.change(input, { target: { value: "go" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(trigger(view.container).getAttribute("aria-expanded")).toBe("false"));
+    fireEvent.click(trigger(view.container));
+    await waitFor(() => expect(trigger(view.container).getAttribute("aria-expanded")).toBe("true"));
+    expect(view.container.textContent).toContain("Still thinking.");
+    expect(set).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(view.container.textContent).toContain("Answer."));
+    expect(trigger(view.container).getAttribute("aria-expanded")).toBe("true");
+    expect(set).not.toHaveBeenCalled();
+    values.mockRestore();
+    set.mockRestore();
+  });
+
   test("shows 'Thought for Ns' after a live reasoning stream, collapsed", async () => {
     const values = spyOn(api, "settingsValues").mockResolvedValue([] as never);
     const adapter: ChatModelAdapter = { run: async function* () {

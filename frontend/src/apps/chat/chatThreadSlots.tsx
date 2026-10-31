@@ -659,8 +659,11 @@ export function ChatStarterPills() {
 // fork of the vendored file): the shipped Root/Trigger/Content/Text
 // primitives, unstyled beyond the variant choice.
 //
-// 2026-10-17 (Jesse): collapsed by default like ChatGPT. While the model
-// reasons the group stays closed with the Element's own shimmer on its
+// 2026-10-31 (Jesse): while the model reasons the group starts closed, and
+// a click opens it live without changing the saved preference. After the
+// answer, that message stays open if it was opened while running; otherwise
+// it follows the saved preference. A finished-state click updates the saved
+// preference as usual. While reasoning, the Element keeps its own shimmer on its
 // label (one calm status line, no stream); when it ends the label gains the
 // measured seconds through the trigger's own `duration` prop. Open/closed is
 // the Element's controlled `open` prop, remembered per person in
@@ -673,6 +676,7 @@ export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: T
   const running = group.status.type === "running";
   const person = useContext(WakeWordPersonContext);
   const [preferOpen, setPreferOpen] = useReasoningOpen(person);
+  const [openedWhileRunning, setOpenedWhileRunning] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [seconds, setSeconds] = useState<number | undefined>(undefined);
   const word = useThinkingWord(running);
@@ -687,8 +691,11 @@ export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: T
   return (
     <ReasoningRoot
       streaming={running}
-      open={running ? false : preferOpen}
-      onOpenChange={(next) => { if (!running) setPreferOpen(next); }}
+      open={running ? openedWhileRunning : (openedWhileRunning || preferOpen)}
+      onOpenChange={(next) => {
+        if (running || openedWhileRunning) setOpenedWhileRunning(next);
+        else setPreferOpen(next);
+      }}
       variant="ghost"
     >
       <ReasoningTrigger
