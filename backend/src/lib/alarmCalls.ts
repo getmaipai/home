@@ -9,6 +9,7 @@ import { LIST_ACTIONS, type ListAction } from "@/lib/listActions";
 /** Structured action to private op-text prefix, per tool. */
 const FOLDS: Record<string, Record<string, string>> = {
   timer: {
+    list_timers: "timer:list:",
     set_alarm: "alarm:set:",
     cancel_alarm: "alarm:cancel:",
     list_alarms: "alarm:list:",

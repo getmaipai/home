@@ -108,6 +108,10 @@ import { hostedSearch } from "@/lib/hostedSearch";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
 import { getPersonSettingValue } from "@/lib/settings";
 import { createHash } from "node:crypto";
+import { and, eq, gt } from "drizzle-orm";
+import { scheduledJobs } from "@/db/schema";
+import { db } from "@/db";
+import { timerStatusReply } from "@/lib/timerStatus";
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
 import { ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS } from "@/lib/webSearchBudget";
@@ -2104,6 +2108,16 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
   // the work; its answer rides the capture so the reply and the card keep the old alarm wording.
   function runAlarmCall(call: AlarmCall): void {
     requirePermission("reminders:write");
+    if (call.action === "list_timers") {
+      const now = new Date();
+      const rows = db.select().from(scheduledJobs)
+        .where(and(eq(scheduledJobs.job, "timers.fire"), eq(scheduledJobs.status, "pending"), eq(scheduledJobs.personId, actor.id), gt(scheduledJobs.nextRunAt, now.toISOString())))
+        .all()
+        .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt));
+      const reply = timerStatusReply(rows, now);
+      if (runtime.capture) runtime.capture.alarm = { task: reply, when_text: "", action: "list" };
+      return;
+    }
     const band = runtime.band ?? speakerAgeBand(actor, new Date());
     // ASSIST-WIRE-01: edit, turn on, turn off, skip and delete resolve among the person's own alarm records (alarmActions.ts).
     if ((ALARM_ACTION_NAMES as readonly string[]).includes(call.action)) {

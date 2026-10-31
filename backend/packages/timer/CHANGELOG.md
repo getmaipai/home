@@ -23,3 +23,9 @@ All notable changes to the Timers package, in [Keep a Changelog](https://keepach
   this package; the separate `alarm` package is removed. The `alarm.due`
   notification type keeps its id and is declared here, and the package gains
   the `reminders:write` permission the alarm engine needs.
+
+## [0.2.0] - 2026-10-31
+
+### Added
+
+- Reports the asking person's active timers and remaining time.

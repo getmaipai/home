@@ -47,6 +47,7 @@ const ALARM_FAILED = "I couldn't set that alarm. Please try again.";
 function alarmPatternAction(id: string, pattern: string): string | null {
   if (id === "timer") {
     if (pattern === "set a timer for *") return null;
+    if (pattern.startsWith("how long") || pattern.startsWith("how much") || pattern.startsWith("what timers") || pattern.startsWith("is my timer")) return "list_timers";
     return pattern.startsWith("cancel ") ? "cancel_alarm" : pattern.startsWith("what ") ? "list_alarms" : "set_alarm";
   }
   if (id === "remind") {
@@ -59,6 +60,7 @@ function alarmPatternAction(id: string, pattern: string): string | null {
 
 /** The words a fixed alarm or reminder phrase stands for when it captures nothing (the tool's expression is never empty). */
 function alarmPatternWords(action: string, pattern: string): string {
+  if (action === "list_timers") return "timers";
   if (action === "list_reminders") return "reminders";
   if (action === "snooze_reminder") return pattern.includes("that") ? "that reminder" : "my reminder";
   return "alarms";

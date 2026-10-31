@@ -1,6 +1,6 @@
 {
   "id": "timer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Timers",
@@ -22,7 +22,11 @@
       "set an alarm for noon",
       "wake me in 20 minutes",
       "cancel my alarm at 6:30",
-      "what alarms do I have"
+      "what alarms do I have",
+      "how long is left on my timer",
+      "how much time is left",
+      "what timers do I have",
+      "is my timer still going"
     ],
     "patterns": [
       "set a timer for *",
@@ -30,7 +34,11 @@
       "set an alarm *",
       "cancel my alarm *",
       "cancel my * alarm",
-      "what alarms do I have"
+      "what alarms do I have",
+      "how long is left on my timer",
+      "how much time is left",
+      "what timers do I have",
+      "is my timer still going"
     ]
   },
   "args": {
