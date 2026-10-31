@@ -16,14 +16,14 @@ import { useAmbientPageContext } from "@/shell/pageContext";
 /** Keep ambient voice calls aligned with backend SPOKEN_IDLE_NEW_CONVERSATION_MS. */
 export const SPOKEN_IDLE_NEW_CONVERSATION_MS = 30 * 60 * 1000;
 
-function rememberedKey(personId: string, companionId: string) { return `maipai.ambient.side.${personId}.${companionId}`; }
+function rememberedKey(personId: string, companionId: string, deviceId?: string) { return `maipai.ambient.side.${personId}.${companionId}${deviceId ? `.device.${deviceId}` : ""}`; }
 function readRemembered(key: string) {
   try { return window.localStorage.getItem(key) || undefined; } catch { return undefined; }
 }
 
-export function useSideChat(person: Roster, companionId: string, incognito: boolean, onReplyText?: (text: string) => void, onReplyState?: (state: "waiting" | "responding" | "ready" | "error" | "idle") => void) {
+export function useSideChat(person: Roster, companionId: string, incognito: boolean, onReplyText?: (text: string) => void, onReplyState?: (state: "waiting" | "responding" | "ready" | "error" | "idle") => void, deviceId?: string) {
   const pageContext = useAmbientPageContext();
-  const storageKey = rememberedKey(person.id, companionId);
+  const storageKey = rememberedKey(person.id, companionId, deviceId);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const createPromiseRef = useRef<Promise<string> | null>(null);
   const restorePromiseRef = useRef<Promise<void> | null>(null);
@@ -32,7 +32,7 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
   const previousKeyRef = useRef("");
   const hasTemporarySessionRef = useRef(incognito);
   if (incognito) hasTemporarySessionRef.current = true;
-  const currentKey = `${person.id}:${companionId}:${incognito}`;
+  const currentKey = `${person.id}:${companionId}:${deviceId ?? ""}:${incognito}`;
   keyRef.current = currentKey;
   const threadActionsRef = useRef<{ reset(): void; import(repository: Awaited<ReturnType<ReturnType<typeof createChatHistoryAdapter>["load"]>>): void } | null>(null);
   const pendingThreadWorkRef = useRef<{ kind: "reset" } | { kind: "import"; repository: Awaited<ReturnType<ReturnType<typeof createChatHistoryAdapter>["load"]>> } | undefined>(undefined);
@@ -63,7 +63,7 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     if (!createPromiseRef.current) {
       const generation = generationRef.current;
       const requestKey = keyRef.current;
-      const pending = api.createConversation(incognito ? "temporary" : undefined, undefined, undefined, companionId, "side").then((created) => {
+      const pending = api.createConversation(incognito ? "temporary" : undefined, undefined, undefined, companionId, "side", deviceId).then((created) => {
         if (generationRef.current === generation && keyRef.current === requestKey) {
           conversationIdRef.current = created.id;
           setConversationId(created.id);
@@ -74,7 +74,7 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
       createPromiseRef.current = pending;
     }
     return createPromiseRef.current;
-  }, [companionId, incognito, storageKey]);
+  }, [companionId, deviceId, incognito, storageKey]);
   const model = useMemo(() => createChatModelAdapter({
     turnSchedulerRef,
     consumeSupersedes: () => undefined,

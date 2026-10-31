@@ -22,14 +22,14 @@ function ThreadBinder({ side }: { side: ReturnType<typeof useSideChat> }) {
   }, [registerThreadActions, runtime]);
   return null;
 }
-function SideHarness({ companion, temporary }: { companion: string; temporary: boolean }) {
-  const side = useSideChat(person, companion, temporary);
+function SideHarness({ companion, temporary, deviceId }: { companion: string; temporary: boolean; deviceId?: string }) {
+  const side = useSideChat(person, companion, temporary, undefined, undefined, deviceId);
   currentSide = side;
   return <AssistantRuntimeProvider runtime={side.runtime}><ThreadBinder side={side} /></AssistantRuntimeProvider>;
 }
-function mount(companion = "companion-1", temporary = false) {
+function mount(companion = "companion-1", temporary = false, deviceId?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = render(<QueryClientProvider client={client}><SideHarness companion={companion} temporary={temporary} /></QueryClientProvider>);
+  const view = render(<QueryClientProvider client={client}><SideHarness companion={companion} temporary={temporary} deviceId={deviceId} /></QueryClientProvider>);
   return { view, client };
 }
 function rerender(client: QueryClient, companion: string, temporary: boolean) {
@@ -111,12 +111,21 @@ describe("useSideChat lifecycle", () => {
     const { view } = mount("companion-1", true); currentView = view;
     let id: string | undefined;
     await act(async () => { id = await currentSide.ensureConversationId(); });
-    expect(create).toHaveBeenCalledWith("temporary", undefined, undefined, "companion-1", "side");
+    expect(create).toHaveBeenCalledWith("temporary", undefined, undefined, "companion-1", "side", undefined);
     expect(id).toBe("temporary-1");
     expect(localStorage.getItem("maipai.ambient.side.person-1.companion-1")).toBeNull();
     act(() => window.dispatchEvent(new Event(INCOGNITO_DISCARDED_EVENT)));
     await waitFor(() => expect(currentSide.conversationId).toBeUndefined());
     expect(currentSide.runtime.thread.export().messages).toHaveLength(0);
+  });
+
+  test("bot side chats include the device id and use a separate remembered thread", async () => {
+    restoreApi();
+    const create = spyOn(api, "createConversation").mockResolvedValue({ id: "bot-side-1" } as never);
+    const { view } = mount("companion-1", false, "robot-1"); currentView = view;
+    await act(async () => { await currentSide.ensureConversationId(); });
+    expect(create).toHaveBeenCalledWith(undefined, undefined, undefined, "companion-1", "side", "robot-1");
+    expect(localStorage.getItem("maipai.ambient.side.person-1.companion-1.device.robot-1")).toBe("bot-side-1");
   });
 
   test("rapid sends share the one conversation create request", async () => {

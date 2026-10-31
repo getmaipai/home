@@ -30,3 +30,13 @@ test("searchWebResults asks the Web tab's own route with the query encoded, and 
   expect(urls).toEqual(["/api/search/web-results?q=how%20to%20brew%20tea"]);
   expect(answer).toEqual({ results: [], note: "Web search is off for this household." });
 });
+
+test("findRobot posts find_me with optional seconds", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+    return Response.json({ id: "command-1" });
+  }) as typeof fetch;
+  await api.findRobot("robot/1", 8);
+  expect(requests).toEqual([{ url: "/api/devices/robot%2F1/commands", body: { kind: "find_me", seconds: 8 } }]);
+});

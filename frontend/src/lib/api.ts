@@ -340,6 +340,11 @@ export interface DeviceInfo {
   /** ROBOT-CARD-01: robots only; `null` until the first report. */
   offlineScope?: Array<"media.offline" | "offline.records">;
   state?: RobotDeviceState | null;
+  companion_id?: string;
+  companion_name?: string;
+  face_color?: string;
+  night?: boolean;
+  speaking?: { voice_id: string; source: "robot" | "companion" | "home"; companion_name?: string };
 }
 
 /** ROBOT-COMPANION-01: GET /api/devices/{id}/companion (admin). `companions` lists only those the robot's controls allow. */
@@ -449,6 +454,7 @@ export interface RobotDeviceState {
   thermal?: RobotState["thermal"];
   reachable: boolean;
   unreachableSince: string | null;
+  presence?: string;
 }
 // ROBOT-DEVICE-01: hand-typed to match backend/src/routes/devices.ts's
 // DiscoveredRobotSchema, same reasoning as DeviceInfo above (inline
@@ -1116,6 +1122,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind: muted ? "mute" : "unmute" }),
     }),
+  findRobot: (deviceId: string, seconds?: number) => request<{ id: string }>(`/api/devices/${encodeURIComponent(deviceId)}/commands`, { method: "POST", body: JSON.stringify({ kind: "find_me", ...(seconds === undefined ? {} : { seconds }) }) }),
   // MOTOR-REBOOT-CARD: an adult's answer to the robot's offer to restart a latched motor. Only "yes" sends a command.
   answerMotorReboot: (id: string, answer: "yes" | "no") =>
     request<unknown>(`/api/devices/${encodeURIComponent(id)}/motor-reboot`, { method: "POST", body: JSON.stringify({ answer }) }),
@@ -1188,7 +1195,7 @@ export const api = {
     return request<{ discarded: number }>(`/api/conversations/incognito/discard${suffix}`, { method: "POST" });
   },
   // PROJECTS-01a: `folderId` starts the chat inside one of the person's projects.
-  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string, companionId?: string, placement?: "chat" | "side") => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(placement ? { placement } : {}), ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}), ...(companionId ? { companion_id: companionId } : {}) }) }),
+  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string, companionId?: string, placement?: "chat" | "side", deviceId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(placement ? { placement } : {}), ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}), ...(companionId ? { companion_id: companionId } : {}), ...(deviceId ? { device_id: deviceId } : {}) }) }),
   // PROJECTS-01a: a person's projects (chat folders) in the chat column.
   chatFolders: (person?: string, options?: { scope?: "mine" | "shared" | "all"; sort?: "order" | "updated" }) => {
     const params = new URLSearchParams();

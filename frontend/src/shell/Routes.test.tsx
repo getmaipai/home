@@ -214,6 +214,31 @@ describe("ambient companion shell slot", () => {
       window.matchMedia = originalMatchMedia;
     }
   });
+
+  test("renders a RobotFace for the selected bot occupant", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = new URL(typeof input === "string" ? input : input.toString(), "http://home");
+      if (["/api/setup-checklist", "/api/apps", "/api/jobs"].includes(url.pathname)) return Promise.resolve(Response.json([]));
+      if (url.pathname === "/api/settings") return Promise.resolve(Response.json([
+        { scope: "person:person-abc123", key: "companions.allowed", value: true },
+        { scope: "person:person-abc123", key: "companions.dock", value: true },
+        { scope: "person:person-abc123", key: "companions.ambient_bot", value: "robot-1" },
+        { scope: "person:person-abc123", key: "ui.appearance", value: "light" },
+        { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+      ]));
+      if (url.pathname === "/api/devices/robots") return Promise.resolve(Response.json([{ id: "robot-1", kind: "robot", name: "Rover", area: "Living room", online: true, companion_id: "companion-1", companion_name: "Companion", face_color: "mint", night: false, capabilities: [], createdAt: "2026-10-31T00:00:00Z", lastSeenAt: null, state: { activity: "idle", presence: "idle", battery_level: 62, on_battery: true } }]));
+      if (url.pathname === "/api/companions/companion-1/activity") return Promise.resolve(Response.json({ activity: [] }));
+      if (url.pathname === "/api/health") return Promise.resolve(healthResponse());
+      if (url.pathname === "/api/voice/wakewords") return Promise.resolve(Response.json({ installed: false, detectors: [] }));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter initialEntries={["/ambient-test"]}><ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider></MemoryRouter>);
+      const avatar = await view.findByRole("button", { name: "Rover" });
+      expect(avatar.querySelector('[data-slot="robot-face"]')?.getAttribute("data-expression")).toBe("idle");
+    } finally { globalThis.fetch = originalFetch; }
+  });
 });
 
 // RAIL-01 (owner's layout, 2026-10-06): system status moved from the

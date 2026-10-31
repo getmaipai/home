@@ -12,7 +12,7 @@ const row = (over: Record<string, unknown> = {}) => ({ id: "task-1", kind: "pict
 function Probe() {
   const ambient = useAmbientCompanion(person);
   const location = useLocation();
-  return <><span data-testid="where">{location.pathname}{location.search}</span>{ambient ? <><span>{ambient.companion.name}</span><span>{ambient.action?.label ?? "No review"}</span>{ambient.action ? <button type="button" onClick={ambient.action.onClick}>Review</button> : null}</> : <span>Off</span>}</>;
+  return <><span data-testid="where">{location.pathname}{location.search}</span>{ambient?.kind === "companion" ? <><span>{ambient.companion.name}</span><span>{ambient.action?.label ?? "No review"}</span>{ambient.action ? <button type="button" onClick={ambient.action.onClick}>Review</button> : null}</> : ambient?.kind === "bot" ? <><span>{ambient.name}</span><span>{ambient.companionId}</span><span>{ambient.presence}</span></> : <span>Off</span>}</>;
 }
 function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -22,7 +22,9 @@ function stubApi(settings: Array<{ key: string; value: unknown }>, activity: unk
   spyOn(api, "settingsValues").mockResolvedValue(settings as never);
   spyOn(api, "companions").mockResolvedValue({ allowed: true, can_create: false, can_discover: false, default_id: "companion-1", companions: [companion], discover: [] } as never);
   spyOn(api, "companionAvatar").mockResolvedValue({ avatar: null } as never);
-  return spyOn(api, "companionActivity").mockResolvedValue({ activity: activity as never });
+  const robots = spyOn(api, "robotDevices").mockResolvedValue([] as never);
+  const companionActivity = spyOn(api, "companionActivity").mockResolvedValue({ activity: activity as never });
+  return { robots, companionActivity };
 }
 
 afterEach(() => { cleanup(); mock.restore(); });
@@ -51,5 +53,20 @@ describe("useAmbientCompanion", () => {
     const view = mount();
     await waitFor(() => expect(view.getByText("No review")).toBeTruthy());
     expect(view.queryByRole("button", { name: "Review" })).toBeNull();
+  });
+
+  test("ambient bot setting returns the usable robot occupant", async () => {
+    const { robots } = stubApi([{ key: "companions.ambient_bot", value: "robot-1" }]);
+    robots.mockResolvedValue([{ id: "robot-1", kind: "robot", name: "Rover", area: "Living room", online: true, companion_id: "companion-1", face_color: "mint", night: false, capabilities: [], createdAt: "", lastSeenAt: null }] as never);
+    const view = mount();
+    await waitFor(() => expect(view.getByText("Rover")).toBeTruthy());
+    expect(view.getByText("companion-1")).toBeTruthy();
+    expect(view.getByText("idle")).toBeTruthy();
+  });
+
+  test("a selected robot that is gone falls back to the companion", async () => {
+    stubApi([{ key: "companions.ambient_bot", value: "robot-gone" }]);
+    const view = mount();
+    await waitFor(() => expect(view.getByText("Companion")).toBeTruthy());
   });
 });
