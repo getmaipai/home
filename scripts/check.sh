@@ -507,7 +507,7 @@ NODE
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
     # A migration or table change that forgets the schema-version bump turned the watcher red three times on 2026-10-29 and 10-30.
     preflight_stage "pre: schema version matches the schema"
-    (cd backend && MAIPAI_TEST_NO_PORTS=1 bun test tests/schemaChain.test.ts >"${TMPDIR:-/tmp}/schema-chain.$$.log" 2>&1) || { cat "${TMPDIR:-/tmp}/schema-chain.$$.log"; rm -f "${TMPDIR:-/tmp}/schema-chain.$$.log"; return 1; }
+    (cd backend && MAIPAI_TEST_NO_PORTS=1 bun test --timeout 60000 tests/schemaChain.test.ts >"${TMPDIR:-/tmp}/schema-chain.$$.log" 2>&1) || { cat "${TMPDIR:-/tmp}/schema-chain.$$.log"; rm -f "${TMPDIR:-/tmp}/schema-chain.$$.log"; return 1; }
     rm -f "${TMPDIR:-/tmp}/schema-chain.$$.log"
   fi
 

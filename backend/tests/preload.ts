@@ -170,6 +170,12 @@ const offlinePageFetch = async (url: string) => ({ ok: false, networkFailure: tr
 const keepPagesOffline = async (): Promise<void> => {
   (await import("@/lib/packageHost")).__setPageFetchForTests(offlinePageFetch as never);
 };
+// The three modules the beforeEach below imports are loaded here, once, at preload time. Loaded lazily they ran inside the first
+// test's beforeEach, where bun's hook timeout applies: with the Studio at load 60 to 90 the first import took over 5 s and
+// `schemaChain` failed on "a beforeEach/afterEach hook timed out" in the lander's static check (2026-10-31, four bounces).
+await import("@/lib/packageHost");
+await import("@/lib/blocklists/listStore");
+await import("@/lib/searchAssist/shadow");
 afterEach(keepPagesOffline);
 beforeEach(async () => {
   await keepPagesOffline();
