@@ -29,6 +29,23 @@ export interface StackMemoryLedger {
   chat_paged_out: boolean;
 }
 
+/** One daily, counts-only memory and resource summary from the Stack. */
+export interface StackDailyResources {
+  date: string;
+  chat_restarts_by_cause: Record<string, number>;
+  engine_stops_by_cause: Record<string, number>;
+  pauses: number;
+  resumes: number;
+  forced_resumes: number;
+  paused_seconds: number;
+  memory_actions: Record<string, number>;
+  shrinks: number;
+  restores: number;
+  survivors_stopped: number;
+  sweeps: { runs: number; freed_bytes: number };
+  canary_restarts: number;
+}
+
 /** The memory watchdog block of GET /stack/v1/memory (stack/backend/src/routes/memory.ts). While `generation_paused` is true the
  * Stack refuses new picture and video jobs with 503 `no_memory`. Older Stacks omit it. Home reads only these two fields. */
 export interface StackMemoryWatchdog {

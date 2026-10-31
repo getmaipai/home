@@ -11,6 +11,7 @@ import { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 import { buildStatusHistory, chatPauseSummary } from "@/lib/statusHistory";
 import { engineCrashSummary } from "@/lib/stackSelfHeal";
 import { readStackMemoryLedger } from "@/lib/stackHealthSync";
+import { readResourceDay } from "@/lib/resourceDay";
 
 export const statusBoardRoutes = apiRouter();
 const NoteInput = z.object({ body: z.string().min(1).max(500), expires_at: z.string().datetime({ offset: true }).optional() });
@@ -29,7 +30,7 @@ const HistoryState = z.enum(["operational", "degraded", "outage", "maintenance",
 const HistoryComponent = z.string().refine((value) => StatusComponent.safeParse(value).success, "Unknown status component.");
 const HistoryDay = z.object({ date: z.string(), worst: HistoryState, minutes: z.object({ operational: z.number(), degraded: z.number(), outage: z.number(), maintenance: z.number() }) });
 const MemoryLedger = z.object({ reserved_bytes: z.number(), warm_bytes: z.number(), burst_bytes: z.number(), budget_bytes: z.number(), working_margin_bytes: z.number(), free_bytes: z.number(), queue_depth: z.object({ reserved: z.number(), warm: z.number(), burst: z.number() }), chat_paged_out: z.boolean() });
-const HistoryResponse = z.object({ generated_at: z.string(), days: z.number(), components: z.array(z.object({ component: HistoryComponent, uptime_percent: z.number().nullable(), days: z.array(HistoryDay), current: z.object({ state: HistoryState, since: z.string().nullable() }) })), incidents: z.array(z.object({ component: HistoryComponent, started_at: z.string(), ended_at: z.string().nullable(), minutes: z.number(), ongoing: z.boolean() })), chat_pauses: z.object({ count: z.number(), causes: z.record(z.string(), z.number()), line: z.string() }), engine_crashes: z.object({ count: z.number(), healed: z.number(), gave_up: z.number(), line: z.string(), days: z.array(z.object({ day: z.string(), crashes: z.number(), healed: z.number(), gave_up: z.number() })) }), memory_ledger: MemoryLedger.optional() });
+const HistoryResponse = z.object({ generated_at: z.string(), days: z.number(), components: z.array(z.object({ component: HistoryComponent, uptime_percent: z.number().nullable(), days: z.array(HistoryDay), current: z.object({ state: HistoryState, since: z.string().nullable() }) })), incidents: z.array(z.object({ component: HistoryComponent, started_at: z.string(), ended_at: z.string().nullable(), minutes: z.number(), ongoing: z.boolean() })), chat_pauses: z.object({ count: z.number(), causes: z.record(z.string(), z.number()), line: z.string() }), engine_crashes: z.object({ count: z.number(), healed: z.number(), gave_up: z.number(), line: z.string(), days: z.array(z.object({ day: z.string(), crashes: z.number(), healed: z.number(), gave_up: z.number() })) }), memory_ledger: MemoryLedger.optional(), resource_day: z.object({ date: z.string(), text: z.string().openapi({ description: "Yesterday's counts-only resource summary." }) }).optional() });
 
 const historyRoute = createRoute({ method: "get", path: "/history", tags: ["Status"], summary: "Read component reliability history",
   middleware: [requireAuth] as const, request: { query: z.object({ days: z.string().optional() }) },
@@ -40,8 +41,9 @@ statusBoardRoutes.openapi(historyRoute, async (c) => {
   const days = raw === undefined ? 90 : /^\d+$/.test(raw) ? Number(raw) : NaN;
   if (!Number.isInteger(days) || days < 1 || days > 90) return c.text("days must be an integer from 1 to 90.", 400);
   const person = c.get("person");
-  const memoryLedger = person.role === "owner" || person.role === "admin" ? await readStackMemoryLedger() : undefined;
-  return c.json({ ...buildStatusHistory(days), chat_pauses: chatPauseSummary(), engine_crashes: engineCrashSummary(), ...(memoryLedger ? { memory_ledger: memoryLedger } : {}) }, 200);
+  const admin = person.role === "owner" || person.role === "admin";
+  const [memoryLedger, resourceDay] = admin ? await Promise.all([readStackMemoryLedger(), readResourceDay()]) : [];
+  return c.json({ ...buildStatusHistory(days), chat_pauses: chatPauseSummary(), engine_crashes: engineCrashSummary(), ...(memoryLedger ? { memory_ledger: memoryLedger } : {}), ...(resourceDay ? { resource_day: resourceDay } : {}) }, 200);
 });
 
 const boardRoute = createRoute({ method: "get", path: "/board", tags: ["Status"], summary: "Read the household status board",

@@ -33,6 +33,7 @@ import type {
   StackVoice,
   StackCodingMode,
   StackMemoryLedger,
+  StackDailyResources,
   StackDevLoad,
   StackCapabilities,
   StackReclaimList,
@@ -176,6 +177,10 @@ export interface StackClient {
   reclaimList?(opts?: { signal?: AbortSignal }): Promise<StackReclaimList>;
   reclaimRun?(opts?: { signal?: AbortSignal }): Promise<StackReclaimResult>;
   memory?(opts?: { signal?: AbortSignal }): Promise<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad }>;
+  /** GET /stack/v1/memory/daily?days=N. Absent on older Stacks. */
+  memoryDaily?(days: number, opts?: { signal?: AbortSignal }): Promise<{ days: StackDailyResources[] }>;
+  /** GET /stack/v1/memory/daily?days=N. Absent on older Stacks. */
+  memoryDaily?(days: number, opts?: { signal?: AbortSignal }): Promise<{ days: StackDailyResources[] }>;
   healthFix(code: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   /** ROBUST-01: crashes per day and the Stack's own restarts; absent on a Stack older than the route. */
   selfHeal?(opts?: { signal?: AbortSignal }): Promise<StackSelfHeal>;
@@ -509,6 +514,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     reclaimList: (opts) => call("/stack/v1/memory/reclaim", { method: "GET" }, json<StackReclaimList>, opts),
     reclaimRun: (opts) => call("/stack/v1/memory/reclaim", { method: "POST" }, json<StackReclaimResult>, opts),
     memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad }>, opts),
+    memoryDaily: (days, opts) => call(`/stack/v1/memory/daily?days=${days}`, { method: "GET" }, json<{ days: StackDailyResources[] }>, opts),
     mediaRoots: (opts) => call("/stack/v1/media", { method: "GET" }, async (res) => {
       const body = await json<{ media?: { roots?: { read?: unknown; write?: unknown } } }>(res);
       return { read: Array.isArray(body.media?.roots?.read) ? body.media!.roots!.read as string[] : [], write: Array.isArray(body.media?.roots?.write) ? body.media!.roots!.write as string[] : [] };

@@ -193,7 +193,7 @@ describe("StatusPage app-first view", () => {
   });
 
   test("admins see the memory ledger row and paged out warning; members do not", async () => {
-    const history = { generated_at: "2026-10-25T12:00:00.000Z", days: 90, components: [], incidents: [], memory_ledger: {
+    const history = { generated_at: "2026-10-25T12:00:00.000Z", days: 90, components: [], incidents: [], resource_day: { date: "2026-10-24", text: "Yesterday: chat restarted 1 time." }, memory_ledger: {
       reserved_bytes: 21.5 * 1024 ** 3, warm_bytes: 15.25 * 1024 ** 3, burst_bytes: 42.75 * 1024 ** 3,
       budget_bytes: 116 * 1024 ** 3, working_margin_bytes: 20 * 1024 ** 3, free_bytes: 36.5 * 1024 ** 3,
       queue_depth: { reserved: 1, warm: 2, burst: 3 }, chat_paged_out: true,
@@ -209,6 +209,7 @@ describe("StatusPage app-first view", () => {
       expect(admin.getByText("Waiting in line: chat and voice 1, pictures and tools 2, big jobs 3")).toBeTruthy();
       expect(admin.getByText("Chat is being paged out to disk. Close big apps, or stop a big job.")).toBeTruthy();
       expect((await admin.findByTestId("other-app")).textContent).toBe("Safari is using 9.0 GB. Closing it gives big jobs more room.");
+      expect((await admin.findByTestId("resource-day")).textContent).toBe("Yesterday: chat restarted 1 time.");
       admin.unmount();
     } finally { adminMock.restore(); }
 
@@ -218,6 +219,7 @@ describe("StatusPage app-first view", () => {
       await member.findByText("Apps");
       expect(member.queryByTestId("memory-ledger")).toBeNull();
       expect(member.queryByTestId("other-app")).toBeNull();
+      expect(member.queryByTestId("resource-day")).toBeNull();
       expect(memberMock.paths).not.toContain("/api/performance/other-apps");
       expect(member.queryByText(/Memory in use by chat and voice/)).toBeNull();
     } finally { memberMock.restore(); }

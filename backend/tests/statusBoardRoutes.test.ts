@@ -6,6 +6,8 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetServiceHealthForTests, recordServiceOutcome } from "@/lib/serviceHealth";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { startStackFixture } from "./stackFixture";
 
 beforeEach(() => { resetDb(); __resetServiceHealthForTests(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
 
@@ -91,6 +93,7 @@ describe("status routes", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { days: number; components: Array<{ days: unknown[]; uptime_percent: number | null; current: object }>; incidents: unknown[] };
     expect(body.days).toBe(30);
+    expect("resource_day" in body).toBe(false);
     expect(body.components[0]?.days).toHaveLength(30);
     expect(body.components.every((part) => part.uptime_percent === null)).toBe(true);
     expect(JSON.stringify(body)).not.toContain("detail");
@@ -101,6 +104,30 @@ describe("status routes", () => {
     const res = await owner.get("/api/status/history?days=0");
     expect(res.status).toBe(400);
     expect(await res.text()).toContain("days");
+  });
+
+  test("only admins receive yesterday's resource summary", async () => {
+    const fixture = startStackFixture({
+      "GET /stack/v1/memory/daily": () => Response.json({ days: [
+        { date: "today", chat_restarts_by_cause: {}, engine_stops_by_cause: {}, pauses: 0, resumes: 0, forced_resumes: 0, paused_seconds: 0, memory_actions: {}, shrinks: 0, restores: 0, survivors_stopped: 0, sweeps: { runs: 0, freed_bytes: 0 }, canary_restarts: 0 },
+        { date: "yesterday", chat_restarts_by_cause: { "memory-watchdog": 1 }, engine_stops_by_cause: {}, pauses: 0, resumes: 0, forced_resumes: 0, paused_seconds: 0, memory_actions: {}, shrinks: 0, restores: 0, survivors_stopped: 0, sweeps: { runs: 0, freed_bytes: 0 }, canary_restarts: 0 },
+      ] }),
+    });
+    __setStackClientForTests(fixture.client);
+    try {
+      const owner = await ownerClient();
+      const ownerBody = await (await owner.get("/api/status/history")).json() as Record<string, unknown>;
+      expect(ownerBody.resource_day).toEqual({ date: "yesterday", text: "Yesterday: chat restarted 1 time (most often because of low memory on this computer)." });
+      const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
+      const person = await created.json() as { id: string };
+      const member = new TestClient();
+      await member.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+      const memberBody = await (await member.get("/api/status/history")).json() as Record<string, unknown>;
+      expect(memberBody).not.toHaveProperty("resource_day");
+    } finally {
+      __setStackClientForTests(null);
+      fixture.stop();
+    }
   });
 
   test("signed-out board is rejected", async () => {

@@ -28,6 +28,8 @@ ENGINE-STATUS-MEDIA-01 (2026-10-29). Owner's ruling of 2026-10-29: `docs/design/
 | Rung | When | How |
 |---|---|---|
 | Quiet | the state does not touch what the person is doing | the header pill and the Status page only |
+
+The admin-only memory block on the Status page includes yesterday's counts-only resource summary when the Stack provides it.
 | In place | what they are about to do cannot run | one line where they act (the screen's existing muted line, or the control's own hint in a card or menu) and the control greyed out |
 | Interrupt | something they asked for was waiting and is now going | one dismissable kit toast, once, only while they are still on that screen (`useMakingRecovery`); with nothing waiting there is no message, the controls just turn normal |
 | Admin | a person cannot fix it | Repairs and the bell; a media pause may become one admin row in the install dock (not built yet) |

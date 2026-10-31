@@ -139,6 +139,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
         </div>
         {history.memory_ledger.chat_paged_out ? <p className="pl-8 text-sm text-attention-fg">Chat is being paged out to disk. Close big apps, or stop a big job.</p> : null}
         {otherApps.data?.apps.map((app) => <p key={app.name} data-testid="other-app" className="pl-8 text-sm text-muted-foreground">{app.name} is using {gb(app.bytes)} GB. Closing it gives big jobs more room.</p>)}
+        {history.resource_day ? <p data-testid="resource-day" className="pl-8 text-sm text-muted-foreground">{history.resource_day.text}</p> : null}
       </div> : null}
     <AlertDialog open={pendingRole !== null} onOpenChange={(open) => { if (!open && restartingRole === null) setPendingRole(null); }}>
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restart {ENGINE_HEALTH_ROWS.find((row) => row.key === pendingRole)?.label ?? "part"}?</AlertDialogTitle><AlertDialogDescription>Anything using it will pause for a moment.{pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel><Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>{restartingRole !== null ? "Restarting…" : "Restart"}</Button></AlertDialogFooter></AlertDialogContent>
