@@ -173,14 +173,6 @@ function extract(img: HTMLImageElement): Palette {
   }
 }
 
-/** Black or white, whichever stays readable on the given colour (for accent-filled buttons). */
-export function readableOn(color: string): string {
-  const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color)
-  if (!m) return hex(255, 255, 255)
-  const [r, g, b] = [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)]
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? hex(0, 0, 0) : hex(255, 255, 255)
-}
-
 /** The palette accent for controls: the vibrant swatch, unless the cover is essentially
  *  monochrome or its "vibrant" is too pale/washed-out to read as a colour on the filled
  *  play button - then fall back to the theme's primary so chrome never goes grey-on-grey. */
@@ -228,10 +220,3 @@ export const rgba = (c: Rgb, a: number) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] 
 
 /** Build a Palette from one or two plain colors, for surfaces without album art
  *  (live radio's amber, the YouTube audio player's cyan, the Studio default). */
-export function paletteFromColors(color: string, colorDark?: string): Palette {
-  const c = hexToRgb(color)
-  const dark = colorDark ?? rgbToHex(mixRgb(c, [0, 0, 0], 0.55))
-  const light = rgbToHex(mixRgb(c, [255, 255, 255], 0.55))
-  return { dominant: color, vibrant: color, dark, light, corners: [color, light, dark, color], muted: false }
-}
-const rgbToHex = (c: Rgb) => hex(c[0], c[1], c[2])

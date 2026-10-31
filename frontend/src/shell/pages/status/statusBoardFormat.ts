@@ -3,6 +3,12 @@ import { ENGINE_ROWS } from "@/shell/pages/status/StatusComponents";
 
 export const STATUS_PARTS = ENGINE_ROWS.map(({ key, label }) => ({ id: key, name: label }));
 
+export function joinNames(names: string[]) {
+  if (names.length < 2) return names[0] ?? "Parts";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 function localParts(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   return Object.fromEntries(parts.map(({ type, value }) => [type, value]));

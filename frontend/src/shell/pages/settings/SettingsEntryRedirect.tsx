@@ -6,7 +6,7 @@ import { viewerBand } from "@/shell/pages/settings/settingsViewer";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 
 /** `/settings` and every old `/settings?tab=...&section=...` link (and the
- * `/settings` ones LegacyShellRedirect forwards here): replaces to the
+ * `/settings` ones SettingsEntryRedirect forwards here): replaces to the
  * page that holds it now. Only an old search link, which names a registry
  * group instead of a section, needs the registry to find its first key. */
 export function SettingsEntryRedirect({ person }: { person: Roster }) {

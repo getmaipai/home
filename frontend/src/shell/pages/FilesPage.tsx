@@ -3,7 +3,6 @@ import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { getIcon } from "@maipai/ui/src/icons";
 import { HitField } from "@maipai/ui/src/settings/HitField";
 import { formatBytes } from "@maipai/ui/src/format";
 import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
@@ -34,8 +33,8 @@ import { LibraryShareDialog } from "@/shell/library/LibraryShareDialog";
 import { LibraryTrash } from "@/shell/library/LibraryTrash";
 import { LibraryStorage } from "@/shell/library/LibraryStorage";
 import { UploadTray, useLibraryUploads } from "@/shell/library/LibraryUploads";
+import { getIcon } from "@maipai/ui/src/icons";
 
-export const FilesIcon = getIcon("folder");
 const UploadIcon = getIcon("upload-cloud");
 const LIBRARY_UPLOAD_EVENT = "maipai:library-upload";
 let libraryCanAdd = false;

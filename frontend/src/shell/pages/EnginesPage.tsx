@@ -13,7 +13,7 @@ import {
 } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
-import { useDataTableControls } from "@/shell/pages/dataTableControls";
+import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 import { useMutation } from "@tanstack/react-query";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and

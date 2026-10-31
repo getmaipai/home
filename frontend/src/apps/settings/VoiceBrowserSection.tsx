@@ -33,7 +33,7 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const voices = useMemo(() => playableVoices(voicesQuery.data?.voices ?? []), [voicesQuery.data]);
   const setting = valuesQuery.data?.find((v) => v.key === "tts.voice_id");
   const definition = registryQuery.data?.find((v) => v.key === "tts.voice_id");
-  const voiceOptions = definition?.selector === "select" ? definition.range?.options ?? [] : [];
+  const voiceOptions = useMemo(() => definition?.selector === "select" ? definition.range?.options ?? [] : [], [definition]);
   const stored = typeof setting?.value === "string" && setting.value ? setting.value : null;
   const canChoose = target.id === person.id ? person.role !== "child" && !setting?.locked && !setting?.reason : isGuardian && target.role === "child";
   // ResolvedSetting.reason is the backend's own copy for this person; shown as given.

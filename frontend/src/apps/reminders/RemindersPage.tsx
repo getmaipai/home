@@ -21,10 +21,6 @@ const COMING_QUERY_KEY = ["household-coming-up"];
 
 export { RemindersIcon };
 
-export function RemindersHeaderTitle() {
-  return <div data-slot="header-title" className="min-w-0 flex-1 truncate text-base font-medium">Reminders</div>;
-}
-
 function RemindersHeaderAction() {
   return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Create list" onClick={() => window.dispatchEvent(new Event("maipai:reminders-add-list"))}>+</Button></>;
 }

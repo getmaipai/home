@@ -18,10 +18,10 @@ import { useTabItem } from "@/shell/tabIdentity";
 /** /repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/repairs` through Home's
  * shared table: severity, title, detail and the fix's own label, the
- * same fields `RepairsSection.tsx` shows.
+ * same fields the retired RepairsSection showed.
  *
  * Named gap: running a fix or dismissing an issue are real actions on
- * the old page (`RepairsSection.tsx`'s own `Button` per row, a real
+ * the old page's own `Button` per row, a real
  * `onClick`) - Home's shared table is deliberately read-only, so running fixes and
  * dismissing issues stay on the old route. Gated to owner/admin like
  * the old page and the backend both agree on here (`GET /api/repairs`

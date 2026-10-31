@@ -1,12 +1,7 @@
 import type { StatusHistory } from "@/lib/api";
 import { ENGINE_ROWS } from "@/shell/pages/status/StatusComponents";
 import { durationWords } from "@/shell/pages/status/statusHistoryFormat";
-
-function joinNames(names: string[]) {
-  if (names.length < 2) return names[0] ?? "Parts";
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
+import { joinNames } from "@/shell/pages/status/statusBoardFormat";
 
 export interface StatusIncidentFacts {
   title: string;

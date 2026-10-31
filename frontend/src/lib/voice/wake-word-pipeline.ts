@@ -31,7 +31,6 @@ export const EMBEDDING_BUFFER_SECONDS = 4;
 export const EMBEDDING_BUFFER_FRAMES = Math.round(
   (EMBEDDING_BUFFER_SECONDS * WAKE_WORD_SAMPLE_RATE) / WAKE_WORD_FRAME_SAMPLES,
 );
-export const DETECTOR_INPUT_FRAMES = 16;
 export const WARMUP_ZERO_FRAMES = 5;
 
 export interface WakeWordPipelineState {

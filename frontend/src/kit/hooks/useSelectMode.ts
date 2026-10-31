@@ -12,7 +12,7 @@ interface UseSelectMode {
   count: number;
 }
 
-/** Four pages (NotificationsPage, UsersSection, MemoryPage, PeopleAndThings)
+/** Four pages (NotificationsPage, UsersSection, MemoryPage, and one retired memory page)
  * each hand-rolled their own select-mode state; a fix that prunes the
  * selected set against the list currently on screen had only reached
  * NotificationsPage. One definition instead, per the platform's own

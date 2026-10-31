@@ -17,7 +17,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, 
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
-import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, ApiError, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 import { downloadProgress } from "@/lib/downloadProgress";
 
@@ -64,7 +64,7 @@ export function CodingAdminSettings() {
   const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running || q.state.data?.state === "switching" || q.state.data?.state === "waiting" ? 2000 : false) });
   const selfTest = selfTestState(mode.data, testStartedAt);
   // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
-  useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt]);
+  useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt, mode]);
   const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
   const pieceCard = (piece: CodingPiece) => <JobProgress key={piece.id} {...downloadProgress({ title: piece.label, state: "running", status: "Downloading and installing", percent: piece.percent ?? undefined })} variant="full" />;
   const downloadCards = downloading.map(pieceCard);
@@ -231,24 +231,4 @@ export function CodingKeysSettings({ person }: { person: Pick<Roster, "id" | "ro
     <Dialog open={rename !== null} onOpenChange={(open) => { if (!open) setRename(null); }}><DialogContent><DialogHeader><DialogTitle>Rename key</DialogTitle></DialogHeader><Label htmlFor="coding-key-rename">Name</Label><Input id="coding-key-rename" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /><DialogFooter><Button type="button" variant="outline" onClick={() => setRename(null)}>Cancel</Button><Button type="button" disabled={!renameValue.trim()} onClick={() => { if (rename) void api.renameApiKey(rename.id, renameValue.trim()).then(() => { setRename(null); return refresh(); }).catch((reason: unknown) => setError(messageOf(reason, "Could not rename this key."))); }}>Save</Button></DialogFooter></DialogContent></Dialog>
     <AlertDialog open={revoke !== null} onOpenChange={(open) => { if (!open) setRevoke(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Revoke this key?</AlertDialogTitle><AlertDialogDescription>Tools using it will no longer connect to Home.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep key</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { const pending = revoke; setRevoke(null); if (pending) void api.revokeApiKey(pending.id).then(refresh).catch((reason: unknown) => setError(messageOf(reason, "Could not revoke this key."))); }}>Revoke</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;
-}
-
-/** Admin view of one person's Coding keys. The admin route omits names, hosts and use details. */
-export function AdminCodingAccessRow({ personId, personName }: { personId: string; personName: string }) {
-  const client = useQueryClient();
-  const query = useQuery({ queryKey: ["admin-coding-keys", personId], queryFn: () => api.adminApiKeys(personId) });
-  const [selected, setSelected] = useState<AdminApiKey | null>(null);
-  const [revokeAll, setRevokeAll] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const keys = Array.isArray(query.data?.keys) ? query.data.keys.filter((key) => key.scopes.includes("code")) : [];
-  const live = keys.filter((key) => key.status !== "revoked" && !key.revoked_at);
-  const reload = () => client.invalidateQueries({ queryKey: ["admin-coding-keys", personId] });
-  const revokeKey = async (key: AdminApiKey) => { setSelected(null); setError(null); try { await api.adminRevokeApiKey(personId, key.id); await reload(); } catch (e) { setError(messageOf(e, "Could not revoke this key.")); } };
-  const revokeEveryKey = async () => { setRevokeAll(false); setError(null); try { await api.adminRevokeAllApiKeys(personId); await reload(); } catch (e) { setError(messageOf(e, "Could not revoke all keys.")); } };
-  return <section aria-label={`${personName} Coding access`} className="flex flex-col gap-2">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-medium">Coding access</h3>{live.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={() => setRevokeAll(true)}>Revoke all</Button> : null}</div>
-    {query.isLoading ? <p className="text-sm text-muted-foreground">Loading keys</p> : query.isError ? <p className="text-sm text-destructive">Could not load Coding access.</p> : live.length === 0 ? <p className="text-sm text-muted-foreground">No Coding keys</p> : <ItemGroup variant="card" aria-label={`${personName} Coding keys`}>{live.map((key) => <Item key={key.id}><ItemContent><ItemTitle>Coding key <Badge variant={key.status === "active" ? "secondary" : "outline"}>{key.status}</Badge></ItemTitle><ItemDescription>Created {dateText(key.created_at)} · Expires {dateText(key.expires_at)} · Hint •••• {key.hint ?? "Unavailable"}</ItemDescription></ItemContent><ItemActions><Button type="button" size="sm" variant="outline" onClick={() => setSelected(key)}>Revoke</Button></ItemActions></Item>)}</ItemGroup>}
-    {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-    <AlertDialog open={selected !== null || revokeAll} onOpenChange={(open) => { if (!open) { setSelected(null); setRevokeAll(false); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{revokeAll ? `Revoke all Coding keys for ${personName}?` : "Revoke this Coding key?"}</AlertDialogTitle><AlertDialogDescription>That key will no longer connect to Home.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { if (revokeAll) void revokeEveryKey(); else if (selected) void revokeKey(selected); }}>Revoke</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-  </section>;
 }

@@ -109,4 +109,3 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
   };
 }
 
-export type ChatColumnState = ReturnType<typeof useChatColumn>;

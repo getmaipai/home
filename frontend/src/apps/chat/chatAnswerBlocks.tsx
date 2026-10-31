@@ -66,10 +66,6 @@ export function drawableBlocks(blocks: readonly unknown[] | undefined): AnswerBl
 }
 
 /** One `answer_block` data part per drawable block, in tool-call order. */
-export function answerBlockParts(blocks: readonly unknown[] | undefined): ThreadAssistantMessagePart[] {
-  return drawableBlocks(blocks).map((block) => ({ type: "data", name: ANSWER_BLOCK_PART, data: block }) as ThreadAssistantMessagePart);
-}
-
 /** The reply's text with its answer blocks (a picture gallery included) placed in it, each at its own
  * `after_paragraph`, in the order given among equal positions: the order the hub placed them. No block: the text as
  * one part. A block with no `after_paragraph` (a record from before GENUI-13c) goes after the whole reply. */
