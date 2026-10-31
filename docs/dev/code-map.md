@@ -464,7 +464,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hubIdentity.ts` | getHubInstanceId, getHubName, setHubName, __resetHubIdentityForTests |
 | `backend/src/lib/hubRestart.ts` | HUB_RESTART_EXIT_CODE, scheduleHubRestart, __setHubRestartSchedulerForTests |
 | `backend/src/lib/hubShutdown.ts` | SHUTDOWN_DEADLINE_MS, shutdownEngines, __resetHubShutdownForTests |
-| `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newReplyFeedbackId |
+| `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, __setImageToolsForTests |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
 | `backend/src/lib/imageSimilarity/fingerprint.ts` | FINGERPRINT_VERSION, hamming, fingerprint, hashDistance |
@@ -877,6 +877,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/toolAudit.ts` | recordToolAudit, listOwnToolAudit, toolAuditCounts |
 | `backend/src/lib/toolBrake.ts` | brakeFor |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |
+| `backend/src/lib/toolUndo.ts` | recordUndo, undoBlockFor, undoPropsFor, runUndo |
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
 | `backend/src/lib/topicStances.ts` | resolveTopicStances, topicStancesForPerson |
 | `backend/src/lib/totp.ts` | beginEnrollment, verifyEnrollment, isTotpEnabled, verifyTotp, disableTotp |
