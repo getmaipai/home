@@ -888,7 +888,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/toolAudit.ts` | recordToolAudit, listOwnToolAudit, toolAuditCounts |
 | `backend/src/lib/toolBrake.ts` | brakeFor |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |
-| `backend/src/lib/toolUndo.ts` | recordUndo, undoBlockFor, undoPropsFor, runUndo |
+| `backend/src/lib/toolUndo.ts` | purgeExpiredUndo, recordListContext, recordUndo, undoBlockFor, undoPropsFor, runUndo |
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
 | `backend/src/lib/topicStances.ts` | resolveTopicStances, topicStancesForPerson |
 | `backend/src/lib/totp.ts` | beginEnrollment, verifyEnrollment, isTotpEnabled, verifyTotp, disableTotp |
