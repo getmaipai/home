@@ -209,6 +209,8 @@ reminder, never a fact to store (the fixture's `neg-reminder` case).
 | MEM-AUDIT-03 (recall) | S | 5 | MEM-AUDIT-06 | An entity-name match below cosine 0.50 is not injected; above it the +0.15 boost applies; a pinned row still bypasses; every injected line starts with "(date, about name)" |
 | MEM-AUDIT-04 (lifecycle) | S | 6 | none | A `state` with `valid_to` is archived at that date and one without at 14 days; a dated `event` leaves recall 2 days after its date; a 0.95-cosine pair that fails `sharesAttribute` is an ADD, not a supersede; a superseded row keeps its `valid_to` and history |
 
+Pin note (2026-10-31): Home takes `instruction` from spec-v0.1.283, pinned by the branch wt/amber-yak-pin-spec283-ui435 that lands just before this one; this branch carries no pin of its own so the two do not conflict. Until that pin is on main, an instruction fact is refused at the write (the judge logs it) and nothing else changes.
+
 ## 7. Supersedes
 
 - PROFILE-CHANNEL-01's "the profile paragraph carries identity only": kept as the intent, replaced in mechanism by the
