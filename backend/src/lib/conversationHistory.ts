@@ -922,6 +922,12 @@ function withoutNames(signal: TurnSignal): TurnSignal {
   return { ...signal, clauses: signal.clauses.map((c) => (c.subject.kind === "named" ? { ...c, subject: { kind: "unknown" as const } } : c)) };
 }
 
+/** SURFACE-01 (b): who spoke, as the turn recorded it; null when the row has none or it fails to parse. */
+export function speakerEvidenceOf(row: Pick<ConversationTurnRow, "speakerEvidence">): SpeakerEvidence | null {
+  if (!row.speakerEvidence) return null;
+  try { return JSON.parse(row.speakerEvidence) as SpeakerEvidence; } catch { return null; }
+}
+
 /** ACT-01: the frozen signal off a turn row, parsed through the
  * generated schema so a reader never trusts a hand-edited column; null
  * for a row written before ACT-01 or one that fails the shape. */
