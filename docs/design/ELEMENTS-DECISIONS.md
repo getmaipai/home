@@ -48,17 +48,17 @@ reason; its status is `being removed` and it points at its item in the ELEMENTS 
 | ED-015 | syntax-highlighter | None; the live `shiki-highlighter` is used | Prism duplicate of the live `shiki-highlighter`; principle 1 | Owner, 2026-10-06 (Q8) | Never while shiki ships | active exception |
 | ED-016 | terminal-block | None; kept in the gallery | Nothing streams command output | Owner, 2026-10-06 (Q8) | An update or backup run log | active exception |
 | ED-017 | edit-message, message-actions, message-branches, scroll-anchor (standalone demos) | None; the kit `Thread` renders the runtime forms (`EditComposer`, `AssistantActionBar`, `BranchPicker`, `ThreadScrollToBottom`) | `elements-adoption.json` verdict reasons: the standalone files are demos of jobs the adopted Thread already does (scroll-anchor ships a `setInterval` demo) | ELT-SCANNER-01 audit (2026-10-06) | None needed: the Element is used, through Thread | active exception |
-| ED-018 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-019 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-020 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-021 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | being removed |
-| ED-022 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-023 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-024 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-025 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | being removed |
-| ED-026 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | being removed |
-| ED-027 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
-| ED-028 | removed; files gone | — | Removed; files gone. | Audit sets B to E (2026-10-06) | — | removed |
+| ED-018 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-019 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-020 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-021 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | being removed |
+| ED-022 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-023 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-024 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-025 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | being removed |
+| ED-026 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | being removed |
+| ED-027 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
+| ED-028 | removed; files gone | none | Removed; files gone. | Audit sets B to E (2026-10-06) | none | removed |
 
 | ED-029 | Composer family (composer, model-selector, composer attachments and menu) | The compact composer CSS block in `shell/tokens.css`, plus `ComposerModelSelector`, `ComposerAddMenuItem` and size classes in `apps/chat/composerAddMenu.tsx` | The kit composer had no compact density; ELT-COMPOSER-KIT-01 adds it in the kit (ui-v0.5.119 carries the label-only part) | Cleanup item 1 (2026-10-06) | ELT-COMPOSER-KIT-01, then pin | being removed |
 | ED-030 | Touch targets on composer and message actions | 44 to 48 px `::before` hit areas in `shell/pages/chatTouchTargets.css` | The kit has no hit-area token or variant; K03 adds `hitArea48` | Cleanup item 7 (2026-10-06) | Pin the kit hit-area prop, delete the CSS | being removed |
