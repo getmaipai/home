@@ -1,5 +1,7 @@
 # Tier families and option-only tiers (2026-10-30)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Status: proposed, not decided, not built. Item id TIER-FAMILY-2026-10-30 (amends TIER-SPEC-01, TIER-STACK-01, TIER-EVAL-01 to 06, TIER-HOME-04). Owner's
 ask (Jesse, 2026-10-30): keep each category's tiers in the same model family where we can (Chatterbox Nano and Chatterbox Turbo are the example), and
 let one model serve more than one tier through options such as thinking on or off. Amends [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md)

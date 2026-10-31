@@ -1,5 +1,7 @@
 # Resource tiers: Standard, Boost and Max for every generating feature (2026-10-27)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Status: decided 2026-10-27, not built. Item id RESOURCE-TIERS-2026-10-27. Jesse answered the open questions in chat the same day (names, Reduced,
 no switches, teens, children in Reduced) and accepted the recommendations on the lease, idle-time and yield-point rules ("I agree with your
 suggestions"). Rows are in `docs/BACKLOG.md` ("Resource tiers"). Every model row carries a confidence mark; rows marked unverified or "to verify" are

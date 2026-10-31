@@ -1,5 +1,7 @@
 # Workload isolation: chat and voice always win (2026-10-18)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Jesse's question (2026-10-18), after a video job ran on the live Stack while his chat turn was in flight and the turn then hit a
 timer: "We cannot have chats and other things from one user mixing with another. Don't we have boundaries? Do we need a design?"
 

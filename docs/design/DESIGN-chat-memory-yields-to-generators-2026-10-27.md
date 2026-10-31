@@ -1,5 +1,7 @@
 # Chat memory yields to generators (2026-10-27)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Owner-approved: Jesse, 2026-10-27 (chat), for video jobs only. Edits RULES.md rule 4 (chat turn, "The window is the model's real context").
 
 ## Why

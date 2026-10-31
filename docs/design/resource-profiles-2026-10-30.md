@@ -1,5 +1,7 @@
 # Resource profiles and priorities: who gets squeezed, who goes first, when a switch may happen (2026-10-30)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Status: proposed, not decided, not built. Extends [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) (tiers, Max lease, Reduced) and
 [memory-management-2026-10-25.md](memory-management-2026-10-25.md) (rules Q1 to Q8). Owner's ask (Jesse, 2026-10-30): when a feature
 needs more, the other categories shift to lower tiers or switch off (making a companion video: pictures High, video Max, chat Reduced); every user

@@ -1,5 +1,7 @@
 # Household memory management: queue, never fail (2026-10-25)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Status: built 2026-10-25 except the bench-lane slices 10 and 13 (section 11 marks each). Item id MEMMGMT-2026-10-25. Updated the same day with the owner's answers (section 9) and the SSD research (section 10). Owner's ask (Jesse, 2026-10-25): a household-wide memory
 management system for the Mac Studio (Apple M5 Max, 128 GB unified memory) that runs chat, pictures, video, voice and the other
 workers. His example: a person asks for a picture, there is not enough memory, and the request is not failed; it is queued, worked

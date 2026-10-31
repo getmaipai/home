@@ -1,5 +1,7 @@
 # Auto-close apps: MaiPai quits other apps on this Mac to make room, with lists and exceptions (2026-10-30)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Status: proposed, not decided, not built. Item ids MEM-SPACE-07 to 12. Owner's ask (Jesse, 2026-10-30): let MaiPai close non-MaiPai apps such as
 Safari and Firefox automatically; an on and off switch; exceptions such as "never close Claude or Terminal"; or the safer shape, an "always close
 these" list that includes the built-in Mac apps (browser, Maps, Messages, Music and so on). Extends [making-space-2026-10-30.md](making-space-2026-10-30.md)

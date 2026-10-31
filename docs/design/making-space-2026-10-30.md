@@ -1,5 +1,7 @@
 # Making space: what we can free, what we must not do, the one easy settings page, and the setup wizard (2026-10-30)
 
+> Current rules and numbers for resource management are on [resource-management.md](resource-management.md); where this note differs, that page describes the code.
+
 Status: proposed, not decided, not built. Item ids MEM-SPACE-01 to 06. Extends [resource-profiles-2026-10-30.md](resource-profiles-2026-10-30.md)
 (the live-fit ladder, section 3b), [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) and
 [memory-management-2026-10-25.md](memory-management-2026-10-25.md) (section 10 already researched the SSD). Owner's ask (Jesse, 2026-10-30): research
