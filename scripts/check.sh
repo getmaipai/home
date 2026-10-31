@@ -28,6 +28,9 @@
 # green full run from the last 4 hours covers every code change in this
 # commit (scripts/gate/releaseGate.ts), it runs only the docs-scope checks
 # for the changelog and docs; otherwise it runs the full gate.
+# --pre sessions queue through the machine-wide heavy slot so concurrent
+# sessions do not launch typechecks and lints together. The lander and
+# watcher set GATE_HEAVY_HELD=1 themselves and never queue.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 GATE_COMMON_DIR="$(git rev-parse --git-common-dir)"
@@ -50,6 +53,16 @@ for arg in "$@"; do
   esac
 done
 
+GATE_LOCK="${MAIPAI_GATE_LOCK:-../.github/standards/bin/gate-lock.sh}"
+if [ "$PRE_ONLY" = 1 ] && [ "${GATE_HEAVY_HELD:-0}" != 1 ]; then
+  if [ -f "$GATE_LOCK" ]; then
+    # The wrapper sets GATE_HEAVY_HELD=1 for the child once it holds a slot, so the child runs the preflight directly.
+    exec bash "$GATE_LOCK" heavy "home-pre-$$" -- bash scripts/check.sh --pre
+  else
+    echo "== preflight: gate-lock $GATE_LOCK is missing; running without the machine-wide heavy slot" >&2
+  fi
+fi
+
 # GATE-FAST-01 (2026-10-16): the bench lane runs only the tests the flake
 # ledger (scripts/gate/flakes.json "bench") keeps out of the gate: real
 # network, wall-clock timing. On demand, no lock, one shard per workspace,
@@ -60,6 +73,8 @@ if [ "$BENCH_ONLY" = 1 ]; then
   MAIPAI_BENCH=1 bun scripts/gate/shardTests.ts --dir backend --root tests --shards 1 --lane bench || rc=1
   echo "== bench lane: frontend"
   MAIPAI_BENCH=1 bun scripts/gate/shardTests.ts --dir frontend --root . --shards 1 --lane bench || rc=1
+  echo "== bench lane: scripts"
+  MAIPAI_BENCH=1 bun scripts/gate/shardTests.ts --dir scripts --root . --shards 1 --lane bench || rc=1
   # Gate files that keep a bench-only assertion (test.skipIf(!process.env.MAIPAI_BENCH)) run here too.
   for ws in backend frontend; do
     budget_files="$(grep -rlF --include='*.test.ts' --include='*.test.tsx' 'skipIf(!process.env.MAIPAI_BENCH)' "$ws" --exclude-dir=node_modules 2>/dev/null | sed "s#^$ws/##" || true)"
@@ -125,7 +140,6 @@ child_exit() {
 # (found in review). Only PIDs this run started are ever signalled.
 SCOPE_CHANGED_FILE=""
 SCOPE_IMPORTED_FILE=""
-GATE_LOCK="${MAIPAI_GATE_LOCK:-../.github/standards/bin/gate-lock.sh}"
 GATE_LOCK_LABEL=""
 BACKEND_PID=""
 FRONTEND_PID=""

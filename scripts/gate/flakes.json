@@ -76,6 +76,16 @@
         "file": "src/apps/chat/composerVoiceControls.test.tsx",
         "reason": "Microphone and engine-route timing under load; 29 reds, 23 at heads that later passed."
       }
+    ],
+    "scripts": [
+      {
+        "file": "wtLandGate.test.ts",
+        "reason": "Starts real worktrees: git fetch of the sibling .github checkout, tmux sessions and the heavy-run wrapper; its 5 to 30 s timeouts miss on a loaded machine (red in every watcher run 2026-10-31 while passing alone). Offline rule: not a gate test."
+      },
+      {
+        "file": "wtLifecycle.test.ts",
+        "reason": "Starts real worktrees: git fetch of the sibling .github checkout, tmux sessions and the heavy-run wrapper; its 5 to 30 s timeouts miss on a loaded machine (red in every watcher run 2026-10-31 while passing alone). Offline rule: not a gate test."
+      }
     ]
   }
 }

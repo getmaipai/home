@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import * as fixtures from "./tests/wtFixtures";
-const { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, setup, cleanup } = fixtures.createWtFixtures();
+const { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, fixtureEnv, setup, cleanup } = fixtures.createWtFixtures();
 beforeAll(setup);
 afterAll(cleanup);
 
@@ -23,7 +23,7 @@ describe.skipIf(!hasNode)("wt.sh land gate stamp (needs node installed)", () => 
     writeFileSync(join(path, file), `${slug}\n`);
     spawnSync("git", ["-C", path, "add", file]);
     spawnSync("git", ["-C", path, "commit", "-m", slug], { env: { ...process.env, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
-    const sh = (args: string[]) => spawnSync("bash", [script, ...args], { cwd: path, encoding: "utf8", env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_SESSION: name, ...IDLE_MACHINE } });
+    const sh = (args: string[]) => spawnSync("bash", [script, ...args], { cwd: path, encoding: "utf8", env: fixtureEnv({ MAIPAI_WT_SESSION: name, ...IDLE_MACHINE }) });
     const stampPath = join(data, "gate-stamps", `${name}.json`);
     const edit = (fn: (s: any) => void) => { const s = JSON.parse(readFileSync(stampPath, "utf8")); fn(s); writeFileSync(stampPath, JSON.stringify(s)); };
     return { path, name, sh, stampPath, edit };

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import * as fixtures from "./tests/wtFixtures";
-const { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, setup, cleanup } = fixtures.createWtFixtures();
+const { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, fixtureEnv, setup, cleanup } = fixtures.createWtFixtures();
 beforeAll(setup);
 afterAll(cleanup);
 
@@ -38,7 +38,7 @@ describe.skipIf(!hasNode)("wt.sh worktree lifecycle (needs node installed)", () 
     const name = path.split("/").at(-1)!.replace(/^home-/, "");
     writeFileSync(join(path, "NOTE.md"), "note\n");
     // Invoke this checkout's script with the fixture worktree as its cwd.
-    const checked = spawnSync("bash", [script, "check"], { cwd: path, encoding: "utf8", env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_SESSION: name } });
+    const checked = spawnSync("bash", [script, "check"], { cwd: path, encoding: "utf8", env: fixtureEnv({ MAIPAI_WT_SESSION: name }) });
     expect(checked.status).toBe(0);
     const stamp = JSON.parse(readFileSync(join(data, "gate-stamps", `${name}.json`), "utf8"));
     expect(stamp.tier).toBe("T0");

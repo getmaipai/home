@@ -24,13 +24,16 @@ const hasNode = spawnSync("node", ["-v"], { stdio: "ignore" }).status === 0;
 const hasTmuxBin = spawnSync("tmux", ["-V"], { stdio: "ignore" }).status === 0;
 process.env.WT_T2_GLOBS ??= "backend/src/auth/* docs/design/RULES.md scripts/check.sh";
 const fixture = join(scratch, "home");
+const stateHome = join(scratch, "xdg-state");
 const bare = join(scratch, "origin.git");
 const data = join(scratch, "session-data");
 const socket = `wt-test-${process.pid}-${Date.now()}`;
+const fixtureEnv = (env: Record<string, string> = {}) => ({ ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_TMUX_SOCKET: socket, XDG_STATE_HOME: stateHome,
+  GATE_HEAVY_SLOTS: "16", GATE_HEAVY_MAX_LOAD: "100000", GATE_HEAVY_MIN_FREE_PCT: "0", GATE_HEAVY_MAX_WAIT_SECONDS: "30", ...env });
 const run = (args: string[], env: Record<string, string> = {}) => spawnSync("bash", [script, ...args], {
   cwd: fixture,
   encoding: "utf8",
-  env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_TMUX_SOCKET: socket, ...env },
+  env: fixtureEnv(env),
 });
 
 const setup = () => {
@@ -54,5 +57,5 @@ const cleanup = () => {
 };
 
 
-  return { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, setup, cleanup };
+  return { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, fixtureEnv, setup, cleanup };
 }
