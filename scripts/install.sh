@@ -601,9 +601,11 @@ snapshot_data() {
   dest="${root}/upgrade-backups/${ts}-from-${from_tag:-unknown}"
   mkdir -p "$dest" || return 1
   chmod 0700 "${root}/upgrade-backups" "$dest" 2>/dev/null || true
-  # The offline books (data/reference/*.zim) are not copied: they are tens to hundreds of GB, already compressed, and can be
-  # downloaded again. Copying them held the hub down for an hour on 2026-10-30 (127 GB Wikipedia). Rollback keeps them in place.
-  if ! tar -czf "${dest}/data.tar.gz" --exclude='data/logs' --exclude='data/reference/*.zim' --exclude='data/reference/*.part' -C "$root" data; then
+  # Big downloaded files (the offline books, models, anything over MAIPAI_SNAPSHOT_SKIP_MIN, 512 MB by default) are not copied: they are
+  # already compressed, can be downloaded again, and copying a 127 GB Wikipedia held the hub's upgrade for an hour on 2026-10-30.
+  # Their paths go in excluded.txt so a rollback puts them back from the data that was set aside.
+  ( cd "$root" && find data -type f -size "+${MAIPAI_SNAPSHOT_SKIP_MIN:-512M}" 2>/dev/null ) > "${dest}/excluded.txt" || : > "${dest}/excluded.txt"
+  if ! tar -czf "${dest}/data.tar.gz" --exclude='data/logs' -X "${dest}/excluded.txt" -C "$root" data; then
     rm -rf "$dest"
     return 1
   fi
@@ -638,12 +640,12 @@ restore_snapshot() {
     log "Your newer data was kept at ${root}/data.rolled-back-${ts}"
   fi
   tar -xzf "${root}/upgrade-backups/${snap}/data.tar.gz" -C "$root" || return 1
-  # The offline books were not in the copy; they come back from the data that was set aside.
-  if [ -d "${root}/data.rolled-back-${ts}/reference" ]; then
-    mkdir -p "${root}/data/reference"
-    for book in "${root}/data.rolled-back-${ts}/reference/"*.zim "${root}/data.rolled-back-${ts}/reference/"*.part; do
-      [ -e "$book" ] && mv "$book" "${root}/data/reference/"
-    done
+  # The big downloaded files were not in the copy; they come back from the data that was set aside.
+  if [ -s "${root}/upgrade-backups/${snap}/excluded.txt" ] && [ -d "${root}/data.rolled-back-${ts}" ]; then
+    while IFS= read -r rel; do
+      [ -n "$rel" ] && [ -e "${root}/data.rolled-back-${ts}/${rel#data/}" ] || continue
+      mkdir -p "$(dirname "${root}/${rel}")" && mv "${root}/data.rolled-back-${ts}/${rel#data/}" "${root}/${rel}"
+    done < "${root}/upgrade-backups/${snap}/excluded.txt"
   fi
   log "Restored your data from ${snap}"
 }
