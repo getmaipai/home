@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArticleSpeechContext, ArticleView, type ArticleAction, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
-import { Skeleton } from "@maipai/ui/src/ui/skeleton";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
 import { useReferenceSaves } from "./saves";
@@ -18,21 +18,6 @@ export function discussMessage(book: string, path: string): string {
   return `${DISCUSS_PROMPT}\n\nmaipai://reference/article/${id}`;
 }
 const MAX_REF_ID = 80;
-
-/** The shape of an article while it loads: a title, a line of facts, a picture and a few paragraphs, so nothing jumps when the words arrive. */
-function ArticleLoading() {
-  return (
-    <div role="status" aria-label="Loading article" className="mx-auto flex w-full max-w-[72ch] flex-col gap-4 px-4 py-6 md:px-6">
-      <Skeleton className="h-5 w-24 rounded-full" />
-      <Skeleton className="h-12 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-      <Skeleton className="aspect-video w-full rounded-lg" />
-      <div className="flex flex-col gap-2.5">
-        {[100, 96, 100, 88, 94, 60].map((width, index) => <Skeleton key={index} className="h-4" style={{ width: `${width}%` }} />)}
-      </div>
-    </div>
-  );
-}
 const PREVIEW_STALE_MS = 10 * 60 * 1000;
 
 export interface ReaderArticleProps {
@@ -83,7 +68,7 @@ export function ReaderArticle({ book, path, routeFor, appName, canDiscuss, onApp
   useEffect(() => { setKeyPoints(null); }, [storyId]);
   const discussable = canDiscuss === true && discussMessage(book, path).split("/").pop()!.length <= MAX_REF_ID;
   const available: ArticleAction[] = discussable ? [...ARTICLE_ACTIONS, "discuss"] : ARTICLE_ACTIONS;
-  if (query.isPending) return <ArticleLoading />;
+  if (query.isPending) return <RouteSkeleton label="Loading article" />;
   if (query.isError) {
     if (query.error instanceof ApiError && query.error.status === 404) return <>{unavailable ?? <p role="status">This article is not available.</p>}</>;
     return <p role="alert">Could not load this article.</p>;
