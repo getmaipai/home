@@ -31,7 +31,7 @@ describe("upgrade data copy and rollback", () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
-  test("snapshot_data leaves big downloaded files out, and restore_snapshot brings them back from the set-aside data", () => {
+  test("snapshot_data excludes downloaded folders and restore_snapshot brings them back from the set-aside data", () => {
     const root = fixture();
     try {
       mkdirSync(join(root, "data", "reference"), { recursive: true });
@@ -40,12 +40,31 @@ describe("upgrade data copy and rollback", () => {
       expect(bash(`MAIPAI_SNAPSHOT_SKIP_MIN=8k; export MAIPAI_SNAPSHOT_SKIP_MIN; snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
       const names = readdirSync(join(root, "upgrade-backups"));
       const listing = Bun.spawnSync(["tar", "-tf", join(root, "upgrade-backups", names[0] as string, "data.tar")]).stdout.toString();
-      expect(listing).toContain("data/reference/library.xml");
-      expect(listing).not.toContain(".zim");
-      expect(readFileSync(join(root, "upgrade-backups", names[0] as string, "excluded.txt"), "utf8")).toContain("data/reference/wikipedia_en_all_maxi.zim");
-      expect(bash(`restore_snapshot "${root}" v0.0.9`).exitCode).toBe(0);
+      expect(listing).not.toContain("data/reference/");
+      expect(readFileSync(join(root, "upgrade-backups", names[0] as string, "excluded.txt"), "utf8")).not.toContain("data/reference/wikipedia_en_all_maxi.zim");
+      const restored = bash(`restore_snapshot "${root}" v0.0.9`);
+      expect(restored.exitCode).toBe(0);
+      expect(restored.stdout.toString()).toContain("Kept reference from the newer data");
       expect(readFileSync(join(root, "data", "reference", "wikipedia_en_all_maxi.zim"), "utf8")).toHaveLength(20_000);
       expect(readFileSync(join(root, "data", "reference", "library.xml"), "utf8")).toBe("<library/>");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("snapshot_data excludes reference and models and logs the skipped directories", () => {
+    const root = fixture();
+    try {
+      mkdirSync(join(root, "data", "reference"), { recursive: true });
+      mkdirSync(join(root, "data", "models"), { recursive: true });
+      writeFileSync(join(root, "data", "reference", "big.zim"), "zim");
+      writeFileSync(join(root, "data", "models", "m.bin"), "model");
+      const result = bash(`snapshot_data "${root}" v0.0.9`);
+      expect(result.exitCode).toBe(0);
+      const snap = join(root, "upgrade-backups", readdirSync(join(root, "upgrade-backups"))[0] as string, "data.tar");
+      const listing = Bun.spawnSync(["tar", "-tf", snap]).stdout.toString();
+      expect(listing).toContain("data/home.db");
+      expect(listing).not.toContain("data/reference/");
+      expect(listing).not.toContain("data/models/");
+      expect(result.stdout.toString()).toContain("Skipped in the data copy (downloaded again when needed): reference, models");
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
