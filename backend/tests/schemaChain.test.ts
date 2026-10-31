@@ -9,7 +9,10 @@
 // - the schema a fresh install gets is pinned to the version number that
 //   names it (fixtures/schema-version.json), so a schema change without a
 //   bump fails here.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
+
+// The migration chain over a real database is the slowest hook in the gate; on a busy machine the 5 s default bounced landings (2026-10-31).
+setDefaultTimeout(60_000);
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
