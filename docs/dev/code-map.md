@@ -311,6 +311,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
 | `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
+| `backend/src/lib/alarmCalls.ts` | alarmFoldFor, isAlarmActionCall, neutralizeReservedPrefix, parseAlarmCall |
 | `backend/src/lib/alarmChat.ts` | daysPhrase, handleAlarmChat |
 | `backend/src/lib/alarms.ts` | syncAlarmJob, listAlarms, createAlarm, updateAlarm, skipNext, deleteAlarm |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |
