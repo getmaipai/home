@@ -559,7 +559,7 @@ function recordsFor(actor: PersonRow): { text: string; status: string }[] {
     .filter((r) => r.text.length > 0);
 }
 
-/** Every open item on the household's lists by id (A5, the list-add
+/** Every open item on the household's lists by id (A5, the remind
  * effect; a checked-off item counts as gone, so G3's "take it off"
  * passes whether the path removes or completes the item). */
 function listItemsNow(): Map<string, string> {
@@ -922,7 +922,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
 
 /** Deletes everything the bench wrote for its two people, inside its
  * own disposable database. Best effort: a row the bench did not expect
- * (a package's own table, the way list-add's lists row was on the first
+ * (a package's own table, the way remind's lists row was on the first
  * live run) is reported, never allowed to lose the run's table, which
  * the caller prints before this runs. */
 export function cleanupBenchPeople(peopleRows: BenchPeople): void {
@@ -946,7 +946,7 @@ function cleanupBenchPeopleStrict(peopleRows: BenchPeople): void {
     // their own person entity, and every edge touching either.
     sqlite.query("DELETE FROM relationships WHERE person = ? OR from_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?) OR to_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?)").run(person.id, person.id, person.id, person.id, person.id);
     sqlite.query("DELETE FROM entities WHERE person = ? OR account_person_id = ?").run(person.id, person.id);
-    sqlite.query("DELETE FROM lists WHERE person = ?").run(person.id); // list-add's own rows
+    sqlite.query("DELETE FROM lists WHERE person = ?").run(person.id); // remind's own rows
     sqlite.query("DELETE FROM open_questions WHERE person = ?").run(person.id); // ASK-01
     sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ?").run(person.id);
     sqlite.query("DELETE FROM scheduled_jobs WHERE person_id = ?").run(person.id);

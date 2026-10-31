@@ -535,7 +535,11 @@ export const WEATHER_NO_PLACE_NOTE = "I don't know where you are yet, so I can't
  * ("list:add_items:milk"), as `alarm` folds its action. A plain reminder carries none, so its op text is unchanged. */
 function remindInputs(inputs: Record<string, unknown>): Record<string, unknown> {
   const { action, list: _list, items: _items, ...rest } = inputs;
-  return action === "add_items" || action === "show_list" ? { ...rest, action: `list:${action}:` } : { ...rest, action: "" };
+  if (action === "add_items" || action === "show_list") return { ...rest, action: `list:${action}:` };
+  // The `list:` prefix is the host's private signal for a list call. A reminder whose own text starts with it must never
+  // be read as one, or a model-supplied expression could reach the list engine without the brake and audit.
+  const expression = typeof rest.expression === "string" ? rest.expression.replace(/^(\s*)list:/i, "$1list ") : rest.expression;
+  return { ...rest, expression, action: "" };
 }
 
 /** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-

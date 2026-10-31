@@ -6,7 +6,7 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 import { commandOpeners, loadAllManifests } from "@/lib/turnShared";
 import { lists, toolAudit, toolUndo } from "@/db/schema";
 import { db } from "@/db";
-import { loadManifestOnly } from "@/lib/plugins";
+import { loadManifestOnly, runPlugin } from "@/lib/plugins";
 import { listWidgets, getWidgetData } from "@/lib/widgets";
 import { guardReply } from "@/lib/guards";
 import { ACTION_FAMILIES } from "@/lib/guards";
@@ -137,7 +137,7 @@ describe("remind owns the shopping list closed patterns", () => {
   });
 
   test("the list false-claim guard covers remind", () => {
-    const family = ACTION_FAMILIES.find((entry) => entry.packages.includes("list-add"));
+    const family = ACTION_FAMILIES.find((entry) => entry.packages.includes("remind"));
     expect(family?.packages).toContain("remind");
     const reply = "Added milk to your shopping list.";
     const guarded = guardReply(reply, {
@@ -145,5 +145,12 @@ describe("remind owns the shopping list closed patterns", () => {
       outcomes: [{ packageId: "remind", status: "succeeded" }],
     } as never);
     expect(guarded.reply ?? reply).toBe(reply);
+  });
+
+  test("a reminder whose text starts with the private list prefix is never run as a list call", async () => {
+    await runPlugin("remind", people.owner, { expression: "list:add_items:smuggled in an hour" });
+    const shopping = db.select().from(lists).all().flatMap((row) => JSON.parse(row.items) as Array<{ text: string }>);
+    expect(shopping.some((item) => item.text.includes("smuggled"))).toBe(false);
+    expect(db.select().from(toolAudit).all().filter((row) => row.tool === "lists")).toHaveLength(0);
   });
 });

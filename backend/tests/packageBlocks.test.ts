@@ -1,5 +1,5 @@
 // GENUI-05: the bundled packages that already produce a visual return it as an
-// answer block: remind and timer a `schedule_card`, list-view a `todo_list`
+// answer block: remind and timer return their declared blocks
 // (show_images' `image_gallery` waits for GENUI-13c). Each block is built from data the
 // run already holds, is valid against the spec, goes through the same filter
 // GENUI-02 applies (manifest allowlist, age band, output floor), and a block
@@ -54,7 +54,6 @@ describe("GENUI-05: the manifests name the kinds they return", () => {
     ["remind", ["schedule_card", "confirmation", "todo_list"]],
     ["alarm", ["schedule_card"]],
     ["timer", ["schedule_card", "confirmation"]],
-    ["list-view", ["todo_list"]],
   ])("%s declares returns_blocks %p", (id, kinds) => {
     expect(allowed(id)).toEqual(kinds);
   });
@@ -103,29 +102,6 @@ describe("GENUI-05: remind, alarm and timer return a schedule_card", () => {
   });
 });
 
-describe("GENUI-05: list-view returns a todo_list", () => {
-  test("every open row, in order, with the list's own ids; a row with a comma stays one row", async () => {
-    await run("list-add", people.owner, { item: "milk" });
-    await run("list-add", people.owner, { item: "salt, pepper" });
-    const value = await run("list-view", people.owner, {});
-    expect(value.reply?.text).toBe("milk, salt, pepper");
-    expect(value.blocks).toHaveLength(1);
-    const block = value.blocks![0] as Block;
-    expect(AnswerBlock.safeParse(block).success).toBe(true);
-    expect(block.kind).toBe("todo_list");
-    expect(block.producer).toBe("list-view");
-    expect(block.props.title).toBe("Shopping list");
-    expect(block.props.items.map((i: { text: string }) => i.text)).toEqual(["milk", "salt, pepper"]);
-    expect(block.props.items.every((i: { status: string; id: string }) => i.status === "pending" && i.id.length > 0)).toBe(true);
-  });
-
-  test("an empty list returns no block (the one-line answer is the whole answer)", async () => {
-    const value = await run("list-view", people.owner, {});
-    expect(value.reply?.text).toBe("Your shopping list is empty.");
-    expect(value.blocks).toBeUndefined();
-  });
-});
-
 describe("GENUI-05: the age filter GENUI-02 applies reaches these blocks", () => {
   test("a card whose text fails the output floor is dropped for a child, a teen and an adult; min_band holds the rest", async () => {
     const unsafe = await run("remind", people.owner, { expression: `at 6 to ${UNSAFE}` });
@@ -143,13 +119,6 @@ describe("GENUI-05: the age filter GENUI-02 applies reaches these blocks", () =>
     const adultOnly = [{ ...safe[0], id: "blk-adultonly1", min_band: "adult" }];
     expect(filterAnswerBlocks(adultOnly, "remind", kinds, "child", actor)).toEqual([]);
     expect(filterAnswerBlocks(adultOnly, "remind", kinds, "adult", actor)).toHaveLength(1);
-  });
-
-  test("a list row that fails the floor drops the whole todo_list for a child", async () => {
-    await run("list-add", people.owner, { item: UNSAFE });
-    const value = await run("list-view", people.owner, {});
-    expect(value.blocks).toHaveLength(1);
-    expect(filterAnswerBlocks(value.blocks, "list-view", allowed("list-view"), "child", { displayName: "Sage" })).toEqual([]);
   });
 
   test("the tool round: a child's unsafe card is dropped and the package answer is still delivered", async () => {
@@ -175,7 +144,7 @@ describe("GENUI-05: the blocks ride the turn's tool events", () => {
   });
 
   test("a closed-intent match (no tool round) carries its block events too", async () => {
-    await run("list-add", people.owner, { item: "eggs" });
+    await run("remind", people.owner, { action: "add_items", expression: "eggs" });
     const state = { ...toolState(people.owner), signal: classifyTurnSignal({ text: "what's on my shopping list", ageBand: "adult", commandOpeners: OPENERS }) } as unknown as TurnState;
     const { output } = await commandsNode(state, { utterance: "what's on my shopping list" }, SIGNAL);
     if (!output.matched) throw new Error("expected the pattern to match");
@@ -189,7 +158,7 @@ describe("GENUI-05: the blocks ride the turn's tool events", () => {
   });
 
   test("a closed-intent match for a child drops an unsafe block and still answers", async () => {
-    await run("list-add", people.owner, { item: UNSAFE });
+    await run("remind", people.owner, { action: "add_items", expression: UNSAFE });
     const state = { ...toolState(people.child), signal: classifyTurnSignal({ text: "what's on my shopping list", ageBand: "child", commandOpeners: OPENERS }) } as unknown as TurnState;
     const { output } = await commandsNode(state, { utterance: "what's on my shopping list" }, SIGNAL);
     if (!output.matched) throw new Error("expected the pattern to match");

@@ -39,7 +39,7 @@ describe("lookupMissed: a lookup that gave the model nothing", () => {
   });
 
   test("another tool's truthful empty list (nothing on the list today) is its answer, not a missed lookup", () => {
-    expect(lookupMissed(outcome({ packageId: "list-view", result: resultWith({ rows: [] }) }))).toBe(false);
+    expect(lookupMissed(outcome({ packageId: "remind", result: resultWith({ rows: [] }) }))).toBe(false);
   });
 
   test("a lookup with rows, or a tool with no rows at all, is not missed", () => {

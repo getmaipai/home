@@ -16,14 +16,14 @@ import type { PersonRow } from "@/types";
 
 beforeEach(() => resetDb());
 afterEach(() => {
-  rmSync(installedPackageVersionDir("list-view", "9.9.9"), { recursive: true, force: true });
+  rmSync(installedPackageVersionDir("remind", "9.9.9"), { recursive: true, force: true });
   __resetPackageCachesForTests();
   __resetAppCachesForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
 function installAdultOnlyApp(): void {
-  const id = "list-view";
+  const id = "remind";
   const version = "9.9.9";
   const dir = installedPackageVersionDir(id, version);
   rmSync(dir, { recursive: true, force: true });
@@ -71,9 +71,9 @@ describe("resolvePageContext", () => {
     installAdultOnlyApp();
     const { client, row } = await owner();
     const { row: childRow } = await child(client);
-    expect(listApps(row).some((app) => app.package === "list-view")).toBe(true);
-    expect(listApps(childRow).some((app) => app.package === "list-view")).toBe(false);
-    expect(resolvePageContext(childRow, { app_id: "list-view", route: "/" })).toBeNull();
+    expect(listApps(row).some((app) => app.package === "remind")).toBe(true);
+    expect(listApps(childRow).some((app) => app.package === "remind")).toBe(false);
+    expect(resolvePageContext(childRow, { app_id: "remind", route: "/" })).toBeNull();
   });
 
   test("a record uses the conversation GET read check and withholds all its details on failure", async () => {

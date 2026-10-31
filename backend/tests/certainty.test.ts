@@ -31,7 +31,7 @@ describe("certaintyOf: one row per source kind", () => {
     expect(certaintyOf(outcome("news", { sources: [{ ...webSource("n.example"), kind: "shelf" }] }))).toBe("reported");
   });
   test("a household record or live reading is sure", () => {
-    expect(certaintyOf(outcome("list-view"))).toBe("sure");
+    expect(certaintyOf(outcome("remind"))).toBe("sure");
     expect(certaintyOf(weather(5))).toBe("sure");
   });
   test("a failed outcome carries no band", () => {

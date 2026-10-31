@@ -18,7 +18,7 @@
 // registry read into a turn, a reconciled interrupted turn, a lookup
 // with a source) fails today on purpose.
 //
-// Only local packages (timer, list-add, list-view, almanac-time,
+// Only local packages (timer, remind, remind, almanac-time,
 // lock-doors against the bench's own fake Home Assistant, remember,
 // recall) run; the lookup rows require websearch, which the bench's
 // disposable household has no search service for, so they fail until
@@ -478,8 +478,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "tools",
     note: "#83's shape: two things in one breath; both effects, read from the list and the scheduler",
     turns: [
-      { say: "add eggs to the shopping list and set a timer for ten minutes", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add", "timer"], listHas: ["egg"], jobScheduled: "timers.fire", attemptsAtMost: { packageId: "list-add", count: 1 }, humanVerdict: true } },
-      { say: "what's on my shopping list", expect: { signal: { primary_act: "question" }, toolRan: "list-view", listHas: ["egg"], mustContain: "egg" } },
+      { say: "add eggs to the shopping list and set a timer for ten minutes", expect: { signal: { primary_act: "directive" }, toolsRan: ["remind", "timer"], listHas: ["egg"], jobScheduled: "timers.fire", attemptsAtMost: { packageId: "remind", count: 1 }, humanVerdict: true } },
+      { say: "what's on my shopping list", expect: { signal: { primary_act: "question" }, toolRan: "remind", listHas: ["egg"], mustContain: "egg" } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
@@ -496,9 +496,9 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     id: "list-then-follow-up",
     category: "tools",
     turns: [
-      { say: "add milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "list-add", listHas: ["milk"], mustContain: "milk" } },
-      { say: "put bread on the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "list-add", listHas: ["milk", "bread"], mustContain: "bread" } },
-      { say: "what do I need to buy", expect: { signal: { primary_act: "question" }, toolRan: "list-view", mustContain: "milk" } },
+      { say: "add milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "remind", listHas: ["milk"], mustContain: "milk" } },
+      { say: "put bread on the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "remind", listHas: ["milk", "bread"], mustContain: "bread" } },
+      { say: "what do I need to buy", expect: { signal: { primary_act: "question" }, toolRan: "remind", mustContain: "milk" } },
     ],
   },
   {
@@ -774,8 +774,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "A2: a digression (two list turns) and a return by pronoun; the subject tracker (CHAT-13, a stack of depth two) records Lisbon on the return turn",
     turns: [
       { say: "we're planning a trip to Lisbon", expect: { signal: { primary_act: "inform" }, guard: null, mustNotContain: NO_CLOSER, humanVerdict: true } },
-      { say: "add sunscreen to the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "list-add", listHas: ["sunscreen"] } },
-      { say: "and what's on the list now", expect: { signal: { primary_act: "question" }, toolRan: "list-view", mustContain: "sunscreen" } },
+      { say: "add sunscreen to the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "remind", listHas: ["sunscreen"] } },
+      { say: "and what's on the list now", expect: { signal: { primary_act: "question" }, toolRan: "remind", mustContain: "sunscreen" } },
       { say: "anyway, back to the trip, what's it known for", expect: { signal: { primary_act: "question" }, subject: "Lisbon", mustContain: "tram|tile|hill|tagus|pastel|fado|alfama|belem|belém|castle|seafood|azulejo", mustNotContain: "sunscreen|shopping|" + HONESTY_LINES } },
     ],
   },
@@ -785,7 +785,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "A6 (TURN-01's rule): 'add it to the list' with nothing to point at asks what, and adds nothing; 'add eggs to the list' with one list never asks which",
     turns: [
       { say: "add it to the list", expect: { signal: { primary_act: "directive" }, toolRan: null, mustContain: "\\?", mustNotContain: "added|on the list" } },
-      { say: "add eggs to the list", expect: { signal: { primary_act: "directive" }, toolRan: "list-add", listHas: ["egg"], mustNotContain: "which list|\\?" } },
+      { say: "add eggs to the list", expect: { signal: { primary_act: "directive" }, toolRan: "remind", listHas: ["egg"], mustNotContain: "which list|\\?" } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
@@ -894,9 +894,9 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "tools",
     note: "G3: 'the second one' resolves against the list the hub just read out; the item comes off the list (a list-remove path)",
     turns: [
-      { say: "add milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "list-add", listHas: ["milk"] } },
-      { say: "put bread on the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "list-add", listHas: ["bread"] } },
-      { say: "what's on my shopping list", expect: { signal: { primary_act: "question" }, toolRan: "list-view", mustContain: "milk" } },
+      { say: "add milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "remind", listHas: ["milk"] } },
+      { say: "put bread on the shopping list", expect: { signal: { primary_act: "directive" }, toolRan: "remind", listHas: ["bread"] } },
+      { say: "what's on my shopping list", expect: { signal: { primary_act: "question" }, toolRan: "remind", mustContain: "milk" } },
       { say: "take the second one off", expect: { signal: { primary_act: "directive" }, listLacks: ["bread"], listHas: ["milk"], mustNotContain: "\\?|\\bwhich (?:one|list)\\b" } },
       { say: "what did you mean by the first one", expect: { signal: { primary_act: "question" }, mustContain: "milk", guard: null } },
     ],
@@ -1319,7 +1319,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     // doubled.
     seedEntities: [{ kind: "pet", name: "Rover", aliases: ["the dog"], description: "The family dog." }],
     turns: [
-      { say: "add oat milk to the list, and when is Pippa's appointment", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add"], listHas: ["oat milk"], mustContain: "oat milk|added|list", guard: null } },
+      { say: "add oat milk to the list, and when is Pippa's appointment", expect: { signal: { primary_act: "directive" }, toolsRan: ["remind"], listHas: ["oat milk"], mustContain: "oat milk|added|list", guard: null } },
       { say: "you added the wrong item", expect: { signal: { primary_act: "inform", expressed_emotion: "anger" }, mustNotContain: "i've removed|i removed|taken it off|fixed it|" + NO_CLOSER, guard: null, humanVerdict: true } },
       { say: "Pippa's appointment is on Thursday at four", expect: { signal: { primary_act: "inform" }, guard: null } },
       { say: "no, Friday, not Thursday", expect: { signal: { primary_act: "inform" }, mustContain: "friday", mustNotContain: "so sorry|apologi|my mistake, i", toolRan: null, guard: null, humanVerdict: true } },
@@ -1382,8 +1382,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "does Pippa prefer quiet films", expect: { signal: { primary_act: "question" }, storesNothing: true, guard: null } },
       // The literal form, so the row tests eligibility, not the 8B's
       // tool-call reliability (the rerun's "Got it, added" without a call).
-      { say: "add oat milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add"], listHas: ["oat milk"], storesNothing: true } },
-      { say: "add oat milk, and I prefer that brand", expect: { signal: { primary_act: "directive", clauseStance: ["asserted", "asserted"] }, toolsRan: ["list-add"], memoryWritten: [["brand"]], guard: null } },
+      { say: "add oat milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolsRan: ["remind"], listHas: ["oat milk"], storesNothing: true } },
+      { say: "add oat milk, and I prefer that brand", expect: { signal: { primary_act: "directive", clauseStance: ["asserted", "asserted"] }, toolsRan: ["remind"], memoryWritten: [["brand"]], guard: null } },
       { say: "thanks, that's all tonight", expect: { signal: { primary_act: "closing" }, storesNothing: true, guard: null, humanVerdict: true } },
     ],
   },

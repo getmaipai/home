@@ -2,8 +2,7 @@
 // and-store.md) - the REST half of the frozen D-to-E contract
 // (docs/plans/wave-2.md). lib/lists.ts's own rules, exercised through
 // the real HTTP boundary the same way entities.test.ts does for
-// lib/entities.ts. The chat-routable shopping-list path (host.lists.add/
-// view, `list-add`/`list-view` packages) is covered separately in
+// lib/entities.ts. The chat-routable shopping-list path through `remind` is covered in
 // packageHost.test.ts and plugins.test.ts - this file is the REST
 // surface Session E's own list page binds to.
 import { describe, expect, test, beforeEach } from "bun:test";

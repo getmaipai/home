@@ -84,7 +84,7 @@ import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
-import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
+import { findOrCreateStandingList } from "@/lib/lists";
 import { runListAction } from "@/lib/listActions";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
@@ -2008,7 +2008,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
 
   // ASSIST-LISTS-01: the shopping-list phrases reach `remind` as a structured action folded into the op text
   // ("list:add_items:milk", written by plugins.ts from the pattern's `action`), the way `alarm` folds its action.
-  // The list action engine does the work; the reply wording stays list-add's and list-view's.
+  // The list action engine does the work; the reply wording stays remind's and remind's.
   function runRemindListCall(call: RemindListCall): { task: string; when_text: string; action: string } {
     const band = runtime.band ?? speakerAgeBand(actor, new Date());
     const list = findOrCreateStandingList("shopping");
@@ -2562,22 +2562,6 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       if (!result.ok) mapWriteFailure(result.status, result.error);
       return result.value.id;
     },
-    lists: {
-      add(text: string): void {
-        requirePermission("lists:write");
-        const list = findOrCreateStandingList("shopping");
-        const result = addListItem(actor, list.id, { text });
-        if (!result.ok) mapWriteFailure(result.status, result.error);
-      },
-      view(): string {
-        requirePermission("lists:read");
-        const list = findOrCreateStandingList("shopping");
-        const items = (JSON.parse(list.items) as { id: string; text: string; done: boolean }[]).filter((i) => !i.done);
-        // GENUI-05: the rows this read already holds, for list-view's todo_list block.
-        if (runtime.capture) runtime.capture.listItems = items.map((i) => ({ id: i.id, text: i.text }));
-        return items.length > 0 ? items.map((i) => i.text).join(", ") : "Your shopping list is empty.";
-      },
-    },
     reminders: {
       // The real natural-language time/task extraction (reminderParsing.ts,
       // chrono-node) and the real scheduling both happen here - a
@@ -2678,5 +2662,5 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         permissions: manifest.permissions ?? [],
       };
     },
-  };
+  } as unknown as Host;
 }

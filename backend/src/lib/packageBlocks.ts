@@ -19,7 +19,7 @@ import { undoPropsFor } from "@/lib/toolUndo";
 /** Rows a host read already holds, handed to the block producers of the same
  * run. Filled by packageHost.ts (never by a package). */
 export interface BlockCapture {
-  /** The open rows of the shopping list, as list-view read them. */
+  /** The open rows of the shopping list, as remind read them. */
   listItems?: { id: string; text: string }[];
   /** The reply a shopping-list phrase run through `remind` gives; plugins.ts uses it in place of the reminder reply. */
   listReply?: string;
@@ -353,7 +353,6 @@ export function blocksForRecipeRun(
       }
       return blocks;
     }
-    case "list-view":
     case "remind":
       return allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems ?? []) : [];
     case "weather":

@@ -42,7 +42,7 @@ describe("GET /api/widgets", () => {
     const body = (await res.json()) as Array<{ package: string; id: string; title: string; size: string; refresh_s: number }>;
     expect(body).toContainEqual(expect.objectContaining({ package: "weather", id: "current", title: "Weather", size: "card", refresh_s: 1800, priority: 50, surfaces: ["home"] }));
     expect(body.some((w) => w.package === "news")).toBe(true);
-    expect(body.some((w) => w.package === "list-view")).toBe(true);
+    expect(body.some((w) => w.package === "remind")).toBe(true);
     expect(body.some((w) => w.package === "almanac-date")).toBe(true);
   });
 
@@ -64,7 +64,7 @@ describe("GET /api/widgets", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Array<{ package: string }>;
     expect(body.some((w) => w.package === "weather")).toBe(false);
-    expect(body.some((w) => w.package === "list-view")).toBe(false);
+    expect(body.some((w) => w.package === "remind")).toBe(false);
   });
 });
 
@@ -114,9 +114,9 @@ describe("GET /api/widgets/:package/:id/data", () => {
     expect(res.status).toBe(403);
   });
 
-  test("runs the real package recipe with the widget's declared inputs - list-view's own empty-list reply", async () => {
+  test("runs the real package recipe with the widget's declared inputs - remind's shopping-list empty reply", async () => {
     const client = await owner();
-    const res = await client.get("/api/widgets/list-view/shopping/data");
+    const res = await client.get("/api/widgets/remind/shopping/data");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { as_of: string; items: Array<{ title: string }> };
     expect(body.items).toEqual([{ title: "Your shopping list is empty." }]);

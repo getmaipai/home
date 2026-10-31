@@ -1,7 +1,7 @@
 import { recomputeMix, recomputeAllMixes, interestRowsOf, setFollow, resetMix } from "@/lib/news/records";
 import { setValue } from "@/lib/settings";
 // NEWS-02a: the hub's News data, action and picture routes, per role and band. The news package is installed as an app over the
-// bundled one (its pages declared, as apps.test.ts does for list-view); feeds, pictures and article pages come from a localhost
+// bundled one (its pages declared, as apps.test.ts does for remind); feeds, pictures and article pages come from a localhost
 // fixture server, never a real address. The promises: a guest gets nothing; while pages are teen a child gets nothing; with the
 // floor at child a child's Today holds only the Kids' lists, no inferred row is ever written for a child, no publisher address is
 // in a body as an image source, no picture is fetched before a screen asks, the host is stopped on a 429, every body validates,

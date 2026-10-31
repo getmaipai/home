@@ -1,6 +1,6 @@
 import { setHouseholdSettingValue } from "@/lib/settings";
 // NEWS-02 test support: the news package installed as an app (its pages and data declared over the bundled package, as the
-// apps test does for list-view), a shelf seeded with feeds and items, and a localhost fixture server standing in for a
+// apps test does for remind), a shelf seeded with feeds and items, and a localhost fixture server standing in for a
 // publisher's picture host and article pages. Nothing here reaches a real network address (docs/THIRD-PARTY-SERVICES.md).
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

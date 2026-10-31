@@ -257,7 +257,7 @@ export const turnMachine = setup({
     // even when the household's own real budget (qwen3-8b:
     // model_transitions true, rounds: 1) would otherwise always offer
     // one. Scoped to this one tool id on purpose - other tools (timer,
-    // list-add) also succeed with actions, but their own
+    // remind) also succeed with actions, but their own
     // conversationFixture.ts rows pass through the ordinary phrasing
     // round without this failure mode, so whether this generalizes to
     // a "self-describing outcome" mechanism is a real open design

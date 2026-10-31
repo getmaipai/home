@@ -54,21 +54,21 @@ describe("item 4b: the forget family (the review's findings 8 and 9)", () => {
 });
 
 describe("CHAT-15: a rejected proposal is no outcome for the guards", () => {
-  test("a list-add the engine set aside unattempted narrates 'nothing added'; one the schema refused narrates the failure", () => {
-    const aside = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "rejected", reason: "over_cap" }] }));
+  test("a remind the engine set aside unattempted narrates 'nothing added'; one the schema refused narrates the failure", () => {
+    const aside = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "remind", status: "rejected", reason: "over_cap" }] }));
     expect(aside.reason).toBe("unsupported_action");
     expect(aside.reply).toBe("I haven't added anything to your list.");
-    const refused = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "rejected", reason: "invalid_args" }] }));
+    const refused = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "remind", status: "rejected", reason: "invalid_args" }] }));
     expect(refused.reason).toBe("unsupported_action");
     expect(refused.reply).toBe("Adding that to your list didn't work."); // the family's own failed line
     // A bare "Done." reads the same outcome the same way.
-    const bare = guardReply("Done.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "rejected", reason: "invalid_args" }] }));
+    const bare = guardReply("Done.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "remind", status: "rejected", reason: "invalid_args" }] }));
     expect(bare.reply).toBe("Adding that to your list didn't work.");
   });
 });
 
 describe("capability claims (bot-legacy: claimed_action/accepted_request)", () => {
-  test("a claimed action on a request is replaced - 'I've added milk to your list' (CHAT-04: a completed claim with no list-add outcome is unsupported_action)", () => {
+  test("a claimed action on a request is replaced - 'I've added milk to your list' (CHAT-04: a completed claim with no remind outcome is unsupported_action)", () => {
     const g = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list on my phone" }));
     expect(g.reason).toBe("unsupported_action");
     expect(g.reply).toBe("I haven't added anything to your list."); // narrated from the outcome (none), not a pool
@@ -518,7 +518,7 @@ describe("guardReply(): cutting padding vs replacing the whole reply", () => {
 
 describe("guardSentence(): the streaming half (one sentence at a time, before hand-off)", () => {
   test("checks a single sentence in isolation, same rules as guardReply", () => {
-    expect(guardSentence("I've added milk to your list.", ctx({ utterance: "add milk to my list" }))).toBe("unsupported_action"); // CHAT-04: a completed claim, no list-add outcome
+    expect(guardSentence("I've added milk to your list.", ctx({ utterance: "add milk to my list" }))).toBe("unsupported_action"); // CHAT-04: a completed claim, no remind outcome
     expect(guardSentence("Sure, what's the address?", ctx({ utterance: "text Nadia" }))).toBeNull();
   });
 });
@@ -697,7 +697,7 @@ describe("action-claim families, the second review's cases", () => {
   test("a third-person report after a command stands; the bare status form only at the sentence's start", () => {
     expect(guardReply("Bruno already added eggs to the list, so I only need milk.", ctx({ utterance: "add milk to my list" })).reason).toBeNull();
     expect(guardReply("Added milk to your shopping list.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
-    expect(guardReply("Added milk to your shopping list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "succeeded" }] })).reason).toBeNull();
+    expect(guardReply("Added milk to your shopping list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "remind", status: "succeeded" }] })).reason).toBeNull();
   });
 
   test("sorting a list, a running timer on a stop command and logging in are not actions", () => {
@@ -709,8 +709,8 @@ describe("action-claim families, the second review's cases", () => {
 
   test("a sentence carrying two claims needs both outcomes, and the narration names the one that is missing", () => {
     const both = "I've added milk to your list and set a timer for ten minutes.";
-    expect(guardReply(both, ctx({ utterance: "add milk and set a timer", outcomes: [{ packageId: "list-add", status: "succeeded" }] })).reply).toBe("I haven't set a timer.");
-    expect(guardReply(both, ctx({ utterance: "add milk and set a timer", outcomes: [{ packageId: "list-add", status: "succeeded" }, { packageId: "timer", status: "succeeded" }] })).reason).toBeNull();
+    expect(guardReply(both, ctx({ utterance: "add milk and set a timer", outcomes: [{ packageId: "remind", status: "succeeded" }] })).reply).toBe("I haven't set a timer.");
+    expect(guardReply(both, ctx({ utterance: "add milk and set a timer", outcomes: [{ packageId: "remind", status: "succeeded" }, { packageId: "timer", status: "succeeded" }] })).reason).toBeNull();
     // The chained form ("and set a timer") is read only after a command, where the subject can only be the hub.
     expect(guardReply("Bruno came home and set a timer for the pasta.", ctx({ utterance: "Bruno is cooking tonight" })).reason).toBeNull();
   });
@@ -737,7 +737,7 @@ describe("action-claim families, the third review's cases", () => {
     expect(guardReply("Boil the water, then set a timer for ten minutes.", ctx({ utterance: "start the pasta", shape: "command" })).reason).toBeNull();
     expect(guardReply("Put it on the calendar and set a reminder so you don't forget.", ctx({ utterance: "set up the dentist visit" })).reason).toBeNull();
     expect(guardReply("Check the fridge and put milk on the list if you're out.", ctx({ utterance: "put together a shopping plan" })).reason).toBeNull();
-    expect(guardReply("I've added milk to your list and set a timer for ten minutes.", ctx({ utterance: "add milk and set a timer", outcomes: ran("list-add") })).reply).toBe("I haven't set a timer.");
+    expect(guardReply("I've added milk to your list and set a timer for ten minutes.", ctx({ utterance: "add milk and set a timer", outcomes: ran("remind") })).reply).toBe("I haven't set a timer.");
   });
 
   test("the bare status with no copula is a claim after a command: 'Timer set for ten minutes.', 'Saved.', 'Lights off.', 'Milk added to your list.'", () => {
@@ -748,7 +748,7 @@ describe("action-claim families, the third review's cases", () => {
     expect(guardReply("Lights off.", ctx({ utterance: "turn off the lights" })).reason).toBe("unsupported_action");
     expect(guardReply("Milk added to your list.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
     expect(guardReply("Milk is on your list now.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
-    expect(guardReply("Milk is on your list now.", ctx({ utterance: "add milk to my list", outcomes: ran("list-add") })).reason).toBeNull();
+    expect(guardReply("Milk is on your list now.", ctx({ utterance: "add milk to my list", outcomes: ran("remind") })).reason).toBeNull();
   });
 
   test("'called them' and 'ordered them for you' are the claim; the sorting and naming senses are not", () => {
@@ -1094,7 +1094,7 @@ describe("EXP-01's set, the coordinator's two folds", () => {
     expect(guardReply("I'll make sure to note that.", stated).replaced).toBe(true);
     // A request to remember keeps its promise even when the signal fell back to inform (a review).
     expect(guardReply("Okay, I'll remember that.", ctx({ utterance: "remember that Pippa is allergic to peanuts", act: "inform" })).reason).toBeNull();
-    expect(guardReply("Sure, I'll add that to the list.", ctx({ utterance: "add oat milk to the list", act: "directive", outcomes: [{ packageId: "list-add", status: "succeeded" }] })).reason).toBeNull();
+    expect(guardReply("Sure, I'll add that to the list.", ctx({ utterance: "add oat milk to the list", act: "directive", outcomes: [{ packageId: "remind", status: "succeeded" }] })).reason).toBeNull();
   });
   test("a sentence that followed a skipped one on a conjunction loses the lead", () => {
     const g = guardReply("You're not, I'm watching it. But we can look up the showtimes if you like.", ctx({ utterance: "we're watching the movie Cobra tonight", act: "inform" }));

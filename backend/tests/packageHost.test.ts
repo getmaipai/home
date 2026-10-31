@@ -2403,42 +2403,6 @@ describe("packageHost llm.complete", () => {
   });
 });
 
-describe("packageHost lists (session-d-packages-and-store.md step 8)", () => {
-  test("add checks permission before touching the shopping list", async () => {
-    const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: [] }));
-    try {
-      host.lists.add("milk");
-      throw new Error("should have thrown");
-    } catch (err) {
-      expect((err as HostError).code).toBe("permission_denied");
-    }
-  });
-
-  test("view reports an empty shopping list plainly", async () => {
-    const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["lists:read"] }));
-    expect(host.lists.view()).toBe("Your shopping list is empty.");
-  });
-
-  test("add then view: the real find-or-create shopping list, not a canned reply", async () => {
-    const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["lists:write", "lists:read"] }));
-    host.lists.add("milk");
-    host.lists.add("eggs");
-    expect(host.lists.view()).toBe("milk, eggs");
-  });
-
-  test("add finds the same standing list across calls, never creating a second one", async () => {
-    const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["lists:write"] }));
-    host.lists.add("milk");
-    host.lists.add("eggs");
-    const rows = db.select().from(lists).where(eq(lists.kind, "shopping")).all();
-    expect(rows).toHaveLength(1);
-  });
-});
-
 describe("packageHost reminders and timers (session-d-packages-and-store.md step 8)", () => {
   test("reminders.set checks permission before parsing anything", async () => {
     const actor = await owner();

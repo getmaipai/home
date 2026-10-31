@@ -6,7 +6,7 @@
 // shape lib/entities.ts already takes for validateEntity().
 //
 // `findOrCreateStandingList` backs the two chat-routable behaviors
-// (`list-add`/`list-view`, via host.lists.add/view in packageHost.ts):
+// (`remind`, via its list action host path):
 // a household's shopping list, and (once a package routes to it) its
 // to-do list, are each a single standing record per household, never a
 // second one - the REST surface below still lets a person create as
@@ -27,8 +27,7 @@ export type ListRow = typeof lists.$inferSelect;
 // A real discriminated union, not the flat "ok: boolean, status: every
 // code" shape lib/entities.ts's own OpResult<T> takes - that shape never
 // narrows `status` down to just the failure codes on the `!ok` branch,
-// which mapWriteFailure (packageHost.ts's own `lists.add`/`lists.view`)
-// needs to accept a real `400 | 403 | 404`, not the full union.
+// which callers can handle at their boundary.
 export type OpResult<T> = { ok: true; status: 200 | 201; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
 
 function toList(row: ListRow): ListT {
@@ -141,9 +140,8 @@ export function createList(actor: { id: string }, input: ListCreate): OpResult<L
 
 /** The one household-wide standing list of `kind` (shopping or todo) -
  * created on first use, found thereafter. Not exposed as a REST verb of
- * its own: `host.lists.add`/`host.lists.view` (packageHost.ts) are the
- * only callers, since only a chat-routed package ever needs "the"
- * shopping list rather than a list it names by id. */
+ * its own: the remind package uses it for the household shopping list
+ * rather than a list it names by id. */
 export function findOrCreateStandingList(kind: "shopping" | "todo"): ListRow {
   const existing = db
     .select()

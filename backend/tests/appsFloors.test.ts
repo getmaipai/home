@@ -18,9 +18,9 @@ import { resetDb } from "./reset-db";
 import { ADULT_HOST, installNewsApp, putItem, removeNewsApp, resetNewsState, seedFeeds } from "./support/newsFixture";
 
 beforeEach(() => resetDb());
-afterEach(() => { rmSync(installedPackageVersionDir("list-view", "9.9.9"), { recursive: true, force: true }); __resetPackageCachesForTests(); __resetAppCachesForTests(); });
+afterEach(() => { rmSync(installedPackageVersionDir("remind", "9.9.9"), { recursive: true, force: true }); __resetPackageCachesForTests(); __resetAppCachesForTests(); });
 async function fixtureApps(client: TestClient): Promise<Array<Record<string, unknown>>> { const rows = (await (await client.get("/api/apps")).json()) as Array<Record<string, unknown>>; return rows.filter((row) => row.package === ID); }
-const ID = "list-view";
+const ID = "remind";
 const VERSION = "9.9.9";
 
 const indexPage = {
@@ -52,7 +52,7 @@ function installFixtureApp(options: FixtureOptions = {}): string {
       ...(options.extraPage === false ? [] : [{ id: "more", label: "More", icon: "calendar", nav: true, kind: "schema", module: "more", ...(options.pageRoles?.more ? { min_role: options.pageRoles.more } : {}) }]),
     ],
     data: options.data ?? [
-      { id: "shopping", inputs: {} },
+      { id: "shopping", inputs: { action: "show_list", expression: "shopping list" } },
       { id: "places", surface: "weather", rows: "places" },
       { id: "forecast", surface: "weather" },
     ],

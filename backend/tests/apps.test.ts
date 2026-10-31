@@ -1,4 +1,4 @@
-// APP-KIND-03: the hub serves package apps. The fixture app is the bundled list-view package installed
+// APP-KIND-03: the hub serves package apps. The fixture app is the bundled remind package installed
 // over itself (an "update to a default package") with app pages and data declared, so the recipe and its
 // todo_list block run offline. Nothing here touches the network.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -17,7 +17,7 @@ import { TestClient } from "./client";
 import { child, owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
-const ID = "list-view";
+const ID = "remind";
 const VERSION = "9.9.9";
 
 const indexPage = {
@@ -49,7 +49,7 @@ function installFixtureApp(options: FixtureOptions = {}): string {
       ...(options.extraPage === false ? [] : [{ id: "more", label: "More", icon: "calendar", nav: true, kind: "schema", module: "more", ...(options.pageRoles?.more ? { min_role: options.pageRoles.more } : {}) }]),
     ],
     data: options.data ?? [
-      { id: "shopping", inputs: {} },
+      { id: "shopping", inputs: { action: "show_list", expression: "shopping list" } },
       { id: "places", surface: "weather", rows: "places" },
       { id: "forecast", surface: "weather" },
     ],
@@ -351,7 +351,7 @@ describe("POST /api/plugins/:id/data/:dataId", () => {
   test("runs the package's recipe and returns the blocks that pass the filter", async () => {
     installFixtureApp();
     const { client } = await owner();
-    await client.post("/api/plugins/list-add/run", { item: "milk" });
+    await client.post("/api/plugins/remind/run", { action: "add_items", expression: "milk" });
     const res = await client.post(`/api/plugins/${ID}/data/shopping`, {});
     expect(res.status).toBe(200);
     const body = (await res.json()) as { as_of: string; blocks: Array<{ kind: string; producer: string }> };

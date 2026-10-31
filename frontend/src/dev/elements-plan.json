@@ -3088,20 +3088,19 @@
       "name": "todo-list",
       "group": "agent/workflow",
       "verdict": "wire-after",
-      "backendNeeded": "list-view and list-add return items[] beside the text (additive)",
+      "backendNeeded": "remind returns items[] beside the text (additive)",
       "effort": "LARGE",
       "specTagNeeded": false,
       "newDependency": false,
       "bindings": [
-        "list-add",
-        "list-view"
+        "remind"
       ],
       "size": "S",
       "showcaseScenario": null,
       "batch": 6,
       "replacesHandBuilt": [],
       "realTurnToday": false,
-      "verdictReason": "Deferred until list-view and list-add return items[] beside the text (additive)."
+      "verdictReason": "Deferred until remind returns items[] beside the text (additive)."
     },
     {
       "file": "tool-call.tsx",

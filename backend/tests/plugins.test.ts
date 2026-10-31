@@ -194,8 +194,6 @@ describe("the bundled websearch package", () => {
 
 describe("the bundled step-8 packages (lists, reminders, timers)", () => {
   const cases: [string, string[]][] = [
-    ["list-add", ["lists:write"]],
-    ["list-view", ["lists:read"]],
     ["remind", ["reminders:write", "lists:write", "lists:read"]],
     ["timer", ["timers:write"]],
   ];
@@ -523,32 +521,6 @@ describe("POST /api/plugins/websearch/run", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
     expect(body.error).toContain("isn't set up yet");
-  });
-});
-
-describe("POST /api/plugins/list-add/run and list-view/run", () => {
-  test("adds an item, then view reads it back - the real shopping list, not a canned reply", async () => {
-    const client = await owner();
-    const addRes = await client.post("/api/plugins/list-add/run", { item: "milk" });
-    expect(addRes.status).toBe(200);
-    const addBody = (await addRes.json()) as { reply?: { text: string } };
-    expect(addBody.reply?.text).toBe("Added milk to your shopping list.");
-
-    const viewRes = await client.post("/api/plugins/list-view/run", {});
-    expect(viewRes.status).toBe(200);
-    const viewBody = (await viewRes.json()) as { reply?: { text: string }; blocks?: { kind: string; producer: string }[] };
-    expect(viewBody.reply?.text).toBe("milk");
-    // GENUI-05: the direct run returns the package's block after the same filter a turn applies.
-    expect(viewBody.blocks).toHaveLength(1);
-    expect(viewBody.blocks![0]).toMatchObject({ kind: "todo_list", producer: "list-view" });
-  });
-
-  test("view reports an empty list plainly", async () => {
-    const client = await owner();
-    const res = await client.post("/api/plugins/list-view/run", {});
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { reply?: { text: string } };
-    expect(body.reply?.text).toBe("Your shopping list is empty.");
   });
 });
 
