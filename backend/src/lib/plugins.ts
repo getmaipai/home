@@ -41,6 +41,7 @@ import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
 import { householdHomeCountryName, householdHomePlaceName, householdHomeSkyInput } from "@/lib/places";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { applyWidenedAssist } from "@/lib/assistWidened";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
@@ -183,6 +184,13 @@ function warnOncePerMtime(id: string, mtimeMs: number, line: string): void {
  * instead. loadPackage() keeps its original read-both-then-validate
  * shape untouched below. */
 export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
+  const loaded = loadManifestFromDisk(id);
+  // ASSIST-BENCH-01: the wider remind and timer schemas apply only while `tools.assist.widened` is on. Applied after
+  // the cache, so flipping the setting takes effect on the next call and the cached manifest is never altered.
+  return loaded.ok ? { ok: true, value: applyWidenedAssist(loaded.value) } : loaded;
+}
+
+function loadManifestFromDisk(id: string): PluginOpResult<PackageManifest> {
   if (!isValidPackageId(id)) {
     return { ok: false, status: 400, error: `${id} is not a valid package id` };
   }

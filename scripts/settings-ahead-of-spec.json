@@ -15,5 +15,6 @@
   "alarms.snooze_minutes",
   "tools.remind.mode",
   "tools.timer.mode",
-  "tools.lists.mode"
+  "tools.lists.mode",
+  "tools.assist.widened"
 ]

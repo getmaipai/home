@@ -1,0 +1,72 @@
+{
+  "description": "Reminders and lists. Set, change, snooze, finish, cancel or show reminders, and create, change, copy, reorder, empty or show lists and the things on them. Pass words, never ids: the list as the person named it, the items as they said them. When the person says that or those, leave the words out and the last list or items are used. When two lists or reminders fit the name, ask which one instead of guessing.",
+  "args": {
+    "type": "object",
+    "properties": {
+      "expression": {
+        "type": "string",
+        "minLength": 1,
+        "description": "For a reminder: what to remember and when, in the person's words. For a list action: the item text or new name when no other field fits."
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "create_reminder",
+          "edit_reminder",
+          "snooze_reminder",
+          "complete_reminder",
+          "cancel_reminder",
+          "list_reminders",
+          "create_list",
+          "rename_list",
+          "delete_list",
+          "add_items",
+          "remove_items",
+          "check_items",
+          "uncheck_items",
+          "edit_item",
+          "move_items",
+          "copy_list",
+          "reorder",
+          "clear_done",
+          "show_list",
+          "find_list"
+        ],
+        "description": "What to do. Omit it for a new reminder. The first six values act on reminders, the rest on lists."
+      },
+      "list": {
+        "type": "string",
+        "description": "The list the person named, in their words, such as groceries. Omit when they said that or my list and only one list fits."
+      },
+      "to_list": {
+        "type": "string",
+        "description": "The target list for move_items."
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Item words, one string per item, such as oat milk."
+      },
+      "name": {
+        "type": "string",
+        "description": "A new list name for create_list, rename_list and copy_list, or the new item text for edit_item."
+      },
+      "exclude": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Items to leave out when copy_list copies a list."
+      },
+      "order": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Item words in the order they should appear for reorder."
+      }
+    }
+  }
+}

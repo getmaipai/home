@@ -1,0 +1,27 @@
+{
+  "description": "Timers and alarms. Start a timer for a length of time, or set, change, turn on, turn off, skip the next ring of, cancel, delete or list alarms. Pass the time and name in the person's words in expression. When two alarms fit the description, ask which one instead of guessing.",
+  "args": {
+    "type": "object",
+    "properties": {
+      "expression": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The length of time for a timer, or the alarm's time, repeat days and name in the person's words, such as 6:30 every weekday called gym."
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "set_alarm",
+          "edit_alarm",
+          "enable_alarm",
+          "disable_alarm",
+          "skip_next_alarm",
+          "cancel_alarm",
+          "delete_alarm",
+          "list_alarms"
+        ],
+        "description": "What to do with an alarm. Omit it for a plain timer."
+      }
+    }
+  }
+}
