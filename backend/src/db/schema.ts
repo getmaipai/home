@@ -2260,6 +2260,14 @@ export const musicJobs = sqliteTable("music_jobs", {
 }, (table) => [index("music_jobs_person_id_idx").on(table.personId), index("music_jobs_turn_id_idx").on(table.turnId),
   index("music_jobs_person_conversation_idx").on(table.personId, table.conversationId), index("music_jobs_file_id_idx").on(table.fileId)]);
 
+// CODE-API-01: durable daily usage for each person's coding allowance.
+export const codingTokenUsage = sqliteTable("coding_token_usage", {
+  personId: text("person_id").notNull().references(() => people.id),
+  day: text("day").notNull(),
+  tokens: integer("tokens").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.personId, table.day] })]);
+
 // NEWS-04: hub-authored cached text, keyed by story and content band.
 export const newsStorySummaries = sqliteTable("news_story_summaries", {
   storyId: text("story_id").notNull(),

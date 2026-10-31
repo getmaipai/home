@@ -4,7 +4,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { sqlite, db } from "@/db";
-import { passkeyCredentials, devices, deviceTokens, totpSecrets, people, biometricPrints, projects, lists, commands, notificationDeliveries, notificationHolds, replyConstraints, musicJobs, memoryRecords, pendingMemoryWork, deviceCommands } from "@/db/schema";
+import { passkeyCredentials, devices, deviceTokens, totpSecrets, people, biometricPrints, projects, lists, commands, notificationDeliveries, notificationHolds, replyConstraints, musicJobs, memoryRecords, pendingMemoryWork, deviceCommands, codingTokenUsage } from "@/db/schema";
 import { newPersonId, newBiometricPrintId } from "@/lib/id";
 import { remember } from "@/lib/memory";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -1010,6 +1010,7 @@ describe("deleting a person erases what the household held about them", () => {
     db.insert(notificationHolds).values({ id: "hold-erasure", typeId: "test", recipientId: person.id, text: "private", options: "[]", deliverAfter: now }).run();
     db.insert(replyConstraints).values({ id: "constraint-erasure", conversationId: "none", person: person.id, kind: "tone", value: "quiet", setAt: now, hlc: now }).run();
     db.insert(musicJobs).values({ id: "music-erasure", personId: person.id, task: "generate", request: JSON.stringify({ prompt: "private request" }), state: "queued", createdAt: now, updatedAt: now, hlc: now }).run();
+    db.insert(codingTokenUsage).values({ personId: person.id, day: "2026-10-31", tokens: 123, updatedAt: now }).run();
     const memoryId = "memory-pending-erasure";
     db.insert(memoryRecords).values({ id: memoryId, recordKind: "memory", text: "private memory", category: "fact", tier: "durable", status: "active", scope: "person", person: person.id, source: "hub", importance: 0.5, createdAt: now, lastUsedAt: now, hlc: now }).run();
     db.insert(pendingMemoryWork).values({ memoryId, reason: "embed_failed", queuedAt: now }).run();
@@ -1022,6 +1023,7 @@ describe("deleting a person erases what the household held about them", () => {
       ["projects", "id", projectId], ["lists", "id", "list-person-erasure"], ["commands", "id", "command-erasure"],
       ["notification_deliveries", "id", "delivery-erasure"], ["notification_holds", "id", "hold-erasure"],
       ["reply_constraints", "id", "constraint-erasure"], ["music_jobs", "id", "music-erasure"],
+      ["coding_token_usage", "person_id", person.id],
       ["pending_memory_work", "memory_id", memoryId], ["device_commands", "id", "device-command-row-erasure"],
     ] as const) expect(countRows(table, column, value)).toBe(0);
     expect(existsSync(projectPath)).toBe(false);

@@ -28,6 +28,7 @@ import {
   sessions,
   personApiTokens,
   apiKeys,
+  codingTokenUsage,
   memoryRecords,
   memoryEmbeddings,
   pendingEmbeddings,
@@ -297,6 +298,7 @@ export function resetDb(): void {
   db.delete(quickTimers).run();
   db.delete(apiKeys).run();
   db.delete(personApiTokens).run();
+  db.delete(codingTokenUsage).run();
   db.delete(personCredentials).run();
   db.delete(people).run();
 }

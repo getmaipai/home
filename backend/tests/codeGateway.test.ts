@@ -356,13 +356,25 @@ describe("limits", () => {
   });
 
   test("the token ledger resets on a new day", () => {
+    const { p } = adultWithKey();
     let now = new Date(2026, 9, 19, 10, 0, 0);
     const ledger = createTokenLedger(() => now);
-    ledger.add("p", 50);
-    expect(ledger.used("p")).toBe(50);
+    ledger.add(p.id, 50);
+    expect(ledger.used(p.id)).toBe(50);
     expect(ledger.secondsToMidnight()).toBe(14 * 3600);
     now = new Date(2026, 9, 20, 0, 0, 1);
-    expect(ledger.used("p")).toBe(0);
+    expect(ledger.used(p.id)).toBe(0);
+  });
+
+  test("daily token usage survives a ledger restart and expires on the next day", () => {
+    const { p } = adultWithKey();
+    let now = new Date(2026, 9, 19, 10, 0, 0);
+    const first = createTokenLedger(() => now);
+    first.add(p.id, 50);
+    const restarted = createTokenLedger(() => now);
+    expect(restarted.used(p.id)).toBe(50);
+    now = new Date(2026, 9, 20, 0, 0, 1);
+    expect(restarted.used(p.id)).toBe(0);
   });
 
   test("one person cannot flood the queue: the extra request is refused and the other person is served in turn", async () => {

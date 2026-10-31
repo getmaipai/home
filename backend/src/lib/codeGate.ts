@@ -9,6 +9,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getStackClient } from "@/lib/stackEngine";
 import type { PersonRow } from "@/types";
+import { sqlite } from "@/db";
 
 export type GateRefusal = { status: 403 | 429 | 503; message: string; code: string; retryAfter?: number };
 
@@ -97,26 +98,26 @@ export function dailyTokenCap(person: PersonRow): number {
   return caps.length ? Math.min(...caps) : 0;
 }
 
-/** Tokens used today per person, from the engine's own usage counts. Memory only: a hub restart starts the day again (a durable ledger needs a migration; owed). */
-export function createTokenLedger(now: () => Date = () => new Date()) {
-  const used = new Map<string, { day: string; tokens: number }>();
-  const dayOf = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+/** Tokens used today per person, from the engine's own usage counts, stored durably through a hub restart. */
+export function createTokenLedger(now: () => Date = () => new Date(), raw: typeof sqlite = sqlite) {
+  const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return {
     used(personId: string): number {
-      const row = used.get(personId);
-      return row && row.day === dayOf(now()) ? row.tokens : 0;
+      return raw.query<{ tokens: number }, [string, string]>("SELECT tokens FROM coding_token_usage WHERE person_id = ? AND day = ?").get(personId, dayOf(now()))?.tokens ?? 0;
     },
     add(personId: string, tokens: number): void {
       if (!(tokens > 0)) return;
       const day = dayOf(now());
-      const row = used.get(personId);
-      used.set(personId, { day, tokens: (row && row.day === day ? row.tokens : 0) + Math.floor(tokens) });
+      const cutoff = dayOf(new Date(now().getFullYear(), now().getMonth(), now().getDate() - 7));
+      raw.query("DELETE FROM coding_token_usage WHERE day < ?").run(cutoff);
+      raw.query("INSERT INTO coding_token_usage (person_id, day, tokens, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(person_id, day) DO UPDATE SET tokens = tokens + excluded.tokens, updated_at = excluded.updated_at")
+        .run(personId, day, Math.floor(tokens), now().toISOString());
     },
     secondsToMidnight(): number {
       const n = now();
       return Math.max(1, Math.ceil((new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1).getTime() - n.getTime()) / 1000));
     },
-    reset(): void { used.clear(); },
+    reset(): void { raw.query("DELETE FROM coding_token_usage").run(); },
   };
 }
 export const tokenLedger = createTokenLedger();
