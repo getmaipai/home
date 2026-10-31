@@ -12,7 +12,7 @@ export function SmartListView({ view, items, onChanged }: {
   onChanged: () => void;
 }) {
   const title = view.kind === "today" ? "Today" : "Scheduled";
-  return <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+  return <section className="flex min-h-0 min-w-0 flex-1 flex-col">
     <header className="border-b px-4 py-4">
       <p className="m-0 text-base tracking-wider text-muted-foreground">SMART LIST</p>
       <h1 className="m-0 text-3xl font-semibold">{title}</h1>
@@ -25,5 +25,5 @@ export function SmartListView({ view, items, onChanged }: {
           <span className="text-sm text-muted-foreground">{dueLabel(item.at)}</span>
         </li>)}
     </ul>
-  </main>;
+  </section>;
 }

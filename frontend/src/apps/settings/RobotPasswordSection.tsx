@@ -98,7 +98,7 @@ export function RobotPasswordRow({
             onChange={(e) => setCurrentPassword(e.target.value)}
             disabled={submitting}
           />
-          {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button onClick={handleRotate} disabled={submitting || !host.trim()}>
               {submitting ? "Rotating…" : "Rotate"}

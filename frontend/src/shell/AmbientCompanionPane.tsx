@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Link, useNavigate } from "react-router-dom";
 import { ActivityFeed } from "@maipai/ui/src/elements/activity-feed";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Badge } from "@maipai/ui/src/elements/ui/badge";
 import { Button } from "@maipai/ui/src/elements/ui/button";
 import { formatRelative } from "@maipai/ui/src/relativeTime";
@@ -281,7 +282,7 @@ export function useAmbientCompanionPane({ person, companionName, companionId, av
     }}>Open</Button> };
   }) }];
   const companionTab = { id: "companion", label: "Talk", content: companionId ? <>{openError ? <p role="alert">Could not open that conversation. Check your connection and try again.</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} incognito={incognito} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} /></> : null };
-  const historyTab = { id: "history", label: "History", content: conversations.isLoading ? <p role="status">Loading conversations…</p> : conversations.isError ? <p role="alert">Could not load conversations. Check your connection and try again.</p> : <ActivityFeed label={`${companionName} conversations`} groups={activityGroups} empty={<p>No conversations with {companionName} yet.</p>} /> };
+  const historyTab = { id: "history", label: "History", content: conversations.isLoading || conversations.isError ? <AsyncState data={conversations.data} error={conversations.isError} isFetching={conversations.isFetching} onRetry={() => void conversations.refetch()} errorMessage="Could not load conversations. Check your connection and try again." loadingLabel="Loading conversations">{() => null}</AsyncState> : <ActivityFeed label={`${companionName} conversations`} groups={activityGroups} empty={<p>No conversations with {companionName} yet.</p>} /> };
   const toggleReadAloud = () => { const next = !side.readAloud; side.setReadAloud(next); if (next && !side.ttsAvailable) toast.error("Read aloud is unavailable because voice output is not ready. Check Voice settings and try again.", { id: "voice-problem" }); };
   const ReadIcon = side.readAloud ? SpeakerIcon : SpeakerOffIcon;
   const settingsTab = { id: "settings", label: "Settings", content: <><div className="flex items-center justify-between gap-3 px-4 py-3"><span>Read replies aloud</span><TooltipIconButton tooltip={side.readAloud ? "Turn off read replies aloud" : "Read replies aloud"} aria-label="Read replies aloud" aria-pressed={side.readAloud} onClick={toggleReadAloud}><ReadIcon aria-hidden="true" /></TooltipIconButton></div><CompanionSettings person={person} companionId={companionId} /></> };

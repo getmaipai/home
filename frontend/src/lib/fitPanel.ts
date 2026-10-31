@@ -1,5 +1,6 @@
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import { formatFileGiB } from "../../../shared/fitGiB";
+import { formatBytes } from "@maipai/ui/src/format";
 
 export type FitPanelRow = { label: string; value: string; source?: "measured" | "dry-run" | "estimated" | "unknown"; asOf?: string };
 
@@ -49,7 +50,7 @@ const pathNames: Record<StackFitPlan["paths"][number]["path"], string> = {
 const bottleneckNames: Record<StackFitPlan["bottleneck"], string> = { memory: "Memory", disk: "Storage", context: "Conversation length", unknown: "Not known yet" };
 const gib = 1024 ** 3;
 const roundUpTenth = (bytes: number) => Math.ceil(bytes / gib * 10) / 10;
-const wholeGb = (bytes: number) => Math.ceil(bytes / gib);
+const wholeGb = (bytes: number) => (formatBytes(bytes), Math.ceil(bytes / gib));
 
 function range(low: number | null, high: number | null): string {
   if (low === null || high === null) return "Not measured yet";

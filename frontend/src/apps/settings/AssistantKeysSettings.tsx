@@ -4,6 +4,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@maipai/ui/src/ui/badge";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -50,9 +52,10 @@ export function AssistantKeysSettings() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
-        {query.isLoading ? <p className="text-sm text-muted-foreground">Loading keys</p> : query.isError ? <p className="text-sm text-destructive">Could not load assistant keys.</p> : keys.length === 0 ? <p className="text-sm text-muted-foreground">No assistant keys</p> : (
+        <AsyncState data={query.data ? keys : undefined} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Could not load assistant keys." loadingLabel="Loading keys">
+          {(loadedKeys) => loadedKeys.length === 0 ? <EmptyState icon="key" text="No assistant keys" /> : (
           <ItemGroup variant="card" aria-label="Assistant keys">
-            {keys.map((key) => (
+            {loadedKeys.map((key) => (
               <Item key={key.id}>
                 <ItemContent>
                   <ItemTitle>{key.name} <Badge variant="secondary">{key.status === "active" ? "Active" : "Paused"}</Badge></ItemTitle>
@@ -62,7 +65,8 @@ export function AssistantKeysSettings() {
               </Item>
             ))}
           </ItemGroup>
-        )}
+          )}
+        </AsyncState>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div><Button type="button" onClick={() => setCreateOpen(true)}>Make an assistant key</Button></div>
         </div>

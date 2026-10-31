@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
@@ -183,9 +184,9 @@ export function EngineLinkCredentialSection() {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return (
     <Section heading="Engine computer link">
-      <p className="text-base text-[var(--muted-foreground)]">Key: {status.data.paired ? "Present" : "Not paired"}</p>
+      <p className="text-base text-muted-foreground">Key: {status.data.paired ? "Present" : "Not paired"}</p>
       <Button variant="outline" onClick={begin}>Pair engine computer</Button>
-      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-[var(--muted-foreground)]">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => void run(revoke)}>Revoke link key</Button></div> : null}
+      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => void run(revoke)}>Revoke link key</Button></div> : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -211,10 +212,10 @@ export function EngineLinkCredentialSection() {
                 <p className="text-base">Enter the engine computer's name or its home network address, and the port Home uses to reach it securely.</p>
                 <Label htmlFor="pair-host">Engine computer name or address</Label>
                 <Input id="pair-host" value={host} onChange={(event) => setHost(event.target.value)} disabled={busy} autoComplete="off" spellCheck={false} aria-invalid={problems.host ? true : undefined} aria-describedby="pair-host-problem" />
-                <p id="pair-host-problem" className="text-sm text-[var(--destructive)]">{host !== "" ? problems.host : null}</p>
+                <p id="pair-host-problem" className="text-sm text-destructive">{host !== "" ? problems.host : null}</p>
                 <Label htmlFor="pair-port">Secure connection port</Label>
                 <Input id="pair-port" value={port} onChange={(event) => setPort(event.target.value)} disabled={busy} inputMode="numeric" autoComplete="off" aria-invalid={problems.port ? true : undefined} aria-describedby="pair-port-problem" />
-                <p id="pair-port-problem" className="text-sm text-[var(--destructive)]">{problems.port}</p>
+                <p id="pair-port-problem" className="text-sm text-destructive">{problems.port}</p>
               </>
             ) : null}
             {step === 2 ? (
@@ -222,7 +223,7 @@ export function EngineLinkCredentialSection() {
                 <>
                   <p className="text-base">On the engine computer, open a terminal and run this one command. Copy it with the button.</p>
                   <CopyLine label="Pairing command" text={pairCommand(origin, pairing.code)} />
-                  <p className="text-sm text-[var(--muted-foreground)]">One-time code: <code>{groupCode(pairing.code)}</code>. It works once and expires at {new Date(pairing.expires_at).toLocaleTimeString()}. The command prints a check code. Keep it for the next step.</p>
+                  <p className="text-sm text-muted-foreground">One-time code: <code>{groupCode(pairing.code)}</code>. It works once and expires at {new Date(pairing.expires_at).toLocaleTimeString()}. The command prints a check code. Keep it for the next step.</p>
                 </>
               ) : (
                 <Button variant="outline" disabled={busy} onClick={() => void run(async () => setPairing(await api.issueEngineLinkPairing()))}>Get a one-time code</Button>
@@ -246,10 +247,10 @@ export function EngineLinkCredentialSection() {
                 <p className="text-base">Paired. Home now trusts this engine computer.</p>
                 {hops ? hops.map((hop) => (
                   <p key={hop.id} className="text-sm">{hop.pass ? "PASS" : "FAIL"} hop {hop.id}{hop.detail ? `: ${hop.detail}` : ""}{hop.pass ? "" : `. To fix: ${hop.fix}`}</p>
-                )) : <p className="text-sm text-[var(--muted-foreground)]">Checking the connection&hellip;</p>}
+                )) : <RouteSkeleton label="Checking the connection" />}
               </>
             ) : null}
-            {error ? <p role="alert" className="text-sm text-[var(--destructive)]">{error}</p> : null}
+            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           </div>
           <DialogFooter>
             {step > 0 && step < 4 ? <Button type="button" variant="ghost" disabled={busy} onClick={back}>Back</Button> : null}

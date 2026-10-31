@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
 import { Section } from "@maipai/ui/src/primitives/Section";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
@@ -97,13 +98,13 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
 
   return (
     <Section heading={management ? "Household commands" : "Commands"}>
-      <p className="text-base text-[var(--muted-foreground)]">
+      <p className="text-base text-muted-foreground">
         Teach MaiPai a phrase of your own - "when I say X, do Y." A command always fires on an exact phrase, never a
         guess.
       </p>
       {management && loadError ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-base text-[var(--destructive)]">{loadError}</p>
+          <p className="text-base text-destructive">{loadError}</p>
           <Button variant="secondary" onClick={load}>
             Try again
           </Button>
@@ -174,7 +175,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
                   />
                 </>
               )}
-              {createError ? <p className="text-base text-[var(--destructive)]">{createError}</p> : null}
+              {createError ? <p className="text-base text-destructive">{createError}</p> : null}
               <div className="flex">
                 <Button type="submit" disabled={creating}>
                   {creating ? "Creating…" : "Create command"}
@@ -182,16 +183,16 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
               </div>
             </form>
           ) : null}
-          {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
+          {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
           {management && commands === null ? null : management && commands?.length === 0 ? (
-            <p className="text-base text-[var(--muted-foreground)]">No commands yet.</p>
+            <EmptyState icon="inbox" text="No commands yet." />
           ) : management && commands ? (
             <ul className="flex flex-col divide-y divide-[var(--border)]">
               {commands.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex flex-col">
                     <span className="text-base">"{c.trigger}"</span>
-                    <span className="text-base text-[var(--muted-foreground)]">
+                    <span className="text-base text-muted-foreground">
                       {summarize(c.action)} - {ROLE_LABELS[c.minRole as keyof typeof ROLE_LABELS] ?? c.minRole} or higher
                     </span>
                   </div>

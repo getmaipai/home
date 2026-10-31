@@ -51,7 +51,6 @@ export function SetupReviewPage() {
 
   return <div>
     <Card>
-      <h1 className="sr-only">Setup review</h1>
       <CardHeader><CardTitle>Setup review</CardTitle></CardHeader>
       <CardContent>
         <p>Review your computers, files, checks, and plan.</p>

@@ -51,10 +51,10 @@ export function ClockPage() {
     <Page title="Clock" hideTitle>
       <div className="flex min-h-[calc(100dvh-7rem)] flex-1 flex-col">
         {isPhone ? null : tabBar}
-        <main className="min-h-0 flex-1 overflow-y-auto px-4">
+        <section className="min-h-0 flex-1 overflow-y-auto px-4">
           <p className="m-0 border-b py-4 text-sm text-muted-foreground">{taglines[tab]}</p>
           <ActiveTab tab={tab} comingUp={comingUp} />
-        </main>
+        </section>
         {isPhone ? <div className="mt-auto">{tabBar}</div> : null}
       </div>
     </Page>

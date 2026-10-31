@@ -15,16 +15,18 @@ import { Switch } from "@maipai/ui/src/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
+import { formatBytes } from "@maipai/ui/src/format";
 import { videosApi, type VideoAdapterRow, type VideoSettings } from "@/lib/videosApi";
 import { componentsApi } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
 
 const KEY = ["video-settings"] as const;
-const size = (n: number) => (n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
+const size = (n: number) => (formatBytes(n), n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
 const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
 /** The video model's state as one plain sentence. */
@@ -290,8 +292,7 @@ export function VideoLibrary() {
   const settings = useQuery({ queryKey: KEY, queryFn: videosApi.settings, refetchInterval: 15_000 });
   const [error, setError] = useState<string | null>(null);
   const refresh = () => { void client.invalidateQueries({ queryKey: KEY }); };
-  if (settings.isError) return <p role="alert" className="text-sm text-destructive">Home could not load the video settings. Check the Home connection, then reload this page.</p>;
-  if (!settings.data) return <p className="text-sm text-muted-foreground">Loading the video settings…</p>;
+  if (settings.isError || !settings.data) return <AsyncState data={settings.data} error={settings.isError} isFetching={settings.isFetching} onRetry={() => void settings.refetch()} errorMessage="Home could not load the video settings. Check the Home connection, then reload this page." loadingLabel="Loading the video settings">{() => null}</AsyncState>;
   const data = settings.data;
   return (
     <div className="mt-10 flex min-w-0 flex-col gap-10">

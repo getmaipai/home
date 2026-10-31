@@ -146,7 +146,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
 
   return (
     <div>
-      <p className="text-base text-[var(--muted-foreground)]">
+      <p className="text-base text-muted-foreground">
         Turn on the robot near your Wi-Fi. It will speak a six-digit code (or show it on its
         own settings page) - type that code below to pair it.
       </p>
@@ -175,7 +175,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
               renderItem={(r) => (
                 <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
                   <span className="truncate text-base font-medium">{r.name}</span>
-                  <span className="text-sm text-[var(--muted-foreground)]">
+                  <span className="text-sm text-muted-foreground">
                     {r.model ?? "Reachy Mini"}
                     {r.daemonVersion ? ` · v${r.daemonVersion}` : ""}
                   </span>
@@ -206,9 +206,9 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
               maxLength={6}
             />
           ) : null}
-          {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+          {error ? <p className="text-base text-destructive">{error}</p> : null}
           {rotationDone ? (
-            <div className="flex flex-col gap-2"><p className="text-base text-[var(--primary)]">Paired and its password is rotated - it's ready to use.</p>{onClose ? <Button onClick={onClose}>Done</Button> : null}</div>
+            <div className="flex flex-col gap-2"><p className="text-base text-primary">Paired and its password is rotated - it's ready to use.</p>{onClose ? <Button onClick={onClose}>Done</Button> : null}</div>
           ) : null}
           <div className="flex">
             <Button type="submit" disabled={submitting}>
@@ -220,7 +220,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         <div className="flex max-w-sm flex-col gap-2">
           {noVendorLogin ? (
             <>
-              <p className="text-base text-[var(--primary)]">
+              <p className="text-base text-primary">
                 Approved and paired. No vendor password to change. It's ready to use.
               </p>
               <div className="flex">
@@ -232,7 +232,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
             </>
           ) : (
             <>
-              <p className="text-base text-[var(--primary)]">
+              <p className="text-base text-primary">
                 Approved and paired. It still has the vendor's published default password - rotate
                 it now to finish adding it.
               </p>
@@ -242,7 +242,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         </div>
       ) : robotsQuery.isError ? (
         <div className="flex max-w-sm flex-col gap-2">
-          <p className="text-base text-[var(--destructive)]">
+          <p className="text-base text-destructive">
             Approved, but checking whether it finished pairing failed. It may still be paired -
             check the robot list below, or try again.
           </p>
@@ -257,7 +257,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         </div>
       ) : presumedExpired ? (
         <div className="flex max-w-sm flex-col items-start gap-2">
-          <p className="text-base text-[var(--destructive)]">
+          <p className="text-base text-destructive">
             The robot hasn't finished pairing and the code has likely expired. Turn the robot's
             Wi-Fi setup back on so it speaks a fresh code, then try again.
           </p>
@@ -267,7 +267,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         </div>
       ) : (
         <div className="flex max-w-sm flex-col items-start gap-2">
-          <p className="text-base text-[var(--muted-foreground)]">
+          <p className="text-base text-muted-foreground">
             Approved. Waiting for the robot to finish pairing on its own end…
           </p>
           <Button variant="ghost" onClick={startOver}>

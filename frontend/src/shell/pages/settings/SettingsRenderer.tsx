@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/ui/button";
 import { groupSettings, sectionTitle, type SettingsGroup } from "@maipai/ui/src/settings/groupSettings";
@@ -210,7 +211,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
             if (first) groups = [{ ...first, basic: groups.flatMap((group) => group.basic), advanced: groups.flatMap((group) => group.advanced), foldAdvanced: false }];
           }
           return groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No settings yet.</p>
+            <EmptyState icon="inbox" text="No settings yet." />
           ) : (
             <>
               {groups.map((group) => plainRows ? (

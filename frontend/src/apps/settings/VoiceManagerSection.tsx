@@ -14,7 +14,7 @@ import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 
 const GENDER: Record<StackVoice["gender"], string> = { female: "Female", male: "Male", neutral: "Neutral", unknown: "Not stated" };
 const COLUMNS = "md:grid-cols-[minmax(0,1fr)_5.5rem_6rem_6.5rem_20rem]";
-const MUTED = "text-sm text-[var(--muted-foreground)]";
+const MUTED = "text-sm text-muted-foreground";
 
 function languageName(code: string): string {
   if (!code || code === "unknown") return "Not stated";
@@ -85,16 +85,16 @@ export function VoiceManagerSection() {
 
   return <section className="flex flex-col gap-4">
     <div className="flex items-start justify-between gap-4">
-      <p className="min-w-0 flex-1 text-base text-[var(--muted-foreground)]">Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.</p>
+      <p className="min-w-0 flex-1 text-base text-muted-foreground">Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.</p>
       <div className="shrink-0"><Button type="button" onClick={() => { setNotice(null); setAdding(true); }}>Add voice</Button></div>
     </div>
-    {notice ? <p role="status" className="text-base text-[var(--primary)]">{notice}</p> : null}
-    {error ? <p role="alert" className="text-base text-[var(--destructive)]">{error}</p> : null}
-    {preview.error ? <p role="alert" className="text-base text-[var(--destructive)]">{preview.error}</p> : null}
+    {notice ? <p role="status" className="text-base text-primary">{notice}</p> : null}
+    {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
+    {preview.error ? <p role="alert" className="text-base text-destructive">{preview.error}</p> : null}
     {failed ? <p role="alert" className="text-base">Home can't reach its voice service. Check Repairs, then come back. <Button type="button" variant="outline" onClick={retry}>Try again</Button></p>
       : <AsyncState data={voicesQuery.data && madeQuery.data && homeQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || madeQuery.isFetching || homeQuery.isFetching} onRetry={retry} loadingLabel="Loading voices">
-        {(list) => list.length === 0 ? <p className="text-base text-[var(--muted-foreground)]">Voices are still getting ready. This takes a minute after setup.</p> : <div className="flex flex-col">
-          <div className={`hidden gap-3 border-b border-[var(--border)] pb-2 md:grid ${COLUMNS} ${MUTED}`}><span>Voice</span><span>Source</span><span>Gender</span><span>Language</span><span className="text-right">Actions</span></div>
+        {(list) => list.length === 0 ? <p className="text-base text-muted-foreground">Voices are still getting ready. This takes a minute after setup.</p> : <div className="flex flex-col">
+          <div className={`hidden gap-3 border-b border-border pb-2 md:grid ${COLUMNS} ${MUTED}`}><span>Voice</span><span>Source</span><span>Gender</span><span>Language</span><span className="text-right">Actions</span></div>
           <ul className="flex flex-col divide-y divide-[var(--border)]">{list.map((voice) => {
             const custom = voice.source === "cloned";
             const home = isHomeDefault(voice, homeDefault);

@@ -209,7 +209,7 @@ export function UsersSection({ person }: UsersSectionProps) {
 
   return (
     <>
-      {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
+      {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
       <AsyncState
         data={roster}
@@ -242,11 +242,11 @@ export function UsersSection({ person }: UsersSectionProps) {
           ) : null}
 
           {confirmingDelete === "batch" ? (
-            <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--destructive)] p-3">
+            <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-destructive p-3">
               <p className="text-base font-medium">
                 Remove {selectMode.count} {selectMode.count === 1 ? "person" : "people"} from your household?
               </p>
-              <p className="text-base text-[var(--muted-foreground)]">
+              <p className="text-base text-muted-foreground">
                 Everything MaiPai remembers about them, every conversation they had, their settings and any voice
                 they recorded will be deleted. So will any files only they could see; files they shared stay with
                 the household. To save someone&apos;s files first, remove them one at a time. This cannot be undone.
@@ -294,7 +294,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                         than the generic person-scope gate) - shown for
                         every row here since UsersSection only ever
                         renders for an owner/admin actor. */}
-                    <span className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Checkbox
                         checked={editSessionLockRequired}
                         onCheckedChange={(checked) => setEditSessionLockRequired(checked === true)}
@@ -321,7 +321,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                 return (
                   <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
                     <p className="text-base font-medium">Remove {p.display_name} from your household?</p>
-                    <p className="text-base text-[var(--muted-foreground)]">
+                    <p className="text-base text-muted-foreground">
                       Everything MaiPai remembers about {p.display_name}, every conversation they had, their
                       settings and any voice they recorded will be deleted. This cannot be undone.
                     </p>
@@ -352,7 +352,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                     <Avatar name={p.display_name} className="h-10 w-10 shrink-0" />
                     <div className="flex min-w-0 flex-1 flex-col break-words">
                       <span className="truncate text-base">{p.display_name}</span>
-                      <span className="text-sm text-[var(--muted-foreground)]">{ROLE_LABELS[p.role]}</span>
+                      <span className="text-sm text-muted-foreground">{ROLE_LABELS[p.role]}</span>
                     </div>
                   </div>
                   <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
@@ -463,7 +463,7 @@ export function UsersSection({ person }: UsersSectionProps) {
 function DeletionFilesNote({ name, preview, failed }: { name: string; preview: PersonDeletionPreview | undefined; failed: boolean }) {
   if (failed) {
     return (
-      <p className="text-base text-[var(--destructive)]">
+      <p className="text-base text-destructive">
         Could not check {name}&apos;s files. Their files will be deleted with them unless someone else can see them.
       </p>
     );
@@ -475,13 +475,13 @@ function DeletionFilesNote({ name, preview, failed }: { name: string; preview: P
   return (
     <div className="flex flex-col gap-2">
       {purged.files > 0 ? (
-        <p className="text-base text-[var(--muted-foreground)]">
+        <p className="text-base text-muted-foreground">
           {files(purged.files)} only {name} could see will be deleted too.{" "}
           {preview.export.url ? "Download them first if you want to keep them." : `Only ${name} can download their own files, so ask them to save anything they want to keep before you remove them.`}
         </p>
       ) : null}
       {keptForHousehold.files > 0 ? (
-        <p className="text-base text-[var(--muted-foreground)]">
+        <p className="text-base text-muted-foreground">
           {files(keptForHousehold.files)} other people can still see will stay, kept by the household.
         </p>
       ) : null}

@@ -47,7 +47,7 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
         getLabel={(v) => roster.find((p) => p.id === v)?.display_name ?? v}
         aria-label="Person"
       />
-      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+      {error ? <p className="text-base text-destructive">{error}</p> : null}
       <AsyncState
         data={query.data}
         error={query.isError}
@@ -58,7 +58,7 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
       >
         {(view) => (
           <>
-            <p className="text-base text-[var(--muted-foreground)]">{chosen.display_name}: {view.label}</p>
+            <p className="text-base text-muted-foreground">{chosen.display_name}: {view.label}</p>
             <OptionMatrix
               rowsLabel="Blocked sites"
               rows={view.rows.map((r) => ({

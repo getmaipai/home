@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
@@ -126,10 +127,10 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
   return (
     <section aria-label="World clocks" className="py-2">
       {query.isError ? <p role="alert">Could not load world clocks.</p> : null}
-      {places.length === 1 ? <p className="py-10 text-center">
-        <span className="block text-lg">No places yet</span>
+      {places.length === 0 ? <div className="py-10 text-center">
+        <EmptyState icon="clock" text="No places yet" actionLabel="Add a world clock" onAction={() => window.dispatchEvent(new Event(CLOCK_ADD_EVENT))} />
         <span className="text-muted-foreground">Keep your favorite places close.</span>
-      </p> : <ul className="m-0 list-none p-0">
+      </div> : <ul className="m-0 list-none p-0">
         {places.map((place) => {
           const clock = localClock(place, now, homeZone);
           return <li key={place.id} className="flex flex-wrap items-center justify-between gap-4 border-b py-5">

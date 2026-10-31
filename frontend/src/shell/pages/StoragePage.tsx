@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
 import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
-import { formatBytes } from "@/apps/settings/formatBytes";
+import { formatBytes } from "@maipai/ui/src/format";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
 import type { PackageCacheSourceRow } from "@maipai/home-backend/src/wire";

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SafeImage, type ImageFallbackKind } from "@maipai/ui/src/primitives/SafeImage";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
@@ -11,9 +12,8 @@ const FALLBACK: Record<MediaHomeRow["app"], ImageFallbackKind> = { videos: "vide
 
 export function ContinueShelf() {
   const query = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false });
-  if (query.isPending) return <p role="status" className="text-sm text-muted-foreground">Loading your recent items</p>;
-  if (query.isError) return <p role="alert" className="text-sm text-muted-foreground">Could not load your recent items. Refresh Home to try again.</p>;
-  const rows = query.data?.rows ?? [];
+  if (query.isPending || query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Could not load your recent items. Refresh Home to try again." loadingLabel="Loading your recent items">{() => null}</AsyncState>;
+  const rows = query.data.rows ?? [];
   if (!rows.length) return null;
   return <section aria-label="Pick up where you left off"><Card size="sm"><CardHeader><CardTitle>Pick up where you left off</CardTitle></CardHeader><CardContent><ItemGroup>
     {rows.map((row) => <Item key={`${row.source}/${row.id}`} size="sm" render={<Link to={row.href} />}><ItemContent><ItemTitle>{row.title}</ItemTitle>{row.subtitle ? <ItemDescription>{row.subtitle}</ItemDescription> : null}</ItemContent></Item>)}
@@ -40,8 +40,7 @@ function MediaRows({ heading, rows }: { heading: string; rows: MediaHomeRow[] })
 export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" }) {
   const query = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false });
   const continuing = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false, enabled: kind === "continue" });
-  if (query.isPending) return <p role="status" className="text-sm text-muted-foreground">Loading your library</p>;
-  if (query.isError) return <p role="alert" className="text-sm text-muted-foreground">Could not load your library. Refresh Home to try again.</p>;
+  if (query.isPending || query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Could not load your library. Refresh Home to try again." loadingLabel="Loading your library">{() => null}</AsyncState>;
   const data: MediaHome = query.data;
   const rows = kind === "continue" ? [
     ...data.continue,

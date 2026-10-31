@@ -4,6 +4,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FolderPicker, type FolderPickerCopy } from "@maipai/ui/src/primitives/FolderPicker";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { needGb } from "../../../../shared/diskPlanMath";
 import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
 
@@ -198,7 +199,7 @@ export function StorageStep({ split, value, onChange }: {
           </Card>
         );
       })}
-      {checking ? <p role="status" className="text-base text-muted-foreground md:text-lg">Checking that Home can use your choice.</p> : null}
+      {checking ? <RouteSkeleton label="Checking that Home can use your choice" /> : null}
       {checkError ? <Alert variant="destructive"><AlertTitle>Home couldn't check your choice</AlertTitle><AlertDescription>{checkError}</AlertDescription></Alert> : null}
       {problems.filter((row) => !kinds.includes(row.class as FolderClass)).map((row) => (
         <Alert key={`${row.class}-${row.id}`} variant={row.kind === "refusal" ? "destructive" : "warning"}>

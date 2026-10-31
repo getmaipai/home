@@ -74,6 +74,7 @@ export function ReaderArticle({ book, path, routeFor, appName, canDiscuss, onApp
     return <p role="alert">Could not load this article.</p>;
   }
   const article = query.data;
+  if (!article) return <AsyncState data={undefined} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Could not load this article." loadingLabel="Loading article">{() => null}</AsyncState>;
   return (
     <div id="reference-article" data-touch-target-exempt className="min-w-0">
       <ArticleSpeechContext.Provider value={reading.speech}>

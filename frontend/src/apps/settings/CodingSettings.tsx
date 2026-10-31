@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maip
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, ItemSeparator } from "@maipai/ui/src/dashboard/components/ui/item";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { api, ApiError, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";

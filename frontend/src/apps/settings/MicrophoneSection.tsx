@@ -61,9 +61,9 @@ export function MicrophoneSection() {
   }, []);
   if (devices.length < 2) return null;
   return (
-    <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
+    <div className="flex flex-col gap-2 border-t border-border pt-3">
       <h3 className="text-base font-medium">Microphone</h3>
-      <p className="text-base text-[var(--muted-foreground)]">The microphone choice is remembered on this device only.</p>
+      <p className="text-base text-muted-foreground">The microphone choice is remembered on this device only.</p>
       <ul className="flex flex-col divide-y divide-[var(--border)]">
         {devices.map((device, index) => {
           const active = selected === device.deviceId;
