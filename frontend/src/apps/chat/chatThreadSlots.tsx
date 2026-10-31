@@ -586,7 +586,7 @@ export function ChatWelcome() {
     <>
       <EngineStartingLoader />
       <EmptyState>
-        <EmptyStateGreeting>{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
+        <EmptyStateGreeting size="lg">{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
       </EmptyState>
       {/* Room between the greeting and the composer now that the chips no longer sit there. */}
