@@ -40,7 +40,7 @@ describe("companion states store", () => {
   });
 
   test("builds the take prompt and uses the vocabulary's generation size", () => {
-    expect(takePrompt({ text: "A red fox." }, "waves once", "magenta")).toBe("Static shot, the camera never moves. A red fox.. The character stays exactly this size and in exactly this place in the frame, whole body always visible from head to feet, the same picture in every frame. Plain solid magenta background with nothing on it; the character floats on it with nothing under it. Action: waves once. One single smooth motion from start to end, one prop only.");
+    expect(takePrompt({ text: "A red fox." }, "waves once", "magenta")).toBe("Static shot, the camera never moves. A red fox.. The character stays exactly this size and in exactly this place in the frame, whole body always visible from head to feet, the same picture in every frame. The character keeps the same face, the same colours and the same flat drawn style in every frame, with a calm closed-mouth smile. Plain solid magenta background with nothing on it; the character floats on it with nothing under it. Action: waves once. One single smooth motion from start to end, one prop only.");
     expect(media.generate.width).toBeGreaterThan(0); expect(media.generate.height).toBeGreaterThan(0); expect(media.generate.seconds).toBeGreaterThan(0);
   });
   test("only vocabulary states are accepted, and the state is persisted", () => {
