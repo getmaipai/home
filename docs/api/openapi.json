@@ -45442,6 +45442,84 @@
         }
       }
     },
+    "/api/reference/key-points/{book}/{path}": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Key points of an offline article (null while they are being written)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Key points, or null while they are written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key_points": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "band": {
+                          "type": "string",
+                          "enum": [
+                            "child",
+                            "teen",
+                            "adult"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "band"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "key_points"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reference/preview/{book}/{path}": {
       "get": {
         "tags": [
