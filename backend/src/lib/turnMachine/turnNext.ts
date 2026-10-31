@@ -56,6 +56,8 @@ import type { ContextSegmentKey } from "@/wire";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes, videoForOutcomes, musicForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
+import { getOfferedVoices, voiceMatchesLanguage } from "@/lib/voiceResolve";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
 import { roleHealth } from "@/lib/roleHealth";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
@@ -142,7 +144,7 @@ export interface RunTurnNextOpts {
   ephemeral?: boolean;
 }
 
-function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[], contextSegments?: Partial<Record<ContextSegmentKey, number>>): TurnValue {
+function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[], contextSegments?: Partial<Record<ContextSegmentKey, number>>, language?: string): TurnValue {
   const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0, state.budget.context_window_tokens, contextSegments);
   // A live acceptance run (U2d) caught this omitting plugin_id/
   // command_id/sources entirely - the old engine file's own equivalent
@@ -188,7 +190,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   const crisisResources = safety ? (deriveCrisisResources(safety) ?? inputCrisisLine) : inputCrisisLine;
   const valueBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
   return {
-    reply: { text, speech },
+    reply: { text, speech, ...(language ? { language } : {}) },
     source,
     ...(state.failedGenerationReply ? { failed_generation: true as const } : {}),
     ...(state.promptLimit === "carry_offer" ? { carry_offer: true } : {}),
@@ -871,7 +873,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   } else if (finalState === "blocked") {
     value = buildTurnValue(state, startedAt, "policy", "Keep passwords and keys in Credentials, not in chat.", undefined, undefined, undefined, contextSegments);
   } else {
-    const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string; reasoningOut?: string; sources?: Source[] };
+    const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string; language?: string; reasoningOut?: string; sources?: Source[] };
     // The last outcome's own `via` (commands.ts/tool.ts both tag it)
     // names which node actually produced the reply - a review caught
     // the previous version guessing "plugin" vs "model" from
@@ -918,7 +920,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     }
     await settleAnswerImages(state, { keep: replyKept });
     settleAnswerBlocks(state, gateOutput?.text ?? "");
-    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources, contextSegments);
+    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources, contextSegments, gateOutput?.language);
     // 2026-10-03: after a successful tool call the reply is the model's
     // own composition, not a package's canned line. The stats stay on
     // source "plugin" (per-package counts), and routing tier "tool"
@@ -955,24 +957,42 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * projection normalized the same way. A written or glance turn keeps whatever speech its own
  * node authored (none for the model's text), so a written adult reply
  * is exactly what it was before this port. */
-function finalizeNextReply(state: TurnState, rawValue: TurnValue): TurnValue {
+async function finalizeNextReply(state: TurnState, rawValue: TurnValue): Promise<TurnValue> {
   // REG-02: the composer, never the model, adds nonverbal cues, and only to the spoken rendering; a tag the model wrote is dropped from the reply.
   const taggedText = stripCueTags(rawValue.reply.text);
   const cleanText = rawValue.source === "model" ? trimClosers(taggedText) : taggedText;
   const cleanSpeech = rawValue.reply.speech === undefined ? undefined : stripCueTags(rawValue.reply.speech);
   const value = cleanText === rawValue.reply.text && cleanSpeech === rawValue.reply.speech ? rawValue : { ...rawValue, reply: { ...rawValue.reply, text: cleanText, ...(cleanSpeech === undefined ? {} : { speech: cleanSpeech }) } };
-  const { text, speech } = value.reply;
   const spokenTurn = surfaceClassOf(state.surface, state.spoken) === "spoken";
+  let { text, speech } = value.reply;
+  let voice = value.reply.voice;
+  if (value.reply.language) {
+    const language = value.reply.language;
+    const voices = await getOfferedVoices();
+    const householdVoiceId = voiceForSpeech({ actor: state.actor, deviceId: state.deviceId });
+    const householdVoice = voices?.find((candidate) => candidate.id === householdVoiceId || candidate.id.endsWith(`-${householdVoiceId}`));
+    const matching = voices?.find((candidate) => voiceMatchesLanguage(language, candidate.language));
+    if (householdVoice && voiceMatchesLanguage(language, householdVoice.language)) {
+      voice = householdVoice.id;
+    } else if (matching) {
+      voice = matching.id;
+    } else {
+      // Issue 58: no voice for that language. The translation stays on screen; what is spoken says why it is not read aloud.
+      const languageName = new Intl.DisplayNames(["en"], { type: "language" }).of(language) || language;
+      speech = `Here it is in ${languageName}. There is no ${languageName} voice installed, so it is on the screen.`;
+      if (spokenTurn) text = `${text}\n\nNo ${languageName} voice is installed, so this was not read aloud.`;
+    }
+  }
   // An authored speech text is kept as authored, and on a spoken turn it
   // is normalized like every other spoken text (one normalizer).
-  if (speech !== undefined && speech !== text) return spokenTurn ? { ...value, reply: { ...value.reply, speech: speechTextFor(state.surface, text, speech, state.persona.clock_style) } } : value;
+  if (speech !== undefined && speech !== text) return spokenTurn ? { ...value, reply: { ...value.reply, text, speech: speechTextFor(state.surface, text, speech, state.persona.clock_style), ...(voice ? { voice } : {}) } } : { ...value, reply: { ...value.reply, text, speech, ...(voice ? { voice } : {}) } };
   const variedText = variedConstantReply(state.actor.id, value.source, text, state.persona.id);
   if (spokenTurn) {
     // A speech that only repeated the text follows the varied text (a review).
-    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech === undefined ? undefined : variedText, state.persona.clock_style) } };
+    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech === undefined ? undefined : variedText, state.persona.clock_style), ...(voice ? { voice } : {}) } };
   }
   if (variedText === text) return value;
-  return { ...value, reply: { ...value.reply, text: variedText, ...(speech === undefined ? {} : { speech: variedText }) } };
+  return { ...value, reply: { ...value.reply, text: variedText, ...(speech === undefined ? {} : { speech: variedText }), ...(voice ? { voice } : {}) } };
 }
 
 class EngineUnavailableTurnError extends Error {

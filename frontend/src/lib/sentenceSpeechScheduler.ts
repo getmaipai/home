@@ -27,7 +27,7 @@ import { sharedPlaybackContext } from "@/lib/voice/playbackContext";
 
 const MAX_PARALLEL_FETCHES = 2;
 
-export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number }
+export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number; voice?: string }
 interface ScheduledSentence { visibleEnd?: number; startTime: number; endTime: number; complete: boolean }
 /** About how fast the voice speaks, used to guess a sentence's length while its audio is still arriving. */
 const CHARS_PER_SECOND = 14;
@@ -245,7 +245,7 @@ export class SentenceSpeechScheduler {
     let whole: AudioBuffer | null = null;
     try {
       if (this.stopped) return;
-      const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation } : undefined);
+      const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation, ...(meta.voice ? { voice: meta.voice } : {}) } : meta?.voice ? { turnId: "", generation: 0, voice: meta.voice } : undefined);
       const reader = typeof this.audioContext.createBuffer === "function" ? response.body?.getReader() : undefined;
       if (!reader) {
         const bytes = new Uint8Array(await response.arrayBuffer());

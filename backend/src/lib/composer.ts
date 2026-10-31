@@ -811,10 +811,10 @@ type Succeeded = ToolExecutionOutcome & { status: "succeeded" };
 
 /** A reply text that says something (a data-only result binds none;
  * a `format` step with a hint and no text binds none either). */
-export function usableReply(outcome: Pick<ToolExecutionOutcome, "result">): { text: string; speech?: string } | null {
+export function usableReply(outcome: Pick<ToolExecutionOutcome, "result">): { text: string; speech?: string; language?: string } | null {
   const reply = outcome.result?.reply;
   if (!reply || typeof reply.text !== "string" || reply.text.trim().length === 0) return null;
-  return reply.speech !== undefined && reply.speech !== reply.text ? { text: reply.text, speech: reply.speech } : { text: reply.text };
+  return { text: reply.text, ...(reply.speech !== undefined && reply.speech !== reply.text ? { speech: reply.speech } : {}), ...(reply.language ? { language: reply.language } : {}) };
 }
 
 /** Whether one succeeded result needs the composer's call: no usable

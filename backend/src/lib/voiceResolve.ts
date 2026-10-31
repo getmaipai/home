@@ -15,6 +15,11 @@ export interface VoiceResolution {
   unavailable: boolean;
 }
 
+export function voiceMatchesLanguage(language: string, voiceLanguage: string): boolean {
+  const primary = (tag: string) => tag.split("-")[0]?.toLowerCase() ?? "";
+  return primary(language) !== "" && primary(language) === primary(voiceLanguage);
+}
+
 /** A saved name matches an offered voice by its id or by the preset name its id ends with. */
 export function voiceMatchesStored(voiceId: string, stored: string): boolean {
   return voiceId === stored || voiceId.endsWith(`-${stored}`);

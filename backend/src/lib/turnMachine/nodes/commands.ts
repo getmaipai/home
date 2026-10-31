@@ -34,7 +34,7 @@ export type CommandsOutput =
   | { matched: false }
   // `whoAnswer` (THIN-7E): the reply is ASK-01's answer to a who question; the outcome is
   // only the answer node's input and is never recorded on the turn.
-  | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome; whoAnswer?: true;
+  | { matched: true; text: string; speech?: string; language?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome; whoAnswer?: true;
       /** INITIATIVE-01: the reply answers a robot offer; the outcome is only the answer node's input. */
       offerAnswer?: true;
       /** GENUI-05: the package's accepted answer blocks, as `block` events (a command match runs no tool round). */
@@ -268,7 +268,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
       // GENUI-05: a closed intent's visual (a reminder or timer card, the
       // shopping list) rides the same filter as a tool call's blocks.
       const blockEvents = blockEventsFor(state, id, outcome.callId, (result.value as typeof result.value & { blocks?: unknown }).blocks, state.toolEvents ?? []);
-      return { outcome: okOutcome, output: { matched: true, text, speech: reply?.speech, outcome, ...(blockEvents.length > 0 ? { blockEvents } : {}) } };
+      return { outcome: okOutcome, output: { matched: true, text, speech: reply?.speech, language: reply?.language, outcome, ...(blockEvents.length > 0 ? { blockEvents } : {}) } };
     }
   }
 

@@ -44,6 +44,7 @@ import { FAILURE_COPY, partialReplyNote } from "@/lib/generationFailure";
 import { remember, embedMemoryRecordSafely, PROFILE_SOURCE } from "@/lib/memory";
 import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
 import { identityLine } from "@/lib/turnShared";
+import { __setOfferedVoicesForTests } from "@/lib/voiceResolve";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { useDefaultScriptedStack } from "../stackFixture";
 import { judgeQueueStats, runJudgeBatch } from "@/lib/memoryJudge";
@@ -89,9 +90,33 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  __setOfferedVoicesForTests(undefined);
   __resetLlmSupervisorForTests();
   __resetPortOwnershipForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
+});
+
+describe("translate language speech", () => {
+  test("keeps the translation visible and speaks the English no-voice notice", async () => {
+    __setOfferedVoicesForTests([{ id: "voice-en", name: "English", description: "", language: "en", country: "", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "test" }]);
+    const result = await withStub({ reply: (request) => request.messages.at(-1)?.content.includes("ONLY the translated text") ? "hola mundo" : "es" }, () => runTurnNext(people.owner, "chat", "translate hello world to spanish"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toContain("hola mundo");
+    // A written chat reads nothing aloud, so it gets no "not read aloud" line.
+    expect(result.value.reply.text).not.toContain("not read aloud");
+    expect(result.value.reply.speech).not.toContain("hola");
+    expect(result.value.reply.speech).toContain("no Spanish voice");
+  });
+
+  test("on a spoken surface the visible reply also says no voice is installed", async () => {
+    __setOfferedVoicesForTests([{ id: "voice-en", name: "English", description: "", language: "en", country: "", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "test" }]);
+    const result = await withStub({ reply: (request) => request.messages.at(-1)?.content.includes("ONLY the translated text") ? "hola mundo" : "es" }, () => runTurnNext(people.owner, "robot", "translate hello world to spanish", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } }));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toContain("No Spanish voice is installed, so this was not read aloud.");
+    expect(result.value.reply.speech).not.toContain("hola");
+  });
 });
 
 async function withStub<T>(
