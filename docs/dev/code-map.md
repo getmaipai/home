@@ -291,6 +291,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/status/StatusComponents.tsx` | ENGINE_ROWS, engineState, formatUptime, StatusLegend, StatusPartsBody |
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
 | `frontend/src/shell/phoneMenuLinks.tsx` | PhoneMenuLinks, coreAppsGroup, searchWithCoreApps |
+| `frontend/src/shell/reader/ArticleCard.tsx` | useSeen, useArticlePreview, ArticleCard |
 | `frontend/src/shell/reader/ReaderArticle.tsx` | ReaderArticle |
 | `frontend/src/shell/reader/SearchBox.tsx` | ReaderSearchBox |
 | `frontend/src/shell/reader/SearchResults.tsx` | SearchResults |
