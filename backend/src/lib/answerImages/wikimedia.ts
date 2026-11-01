@@ -99,10 +99,10 @@ export const wikimediaFetchJson: FetchJson = async (url) => {
   return response.json();
 };
 
-function entityId(claim: unknown): string | undefined {
+export function entityId(claim: unknown): string | undefined {
   return (claim as { mainsnak?: { datavalue?: { value?: { id?: string } } } } | undefined)?.mainsnak?.datavalue?.value?.id;
 }
-function claimText(claim: unknown): string | undefined {
+export function claimText(claim: unknown): string | undefined {
   const value = (claim as { mainsnak?: { datavalue?: { value?: unknown } } } | undefined)?.mainsnak?.datavalue?.value;
   if (typeof value === "string") return value;
   if (value && typeof value === "object") {

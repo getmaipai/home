@@ -2,6 +2,12 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.10] - 2026-11-01
+
+### Added
+
+- A new `wikimedia-artists` data source, on by default: for each artist MusicBrainz matched, Home keeps one Wikimedia photo (with its licence line) and a two-sentence Wikipedia bio on your computer and shows them on the Artist page. Only public ids and page titles are sent, and nothing for an artist under 18. An owner turns it off with "Show artist photos and short bios from Wikimedia" under Music settings; without it the Artist page shows the generated cover.
+
 ## [0.3.9] - 2026-11-01
 
 ### Changed

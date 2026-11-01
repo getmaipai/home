@@ -82,6 +82,8 @@ export class MusicBrainzUnavailable extends Error {}
 
 export interface MusicBrainzClient {
   searchRecordings(query: string, limit: number): Promise<MbRecording[]>;
+  /** MUSIC-WIKI-01: the artist's Wikidata id from its MusicBrainz url relations, or null when it has none. Only the artist's MusicBrainz id is sent. */
+  lookupArtistWikidata(artistId: string): Promise<string | null>;
 }
 
 /** One client holds the one queue: every request to MusicBrainz from this process goes through it, so the spacing is global. */
@@ -101,34 +103,51 @@ export function createMusicBrainzClient(deps: ClientDeps = {}): MusicBrainzClien
     chain = mine.catch(() => undefined);
     return mine;
   };
+  const getJson = async (url: URL): Promise<unknown> => {
+    // Only musicbrainz.org (or the test override) is ever asked.
+    if (url.hostname !== MUSICBRAINZ_HOST && !process.env.MAIPAI_MUSICBRAINZ_BASE_URL) throw new MusicBrainzUnavailable("host");
+    await turn();
+    let response: Response;
+    try {
+      response = await doFetch(url, {
+        method: "GET",
+        headers: { "User-Agent": HOME_USER_AGENT, Accept: "application/json" },
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      throw new MusicBrainzUnavailable("network");
+    }
+    if (response.status === 404) return null;
+    if (!response.ok) throw new MusicBrainzUnavailable(`status ${response.status}`);
+    try {
+      return await response.json();
+    } catch {
+      throw new MusicBrainzUnavailable("body");
+    }
+  };
   return {
     async searchRecordings(query, limit) {
       const url = new URL(`${baseUrl()}/ws/2/recording`);
       url.searchParams.set("query", query);
       url.searchParams.set("limit", String(limit));
       url.searchParams.set("fmt", "json");
-      // Only musicbrainz.org (or the test override) is ever asked.
-      if (url.hostname !== MUSICBRAINZ_HOST && !process.env.MAIPAI_MUSICBRAINZ_BASE_URL) throw new MusicBrainzUnavailable("host");
-      await turn();
-      let response: Response;
-      try {
-        response = await doFetch(url, {
-          method: "GET",
-          headers: { "User-Agent": HOME_USER_AGENT, Accept: "application/json" },
-          credentials: "omit",
-          referrerPolicy: "no-referrer",
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        });
-      } catch {
-        throw new MusicBrainzUnavailable("network");
+      const body = (await getJson(url)) as { recordings?: unknown } | null;
+      return Array.isArray(body?.recordings) ? (body!.recordings as MbRecording[]) : [];
+    },
+    async lookupArtistWikidata(artistId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(artistId)) return null;
+      const url = new URL(`${baseUrl()}/ws/2/artist/${artistId}`);
+      url.searchParams.set("inc", "url-rels");
+      url.searchParams.set("fmt", "json");
+      const body = (await getJson(url)) as { relations?: Array<{ type?: string; url?: { resource?: string } }> } | null;
+      for (const relation of body?.relations ?? []) {
+        if (relation.type !== "wikidata") continue;
+        const found = /^https?:\/\/(?:www\.)?wikidata\.org\/(?:wiki|entity)\/(Q\d+)$/.exec(relation.url?.resource ?? "");
+        if (found) return found[1]!;
       }
-      if (!response.ok) throw new MusicBrainzUnavailable(`status ${response.status}`);
-      try {
-        const body = (await response.json()) as { recordings?: unknown };
-        return Array.isArray(body.recordings) ? (body.recordings as MbRecording[]) : [];
-      } catch {
-        throw new MusicBrainzUnavailable("body");
-      }
+      return null;
     },
   };
 }

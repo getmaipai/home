@@ -1984,6 +1984,23 @@ export const mediaSources = sqliteTable(
   (table) => [index("media_sources_kind_idx").on(table.kind), index("media_sources_root_path_idx").on(table.rootPath)],
 );
 
+// MUSIC-WIKI-01: a local copy of what Wikipedia and Commons say about a matched artist (short bio, one photo with its licence line).
+// A reconstructible cache keyed by the MusicBrainz artist id, not a household record: the photo file lives in the cache data class.
+// status: found (bio and/or photo kept), none (no usable page), withheld (a person under 18 or of unknown age: nothing kept).
+export const musicArtistProfiles = sqliteTable("music_artist_profiles", {
+  musicbrainzArtistId: text("musicbrainz_artist_id").primaryKey(),
+  status: text("status").notNull(),
+  wikidataId: text("wikidata_id"),
+  bio: text("bio"),
+  bioUrl: text("bio_url"),
+  photoFile: text("photo_file"),
+  photoMime: text("photo_mime"),
+  photoCredit: text("photo_credit"),
+  checkedAt: text("checked_at").notNull(),
+  hlc: text("hlc").notNull(),
+  provenance: text("provenance").notNull(),
+});
+
 export const mediaItems = sqliteTable(
   "media_items",
   {

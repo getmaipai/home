@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -55,10 +55,23 @@
       "who": "the MetaBrainz Foundation",
       "opt_in": false,
       "retention": "unknown, see MusicBrainz's own policy"
+    },
+    {
+      "id": "wikimedia-artists",
+      "destination": "Wikidata, Wikipedia and Wikimedia Commons (www.wikidata.org, en.wikipedia.org, commons.wikimedia.org, upload.wikimedia.org), and MusicBrainz once per artist to find the artist's Wikidata id",
+      "when": "in the background after a library scan, once for each artist MusicBrainz matched, to keep one photo and a two-sentence bio on your computer for the Artist page. Turn it off under Music settings.",
+      "what": "the artist's public MusicBrainz id, then the artist's public Wikidata id, Wikipedia page title and photo file name, plus your home's internet address. Never anyone's name, a song from your library, an account, a cookie or listening history. Nothing is asked for an artist under 18.",
+      "who": "the Wikimedia Foundation and the MetaBrainz Foundation",
+      "opt_in": false,
+      "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
     }
   ],
   "permissions": [
-    "net:musicbrainz.org"
+    "net:musicbrainz.org",
+    "net:www.wikidata.org",
+    "net:en.wikipedia.org",
+    "net:commons.wikimedia.org",
+    "net:upload.wikimedia.org"
   ],
   "notifications": [],
   "cache": {

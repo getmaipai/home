@@ -20,6 +20,7 @@ import { findDuplicates } from "@/lib/media/duplicates";
 import { hideItem, itemDetail, listGroups, listItems, removeItem, rowById } from "@/lib/media/items";
 import { isScanning, scanRoot, syncMediaScanner, type ScanSummary } from "@/lib/media/scan";
 import { serveItemArtwork, serveItemBytes } from "@/lib/media/serve";
+import { artistPhotoFile } from "@/lib/media/artistProfiles";
 import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/lib/media/sources";
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
 import { madeFileFor } from "@/lib/media/appHost";
@@ -284,6 +285,26 @@ mediaRoutes.openapi(artworkRoute, async (c) => {
   const served = await serveItemArtwork(actor, item);
   if (served instanceof Response) return served as never;
   return c.json({ error: served.error }, served.status);
+});
+
+const artistPhotoRoute = createRoute({
+  method: "get",
+  path: "/artists/{id}/photo",
+  tags: ["Media"],
+  summary: "The kept Wikimedia photo of an artist the signed-in person has songs by",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { content: { "image/*": { schema: z.string() } }, description: "The photo." }, ...errorResponses({ 401: "Not signed in", 404: "No kept photo for this artist" }) },
+});
+mediaRoutes.openapi(artistPhotoRoute, async (c) => {
+  const actor = c.get("person");
+  const id = c.req.valid("param").id.toLowerCase();
+  // Only a person who can read a song by this artist sees the photo; the page is the only caller.
+  const songs = db.select({ id: mediaItems.id }).from(mediaItems).where(and(eq(mediaItems.musicbrainzArtistId, id), isNull(mediaItems.deletedAt))).limit(50).all();
+  const readable = songs.some((song) => readableItem(actor, song.id) !== null);
+  const photo = readable ? artistPhotoFile(id) : null;
+  if (!photo) return c.json({ error: "There is no photo for this artist. The artist page shows the cover instead." }, 404);
+  return new Response(Bun.file(photo.path), { status: 200, headers: { "content-type": photo.mime, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" } }) as never;
 });
 
 // ---- groups and duplicates ----

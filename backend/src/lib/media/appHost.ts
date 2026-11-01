@@ -30,6 +30,7 @@ import { canReadFileAudience, fileAudience, getPersonRole, isOwnerOrAdmin, listA
 import { libraryProvenance } from "@/lib/libraryProvenance";
 import { speakerAgeBand } from "@/lib/ageBand";
 
+import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 
 export type MediaKind = MediaItem["kind"];
@@ -1054,9 +1055,13 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
     const years = [...new Set(tracks.map((item) => item.year).filter((year): year is number => !!year))];
     const genres = [...new Set(tracks.map((item) => item.genre?.trim()).filter((genre): genre is string => !!genre))];
-    const art = artworkUrl(pictured);
+    // MUSIC-WIKI-01: a kept Wikimedia photo and short bio for a matched artist; otherwise the page is as it was (cover art or initials).
+    const wiki = artistProfileFor(mostCommon(tracks.map((item) => item.musicbrainz_artist_id)));
+    const art = wiki?.photoUrl ?? artworkUrl(pictured);
+    const credit = wiki ? creditLines(wiki) : [];
     return [{ ...rowsOf(person, [pictured])[0]!, id: params.id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist",
       art, meta: "Artist", radio_id: `radio:artist:${params.id}`, visibility: { mode: "shared", people: [], can_manage: false }, made_at: tracks.map((item) => item.added_at).sort().at(-1),
+      ...(wiki?.bio ? { description: wiki.bio } : {}), ...(credit.length ? { footer_lines: credit } : {}),
       ...(years.length === 1 ? { year: years[0] } : {}), ...(genres.length === 1 ? { genre: genres[0] } : {}) }];
   }
   if (dataId === "header" && params.scope === "playlist") {

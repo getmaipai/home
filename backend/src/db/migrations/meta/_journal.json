@@ -1072,6 +1072,13 @@
       "when": 1793333349241,
       "tag": "0152_media_items_musicbrainz",
       "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "6",
+      "when": 1793333349242,
+      "tag": "0153_music_artist_profiles",
+      "breakpoints": true
     }
   ]
 }

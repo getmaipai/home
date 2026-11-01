@@ -18,6 +18,12 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
     level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "music.artist_wikimedia", scope: "household", selector: "boolean", default: true,
+    label: "Show artist photos and short bios from Wikimedia",
+    help: "In the background, Home asks Wikidata, Wikipedia and Wikimedia Commons about an artist you have songs by, using only the artist's public Wikidata id (found through MusicBrainz), to keep one photo and a two-sentence bio on your computer. Nothing about your home is sent. Never for an artist under 18. Off stops it; photos and bios already kept stay, and artists show the generated cover instead.",
+    level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "generation.music.enabled",
     scope: "household",
     selector: "boolean",

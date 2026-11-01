@@ -178,15 +178,15 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 ## Music
 
-**What it is for:** Looking up facts about a music artist, and matching your songs to their public MusicBrainz entries.
+**What it is for:** Looking up facts about a music artist, matching your songs to their public MusicBrainz entries, and showing an artist's photo and short bio on the Artist page.
 
-**When it happens:** Home asks MusicBrainz when someone asks about an artist. It also matches the songs in your music library to MusicBrainz in the background after a scan, about one song a second. This is on by default. An owner or admin can turn it off with **Match my songs to MusicBrainz** in Music settings. Songs already matched stay matched.
+**When it happens:** Home asks MusicBrainz when someone asks about an artist. It also matches the songs in your music library to MusicBrainz in the background after a scan, about one song a second. This is on by default. An owner or admin can turn it off with **Match my songs to MusicBrainz** in Music settings. Songs already matched stay matched. For each artist MusicBrainz matched, Home also asks Wikidata, Wikipedia and Wikimedia Commons in the background for one photo and a two-sentence bio, and keeps them on your computer, so opening an Artist page asks nothing. This is on by default. An owner or admin can turn it off with **Show artist photos and short bios from Wikimedia** in Music settings. Photos and bios already kept stay, and an artist with none shows the generated cover.
 
-**What it sends:** For an artist question, the artist's name. For the background match, each song's title, artist, album and track number from its file, plus your home's internet address. It sends no other personal details.
+**What it sends:** For an artist question, the artist's name. For the background match, each song's title, artist, album and track number from its file, plus your home's internet address. For the photo and bio, MusicBrainz gets the artist's public MusicBrainz id, then Wikidata, Wikipedia and Wikimedia Commons get the artist's public Wikidata id, page title and photo file name, plus your home's internet address. Home never asks about a person under 18. It sends no other personal details.
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long MusicBrainz keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long MusicBrainz or the Wikimedia Foundation keeps request records. See its own policy.
 
 ## Film and TV lookup
 
