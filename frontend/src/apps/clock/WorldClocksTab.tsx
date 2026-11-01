@@ -127,7 +127,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
   return (
     <section aria-label="World clocks" className="py-2">
       {query.isError ? <p role="alert">Could not load world clocks.</p> : null}
-      {places.length === 0 ? <div className="py-10 text-center">
+      {places.length === 1 ? <div className="py-10 text-center">
         <EmptyState icon="clock" text="No places yet" actionLabel="Add a world clock" onAction={() => window.dispatchEvent(new Event(CLOCK_ADD_EVENT))} />
         <span className="text-muted-foreground">Keep your favorite places close.</span>
       </div> : <ul className="m-0 list-none p-0">

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-01T05:03:48.451Z",
+  "generatedAt": "2026-11-01T11:54:19.134Z",
   "kitTag": "ui-v0.5.440",
   "items": [
     {
@@ -1237,9 +1237,9 @@
     {
       "file": "robot-face.tsx",
       "name": "robot-face",
-      "group": "robot",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "Drawn in the ambient companion pane for a robot companion; Home passes its name, colour and expression as props only.",
       "implemented": true
     },
     {

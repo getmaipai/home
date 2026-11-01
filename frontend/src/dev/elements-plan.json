@@ -4274,6 +4274,23 @@
       "replacesHandBuilt": [],
       "realTurnToday": true,
       "verdictReason": "Wired on video cards by TIER-HOME-03 (8518bf3e3): the Quality segment that makes another clip at Standard, Boost or Max."
+    },
+    {
+      "file": "robot-face.tsx",
+      "name": "robot-face",
+      "group": "companion",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": ["ambient companion pane"],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "Drawn in the ambient companion pane for a robot companion; Home passes its name, colour and expression as props only."
     }
   ]
 }
