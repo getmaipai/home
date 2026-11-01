@@ -191,13 +191,13 @@ export interface Analysis { claims: AnalysisClaim[]; conflicts: string[]; gaps: 
 
 export const ANALYSIS_TOKENS = { thinking: 350, max: 650 } as const;
 
-export function analysisPrompt(brief: Brief | null, question: string, ledger: string): string {
+export function analysisPrompt(brief: Brief | null, question: string, ledger: string, backbone = ""): string {
   return `You analyse research notes before an answer is written. You write no answer here.
 The question: "${question.replace(/"/g, "'")}"
 ${brief ? `${briefBlock(brief)}\n` : ""}
-${ledger}
+${backbone ? `${backbone}\n\n` : ""}${ledger}
 
-Work from these notes only. Answer with one JSON object and nothing else:
+Work from these notes and the article only. Answer with one JSON object and nothing else:
 {"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}], "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]}
 "status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). Use at most 8 claims and 4 guesses.`;
 }
@@ -226,11 +226,11 @@ export function parseAnalysis(text: string | null, valid: ReadonlySet<number>): 
   return { claims, conflicts: strings(data.conflicts, 4, 240), gaps: strings(data.gaps, 5, 200), guesses };
 }
 
-export async function analyse(brief: Brief | null, question: string, findings: Findings, validNumbers: ReadonlySet<number>, style: AnswerStyle, signal?: AbortSignal): Promise<Analysis | null> {
-  if (findings.ledger.notes === 0) return null;
+export async function analyse(brief: Brief | null, question: string, findings: Findings, validNumbers: ReadonlySet<number>, style: AnswerStyle, signal?: AbortSignal, backbone = ""): Promise<Analysis | null> {
+  if (findings.ledger.notes === 0 && !backbone) return null;
   const tokens = style === "max" ? ANALYSIS_TOKENS.max : ANALYSIS_TOKENS.thinking;
   let reply: string | null = null;
-  try { reply = await (analysisOverride ?? chatAnalysisWriter(tokens, signal))(analysisPrompt(brief, question, findings.ledger.text)); } catch { reply = null; }
+  try { reply = await (analysisOverride ?? chatAnalysisWriter(tokens, signal))(analysisPrompt(brief, question, findings.ledger.text, backbone)); } catch { reply = null; }
   return parseAnalysis(reply, validNumbers);
 }
 

@@ -12,11 +12,21 @@ import { installed, libraryRequest } from "@/lib/kiwixClient";
 import { extractFullArticle, type ArticleBlock, type ArticleInline } from "@/lib/retrieval/extractArticle";
 import { wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { wikimediaApiJson } from "@/lib/packageHost";
+import { wikimediaLiveBaseUrl } from "@/lib/wikimediaLive";
 import type { Brief } from "./researchPipeline";
 
 export interface ArticleSection { heading: string; text: string }
 /** An article read whole: its lead (the text before the first heading) and its sections in order. */
-export interface ArticleText { title: string; lead: string; sections: ArticleSection[]; source: "library" | "wikimedia" }
+export interface ArticleText {
+  title: string;
+  lead: string;
+  sections: ArticleSection[];
+  source: "library" | "wikimedia";
+  /** Where it was read: the offline library's book and path, or the live article's public address. */
+  book?: string;
+  path?: string;
+  url?: string;
+}
 
 export interface EntityCandidate {
   title: string;
@@ -119,7 +129,7 @@ async function libraryArticle(book: string, path: string, title: string): Promis
     const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`, { timeoutMs: 4000 });
     if (!res.ok) return null;
     const full = extractFullArticle(await res.text(), { book, allowedBooks: new Set(names), allowLinks: false, allowImages: false });
-    const article = articleFromBlocks(full.title || title, full.blocks, "library");
+    const article = { ...articleFromBlocks(full.title || title, full.blocks, "library"), book, path };
     return article.lead || article.sections.length > 0 ? article : null;
   } catch { return null; }
 }
@@ -129,7 +139,9 @@ async function wikimediaArticle(title: string, signal?: AbortSignal): Promise<Ar
   const pages = ((data?.query as { pages?: Record<string, { title?: unknown; extract?: unknown }> } | undefined)?.pages) ?? {};
   const page = Object.values(pages)[0];
   const extract = typeof page?.extract === "string" ? page.extract : "";
-  return extract ? articleFromExtract(typeof page?.title === "string" ? page.title : title, extract, "wikimedia") : null;
+  if (!extract) return null;
+  const found = typeof page?.title === "string" ? page.title : title;
+  return { ...articleFromExtract(found, extract, "wikimedia"), url: `${wikimediaLiveBaseUrl()}/wiki/${encodeURIComponent(found.replace(/ /g, "_"))}` };
 }
 
 /** The default lookup: the offline library's title and text search (an adult's, with the household's book list), then the live

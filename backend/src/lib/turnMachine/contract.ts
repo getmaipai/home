@@ -183,6 +183,9 @@ export interface TurnState {
   researchPlan?: import("./researchPipeline").DataPlan;
   /** RESEARCH-PIN-01: the article stage 1 pinned the subject to (null: none was clearly it), whose name and years every research search carries. */
   entityAnchor?: import("./entityPin").EntityAnchor | null;
+  /** RESEARCH-BACKBONE-01: the pinned article's chosen sections, being chosen while the searches run (promise) and as resolved for the writing round. */
+  backbonePromise?: Promise<import("./backbone").Backbone | null>;
+  backbone?: import("./backbone").Backbone | null;
   researchAnalysis?: import("./researchPipeline").Analysis | null;
   /** RESEARCH-PIPELINE-01: the searches the gap check proposed for the round about to run (set by the model node just before the round). */
   nextQueries?: string[];

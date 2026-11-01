@@ -1,6 +1,7 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
+import { backboneBlock, pickBackbone, type Backbone } from "../backbone";
 import { analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
@@ -776,6 +777,10 @@ export function __setQueryWriterForTests(writer: QueryWriter | undefined): void 
 /** RESEARCH-QUERY-01: how many searches the writer proposes per round (the first round plans the whole question). */
 /** RESEARCH-NOTES-01: with a notes ledger in the answering round, the raw page text of the sources shrinks to this many characters in all. */
 const RAW_EVIDENCE_WITH_LEDGER_CHARS = 4_500;
+/** RESEARCH-BACKBONE-01: with the backbone article in the writing round (up to 12,000 characters) the notes ledger takes this many at most. */
+const LEDGER_WITH_BACKBONE_CHARS = 8_000;
+/** The writing round waits at most this long for the backbone choice (a one-second model call that ran beside the searches). */
+const BACKBONE_WAIT_MS = 4_000;
 /** The analysis may start up to this long after the cap (it takes 3 to 10 seconds). */
 const ANALYSIS_GRACE_MS = 15_000;
 const WRITER_QUERIES_FIRST = 6;
@@ -958,6 +963,17 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const assumption = brief?.ambiguous ? brief.assumption || null : null;
     let replyExtra = "";
     let haveLedger = false;
+    // RESEARCH-BACKBONE-01: the pinned article's chosen sections, picked while the searches ran, are cited as one more source of the reply.
+    let backbone: Backbone | null = null;
+    if (researching && state.backbonePromise) {
+      markResearch(state, "backbone wait start");
+      backbone = await Promise.race([state.backbonePromise, new Promise<null>((resolve) => setTimeout(() => resolve(null), BACKBONE_WAIT_MS))]);
+      state.backbone = backbone;
+      markResearch(state, `backbone wait end (${backbone ? `${backbone.chars} chars, ${backbone.headings.length} sections` : "none"})`);
+    }
+    const backboneNumber = state.outcomes.flatMap((o) => o.sources ?? []).length + 1;
+    const backboneText = backbone ? backboneBlock(backbone, backboneNumber) : "";
+    const noFindings = { notes: [], ledger: { text: "", notes: 0, dropped: 0 }, read: 0, dropped: 0 };
     if (researching && state.researchBudget && state.researchBudget.notes.size > 0) {
       markResearch(state, "stage 3 notes wait start");
       const wait = Math.max(2_000, Math.min(NOTES_WAIT_MS, (researchCutAt(state) ?? Date.now()) - Date.now()));
@@ -965,21 +981,27 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, "stage 3 notes wait end");
       const numberOf = new Map<string, number>();
       state.outcomes.flatMap((o) => o.sources ?? []).forEach((source, index) => { if (!numberOf.has(source.url)) numberOf.set(source.url, index + 1); });
-      const findings = filterFindings(state.pageNotes, numberOf, searchEvidenceMaxChars(state.budget.context_tokens));
+      const findings = filterFindings(state.pageNotes, numberOf, Math.min(searchEvidenceMaxChars(state.budget.context_tokens), backbone ? LEDGER_WITH_BACKBONE_CHARS : Infinity));
       haveLedger = findings.ledger.notes > 0;
       const stats = state.researchBudget.noteStats;
       markResearch(state, `stage 3 ledger: ${findings.ledger.notes} notes kept of ${state.pageNotes.length} written (${findings.ledger.text.length} chars) from ${findings.read} pages; note calls ${stats?.calls ?? 0} (${Math.round((stats?.ms ?? 0) / 100) / 10} s of light-model time), quotes dropped ${stats?.droppedQuotes ?? 0}`);
-      if (haveLedger && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
+      if ((haveLedger || backbone) && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, findings, new Set(numberOf.values()), state.answerStyle!, signal);
+        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backbone ? [backboneNumber] : [])]), state.answerStyle!, signal, backboneText);
         markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
       }
       replyExtra = replyBrief(brief, state.researchAnalysis ?? null, findings.ledger.text, assumption);
-    } else if (researching && assumption) {
-      replyExtra = replyBrief(brief, null, "", assumption);
+    } else if (researching && (assumption || backbone)) {
+      if (backbone && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
+        markResearch(state, "stage 4 analysis start");
+        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set([backboneNumber]), state.answerStyle!, signal, backboneText);
+        markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
+      }
+      replyExtra = replyBrief(brief, state.researchAnalysis ?? null, "", assumption);
     }
+    if (backboneText) replyExtra = [replyExtra, backboneText].filter(Boolean).join("\n\n");
     const rawChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
-    const evidenceChars = haveLedger ? Math.min(rawChars, RAW_EVIDENCE_WITH_LEDGER_CHARS) : rawChars;
+    const evidenceChars = haveLedger || backbone ? Math.min(rawChars, RAW_EVIDENCE_WITH_LEDGER_CHARS) : rawChars;
     const resultMessages = toolResultMessages(phrasedOutcomes, evidenceChars, surfaceClass === "spoken", certaintyGate, sourceNumbers);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,
@@ -1116,6 +1138,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor));
     markResearch(state, "stage 2 plan end");
     state.researchPlan = plan;
+    // RESEARCH-BACKBONE-01: choose the pinned article's sections while the searches run; the writing round waits for it only briefly.
+    state.backbone = undefined;
+    state.backbonePromise = pinned.anchor?.article
+      ? pickBackbone(pinned.anchor, rq, [...(brief?.mustContain ?? []), ...plan.subQuestions], { signal }).catch(() => null)
+      : undefined;
     firstRoundQueries = plan.queries;
     briefNote = brief ? ` ${briefBlock(brief)}` : "";
     // The plan's own searches are the first round's calls: no big-model generation is spent writing them.

@@ -25,6 +25,7 @@ import { __setQueryWriterForTests } from "@/lib/turnMachine/nodes/model";
 import { __setNoteWriterForTests } from "@/lib/turnMachine/pageNotes";
 import { __setStageWritersForTests } from "@/lib/turnMachine/researchPipeline";
 import { __setEntityPinForTests } from "@/lib/turnMachine/entityPin";
+import { __setBackboneWriterForTests } from "@/lib/turnMachine/backbone";
 
 let people: BenchPeople;
 let searx: ReturnType<typeof Bun.serve>;
@@ -92,6 +93,7 @@ afterEach(() => {
   __setNoteWriterForTests(undefined);
   __setStageWritersForTests(undefined);
   __setEntityPinForTests(undefined);
+  __setBackboneWriterForTests(undefined);
   searx.stop(true);
   registerActiveChatLease(null);
   __setPageReaderForTests(null);
@@ -555,5 +557,49 @@ describe("the pinned subject rides every research search (RESEARCH-PIN-01)", () 
     __setQueryWriterForTests(async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["x"], queries: ['"series" cancelled one season'] }) : JSON.stringify({ queries: [] })));
     await turn("owner", 1, { max: true });
     expect(searxQueries).toEqual(["series cancelled one season"]);
+  });
+});
+
+describe("the pinned article is read whole by section and cited as a source (RESEARCH-BACKBONE-01)", () => {
+  const BRIEF = JSON.stringify({ subject: "the series", answer_type: "an explanation", must_contain: ["why it ended"], ambiguous: false, options: [], question: "", assumption: "" });
+  const FACT = "The show fell to 57th of 77 in the ratings and was cancelled in March 1985.";
+  const article = {
+    title: "Harbor (1984 television series)",
+    lead: "Harbor is a show that aired for one season.",
+    source: "library" as const,
+    book: "wikipedia_en_all_maxi",
+    path: "Harbor_(1984_TV_series)",
+    sections: [
+      { heading: "Premise", text: "premise filler. ".repeat(300) },
+      { heading: "Reception", text: `${"ratings filler. ".repeat(500)}${FACT}` },
+    ],
+  };
+
+  test("a fact 8,000 characters into the article is in the writing round, the article is a numbered source, and the analysis can cite it", async () => {
+    await holdMax();
+    __setStageWritersForTests({
+      brief: async () => BRIEF,
+      analysis: async () => JSON.stringify({ claims: [{ claim: "It was cancelled in March 1985.", status: "established", sources: [4] }], conflicts: [], gaps: [], guesses: [] }),
+    });
+    __setEntityPinForTests({ finder: async () => [{ title: article.title, snippet: "s", load: async () => article }, { title: "Harbor (franchise)", snippet: "f", load: async () => null }], writer: async () => '{"pick": 1}' });
+    __setBackboneWriterForTests(async () => '{"sections": [2]}');
+    __setQueryWriterForTests(async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["why it ended"], queries: ["series cancelled why"] }) : JSON.stringify({ queries: [] })));
+    const { requests, result } = await turn("owner", 1, { max: true, thinking: true });
+    const instruction = lastRequest(requests).messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
+    expect(instruction).toContain(FACT);
+    expect(instruction).toContain("cite it as [4]");
+    expect(instruction).toContain("It was cancelled in March 1985. [4]");
+    const titles = (result.value.sources ?? []).map((s) => s.title);
+    expect(titles.at(-1)).toBe("Harbor (1984 television series)");
+    expect(result.value.sources!.length).toBe(4);
+  });
+
+  test("a turn with no pinned article has no backbone and no extra source", async () => {
+    await holdMax();
+    __setStageWritersForTests({ brief: async () => BRIEF, analysis: async () => null });
+    __setEntityPinForTests({ finder: async () => [], writer: async () => '{"pick": 0}' });
+    const { requests, result } = await turn("owner", 1, { max: true });
+    expect(JSON.stringify(lastRequest(requests).messages)).not.toContain("Backbone article");
+    expect(result.value.sources!.length).toBe(3);
   });
 });
