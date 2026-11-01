@@ -516,7 +516,8 @@ S7. **Whatever an app can make or change, chat can ask for, and a creative app i
     (b) An app that both plays and makes things is one app with two modes: **Listen** and **Create** in
     Music, **Watch** and **Create** in Videos, **View** and **Create** in Pictures (the exact word is the
     one the native app uses; Create is always the second mode). The switch sits at the top of the app so
-    Create is always visible. What Create makes appears in the first mode labelled "Made here". There is
+    Create is always visible to a person whose lane is on (a person whose lane is off simply does not see
+    Create, rule 0). What Create makes appears in the first mode labelled "Made here". There is
     no separate studio app for making what the app plays. An editor that changes a person's existing files (the Photo editor and the Video editor of [media-editors](media-editors-2026-10-31.md)) stays its own pinnable app. The record arguing for this rule is [music-listen-create-2026-11-01](music-listen-create-2026-11-01.md), which lists what it supersedes.
     A new creative app or a new Create function that skips (a) or (b) is rejected in review. Applies to
     Music, Videos and Pictures from the next slice of each; existing pages move when their app is next
