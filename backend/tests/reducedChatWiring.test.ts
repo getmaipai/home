@@ -7,7 +7,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { collectHealth } from "@/lib/healthSnapshot";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { reducedChatState, resetReducedTruthForTests, setReducedChat } from "@/lib/reducedChat";
-import { noteChatInFlight, registerQueueProvider, releaseHouseholdQueue, resetActivePlanForTests, resetChatActivityForTests, resetDownshiftForTests, resetFitMemoryForTests, resetTierStateForTests, setBudgetReader, activeProfileLine, type QueueJob } from "@/lib/jobs/householdQueue";
+import { noteChatInFlight, registerQueueProvider, releaseHouseholdQueue, resetActivePlanForTests, isolateQueueProvidersForTests, resetChatActivityForTests, resetDownshiftForTests, resetFitMemoryForTests, resetTierStateForTests, setBudgetReader, activeProfileLine, type QueueJob } from "@/lib/jobs/householdQueue";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
 import type { ProfileRow } from "@/lib/jobs/profileTable";
 
@@ -16,8 +16,10 @@ let server: ReturnType<typeof Bun.serve>;
 let mode: Mode;
 let reduced: boolean;
 let calls: boolean[];
+let restoreProviders: () => void = () => undefined;
 
 beforeEach(() => {
+  restoreProviders = isolateQueueProvidersForTests();
   mode = "ok"; reduced = false; calls = [];
   server = Bun.serve({
     port: 0,
@@ -43,6 +45,7 @@ beforeEach(() => {
   setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
 });
 afterEach(() => {
+  restoreProviders();
   server.stop(true);
   __setStackClientForTests(null); setProfileSource(null); setBudgetReader(null); setReducedChat(null); __setRoleHealthForTests({});
   resetChatActivityForTests(); resetDownshiftForTests(); resetTierStateForTests(); resetActivePlanForTests(); resetReducedTruthForTests();

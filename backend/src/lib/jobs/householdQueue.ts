@@ -363,6 +363,16 @@ async function stackBudget(): Promise<BudgetNow> {
   } catch { throw new Error("budget unavailable"); }
 }
 
+/** Tests that drive the queue with their own jobs: take the registered providers (video, picture, music... from other test files in the same process) out of the way and put them back with the returned function. Also clears the release lock and the Reduced renewal clock. */
+export function isolateQueueProvidersForTests(): () => void {
+  const saved = [...providers];
+  providers.clear();
+  releasing = false; releaseAgain = false; lastReducedRenewAt = 0;
+  if (reducedRenewal) clearTimeout(reducedRenewal);
+  reducedRenewal = null; pendingPlan = null; currentEntries = [];
+  return () => { providers.clear(); for (const p of saved) providers.add(p); };
+}
+
 export function registerQueueProvider(provider: QueueProvider): () => void {
   providers.add(provider);
   return () => providers.delete(provider);
