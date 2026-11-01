@@ -74,6 +74,18 @@ describe("Wikipedia app", () => {
     expect(kid.queryByRole("button", { name: /Discuss/ })).toBeNull();
   });
 
+  test("an article page has the News header: no search box and no section chips above it, the source line carries the reading time, Save and Listen sit in one place", async () => {
+    const view = mount(`/wikipedia/a/${encodeURIComponent("wikipedia_en_all_maxi_2026-09")}/Aurora`);
+    expect(await view.findByText("Lights in the sky.")).toBeTruthy();
+    expect(view.queryByRole("searchbox")).toBeNull();
+    expect(view.queryByPlaceholderText("Search Wikipedia")).toBeNull();
+    expect(view.queryByRole("navigation", { name: "Wikipedia sections" })).toBeNull();
+    expect(view.container.querySelector('[data-slot="article-provider"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-slot="article-action-row"]')).toBeNull();
+    expect(view.container.textContent).toMatch(/\d+ min read/);
+    expect(view.getAllByRole("button", { name: "Save" })).toHaveLength(1);
+  });
+
   test("Random article opens the article the hub picked", async () => {
     const view = mount();
     fireEvent.click(await view.findByRole("button", { name: "Random article" }));
@@ -99,7 +111,7 @@ describe("Wikipedia app", () => {
     await view.findByText("Lights in the sky.");
     fireEvent.click((await view.findAllByRole("button", { name: "Save" }))[0]!);
     await waitFor(() => expect(saved.length).toBe(1));
-    fireEvent.click(within(view.getByRole("navigation", { name: "Wikipedia sections" })).getByRole("button", { name: "Saved" }));
+    fireEvent.click(view.getByRole("link", { name: "Saved" }));
     expect(await view.findByRole("link", { name: /Aurora/ })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Remove Aurora from Saved" }));
     fireEvent.click(await view.findByRole("button", { name: "Remove" }));

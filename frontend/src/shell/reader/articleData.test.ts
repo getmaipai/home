@@ -16,17 +16,19 @@ const base: ReferenceArticleView = {
 const opts = { appName: "Wikipedia", onAppHome: () => {} };
 
 describe("toArticleViewData", () => {
-  test("a bare article keeps title, blocks and a source line with reading time, and draws nothing extra", () => {
+  test("a bare article keeps title, blocks and the News header line (source, snapshot date, reading time), and draws nothing extra", () => {
     const data = toArticleViewData({ ...base, reading_minutes: 12 }, opts);
     expect(data.title).toBe("Zendaya");
-    expect(data.description).toBe("Wikipedia · 12 min read");
+    expect(data.description).toBeUndefined();
+    expect(data.byline).toEqual({ publisher: "Wikipedia", site: "Wikipedia", published_at: "2026-09-01", outlets: 1, reading_s: 720 });
+    expect(data.actionRow).toBeUndefined();
     expect(data.infobox).toBeUndefined();
     expect(data.related).toBeUndefined();
     expect(data.blocks[1]).toMatchObject({ type: "paragraph" });
     expect(paragraph(data.blocks[1]).inlines[1]).toEqual({ type: "text", text: "Plain" });
   });
 
-  test("the book's own short description wins over the source line", () => {
+  test("the book's own short description is the dek", () => {
     expect(toArticleViewData({ ...base, description: "American actor and producer", reading_minutes: 3 }, opts).description).toBe("American actor and producer");
   });
 
@@ -38,19 +40,17 @@ describe("toArticleViewData", () => {
     expect(toArticleViewData({ ...base, kicker: "Actor" }, opts).onKicker).toBeUndefined();
   });
 
-  test("an infobox picture means a top action row, no hero, a floated first figure and a kicker chip", () => {
+  test("an infobox picture means no hero, a floated first figure and a kicker chip", () => {
     const data = toArticleViewData({ ...base, kicker: "Actor · Producer", lead_image: { src: "/api/reference/media/wiki/z.jpg", alt: "Z" }, infobox: { title: "Zendaya", image: { src: "/api/reference/media/wiki/z.jpg", alt: "Z" }, rows: [{ label: "Born", value: "1996" }] } }, opts);
-    expect(data.actionRow).toBe("top");
     expect(data.image).toBeUndefined();
     expect(data.floatFirstFigure).toBe(true);
     expect(data.kickerStyle).toBe("chip");
     expect(data.infobox?.image?.src).toContain("/api/reference/media/");
   });
 
-  test("a lead picture without an infobox picture is the hero with the book's own chip text and the row under it", () => {
+  test("a lead picture without an infobox picture is the hero with the book's own chip text", () => {
     const data = toArticleViewData({ ...base, lead_image: { src: "/m/a.jpg", alt: "Aurora" }, badge: "Earth's light show" }, opts);
     expect(data.image).toEqual({ w480: "/m/a.jpg", w1280: "/m/a.jpg", alt: "Aurora", badge: "Earth's light show" });
-    expect(data.actionRow).toBe("under-hero");
   });
 
   test("breadcrumb is the app's own home, then the kicker when there is one, then the page", () => {
@@ -91,7 +91,6 @@ describe("toArticleViewData", () => {
     const data = toArticleViewData({ ...base, blocks: [{ type: "paragraph", inlines: ["Intro."] }, { type: "figure", src: "/m/a.jpg", alt: "Aurora", caption: "Earth's light show" }, { type: "paragraph", inlines: ["More."] }] }, opts);
     expect(data.image).toEqual({ w480: "/m/a.jpg", w1280: "/m/a.jpg", alt: "Aurora", badge: "Earth's light show" });
     expect(data.blocks.map((block) => block.type)).toEqual(["paragraph", "paragraph"]);
-    expect(data.actionRow).toBe("under-hero");
   });
 
   test("a page with a facts card keeps its first paragraph whole instead of drawing a standfirst", () => {

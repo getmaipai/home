@@ -40,10 +40,10 @@ export function ReferencePage({ person }: { person?: Roster } = {}) {
 
   return <Page title={title} hideTitle>
     <div className="flex min-w-0 flex-1 flex-col gap-5 p-4">
-      <form onSubmit={(event) => { event.preventDefault(); search(query, book); }} className="flex min-w-0 gap-2">
+      {book && path ? null : <form onSubmit={(event) => { event.preventDefault(); search(query, book); }} className="flex min-w-0 gap-2">
         <Input aria-label="Search reference" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search articles" autoComplete="off" />
         <Button type="submit">Search</Button>
-      </form>
+      </form>}
       {!path && suggestions.length && query.trim() ? <ul aria-label="Suggested articles" className="flex min-w-0 flex-col">{suggestions.map((item) => <li key={`${item.book}:${item.path}`}><Button asChild variant="link"><Link to={routeFor(item.book, item.path)}>{item.title}</Link></Button></li>)}</ul> : null}
       {book && path ? <ReaderArticle book={book} path={path} routeFor={routeFor} appName="Reference" canDiscuss={!!person && person.age_band !== "child"} onAppHome={() => navigate("/reference")} /> : null}
       {!book && resultQuery ? <SearchResults q={resultQuery} {...(resultBook ? { book: resultBook } : {})} books={books} routeFor={routeFor} onBook={(next) => search(resultQuery, next)} onSearch={(next) => search(next, resultBook)} /> : null}

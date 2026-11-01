@@ -75,7 +75,12 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     title: article.title,
     ...(kicker ? { kicker, kickerStyle: "chip" as const } : {}),
     ...(kicker && options.onCategory ? { onKicker: () => options.onCategory!(kicker) } : {}),
-    description: article.description ?? (article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label),
+    // The same header row as a News story: source line with the snapshot date and reading time, Save and Listen in one place.
+    // A book that reports no snapshot date keeps the plain source line instead.
+    ...(article.snapshot_date
+      ? { byline: { publisher: article.source_label, site: article.source_label, published_at: article.snapshot_date, outlets: 1, reading_s: Math.max(1, article.reading_minutes ?? 1) * 60 } }
+      : {}),
+    ...(article.description ? { description: article.description } : article.snapshot_date ? {} : { description: article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label }),
     ...(standfirst ? { lead: standfirst } : {}),
     breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker, ...(options.onCategory ? { onClick: () => options.onCategory!(kicker) } : {}) }] : []), { label: article.title }],
     ...(article.infobox && article.infobox.rows.length ? { infobox: article.infobox } : {}),
@@ -86,7 +91,6 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     contents: article.toc.filter((item) => item.level >= 2 && item.level <= 4).map((item) => ({ id: item.id, title: item.title, level: item.level as 2 | 3 | 4 })),
     foldSections: true,
     floatFirstFigure: true,
-    actionRow: infoboxPicture ? "top" : "under-hero",
     blocks: withoutLead(blocksIn.map(asBlock), standfirst),
   };
 }

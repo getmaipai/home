@@ -172,14 +172,14 @@ export function WikipediaPage({ person }: { person?: Roster } = {}) {
         ) : null}
         {book ? (
           <>
-            <ReaderSearchBox key={`${location.pathname}${location.search}`} book={book} placeholder="Search Wikipedia" routeFor={articleRoute} onSearch={(next) => search(next)} initial={onSearchPage ? q : ""} />
-            <div className="flex flex-wrap items-center gap-2 lg:hidden" role="navigation" aria-label="Wikipedia sections">
+            {articleMatch ? null : <ReaderSearchBox key={`${location.pathname}${location.search}`} book={book} placeholder="Search Wikipedia" routeFor={articleRoute} onSearch={(next) => search(next)} initial={onSearchPage ? q : ""} />}
+            {articleMatch ? null : <div className="flex flex-wrap items-center gap-2 lg:hidden" role="navigation" aria-label="Wikipedia sections">
               <Chip selected={!articleMatch && !onSearchPage && section === "home"} onClick={() => navigate("/wikipedia")}>Home</Chip>
               <Chip selected={section === "explore" && !articleMatch} onClick={() => navigate("/wikipedia/explore")}>Explore</Chip>
               <Chip selected={section === "saved" && !articleMatch} onClick={() => navigate("/wikipedia/saved")}>Saved</Chip>
               <Button variant="outline" size="sm" disabled={random.isPending} onClick={() => random.mutate()}>Random article</Button>
               {random.isError ? <span role="alert" className="text-muted-foreground text-sm">No article came back. Try once more.</span> : null}
-            </div>
+            </div>}
             {articleBook && articlePath ? <ReaderArticle book={articleBook} path={articlePath} routeFor={articleRoute} appName="Wikipedia" canDiscuss={!!person && person.age_band !== "child"} onAppHome={appHome} onSearch={(next) => search(next)} /> : null}
             {onSearchPage ? <SearchResults q={q} {...(resultBook ? { book: resultBook } : {})} books={books} routeFor={articleRoute} onBook={(next) => search(q, next)} onSearch={(next) => search(next, resultBook)} /> : null}
             {!articleMatch && !onSearchPage && section === "explore" ? <ExploreGrid book={book} /> : null}
