@@ -512,12 +512,12 @@ S7. **Whatever an app can make or change, chat can ask for, and a creative app i
     adds a Create function is not done until its chat tool, its card and the tool's bench row exist.
     Tools are conditional (rule 1) and gated in the tool, not the card. A job that takes time uses a
     named tool-call card that polls the job; anything else is an answer block kind added once in
-    `commons` ([chat cards standard](chat-cards-2026-10-18.md)).
+    `commons` ([chat cards standard](chat-cards-2026-10-18.md)). Each app's tools stay inside rule 1's cap of 16 conditional tools per turn.
     (b) An app that both plays and makes things is one app with two modes: **Listen** and **Create** in
     Music, **Watch** and **Create** in Videos, **View** and **Create** in Pictures (the exact word is the
     one the native app uses; Create is always the second mode). The switch sits at the top of the app so
     Create is always visible. What Create makes appears in the first mode labelled "Made here". There is
-    no separate studio app for the same media.
+    no separate studio app for making what the app plays. An editor that changes a person's existing files (the Photo editor and the Video editor of [media-editors](media-editors-2026-10-31.md)) stays its own pinnable app. The record arguing for this rule is [music-listen-create-2026-11-01](music-listen-create-2026-11-01.md), which lists what it supersedes.
     A new creative app or a new Create function that skips (a) or (b) is rejected in review. Applies to
     Music, Videos and Pictures from the next slice of each; existing pages move when their app is next
     worked on, not before.
