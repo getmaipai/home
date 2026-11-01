@@ -23,7 +23,8 @@ import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
 import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
 import { AiModelChoices } from "@/apps/settings/AiModelDialog";
 import { AiSlotChoices } from "@/apps/settings/AiSlotDialog";
-import { TIERED_JOBS, configurableTiers, draftOf, sameDraft, slotKey, toStored, levelsLine, type SlotDrafts } from "@/apps/settings/aiTierSlots";
+import { AiJobSummary } from "@/apps/settings/AiJobSummary";
+import { TIERED_JOBS, configurableTiers, draftOf, sameDraft, slotKey, toStored, type SlotDrafts, type SlotTier } from "@/apps/settings/aiTierSlots";
 import { useAiChoices } from "@/apps/settings/useAiChoices";
 import { ENGINE_ROLE, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
 import { sizeGb } from "../../../../shared/diskPlanMath";
@@ -51,6 +52,7 @@ export function AiGlance({ card }: SettingsViewProps) {
   const maxWindow = useQuery({ queryKey: ["ai", "tier-window"], queryFn: () => aiChoicesApi.tierWindow(), refetchInterval: 10_000, retry: false });
   const stopWindow = useMutation({ mutationFn: () => aiChoicesApi.stopTierWindow(), onSettled: () => { void maxWindow.refetch(); } });
   const [levels, setLevels] = useState<GlanceRow | null>(null);
+  const [levelTier, setLevelTier] = useState<SlotTier | null>(null);
   const [levelsError, setLevelsError] = useState<string | null>(null);
   const [cleanup, setCleanup] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function AiGlance({ card }: SettingsViewProps) {
       const role = TIERED_JOBS[row.job]!.role;
       for (const tier of configurableTiers(row.job)) if (!sameDraft(before[tier], drafts[tier])) await api.setSetting("household", slotKey(role, tier), toStored(drafts[tier], tier));
     },
-    onSuccess: () => { setLevels(null); setLevelsError(null); void settings.refetch(); refresh(); },
+    onSuccess: () => { setLevelTier(null); setLevelsError(null); void settings.refetch(); refresh(); },
     onError: (e) => setLevelsError(messageOf(e, "Could not save the levels. Check that Home is running, then try again.")),
   });
 
@@ -200,7 +202,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         <p className="text-base text-muted-foreground" data-testid="ai-counter">{fill(copy.counter ?? "", tally)}</p>
       </div>
       <ItemGroup variant="card" role="group" aria-label={copy.glance}>
-        {rows.map((row) => glanceRow({ row, copy, onSwitch: (on) => stage(row, on ? (row.shown?.id ?? row.recommended?.id ?? OFF) : OFF), onEdit: () => setEditing(row), levelsLine: TIERED_JOBS[row.job] ? levelsLine(slotDrafts(row), row.job, row.options) : null, onLevels: TIERED_JOBS[row.job] ? () => { setLevelsError(null); setLevels(row); } : null, onReset: () => setResetting(row), onDownload: () => download.mutate([row]) }))}
+        {rows.map((row) => glanceRow({ row, copy, onSwitch: (on) => stage(row, on ? (row.shown?.id ?? row.recommended?.id ?? OFF) : OFF), onEdit: () => { if (TIERED_JOBS[row.job]) { setLevelsError(null); setLevelTier(null); setLevels(row); } else setEditing(row); }, onReset: () => setResetting(row), onDownload: () => download.mutate([row]) }))}
       </ItemGroup>
 
       <p className="text-base text-muted-foreground">
@@ -211,8 +213,8 @@ export function AiGlance({ card }: SettingsViewProps) {
       <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
         <DialogContent scroll="viewport">{editing ? <AiModelChoices key={editing.job} row={editing} copy={copy} onClose={() => setEditing(null)} onSave={stage} onAdded={refresh} /> : null}</DialogContent>
       </Dialog>
-      <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) setLevels(null); }}>
-        <DialogContent scroll="viewport">{levels ? <AiSlotChoices key={levels.job} row={levels} initial={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevels(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
+      <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) { setLevels(null); setLevelTier(null); } }}>
+        <DialogContent scroll="viewport">{levels && levelTier === null ? <AiJobSummary key={`${levels.job}-summary`} row={levels} drafts={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} onClose={() => setLevels(null)} onEdit={(tier) => { if (tier === "standard") { setLevels(null); setEditing(levels); } else setLevelTier(tier); }} /> : null}{levels && levelTier !== null ? <AiSlotChoices key={`${levels.job}-${levelTier}`} only={levelTier} row={levels} initial={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevelTier(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
       </Dialog>
       <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? "Apply"} discardLabel={copy.discard ?? "Discard"} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
       <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>
@@ -234,7 +236,7 @@ export function AiGlance({ card }: SettingsViewProps) {
 }
 
 /** One row, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
-function glanceRow({ row, copy, onSwitch, onEdit, onLevels, levelsLine: levels, onReset, onDownload }: { row: GlanceRow; levelsLine: string | null; copy: Record<string, string>; onSwitch: (on: boolean) => void; onEdit: () => void; onLevels: (() => void) | null; onReset: () => void; onDownload: () => void }) {
+function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: GlanceRow; copy: Record<string, string>; onSwitch: (on: boolean) => void; onEdit: () => void; onReset: () => void; onDownload: () => void }) {
   const Icon = getIcon(JOB_ICONS[row.job]);
   const Reset = getIcon("rotate-ccw");
   const Gear = getIcon("settings");
@@ -255,7 +257,6 @@ function glanceRow({ row, copy, onSwitch, onEdit, onLevels, levelsLine: levels, 
           {row.offered && row.shown?.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
-        {levels && row.offered ? <ItemDescription clamp={false} data-testid={`ai-levels-${row.job}`}>{levels}</ItemDescription> : null}
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
         {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
         {progress && busy ? <JobProgress {...downloadProgress({ title: busy.label, state: "running", status: progress.text, percent: progress.percent ?? undefined })} variant="full" /> : null}
@@ -267,7 +268,6 @@ function glanceRow({ row, copy, onSwitch, onEdit, onLevels, levelsLine: levels, 
         {row.missing ? <Button type="button" variant="ghost" size="icon-sm" aria-label={`${copy.download_missing?.replace(" ({count})", "")}: ${row.title}`} onClick={onDownload}><Down /></Button> : null}
         <Switch checked={row.shownEnabled} disabled={!row.offered} onCheckedChange={onSwitch} aria-label={`${row.title}: ${row.shownEnabled ? copy.on : copy.off}`} />
         <Button type="button" variant="ghost" size="icon-sm" aria-label={`${copy.dialog_title}: ${row.title}`} disabled={!row.offered} onClick={onEdit}><Gear /></Button>
-        {onLevels ? <Button type="button" variant="ghost" size="sm" aria-label={`Levels: ${row.title}`} disabled={!row.offered} onClick={onLevels}>Levels</Button> : null}
       </ItemActions>
     </Item>
   );

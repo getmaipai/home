@@ -35,9 +35,11 @@ export interface AiSlotChoicesProps {
   error: string | null;
   onClose: () => void;
   onSave: (drafts: SlotDrafts) => void;
+  /** Show only this level (opened from the job summary); absent shows every level. */
+  only?: SlotTier;
 }
 
-export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClose, onSave }: AiSlotChoicesProps) {
+export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClose, onSave, only }: AiSlotChoicesProps) {
   const [drafts, setDrafts] = useState<SlotDrafts>(initial);
   const spec = TIERED_JOBS[row.job]!;
   const defs = optionDefs(spec.category);
@@ -58,10 +60,10 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
     <>
       <DialogHeader>
         <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">{row.title}</p>
-        <DialogTitle>Levels</DialogTitle>
-        <DialogDescription>Choose which levels exist, the model each one uses and who can use it. Nothing is deleted or cancelled by turning a level off.</DialogDescription>
+        <DialogTitle>{only ? TIER_TITLE[only] : "Levels"}</DialogTitle>
+        <DialogDescription>{only ? TIER_PROMISE[only] : "Choose which levels exist, the model each one uses and who can use it."} Nothing is deleted or cancelled by turning a level off.</DialogDescription>
       </DialogHeader>
-      {configurableTiers(row.job).map((tier) => {
+      {configurableTiers(row.job).filter((tier) => !only || tier === only).map((tier) => {
         const draft = drafts[tier];
         const on = isOn(draft);
         const floor = tier === "standard";
@@ -144,7 +146,7 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
       {notes.length > 0 ? <Alert data-testid="ai-slot-consequences"><AlertDescription>{notes.map((line) => <p key={line}>{line}</p>)}</AlertDescription></Alert> : null}
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>{copy.cancel ?? "Cancel"}</Button>
+        <Button type="button" variant="outline" onClick={onClose}>{only ? "Back" : (copy.cancel ?? "Cancel")}</Button>
         <Button type="button" disabled={saving} onClick={() => onSave(drafts)}>{saving ? "Saving…" : (copy.save_choice ?? "Save")}</Button>
       </DialogFooter>
     </>
