@@ -3,7 +3,8 @@
 // access check.
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 import { MediaViewer, type MediaViewerItem } from "@maipai/ui/src/elements/media-viewer";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
@@ -12,7 +13,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { formatBytes } from "@maipai/ui/src/format";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type LibraryItem, type Roster } from "@/lib/api";
-import type { MusicCard } from "@/lib/musicApi";
+import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { canShareFiles, creationOf, fileKind, isAdultRole, kindWord } from "./libraryModel";
@@ -45,6 +46,8 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   seeds[me.id] ??= me.avatar_seed;
   const creation = creationOf(item, me, sharedWith, seeds);
   const [panelOpen, setPanelOpen] = useState(false);
+  const navigate = useNavigate();
+  const [splitting, setSplitting] = useState(false);
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   const origin = libraryOrigin(item, record.data?.origin);
@@ -74,9 +77,11 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => actions.rename(item)}>Rename</Button>
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>Keep</Button> : null}
+          {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "The stems could not be made. Try again in a minute.")).finally(() => setSplitting(false)); }}>Split into stems</Button> : null}
           {isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <Button type="button" variant="secondary" onClick={() => actions.recheck(item)}>Mark all-ages</Button> : null}
         </div>
       ) : null}
+      {mine && isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <p className="text-sm text-muted-foreground">Stems stay on this home server. Splitting does not make a voice.</p> : null}
       {item.can_edit && item.chat_id ? <Button asChild variant="secondary"><Link to={`/chat?conversation=${encodeURIComponent(item.chat_id)}`}>Edit in its chat</Link></Button> : mine && item.kind === "image" && !item.chat_id && record.data?.origin === "made" ? <p className="text-muted-foreground text-base">Its chat was deleted, so it cannot be edited here.</p> : null}
       </div>
     </>

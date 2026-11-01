@@ -5,6 +5,7 @@ import { requestJson } from "@/lib/api";
 
 export interface MusicVersion { id: string; label: string; url: string }
 export interface MusicCard {
+  /** The chat the card lives in; null for a temporary one. */ conversation_id?: string | null; /** A split of an audio file the person owns, not a song made here. */ made_from_file?: boolean;
   id: string;
   task: string;
   state: "queued" | "running" | "done" | "failed" | "cancelled";
@@ -54,6 +55,7 @@ export const musicApi = {
   setTier: (id: string, tier: "standard" | "boost", fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/quality`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { tier, file_id: fileId } : { tier }) }),
   revise: (id: string, change: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/revise`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ change, ...(fileId ? { file_id: fileId } : {}) }) }),
   stems: (id: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/stems`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { file_id: fileId } : {}) }),
+  stemsFromFile: (fileId: string) => requestJson<MusicCard>("/api/music/stems/from-file", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
   newCover: (id: string, prompt: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/cover`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) }),
   useVersion: (id: string, fileId: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/use`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
   /** A personal download of one version (never the commercial purpose). */

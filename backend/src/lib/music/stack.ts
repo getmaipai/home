@@ -16,6 +16,7 @@ export interface MusicBody {
   bpm?: number; key?: string; language?: string; seed?: number; quality?: "quick" | "detailed";
   source?: string; source_sha256?: string; from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end";
   strength?: number; edit?: { op: "trim" | "fade" | "loudness"; from_s?: number; to_s?: number; seconds?: number; where?: "in" | "out" | "both"; lufs?: number };
+  /** Stems only: an audio file the person owns, which the Stack may split and nothing else. */ origin?: "owned_file";
   timeout_ms: number;
 }
 export function musicBody(request: MusicRequest, task: MusicBody["task"]): Omit<MusicBody, "timeout_ms"> {
@@ -76,8 +77,8 @@ export async function stemsStatus(): Promise<StackStemsStatus | null> {
   } catch { return null; }
 }
 export function stemsStatusReady(status: StackStemsStatus | null): boolean { return !!status && status.available && !["unsupported", "off", "not-installed"].includes(status.state); }
-export async function submitStems(source: string, source_sha256: string): Promise<string> {
-  const res = await checked(await request("/v1/audio/stems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, model: "htdemucs" }) }, 60_000));
+export async function submitStems(source: string, source_sha256: string, origin?: "owned_file"): Promise<string> {
+  const res = await checked(await request("/v1/audio/stems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, model: "htdemucs", ...(origin ? { origin } : {}) }) }, 60_000));
   const parsed = await res.json() as { job?: string };
   if (!parsed.job) throw new StackMusicError(502, "bad_reply");
   return parsed.job;

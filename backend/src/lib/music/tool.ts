@@ -13,6 +13,7 @@ import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsFor
 import { StackMusicError, musicBody, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
+import { provenanceFor } from "./commercial";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
 export const EDIT_MUSIC_TOOL_ID = "edit_music";
 export function musicAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): MusicAudience {
@@ -97,6 +98,8 @@ function isWholeSong(lyrics: string, stored: string | undefined): boolean {
 }
 type EditPlan = { ok: true; task: MusicTask; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; line: string };
 export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusicArgs>, limits = { min_seconds: 10, max_seconds: source.request.max_seconds ?? FULL_SONG.max }): EditPlan {
+  // A file the person owns can be split into stems and nothing else: no edit, cover or remake takes it or its stems as a source.
+  if (source.fileId && provenanceFor(source.fileId)?.source_kind === "upload") return { ok: false, line: "That file is yours, not a song made here, so it can only be split into stems." };
   const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, ...stored } = source.request;
   const request: MusicRequest = { ...stored, seconds: source.durationS ?? stored.seconds, seed: source.seed ?? stored.seed,
     ...(args.description !== undefined ? { description: args.description } : {}), ...(args.lyrics !== undefined ? { lyrics: args.lyrics } : {}),

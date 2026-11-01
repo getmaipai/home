@@ -181,6 +181,15 @@ describe("MusicToolRender", () => {
     expect(result.container.textContent).not.toContain("Pancakes (vocals)");
   });
 
+  test("a split of the person's own file says so and offers no song edits", async () => {
+    card = done({ task: "stems", title: "Garage Take (vocals)", made_from_file: true, duration_s: 12, current_id: "audio-0", versions: ["Vocals", "Drums"].map((label, index) => ({ id: `audio-${index}`, label, url: `/audio-${index}` })) });
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    expect(view.container.textContent).toContain("Made from your file, 0:12");
+    expect(view.container.textContent).not.toContain("Quick song");
+    expect(view.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
   test("Edit shows a plain next step when a song change fails", async () => {
     card = done();
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
