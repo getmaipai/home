@@ -759,6 +759,13 @@ function isAbortError(err: unknown): boolean {
 // authors is just a path string, not one of the named methods below, so
 // the interpreter needs the same request plumbing (credentials,
 // timeout, error shape) directly rather than duplicating it.
+/** JSON content type unless the caller set one under any casing: two spellings of one header reach the server as "application/json, application/json" and a strict route answers 415. */
+function jsonHeaders(given?: HeadersInit): Headers {
+  const headers = new Headers(given);
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  return headers;
+}
+
 export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   // An explicit sign-out discards the copies (a shared browser). An expired session never does.
   if (path === "/api/auth/logout") await removeAllOfflineMedia();
@@ -768,7 +775,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const res = await fetch(path, {
       ...rest,
       credentials: "include",
-      headers: rest.body instanceof FormData ? rest.headers : { "Content-Type": "application/json", ...rest.headers },
+      headers: rest.body instanceof FormData ? rest.headers : jsonHeaders(rest.headers),
       // A code review (2026-09-04) found this unconditionally overwrote
       // whatever `signal` a caller passed via `init` - harmless today
       // (no call site passes its own signal), but silently discarding a

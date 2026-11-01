@@ -52,3 +52,13 @@ test("findRobot posts find_me with optional seconds", async () => {
   await api.findRobot("robot/1", 8);
   expect(requests).toEqual([{ url: "/api/devices/robot%2F1/commands", body: { kind: "find_me", seconds: 8 } }]);
 });
+
+test("a caller's lowercase content-type does not double the JSON header (the server answered 415 and Apply on AI and models did nothing)", async () => {
+  let sent: Headers | null = null;
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    sent = new Headers(init?.headers);
+    return new Response("{}", { headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  await requestJson("/api/ai/choices/stems", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  expect(sent!.get("content-type")).toBe("application/json");
+});
