@@ -94,7 +94,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [music-generation-2026-10-17.md](music-generation-2026-10-17.md) | new 2026-10-17, measured; chat first, studio later | MUSIC-SPEC-01, MUSIC-GEN-01 to -14, MUSIC-STUDIO-01 (Music generation) |
 | [music-studio-2026-10-31.md](music-studio-2026-10-31.md) | proposed (architect ruling pending) | MUSIC-STUDIO-01 |
 | [music-listen-create-2026-11-01.md](music-listen-create-2026-11-01.md) | proposed (architect ruling pending); amends the Studio note: Listen/Create, made bands and albums, own lyrics, playback first | MUSIC-STUDIO-01 |
-| [video-create-2026-11-01.md](video-create-2026-11-01.md) | proposed (architect ruling pending); Videos Create: Make, keyframes, extend, Storyboard, characters, places, voice overlay, chat parity | VIDEO-CREATE-01 |
+| [video-create-2026-11-01.md](video-create-2026-11-01.md) | proposed (architect APPROVED 2026-11-01); Videos Create: Make, keyframes, extend, Storyboard, characters, places, voice overlay, chat parity | VIDEO-CREATE-01 |
 | [music-handoff-2026-11-01.md](music-handoff-2026-11-01.md) | history: session handoff (where each piece is, owner decisions, research findings, next steps) | MUSIC-STUDIO-01 |
 | [music-made-radio-2026-11-01.md](music-made-radio-2026-11-01.md) | architect APPROVED 2026-11-01: made radio, stations that write their own songs | MUSIC-STUDIO-01 (slice G1) |
 | [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) | new 2026-10-27, decided, not built; Standard, Boost, Max and system-only Reduced for every generating feature; evaluations first | TIER-EVAL-01 to -08, TIER-SPEC-01, TIER-STACK-01 to -03, TIER-HOME-01 to -05, TIER-UI-01, TIER-STEMS-01, TIER-BENCH-01, TIER-DOC-01, TIER-SHIP-01 (Resource tiers) |
