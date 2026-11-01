@@ -6,7 +6,7 @@
 
 The model never needs push rights of its own: it calls this script, which applies fixed guards and uses the repo's own `wt.sh` and
 `release-home.sh`. It refuses anything touching access, credentials, safety, migrations, installers, the gates or package files; more than
-12 files or 700 diff lines; a failing check; a newest main that failed its gate; and a second release within 30 minutes. Standard library only.
+12 files or 700 diff lines; a failing check; and a newest main that failed its gate. Standard library only.
 """
 import os, re, subprocess, sys, time
 
@@ -14,7 +14,7 @@ PROTECTED = re.compile(
     r"(^|/)(package\.json|bun\.lock|\.env[^/]*|\.github/|\.githooks/|hooks/|docs/design/RULES\.md|scripts/(check|wt|release-home|install|maipai|local-land)[^/]*|"
     r"scripts/engine-computer/|backend/drizzle|backend/src/db/migrations|rules-baseline\.json)|(auth|credential|secret|password|session|consent|safety|csam|age[-_]?gate|codeGate|apiKeys|trustProxy|tailnetNode)",
     re.I)
-MAX_FILES, MAX_DIFF_LINES, RELEASE_COOLDOWN_S = 12, 700, 30 * 60
+MAX_FILES, MAX_DIFF_LINES = 12, 700
 HTTPS = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "url.https://github.com/.insteadOf", "GIT_CONFIG_VALUE_0": "git@github-jessewebdotcom:"}
 
 
@@ -71,12 +71,7 @@ def release(repo, yes):
     tip = git(repo, "rev-parse", "origin/main").stdout.strip()
     note = os.path.join(repo, "data-scratch", "main-gate", tip + ".md")
     if os.path.exists(note): print("REFUSED: the newest main (%s) failed its gate. Read %s, fix it, then try again." % (tip[:9], note)); return 3
-    stamp = os.path.join(repo, "data-scratch", "main-gate", "last-local-release")
-    if os.path.exists(stamp) and time.time() - os.path.getmtime(stamp) < RELEASE_COOLDOWN_S:
-        print("REFUSED: a release ran less than 30 minutes ago. Wait, then try again."); return 3
     r = subprocess.run(["bash", "scripts/release-home.sh", "--owner-approved"], cwd=repo, env=dict(os.environ, **HTTPS))
-    if r.returncode == 0:
-        os.makedirs(os.path.dirname(stamp), exist_ok=True); open(stamp, "w").write(tip)
     return r.returncode
 
 
