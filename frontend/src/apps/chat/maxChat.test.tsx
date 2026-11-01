@@ -80,6 +80,20 @@ describe("one answer-style control", () => {
     expect(control.textContent).toBe("");
   });
 
+  test("the closed control is quiet on Instant and wears the filled on-look on Thinking and on an armed Max", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    expect((await trigger(view)).getAttribute("data-on")).toBe("false");
+    expect((await trigger(view)).getAttribute("data-variant")).toBe("ghost");
+    await choose(view, "Thinking");
+    expect((await trigger(view)).getAttribute("data-on")).toBe("true");
+    expect((await trigger(view)).getAttribute("data-variant")).toBe("default");
+    await choose(view, "Instant");
+    expect((await trigger(view)).getAttribute("data-on")).toBe("false");
+    await pickMax(view);
+    await waitFor(() => expect((document.querySelector("[data-slot=answer-style-select-trigger]") as HTMLElement).getAttribute("data-on")).toBe("true"));
+  });
+
   test("the open menu shows icon, word and one plain line per choice", async () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
     await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));

@@ -229,7 +229,7 @@ export function ComposerTrailingWithThinkingMode() {
   const icons = { instant: getIcon("zap"), thinking: getIcon("brain"), max: getIcon("brain") } as const;
   const Sparkles = getIcon("sparkles");
   const choices = (!adult ? [] : MODE_CHOICES.filter((choice) => (choice.id === "max" ? max.visible : choice.id === "instant" ? capability === "switchable" : capability !== "none"))).map((choice) => ({
-    id: choice.id, label: choice.word, description: choice.line, icon: icons[choice.id],
+    id: choice.id, label: choice.word, description: choice.line, icon: icons[choice.id], on: choice.id !== "instant",
     ...(choice.id === "max" ? { accent: Sparkles, disabled: max.disabled || engineDown !== undefined } : {}),
   }));
   const current: ModeChoiceId = max.picked ? "max" : mode;

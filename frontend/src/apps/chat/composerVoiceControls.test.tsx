@@ -3,6 +3,7 @@ import { cleanup, waitFor } from "@testing-library/react";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ComposerVoiceControls, useVoiceCallReady } from "@/apps/chat/composerVoiceControls";
+import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 
 afterEach(cleanup);
 
@@ -57,6 +58,24 @@ describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd,
     try {
       const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);
       expect(await view.findByLabelText("Start a voice conversation")).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  // Idle controls are quiet; the filled look (Send's own) means "on".
+  test("the start-a-call button is quiet while idle and filled with aria-pressed while a call is open", async () => {
+    const restore = stubEngines([{ id: "stt", state: "ready" }, { id: "tts", state: "ready" }]);
+    try {
+      const idle = renderWithQueryClient(<AdminContext.Provider value><VoiceSessionProvider value={{ open: false, setOpen: () => {} }}><ComposerVoiceControls /></VoiceSessionProvider></AdminContext.Provider>);
+      const quiet = await idle.findByLabelText("Start a voice conversation");
+      expect(quiet.getAttribute("data-variant")).toBe("ghost");
+      expect(quiet.getAttribute("aria-pressed")).toBe("false");
+      cleanup();
+      const live = renderWithQueryClient(<AdminContext.Provider value><VoiceSessionProvider value={{ open: true, setOpen: () => {} }}><ComposerVoiceControls /></VoiceSessionProvider></AdminContext.Provider>);
+      const on = await live.findByLabelText("Start a voice conversation");
+      expect(on.getAttribute("data-variant")).toBe("default");
+      expect(on.getAttribute("aria-pressed")).toBe("true");
     } finally {
       restore();
     }

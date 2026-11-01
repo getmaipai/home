@@ -36,19 +36,20 @@ const AudioWaveformIcon = getIcon("audio-waveform");
 // VOICE-LIVE-05 follow-up (Jesse's own live read, 2026-09-23): the pill
 // read too large beside the composer's own Dictate/Send buttons
 // (thread.aui.tsx's ComposerAction, both `size-7 rounded-full`). Visual
-// size matches them exactly now - `variant="default"` is Send's own
-// filled look, the one this control keeps as its "start a call"
-// affordance. The kit's `elements/tooltip-icon-button` has no touch-target
+// size matches them exactly now. On-look (owner, 2026-11-01): idle controls
+// are quiet (`ghost`, like Dictate); the filled look (`default`, Send's own)
+// shows only while a call is open, with aria-pressed saying the same. The kit's `elements/tooltip-icon-button` has no touch-target
 // floor of its own, so the 48px hit area (docs/UI.md) is the
 // `before:-inset-3` pseudo-element passed through className.
-function WaveformButton({ onClick, engineDown }: { onClick: () => void; engineDown?: string | undefined }) {
+function WaveformButton({ onClick, engineDown, on }: { onClick: () => void; engineDown?: string | undefined; on: boolean }) {
   return (
     <TooltipIconButton
       tooltip={engineDown === undefined ? "Start a voice conversation" : `Start a voice conversation. ${engineDown}`}
       disabled={engineDown !== undefined}
       type="button"
-      variant="default"
+      variant={on ? "default" : "ghost"}
       size="icon"
+      aria-pressed={on}
       className="relative size-7 rounded-full before:absolute before:-inset-3 before:content-['']"
       aria-label={engineDown === undefined ? "Start a voice conversation" : `Start a voice conversation. ${engineDown}`}
       onClick={onClick}
@@ -71,5 +72,5 @@ export function ComposerVoiceControls({ disabled = false, engineDown }: { disabl
   // ready.
   const session = useVoiceSession();
   if (!useVoiceCallReady(disabled, engineDown)) return null;
-  return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} />;
+  return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} on={session?.open === true} />;
 }
