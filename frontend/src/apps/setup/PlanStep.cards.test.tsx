@@ -33,6 +33,12 @@ describe("the plan step's job cards", () => {
     const rows = (start.mock.calls[0] as unknown[])[1] as string[];
     expect(rows.some((id) => id.startsWith("videos"))).toBe(false);
   });
+  test("a job that cannot run says why in the Stack's plain words, with the memory it asks for", async () => {
+    const why = "Videos need about 44 GB of memory, more than this computer can ever give them, so Home does not download them.";
+    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { cannot_run: ["videos"], cannot_run_why: { videos: why } })} start={mock(async () => ({}))} onInstalled={() => {}} />);
+    await view.findByRole("group", { name: "What gets installed" });
+    expect(within(view.getByTestId("plan-job-videos")).getByText(why)).toBeTruthy();
+  });
   test("shows a card per job with the chosen model's size, the total, the free space and a check", async () => {
     const plan = plans.p128!;
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB)} start={async () => ({})} onInstalled={() => {}} />);

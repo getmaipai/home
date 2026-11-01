@@ -21,7 +21,7 @@ const TIER_PROMISE: Record<SlotTier, string> = {
   standard: "Home keeps working normally while this runs. It is the floor, so it stays on.",
   boost: "Home stays up, but other big jobs wait their turn.",
   max: "This takes the computer. Everything big waits.",
-  reduced: "While a Max job runs, chat switches to a simpler model so the job can have more of the computer.",
+  reduced: "When a Max job needs more room than is free, chat switches to a simpler model while it runs.",
 };
 const WHO_LABEL: Record<SlotWho, string> = { everyone: "Everyone the age gates allow", assigned: "Assigned people only", admins: "Admins only" };
 

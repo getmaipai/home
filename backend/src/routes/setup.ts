@@ -29,7 +29,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems, webSearchNeedsSetup } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
-import { cannotRunJobs, readCapabilities } from "@/lib/memoryRoom";
+import { cannotRunJobs, cannotRunWhy, readCapabilities } from "@/lib/memoryRoom";
 import { beginInstall, engineNeedsInstall, previewPlan } from "@/lib/installActions";
 import { startEngineInstall } from "@/lib/stackInstall";
 import { getStackClient } from "@/lib/stackEngine";
@@ -151,21 +151,26 @@ const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).op
 const planRoute = createRoute({
   method: "get", path: "/plan", tags: ["Setup"], summary: "What Home would install on the AI computer",
   request: { query: planQuery },
-  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), choices: z.object({ cards: z.array(z.unknown()), alwaysOn: z.unknown() }).nullable().optional().describe("The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say.") }) } }, description: "The Stack's plan and Home's words for it." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), choices: z.object({ cards: z.array(z.unknown()), alwaysOn: z.unknown() }).nullable().optional().describe("The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."), cannot_run_why: z.record(z.string(), z.string()).optional().describe("For each job in cannot_run, the reason in plain words (how much memory it asks for).") }) } }, description: "The Stack's plan and Home's words for it." } },
 });
 setupRoutes.openapi(planRoute, async (c) => {
   const { vram_gb: vramGb } = c.req.valid("query");
   const preview = await previewPlan(vramGb);
   const disk = preview.wording.disk?.plan as DiskPlan | undefined;
   // The wizard shows the same job cards as Settings, so they come from the same builder (shared/aiChoices.ts).
-  return c.json({ ...preview, choices: disk ? await setupCards(disk) : null, cannot_run: cannotRunJobs(await readCapabilities()) }, 200);
+  return c.json({ ...preview, choices: disk ? await setupCards(disk) : null, ...(await cannotRunFields()) }, 200);
 });
+
+async function cannotRunFields() {
+  const view = await readCapabilities();
+  return { cannot_run: cannotRunJobs(view), cannot_run_why: cannotRunWhy(view) };
+}
 
 const installStartRoute = createRoute({
   method: "post", path: "/install", tags: ["Setup"], summary: "Install the plan: start the downloads and go on",
   request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional(), accepted_licences: z.array(z.string().max(120)).max(8).optional().openapi({ description: "Ids of the licence notices the person read and accepted for licensed rows (Detailed video). A licensed row left on without its accept is refused." }), components: z.array(z.string()).optional().openapi({ description: "The disk plan rows to install (ids from the plan's disk.plan.rows). Required rows are always installed; omitted means the plan's defaults." }), settings: z.record(z.string(), z.union([z.string(), z.boolean()])).optional().openapi({ description: "The household settings the chosen job cards carry (the picture, video and music choices). Written once the install can start; keys outside the card settings are refused." }) }).strict() } } } },
   responses: {
-    202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number() }) } }, description: "The downloads started in the background." },
+    202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number(), left_out: z.array(z.object({ job: z.string(), reason: z.string() })).optional() }) } }, description: "The downloads started in the background. left_out names a job the request asked for that this computer can never run (the Stack's fits_ever), with the reason in plain words; nothing is downloaded for it." },
     409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "There is nothing the AI can install on this computer, or not enough free disk space for the rows chosen." },
   },
 });
@@ -184,7 +189,7 @@ setupRoutes.openapi(installStartRoute, async (c) => {
     const written = setHouseholdSettingValue(key, value);
     if (!written.ok) return c.json({ error: written.error, next: "Change it later under AI and models in Settings." }, 409);
   }
-  return c.json({ started: true as const, models: result.models }, 202);
+  return c.json({ started: true as const, models: result.models, ...(result.leftOut?.length ? { left_out: result.leftOut } : {}) }, 202);
 });
 
 const licencesRoute = createRoute({

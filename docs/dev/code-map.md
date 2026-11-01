@@ -487,7 +487,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/subject.ts` | clippedEdges, subjectBounds, findSubject |
 | `backend/src/lib/imaging/targets.ts` | imagingTargets |
 | `backend/src/lib/imaging/tools.ts` | submitImageTool, fetchImageToolResult, runImageTool, removeBackground, upscale |
-| `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, beginInstall |
+| `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, withoutUnfitJobs |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight |
 | `backend/src/lib/installStatus.ts` | setRobotReleaseInstall, EMPTY_INSTALL, summarizeBackground, summarizeInstall, resetInstallStatusCache, getInstallStatus |
@@ -595,7 +595,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryIngestion.ts` | canonicalKey, storeEmbeddingInTx, supersedeInTx, ingestMemory, supersedeMemory, drainPendingWork |
 | `backend/src/lib/memoryJudge.ts` | categoryToRecordKind, exampleDateFor, promptExampleTexts, requestExampleText, instructionExampleText, questionExampleText |
 | `backend/src/lib/memoryProfile.ts` | PROFILE_CARD_MAX_LINES, PROFILE_CARD_MAX_CHARS, profileCardRuleLine, isProfileCardCategory, renderProfileCardLine, renderProfileCard |
-| `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs |
+| `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs, cannotRunWhy |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | sweepStaleDownloads, sha256OfFile, downloadUrl |

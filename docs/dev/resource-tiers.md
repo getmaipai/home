@@ -32,9 +32,11 @@ Dev tier. Design records: [resource tiers](../design/resource-tiers-2026-10-27.m
 - Performance (admins): `PerformanceSettings.tsx` (presets, Free up memory, Close apps card, capability table, host tune for the owner, Customize with priorities and the profile table). Routes in `routes/performance.ts` and `performanceApps.ts`.
 - Cards and tools: the typed `tier` argument on the picture, video and music tools (no new tool; the cap stays 16), Make it Boost and Make it Max on cards, `edit_music` `change: "stems"` (see [music generation](music-generation.md)).
 
-## Not landed
+## What reaches the Stack, and what is still open
 
-The Stack's tier catalog, resolver and governor tiers (TIER-STACK-01 to 03), the kit tier segment (TIER-UI-01), and the Max chat lease with the retirement of coding mode (TIER-HOME-05) are open in `docs/BACKLOG.md`. No Max model is recommended for any category. Nothing here is shipped to a live hub by this page.
+Checked 2026-11-01 against Stack `007453d` and Home `main`. A Max job's tier travels to the Stack (TIER-WIRE-01, TIER-ROUTES-01). The Stack opens a Max window for it and, when the job's peak is more than the Standard share of the room, swaps chat to Reduced by itself (`maxWindowReduced.ts`), waiting for an in-flight chat turn. Home also asks the Stack to enter, renew and leave Reduced from the queue (`reducedChat.ts`, every 5 minutes, since the Stack leaves after 30 minutes without a renewal), after its own quiet wait. The line under the chat box and the Status row follow the Stack's `reduced_chat` and window. Only `tier: "max"` enters Reduced; a Boost job never does.
+
+Open: no Max model is recommended for any category, and video and music have no Max candidate at all (`tiers.ts` in the Stack). Max chat is the separate Max chat lease. Nothing here is shipped to a live hub by this page; a run of a real Max job on the live hub has not been recorded.
 
 ## Adding a model to a slot
 

@@ -15,7 +15,7 @@ const LEVEL_LINE: Record<SlotTier, string> = {
   standard: "Everyday use. Home keeps working normally.",
   boost: "A stronger pick when someone asks for more. Other big jobs wait their turn.",
   max: "The best this computer can do. It takes the computer while it runs.",
-  reduced: "While a Max job runs, chat switches to a simpler model to make room.",
+  reduced: "When a Max job needs more room than is free, chat switches to a simpler model while it runs.",
 };
 
 export interface LevelSummary { tier: SlotTier; model: string; kind: "recommended" | "custom" | "off"; note: string | null }

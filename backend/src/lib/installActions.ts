@@ -15,6 +15,8 @@ import { installStackComponent, listStackComponents } from "@/lib/stackComponent
 import { licenceCovered } from "@/lib/licenceAcceptance";
 import { isLicensedRow, LICENSED_ROWS, type PlanLicence } from "../../../shared/licensedRows";
 import type { StackInstallPlan } from "@/lib/stack/client";
+import { cannotRunJobs, cannotRunWhy, readCapabilities } from "@/lib/memoryRoom";
+import { setupCards } from "@/lib/aiChoicesState";
 
 /** Where the plan's files land and how much room each place has: Home's program and data on this computer, the AI's files on the Stack's disk (read by the Stack, which may be another computer). */
 export function volumesFor(plan: StackInstallPlan): DiskVolume[] {
@@ -70,7 +72,29 @@ export function ensureEngineInstalling(): { ok: false; error: string; next: stri
   return { ok: false, error: "The AI engine is still installing on this computer.", next: "Wait for the progress bar to finish, then press Check again." };
 }
 
-export type BeginInstall = { ok: true; models: number } | { ok: false; error: string; next: string };
+/** A job the request asked for that this computer can never run (the Stack's fits_ever is false for every tier), with the reason. */
+export interface LeftOut { job: string; reason: string }
+
+/** MEM-SPACE-05: takes the rows of every job no tier can run out of the selection. Required rows stay; a Stack without the capability table leaves the selection as it is. */
+export async function withoutUnfitJobs(diskPlan: DiskPlan, selected: string[]): Promise<{ selected: string[]; leftOut: LeftOut[] }> {
+  const view = await readCapabilities();
+  const never = cannotRunJobs(view);
+  if (never.length === 0) return { selected, leftOut: [] };
+  const why = cannotRunWhy(view);
+  const cards = (await setupCards(diskPlan)).cards;
+  const required = new Set(diskPlan.rows.filter((row) => row.need === "required").map((row) => row.id));
+  const drop = new Set<string>();
+  const leftOut: LeftOut[] = [];
+  for (const job of never) {
+    const rows = (cards.find((card) => card.id === job)?.choices ?? []).flatMap((choice) => choice.rowIds).filter((id) => selected.includes(id) && !required.has(id));
+    if (rows.length === 0) continue;
+    rows.forEach((id) => drop.add(id));
+    leftOut.push({ job, reason: why[job] ?? "This computer can never run it, so Home does not download it." });
+  }
+  return { selected: selected.filter((id) => !drop.has(id)), leftOut };
+}
+
+export type BeginInstall = { ok: true; models: number; leftOut?: LeftOut[] } | { ok: false; error: string; next: string };
 
 /** Starts the downloads in the background. `recordInSetup` also marks the
  * wizard's plan step done; Home settings leaves the setup record alone. */
@@ -90,7 +114,10 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
   // The disk check, on the rows the person left turned on: the same function the page ran while they chose.
   const diskPlan = plan.disk ?? (plan.tier ? shippedDiskPlan(plan.tier) : null);
   // A licensed extra (Detailed video) is on by default in the wizard only; Home settings and an upgrade never pull it unasked.
-  const selected = diskPlan ? sanitizeSelection(diskPlan, components ?? (recordInSetup ? diskPlan.default_selected : diskPlan.default_selected.filter((id) => !isLicensedRow(id)))) : undefined;
+  const wanted = diskPlan ? sanitizeSelection(diskPlan, components ?? (recordInSetup ? diskPlan.default_selected : diskPlan.default_selected.filter((id) => !isLicensedRow(id)))) : undefined;
+  // The Stack's fits_ever: a job no tier can ever run on this computer is not downloaded, whatever was asked for.
+  const fitted = diskPlan && wanted ? await withoutUnfitJobs(diskPlan, wanted) : { selected: wanted, leftOut: [] as LeftOut[] };
+  const selected = fitted.selected;
   if (diskPlan && selected) {
     const verdict = diskVerdict(diskPlan, selected, volumesFor(plan), { missingOnly: Boolean(plan.disk) });
     if (verdict.state === "red") return { ok: false, error: verdict.text, next: "Free some space, or turn off an extra on the list, then press Install again." };
@@ -123,5 +150,5 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
   }
   void startSetupDownloads(getStackClient(), { ...(vramGb ? { vramGb } : {}), ...(selected ? { selected } : {}) }).catch(() => {});
   const pending = plan.models.filter((model) => !model.installed).length + (selected && plan.disk ? (plan.optional_models ?? []).filter((model) => !model.installed && plan.disk!.rows.some((row) => selected.includes(row.id) && row.model_ids.includes(model.id))).length : 0);
-  return { ok: true, models: pending + startedLicensed };
+  return { ok: true, models: pending + startedLicensed, ...(fitted.leftOut.length ? { leftOut: fitted.leftOut } : {}) };
 }

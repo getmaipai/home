@@ -9,9 +9,16 @@ Pictures, videos and songs can be made at more than one level. A higher level lo
 
 - **Standard** is the everyday level. It is on for everyone the age rules allow.
 - **Boost** is a bigger, slower maker. Pictures and videos made at Boost are the ones the older pages called Detailed.
-- **Max** is the biggest maker, for one big job at a time. Everything else big waits while a Max job runs. Max shows up only when an owner or admin has picked a Max model for that kind of job.
+- **Max** is the biggest maker, for one big job at a time. Everything else big waits while a Max job runs. Max shows up only when an owner or admin has picked a Max model for that kind of job. Home does not pick one for you. Today there is a Max model for pictures, on a computer with lots of memory. There is none for video or songs, so those two never offer Max.
 
-Home also has a level called **Reduced**. You never pick it. While a Max job runs, Home may make chat simpler so there is room. Chat still answers, and a line under the box says so.
+Home also has a level called **Reduced**. You never pick it. Only a Max job can bring it in, and only when that job needs more room than a Standard job gets. When that happens:
+
+1. Home waits for a quiet moment in chat.
+2. Chat swaps to a smaller model. This takes 20 to 60 seconds.
+3. The Max job runs. Chat still answers, but answers are shorter and some extras may pause. A line under the box says so and shows about how many minutes are left.
+4. When the job ends, chat goes back to its usual model.
+
+A Standard or Boost job never makes chat simpler, even a long one. If the Max job fits beside chat, chat is not touched either.
 
 ## Who can use them
 

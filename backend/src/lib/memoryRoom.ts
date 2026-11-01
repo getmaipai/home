@@ -49,6 +49,21 @@ export async function readCapabilities(read: () => Promise<StackCapabilities | u
 /** MEM-SPACE-05: the setup jobs no tier of the capability table can ever run on this computer; the wizard leaves them off and downloads nothing for them. Chat is never listed (it is always installed). */
 const JOBS_OF_CATEGORY: Partial<Record<CapabilityRow["category"], string[]>> = { image: ["pictures", "picturesdetailed"], video: ["videos"], music: ["music"], voice: ["voice"] };
 export function cannotRunJobs(view: CapabilityView): string[] {
-  if (!view.available) return [];
-  return view.rows.filter((row) => row.cells.length > 0 && row.cells.every((cell) => !cell.fits)).flatMap((row) => JOBS_OF_CATEGORY[row.category] ?? []);
+  return unfitRows(view).flatMap((row) => JOBS_OF_CATEGORY[row.category] ?? []);
+}
+const unfitRows = (view: CapabilityView): CapabilityRow[] => (!view.available ? [] : view.rows.filter((row) => row.cells.length > 0 && row.cells.every((cell) => !cell.fits)));
+
+/** How each category reads in a sentence: who "needs", and what Home does not download. */
+const SPOKEN = { chat: ["Chat", "needs", "it"], image: ["Pictures", "need", "them"], video: ["Videos", "need", "them"], music: ["Music", "needs", "it"], voice: ["Voice", "needs", "it"] } as const;
+/** The plain reason per job that cannot run here, from the smallest memory any tier of that category asks for. Empty when the Stack gave no table. */
+export function cannotRunWhy(view: CapabilityView): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const row of unfitRows(view)) {
+    const [subject, verb, pronoun] = SPOKEN[row.category];
+    const sizes = row.cells.flatMap((cell) => (cell.needs_bytes ? [cell.needs_bytes] : []));
+    const need = sizes.length ? ` about ${Math.max(1, Math.round(Math.min(...sizes) / 1_073_741_824))} GB of memory,` : " more memory,";
+    const reason = `${subject} ${verb}${need} more than this computer can ever give ${pronoun}, so Home does not download ${pronoun}.`;
+    for (const job of JOBS_OF_CATEGORY[row.category] ?? []) out[job] = reason;
+  }
+  return out;
 }
