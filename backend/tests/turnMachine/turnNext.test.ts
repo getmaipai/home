@@ -1620,10 +1620,10 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(sawThinking).toBe(true);
-    // 1536 (reply_ceiling_tokens) + 512 (thinking_budget_tokens_toggled,
-    // the 8B's toggled-on value) = 2048: room for the reasoning span
-    // ahead of the visible reply, not just the reply alone.
-    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(2048);
+    // 1536 (reply_ceiling_tokens) + 2048 (thinking_budget_tokens_toggled,
+    // the 8B's toggled-on value 512 times 4 for Thinking, RESEARCH-TIER-01) = 3584: room for
+    // the reasoning span ahead of the visible reply, not just the reply alone.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(3584);
   });
 });
 
@@ -3058,7 +3058,7 @@ describe("turnNext.ts: FORCED-CALL-01 (retired by THIN-2A), no call is forced, s
       expect(result.ok).toBe(true);
       expect(firstRequest?.tool_choice).toBe("auto");
       expect(firstRequest?.chat_template_kwargs?.enable_thinking).toBe(true);
-      expect(firstRequest?.max_tokens).toBe(1536 + 512);
+      expect(firstRequest?.max_tokens).toBe(1536 + 512 * 4);
     } finally {
       searxng.stop();
     }

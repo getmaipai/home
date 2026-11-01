@@ -57,7 +57,7 @@ try {
     const searches = outcomes.filter((o) => o.packageId === "websearch");
     const sources = (result.value.sources ?? []).map((s) => ({ site: s.site, title: s.title?.slice(0, 80) }));
     const verdict = judgeResearchAnswer(research, { answer: result.value.reply.text, sources: (result.value.sources ?? []).map((s) => ({ site: s.site, url: s.url })), queries: searches.map((o) => o.args?.expression ?? "") });
-    console.log(redact(JSON.stringify({ style, seconds: Math.round(ms / 100) / 10, rounds: searches.length, queries: searches.map((o) => `${o.args?.expression ?? ""} [${o.status}, ${o.result?.data?.rows?.length ?? 0} rows]`), sources, answer: result.value.reply.text, verdict }, null, 2)));
+    console.log(redact(JSON.stringify({ style, seconds: Math.round(ms / 100) / 10, rounds: searches.length, queries: searches.map((o) => `${o.args?.expression ?? ""} [scope ${o.args?.scope ?? "unset"}, ${o.status}, ${o.result?.data?.rows?.length ?? 0} rows]`), sources, answer: result.value.reply.text, verdict }, null, 2)));
   }
   registerActiveChatLease(null);
   runner.cleanupBenchPeople(people);

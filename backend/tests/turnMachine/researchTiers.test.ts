@@ -16,7 +16,7 @@ import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
-import { budgetForStyle, dropUnknownCitations, roundAddedNothing } from "@/lib/turnMachine/research";
+import { budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
@@ -85,9 +85,10 @@ afterEach(() => {
 });
 
 /** Runs one turn against a model that wants to search `wantedRounds` times (a different query each round), then answers. */
-async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean } = {}) {
+async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[] } = {}) {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const requests: ChatCompletionRequest[] = [];
+  let made = 0; // searches the scripted model has asked for so far (a skipped or empty search leaves no tool message to count)
   const stub = startStubLlmServer(0, {
     scriptedChatReply: (request: ChatCompletionRequest) => {
       requests.push(request);
@@ -97,9 +98,10 @@ async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts:
       if (!request.tools || request.tools.length === 0 || request.tool_choice === "none") return undefined;
       requests.push(request);
       __resetRateLimiterForTests(); // Home's own search pace (a burst of three) would make this scripted run wait seconds per round
-      const done = request.messages.filter((m) => m.role === "tool").length;
+      const done = made;
       if (done >= wantedRounds) return undefined;
-      return [{ id: `call-${done + 1}`, type: "function" as const, function: { name: "websearch", arguments: JSON.stringify({ expression: QUERIES[done], scope: "web" }) } }];
+      made += 1;
+      return [{ id: `call-${done + 1}`, type: "function" as const, function: { name: "websearch", arguments: JSON.stringify({ expression: (opts.queries ?? QUERIES)[done], scope: opts.scope ?? "web" }) } }];
     },
   });
   const proxy = startRecordingProxy(stub.url);
@@ -213,6 +215,9 @@ describe("the stop rule, the citation check, the page budget and the stored step
     const outcome = (urls: string[]) => ({ packageId: "websearch", sources: urls.map((url) => ({ url })) }) as never;
     expect(roundAddedNothing([outcome(["https://a.example/1"])], [outcome(["https://a.example/1"])])).toBe(true);
     expect(roundAddedNothing([outcome(["https://a.example/1"])], [outcome(["https://b.example/2"])])).toBe(false);
+    // an empty first round gets one more try; a second empty round in a row ends it
+    expect(roundAddedNothing([], [outcome([])])).toBe(false);
+    expect(roundAddedNothing([outcome([])], [outcome([])])).toBe(true);
   });
 
   test("a research run reads at most 40 pages, 4 from one site, and none after a site refuses", () => {
@@ -248,5 +253,34 @@ describe("the reasoning room grows with the style so a long research answer is n
     expect(budgetForStyle(base, "thinking").thinking_budget_tokens_toggled).toBe(base.thinking_budget_tokens_toggled * 4);
     expect(budgetForStyle(base, "max").thinking_budget_tokens_toggled).toBe(base.thinking_budget_tokens_toggled * 12);
     expect(budgetForStyle(base, "max").reply_ceiling_tokens).toBe(base.reply_ceiling_tokens);
+  });
+});
+
+describe("repeat queries, the web scope, and credits no source names", () => {
+  test("a search that repeats an earlier one is not issued", async () => {
+    await turn("owner", 4, { thinking: true, queries: ["V series cancelled why", "why V series cancelled", "V series novel sequel", "V series 2009 reboot"] });
+    // the second is the first reworded (same words), so only three reach the search backend
+    expect(searxQueries.length).toBe(3);
+  });
+
+  test("a research turn searches the web after its first round even when the model keeps choosing the offline library", async () => {
+    await turn("owner", 3, { thinking: true, scope: "reference" });
+    expect(searxQueries.length).toBe(2);
+  });
+
+  test("repeat detection reads words only", () => {
+    expect(isRepeatQuery(["V series cancelled why"], "why V series cancelled")).toBe(true);
+    expect(isRepeatQuery(["V series cancelled why"], "V series novel sequel")).toBe(false);
+    expect(isRepeatQuery([], "anything")).toBe(false);
+  });
+
+  test("a sentence crediting a person no source or question named is dropped; supported credits stay", () => {
+    const evidence = "The weekly show was produced by Pat Quill according to the network.";
+    const answer = "It was produced by Pat Quill. It was created by Jane Roe. It ended after one season.";
+    const checked = dropUnsupportedCredits(answer, evidence, "tell me about the show");
+    expect(checked.dropped).toBe(1);
+    expect(checked.text).toContain("Pat Quill");
+    expect(checked.text).not.toContain("Jane Roe");
+    expect(checked.text).toContain("ended after one season");
   });
 });

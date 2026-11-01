@@ -1,4 +1,4 @@
-import { dropUnknownCitations } from "../research";
+import { dropUnknownCitations, dropUnsupportedCredits, researchEvidence } from "../research";
 import { MUSIC_NOT_HERE_LINE, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 // U2c, the `answer` node (turn-machine-state-record-2026-09-22.md's
 // state table): "the model's final text or the package reply, the
@@ -173,8 +173,12 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // what is missing and what to do. It stands in only when no model words exist.
       if (input.text.trim().length === 0 && state.outcomes.length > 0) return { outcome: { ok: true }, output: { text: missedLookupLine(state.outcomes), sources } };
       // RESEARCH-TIER-01: a Thinking or Max answer keeps only the citation numbers that name a source of this reply.
-      const checked = state.answerStyle !== undefined && state.answerStyle !== "instant" ? dropUnknownCitations(input.text, sources.length) : { text: input.text, dropped: 0 };
-      return { outcome: { ok: true }, output: { text: checked.text, sources } };
+      const research = state.answerStyle !== undefined && state.answerStyle !== "instant";
+      const cited = research ? dropUnknownCitations(input.text, sources.length) : { text: input.text, dropped: 0 };
+      // ... and drops a sentence that credits a named person no fetched source named.
+      const credited = research ? dropUnsupportedCredits(cited.text, researchEvidence(state.outcomes), state.utterance) : { text: cited.text, dropped: 0 };
+      const note = credited.dropped > 0 ? "\n\nI left out a statement about who made or wrote something, because none of the sources I read named them." : "";
+      return { outcome: { ok: true }, output: { text: `${credited.text}${note}`, sources } };
     }
     case "from_outcomes": {
       // COMMAND-FAIL-01: this text is machine.ts's own last-resort

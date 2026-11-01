@@ -82,10 +82,18 @@ export function continuationInstruction(style: AnswerStyle, utterance: string, p
 /** The stop rule (Jina-style): a round whose searches found no source the earlier rounds had not already shown has nothing
  * new to add, so the turn goes to its answer instead of searching on. Counts and URLs only, no wording is read. */
 export function roundAddedNothing(previous: readonly ToolExecutionOutcome[], round: readonly ToolExecutionOutcome[]): boolean {
-  const searches = round.filter((o) => o.packageId === "websearch");
+  // A skipped repeat is not a result: the next round tells the model and lets it search another angle.
+  const searches = round.filter((o) => o.packageId === "websearch" && o.errorCode !== "repeat_query");
   if (searches.length === 0) return false;
-  const seen = new Set(previous.flatMap((o) => (o.sources ?? []).map((source) => source.url)));
-  return !searches.some((o) => (o.sources ?? []).some((source) => !seen.has(source.url)));
+  const sourcesIn = (list: readonly ToolExecutionOutcome[]) => list.filter((o) => o.packageId === "websearch").flatMap((o) => o.sources ?? []);
+  const seen = new Set(sourcesIn(previous).map((source) => source.url));
+  const found = searches.flatMap((o) => o.sources ?? []);
+  if (found.length === 0) {
+    // An empty round is a thin query, not the end: the model gets one more try to rewrite it, and a second empty round in a row ends the searching.
+    const earlierSearches = previous.filter((o) => o.packageId === "websearch" && o.errorCode !== "repeat_query");
+    return earlierSearches.length > 0 && seen.size === 0;
+  }
+  return !found.some((source) => !seen.has(source.url));
 }
 
 /** The reply's citation check, mechanical: a [n] that names no source of this reply is dropped (a fabricated reference is the
@@ -99,4 +107,55 @@ export function dropUnknownCitations(text: string, sourceCount: number): { text:
     return "";
   });
   return { text: cleaned, dropped };
+}
+
+const STOP_WORDS = new Set(["the", "a", "an", "of", "and", "or", "in", "on", "for", "to", "is", "was", "what", "why", "how", "did", "about"]);
+const tokensOf = (query: string): Set<string> => new Set(query.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((t) => t.length > 0 && !STOP_WORDS.has(t)));
+
+/** Whether this query repeats an earlier search of the turn: the same words, or nearly (four in five shared). Counts words only. */
+export function isRepeatQuery(earlier: readonly string[], query: string): boolean {
+  const mine = tokensOf(query);
+  if (mine.size === 0) return false;
+  return earlier.some((previous) => {
+    const theirs = tokensOf(previous);
+    const shared = [...mine].filter((t) => theirs.has(t)).length;
+    return shared / Math.max(mine.size, theirs.size) >= 0.8;
+  });
+}
+
+/** The repeat-skip note the next round's nudge carries, so the model knows why a search did not run. */
+export const REPEAT_SKIPPED_NOTE = "A search that repeated an earlier one was skipped; search a different angle or answer.";
+
+const CREDIT_CUE = /\b(created|creator of|wrote|written by|produced|directed|developed by|showrunner|founded|invented|designed)\b/i;
+const NAME = /\b[A-Z][a-z]+(?:\s+(?:[A-Z]\.|[A-Z][a-z]+)){1,2}\b/g;
+
+/** The reply's credit check: a sentence that credits a named person with a work or claim ("created by Jane Roe") is dropped when no
+ * fetched source and no word of the person's own question names that person. Returns the text and how many sentences went. Names are
+ * capitalized word runs; the sources' titles, snippets and page text are the evidence. */
+export function dropUnsupportedCredits(text: string, evidence: string, question: string): { text: string; dropped: number } {
+  const haystack = `${evidence}\n${question}`.toLowerCase();
+  let dropped = 0;
+  const parts = text.split(/(?<=[.!?])(\s+)/);
+  const kept = parts.filter((part) => {
+    if (!CREDIT_CUE.test(part)) return true;
+    const names = part.match(NAME) ?? [];
+    const unsupported = names.some((name) => !haystack.includes(name.toLowerCase()));
+    if (unsupported) dropped += 1;
+    return !unsupported;
+  });
+  return { text: kept.join("").replace(/\s{3,}/g, "\n\n").trim(), dropped };
+}
+
+/** Said when the answer is written after searches that found nothing at all, so a memory answer is never dressed as research. */
+export const NO_WEB_RESULTS_CLAUSE = "Every search returned nothing usable. Say so in your first sentence (that you could not reach the web for this), then give what you know and mark it as from memory, not researched.";
+
+/** Everything the searches returned as text (titles, snippets, page text), for the credit check. */
+export function researchEvidence(outcomes: readonly ToolExecutionOutcome[]): string {
+  const parts: string[] = [];
+  for (const outcome of outcomes) {
+    const data = outcome.result?.data as { rows?: { title?: unknown; snippet?: unknown }[]; pages?: { text?: unknown; title?: unknown }[] } | undefined;
+    for (const row of data?.rows ?? []) parts.push(String(row.title ?? ""), String(row.snippet ?? ""));
+    for (const page of data?.pages ?? []) parts.push(String(page.title ?? ""), String(page.text ?? ""));
+  }
+  return parts.join("\n");
 }

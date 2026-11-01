@@ -6,6 +6,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
 import { newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
+import { isRepeatQuery } from "../research";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
 import type { TurnAskField } from "@/wire";
@@ -287,10 +288,21 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     // SEARCH-DDGS-TEEN-01: the host's `spoken` (a minor's ddgs lock) is true for every surface that is not a plain written one, so the
     // shared glance screen is held to SearXNG only too, and an unplanned turn counts as spoken.
+    // RESEARCH-TIER-01: a search that repeats an earlier one of this turn is not issued; the round records it as found nothing new.
+    const priorQueries = tool === "websearch" && researchRun ? [...state.outcomes, ...outcomes].filter((o) => o.packageId === "websearch").map((o) => String((o.args as { expression?: unknown } | undefined)?.expression ?? "")) : [];
+    if (tool === "websearch" && researchRun && isRepeatQuery(priorQueries, String((args as { expression?: unknown }).expression ?? ""))) {
+      const repeat = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "repeat_query", durationMs: 0, failureKind: "found_nothing" });
+      outcomes.push(repeat);
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
+      continue;
+    }
     // Max with the admin's web switch off keeps its first search ordinary and searches the offline library after that.
     const libraryOnlyNow = tool === "websearch" && researchRun?.libraryOnly === true && researchRun.searches > 0;
+    // Research goes past the offline library's overview: after its first search, a research turn searches the web (the live V run
+    // showed the model choosing the library every round and getting only an encyclopedia page).
+    const webNow = tool === "websearch" && researchRun !== undefined && researchRun.libraryOnly !== true && researchRun.searches > 0;
     if (tool === "websearch" && researchRun) researchRun.searches += 1;
-    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}), ...(libraryOnlyNow ? { scope: "reference" } : {}) } : args;
+    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}), ...(libraryOnlyNow ? { scope: "reference" } : webNow ? { scope: "web" } : {}) } : args;
     const startedAt = Date.now();
     // PLACE-WEATHER-01: the host resolves the place and injects coordinates; the
     // model's own args (and so the stored call) carry only the place it named.

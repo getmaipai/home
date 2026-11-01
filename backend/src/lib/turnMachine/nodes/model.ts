@@ -1,4 +1,4 @@
-import { RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress } from "../research";
+import { NO_WEB_RESULTS_CLAUSE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -922,7 +922,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const missedKinds = state.outcomes.slice(recovered?.outcomesBefore ?? 0).filter(lookupMissed).map(lookupFailureKind);
     const answering =
       phrasedOutcomes.length === 0
-        ? lookupMissedInstruction(promptSurfaceClass, input.utterance, missedKinds)
+        ? `${lookupMissedInstruction(promptSurfaceClass, input.utterance, missedKinds)}${researching ? ` ${NO_WEB_RESULTS_CLAUSE}` : ""}`
         : missedKinds.length > 0
           ? `${phrasing}${lookupMissedClause(missedKinds)}`
           : phrasing;
@@ -979,7 +979,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const history = recovered?.history ?? state.messages;
     const evidenceChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
-    const nudge: LlmMessage = { role: "user", content: continuationInstruction(state.answerStyle!, input.utterance, researchProgress(state.outcomes), roundsLeft) };
+    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, researchProgress(state.outcomes), roundsLeft)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}` };
     messages = phrasedOutcomes.length === 0
       ? [...history, nudge]
       : [...history, toolCallAssistantMessage(phrasedOutcomes), ...toolResultMessages(phrasedOutcomes, evidenceChars, promptSurfaceClass !== "written", certaintyGate, sourceNumberOffsets(state.outcomes)), nudge];
