@@ -12,14 +12,16 @@ import { maxStartLine } from "@/apps/chat/composerModeLines";
 // CHAT-NOTICE-SHORT-01: every line is one short sentence pair (about 40 characters).
 export const MAX_SELF_TEST_LINE = "Max needs a quick test first.";
 export const MAX_RUNNING_LONG_LINE = "Taking longer than usual. Still working.";
+export const MAX_READY_LINE = "Max is ready.";
+export const MAX_BACK_LINE = "Back to Instant.";
 const DEFAULT_MAX_LOAD_S = 60;
 const DEFAULT_SELF_TEST_S = 35;
 /** The same rule as the Home side (chatTransitions.ts waitPhrase): rounded to 5 seconds, "a minute" past 50. */
 export function waitPhrase(seconds: number): string {
   return seconds > 50 ? "a minute" : `${Math.max(5, Math.round(seconds / 5) * 5)} seconds`;
 }
-/** The loading line for a step that has run `elapsedMs` of its measured `seconds`; "taking longer" past 1.5 times that. */
-export function maxProgressLine(verb: "Loading" | "Testing", seconds: number, elapsedMs: number): string {
+/** The line for a step that has run `elapsedMs` of its measured `seconds`; "taking longer" past 1.5 times that. */
+export function maxProgressLine(verb: "Switching to" | "Testing", seconds: number, elapsedMs: number): string {
   return elapsedMs > 1.5 * seconds * 1000 ? MAX_RUNNING_LONG_LINE : `${verb} Max. About ${waitPhrase(seconds)}.`;
 }
 const LEASE_KEY = ["max-chat", "lease"] as const;
@@ -150,11 +152,18 @@ export function useMaxChat(enabled: boolean): MaxChat {
   };
 }
 
+/** The person who switched to Max reads Max's own lines, not the general chat-starting notice that the same swap raises for everyone. */
+export function composerNoticeFor(max: ChatComposerNoticeValue | null, general: ChatComposerNoticeValue | null): ChatComposerNoticeValue | null {
+  return max ?? general;
+}
+
 /** The one notice line Max chat needs, in the composer's existing notice slot; null when there is nothing to say. */
 export function useMaxChatNotice(isAdmin: boolean): ChatComposerNoticeValue | null {
   const qc = useQueryClient();
   const flow = useQuery<Flow>({ queryKey: FLOW_KEY, queryFn: () => IDLE, initialData: IDLE, staleTime: Infinity, enabled: false }).data;
   const dismiss = () => setFlow(qc, IDLE);
+  const picked = useQuery<boolean>({ queryKey: PICK_KEY, queryFn: () => false, initialData: false, staleTime: Infinity, enabled: false }).data;
+  const lease = useQuery<ChatLeaseView>({ queryKey: LEASE_KEY, queryFn: chatLeaseApi.get, enabled: false }).data;
   // Re-draw every few seconds while a step runs so "taking longer than usual" appears on time.
   const [, setTick] = useState(0);
   const timed = flow.phase === "starting" || flow.phase === "self_test_running";
@@ -165,12 +174,15 @@ export function useMaxChatNotice(isAdmin: boolean): ChatComposerNoticeValue | nu
   }, [timed]);
   const estimates = qc.getQueryData<ChatLeaseView>(LEASE_KEY)?.estimates;
   switch (flow.phase) {
-    case "starting": return { text: maxProgressLine("Loading", estimates?.max_load_s ?? DEFAULT_MAX_LOAD_S, Date.now() - flow.startedAt), repairsLink: null };
+    case "starting": return { text: maxProgressLine("Switching to", estimates?.max_load_s ?? DEFAULT_MAX_LOAD_S, Date.now() - flow.startedAt), repairsLink: null };
     case "self_test_running": return { text: maxProgressLine("Testing", estimates?.self_test_s ?? DEFAULT_SELF_TEST_S, Date.now() - flow.startedAt), repairsLink: null };
     case "self_test_needed": return isAdmin
       ? { text: flow.line, repairsLink: null, actionLabel: "Run self-test", onAction: () => { void runSelfTest(qc); } }
       : { text: `${flow.line} Ask an admin.`, repairsLink: null, actionLabel: "Dismiss", onAction: dismiss };
     case "error": return { text: flow.line, repairsLink: null, actionLabel: "Dismiss", onAction: dismiss };
-    default: return null;
+    default:
+      if (lease?.held_by_you && lease.state === "releasing") return { text: MAX_BACK_LINE, repairsLink: null };
+      if (picked && lease?.held_by_you && lease.state === "held") return { text: MAX_READY_LINE, repairsLink: null };
+      return null;
   }
 }

@@ -6,7 +6,7 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ComposerTrailingWithThinkingMode } from "@/apps/chat/chatThreadSlots";
 import { ChatAgeBandContext, ThinkingModeCapabilityContext, ThinkingModeContext } from "@/apps/chat/chatThreadContexts";
-import { MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, __setSelfTestPollMsForTests, consumeMaxPick, dropMaxPick, maxProgressLine, useMaxChatNotice, useMaxSendHold } from "@/apps/chat/maxChat";
+import { MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, MAX_READY_LINE, MAX_BACK_LINE, composerNoticeFor, __setSelfTestPollMsForTests, consumeMaxPick, dropMaxPick, maxProgressLine, useMaxChatNotice, useMaxSendHold } from "@/apps/chat/maxChat";
 import { MAX_DIALOG_BODY, MAX_DIALOG_TITLE, MODE_CHOICES } from "@/apps/chat/composerModeLines";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -102,11 +102,36 @@ describe("one answer-style control", () => {
     expect(calls).not.toContain("POST /api/ai/chat-lease");
     expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Instant");
     fireEvent.click(view.getByRole("button", { name: "Use Max" }));
-    expect(await view.findByText("Loading Max. About a minute.")).toBeTruthy();
+    expect(await view.findByText("Switching to Max. About a minute.")).toBeTruthy();
     expect(held()).toBe("held");
     expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Max");
     finish();
     await waitFor(() => expect(held()).toBe("open"));
+    expect(await view.findByText(MAX_READY_LINE)).toBeTruthy();
+    expect(view.queryByText(/Switching to Max/)).toBeNull();
+  });
+
+  test("when Max is being handed back the person who had it reads Back to Instant", async () => {
+    current = lease({ state: "releasing", held_by_you: true });
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    expect(await view.findByText(MAX_BACK_LINE)).toBeTruthy();
+  });
+
+  test("someone else's Max lease never shows these lines", async () => {
+    current = lease({ state: "held", held_by_you: false });
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(view.queryByText(MAX_READY_LINE)).toBeNull();
+    expect(view.queryByText(MAX_BACK_LINE)).toBeNull();
+  });
+
+  test("the Max line wins over the general chat-starting notice, which still shows when Max has nothing to say", () => {
+    const general = { text: "Chat is starting. Back in a moment.", repairsLink: null };
+    const max = { text: "Switching to Max. About a minute.", repairsLink: null };
+    expect(composerNoticeFor(max, general)).toBe(max);
+    expect(composerNoticeFor(null, general)).toBe(general);
+    expect(composerNoticeFor(null, null)).toBeNull();
   });
 
   test("Cancel leaves the control on what it was and asks nothing of the lease", async () => {
@@ -198,11 +223,11 @@ describe("one answer-style control", () => {
   });
 
   test("the loading and testing lines carry the measured time, and give way to taking-longer past 1.5 times it", () => {
-    expect(maxProgressLine("Loading", 60, 0)).toBe("Loading Max. About a minute.");
+    expect(maxProgressLine("Switching to", 60, 0)).toBe("Switching to Max. About a minute.");
     expect(maxProgressLine("Testing", 35, 0)).toBe("Testing Max. About 35 seconds.");
     expect(maxProgressLine("Testing", 35, 52_000)).toBe("Testing Max. About 35 seconds.");
     expect(maxProgressLine("Testing", 35, 53_000)).toBe(MAX_RUNNING_LONG_LINE);
-    for (const line of [maxProgressLine("Loading", 60, 0), MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE]) { expect(line.length).toBeLessThanOrEqual(42); expect(line).not.toContain("\u2014"); }
+    for (const line of [maxProgressLine("Switching to", 60, 0), MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE]) { expect(line.length).toBeLessThanOrEqual(42); expect(line).not.toContain("\u2014"); }
   });
 
   const needsSelfTest = async () => Response.json({ error: MAX_SELF_TEST_LINE, code: "not_ready", first_unmet: "self_test" }, { status: 409 });

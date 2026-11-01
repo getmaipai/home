@@ -87,7 +87,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognit
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
-import { consumeMaxPick, dropMaxPick, useMaxChatNotice } from "@/apps/chat/maxChat";
+import { composerNoticeFor, consumeMaxPick, dropMaxPick, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
@@ -1127,7 +1127,7 @@ export function ChatPage({ person }: { person: Roster }) {
   const maxChatNotice = useMaxChatNotice(isOwnerOrAdminRole(person.role));
   const composerNotice = tryActive
     ? { text: tryCompanionName ? `Trying ${tryCompanionName}, a draft. Nothing is saved.` : "Trying a draft. Nothing is saved.", repairsLink: null, actionLabel: "Stop trying", onAction: () => navigate("/chat") }
-    : baseComposerNotice ?? maxChatNotice;
+    : composerNoticeFor(maxChatNotice, baseComposerNotice);
   const routeLocation = useLocation();
   const projectRoute = useMatch("/chat/projects/:id");
   const projectFolderId = projectRoute?.params.id ? decodeURIComponent(projectRoute.params.id) : undefined;
