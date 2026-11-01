@@ -20,7 +20,8 @@ import { MusicVisualizerSection } from "@/shell/media/MusicVisualizerSection";
 import { appHomeLabel, isMediaApp, isMediaPlayPage, usesFamilyHeader } from "@/shell/mediaApps";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@maipai/ui/src/elements/weather-forecast-page";
-import { useAppSidebar } from "@/shell/useAppSidebar";
+import { navigateOf, useAppSidebar } from "@/shell/useAppSidebar";
+import { rememberMode, rememberedMode, resolveMode, sidebarInMode } from "@/shell/appHeaderModes";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
 import { PackageAppHeaderActions, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
@@ -234,16 +235,29 @@ export function PackageAppPage({ person }: { person: Roster }) {
     if (search) navigate(`${location.pathname}?${search}`, { replace: true, state: location.state });
   }, [packageId, location.pathname, location.search, location.state, arrived, navigate]);
 
-  const sidebar = app?.sidebar;
+  // MEDIA-HEADER-01: the header mode the address is in; the column draws that mode's groups and the groups every mode shares.
+  const mode = resolveMode(app?.header, app?.sidebar, pageId, app?.header?.modes ? rememberedMode(person.id, packageId) : null);
+  const sidebar = useMemo(() => sidebarInMode(app?.sidebar, mode), [app?.sidebar, mode]);
+  const modeLanding = app?.header?.modes?.find((entry) => entry.id === mode)?.page;
+  useEffect(() => { if (mode && app?.header?.modes && (pageId === modeLanding || sidebar?.groups.some((group) => group.mode === mode && group.pages?.some((entry) => entry.page === pageId)))) rememberMode(person.id, packageId, mode); }, [mode, modeLanding, pageId, person.id, packageId]); // eslint-disable-line react-hooks/exhaustive-deps -- remembers only a mode the address chose
+  const onMode = useMemo(() => (id: string) => {
+    const target = app?.header?.modes?.find((entry) => entry.id === id);
+    if (!target || !app) return;
+    rememberMode(person.id, packageId, id);
+    navigate(target.page === "index" ? app.to : `${app.to}/${target.page}`);
+  }, [app, person.id, packageId, navigate]);
   const arrivedState = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState ?? {};
-  const sidebarProps = useAppSidebar(app, sidebar, pageId, arrivedState, person.id);
+  const sidebarFull = useAppSidebar(app, sidebar, pageId, arrivedState, person.id);
+  // An app whose header carries the search draws it there, not a second time in the column.
+  const sidebarProps = sidebarFull && app?.header?.search ? { ...sidebarFull, search: undefined } : sidebarFull;
+  const searchTo = navigateTo(app?.sidebar?.search);
   const pageDoc = page.data as { title?: string; body?: Array<{ type?: string }> } | undefined;
   const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
   useEffect(() => {
-    publishPackageAppHeader(app ? { to: app.to, label: app.label, ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}) } : null);
+    publishPackageAppHeader(app ? { to: app.to, label: app.label, ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
     return () => publishPackageAppHeader(null);
-  }, [app?.to, app?.label, app?.settings_area?.id, contextTitle]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
+  }, [app?.to, app?.label, app?.settings_area?.id, app?.header, contextTitle, mode, onMode, searchTo]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
 
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 
@@ -309,7 +323,14 @@ export function PackageAppPage({ person }: { person: Roster }) {
       {content}
     </div>
   ) : content;
-  return media && hubActive ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
+  // MEDIA-HEADER-01: an app with its own column (Music, Videos) draws that column, not the hub's app list beside it.
+  return media && hubActive && !sidebarProps ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
+}
+
+/** Where an app's search sends the typed words: the search node's `submit` navigate target. */
+function navigateTo(search: unknown): string | undefined {
+  const target = navigateOf((search as { submit?: unknown } | undefined)?.submit);
+  return target?.to;
 }
 
 /** A page document without its search box: on a phone the sections bar's Search item takes its place. */

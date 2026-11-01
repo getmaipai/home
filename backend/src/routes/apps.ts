@@ -21,10 +21,19 @@ const AppRow = z.object({
     groups: z.array(z.object({
       id: z.string(),
       title: z.string().optional(),
+      mode: z.string().optional().describe("Drawn only in this header mode (MEDIA-HEADER-01); none means every mode."),
       pages: z.array(z.object({ page: z.string(), label: z.string(), icon: z.string().nullable() })).optional(),
       rows: z.record(z.string(), z.unknown()).optional(),
     })),
   }).optional().describe("The app's own sidebar column (NEWS-SIDEBAR-01), already reduced to what the asking person may open."),
+  header: z.object({
+    search: z.object({ label: z.string() }).optional().describe("A field-shaped trigger for the app's own search; present only when the app's sidebar search is the person's to open."),
+    modes: z.array(z.object({ id: z.string(), label: z.string(), icon: z.string().nullable(), page: z.string() })).optional().describe("The modes the asking person may use; the first is the default."),
+    actions: z.object({
+      primary: z.object({ label: z.string(), icon: z.string().nullable(), open: z.record(z.string(), z.unknown()) }).optional(),
+      more: z.array(z.object({ label: z.string(), icon: z.string().nullable(), open: z.record(z.string(), z.unknown()) })).optional(),
+    }).optional(),
+  }).optional().describe("The app's buttons in the shell's header row (MEDIA-HEADER-01), already reduced to what the asking person may open."),
   to: z.string().describe("The app's route in the web shell: /apps/<package id>."),
   settings_area: z.record(z.string(), z.unknown()).optional().describe("The package's own settings area as its manifest declares it (present only when it declares one and the asking person's role may open it); the shell draws it at /settings/<id>."),
   pinned_by_default: z.boolean().optional().describe("The app's manifest asks to be pinned in the left rail for a person who has never chosen their own pins."),

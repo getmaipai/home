@@ -31,7 +31,7 @@ import type { PersonRow } from "@/types";
 const ajv = new Ajv2020({ strict: false });
 const validateUiPage = ajv.compile(UI_SCHEMA as object);
 
-import type { AppRow, AppSection, AppSidebar, AppSidebarGroup, AppSidebarRows } from "../wire";
+import type { AppHeader, AppHeaderButton, AppRow, AppSection, AppSidebar, AppSidebarGroup, AppSidebarRows } from "../wire";
 export type { AppRow, AppSection };
 
 export interface AppData {
@@ -196,17 +196,42 @@ export function sidebarFor(person: PersonRow, manifest: PackageManifest, contrib
   for (const group of sidebar.groups) {
     if (group.pages) {
       const entries = group.pages.flatMap((id) => { const entry = visible(id); return entry ? [{ page: entry.id, label: entry.label ?? entry.id, icon: entry.icon ?? null }] : []; });
-      if (entries.length > 0) groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), pages: entries });
+      if (entries.length > 0) groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), ...(group.mode ? { mode: group.mode } : {}), pages: entries });
     } else if (group.rows && actionVisible(group.rows.open)) {
       const { manage, ...rest } = group.rows;
       const bind = rest.bind as { source?: string; path?: string };
       const initial = manifest.id === "news" && bind.source === "package" && bind.path ? sidebarInlineRows(person, bind.path) : undefined;
-      groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), rows: { ...rest, ...(initial ? { initial } : {}), ...(manage && actionVisible(manage.open) ? { manage } : {}) } as AppSidebarRows });
+      groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), ...(group.mode ? { mode: group.mode } : {}), rows: { ...rest, ...(initial ? { initial } : {}), ...(manage && actionVisible(manage.open) ? { manage } : {}) } as AppSidebarRows });
     }
   }
   if (groups.length === 0) return undefined;
   const search = sidebar.search && typeof sidebar.search === "object" && actionVisible((sidebar.search as { submit?: unknown }).submit) ? (sidebar.search as Record<string, unknown>) : undefined;
   return { ...(search ? { search } : {}), groups };
+}
+
+/** MEDIA-HEADER-01: the header buttons this person may use. A mode whose landing page, an action whose target page, or a search whose
+ * sidebar search the person cannot open is removed through the same `pageVisibleTo` check; nothing left means no header. */
+export function headerFor(person: PersonRow, manifest: PackageManifest, contributes: AppContributes, sidebar: AppSidebar | undefined): AppHeader | undefined {
+  const header = contributes.header;
+  if (!header) return undefined;
+  const pages = contributes.pages ?? [];
+  const visible = (id: string | null): boolean => {
+    const entry = id === null ? undefined : pages.find((page) => page.id === id);
+    return entry !== undefined && pageVisibleTo(person, manifest, entry);
+  };
+  const button = (item: { label: string; icon?: string; open: unknown }): AppHeaderButton[] => {
+    const target = navigateTargetPage(manifest.id, item.open);
+    return target !== null && !visible(target) ? [] : [{ label: item.label, icon: item.icon ?? null, open: item.open as Record<string, unknown> }];
+  };
+  const modes = (header.modes ?? []).filter((mode) => visible(mode.page)).map((mode) => ({ id: mode.id, label: mode.label, icon: mode.icon ?? null, page: mode.page }));
+  const primary = header.actions?.primary ? button(header.actions.primary)[0] : undefined;
+  const more = (header.actions?.more ?? []).flatMap(button);
+  const out: AppHeader = {
+    ...(header.search && sidebar?.search ? { search: { label: header.search.label ?? "Search" } } : {}),
+    ...(modes.length > 0 ? { modes } : {}),
+    ...(primary || more.length > 0 ? { actions: { ...(primary ? { primary } : {}), ...(more.length > 0 ? { more } : {}) } } : {}),
+  };
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Two page entries may not name one module file: a second entry with a lower floor would serve the raised page's document. */
@@ -406,6 +431,8 @@ export function listApps(person: PersonRow): AppRow[] {
     if (index.nav === false) continue;
     if (!pageVisibleTo(person, app.manifest, index)) continue;
     const manifest = app.manifest;
+    const sidebar = sidebarFor(person, manifest, app.contributes);
+    const header = headerFor(person, manifest, app.contributes, sidebar);
     rows.push({
       package: id,
       page: "index",
@@ -414,7 +441,8 @@ export function listApps(person: PersonRow): AppRow[] {
       description: manifest.description,
       category: manifest.category,
       keywords: index.keywords ?? [],
-      ...(sidebarFor(person, manifest, app.contributes) ? { sidebar: sidebarFor(person, manifest, app.contributes)! } : {}),
+      ...(sidebar ? { sidebar } : {}),
+      ...(header ? { header } : {}),
       sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav && pageVisibleTo(person, manifest, page)).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
       to: `/apps/${id}`,
       incognito: manifest.incognito,

@@ -140,7 +140,7 @@ function fill(template: string, fields: Record<string, unknown>): string {
   return template.replace(/\{([^}]+)\}/g, (_match, name: string) => String(fields[name] ?? ""));
 }
 
-function navigateOf(action: unknown): { to: string; state: Record<string, unknown> } | null {
+export function navigateOf(action: unknown): { to: string; state: Record<string, unknown> } | null {
   const navigate = typeof action === "object" && action !== null ? (action as { navigate?: { to?: unknown; state?: unknown } }).navigate : undefined;
   if (!navigate || typeof navigate.to !== "string") return null;
   return { to: navigate.to, state: typeof navigate.state === "object" && navigate.state !== null ? (navigate.state as Record<string, unknown>) : {} };

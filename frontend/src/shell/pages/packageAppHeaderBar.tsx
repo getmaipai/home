@@ -1,6 +1,11 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
+import HeaderSearch, { type SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
+import type { AppRow } from "@/lib/api";
+import { navigateOf } from "@/shell/useAppSidebar";
 import { getIcon } from "@maipai/ui/src/icons";
 import { iconNames } from "@maipai/ui/src/icons";
 
@@ -11,13 +16,18 @@ export interface PackageAppHeaderState {
   label: string;
   title?: string;
   settingsArea?: string;
+  /** MEDIA-HEADER-01: the app's own header buttons, the mode in force and where a search goes. */
+  header?: AppRow["header"];
+  mode?: string;
+  onMode?: (id: string) => void;
+  searchTo?: string;
 }
 
 let current: PackageAppHeaderState | null = null;
 const listeners = new Set<() => void>();
 
 export function publishPackageAppHeader(next: PackageAppHeaderState | null): void {
-  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea);
+  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea && current.header === next.header && current.mode === next.mode && current.onMode === next.onMode && current.searchTo === next.searchTo);
   if (same) return;
   current = next;
   for (const listener of listeners) listener();
@@ -33,12 +43,45 @@ function snapshot(): PackageAppHeaderState | null {
 }
 
 const GearIcon = getIcon("settings");
+const MoreIcon = getIcon("more-horizontal");
+
+/** The app's own search: one row that opens the app's search page for the typed words. The palette lists nothing of the shell. */
+function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
+  const remote = useMemo(() => async (query: string): Promise<SearchGroup[]> => [{
+    kind: "app",
+    heading: label,
+    results: [{ kind: "app", id: "search", title: `Search ${label} for "${query.trim()}"`, href: `${searchTo}?q=${encodeURIComponent(query.trim())}` }],
+  }], [label, searchTo]);
+  return <HeaderSearch scope={{ label }} remote={remote} />;
+}
 
 export function PackageAppHeaderActions() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   const navigate = useNavigate();
-  if (!state?.settingsArea) return null;
-  return <><Button type="button" variant="ghost" size="icon-lg" aria-label={`${state.label} settings`} onClick={() => navigate(`/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button></>;
+  if (!state) return null;
+  const { header } = state;
+  const open = (action: unknown) => { const target = navigateOf(action); if (target) navigate(target.to, { state: { pageState: target.state } }); };
+  const modes = header?.modes ?? [];
+  const primary = header?.actions?.primary;
+  const more = header?.actions?.more ?? [];
+  return <>
+    {header?.search && state.searchTo ? <AppSearch label={state.label} searchTo={state.searchTo} /> : null}
+    {modes.length > 1 && state.mode ? (
+      <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
+        <TabsList variant="pill" aria-label={`${state.label} mode`}>
+          {modes.map((mode) => <TabsTrigger key={mode.id} value={mode.id}>{mode.label}</TabsTrigger>)}
+        </TabsList>
+      </Tabs>
+    ) : null}
+    {primary ? <Button type="button" onClick={() => open(primary.open)}>{primary.label}</Button> : null}
+    {more.length > 0 ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-lg" aria-label={`More ${state.label} actions`} />}><MoreIcon aria-hidden="true" /></DropdownMenuTrigger>
+        <DropdownMenuContent align="end">{more.map((item) => <DropdownMenuItem key={item.label} onSelect={() => open(item.open)}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent>
+      </DropdownMenu>
+    ) : null}
+    {state.settingsArea ? <Button type="button" variant="ghost" size="icon-lg" aria-label={`${state.label} settings`} onClick={() => navigate(`/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button> : null}
+  </>;
 }
 
 // The sections of an app as the kit's phone bar entries (phone-minimal-2026-10-25 P2): the app's own index first (active only on its

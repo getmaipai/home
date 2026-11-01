@@ -74,6 +74,11 @@
   "backup": "exclude",
   "background": false,
   "contributes": {
+    "sidebar": {
+      "groups": [
+        { "id": "play", "pages": ["index", "radio", "songs", "albums", "artists", "playlists", "liked"] }
+      ]
+    },
     "pages": [
       {
         "id": "index",

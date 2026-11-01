@@ -1274,8 +1274,13 @@ export interface AppSidebarRows {
   open: Record<string, unknown>;
   manage?: { label: string; open: Record<string, unknown> };
 }
-export interface AppSidebarGroup { id: string; title?: string; pages?: AppSidebarPage[]; rows?: AppSidebarRows }
+export interface AppSidebarGroup { id: string; title?: string; mode?: string; pages?: AppSidebarPage[]; rows?: AppSidebarRows }
 export interface AppSidebar { search?: Record<string, unknown>; groups: AppSidebarGroup[] }
+/** MEDIA-HEADER-01: what an app puts in the shell's one header row, as GET /api/apps returns it for the asking person: the manifest's
+ * `contributes.header` with every mode, action and the search whose target page the person cannot open already removed. */
+export interface AppHeaderButton { label: string; icon: string | null; open: Record<string, unknown> }
+export interface AppHeaderMode { id: string; label: string; icon: string | null; page: string }
+export interface AppHeader { search?: { label: string }; modes?: AppHeaderMode[]; actions?: { primary?: AppHeaderButton; more?: AppHeaderButton[] } }
 export interface AppRow {
   package: string;
   page: "index";
@@ -1287,6 +1292,8 @@ export interface AppRow {
   sections: AppSection[];
   /** The app's own sidebar column (wide screens), when it declares one and anything in it is the person's to see. */
   sidebar?: AppSidebar;
+  /** The app's buttons in the shell's header row (MEDIA-HEADER-01), when it declares any the person may use. */
+  header?: AppHeader;
   to: string;
   /** The package's Incognito behaviour. The hub cannot see the browser's Incognito state, so the shell
    * hides an app whose value is "blocked" while Incognito is on. */

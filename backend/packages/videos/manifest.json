@@ -33,6 +33,11 @@
   "backup": "exclude",
   "background": false,
   "contributes": {
+    "sidebar": {
+      "groups": [
+        { "id": "play", "pages": ["index", "library", "history", "watch-later"] }
+      ]
+    },
     "pages": [
       {
         "id": "index",
