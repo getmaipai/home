@@ -6771,6 +6771,10 @@
                                 "title": {
                                   "type": "string"
                                 },
+                                "mode": {
+                                  "type": "string",
+                                  "description": "Drawn only in this header mode (MEDIA-HEADER-01); none means every mode."
+                                },
                                 "pages": {
                                   "type": "array",
                                   "items": {
@@ -6811,6 +6815,106 @@
                           "groups"
                         ],
                         "description": "The app's own sidebar column (NEWS-SIDEBAR-01), already reduced to what the asking person may open."
+                      },
+                      "header": {
+                        "type": "object",
+                        "properties": {
+                          "search": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "label"
+                            ],
+                            "description": "A field-shaped trigger for the app's own search; present only when the app's sidebar search is the person's to open."
+                          },
+                          "modes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "icon": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "page": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "icon",
+                                "page"
+                              ]
+                            },
+                            "description": "The modes the asking person may use; the first is the default."
+                          },
+                          "actions": {
+                            "type": "object",
+                            "properties": {
+                              "primary": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "icon": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "open": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "nullable": true
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "icon",
+                                  "open"
+                                ]
+                              },
+                              "more": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "label": {
+                                      "type": "string"
+                                    },
+                                    "icon": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "open": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "label",
+                                    "icon",
+                                    "open"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "description": "The app's buttons in the shell's header row (MEDIA-HEADER-01), already reduced to what the asking person may open."
                       },
                       "to": {
                         "type": "string",
