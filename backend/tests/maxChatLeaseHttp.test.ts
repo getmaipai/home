@@ -145,11 +145,11 @@ describe("Max chat lease over HTTP (TIER-HOME-05)", () => {
     expect(await (await client.get("/api/ai/chat-lease")).json()).toMatchObject({ state: "off" });
   });
 
-  test("the lease ends by itself after 30 quiet minutes and the Stack is told to return the standard model", async () => {
+  test("the lease ends by itself 3 minutes after the last answer and the Stack is told to return the standard model", async () => {
     const { client } = await owner();
     expect((await client.post("/api/ai/chat-lease", {})).status).toBe(200);
     getChatLease().requestStarted(); getChatLease().requestEnded();
-    clock += 29 * 60_000;
+    clock += 2 * 60_000;
     expect(await getChatLease().tick()).toBe(false);
     expect(mode).toBe("coding");
     clock += 2 * 60_000;
