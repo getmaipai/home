@@ -8,6 +8,7 @@
 import type { AgeBand } from "@/lib/ageBand";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { TurnBudget } from "./contract";
+import { plainQuery } from "./entityPin";
 
 /** Appended to the final answering instruction of a research turn. */
 export const RESEARCH_ANSWER_CLAUSE = "Say where each claim comes from (the site, or who was interviewed) beside its [n]. Say plainly which parts are your own guess and which the sources state. If the sources disagree or are thin, say so.";
@@ -347,10 +348,18 @@ ${digest.trim() === "" ? "Nothing has been read yet, so write only searches that
 Reply with one JSON object and nothing else: {"queries": ["...", "..."]}`;
 }
 
+/** RESEARCH-QUERY-04: a planned search is plain keywords of at most eight words. The engines return nothing for the long quoted and OR forms
+ * (8 of 20 searches of one live run), so a query is cleaned and cut to its first eight words here, whoever wrote it. */
+export function shortKeywordQuery(query: string, maxWords = 8): string {
+  const cleaned = plainQuery(query);
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  return words.length > maxWords ? words.slice(0, maxWords).join(" ") : cleaned;
+}
+
 export function parsePlannedQueries(text: string): string[] {
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { queries?: unknown };
-    return Array.isArray(parsed.queries) ? parsed.queries.filter((q): q is string => typeof q === "string" && q.trim().length > 3).map((q) => q.trim().slice(0, 140)) : [];
+    return Array.isArray(parsed.queries) ? parsed.queries.filter((q): q is string => typeof q === "string").map((q) => shortKeywordQuery(q.trim().slice(0, 200))).filter((q) => q.length > 3 && q.split(/\s+/).length >= 2) : [];
   } catch {
     return [];
   }

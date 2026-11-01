@@ -5,7 +5,7 @@ import {
   researchQuestion, shouldAsk, understand, __setStageWritersForTests, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
-import { evidenceBySource } from "@/lib/turnMachine/research";
+import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 
 const note = (over: Partial<PageNote> & { url: string }): PageNote => ({ title: "T", kind: "reputable", topic: "why it ended", note: "It ended after low ratings.", quote: "ranked 57th of 77 shows that season", weight: 3, ...over });
@@ -237,5 +237,27 @@ describe("stage 5: the reply, and the chain of hand-offs", () => {
     expect(findings.ledger.text).toContain("- [2] (reputable)");
     expect(reply).toContain("- It ranked 57th of 77. [2]");
     __setStageWritersForTests(undefined);
+  });
+});
+
+describe("planned searches are short plain keywords (RESEARCH-QUERY-04)", () => {
+  test("quotes, OR and minus are taken out and a long query is cut to its first eight words", () => {
+    const q = shortKeywordQuery('"season two" OR "third season" plans for the show on the network after the cancellation was announced');
+    expect(q.split(/\s+/).length).toBeLessThanOrEqual(8);
+    expect(q).not.toMatch(/["]| OR /);
+    expect(shortKeywordQuery("plain short query")).toBe("plain short query");
+  });
+
+  test("a planner's list is cleaned: one-word and empty entries go, long ones are cut", () => {
+    const queries = parsePlannedQueries(JSON.stringify({ queries: ["x", '"a b c" OR "d e f" g h i j k l m n', "good two"] }));
+    expect(queries.length).toBe(2);
+    expect(queries[0]!.split(/\s+/).length).toBeLessThanOrEqual(8);
+    expect(queries[1]).toBe("good two");
+  });
+
+  test("planData keeps the same rules for the first round", async () => {
+    const plan = await planData(async () => JSON.stringify({ sub_questions: ["a"], queries: ['"quoted phrase" OR "other phrase" with many more words than eight allow here', "short one"] }), null, "q", 4);
+    expect(plan.queries.every((q) => q.split(/\s+/).length <= 8 && !q.includes('"'))).toBe(true);
+    expect(plan.queries).toContain("short one");
   });
 });
