@@ -16,7 +16,7 @@ import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityClockForTests, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
-import { remember, PROFILE_SOURCE } from "@/lib/memory";
+import { remember } from "@/lib/memory";
 import * as memoryModule from "@/lib/memory";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { __resetDenoHostForTests } from "@/lib/denoHost";
@@ -603,9 +603,9 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
 
   const LOCATION_REPLY = "Pippa is at soccer practice right now.";
 
-  test("an included profile fact passes grounding: a location claim about a household member the profile paragraph states is not cut", async () => {
+  test("an included profile fact passes grounding: a location claim about a household member the profile card states is not cut", async () => {
     const { actor } = await ownerWithPippa();
-    const profile = remember(actor, { text: "Pippa has soccer practice every Tuesday afternoon.", category: "identity", tier: "durable", scope: "person", person: actor.id, source: PROFILE_SOURCE, importance: 0.9, pinned: true });
+    const profile = remember(actor, { text: "Pippa has soccer practice every Tuesday afternoon.", category: "identity", tier: "durable", scope: "person", person: actor.id, source: "test", importance: 0.9, pinned: true });
     expect(profile.ok).toBe(true);
     const { result, contextMessage } = await turnWith(actor, "where is Pippa this afternoon", LOCATION_REPLY);
     expect(contextMessage).toContain("Pippa has soccer practice every Tuesday afternoon.");
