@@ -7,7 +7,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 import { runPlugin } from "@/lib/plugins";
 import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
 import { researchQuestion } from "../researchPipeline";
-import { NOTE_CONCURRENCY, currentNoteWriter, makeGate, newNoteStats, writePageNotes } from "../pageNotes";
+import { NOTES_START_BUDGET_MS, NOTE_CONCURRENCY, currentNoteWriter, makeGate, newNoteStats, writePageNotes } from "../pageNotes";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { isRepeatQuery, markResearch, memoryDetailsIn, researchCutAt, researchEvidence, withoutMemoryDetails } from "../research";
 import { anchorQuery } from "../entityPin";
@@ -127,9 +127,15 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const gate = makeGate(NOTE_CONCURRENCY);
     const stats = researchRun.noteStats ??= newNoteStats();
     const question = researchQuestion(state.messages, state.utterance);
+    // The passages sent to the light model are the ones that share the most words with the question and its parts.
+    const focus = [question, ...(state.researchBrief?.mustContain ?? []), ...(state.researchPlan?.subQuestions ?? [])].join(" ");
+    let firstNoteAt: number | undefined;
     researchRun.noteJob = (page) => {
       if (researchRun.notes.has(page.url)) return;
-      researchRun.notes.set(page.url, writePageNotes(currentNoteWriter(), gate, question, page, stats).catch(() => []));
+      // Notes are written only while time allows: no new call starts 25 seconds after the first.
+      firstNoteAt ??= Date.now();
+      if (Date.now() - firstNoteAt > NOTES_START_BUDGET_MS) return;
+      researchRun.notes.set(page.url, writePageNotes(currentNoteWriter(), gate, question, page, stats, Date.now, focus).catch(() => []));
     };
   }
   const outcomes: ToolExecutionOutcome[] = [];

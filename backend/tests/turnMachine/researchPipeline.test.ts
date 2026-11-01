@@ -4,7 +4,7 @@ import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
   researchQuestion, shouldAsk, understand, __setStageWritersForTests, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
-import { NOTE_WINDOW_CHARS, notesLedger, pageWindows, parseNotes, quoteInPage, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
+import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource } from "@/lib/turnMachine/research";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 
@@ -83,11 +83,20 @@ describe("page notes", () => {
   const fact = "Deep fact: the show ranked 57th of 77 shows that season, which led to the cancellation.";
   const page = `${filler(9_000)}\n${fact}\n${filler(3_000)}`;
 
-  test("a long page is read in windows, so a fact 9,000 characters in is reached", () => {
-    const windows = pageWindows(page);
-    expect(windows.length).toBeGreaterThan(1);
-    expect(windows.every((w) => w.length <= NOTE_WINDOW_CHARS + 5)).toBe(true);
-    expect(windows.some((w) => w.includes(fact))).toBe(true);
+  test("a long page is cut to the passages that share the most words with the question: a fact 9,000 characters in is reached, and the excerpt is short", () => {
+    const excerpt = relevantExcerpt(page, "why did the show get cancelled, what ranking did it have");
+    expect(excerpt).toContain(fact);
+    expect(excerpt.length).toBeLessThanOrEqual(NOTE_EXCERPT_CHARS);
+    expect(excerpt.length).toBeLessThan(page.length / 4);
+  });
+
+  test("passages: short lines are skipped, a very long paragraph is split near 600 characters, and a page with no newlines still yields passages", () => {
+    const long = `${"A sentence about nothing in particular. ".repeat(60)}`;
+    const passages = pagePassages(`tiny\n${long}`);
+    expect(passages.length).toBeGreaterThan(2);
+    expect(passages.every((p) => p.length <= 700)).toBe(true);
+    expect(pagePassages("x\n\ny")).toEqual([]);
+    expect(relevantExcerpt("short", "anything")).toBe("short");
   });
 
   test("the quote check keeps a note whose quote is in the page (curly quotes and spacing aside) and drops one that is not", () => {
@@ -101,15 +110,15 @@ describe("page notes", () => {
     expect(parsed.kind).toBe("primary");
   });
 
-  test("writePageNotes reads every window through the gate and keeps the deep note", async () => {
+  test("writePageNotes makes ONE call over the relevant passages and keeps the deep note, its quote checked against the whole page", async () => {
     let calls = 0;
     const writer = async (prompt: string) => {
       calls += 1;
       const m = prompt.match(/Deep fact: [^.]*\./);
       return JSON.stringify({ kind: "reputable", notes: m ? [{ topic: "why it ended", note: "It ranked low.", quote: m[0], weight: 3 }] : [] });
     };
-    const notes = await writePageNotes(writer, makeGate(2), "why did it end", { url: "https://a.example/p", title: "A", text: page });
-    expect(calls).toBe(pageWindows(page).length);
+    const notes = await writePageNotes(writer, makeGate(2), "why did it end", { url: "https://a.example/p", title: "A", text: page }, undefined, Date.now, "why did it end ranking cancellation");
+    expect(calls).toBe(1);
     expect(notes.map((n) => n.quote)).toEqual(["Deep fact: the show ranked 57th of 77 shows that season, which led to the cancellation."]);
   });
 
