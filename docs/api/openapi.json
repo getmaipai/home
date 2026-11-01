@@ -14821,6 +14821,22 @@
                         "queue_depth",
                         "chat_paged_out"
                       ]
+                    },
+                    "resource_day": {
+                      "type": "object",
+                      "properties": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "Yesterday's counts-only resource summary."
+                        }
+                      },
+                      "required": [
+                        "date",
+                        "text"
+                      ]
                     }
                   },
                   "required": [
