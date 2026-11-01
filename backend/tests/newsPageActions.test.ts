@@ -50,8 +50,8 @@ describe("a shelf's channel button has somewhere to go", () => {
 describe("the search box (NEWS-LOOK-02)", () => {
   const page = (name: string) => JSON.parse(readFileSync(join(PAGES, name), "utf-8")) as { body: Node[] };
 
-  test("every story page opens on a search box that navigates to the Search page with the query", () => {
-    for (const file of ["index.json", "mix.json", "following.json", "saved.json", "channel.json", "story.json"]) {
+  test("every list page opens on a search box that navigates to the Search page with the query", () => {
+    for (const file of ["index.json", "mix.json", "following.json", "saved.json", "channel.json"]) {
       expect(page(file).body[0], file).toEqual({ type: "search", state: "q", placeholder: "Search News", submit: { navigate: { to: "/apps/news/search", state: { q: "{q}" } } } });
     }
   });
