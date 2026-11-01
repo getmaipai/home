@@ -66,6 +66,33 @@ New records, spec first in `commons/spec`, additive only:
 - **Band creator**: one box, "Describe your band". The chat model writes the name, backstory, members and three album ideas; the picture job makes portraits, a logo and a cover; the song engine makes tracks from the band's `style` words so an album sounds like one band. Every piece is editable and re-makeable, old versions kept (the picture editor's version model).
 - Guards: a made band is never named or drawn as a real artist or a real person; portraits are fictional people; family-likeness rules (likeness consent) apply unchanged; child and teen lanes open only with the safety slice (section 7, S8). Backstory text runs through the same text checks as chat.
 
+## 3.3 Chat: every thing Create makes also has a chat tool and a card (owner, 2026-11-01)
+
+Rule for this whole note: no slice is done until its chat half exists. Anything a person can make or change in Create can be asked for
+in chat, and the result is the same Element in both places (rule 9: the kit Element as it ships, never a chat-only copy). This follows the
+[chat cards standard](chat-cards-2026-10-18.md): a job that takes time uses a named tool-call card that polls the job (as the song card does
+today); everything else is an answer block, a new `kind` added once in `commons` and drawn by `AnswerBlockView`.
+
+| Make | Chat tool (conditional, rule 1: appears only when the turn needs it, with a bench row) | Chat card | Same Element in Create |
+|---|---|---|---|
+| Song | `generate_music`, `edit_music` (built) | `MusicTrack` song card (built) | Song page |
+| **Lyrics** | `write_lyrics` (draft, tidy, rhyme a line, fit to a length; returns text only, no job) and `edit_lyrics` (change a line, then offer "Remake this part") | **Lyrics card** (answer block `lyrics`): sections, editable lines, "Use in a song", "Make it a song", copy; the same Element is the Lyrics box's editor in Create | Create's Lyrics box and the Song page lyrics tab |
+| **Sound effect** | `make_sound` (description, length, loop; returns three takes) | **Sound card**: three takes with play, Loop toggle, "Stick to my words or Surprise me", Save to Sounds, "Add to a song" | Sounds maker |
+| **Stems** | `split_stems` (a made song or an uploaded file the person owns) | **Stems card**: four rows with mute, solo, level, download, "Make a song from this mix" | Stems mixer |
+| **Cover art** | existing picture tool with a song or album as the subject | picture card (built) | Song and Album pages |
+| **Band** | `make_band` (description; the model writes name, back story and members, the picture job makes portraits and logo) | **Band card** (answer block `band`): portrait, name, back story, members, "Make an album", "Remake the logo" | Band page |
+| **Album** | `make_album` (a band or a theme and a track count; queues the song jobs) | **Album card** (answer block `album`): cover, ordered tracks that play in place, progress while tracks are made, "Reorder", "Remake a track" | Album page |
+| Practice | `change_song` for tempo and pitch (an `edit_music` task) | song card gains Slower, Key shift | Edit |
+| Playlist and DJ (S9) | `make_playlist`, `play_queue` | playlist card (exists in the media shelf kinds) | Playlists |
+
+Rules that apply to every row:
+- **One definition each:** a card kind and a tool are defined once in `commons` spec (`answer-block` kinds, tool result schema) and bound once in `elementBindings.ts`; the Create pages bind the same kinds. Adding a kind is a commons change first, tagged, then the Home pin.
+- **The model decides when to call a tool** (rule 1): no word list picks `write_lyrics` over `generate_music`. Each tool gets a bench row (right tool for "help me with the chorus", "make a door slam", "split this song", "invent a band") before it is allowed in the default tool set.
+- **A failed tool never fails the answer** (rule): a failed `make_sound` returns a plain card line and the Status row, not an error bubble.
+- **Gates apply at the tool, not the card:** age band, surface, as-sung check and likeness rules run in the tool exactly as for `generate_music`; the card only draws what the tool returned.
+- **Resume in chat:** "Work on lyrics" opens the Lyrics card seeded from the current song; "Use in a song" hands the text to `generate_music` in the same turn, so a conversation can go lyrics, song, cover, album with no page change.
+- **Voice and spoken surface:** spoken turns read a short summary and show the card on the shared screen only (as the song card does).
+
 ## 4. Edit
 
 As the Studio note section 3.2 item 4: Trim, Fade, Loop a part, Rewrite a part, Extend, Style, Singer swap by description, Tempo, Pitch, Stems, Add a sound, Lyrics. Each tool previews, then applies as a new version.
@@ -106,4 +133,4 @@ household library through the local chat model, similar-track radio, export and 
 | S9 | M | Practice mode, then prompt playlists and the AI DJ | 0.8x keeps pitch within a measured tolerance; a spoken request builds a queue |
 | S10 | S | Export and share, privacy check on every new worker (MUSIC-GEN-08) | zero outbound connections asserted |
 
-Each slice goes to Codex or the local lane as one-to-three-file briefs with a failing test; commons work is its own worktree.
+Each slice ships its chat tool and card with it (section 3.3): a slice is not done until the same thing can be asked for in chat and draws the same Element. Each slice goes to Codex or the local lane as one-to-three-file briefs with a failing test; commons work is its own worktree.
