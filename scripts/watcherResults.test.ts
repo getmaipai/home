@@ -36,7 +36,7 @@ describe("main watcher", () => {
 
   test("records failing files from multiple leg sections", () => {
     const f = fixture();
-    writeFileSync(join(f.main, "scripts/suite.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then\n  echo '== leg: backend (exit 1, 12 s)'\n  echo 'shard: failing files: backend/tests/a.test.ts'\n  echo '== leg: frontend (exit 1, 8 s)'\n  echo 'shard: failing files: frontend/src/b.test.ts'\n  exit 1\nfi\necho 'all green'\n");
+    writeFileSync(join(f.main, "scripts/suite.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then\n  echo '== leg: backend (exit 1, 12 s)'\n  echo 'error: backend boom message'\n  echo '(fail) backend thing > breaks [3ms]'\n  echo 'shard: failing files: backend/tests/a.test.ts'\n  for i in $(seq 1 80); do echo \"(pass) filler $i\"; done\n  echo '== leg: frontend (exit 1, 8 s)'\n  echo 'shard: failing files: frontend/src/b.test.ts'\n  exit 1\nfi\necho 'all green'\n");
     writeFileSync(join(f.main, "scripts/rerun.sh"), "#!/usr/bin/env bash\nexit 1\n");
     git(f.main, "add", "-A");
     git(f.main, "commit", "-m", "fixture multi-leg suite");
@@ -52,6 +52,8 @@ describe("main watcher", () => {
     expect(note).toContain("frontend/src/b.test.ts");
     expect(note).toContain("== leg: backend (exit 1, 12 s)");
     expect(note).toContain("== leg: frontend (exit 1, 8 s)");
+    expect(note).toContain("error: backend boom message");
+    expect(note).toContain("(fail) backend thing > breaks");
   }, 60_000);
 
   test("bisects multiple landings to the commit that introduced RED", () => {

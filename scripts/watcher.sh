@@ -494,6 +494,8 @@ run_once() {
     else printf -- '- Main SHA: `%s`\n- Culprit: `%s` (%s)\n- Failing files: %s\n\n' "$head" "$culprit" "$subject" "${files:-unknown}"; fi
     printf '## Last 60 lines of suite output\n\n```text\n'
     tail -n 60 "$output"
+    printf '\n```\n\n## Failure messages (every leg, WATCH-RED-KEEP-01)\n\n```text\n'
+    grep -h -E -B6 '^\(fail\)|^error:|timed out' "$output" "$output.backend" "$output.frontend" "$output.scripts" 2>/dev/null | head -n "${MAIPAI_WATCH_RED_FAILURE_LINES:-400}" || true
     printf '\n```\n'
   } > "$note_tmp"
   mv -f "$note_tmp" "$note"
