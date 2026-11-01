@@ -85,6 +85,8 @@ export interface StartPictureInput {
   prompt: string;
   body: Omit<GenerationBody, "timeout_ms">;
   sourceFileId?: string | null;
+  /** TIER-WIRE-01: the allowed tier (`jobTier`); Standard or absent adds nothing to the request. */
+  tier?: "standard" | "boost" | "max";
   /** IMGEDIT-01: this job changes a picture already in the chat; the result is saved as its next version. */
   edit?: { sourceId: string; label: string; method: "instruct" | "tool" };
   /** IMGEDIT-01: how the Stack is asked (default: a generation). An edit sends the picture and the instruction to POST /v1/images/edits. */
@@ -107,7 +109,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);

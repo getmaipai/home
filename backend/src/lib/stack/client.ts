@@ -105,6 +105,13 @@ export type CodingWirePath = "/v1/messages" | "/v1/messages/count_tokens" | "/v1
 export interface StackCodingModels { object: "list"; data: Array<{ id: string; role?: string; context_length?: number; thinking_budget_ceiling?: number }> }
 /** `GET /stack/v1/roles` coding entry: only what the gateway reads. */
 export interface StackCodingStatus { state?: string; slots?: number | null; slots_busy?: number }
+/** TIER-WIRE-02: how the Stack answered a Reduced chat request. `waiting` is a chat turn in flight (try again at the next turn boundary); `unsupported` is a Stack without the route. */
+export type StackReducedResult =
+  | { state: "ok"; reduced: boolean; swapMs?: number }
+  | { state: "waiting"; reduced: boolean }
+  | { state: "unsupported" }
+  | { state: "refused"; reason: string };
+
 export interface StackClient {
   getCodingMode(opts?: { signal?: AbortSignal }): Promise<StackCodingMode>;
   setCodingMode(mode: "normal" | "coding", opts?: { signal?: AbortSignal }): Promise<void>;
@@ -176,7 +183,9 @@ export interface StackClient {
   /** GET and POST /stack/v1/memory/reclaim. Absent on older Stacks (404). */
   reclaimList?(opts?: { signal?: AbortSignal }): Promise<StackReclaimList>;
   reclaimRun?(opts?: { signal?: AbortSignal }): Promise<StackReclaimResult>;
-  memory?(opts?: { signal?: AbortSignal }): Promise<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad }>;
+  memory?(opts?: { signal?: AbortSignal }): Promise<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad; reduced_chat?: boolean }>;
+  /** POST /stack/v1/tiers/reduced `{on}` (TIER-WIRE-02): enter, renew (`on: true` again) or leave the Reduced chat model. Absent on a Stack that cannot (the method is optional, and a 404 answers `unsupported`). */
+  setReducedChat?(on: boolean, opts?: { signal?: AbortSignal }): Promise<StackReducedResult>;
   /** GET /stack/v1/memory/daily?days=N. Absent on older Stacks. */
   memoryDaily?(days: number, opts?: { signal?: AbortSignal }): Promise<{ days: StackDailyResources[] }>;
   /** GET /stack/v1/memory/daily?days=N. Absent on older Stacks. */
@@ -513,7 +522,19 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     capabilities: (opts) => call("/stack/v1/capabilities", { method: "GET" }, json<StackCapabilities>, opts),
     reclaimList: (opts) => call("/stack/v1/memory/reclaim", { method: "GET" }, json<StackReclaimList>, opts),
     reclaimRun: (opts) => call("/stack/v1/memory/reclaim", { method: "POST" }, json<StackReclaimResult>, opts),
-    memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad }>, opts),
+    memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad; reduced_chat?: boolean }>, opts),
+    async setReducedChat(on, opts) {
+      try {
+        // 200 {ok:true, swap_ms, reduced} and 202 {ok:false, waiting:true, reduced} both come back as success statuses.
+        const body = await call("/stack/v1/tiers/reduced", jsonInit({ on }), json<{ ok?: boolean; waiting?: boolean; reduced?: boolean; swap_ms?: number }>, opts);
+        if (body.waiting === true) return { state: "waiting", reduced: body.reduced === true };
+        return { state: "ok", reduced: body.reduced === true, ...(typeof body.swap_ms === "number" ? { swapMs: body.swap_ms } : {}) };
+      } catch (err) {
+        if (err instanceof StackError && err.status === 404) return { state: "unsupported" };
+        if (err instanceof StackError && (err.status === 409 || err.status === 503)) return { state: "refused", reason: err.reason ?? err.message };
+        throw err;
+      }
+    },
     memoryDaily: (days, opts) => call(`/stack/v1/memory/daily?days=${days}`, { method: "GET" }, json<{ days: StackDailyResources[] }>, opts),
     mediaRoots: (opts) => call("/stack/v1/media", { method: "GET" }, async (res) => {
       const body = await json<{ media?: { roots?: { read?: unknown; write?: unknown } } }>(res);

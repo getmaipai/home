@@ -2,7 +2,7 @@
 import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
 import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
-import { setReducedChat } from "@/lib/reducedChat";
+import { enterStackReducedChat, leaveStackReducedChat, setReducedChat } from "@/lib/reducedChat";
 import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
@@ -44,6 +44,14 @@ type QueueProvider = () => QueueStoreEntry[];
 
 /** The Max job whose plan lowered chat to Reduced (TIER-HOME-03): the chat line under the input shows while it runs. */
 let reducedChatJobId: string | null = null;
+const REDUCED_RENEW_MS = 5 * 60_000;
+let lastReducedRenewAt = 0;
+let reducedRenewal: ReturnType<typeof setTimeout> | null = null;
+function scheduleReducedRenewal(): void {
+  if (reducedRenewal) return;
+  reducedRenewal = setTimeout(() => { reducedRenewal = null; void releaseHouseholdQueue(); }, REDUCED_RENEW_MS);
+  reducedRenewal.unref?.();
+}
 let currentEntries: QueueStoreEntry[] = [];
 
 /** The plan of the Boost or Max job now running (TIER-PRIO-04/05): what each category does while it runs. Kept in memory only; no person, no app name. */
@@ -399,11 +407,20 @@ export async function releaseHouseholdQueue(): Promise<void> {
         if (held && entry.job.riseReason !== "profile_lowered") { entry.job.riseReason = "profile_lowered"; entry.save(); }
         else if (!held && entry.job.riseReason === "profile_lowered") { entry.job.riseReason = null; entry.save(); }
       }
-      if (runningMax && runningMax.id === reducedChatJobId) setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
-      else {
-        if (reducedChatJobId !== null) { downshiftMemory.restoredAt = now; downshiftMemory.lastJobEndedAt = now; }
-        reducedChatJobId = null; setReducedChat(null);
-      }
+      if (runningMax && runningMax.id === reducedChatJobId) {
+        setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
+        // TIER-WIRE-02: the Stack leaves Reduced by itself after 30 minutes without a renewing `{on:true}`, so a long Max job renews it.
+        if (now - lastReducedRenewAt >= REDUCED_RENEW_MS) { lastReducedRenewAt = now; await enterStackReducedChat(); }
+        scheduleReducedRenewal();
+      } else if (reducedChatJobId !== null) {
+        // The Max window ended: upshift has no delay but waits for a turn boundary (`mayRestoreNow`); the Stack answers 202 while a turn is in flight.
+        if (mayRestoreNow({ reducedNow: true }, chatActivity().inFlight === 0)) {
+          const left = await leaveStackReducedChat();
+          if (left === "waiting") { setReducedChat({ minutesLeft: null }); scheduleDownshiftRecheck(); }
+          else { downshiftMemory.restoredAt = now; downshiftMemory.lastJobEndedAt = now; reducedChatJobId = null; setReducedChat(null); }
+          // A failed leave is not retried forever: renewals stop, so the Stack leaves Reduced by itself, and the composer line follows the Stack.
+        } else { setReducedChat({ minutesLeft: null }); scheduleDownshiftRecheck(); }
+      } else setReducedChat(null);
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
       const admission = admit(jobs, now, tierState);
       const admitted = new Set(admission.start);
@@ -445,7 +462,19 @@ export async function releaseHouseholdQueue(): Promise<void> {
                 }
                 downshiftRequestedAt.delete(entry.job.id);
                 if (entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait") { entry.job.riseReason = null; entry.save(); }
-                if (entry.job.tier === "max") reducedChatJobId = entry.job.id;
+                if (entry.job.tier === "max") {
+                  // TIER-WIRE-02: ask the Stack to swap chat to its Reduced model before the Max job starts.
+                  const entered = await enterStackReducedChat();
+                  if (entered === "waiting") {
+                    // A chat turn is in flight: the swap waits for the turn boundary, like the quiet wait.
+                    if ((entry.job.riseReason as string | null | undefined) !== "quiet_wait") { entry.job.riseReason = "quiet_wait"; entry.save(); }
+                    scheduleDownshiftRecheck();
+                    continue;
+                  }
+                  if (entered === "ok") { reducedChatJobId = entry.job.id; lastReducedRenewAt = now; }
+                  // An older Stack (404) or a refused swap leaves chat normal with no line; the plan then does not claim Reduced chat.
+                  else if (fit.applied.cells.chat) delete (fit.applied.cells as Record<string, unknown>).chat;
+                }
               }
               if (fit.applied) pendingPlan = { jobId: entry.job.id, lead: fit.applied.lead, cells: Object.fromEntries(Object.entries(fit.applied.cells).map(([category, cell]) => [category, cell.state])) };
             }

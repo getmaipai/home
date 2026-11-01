@@ -51,6 +51,8 @@ export interface VideoRequest {
   audience: "all-ages" | "adult";
   /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
+  /** TIER-WIRE-01: the resource tier the job is queued at (absent: Standard). The household queue reads it with `requestTier`. */
+  tier?: "boost" | "max";
 }
 
 export interface VideoJob {
@@ -318,6 +320,8 @@ export interface StartVideoInput {
   prompt: string;
   body: Omit<VideoBody, "timeout_ms">;
   sourceFileId?: string | null;
+  /** TIER-WIRE-01: the allowed tier (`jobTier`); Standard or absent adds nothing to the request. */
+  tier?: "standard" | "boost" | "max";
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -330,7 +334,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

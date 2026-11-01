@@ -19,7 +19,7 @@ const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
-import { allowedQuality, tierArgument } from "@/lib/tiers";
+import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
 import { chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
 import { StackVideoError } from "./stack";
@@ -170,6 +170,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       kind: image ? "animate" : "generate",
       prompt,
       sourceFileId,
+      tier: jobTier("video", tierAsked.tier, choice.quality),
       body: {
         prompt: kid ? forceCartoon(prompt) : withVideoTriggerWords(prompt, adapter),
         size,

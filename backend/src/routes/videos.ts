@@ -20,7 +20,7 @@ import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
-import { allowedQuality, maxOffered, tierArgument } from "@/lib/tiers";
+import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { and, eq } from "drizzle-orm";
@@ -280,6 +280,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   try {
     const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: words, sourceFileId: source.request.source_file_id,
+      tier: jobTier("video", tierArgument({ person: actor, category: "video", arg: asked.tier, band: audience.band }).tier, choice.quality),
       body: {
         prompt: laneOf(audience) === "child" ? forceCartoon(words) : words, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),

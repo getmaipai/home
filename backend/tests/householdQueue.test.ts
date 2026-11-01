@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, test, setSystemTime } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test, setSystemTime } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
 import { fitMemorySizeForTests, rememberFitForTests, resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, resetDownshiftForTests, setQuietConfigSource, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 import { reducedChatState, setReducedChat } from "../src/lib/reducedChat";
+import { __setStackClientForTests } from "../src/lib/stackEngine";
 import { setProfileSource, type ProfileSource } from "../src/lib/jobs/admissionFit";
 import type { ProfileRow } from "../src/lib/jobs/profileTable";
 
@@ -14,7 +15,9 @@ function job(id: string, personId: string, jobClass: QueueJob["jobClass"], creat
 }
 
 describe("household queue", () => {
-  beforeEach(() => { resetChatActivityForTests(); resetDownshiftForTests(); });
+  // TIER-WIRE-02: the queue now asks the Stack to swap chat; this scripted Stack accepts every swap (tests/reducedChatWiring.test.ts covers the HTTP shapes and the failures).
+  beforeEach(() => { resetChatActivityForTests(); resetDownshiftForTests(); let reduced = false; __setStackClientForTests({ setReducedChat: async (on: boolean) => { reduced = on; return { state: "ok", reduced }; }, memory: async () => ({ reduced_chat: reduced }) } as never); });
+  afterEach(() => { __setStackClientForTests(null); });
 
   test("fit admission gates Max release, persists counts, and leaves Standard unchanged", async () => {
     const maxRow: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "standard" }, video: { state: "max" }, picture: { state: "max" }, voice: { state: "standard" } } };
@@ -415,6 +418,8 @@ describe("household queue", () => {
       expect(await endMaxWindow()).toBe(true);
       expect(stopped).toBe(1);
       await releaseHouseholdQueue();
+      // endMaxWindow started a pass of its own that is now asking the Stack to leave; wait for it to finish.
+      for (let i = 0; i < 40 && reducedChatState() !== null; i += 1) await Bun.sleep(5);
       expect(reducedChatState()).toBeNull();
       expect(await endMaxWindow()).toBe(false);
     } finally { remove(); setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); setReducedChat(null); }

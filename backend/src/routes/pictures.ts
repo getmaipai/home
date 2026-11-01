@@ -10,7 +10,7 @@ import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIA
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
-import { allowedQuality, maxOffered, tierArgument } from "@/lib/tiers";
+import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseQuality, detailedReady, isPictureQuality, QUICK_MODEL } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -198,6 +198,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: words,
+      tier: jobTier("image", tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).tier, choice.quality),
       body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
     });
     void job;

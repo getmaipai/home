@@ -34,6 +34,8 @@ export interface PictureRequest {
   audience: "all-ages" | "adult";
   /** IMGGEN-QUALITY-01: which maker made it (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
+  /** TIER-WIRE-01: the resource tier the job is queued at (absent: Standard). The household queue reads it with `requestTier`. */
+  tier?: "boost" | "max";
   /** IMGEDIT-01: an edit of a picture already in this chat. The result is saved as the next version of that picture (so the editor shows Original and Undo), and its source is never changed. */
   edit?: { source_id: string; label: string; method: "instruct" | "tool" };
 }

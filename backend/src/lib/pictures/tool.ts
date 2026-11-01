@@ -12,7 +12,7 @@ import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultAdaptersAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
-import { allowedQuality, tierArgument } from "@/lib/tiers";
+import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from "./quality";
 import { StackPicturesError } from "./stack";
 
@@ -130,6 +130,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       temporary,
       kind: "generate",
       prompt,
+      tier: jobTier("image", tierAsked.tier, choice.quality),
       body: {
         prompt: kid ? forceCartoon(sentPrompt) : sentPrompt,
         size,

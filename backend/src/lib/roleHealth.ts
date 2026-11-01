@@ -1,6 +1,6 @@
 
 import * as canaryResults from "@/lib/canary/results";
-import { reducedChatState } from "@/lib/reducedChat";
+import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
 import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
 import type { EngineHealthEntry } from "@/wire";
@@ -58,8 +58,8 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (role === "chat" && chatBlockedByGpu()) return GPU_HEALTH;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   if (role === "image" || role === "video") return makingHealth(role);
-  if (role === "chat" && reducedChatState()) {
-    // TIER-HOME-03: simpler, not unavailable. Chat answers, so this stays "ready" and never holds Send.
+  if (role === "chat" && await stackReducedChat()) {
+    // TIER-WIRE-03: the Stack's own `reduced_chat` decides, not Home's flag. TIER-HOME-03: simpler, not unavailable. Chat answers, so this stays "ready" and never holds Send.
     return { availability: "ready", reason: null, cause: "tier_reduced" };
   }
   if (role === "chat") {

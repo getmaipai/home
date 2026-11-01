@@ -115,6 +115,16 @@ export function maxOffered(person: PersonRow, category: TierCategory, band?: Age
   return maxAvailable(category) && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
 }
 
+/**
+ * The tier a generating job is queued at (TIER-WIRE-01): the allowed tier `tierArgument` returned, kept only when the job really runs the better
+ * maker (a Quick result is Standard) and Max only when a Max model exists here (otherwise the job runs at Boost, as the line told the person).
+ * The household queue reads it from `request.tier`; nothing here loosens an age or surface gate.
+ */
+export function jobTier(category: TierCategory, tier: Tier | undefined, quality: "quick" | "detailed"): Tier {
+  if (!tier || tier === "standard" || quality === "quick") return "standard";
+  return tier === "max" && !maxAvailable(category) ? "boost" : tier;
+}
+
 export const MAX_NEEDS_ADMIN_LINE = "Max needs an admin's OK. Ask an admin.";
 export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this computer yet, so this one is made at Boost.";
 
