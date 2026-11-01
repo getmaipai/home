@@ -10,6 +10,8 @@ common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
 main="$(cd "$(dirname "$common")" && pwd -P)"
 cd "$(git rev-parse --show-toplevel)"
+# GITNET-01: remote git operations are bounded and retried (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
+if [[ -f scripts/lib/gitnet.sh ]]; then source scripts/lib/gitnet.sh; gitnet_env; else GITNET_TIMED_OUT=0; gitnet() { git "$@"; }; fi
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 [[ -z "$git_env" || ! -f "$git_env" ]] || source "$git_env"
 data="${MAIPAI_SHIP_DATA:-$main/data-scratch/ship}"
@@ -48,7 +50,7 @@ fi
 before_green=0; tag_after=0; dry=0; adopt_empty_live=0; allow_big_copy=0; reinstall=0; retry=0; target=main
 while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --allow-big-copy) allow_big_copy=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
-git fetch origin || die "could not fetch origin; check network access and retry."
+gitnet fetch origin || die "could not fetch origin$( ((GITNET_TIMED_OUT)) && echo ' (GitHub did not answer in time)'); check network access and retry."
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
 else sha="$(git rev-parse --verify "$target^{commit}" 2>/dev/null)" || die "could not resolve $target to a commit; fetch or check the SHA and retry."; fi
 git merge-base --is-ancestor "$sha" origin/main || die "${sha:0:7} is not on origin/main; land it first with bash scripts/land.sh"
@@ -230,10 +232,10 @@ if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   echo "shipped: $label live ($seconds s)"
 fi
 if (( tag_after )); then
-  latest="$(git ls-remote --tags origin 'refs/tags/v[0-9]*' | awk -F/ '{print $NF}' | sed 's/\^{}//' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+  latest="$(gitnet ls-remote --tags origin 'refs/tags/v[0-9]*' | awk -F/ '{print $NF}' | sed 's/\^{}//' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
   [[ -n "$latest" ]] || die "origin has no vX.Y.Z tag to increment; publish the first release tag manually."
   IFS=. read -r major minor patch <<< "${latest#v}"; next="v$major.$minor.$((patch + 1))"
-  if git ls-remote --exit-code --tags origin "refs/tags/$next" >/dev/null 2>&1; then die "$next already exists on origin; fetch tags and retry with the next patch version."; fi
+  if gitnet ls-remote --exit-code --tags origin "refs/tags/$next" >/dev/null 2>&1; then die "$next already exists on origin; fetch tags and retry with the next patch version."; fi
   if git show-ref --verify --quiet "refs/tags/$next"; then
     local_sha="$(git rev-parse "$next^{commit}")"
     local_subject="$(git show -s --format=%s "$local_sha")"
@@ -262,7 +264,7 @@ if (( tag_after )); then
     notes_args="--notes-file $quoted_notes_file"
   fi
   git tag -a "$next" -m "$next" "$sha" || die "could not create $next; check local Git tag state."
-  git push origin "$next" || die "could not push $next; check Git access and retry."
+  gitnet push origin "$next" || die "could not push $next$( ((GITNET_TIMED_OUT)) && echo ' (GitHub did not answer in time)'); check Git access and retry."
   publish="${publish_cmd//TAG/$next}"; publish="${publish//NOTES/$notes_args}"; eval "$publish" || die "published tag $next on GitHub, but the latest-release update failed; run the publish command again."
   echo "tagged $next at ${sha:0:7}"
 fi

@@ -14,11 +14,27 @@ mkdir -p "$data/queue" "$data/notes" "$data"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 
+# GITNET-01: every remote git operation and every long step is bounded (scripts/lib/gitnet.sh), so one hung connection cannot hold the queue.
+# The lib is a snapshot taken from origin/main like this script; until it is present the plain, unbounded behaviour below applies.
+gitnet_lib="$bin/gitnet.sh"
+[[ -f "$gitnet_lib" ]] || gitnet_lib="$main/scripts/lib/gitnet.sh"
+if [[ -f "$gitnet_lib" ]]; then source "$gitnet_lib"
+else
+  gitnet_lib=""
+  gitnet_env() { :; }
+  bounded_run() { shift 2; "$@"; }
+  gitnet() { git "$@"; }
+fi
+mkdir -p "$data/ops"
+GITNET_TIMED_OUT=0
+export GITNET_OPS_DIR="$data/ops" GITNET_STUCK_LOG="$data/stuck.log"
+gitnet_env "$main"
+
 refresh_snapshot() {
-  local script="$1" current="$bin/$1" tmp="$bin/$1.new"
+  local script="$1" src="${2:-scripts/$1}" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
-  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
-  if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
+  [[ -n "${REFRESH_SKIP_FETCH:-}" ]] || GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="refresh fetch" gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  if ! git -C "$main" show "origin/main:$src" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
     rm -f "$tmp"
     return 1
   fi
@@ -33,14 +49,14 @@ refresh_snapshot() {
 
 checkout_warm() {
   if [[ ! -e "$checkout/.git" ]]; then
-    git -C "$main" fetch origin || { error "could not fetch origin; check network and git credentials, then retry checkout."; return 1; }
+    gitnet -C "$main" fetch origin || { error "could not fetch origin; check network and git credentials, then retry checkout."; return 1; }
     git -C "$main" worktree add --detach "$checkout" origin/main || { error "could not create warm checkout at $checkout; remove a stale path and retry."; return 1; }
   fi
   if [[ -z "${MAIPAI_LAND_SKIP_INSTALL:-}" ]]; then
     local d
     for d in backend frontend; do
       [[ -d "$checkout/$d" ]] || continue
-      (cd "$checkout/$d" && bun install --frozen-lockfile) || { error "bun install failed in $d; repair dependencies in $checkout and retry."; return 1; }
+      bounded_run "${MAIPAI_LAND_INSTALL_SECONDS:-600}" "bun install $d (warm checkout)" bash -c 'cd "$1" && bun install --frozen-lockfile' _ "$checkout/$d" || { error "bun install failed or timed out in $d; repair dependencies in $checkout and retry."; return 1; }
     done
   fi
 }
@@ -147,7 +163,7 @@ PY
 # DISK-REMOVE-01: remove finished worktrees after a landing. Best effort: errors are logged, a landing never fails because of it.
 sweep_worktrees() {
   [[ -f "$main/scripts/pipeline.sh" ]] || return 0
-  (cd "$main" && nice -n 10 bash scripts/pipeline.sh sweep >>"$data/lander.log" 2>&1) || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) worktree sweep failed; see above" >> "$data/lander.log"
+  bounded_run "${MAIPAI_LAND_SWEEP_SECONDS:-600}" "worktree sweep" bash -c 'cd "$1" && nice -n 10 bash scripts/pipeline.sh sweep' _ "$main" >>"$data/lander.log" 2>&1 || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) worktree sweep failed or timed out; see above" >> "$data/lander.log"
   return 0
 }
 
@@ -160,7 +176,7 @@ reinstall_main_dependencies() {
   for d in backend frontend; do
     printf '%s\n' "$changed" | grep -Eq "^$d/" || continue
     # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md).
-    if (cd "$main/$d" && bun install --frozen-lockfile --force >/dev/null 2>&1); then done_dirs+=("$d")
+    if bounded_run "${MAIPAI_LAND_INSTALL_SECONDS:-600}" "bun install $d (main checkout)" bash -c 'cd "$1" && bun install --frozen-lockfile --force' _ "$main/$d" >/dev/null 2>&1; then done_dirs+=("$d")
     else echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout install failed in $d; run bun install there" >> "$data/lander.log"; fi
   done
   [[ ${#done_dirs[@]} -eq 0 ]] || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout dependencies reinstalled (${done_dirs[*]})" >> "$data/lander.log"
@@ -177,7 +193,7 @@ update_main_checkout() {
     lock_path="$(git -C "$main" rev-parse --git-path index.lock 2>/dev/null || true)"
     [[ "$lock_path" = /* ]] || lock_path="$main/$lock_path"
     if [[ -e "$lock_path" ]]; then reason="index is locked"
-    elif ! git -C "$main" fetch origin main >/dev/null 2>&1; then reason="could not fetch origin/main"
+    elif ! GITNET_LABEL="main checkout fetch" gitnet -C "$main" fetch origin main >/dev/null 2>&1; then reason="could not fetch origin/main"
     else
       origin_main="$(git -C "$main" rev-parse origin/main 2>/dev/null || true)"
       if [[ -z "$branch" ]] && { [[ -z "$head" || -z "$origin_main" ]] || ! git -C "$main" merge-base --is-ancestor "$head" "$origin_main"; }; then reason="diverged (detached HEAD is not an ancestor of origin/main)"
@@ -209,10 +225,72 @@ safety_surface_files() {
   printf '%s' "$matches"
 }
 
+# GITNET-01: a long step runs in its own process group under a wall clock. On timeout only that group is signalled, the output
+# says so on its last line, and the step fails like any other failure, so the entry bounces with the cause and the queue moves on.
+bounded_step() {
+  local secs="$1" label="$2" out="$3" rc=0
+  shift 3
+  bounded_run "$secs" "$label" "$@" >"$out" 2>&1 || rc=$?
+  if (( rc == 124 )); then echo "timed out after ${secs}s: $label" >>"$out"; fi
+  return "$rc"
+}
+
+timeout_note() { tail -n 1 "$1" 2>/dev/null | grep -E '^timed out after ' || true; }
+
 run_t2_tests() {
   local output="$1" command="${MAIPAI_LAND_T2_CMD:-bun scripts/gate/shardTests.ts --dir backend --root tests && bun scripts/gate/shardTests.ts --dir frontend --root .}"
-  (cd "$checkout" && eval "$command") >"$output" 2>&1
+  bounded_step "${MAIPAI_LAND_T2_SECONDS:-2400}" "safety-surface tests" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
 }
+
+run_static_check() {
+  local output="$1" cap="${MAIPAI_LAND_CHECK_SECONDS:-900}" command="${MAIPAI_LAND_CHECK_CMD:-}"
+  if [[ -n "$command" ]]; then
+    bounded_step "$cap" "static check" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
+  else
+    MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" \
+      bounded_step "$cap" "static check" "$output" bash -c 'cd "$1" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)' _ "$checkout"
+  fi
+}
+
+static_check_reason() {
+  local output="$1" last_line note
+  note="$(timeout_note "$output")"
+  if [[ -n "$note" ]]; then printf 'static check %s' "$note"; return; fi
+  last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"
+  printf 'static check failed%s' "${last_line:+ at $last_line}"
+}
+
+# A network failure (timeout after the bounded retries) does not bounce the entry at once: it goes to the back of the queue for a
+# growing pause, so one stalled connection never blocks the entries behind it, and after MAIPAI_LAND_DEFER_MAX tries it bounces with the cause.
+defer_dir() { printf '%s/deferred' "$data"; }
+net_fail() {
+  local request="$1" branch="$2" sha="$3" what="$4" started="$5" output="$6" base n reason
+  base="$(basename "$request")"; mkdir -p "$(defer_dir)"
+  if (( GITNET_TIMED_OUT )); then reason="git $what timed out; GitHub did not answer in time"; else reason="could not $what origin; check network and git credentials"; fi
+  n="$(cat "$(defer_dir)/$base.n" 2>/dev/null || echo 0)"; n=$(( n + 1 ))
+  if (( n >= ${MAIPAI_LAND_DEFER_MAX:-3} )); then
+    bounce "$request" "$branch" "$sha" "$reason (gave up after $n tries); run land.sh again when the network is back" "$started" "$output"
+    return 0
+  fi
+  printf '%s\n' "$n" >"$(defer_dir)/$base.n"
+  printf '%s\n' $(( $(date +%s) + ${MAIPAI_LAND_DEFER_SECONDS:-120} * n )) >"$(defer_dir)/$base.until"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) deferred $branch (try $n): $reason" >> "$data/lander.log"
+  echo "deferred: $branch (try $n): $reason"
+}
+
+# The oldest request that is not waiting out a network pause.
+next_request() {
+  local f now until
+  now="$(date +%s)"
+  while IFS= read -r f; do
+    until="$(cat "$(defer_dir)/$(basename "$f").until" 2>/dev/null || echo 0)"
+    [[ "$until" =~ ^[0-9]+$ ]] || until=0
+    if (( until <= now )); then printf '%s' "$f"; return 0; fi
+  done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
+}
+
+# One line the status page reads: branch, when the entry started, when the phase last changed, the phase.
+phase() { printf '%s\t%s\t%s\t%s\n' "${current_branch:-}" "${entry_started:-0}" "$(date +%s)" "$1" >"$data/current-entry.tmp" && mv -f "$data/current-entry.tmp" "$data/current-entry"; }
 
 bounce() {
   local request="$1" branch="$2" sha="$3" reason="$4" started="$5" output="$6" main_sha seconds slug landing_note
@@ -226,7 +304,7 @@ PY
   seconds=$(( $(date +%s) - started )); slug="${branch//\//-}"
   atomic_json_note "$branch" "$sha" bounced "$reason" "$main_sha" "$output" "$seconds" "$landing_note"
   log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" bounced "$seconds" "$reason"
-  rm -f "$request"
+  rm -f "$request" "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until
   echo "bounced: $branch at $sha: $reason"
 }
 
@@ -256,6 +334,7 @@ PY
     return 0
   fi
   branch="$(sed -n '1p' "$data/.request-values")"; sha="$(sed -n '2p' "$data/.request-values")"; landing_note="$(sed -n '3p' "$data/.request-values")"
+  current_branch="$branch"; entry_started="$started"
   while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +4 "$data/.request-values"); rm -f "$data/.request-values"
   if [[ ! "$branch" == wt/* || ! "$sha" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
     mkdir -p "$data/queue/bad"; mv "$request" "$data/queue/bad/$(basename "$request")"
@@ -263,7 +342,8 @@ PY
     echo "lander.sh: malformed branch or sha moved to queue/bad; repair or remove it and inspect $data/lander.log" >&2
     rm -f "$output"; return 0
   fi
-  if ! git -C "$checkout" fetch origin; then bounce "$request" "$branch" "$sha" "could not fetch origin; check network and git credentials, then land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
+  phase "fetching origin"
+  if ! GITNET_LABEL="fetch origin" gitnet -C "$checkout" fetch origin; then net_fail "$request" "$branch" "$sha" "fetch" "$started" "$output"; rm -f "$output"; return 0; fi
   if git -C "$checkout" merge-base --is-ancestor "$sha" origin/main; then
     main_sha="$(git -C "$checkout" rev-parse origin/main)"
     seconds=$(( $(date +%s) - started ))
@@ -278,6 +358,7 @@ PY
   if [[ "$origin_branch" != "$sha" ]]; then bounce "$request" "$branch" "$sha" "branch not on origin at $sha; run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
   prev_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo origin/main)"
   if ! git -C "$checkout" checkout --detach "$sha"; then bounce "$request" "$branch" "$sha" "could not check out $sha; inspect the warm checkout, then land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
+  phase "rebasing"
   if ! git -C "$checkout" rebase origin/main; then
     conflict="$(git -C "$checkout" diff --name-only --diff-filter=U || true)"
     git -C "$checkout" rebase --abort || true
@@ -292,7 +373,8 @@ PY
     for d in backend frontend; do
       if printf '%s\n' "$package_changed" | grep -Eq "^$d/"; then
         # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md), which made the generated adoption file name the old kit and turned main red.
-        (cd "$checkout/$d" && bun install --frozen-lockfile --force) || { bounce "$request" "$branch" "$sha" "bun install failed in $d; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; }
+        phase "installing dependencies"
+        bounded_step "${MAIPAI_LAND_INSTALL_SECONDS:-600}" "bun install $d" "$output" bash -c 'cd "$1" && bun install --frozen-lockfile --force' _ "$checkout/$d" || { bounce "$request" "$branch" "$sha" "bun install failed or timed out in $d; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; }
       fi
     done
   fi
@@ -301,12 +383,14 @@ PY
   settings_file="${MAIPAI_COMMONS_DIR}/spec/settings/keys.json"
   case "$settings_file" in "$checkout"/*) generated_paths+=("${settings_file#"$checkout"/}");; esac
   if [[ -n "${MAIPAI_LAND_GENERATE_CMD:-}" ]]; then
-    if ! (cd "$checkout" && eval "$MAIPAI_LAND_GENERATE_CMD") >"$output" 2>&1; then
+    phase "generating files"
+    if ! bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$MAIPAI_LAND_GENERATE_CMD"; then
       last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
     fi
   else
-    if ! (cd "$checkout" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }) >"$output" 2>&1; then
+    phase "generating files"
+    if ! bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
       last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
     fi
@@ -343,18 +427,16 @@ PY
     git -C "$checkout" -c user.name="MaiPai lander" -c user.email="lander@users.noreply.github.com" commit -m "Backlog: ${done_items[*]} done (landed by the lander)" >>"$output" 2>&1 || { last_line="$(tail -n 1 "$output" 2>/dev/null || true)"; bounce "$request" "$branch" "$sha" "backlog item update failed: ${last_line:-could not commit backlog}" "$started" "$output"; rm -f "$output"; return 0; }
   fi
   check_cmd="${MAIPAI_LAND_CHECK_CMD:-}"
-  if [[ -n "$check_cmd" ]]; then
-    (cd "$checkout" && eval "$check_cmd") >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
-  else
-    (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
-  fi
+  phase "static check"
+  run_static_check "$output" || { bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; }
 
   changed_files="$(git -C "$checkout" diff --name-only origin/main...HEAD 2>/dev/null || true)"
   safety_files="$(safety_surface_files "$changed_files")"
   if [[ -n "$safety_files" ]]; then
     t2_started="$(date +%s)"
+    phase "safety-surface tests"
     if ! run_t2_tests "$output"; then
-      reason="safety-surface tests failed: $(printf '%s' "$safety_files" | paste -sd ', ' -)"
+      reason="safety-surface tests failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): $(printf '%s' "$safety_files" | paste -sd ', ' -)"
       bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
     fi
     t2_seconds=$(( $(date +%s) - t2_started ))
@@ -362,23 +444,25 @@ PY
   fi
 
   for attempt in 1 2 3; do
-    if git -C "$checkout" push origin HEAD:refs/heads/main; then
+    phase "pushing to main"
+    if GITNET_TRIES=2 GITNET_LABEL="push main" gitnet -C "$checkout" push origin HEAD:refs/heads/main; then
       main_sha="$(git -C "$checkout" rev-parse HEAD)"
-      git -C "$checkout" push origin --delete "$branch" >>"$data/lander.log" 2>&1 || echo "lander.sh: could not delete remote $branch; remove it when convenient." >&2
+      GITNET_TRIES=1 GITNET_TIMEOUT=45 GITNET_LABEL="delete remote branch" gitnet -C "$checkout" push origin --delete "$branch" >>"$data/lander.log" 2>&1 || echo "lander.sh: could not delete remote $branch; remove it when convenient." >&2
       seconds=$(( $(date +%s) - started ))
       atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds" "$landing_note"
       log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
       rm -f "$request" "$output"
       echo "landed: $branch at $sha"
-      bash "$main/scripts/worktree-map.sh" build >>"$data/lander.log" 2>&1 || true
+      bounded_run "${MAIPAI_LAND_MAP_SECONDS:-120}" "worktree map" bash "$main/scripts/worktree-map.sh" build >>"$data/lander.log" 2>&1 || true
       update_main_checkout
       sweep_worktrees
       return 0
     fi
+    if (( GITNET_TIMED_OUT )); then net_fail "$request" "$branch" "$sha" "push" "$started" "$output"; rm -f "$output"; return 0; fi
     if (( attempt == 3 )); then break; fi
     before_rebase="$(git -C "$checkout" rev-parse HEAD)"
     changed="$(git -C "$checkout" diff --name-only origin/main...HEAD || true)"
-    git -C "$checkout" fetch origin || break
+    GITNET_LABEL="fetch origin (retry)" gitnet -C "$checkout" fetch origin || break
     if ! git -C "$checkout" rebase origin/main; then
       git -C "$checkout" rebase --abort || true
       break
@@ -389,11 +473,8 @@ PY
       intersect="$(comm -12 <(printf '%s\n' "$changed" | sort -u) <(git -C "$checkout" diff --name-only "$before_rebase" "$after_rebase" | sort -u))"
     fi
     if [[ -n "$intersect" ]]; then
-      if [[ -n "$check_cmd" ]]; then
-        (cd "$checkout" && eval "$check_cmd") >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
-      else
-        (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"; reason="static check failed${last_line:+ at $last_line}"; bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; }
-      fi
+      phase "static check (after rebase)"
+      run_static_check "$output" || { bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; }
     fi
   done
   bounce "$request" "$branch" "$sha" "main moved three times during landing; run land.sh again" "$started" "$output"
@@ -402,7 +483,7 @@ PY
 
 run_once() {
   local request
-  request="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort | head -n 1)"
+  request="$(next_request)"
   if [[ -z "$request" ]]; then ring_waiters || true; return 0; fi
   local oldest_branch oldest_slug newer newer_branch newest
   oldest_branch="$(python3 - "$request" <<'PY'
@@ -437,9 +518,11 @@ try: print(json.load(open(sys.argv[1])).get('branch',''))
 except Exception: pass
 PY
 )"
-    if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer"; fi
+    if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer" "$(defer_dir)/$(basename "$newer")".n "$(defer_dir)/$(basename "$newer")".until; fi
   done
   run_one "$request"
+  rm -f "$data/current-entry"
+  [[ -f "$request" ]] || rm -f "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until
   ring_waiters || true
 }
 
@@ -447,6 +530,8 @@ serve() {
   local pidfile="$data/lander.pid" poll="${MAIPAI_LAND_POLL_SECONDS:-2}" old
   local refresh_seconds="${MAIPAI_PIPELINE_REFRESH_SECONDS:-60}" last_refresh=0 now refresh_result running_hash snapshot_hash
   running_hash="$(git -C "$main" hash-object "$0" 2>/dev/null || true)"
+  local lib_hash=""
+  [[ -z "$gitnet_lib" ]] || lib_hash="$(git -C "$main" hash-object "$gitnet_lib" 2>/dev/null || true)"
   [[ "$refresh_seconds" =~ ^[0-9]+$ ]] || refresh_seconds=60
   (( refresh_seconds > 0 )) || refresh_seconds=1
   if [[ -f "$pidfile" ]]; then
@@ -467,6 +552,12 @@ serve() {
       snapshot_hash="$(git -C "$main" hash-object "$bin/lander.sh" 2>/dev/null || true)"
       if [[ "$refresh_result" == changed || ( -n "$running_hash" && "$snapshot_hash" != "$running_hash" ) ]]; then
         echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) code refreshed from origin/main; restarting lander" >> "$data/lander.log"
+        exec bash "$bin/lander.sh" "$@"
+      fi
+      REFRESH_SKIP_FETCH=1 refresh_snapshot gitnet.sh scripts/lib/gitnet.sh >/dev/null || true
+      snapshot_hash="$(git -C "$main" hash-object "$bin/gitnet.sh" 2>/dev/null || true)"
+      if [[ -n "$snapshot_hash" && "$snapshot_hash" != "$lib_hash" ]]; then
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) network helpers refreshed from origin/main; restarting lander" >> "$data/lander.log"
         exec bash "$bin/lander.sh" "$@"
       fi
     fi

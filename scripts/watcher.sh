@@ -22,10 +22,25 @@ mkdir -p "$data/green" "$data/reds"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 
+# GITNET-01: every remote git operation and the dependency install are bounded (scripts/lib/gitnet.sh, kept fresh in $bin by the lander).
+# A fetch that never answers used to freeze the watcher with its pid file held; now it times out, retries and logs. Plain git until the lib exists.
+gitnet_lib="$bin/gitnet.sh"
+[[ -f "$gitnet_lib" ]] || gitnet_lib="$main/scripts/lib/gitnet.sh"
+if [[ -f "$gitnet_lib" ]]; then source "$gitnet_lib"
+else
+  gitnet_env() { :; }
+  bounded_run() { shift 2; "$@"; }
+  gitnet() { git "$@"; }
+fi
+mkdir -p "$data/ops"
+GITNET_TIMED_OUT=0
+export GITNET_OPS_DIR="$data/ops" GITNET_STUCK_LOG="$data/stuck.log"
+gitnet_env "$main"
+
 refresh_snapshot() {
   local script="$1" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
-  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="refresh fetch" gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
   if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
     rm -f "$tmp"
     return 1
@@ -48,7 +63,7 @@ atomic_value() {
 
 checkout_warm() {
   if [[ ! -e "$checkout/.git" ]]; then
-    git -C "$main" fetch origin || { error "could not fetch origin; check network and git credentials, then retry checkout."; return 1; }
+    gitnet -C "$main" fetch origin || { error "could not fetch origin; check network and git credentials, then retry checkout."; return 1; }
     git -C "$main" worktree add --detach "$checkout" origin/main || { error "could not create warm checkout at $checkout; remove a stale path and retry."; return 1; }
   fi
 }
@@ -63,7 +78,7 @@ install_if_needed() {
   for d in backend frontend; do
     [[ -d "$checkout/$d" ]] || continue
     # --force for the same reason as the lander: a changed commons pin is a file: dependency and a plain install keeps the old snapshot.
-    (cd "$checkout/$d" && bun install --frozen-lockfile --force) || { error "bun install failed in $d; repair dependencies in $checkout and retry."; return 1; }
+    bounded_run "${MAIPAI_WATCH_INSTALL_SECONDS:-600}" "bun install $d" bash -c 'cd "$1" && bun install --frozen-lockfile --force' _ "$checkout/$d" || { error "bun install failed or timed out in $d; repair dependencies in $checkout and retry."; return 1; }
   done
 }
 
@@ -417,13 +432,13 @@ file_issue() {
 run_once() {
   local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
   local bisect_started bisect_budget bisect_spent
-  git -C "$checkout" fetch origin || { echo "watcher.sh: fetch failed" >> "$data/watcher.log"; return 0; }
+  GITNET_LABEL="watcher fetch" gitnet -C "$checkout" fetch origin || { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed$( ((GITNET_TIMED_OUT)) && echo ' (timed out)')" >> "$data/watcher.log"; return 0; }
   head="$(git -C "$checkout" rev-parse origin/main)"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
   if ! wait_for_quiet; then return 0; fi
-  git -C "$checkout" fetch origin || { echo "watcher.sh: fetch failed after quiet wait" >> "$data/watcher.log"; return 0; }
+  GITNET_LABEL="watcher fetch (after quiet wait)" gitnet -C "$checkout" fetch origin || { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed after quiet wait$( ((GITNET_TIMED_OUT)) && echo ' (timed out)')" >> "$data/watcher.log"; return 0; }
   head="$(git -C "$checkout" rev-parse origin/main)"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"

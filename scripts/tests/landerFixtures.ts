@@ -22,6 +22,7 @@ const env: Record<string, string | undefined> = {
   MAIPAI_LAND_SKIP_INSTALL: "1",
   MAIPAI_LAND_UPDATE_MAIN: "0",
   MAIPAI_LAND_GIT_ENV: "",
+  GITNET_STATE_DIR: join(scratch, "gitnet-state"),
   MAIPAI_LAND_CHECK_CMD: "bash scripts/check.sh --pre",
   MAIPAI_LAND_GENERATE_CMD: "bash scripts/generate.sh",
 };
@@ -69,6 +70,8 @@ const setup = () => {
   git(main, "config", "user.email", "lander@example.test");
   mkdirSync(join(main, "scripts"), { recursive: true });
   for (const name of scriptNames) copyFileSync(join(import.meta.dir, "..", name), join(main, "scripts", name));
+  mkdirSync(join(main, "scripts", "lib"), { recursive: true });
+  copyFileSync(join(import.meta.dir, "..", "lib", "gitnet.sh"), join(main, "scripts", "lib", "gitnet.sh"));
   writeFileSync(join(main, "scripts", "check.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then echo 'fake check: RED found'; exit 1; fi\necho 'fake check: clean'\n");
   writeFileSync(join(main, "scripts", "generate.sh"), "#!/usr/bin/env bash\nif [[ -f GEN ]]; then mkdir -p docs/api; git rev-parse HEAD > docs/api/openapi.json; fi\n");
   mkdirSync(join(main, "docs"), { recursive: true });

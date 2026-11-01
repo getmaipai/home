@@ -16,11 +16,15 @@ export WT_PIN_REMINDER="a pin changed; run bun install --force in backend and fr
 common="$(git rev-parse --git-common-dir)"
 case "$common" in /*) ;; *) common="$(cd "$common" && pwd)" ;; esac
 std="$(cd "$common/.." && pwd)/../.github"
+# GITNET-01: every git child of the shared script inherits the https low-speed abort from the environment (not the ssh command: that carries
+# this repo's deploy key), and the .github fetch below is bounded and retried. Plain git when the helper is absent.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; GITNET_NO_SSH_COMMAND=1 gitnet_env; else gitnet() { git "$@"; }; fi
 
 case "${1:-}" in done) [[ ! -f scripts/dev.sh ]] || bash scripts/dev.sh stop >/dev/null 2>&1 || true;; esac
 if [[ -n "${MAIPAI_WT_SHARED:-}" ]]; then exec bash "$MAIPAI_WT_SHARED" "$@"; fi
 [[ -d "$std/.git" || -f "$std/.git" ]] || { echo "wt: getmaipai/.github is missing at $std; clone it next to this repo and retry." >&2; exit 1; }
-case "${1:-}" in start|land) git -C "$std" fetch -q origin main 2>/dev/null || echo "wt: could not fetch .github; using its last known origin/main." >&2;; esac
+case "${1:-}" in start|land) GITNET_TRIES=2 GITNET_TIMEOUT=45 gitnet -C "$std" fetch -q origin main 2>/dev/null || echo "wt: could not fetch .github; using its last known origin/main." >&2;; esac
 shared="$(mktemp)"
 trap 'rm -f "$shared"' EXIT
 git -C "$std" show origin/main:standards/bin/wt.sh > "$shared" 2>/dev/null || { echo "wt: .github has no standards/bin/wt.sh on origin/main; fetch it and retry." >&2; exit 1; }

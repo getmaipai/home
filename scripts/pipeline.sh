@@ -17,11 +17,14 @@ launchctl_cmd="${MAIPAI_LAUNCHCTL:-launchctl}"
 bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
+# GITNET-01: remote git operations are bounded (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; gitnet_env "$main"; else GITNET_TIMED_OUT=0; gitnet() { git "$@"; }; fi
 
 refresh_snapshot() {
   local script="$1" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
-  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
   if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
     rm -f "$tmp"
     return 1
@@ -185,14 +188,57 @@ else:
 PY
 }
 
+# GITNET-01: say loudly when the lander or watcher is inside one operation past its bound or one landing phase with no progress,
+# and when a hung operation was killed recently. Reads the ops records and stuck log the bounded steps write; no new daemon.
+stuck_status() {
+  python3 - "$data" "$watch_data" "$(date +%s)" "$(is_running && echo 1 || echo 0)" <<'PY'
+import datetime, glob, json, os, sys
+data, watch, now, lander_up = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4] == '1'
+def alive(pid):
+    try: os.kill(pid, 0); return True
+    except ProcessLookupError: return False
+    except PermissionError: return True
+for root, who in ((data, 'lander'), (watch, 'watcher')):
+    for rec in glob.glob(os.path.join(root, 'ops', '*.op')):
+        try:
+            pid, start, secs, label = open(rec).read().rstrip('\n').split('\t', 3)
+            pid, start, secs = int(pid), int(start), int(secs)
+        except Exception:
+            continue
+        if not alive(pid):
+            try: os.unlink(rec)
+            except OSError: pass
+            continue
+        run = now - start
+        if run > secs + 60: print('STUCK: %s %s for %d min (pid %d, bound %d s)' % (who, label, run // 60, pid, secs))
+    try:
+        for line in open(os.path.join(root, 'stuck.log')).read().splitlines()[-20:]:
+            x = json.loads(line)
+            ts = int(datetime.datetime.fromisoformat(x['ts'].replace('Z', '+00:00')).timestamp())
+            if now - ts <= 3600: print('note: %s hung "%s" (bound %d s) and was stopped %d min ago' % (who, x['op'], x['seconds'], (now - ts) // 60))
+    except (OSError, ValueError, KeyError):
+        pass
+if lander_up:
+    try:
+        branch, started, phase_ts, phase = open(os.path.join(data, 'current-entry')).read().rstrip('\n').split('\t', 3)
+        idle = now - int(phase_ts)
+        limit = int(os.environ.get('MAIPAI_STUCK_PHASE_SECONDS', '3600'))
+        if idle > limit: print("STUCK: lander on %s at '%s' for %d min with no progress" % (branch, phase, idle // 60))
+    except (OSError, ValueError):
+        pass
+PY
+}
+
 status() {
-  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  local fetched=1
+  GITNET_TRIES=1 GITNET_TIMEOUT=20 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || fetched=0
   if is_running; then echo "lander: running (pid $pid)"; else echo "lander: stopped"; fi
   if watch_is_running; then echo "watcher: running (pid $watch_pid)"; else echo "watcher: stopped"; fi
+  stuck_status
   code_status lander.sh
   code_status watcher.sh
   watch_main_status
-  local f branch sha requested age now queue_count vals
+  local f branch sha requested age now queue_count vals deferred_note deferred_until
   queue_count="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | wc -l | tr -d ' ')"
   echo "queue: $queue_count"
   now="$(date +%s)"
@@ -208,7 +254,12 @@ PY
     age="$(python3 -c 'import datetime,sys
 try: print(max(0,int(sys.argv[2])-int(datetime.datetime.fromisoformat(sys.argv[1].replace("Z","+00:00")).timestamp())))
 except Exception: print(0)' "$requested" "$now")"
-    echo "  $branch ${sha:0:7} ${age}s"
+    deferred_note=""
+    if [[ -f "$data/deferred/$(basename "$f").until" ]]; then
+      deferred_until="$(cat "$data/deferred/$(basename "$f").until" 2>/dev/null || echo 0)"; [[ "$deferred_until" =~ ^[0-9]+$ ]] || deferred_until=0
+      if (( deferred_until > now )); then deferred_note=" (GitHub did not answer; try $(cat "$data/deferred/$(basename "$f").n" 2>/dev/null || echo 1), next in $(( deferred_until - now ))s)"; fi
+    fi
+    echo "  $branch ${sha:0:7} ${age}s$deferred_note"
   done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
   bash "$main/scripts/worktree-map.sh" counts 2>/dev/null || echo "worktrees: unknown (map build failed)"
   echo "last landings:"
@@ -219,7 +270,7 @@ for line in sys.stdin:
   x=json.loads(line); ts=datetime.datetime.fromisoformat(x["ts"].replace("Z","+00:00")).astimezone().strftime("%Y-%m-%d %H:%M:%S"); print("%s %s %s %ss %s" % (ts, x["status"], x["branch"], x["seconds"], x["reason"]))
  except Exception: pass'
   fi
-  if git -C "$main" fetch origin >/dev/null 2>&1 && git -C "$main" log origin/main -1 --format='origin/main: %h %s' 2>/dev/null; then :; else echo "origin/main: unknown (fetch failed)"; fi
+  if git -C "$main" log origin/main -1 --format='origin/main: %h %s' 2>/dev/null; then (( fetched )) || echo "origin/main: the line above may be stale (GitHub did not answer the last fetch)"; else echo "origin/main: unknown (fetch failed)"; fi
   service_state com.maipai.lander "$pidfile" "$(service_plist lander)"
   service_state com.maipai.watcher "$watch_pidfile" "$(service_plist watcher)"
 }
@@ -277,7 +328,7 @@ elif kind == 'main-green':
 print(out)
 PY
 )"
-  if [[ -z "$result" && "$kind" == sha ]] && git -C "$main" fetch -q origin main >/dev/null 2>&1 && git -C "$main" merge-base --is-ancestor "$a1" origin/main 2>/dev/null; then result="landed $a1 (on origin/main)"; fi
+  if [[ -z "$result" && "$kind" == sha ]] && GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 && git -C "$main" merge-base --is-ancestor "$a1" origin/main 2>/dev/null; then result="landed $a1 (on origin/main)"; fi
   if [[ -n "$result" ]]; then echo "$result"; return 0; fi
   if (( tmo == 0 )); then echo "pipeline.sh: timed out waiting for $kind $a1" >&2; return 2; fi
   ( sleep "$tmo"; echo TIMEOUT >&3 ) &
