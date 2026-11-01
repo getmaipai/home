@@ -1,3 +1,4 @@
+import { RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -26,7 +27,7 @@ import { streamWatchdog, replyIsUncapped } from "../deadline";
 import type { StackFailureFacts } from "@/lib/stackEngine";
 import { classifyGenerationFailure, engineComputerAwayFromHome, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
-import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars, musicForOutcomes } from "@/lib/composer";
+import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars, musicForOutcomes, sourceNumberOffsets, researchEvidenceChars } from "@/lib/composer";
 import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 import { planLineForTurnMachine } from "@/lib/register";
 import { repeatNotes } from "@/lib/echo";
@@ -132,6 +133,8 @@ export interface ModelInput {
    * boundary, since offering no tools is what makes a text answer
    * certain, never a second, separate cap checked somewhere else. */
   toolsAllowed: boolean;
+  /** RESEARCH-TIER-01: tool rounds finished so far this turn (machine.ts's counter), for the rounds-left line of a later round. */
+  roundsUsed?: number;
   /** T5 / THIN-2G: the one retry round after every call of a tool round failed
    * (machine.ts sets it). Offered like the failed round (same tools block,
    * tool_choice auto) plus a plain line naming the failed tool and kind. */
@@ -772,6 +775,16 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   return { ...result, output: { ...result.output, calls } };
 };
 
+/** RESEARCH-TIER-01: the note joins the last user message of the first round's messages (a copy, the input is not touched). */
+function withResearchNote(messages: LlmMessage[], note: string): LlmMessage[] {
+  const index = messages.map((m) => m.role).lastIndexOf("user");
+  const target = index >= 0 ? messages[index] : undefined;
+  if (!target || typeof target.content !== "string") return messages;
+  const copy = messages.slice();
+  copy[index] = { ...target, content: `${target.content}\n\n[${note}]` };
+  return copy;
+}
+
 const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
   // THIN-3G (rule 4, written chat only, set by the context node): the
   // prompt cannot fit, so the reply is the plain offer of a new chat that
@@ -806,6 +819,9 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 
   // THIN-7C: a bare turn and a continuation offer no tool, ever.
   const toolsAllowed = input.toolsAllowed && !noToolsTurn(state);
+  // RESEARCH-TIER-01: a Thinking or Max turn that may take more than one tool round.
+  const researching = isResearchStyle(state.answerStyle, state.budget);
+  const continuing = researching && state.outcomes.length > 0 && toolsAllowed && !input.retry;
   let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName);
   if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
   let tools: ToolSpec[];
@@ -870,7 +886,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       repeats: repeatNotes(phrasedOutcomes, { conversationId: state.conversationId, turnId: state.turnId, surfaceClass: surfaceClass === "spoken" ? "spoken" : "written", ageBand: state.planBasis.band, safetyFlagged: state.safety.flagged, nowMs: Date.now() }),
     };
     // THIN-4F: a spoken surface's answering round re-reads only the top rows' short text.
-    const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens), surfaceClass === "spoken", certaintyGate);
+    // RESEARCH-TIER-01: source numbers run across every search of the turn, and the evidence is shared between them.
+    const sourceNumbers = sourceNumberOffsets(state.outcomes);
+    const evidenceChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
+    const resultMessages = toolResultMessages(phrasedOutcomes, evidenceChars, surfaceClass === "spoken", certaintyGate, sourceNumbers);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,
     // the exact shape turn-dbyu1niupc actually stored) on EVERY counted
@@ -892,9 +911,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // ANSWER-IMG-05b: a round whose only call showed pictures has no results to
     // phrase; its answering round gets the short instruction.
     const picturesOnly = phrasedOutcomes.length > 0 && phrasedOutcomes.every((o) => o.packageId === SHOW_IMAGES_TOOL_ID);
-    const phrasing = picturesOnly
+    const basePhrasing = picturesOnly
       ? picturesOnlyInstruction(promptSurfaceClass, input.utterance, replayedSearchCount)
       : phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty, replayedSearchCount);
+    // RESEARCH-TIER-01: a Thinking or Max answer names where each claim comes from and marks its guesses.
+    const phrasing = researching && !picturesOnly && searchResultCount > 0 ? `${basePhrasing} ${RESEARCH_ANSWER_CLAUSE}` : basePhrasing;
     // SEARCH-ANSWER-01: when the one retry round produced results, the retry's
     // own instruction and the first round's misses are history, not news.
     const recovered = phrasedOutcomes.length > 0 ? recoveredRetry(state.messages) : null;
@@ -909,13 +930,13 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const history = recovered?.history ?? state.messages;
     messages = phrasedOutcomes.length === 0 ? [...history, instruction] : [...history, assistantMessage, ...resultMessages, instruction];
     if (phrasedOutcomes.length > 0 && searchResultCount > 0) {
-      const baseEvidenceChars = searchEvidenceMaxChars(state.budget.context_tokens);
+      const baseEvidenceChars = evidenceChars;
       withEvidenceLimit = (maxChars) => {
         const resultMessages = maxChars > 0
-          ? toolResultMessages(phrasedOutcomes, maxChars, surfaceClass === "spoken", certaintyGate)
+          ? toolResultMessages(phrasedOutcomes, maxChars, surfaceClass === "spoken", certaintyGate, sourceNumbers)
           : phrasedOutcomes.flatMap((outcome) => outcome.status === "succeeded" && outcome.packageId === "websearch"
             ? [{ role: "tool" as const, tool_call_id: outcome.callId, content: JSON.stringify({ status: "succeeded", package: "websearch", instruction: "The search results could not be read because they did not fit in the available context. Do not claim to have read them." }) }]
-            : toolResultMessages([outcome], undefined, false, certaintyGate));
+            : toolResultMessages([outcome], undefined, false, certaintyGate, sourceNumbers));
         const retryInstruction = maxChars === 0
           ? { ...instruction, content: `${instruction.content} The search results could not be read because they did not fit in the available context. Say that in your own words, and do not claim facts from those results.` }
           : instruction;
@@ -940,6 +961,30 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     messages = [...state.messages, markRetryMessage({ role: "user", content: promptSurfaceClass === "written" ? retrying : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${retrying}` }, state.outcomes.length)];
     tools = retryTools(state.lastTools, state.temporary);
     tool_choice = "auto";
+  } else if (continuing) {
+    // RESEARCH-TIER-01: a later tool round of a Thinking or Max turn. The turn's first messages, then every search so far
+    // (one assistant message naming the calls, one tool message each, source numbers running on from search to search), then
+    // a nudge saying what was searched, which sites were read and how many searches are left. Tools stay offered with
+    // tool_choice "auto": the model decides whether to search again or answer. `state.messages` is not replaced, so the
+    // answering round builds on the same first messages and replays each search once.
+    const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(state.planBasis.surfaceClass ?? "spoken", state.plan.age_band);
+    const phrasedOutcomes = state.outcomes.filter((o) => !lookupMissed(o));
+    const certaintyGate = {
+      ageBand: state.planBasis.band,
+      safetyFlagged: state.safety.flagged,
+      hedging: state.persona.hedging,
+      repeats: repeatNotes(phrasedOutcomes, { conversationId: state.conversationId, turnId: state.turnId, surfaceClass: "written", ageBand: state.planBasis.band, safetyFlagged: state.safety.flagged, nowMs: Date.now() }),
+    };
+    const recovered = phrasedOutcomes.length > 0 ? recoveredRetry(state.messages) : null;
+    const history = recovered?.history ?? state.messages;
+    const evidenceChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
+    const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
+    const nudge: LlmMessage = { role: "user", content: continuationInstruction(state.answerStyle!, input.utterance, researchProgress(state.outcomes), roundsLeft) };
+    messages = phrasedOutcomes.length === 0
+      ? [...history, nudge]
+      : [...history, toolCallAssistantMessage(phrasedOutcomes), ...toolResultMessages(phrasedOutcomes, evidenceChars, promptSurfaceClass !== "written", certaintyGate, sourceNumberOffsets(state.outcomes)), nudge];
+    tools = state.lastTools;
+    tool_choice = "auto";
   } else if (!toolsAllowed) {
     tools = [];
     tool_choice = undefined;
@@ -952,7 +997,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     tool_choice = "auto";
   }
 
-  state.messages = messages;
+  // RESEARCH-TIER-01: the first round of a research turn is told it may search more than once (Max: split the question first).
+  // `state.messages` keeps the messages without the note, so the answering round does not repeat it.
+  const firstRoundMessages = researching && toolsAllowed && !continuing && !input.retry && !isPhrasingRound && state.outcomes.length === 0 ? withResearchNote(messages, firstRoundNote(state.answerStyle!, state.budget.rounds)) : null;
+  state.messages = continuing ? state.messages : messages;
+  if (firstRoundMessages) messages = firstRoundMessages;
   if (!isPhrasingRound) state.lastTools = tools;
 
   // STREAM-NEXT-01 (b): the gate settles at exactly one of this
@@ -980,7 +1029,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "generate_music" || t.id === "edit_music");
   const successfulMusicStart = musicForOutcomes(state.outcomes) !== null;
   const holdMedia = !input.retry && !noToolsTurn(state) && (successfulMusicStart || (!isPhrasingRound && asksForMedia(input.utterance)));
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && (searchAssistMayHold(state, tools) || weatherAssistMayHold(state, tools)));
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && !continuing && (searchAssistMayHold(state, tools) || weatherAssistMayHold(state, tools)));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
   // keep cutting until the request fits or the prompt carries no search

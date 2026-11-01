@@ -985,7 +985,7 @@ function isVideoSource(source: { url: string; category?: unknown; template?: unk
 }
 
 /** Build bounded numbered search sources, with labels for exactly what was read. */
-export function buildSearchSources(rows: unknown, pages: unknown, spoken = false): Record<string, unknown>[] {
+export function buildSearchSources(rows: unknown, pages: unknown, spoken = false, numberFrom = 0): Record<string, unknown>[] {
   const pageTexts = new Map<string, string>();
   if (Array.isArray(pages)) {
     for (const raw of pages) {
@@ -1004,7 +1004,7 @@ export function buildSearchSources(rows: unknown, pages: unknown, spoken = false
     const pageText = video ? undefined : pageTexts.get(source.url);
     const short = (pageText ?? source.snippet ?? "").slice(0, SPOKEN_SOURCE_TEXT_CHARS);
     return {
-      n: index + 1,
+      n: numberFrom + index + 1,
       title: source.title,
       url: source.url,
       ...(video
@@ -1018,13 +1018,13 @@ export function buildSearchSources(rows: unknown, pages: unknown, spoken = false
   });
 }
 
-function websearchPayload(outcome: ToolExecutionOutcome, spoken = false): Record<string, unknown> | null {
+function websearchPayload(outcome: ToolExecutionOutcome, spoken = false, numberFrom = 0): Record<string, unknown> | null {
   const data = recordData(outcome.result?.data);
   if (!data || !Array.isArray(data.rows)) return null;
   // The numbered list is the same one the reply's Sources card is built
   // from (sourcesFromRows), so a cited [n] and the card agree by
   // construction.
-  const sources = buildSearchSources(data.rows, data.pages, spoken);
+  const sources = buildSearchSources(data.rows, data.pages, spoken, numberFrom);
   const context = (spoken ? [] : data.rows.slice(0, MAX_ROWS))
     .flatMap((raw) => {
       const row = recordData(raw);
@@ -1075,7 +1075,7 @@ function searchContent(payload: Record<string, unknown>, maxChars = SEARCH_SOURC
 /** The tool message's content for one outcome: the result as JSON data
  * (the reply, the data, the hint), or the failure; never a developer
  * diagnostic. */
-export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?: number, spoken = false, certainty?: CertaintyGate): string {
+export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?: number, spoken = false, certainty?: CertaintyGate, numberFrom = 0): string {
   // NAT-03: the certainty band rides beside the fact (certainty.ts), gated by the listener.
   const repeat = certainty?.repeats?.get(outcome.callId);
   const banded = certainty ? certaintyFields(outcome, certainty.ageBand, certainty.safetyFlagged) : {};
@@ -1083,7 +1083,7 @@ export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?
   const hedgeHint = certainty?.hedging && certainty.hedging !== "medium" && Object.values(banded).some((band) => band !== "sure") ? { hedging: certainty.hedging } : {};
   const bands = { ...banded, ...hedgeHint, ...(repeat ? { repeat } : {}) };
   if (outcome.status === "succeeded" && outcome.packageId === "websearch") {
-    const search = websearchPayload(outcome, spoken);
+    const search = websearchPayload(outcome, spoken, numberFrom);
     if (search) Object.assign(search, bands);
     // THIN-4F: a spoken turn's cap is the smaller of the window-sized cap and the spoken one.
     if (search) return searchContent(search, spoken ? Math.min(searchMaxChars ?? Infinity, SPOKEN_EVIDENCE_TOKENS_MAX * 4) : searchMaxChars);
@@ -1191,8 +1191,29 @@ export function toolCallAssistantMessage(outcomes: readonly ToolExecutionOutcome
  * payload as its content - the array-building half `toolResultContent`
  * itself doesn't cover, extracted the same way and for the same reason
  * as `toolCallAssistantMessage` above. */
-export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[], searchMaxChars?: number, spoken = false, certainty?: CertaintyGate): LlmMessage[] {
-  return outcomes.map((o) => ({ role: "tool", content: toolResultContent(o, searchMaxChars, spoken, certainty), tool_call_id: callIdOf(o) }));
+export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[], searchMaxChars?: number, spoken = false, certainty?: CertaintyGate, numberFrom?: ReadonlyMap<string, number>): LlmMessage[] {
+  return outcomes.map((o) => ({ role: "tool", content: toolResultContent(o, searchMaxChars, spoken, certainty, numberFrom?.get(callIdOf(o)) ?? 0), tool_call_id: callIdOf(o) }));
+}
+
+/** RESEARCH-TIER-01: where each outcome's source numbers start, so a [n] the model cites in a later round
+ * names one source of the reply's whole list (the Sources card is every outcome's sources in order). */
+export function sourceNumberOffsets(outcomes: readonly ToolExecutionOutcome[]): Map<string, number> {
+  const offsets = new Map<string, number>();
+  let count = 0;
+  for (const outcome of outcomes) {
+    offsets.set(callIdOf(outcome), count);
+    count += outcome.sources?.length ?? 0;
+  }
+  return offsets;
+}
+
+/** RESEARCH-TIER-01: the evidence a research turn re-reads on each later round is shared, not repeated per search:
+ * about two windows' worth of search text in all, split over the searches so far, never more than one search got
+ * before and never under 2,500 characters. One search keeps exactly the cap it always had. */
+export function researchEvidenceChars(contextTokens: number, searchCount: number): number {
+  const base = searchEvidenceMaxChars(contextTokens);
+  if (searchCount <= 1) return base;
+  return Math.max(2_500, Math.min(base, Math.floor((base * 2) / searchCount)));
 }
 
 /** PHRASE-01's own phrasing-round instruction (dev.md "The written

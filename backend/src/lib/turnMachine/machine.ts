@@ -5,6 +5,7 @@
 // per row, invoke wraps the node call (runNode() below owns the
 // deadline and the trace entry, both section 11's own requirements),
 // and every transition matches the table's own "Exits" column.
+import { isResearchStyle, roundAddedNothing } from "./research";
 import { setup, fromPromise, assign } from "xstate";
 import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contract";
 
@@ -149,7 +150,7 @@ export const turnMachine = setup({
         deadlineFor(input, modelNodeDeadlineMs(input.turnState)),
         input.turnState,
         input.abortSignal,
-        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds, retry: retryRound(input) },
+        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds, roundsUsed: input.roundsUsed, retry: retryRound(input) },
         modelNode,
       ),
     ),
@@ -548,7 +549,13 @@ export const turnMachine = setup({
           },
           {
             guard: "moreRoundsAvailable",
-            actions: [assign(({ event }) => ({ step: event.output })), assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), "recordOutcomes", "derivePlanFromEvidence"],
+            actions: [
+              assign(({ event }) => ({ step: event.output })),
+              // RESEARCH-TIER-01: a research round that found nothing new ends the searching; the next model call is the answering round.
+              assign({ roundsUsed: ({ context, event }) => (isResearchStyle(context.turnState.answerStyle, context.turnState.budget) && roundAddedNothing(context.turnState.outcomes, (event as unknown as { output: ToolOutput }).output.outcomes) ? context.turnState.budget.rounds : context.roundsUsed + 1) }),
+              "recordOutcomes",
+              "derivePlanFromEvidence",
+            ],
             target: "model",
           },
           { actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"], target: "answer" },

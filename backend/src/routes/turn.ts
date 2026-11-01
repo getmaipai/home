@@ -950,6 +950,8 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     text?: string;
     model?: string;
     thinking?: boolean;
+    /** RESEARCH-TIER-01: Max armed for this message; runTurnNext honors it only while the person holds the Max lease. */
+    max?: boolean;
     conversation_id?: string;
     mention_companion_id?: string;
     try_companion_id?: string;
@@ -1093,6 +1095,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       spoken: body.spoken === true,
       ...(currentLocation ? { currentLocation } : {}),
       thinking: dropReasoning ? false : body.thinking,
+      max: dropReasoning ? false : body.max === true,
       model: modelSelection.model,
       ...(robotName ? { robotName } : {}),
       ...(surface === "robot" && deviceId ? { deviceId } : {}),

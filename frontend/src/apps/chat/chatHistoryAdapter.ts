@@ -184,9 +184,11 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.picture || row.video || row.music || row.sources?.length || row.blocks?.length
+        row.reasoning || row.research_steps?.length || row.structured_part || row.artifact || row.confirm || row.project || row.picture || row.video || row.music || row.sources?.length || row.blocks?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
+              // RESEARCH-TIER-01: the searches of a Thinking or Max turn, as the live stream drew them (the steps persist with the message).
+              ...(row.research_steps?.length ? [toolCallPart(`${row.id}-tools`, "tool_timeline", row.research_steps.map((step) => ({ callId: step.call_id, packageId: step.package_id, label: step.label, state: step.state, ...(step.sites ? { sites: step.sites } : {}) })))] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
               // #182: a project-attached artifact (PROJECT_START_PLUGIN_ID
               // above) rides AFTER the text below, not here - it belongs

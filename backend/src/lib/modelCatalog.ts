@@ -87,6 +87,11 @@ export const CATALOG: ModelCapabilities[] = [
     // repeats (0 false calls in 50, 19 fitting searches in 50).
     turn_budget: {
       rounds: 1,
+      // RESEARCH-TIER-01 (spec-v0.1.290): rounds: 1 is Instant. Thinking and Max take more tool
+      // rounds on an adult's written turn so research depth follows the answer style; the
+      // figures are starting values until the V-question bench in docs/dev dev notes is rerun.
+      rounds_thinking: 4,
+      rounds_max: 12,
       max_tools: 16,
       // THIN-2B (rule 1): deprecated and ignored. Home no longer reads it;
       // the pinned spec still requires the field, and a later spec tag
@@ -190,6 +195,11 @@ export const CATALOG: ModelCapabilities[] = [
     // tool-calling bench on the Studio (measured.on says so).
     turn_budget: {
       rounds: 1,
+      // RESEARCH-TIER-01 (spec-v0.1.290): rounds: 1 is Instant. Thinking and Max take more tool
+      // rounds on an adult's written turn so research depth follows the answer style; the
+      // figures are starting values until the V-question bench in docs/dev dev notes is rerun.
+      rounds_thinking: 4,
+      rounds_max: 12,
       max_tools: 16,
       always_search: true,
       model_transitions: true,
@@ -265,6 +275,11 @@ export const CATALOG: ModelCapabilities[] = [
     // tool-calling bench on the Studio (measured.on says so).
     turn_budget: {
       rounds: 1,
+      // RESEARCH-TIER-01 (spec-v0.1.290): rounds: 1 is Instant. Thinking and Max take more tool
+      // rounds on an adult's written turn so research depth follows the answer style; the
+      // figures are starting values until the V-question bench in docs/dev dev notes is rerun.
+      rounds_thinking: 4,
+      rounds_max: 12,
       max_tools: 16,
       always_search: true,
       model_transitions: true,
@@ -338,6 +353,11 @@ export const CATALOG: ModelCapabilities[] = [
     // unless toggled); the measured block says what has not been run.
     turn_budget: {
       rounds: 1,
+      // RESEARCH-TIER-01 (spec-v0.1.290): rounds: 1 is Instant. Thinking and Max take more tool
+      // rounds on an adult's written turn so research depth follows the answer style; the
+      // figures are starting values until the V-question bench in docs/dev dev notes is rerun.
+      rounds_thinking: 4,
+      rounds_max: 12,
       max_tools: 16,
       always_search: true,
       model_transitions: true,
@@ -404,6 +424,11 @@ export const CATALOG: ModelCapabilities[] = [
     },
     turn_budget: {
       rounds: 1,
+      // RESEARCH-TIER-01 (spec-v0.1.290): rounds: 1 is Instant. Thinking and Max take more tool
+      // rounds on an adult's written turn so research depth follows the answer style; the
+      // figures are starting values until the V-question bench in docs/dev dev notes is rerun.
+      rounds_thinking: 4,
+      rounds_max: 12,
       max_tools: 16,
       always_search: true,
       model_transitions: true,

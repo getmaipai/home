@@ -52,6 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
+import { currentResearchBudget, noteDeclined, notePageRead, researchPageAllowed, waitForHostPace } from "@/lib/researchBudget";
 import { runAsBlockViewer } from "@/lib/blocklists/blockViewer";
 import { siteBlockSignature, siteBlocksActive, urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { isPrivacyFlaggedSearchEngine } from "@/lib/searchEngines";
@@ -196,6 +197,8 @@ const SEARXNG_RATE_LIMIT_KEY = "searxng";
 // engines. A person asking several things in a row is still a burst of
 // three; nothing beyond that was ever a person's own pace.
 const SEARXNG_RATE_LIMIT = { capacity: 3, refillPerSecond: 1 / 6 };
+/** RESEARCH-TIER-01: the longest a research run waits for a search token (one token comes back every six seconds). */
+const RESEARCH_SEARCH_WAIT_MS = 8_000;
 /** One choke point for real searches (the person's questions and answer pictures). */
 export function consumeSearxngRequestToken(): boolean {
   return tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT);
@@ -1336,7 +1339,14 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
   const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts) : null;
   const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
   const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}${opts.timeRange ? `&time_range=${opts.timeRange}` : ""}`;
-  if (!consumeSearxngRequestToken()) {
+  let searchToken = consumeSearxngRequestToken();
+  // RESEARCH-TIER-01: a research run's next search waits for its turn at Home's own pace (a burst of three, then one about every
+  // six seconds) instead of failing the round; a person doing this by hand would simply wait too.
+  for (let waited = 0; !searchToken && currentResearchBudget() && waited < RESEARCH_SEARCH_WAIT_MS; waited += 500) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    searchToken = consumeSearxngRequestToken();
+  }
+  if (!searchToken) {
     throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
   }
   // No retry, unlike getHomeAssistantState's own GET - a code review
@@ -1553,6 +1563,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
   const hosts = new Set<string>();
   const candidates: SearxngRow[] = [];
+  const runBudget = currentResearchBudget();
   for (const row of result.rows) {
     if (candidates.length >= pagesMax) break;
     if (!row.url) continue;
@@ -1563,6 +1574,8 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
       continue;
     }
     if (hosts.has(host)) continue;
+    // RESEARCH-TIER-01: a research run shares one page budget across its searches (40 pages, 4 per site, stop at a refusal).
+    if (runBudget && !researchPageAllowed(runBudget, host)) continue;
     hosts.add(host);
     candidates.push(row);
   }
@@ -1579,6 +1592,12 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const rowHost = runBudget ? new URL(row.url!).hostname : "";
+    if (runBudget) {
+      if (runBudget.declined) break;
+      await waitForHostPace(runBudget, rowHost);
+      notePageRead(runBudget, rowHost);
+    }
     try {
       const read = searxngPageRead({ url: row.url! }, signal, minorBand, { temporary });
       read.catch(() => {}); // an abandoned read that fails later is not an unhandled rejection
@@ -1592,7 +1611,12 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
       first ??= doc;
       pages.push({ url: row.url!, title: doc.title || row.title, text });
     } catch (err) {
-      if (err instanceof PageDeclinedError || (err instanceof HostError && err.code === "rate_limited")) break;
+      if (err instanceof PageDeclinedError) {
+        // A site refused: a research run reads no more pages at all (owner ruling 2026-11-01).
+        if (runBudget) noteDeclined(runBudget);
+        break;
+      }
+      if (err instanceof HostError && err.code === "rate_limited") break; // Home's own page pace ran out: this search stops reading, the run goes on
       // Any other failure falls back to the row's own snippet.
     } finally {
       clearTimeout(timer);

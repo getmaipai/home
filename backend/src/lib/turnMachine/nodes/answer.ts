@@ -1,3 +1,4 @@
+import { dropUnknownCitations } from "../research";
 import { MUSIC_NOT_HERE_LINE, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 // U2c, the `answer` node (turn-machine-state-record-2026-09-22.md's
 // state table): "the model's final text or the package reply, the
@@ -171,7 +172,9 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // regeneration came back empty too). The person never gets silence: a short plain line says
       // what is missing and what to do. It stands in only when no model words exist.
       if (input.text.trim().length === 0 && state.outcomes.length > 0) return { outcome: { ok: true }, output: { text: missedLookupLine(state.outcomes), sources } };
-      return { outcome: { ok: true }, output: { text: input.text, sources } };
+      // RESEARCH-TIER-01: a Thinking or Max answer keeps only the citation numbers that name a source of this reply.
+      const checked = state.answerStyle !== undefined && state.answerStyle !== "instant" ? dropUnknownCitations(input.text, sources.length) : { text: input.text, dropped: 0 };
+      return { outcome: { ok: true }, output: { text: checked.text, sources } };
     }
     case "from_outcomes": {
       // COMMAND-FAIL-01: this text is machine.ts's own last-resort

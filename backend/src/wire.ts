@@ -131,6 +131,8 @@ export interface TurnStats {
   // rest of this already-JSON stats blob (no migration: the same reason
   // every other field here needed none).
   thinking: boolean;
+  /** RESEARCH-TIER-01: the answer style this reply came from, recorded for Thinking and Max (absent means Instant). */
+  answer_style?: "thinking" | "max";
   /** LAT-00: every real model call this turn made, oldest first - the
    * fields above summarize the LAST one (unchanged shape/meaning for
    * every existing reader); this is the full history, so a turn that
@@ -561,7 +563,11 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks" | "answeredBy"> & { answered_by: AnsweredBy | null; sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; video?: { id: string }; music?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+/** RESEARCH-TIER-01: one search of a Thinking or Max turn as the page draws it after a reload (the live twin is the stream's
+ * tool_call and tool_result events): what was searched, whether it worked, and the sites it read. */
+export interface ResearchStep { call_id: string; package_id: string; label: string; state: "ok" | "error"; sites?: { host: string; url: string }[] }
+
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks" | "answeredBy"> & { answered_by: AnsweredBy | null; sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; research_steps?: ResearchStep[]; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; video?: { id: string }; music?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

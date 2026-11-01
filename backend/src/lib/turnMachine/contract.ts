@@ -118,7 +118,13 @@ export type PolicyDecision =
  * see backend/src/lib/turnMachine/budget.ts for how a model's record
  * resolves to this at runtime, and the fallback for a model with none. */
 export interface TurnBudget {
-  rounds: 0 | 1 | 2;
+  /** Tool rounds this turn may take. The record's figure is 0, 1 or 2 (Instant); research.ts raises it for
+   * Thinking and Max from `rounds_thinking` and `rounds_max` (RESEARCH-TIER-01), so the resolved value runs to 12. */
+  rounds: number;
+  /** RESEARCH-TIER-01 (spec-v0.1.290): rounds an adult's written turn takes when the person picked Thinking. */
+  rounds_thinking?: number;
+  /** RESEARCH-TIER-01 (spec-v0.1.290): rounds an adult's written turn takes when the person picked Max. */
+  rounds_max?: number;
   max_tools?: number;
   tools_offered: string[];
   model_transitions: boolean;
@@ -166,6 +172,12 @@ export interface TurnBudget {
 }
 
 export interface TurnState {
+  /** RESEARCH-TIER-01: the answer style the person picked for this message (research.ts). Absent reads as instant. */
+  answerStyle?: import("./research").AnswerStyle;
+  /** RESEARCH-TIER-01: the page budget the rounds of a Thinking or Max turn share (created by the tool node on its first round). */
+  researchBudget?: import("@/lib/researchBudget").ResearchRunBudget;
+  /** RESEARCH-TIER-01: the admin turned research.max_web off; Max's rounds after its first search read the offline library. */
+  researchLibraryOnly?: boolean;
   replyLanguage?: string;
   turnId: string;
   /** Date.now() when this turn began (turnNext.ts's own `startedAt`,

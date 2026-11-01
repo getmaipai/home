@@ -96,6 +96,8 @@ export interface ChatModelAdapterDeps {
   // NewChat reads the active conversation's selected mode. Undefined
   // for a minor (safety ruling, 2026-09-22): its request omits `thinking`.
   getThinking?(): boolean | undefined;
+  /** Whether the person armed Max for this message (read before `onTurnSent` disarms it). The hub still checks the Max lease. */
+  getMax?(): boolean;
   /** The first stream of a send opened: Max is one message only, so the page disarms it here. */
   onTurnSent?(): void;
   // Retired ChatPage's one-message "Think longer" action.
@@ -427,12 +429,14 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // conversation setting; the old ChatPage fallback consumes its
           // one-message action.
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
+          const max = reconnectAttempts === 0 && !bare && deps.getMax?.() === true ? true : undefined;
           if (reconnectAttempts === 0 && !bare) deps.onTurnSent?.();
           const perRunModel = (runConfig as { custom?: { model?: unknown } } | undefined)?.custom?.model;
           const runModel = deps.getAgeBand?.() === "adult" && typeof perRunModel === "string" ? perRunModel : undefined;
           const currentLocation = reconnectAttempts === 0 && !bare ? await deps.getCurrentLocation?.() : undefined;
           const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? (imageAttached ? "Please look at the attached picture." : "Please read the attached document."), abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
+            max,
             model: !bare ? (runModel ?? selectedModel) : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
             // concept at all (ChatPage.tsx's own adapter never sets
@@ -485,7 +489,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             if (e.t === "block") {
               streamedBlocks.push(e.block);
             } else if (e.t === "tool_call") {
-              toolCalls.set(e.call_id, { packageId: e.package_id, state: "running" });
+              toolCalls.set(e.call_id, { packageId: e.package_id, state: "running", ...(e.label ? { label: e.label } : {}) });
             } else if (e.t === "tool_result" || e.t === "tool_error") {
               // tool_result and tool_error both resolve an existing call;
               // an unrecognized call_id (a result for a call this stream

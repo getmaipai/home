@@ -150,3 +150,5 @@ let active: ChatLease | null = null;
 export function registerActiveChatLease(lease: ChatLease | null): void { active = lease; }
 /** True while the big chat model is leased: big generators wait, robot captioning and canary pictures stand aside. */
 export const chatLeaseHeld = (): boolean => active?.snapshot().state === "held";
+/** RESEARCH-TIER-01: whether this person holds the Max lease right now (the server never trusts the page's say-so alone). */
+export const chatLeaseHeldBy = (personId: string): boolean => { const snap = active?.snapshot(); return snap?.state === "held" && snap.holderId === personId; };

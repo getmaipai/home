@@ -88,7 +88,7 @@ import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
 import { selectedSpeakerFromCache } from "@/apps/chat/selectedSpeaker";
-import { composerNoticeFor, consumeMaxPick, dropMaxPick, useMaxChatNotice } from "@/apps/chat/maxChat";
+import { composerNoticeFor, consumeMaxPick, dropMaxPick, isMaxPicked, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
@@ -519,6 +519,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // current value is hydrated from the conversation settings,
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
+          getMax: () => isMaxPicked(maxQueryClient),
           onTurnSent: () => consumeMaxPick(maxQueryClient),
           getAgeBand: () => person.age_band,
           getTryCompanionId: () => tryCompanionIdRef.current,

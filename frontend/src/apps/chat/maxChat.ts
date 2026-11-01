@@ -39,6 +39,8 @@ const IDLE: Flow = { phase: "idle" };
 const PICK_KEY = ["max-chat", "picked"] as const;
 const setPicked = (qc: QueryClient, value: boolean) => qc.setQueryData<boolean>(PICK_KEY, value);
 const getPicked = (qc: QueryClient) => qc.getQueryData<boolean>(PICK_KEY) ?? false;
+/** Whether Max is armed for the message being sent (read just before `consumeMaxPick` disarms it). */
+export function isMaxPicked(qc: QueryClient): boolean { return getPicked(qc); }
 /** Max is one message only: the send path calls this once the message left; the lease itself is handed back by the server after its grace. */
 export function consumeMaxPick(qc: QueryClient): void { if (getPicked(qc)) setPicked(qc, false); }
 /** Hand the lease back at once and drop the pick (a new chat, or Max left unused). */

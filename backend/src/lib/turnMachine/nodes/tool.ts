@@ -5,6 +5,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // stop at cancellation; the race still records a timeout if a package
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
+import { newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
 import type { TurnAskField } from "@/wire";
@@ -112,6 +113,8 @@ async function waitForImageLead(done: Promise<void>): Promise<boolean> {
 }
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
+  // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
+  const researchRun = state.answerStyle !== undefined && state.answerStyle !== "instant" && state.budget.rounds > 1 ? (state.researchBudget ??= newResearchBudget(state.answerStyle === "max" && state.researchLibraryOnly === true)) : undefined;
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
   // ANSWER-IMG-02: a round's show_images call starts its picture pipeline
@@ -169,7 +172,9 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // step running, not just its eventual outcome.
     // FORM-CHAT-HUB-01 (rule 6a): a package re-run with a form's values bound as inputs puts no args on the stream, and records none.
     const resumedAsk = proposal.redactArgs === true;
-    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
+    // RESEARCH-TIER-01: on a research turn the step row names the search it ran (the model's own query), so the person sees what each round looked into.
+    const stepLabel = tool === "websearch" && researchRun !== undefined && typeof (args as { expression?: unknown }).expression === "string" ? (args as { expression: string }).expression.trim().slice(0, 100) : "";
+    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args, ...(stepLabel ? { label: stepLabel } : {}) });
     // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
     // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
@@ -282,7 +287,10 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     // SEARCH-DDGS-TEEN-01: the host's `spoken` (a minor's ddgs lock) is true for every surface that is not a plain written one, so the
     // shared glance screen is held to SearXNG only too, and an unplanned turn counts as spoken.
-    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
+    // Max with the admin's web switch off keeps its first search ordinary and searches the offline library after that.
+    const libraryOnlyNow = tool === "websearch" && researchRun?.libraryOnly === true && researchRun.searches > 0;
+    if (tool === "websearch" && researchRun) researchRun.searches += 1;
+    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}), ...(libraryOnlyNow ? { scope: "reference" } : {}) } : args;
     const startedAt = Date.now();
     // PLACE-WEATHER-01: the host resolves the place and injects coordinates; the
     // model's own args (and so the stored call) carry only the place it named.
@@ -298,7 +306,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
         uncached = weatherPlace.uncached;
       }
     }
-    const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
+    const raced = await withDeadline(researchRun ? runWithResearchBudget(researchRun, () => runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) })) : runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: resumedAsk ? "ask" : "tool_call", ...(resumedAsk ? {} : { args }), errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

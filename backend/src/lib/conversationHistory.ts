@@ -2081,7 +2081,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, answered_by, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: { id: videoByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: { id: videoByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2369,6 +2369,22 @@ function hasFailedFinalGeneration(t: ConversationTurnRow): boolean {
     const finalGeneration = stats.generations?.at(-1);
     return typeof finalGeneration?.error === "string" && finalGeneration.error.length > 0;
   } catch { return false; }
+}
+
+/** RESEARCH-TIER-01: the searches of a turn that took more than one, for an adult's reload. Built from the stored outcomes (which only an
+ * admin's listing returns whole), so the page shows the same steps after a reload that it showed live. Nothing else of an outcome leaves. */
+export function researchStepsFor(rawOutcomes: string | null | undefined, band: string): import("@/wire").ResearchStep[] | undefined {
+  if (!rawOutcomes || band !== "adult") return undefined;
+  try {
+    const parsed = JSON.parse(rawOutcomes) as ToolExecutionOutcome[];
+    const searches = parsed.filter((o) => o.packageId === "websearch");
+    if (searches.length < 2) return undefined;
+    return searches.map((o) => {
+      const expression = (o.args as { expression?: unknown } | undefined)?.expression;
+      const sites = (o.sources ?? []).slice(0, 5).map((source) => ({ host: source.site ?? "", url: source.url })).filter((site) => site.host && site.url);
+      return { call_id: o.callId, package_id: o.packageId, label: typeof expression === "string" ? expression.trim().slice(0, 100) : "Web search", state: o.status === "succeeded" ? "ok" as const : "error" as const, ...(sites.length > 0 ? { sites } : {}) };
+    });
+  } catch { return undefined; }
 }
 
 function replaySearchOutcomes(t: ConversationTurnRow): ToolExecutionOutcome[] {
@@ -3118,7 +3134,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, answered_by, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

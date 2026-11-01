@@ -768,6 +768,7 @@ export function buildTimingStats(stats: TurnStats): TimingStat[] {
   if (stats.total_time_ms !== null) list.push({ label: "Total", value: `${(stats.total_time_ms / 1000).toFixed(1)}s` });
   if (stats.tokens_per_second !== null) list.push({ label: "Speed", value: `${stats.tokens_per_second.toFixed(0)} tok/s` });
   if (stats.engine) list.push({ label: "Engine", value: stats.engine });
+  if (stats.answer_style) list.push({ label: "Answered with", value: stats.answer_style === "max" ? "Max" : "Thinking" });
   return list;
 }
 

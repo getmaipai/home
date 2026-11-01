@@ -1,3 +1,6 @@
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { answerStyleFor, budgetForStyle } from "./research";
+import { chatLeaseHeldBy } from "@/lib/chatLease";
 import { SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
 import { isLookupPackage } from "@/lib/ruleNames";
 import { conversationHasMusic } from "@/lib/music/jobs";
@@ -121,6 +124,8 @@ export interface RunTurnNextOpts {
   // (thinking_budget_tokens, 0 on every real budget); true substitutes
   // thinking_budget_tokens_toggled for this turn only.
   thinking?: boolean;
+  /** RESEARCH-TIER-01: the page armed Max for this message; honored only while this person holds the Max lease. */
+  max?: boolean;
   model?: string;
   // THIN-7C (ADMIN-COMPARE-01 b): the bare-mode bypass, chat surface only.
   // routes/turn.ts checks owner/admin and adult first (a clean 403); beginTurn()
@@ -147,7 +152,8 @@ export interface RunTurnNextOpts {
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[], contextSegments?: Partial<Record<ContextSegmentKey, number>>, language?: string): TurnValue {
-  const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0, state.budget.context_window_tokens, contextSegments);
+  // RESEARCH-TIER-01: which answer style this reply came from (the picker is never switched for the person; this only records it).
+  const stats = { ...buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0, state.budget.context_window_tokens, contextSegments), ...(state.answerStyle ? { answer_style: state.answerStyle } : {}) };
   // A live acceptance run (U2d) caught this omitting plugin_id/
   // command_id/sources entirely - the old engine file's own equivalent
   // builder always carries the package id that ran (plugin_id for a
@@ -637,7 +643,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
   const { budget: resolvedBudget, engineModelId } = await resolveTurnBudgetAndEngineModel(opts.model, band);
-  const thinkingBudget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
+  // RESEARCH-TIER-01: the answer style this message runs under (Max also thinks); an adult's written turn only.
+  const answerStyle = answerStyleFor({ thinking: opts.thinking, max: opts.max, maxLeaseHeld: chatLeaseHeldBy(actor.id), band, surfaceClass, bare });
+  const styledBudget = budgetForStyle(resolvedBudget, answerStyle);
+  const thinkingBudget: TurnBudget = opts.thinking === true || answerStyle === "max" || bare ? { ...styledBudget, thinking_budget_tokens: styledBudget.thinking_budget_tokens_toggled } : styledBudget;
   // ANSWER-IMG-02 (rules 0 and 8): `show_images` is offered only when the
   // model's own record offers it AND this turn may show pictures; the
   // record keeps it out until ANSWER-IMG-05's bench passes.
@@ -681,6 +690,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(engineModelId ? { engineModelId } : {}),
     signal,
     budget,
+    ...(answerStyle !== "instant" ? { answerStyle } : {}),
+    // RESEARCH-TIER-01: the admin's switch for Max's web research (research.max_web, default on).
+    ...(answerStyle === "max" && getHouseholdSettingValue("research.max_web") === false ? { researchLibraryOnly: true } : {}),
     persona,
     answerVia,
     topicBlock: topicBlockForTurn(actor, band),

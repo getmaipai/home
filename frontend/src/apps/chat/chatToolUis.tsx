@@ -437,17 +437,22 @@ export const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
   ok: "Ran",
   error: "Failed",
 };
+/** RESEARCH-TIER-01: a search step reads as what it did ("Searched · why the series ended"), not as a tool run. */
+const SEARCH_VERB: Record<TimelineCall["state"], string> = { running: "Searching", ok: "Searched", error: "Failed" };
+export const timelineVerb = (call: Pick<TimelineCall, "packageId" | "state">): string => (call.packageId === "websearch" ? SEARCH_VERB[call.state] : TIMELINE_VERB[call.state]);
 export const ToolTimelineIcon = getIcon("wrench");
 
-export function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | undefined): string {
+export function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | undefined, siteCount = 0): string {
   const totalTimeMs = stats?.total_time_ms;
-  if (totalTimeMs == null) return `${stepCount} tool call${stepCount === 1 ? "" : "s"}`;
+  // RESEARCH-TIER-01: counts only ("5 steps, 12 sites"), never a query or an address.
+  const sites = siteCount > 0 ? `, ${siteCount} site${siteCount === 1 ? "" : "s"}` : "";
+  if (totalTimeMs == null) return `${stepCount} tool call${stepCount === 1 ? "" : "s"}${sites}`;
   if (totalTimeMs < 60_000) {
     const seconds = Math.round(totalTimeMs / 1000);
-    return `Worked for ${seconds} second${seconds === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}`;
+    return `Worked for ${seconds} second${seconds === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}${sites}`;
   }
   const minutes = Math.round(totalTimeMs / 60_000);
-  return `Worked for ${minutes} minute${minutes === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}`;
+  return `Worked for ${minutes} minute${minutes === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}${sites}`;
 }
 
 export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>, TimelineCall[]> = ({ result }) => {
@@ -460,13 +465,13 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
   // never in a box under the timeline.
   return (
     <ToolTimeline
-      steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon, sites: call.sites }))}
+      steps={result.map((call) => ({ verb: timelineVerb(call), chip: call.label ?? call.packageId, icon: ToolTimelineIcon, sites: call.sites }))}
       visibleSteps={result.length}
       streaming={running}
       open={open}
       onOpenChange={setOpen}
       activeLabel="Working…"
-      restingLabel={toolTimelineRestingLabel(result.length, stats)}
+      restingLabel={toolTimelineRestingLabel(result.length, stats, new Set(result.flatMap((call) => call.sites?.map((site) => site.host) ?? [])).size)}
       // No producer for a per-file diff-stat summary anywhere in Home
       // today (the kit's own upstream use is a coding-agent timeline) -
       // a named gap, not invented data.
