@@ -27,6 +27,8 @@ export interface PictureCard {
   switch_to: "quick" | "detailed" | null;
   /** TIER-HOME-03: this person is shown Make it Max (they hold it and a Max model is set). */
   max_offered?: boolean;
+  /** TIER-PRIO-07: set while the card asks whether to run at a lower level now and this person may answer; null otherwise. */
+  fit_ask?: { job_id: string } | null;
   size: string;
   stop_id: string;
 }

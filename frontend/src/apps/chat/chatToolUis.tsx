@@ -18,6 +18,7 @@ import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ImageGallery } from "@maipai/ui/src/elements/image-gallery";
 import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { picturesApi, type PictureCard } from "@/lib/picturesApi";
+import { fitAskActions } from "@/lib/fitAsk";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
@@ -517,6 +518,7 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
   }, [active]);
   if (!result || !card || !active) return null;
   const elapsedSeconds = Math.max(0, Math.round((card.elapsed_ms + Math.max(0, tick - fetchedAt)) / 1000));
+  const pendingActions = card.state === "queued" ? fitAskActions(card.fit_ask, () => { void query.refetch(); }) : undefined;
   return (
     <ImageGeneration
       prompt={card.prompt}
@@ -528,6 +530,7 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
       sizeLabel={card.size.replace("x", " × ")}
       {...(card.preview_url ? { previewSrc: card.preview_url, ...(card.preview_step !== null ? { previewStep: card.preview_step } : {}), ...(card.steps !== null ? { steps: card.steps } : {}) } : {})}
       {...(etaLabel(card.eta_seconds, { short: true }) ? { etaLabel: etaLabel(card.eta_seconds, { short: true })! } : {})}
+      {...(pendingActions ? { pendingActions } : {})}
       stopLabel="Stop"
       onStop={() => { void picturesApi.stop(card.stop_id).then(() => query.refetch()).catch(() => query.refetch()); }}
     />
@@ -643,6 +646,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   const refresh = () => { void query.refetch(); };
   const status = videoStatusOf(item);
   const clip = status === "ready" ? item.clip : null;
+  const pendingActions = status === "queued" ? fitAskActions(item.fit_ask, refresh) : undefined;
   return (
     <VideoPlayer
       status={status}
@@ -655,6 +659,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       queuePosition={item.position}
       startedAt={item.started_at}
       hint={videoHint(item)}
+      {...(pendingActions ? { pendingActions } : {})}
       {...(item.error ? { error: item.error } : {})}
       downloadName={prepared.data?.name ?? "video.mp4"}
       onStop={() => { void videosApi.stop(item.id).then(refresh).catch(refresh); }}

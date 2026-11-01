@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { TierSegment } from "@maipai/ui/src/elements/tier-segment";
+import { fitAskActions } from "@/lib/fitAsk";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import type { MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
@@ -65,7 +66,8 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const cardStarted = Number.isFinite(card.started_at) && card.started_at > 0 ? card.started_at : NaN;
   const elapsedSeconds = Number.isFinite(cardStarted) ? Math.max(0, Math.floor((now - cardStarted) / 1000)) : undefined;
   const lyrics = card.lyrics?.trim() === "[Instrumental]" ? undefined : card.lyrics ?? undefined;
-  return { status, width: "full", ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,
+  const pendingActions = status === "queued" ? fitAskActions(card.fit_ask, refresh) : undefined;
+  return { status, width: "full", ...(pendingActions ? { pendingActions } : {}), ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,
     ...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {}), ...(descriptionOf(card) ? { description: descriptionOf(card) } : {}), ...(ready ? { src: shown.url } : {}),
     stages: card.stages, currentStage: card.stage_index, progress: card.progress, ...(generating && elapsedSeconds !== undefined ? { elapsedSeconds } : {}), ...(card.eta_seconds !== null ? { etaSeconds: card.eta_seconds } : {}),
     ...(card.stage_label ? { phaseLabel: card.stage_label } : {}), waitingForMemory: card.state === "queued" && card.stage !== "longer",

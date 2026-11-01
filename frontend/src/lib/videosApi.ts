@@ -21,6 +21,8 @@ export interface VideoItem {
   quality?: "quick" | "detailed";
   switch_to?: "quick" | "detailed" | null;
   /** TIER-HOME-03: this person is shown Max on the card. */
+  /** TIER-PRIO-07: set while the card asks whether to run at a lower level now and this person may answer; null otherwise. */
+  fit_ask?: { job_id: string } | null;
   max_offered?: boolean;
   clip: VideoClip | null;
 }
