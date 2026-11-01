@@ -164,6 +164,7 @@ VIDEO-EVAL-05 (keyframe interpolation price) behind them; this note cites those 
 9. Two-stage Max (section 9a): this is TIER-EVAL-03 (LTX-2.3 dev two-stage with guidance); the note adds no copy, only the identity check on the refine pass.
 10. Tool decisions (rule 1, the VIDEO-GEN-07 shape): offer rate and false offers for `edit_video`, `make_character`, `make_place`,
     `make_storyboard` and the new `generate_video` arguments, with the worst case (a video in the Videos pane) at 16 tools or fewer.
+11. MiniMax-H3 on an MLX port against LTX-2.3, same prompts, with End frame and reference pictures: peak memory, seconds, quality pair; sits beside TIER-EVAL-03.
 
 ### 9a. What the Pika-H3-Flex and 2K upscale video adds (reviewed 2026-11-01)
 
@@ -182,6 +183,12 @@ What carries over, and what does not:
   LTX-2.3's own two-stage pipeline (a latent spatial upscale, then a refine pass) is the same idea in a model we can run, and it is the
   existing Max video proposal (resource-tiers section 5.3). Bench row 9 measures it; Max video stays empty until it passes.
 - **For Storyboard:** the refine pass is the identity risk; keep its strength low and compare against the reference pictures (bench 6).
+- **MiniMax-H3 itself is a Max candidate (owner asked, 2026-11-01):** open weights with video and stereo audio together, text and
+  first/last-frame conditioning (our End frame) and a reference-picture checkpoint (our Characters), about 768p at 24 fps up to about
+  15 s, and community MLX ports for Apple Silicon (Argus-AiTeam/ComfyUI-MiniMax-H3-MLX, PipeNetwork/minimax-h3-mlx; neither verified
+  by us). One port describes a 33B transformer with a 32B Qwen3-VL text encoder and dense attention, so it is a Max-size job, not
+  Boost. Bench row 11 runs it against LTX-2.3 beside TIER-EVAL-03; it becomes the Max model only if it wins on time, memory and a
+  blind quality pair, and its End frame and reference-picture modes work through the Stack's runner.
 - **Not a plan:** the 60-second headline. A film is still stitched from shots (section 4).
 
 ## 10. Slices, in order
