@@ -60,7 +60,7 @@ stored). Library items carry free-text `artist` and `album` and no identity. Mat
 A matched artist's page shows a photo and a two-sentence bio. The Wikimedia page comes from the MusicBrainz artist's Wikimedia
 link, and the fetch reuses `backend/src/lib/answerImages/wikimedia.ts` (no new client), keeping its under-18 subject protection.
 Only the Wikipedia or Commons title is sent, never anything about the household. A failed fetch leaves the page as it was (rule 6).
-Logs carry counts only (rule 6a). Cover Art Archive stays out: album art comes from the files and made-here art.
+Logs carry counts only (rule 6a). Cover Art Archive is allowed by the 2026-11-01 ruling in [music-listen-build](music-listen-build-2026-11-01.md) (MUSIC-DATA-01); album art otherwise comes from the files and made-here art.
 
 ## 2. "Create a band like this" and "Create a song like this" (MUSIC-LIKE-01; after MUSIC-MB-01 and C5)
 
