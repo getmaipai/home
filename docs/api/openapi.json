@@ -61230,6 +61230,336 @@
         }
       }
     },
+    "/api/videos/make": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Make a video from words (the Create page); adults on their own screen only",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1200,
+                    "description": "What the video shows."
+                  },
+                  "orientation": {
+                    "type": "string",
+                    "enum": [
+                      "landscape",
+                      "portrait"
+                    ]
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "description": "Length in seconds; the most this level makes is used when it is longer."
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ],
+                    "description": "The level to make it at. Max needs an admin's OK; without it the request is refused."
+                  },
+                  "recipe": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "A recipe id from the package's `recipes` data (a camera move or style); its wording goes to the model after the prompt."
+                  }
+                },
+                "required": [
+                  "prompt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The card for the new clip.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "percent": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "One plain line for the card: what is happening now."
+                          },
+                          "position": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "eta_seconds": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "While running: seconds left, from earlier clips of this size and length."
+                          },
+                          "step": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "preview_url": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                          },
+                          "started_at": {
+                            "type": "number",
+                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "animate"
+                            ]
+                          },
+                          "error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "quality": {
+                            "type": "string",
+                            "enum": [
+                              "quick",
+                              "detailed"
+                            ],
+                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                          },
+                          "switch_to": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "quick",
+                              "detailed",
+                              null
+                            ],
+                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                          },
+                          "fit_ask": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "job_id": {
+                                "type": "string"
+                              },
+                              "picked": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actual": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "job_id",
+                              "picked",
+                              "actual"
+                            ],
+                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                          },
+                          "max_offered": {
+                            "type": "boolean",
+                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                          },
+                          "clip": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "poster_url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seconds": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "file_id": {
+                                "type": "string"
+                              },
+                              "poster_file_id": {
+                                "type": "string"
+                              },
+                              "has_sound": {
+                                "type": "boolean",
+                                "description": "The clip has a sound track the model made (speech included)."
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "poster_url",
+                              "width",
+                              "height",
+                              "seconds",
+                              "seed",
+                              "file_id",
+                              "poster_file_id",
+                              "has_sound"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "percent",
+                          "label",
+                          "position",
+                          "eta_seconds",
+                          "step",
+                          "steps",
+                          "preview_url",
+                          "started_at",
+                          "prompt",
+                          "kind",
+                          "error",
+                          "quality",
+                          "switch_to",
+                          "fit_ask",
+                          "max_offered",
+                          "clip"
+                        ]
+                      }
+                    },
+                    "can_make_another": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversation_id",
+                    "items",
+                    "can_make_another",
+                    "limits"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Videos are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Videos could not be made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Videos are not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/animate": {
       "post": {
         "tags": [

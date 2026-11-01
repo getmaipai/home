@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-01T19:19:02.410Z",
-  "kitTag": "ui-v0.5.451",
+  "generatedAt": "2026-11-01T23:44:08.718Z",
+  "kitTag": "ui-v0.5.452",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1112,6 +1112,14 @@
       "group": "project",
       "verdict": "no-fit",
       "verdictReason": "Home's project sharing is rendered by the kit's shadcn project blocks, not this assistant-ui Element.",
+      "implemented": false
+    },
+    {
+      "file": "prompt-bar.tsx",
+      "name": "prompt-bar",
+      "group": "prompt",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
