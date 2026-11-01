@@ -8,6 +8,8 @@ import { __resetAnswerImageFetchForTests, libraryImageUrl } from "@/lib/answerIm
 import { answerImagesCacheDir, clearAnswerImageCacheForTests } from "@/lib/answerImages/cache";
 import { rmSync } from "node:fs";
 import { __setAnswerImageDepsForTests, selectAnswerImages } from "@/lib/answerImages/select";
+import { galleryBlockFor } from "@/lib/answerImages/gallery";
+import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import type { LibraryImage } from "@/lib/retrieval/referenceReader";
 import type { AgeBand } from "@/lib/ageBand";
 import { registerSidecar, unregisterSidecar } from "@/lib/sidecars";
@@ -90,6 +92,18 @@ describe("ZIM-IMG-01: library pictures lead the row", () => {
     const withLimit = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [], deadlineAt: past, libraryDeadlineAt: Date.now() + 10_000 });
     expect(withLimit.set?.items.length).toBeGreaterThanOrEqual(2);
     expect(withLimit.set!.items[0]!.source.site).toBe("Wikipedia (offline library)");
+  });
+
+  test("a library set becomes an accepted image_gallery block (the block schema takes absolute addresses only; live turn 2026-11-01 lost its gallery here)", async () => {
+    use([TOWER], async () => [image(1), image(2), image(3)]);
+    const result = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(result.set?.items.length).toBeGreaterThanOrEqual(3);
+    const raw = galleryBlockFor(result.set!, "Eiffel Tower", "show_images call 1 in turn t", "1:1:abcdef");
+    const accepted = filterAnswerBlocks([raw], "show_images", ["image_gallery"], "adult", null);
+    expect(accepted.length).toBe(1);
+    const images = (accepted[0]!.props as { images: Array<{ source?: { label?: string; url?: string } }> }).images;
+    expect(images[0]!.source?.label).toBe("Wikipedia (offline library)");
+    expect(images[0]!.source?.url).toBeUndefined();
   });
 
   test("with only two library pictures they come first and Commons fills the rest", async () => {

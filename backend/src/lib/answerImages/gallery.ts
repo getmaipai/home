@@ -22,6 +22,11 @@ const ALT_SUBJECT_MAX = 120;
 
 type GalleryProps = { images: Array<Record<string, unknown>>; maxVisible: number };
 
+function absoluteUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try { new URL(value); return true; } catch { return false; }
+}
+
 /** The gallery's props from a picture set: a lone extra picture is dropped, so the badge never reads +1 and always
  * equals what the gallery holds. Null when the set has no picture. */
 export function galleryProps(set: Pick<AnswerImageSet, "visible" | "items">): GalleryProps | null {
@@ -35,7 +40,8 @@ export function galleryProps(set: Pick<AnswerImageSet, "visible" | "items">): Ga
       src: item.src,
       alt: item.alt,
       caption: item.license ? `${item.caption} · ${item.license.short}${item.license.artist ? `, ${item.license.artist}` : ""}` : item.caption,
-      source: { label: item.source.site, url: item.source.url },
+      // The block schema takes an absolute address only; a library picture's link is the hub's own relative path, so it carries the label alone.
+      source: { label: item.source.site, ...(absoluteUrl(item.source.url) ? { url: item.source.url } : {}) },
     })),
   };
 }
