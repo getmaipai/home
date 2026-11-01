@@ -500,7 +500,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, startImageProducerJob, pollActiveStackImageJobs |
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
-| `backend/src/lib/jobs/admissionFit.ts` | setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission, admissionFitProfile, admissionFitAskLine |
+| `backend/src/lib/jobs/admissionFit.ts` | FIT_HYSTERESIS_GB, resetFitHysteresisForTests, setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission |
 | `backend/src/lib/jobs/closeApps.ts` | realHelper, closeSettingsFrom, closableApps, pickSmallestSet, closeForJob, reopenForJob |
 | `backend/src/lib/jobs/householdQueue.ts` | PERSISTED_HOLDS, activeProfileLine, resetActivePlanForTests, openMaxWindow, currentMaxWindow, endMaxWindow |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |

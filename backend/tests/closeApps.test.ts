@@ -62,7 +62,7 @@ test("the ladder closes listed apps before lowering chat, and the job record hol
   const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "standard" }, video: { state: "max" } } };
   setProfileSource({ table: [row], hw: { budgetGb: 100, marginGb: 2, peakGb: { video: { max: 60 } }, residentGb: { chat: { standard: 20, reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: { chat: true }, close: settings });
   const { helper, calls } = fakeHelper([app("x.Safari", 9), app("x.Other", 30)]);
-  let free = 72; // 80 needed
+  let free = 74; // 80 needed plus the 2 GB working margin
   const budget = async () => ({ freeMemoryBytes: free * GB, loaded: [] });
   const quitting: CloseHelper = { ...helper, quit: async (id) => { calls.push(id); free += 9; return "quit"; } };
   const fit = await fitForAdmission({ id: "job-3", jobClass: "video", tier: "max" }, budget, quitting);

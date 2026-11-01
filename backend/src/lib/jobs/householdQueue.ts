@@ -4,7 +4,7 @@ import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackReducedChat } from "@/lib/reducedChat";
 import { stackMaxWindow } from "./stackWindow";
-import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
+import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -410,7 +410,7 @@ function rememberFit(id: string, key: string): void {
 }
 export function rememberFitForTests(id: string, key: string): void { rememberFit(id, key); }
 export function fitMemorySizeForTests(): number { return lastFit.size; }
-export function resetFitMemoryForTests(): void { lastFit.clear(); }
+export function resetFitMemoryForTests(): void { lastFit.clear(); resetFitHysteresisForTests(); }
 let budgetReader: (() => Promise<BudgetNow>) | null = null;
 export function setBudgetReader(fn: (() => Promise<BudgetNow>) | null): void { budgetReader = fn; }
 async function stackBudget(): Promise<BudgetNow> {
@@ -419,7 +419,7 @@ async function stackBudget(): Promise<BudgetNow> {
     const client = await import("@/lib/stack/client");
     if (typeof client.createStackClient !== "function") throw new Error("budget unavailable");
     const budget = await client.createStackClient().budget();
-    return { freeMemoryBytes: budget.freeMemoryBytes, loaded: budget.loaded.map((item) => ({ class: (item as typeof item & { class?: string }).class ?? item.kind, peakBytes: item.peakBytes, pinned: item.pinned })) };
+    return { freeMemoryBytes: budget.freeMemoryBytes, loaded: budget.loaded.map((item) => ({ class: (item as typeof item & { class?: string }).class ?? item.kind, peakBytes: item.peakBytes, pinned: item.pinned, measured: item.measured })), ...(budget.margin_bytes !== undefined ? { marginBytes: budget.margin_bytes } : {}), readingDegraded: budget.memoryReadingDegraded === true };
   } catch { throw new Error("budget unavailable"); }
 }
 

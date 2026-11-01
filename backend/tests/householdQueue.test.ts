@@ -35,14 +35,14 @@ describe("household queue", () => {
     };
     resetTierStateForTests(); setProfileSource(configured);
     try {
-      const fitting = await run("max", 62);
+      const fitting = await run("max", 64); // 62 GB usable after the 2 GB working margin
       expect(fitting.released).toBe(1);
       expect(fitting.applied?.outcome).toBe("run");
       expect(fitting.applied?.profile).toEqual({ lowered: 1, queued: 0, off: 0, closed_apps: 0, closed_bytes: 0 });
       expect(Object.keys(fitting.applied!.profile).sort()).toEqual(["closed_apps", "closed_bytes", "lowered", "off", "queued"]);
       const askSource = { ...configured, lowerWithoutAsking: {} };
       setProfileSource(askSource);
-      const asking = await run("max", 50);
+      const asking = await run("max", 52);
       expect(asking.released).toBe(0); expect(asking.applied?.outcome).toBe("ask");
       expect(asking.applied?.profile.lowered).toBe(1);
       const queueSource: ProfileSource = { ...configured, hw: { ...base, budgetGb: 80, peakGb: { video: { max: 60, boost: 60, standard: 25 } }, residentGb: { ...base.residentGb, picture: { boost: 2, standard: 1, reduced: 0 } } }, table: [maxRow, { ...boostRow, cells: { ...boostRow.cells, picture: { state: "standard" } } }] };
