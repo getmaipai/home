@@ -63,6 +63,7 @@ import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { useMaxChat } from "@/apps/chat/maxChat";
+import { ANSWER_STYLE_LINES, ANSWER_STYLE_WORDS, answerStyleOf } from "@/apps/chat/answerStyleLabel";
 import { MODE_CHOICES, MAX_DIALOG_BODY, MAX_DIALOG_TITLE, type ModeChoiceId } from "@/apps/chat/composerModeLines";
 import { AnswerStyleSelect } from "@maipai/ui/src/elements/answer-style-select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
@@ -832,6 +833,8 @@ export function BareModelBadge() {
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
   const message = useAuiState((s) => s.message);
+  const adult = useContext(ChatAgeBandContext) === "adult";
+  const answerStyle = answerStyleOf(message.metadata?.custom?.stats as TurnStats | undefined);
   const turnId = message.metadata?.custom?.turnId as string | undefined;
   const sources = sourcesFromMessage(message);
   const sourceOpen = useContext(SourcesOpenContext);
@@ -846,6 +849,16 @@ export function MessageFooterExtra() {
   return (
     <>
       <BareModelBadge />
+      {adult && message.role === "assistant" && answerStyle ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" data-slot="answer-style-label" data-answer={answerStyle} aria-label={`Answered with ${ANSWER_STYLE_WORDS[answerStyle]}. ${ANSWER_STYLE_LINES[answerStyle]}`}>{ANSWER_STYLE_WORDS[answerStyle]}</Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top">{ANSWER_STYLE_LINES[answerStyle]}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
       {turnId && sources.length ? (
         // SEARCH-ANSWER-04 (rule 9): the kit's own sources trigger as it ships
         // ("Sources", the count, a chevron), not a hand-made button that drew
