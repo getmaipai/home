@@ -84,7 +84,7 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
       : {}),
     ...(article.description ? { description: article.description } : article.snapshot_date ? {} : { description: article.reading_minutes ? `${article.source_label} · ${article.reading_minutes} min read` : article.source_label }),
     ...(standfirst ? { lead: standfirst } : {}),
-    breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker, ...(options.onCategory ? { onClick: () => options.onCategory!(kicker) } : {}) }] : []), { label: article.title }],
+    breadcrumb: [{ label: options.appName, onClick: options.onAppHome }, ...(kicker ? [{ label: kicker, ...(options.onCategory ? { onClick: () => options.onCategory!(kicker) } : {}) }] : [])],
     ...(article.infobox && article.infobox.rows.length ? { infobox: article.infobox } : {}),
     ...(figureHero ? { image: { w480: figureHero.hero.src, w1280: figureHero.hero.src, alt: figureHero.hero.alt, ...(figureHero.hero.caption ? { badge: shortCaption(figureHero.hero.caption) } : {}) } } : {}),
     ...(!infoboxPicture && article.lead_image ? { image: { w480: article.lead_image.src, w1280: article.lead_image.src, alt: article.lead_image.alt, ...(article.badge ? { badge: article.badge } : {}) } } : {}),

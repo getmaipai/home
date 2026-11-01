@@ -59,13 +59,13 @@ describe("toArticleViewData", () => {
     expect(data.image).toEqual({ w480: "/m/a.jpg", w1280: "/m/a.jpg", alt: "Aurora", badge: "Earth's light show" });
   });
 
-  test("breadcrumb is the app's own home, then the kicker when there is one, then the page", () => {
+  test("breadcrumb is the app's own home, then the kicker when there is one, and nothing after it (the title is the heading)", () => {
     const calls: string[] = [];
     const withKicker = toArticleViewData({ ...base, kicker: "Nature" }, { ...opts, onAppHome: () => calls.push("home") });
-    expect(withKicker.breadcrumb?.map((b) => b.label)).toEqual(["Wikipedia", "Nature", "Zendaya"]);
+    expect(withKicker.breadcrumb?.map((b) => b.label)).toEqual(["Wikipedia", "Nature"]);
     withKicker.breadcrumb![0]!.onClick!();
     expect(calls).toEqual(["home"]);
-    expect(toArticleViewData(base, opts).breadcrumb?.map((b) => b.label)).toEqual(["Wikipedia", "Zendaya"]);
+    expect(toArticleViewData(base, opts).breadcrumb?.map((b) => b.label)).toEqual(["Wikipedia"]);
   });
 
   test("related becomes rail items with book targets; contents keep levels 2 to 4 only", () => {

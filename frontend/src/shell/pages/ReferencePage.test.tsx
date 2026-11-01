@@ -117,12 +117,12 @@ describe("Reference reader", () => {
     } finally { globalThis.IntersectionObserver = seen; }
   });
 
-  test("READER-03: the article draws the kit's new parts: kicker chip, breadcrumb from the app's own home, lead cut from the first paragraph", async () => {
+  test("READER-03: the article draws the kit's new parts: breadcrumb from the app's own home with the category, lead cut from the first paragraph", async () => {
     api.referenceArticle = async () => ({ ...article, kicker: "Space", lead: "Plain strongemphasis", reading_minutes: 4, quick_fact: "Orbit: Earth", infobox: { title: "Moon", rows: [{ label: "Orbit", value: "Earth" }] } });
     const view = mount("/reference/wiki_en/A/Moon");
     await view.findByText("A note");
-    expect(document.querySelector('[data-slot="article-kicker-chip"]')?.textContent).toBe("Space");
-    expect(document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain("Reference");
+    expect(document.querySelector('[data-slot="article-kicker-chip"]')).toBeNull();
+    expect(document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain("Space");
     // A page with a facts card keeps its first paragraph whole; the standfirst belongs to the picture-led page.
     expect(document.querySelector('[data-slot="article-standfirst"]')).toBeNull();
     expect(document.querySelector('[data-slot="article-quick-fact"]')?.textContent).toContain("Orbit: Earth");
