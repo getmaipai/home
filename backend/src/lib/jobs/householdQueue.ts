@@ -3,6 +3,7 @@ import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScoreP
 import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { enterStackReducedChat, leaveStackReducedChat, setReducedChat } from "@/lib/reducedChat";
+import { stackMaxWindow } from "./stackWindow";
 import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
@@ -16,7 +17,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | null;
   category?: JobCategory;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
@@ -30,6 +31,10 @@ export interface QueueJob {
   fit?: { outcome: "run" | "ask" | "queue" | "refuse"; profile: { lowered: number; queued: number; off: number; closed_apps: number; closed_bytes: number }; askLine: string | null };
 }
 
+/** Waits a job store keeps on the card across a restart (the phase or stage reads `held:<reason>`), and the card words for them. One list for the three kinds of job. */
+const HOLD_LIST = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
+export type PersistedHold = typeof HOLD_LIST[number];
+export const PERSISTED_HOLDS: readonly string[] = HOLD_LIST;
 export interface QueuePosition { id: string; position: number }
 export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat";
 export interface TierState {
@@ -85,8 +90,18 @@ export function openMaxWindow(): { minutesLeft: number | null } | null {
   return job ? { minutesLeft: stillRunningMinutes(job) } : null;
 }
 
-/** Admin Stop for the open Max window: ends the running Max job through its own store, which frees the room and lets chat return. False when no Max job runs. */
+/** The Max window as the Stack says it (TIER-STATUS-01): open only while the governor holds the computer for a Max job. `minutesLeft` still comes from Home's own running Max job, because only Home knows the estimate. A Stack that cannot answer falls back to Home's record. */
+export async function currentMaxWindow(): Promise<{ minutesLeft: number | null } | null> {
+  const stack = await stackMaxWindow();
+  if (!stack) return openMaxWindow();
+  if (stack.state !== "open") return null;
+  const job = currentEntries.find((item) => item.job.state === "running" && item.job.tier === "max")?.job;
+  return { minutesLeft: job ? stillRunningMinutes(job) : null };
+}
+
+/** Admin Stop for the open Max window: ends the running Max job through its own store, which frees the room and lets chat return. False when the Stack says no window is open, or no Max job runs here. */
 export async function endMaxWindow(): Promise<boolean> {
+  if (!(await currentMaxWindow())) return false;
   const entry = currentEntries.find((item) => item.job.state === "running" && item.job.tier === "max");
   if (!entry?.stop) return false;
   await entry.stop();
@@ -266,6 +281,35 @@ export function trackChatLease<T extends { release(): void }>(personId: string, 
   return lease;
 }
 
+/** TIER-PRIO-07: a Boost or Max job that would only fit below the tier its person picked asks first (`ask`). In memory only: the question's words and the answer, never an app or a name. */
+export const FIT_ASK_TIMEOUT_MS = 10 * 60_000;
+interface FitAsk { personId: string; askedAt: number; line: string | null; answer: "allow" | "wait" | null }
+const fitAsks = new Map<string, FitAsk>();
+let fitAskTimeoutMs = FIT_ASK_TIMEOUT_MS;
+export function setFitAskTimeoutForTests(ms: number | null): void { fitAskTimeoutMs = ms ?? FIT_ASK_TIMEOUT_MS; }
+export function resetFitAsksForTests(): void { fitAsks.clear(); fitAskTimeoutMs = FIT_ASK_TIMEOUT_MS; }
+/** The open question for a job, or null when none is waiting for an answer (never asked, answered, or timed out into Wait). */
+export function pendingFitAsk(jobId: string, now = Date.now()): { personId: string; line: string | null; secondsLeft: number } | null {
+  const ask = fitAsks.get(jobId);
+  if (!ask || ask.answer !== null) return null;
+  const left = fitAskTimeoutMs - (now - ask.askedAt);
+  return left > 0 ? { personId: ask.personId, line: ask.line, secondsLeft: Math.ceil(left / 1000) } : null;
+}
+/** The person's answer: Allow runs the job at the lower tier now, Wait keeps it queued for the tier they picked. False when no question is open. */
+export function answerFitAsk(jobId: string, answer: "allow" | "wait"): boolean {
+  const ask = fitAsks.get(jobId);
+  if (!ask || ask.answer !== null || pendingFitAsk(jobId) === null) return false;
+  ask.answer = answer;
+  void releaseHouseholdQueue();
+  return true;
+}
+let askRecheck: ReturnType<typeof setTimeout> | null = null;
+function scheduleAskRecheck(ms: number): void {
+  if (askRecheck) clearTimeout(askRecheck);
+  askRecheck = setTimeout(() => { askRecheck = null; void releaseHouseholdQueue(); }, Math.max(1000, Math.min(ms, 60_000)) + 50);
+  askRecheck.unref?.();
+}
+
 /** The window, fairness and heavy-slot memory behind `admit`. Process memory only. */
 const tierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
 /** PRIO-03: the quiet-window settings, read at every Max admission. Null means the defaults. */
@@ -294,7 +338,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
   for (const job of jobs) {
     const next = byId.get(job.id) ?? null;
     const old = previous.get(job.id) ?? null;
-    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" || job.riseReason === "heavy_slot" || job.riseReason === "fairness_wait" || job.riseReason === "max_window" || job.riseReason === "max_chat" || job.riseReason === "max_drain" ? job.riseReason : null;
+    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "tier_ask" || job.riseReason === "tier_no_room" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" || job.riseReason === "heavy_slot" || job.riseReason === "fairness_wait" || job.riseReason === "max_window" || job.riseReason === "max_chat" || job.riseReason === "max_drain" ? job.riseReason : null;
     if (next !== null && old !== null && next > old) {
       const overtaker = positions.filter((item) => item.position < next && item.position < (previous.get(item.id) ?? Infinity)).sort((a, b) => b.position - a.position)[0];
       if (overtaker) {
@@ -342,6 +386,7 @@ const LAST_FIT_LIMIT = 200;
 function forgetFinishedFits(jobs: readonly QueueJob[]): void {
   const active = new Set(jobs.filter((job) => job.state === "queued" || job.state === "running").map((job) => job.id));
   for (const id of lastFit.keys()) if (!active.has(id)) lastFit.delete(id);
+  for (const id of fitAsks.keys()) if (!active.has(id)) fitAsks.delete(id);
 }
 function rememberFit(id: string, key: string): void {
   lastFit.delete(id);
@@ -437,7 +482,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
       for (const entry of entries) {
         if (entry.job.state !== "queued") continue;
         const hold = admission.holds[entry.job.id] ?? null;
-        const specific = entry.job.riseReason === "profile_lowered" || entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait" || entry.job.riseReason === "requeued_memory";
+        const specific = entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room" || entry.job.riseReason === "profile_lowered" || entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait" || entry.job.riseReason === "requeued_memory";
         if (hold && !specific && entry.job.riseReason !== hold) { entry.job.riseReason = hold; entry.save(); }
         else if (!hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
       }
@@ -456,7 +501,23 @@ export async function releaseHouseholdQueue(): Promise<void> {
               // Save only when the answer changed: a save refreshes the queue, which would run this loop again forever for a job that keeps waiting.
               const key = JSON.stringify(admission);
               if (lastFit.get(entry.job.id) !== key) { rememberFit(entry.job.id, key); entry.applyFit?.(admission); }
-              if (fit.outcome !== "run") continue;
+              if (fit.outcome === "ask") {
+                // TIER-PRIO-07: the person decides whether to run lower now (Allow) or wait for the tier they picked (Wait). No answer in ten minutes counts as Wait, so nothing stays stuck on a question.
+                const ask = fitAsks.get(entry.job.id) ?? { personId: entry.job.personId, askedAt: now, line: null, answer: null as FitAsk["answer"] };
+                ask.line = admission.askLine;
+                fitAsks.set(entry.job.id, ask);
+                if (ask.answer === null && now - ask.askedAt >= fitAskTimeoutMs) ask.answer = "wait";
+                if (ask.answer !== "allow") {
+                  const reason = ask.answer === null ? "tier_ask" : "tier_no_room";
+                  if (entry.job.riseReason !== reason) { entry.job.riseReason = reason; entry.save(); }
+                  if (ask.answer === null) scheduleAskRecheck(fitAskTimeoutMs - (now - ask.askedAt));
+                  continue;
+                }
+                if (entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room") { entry.job.riseReason = null; entry.save(); }
+              } else if (fit.outcome !== "run") {
+                if (entry.job.riseReason !== "tier_no_room") { entry.job.riseReason = "tier_no_room"; entry.save(); }
+                continue;
+              }
               if (fit.applied?.cells.chat?.state === "reduced") {
                 // PRIO-03 (S1 to S4): chat is lowered only after a quiet moment, outside the cooldown; chat is never paused, so the wait is bounded.
                 const requestedAt = downshiftRequestedAt.get(entry.job.id) ?? now;

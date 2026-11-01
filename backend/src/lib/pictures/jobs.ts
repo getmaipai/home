@@ -15,7 +15,7 @@ import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
 import { clearLive, updateLive } from "@/lib/genLive";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
@@ -26,14 +26,14 @@ type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReas
 const queuedPictureSubmits = new Map<string, () => Promise<{ job: string; done: StackPic[] | null }>>();
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;
-  const phaseHold = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
+  const phaseHold = PERSISTED_HOLDS.find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
   const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, tier: requestTier(job.request), createdAt: job.createdAt, headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
     position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason ?? phaseHold, typicalSeconds: job.kind === "edit" ? 20 : 44 };
   return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
     applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; savePictureJob(job); },
     stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelPictureJob(owner as PersonRow, job.id); } : undefined,
     release: job.state === "queued" && !job.stackJob ? () => releasePicture(job) : undefined,
-    save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); if (queued.riseReason && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; saveJob(job); } };
+    save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); if (queued.riseReason && PERSISTED_HOLDS.includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; saveJob(job); } };
 }));
 
 async function releasePicture(job: PictureJob): Promise<void> {

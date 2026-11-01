@@ -106,6 +106,8 @@ export interface StackCodingModels { object: "list"; data: Array<{ id: string; r
 /** `GET /stack/v1/roles` coding entry: only what the gateway reads. */
 export interface StackCodingStatus { state?: string; slots?: number | null; slots_busy?: number }
 /** TIER-WIRE-02: how the Stack answered a Reduced chat request. `waiting` is a chat turn in flight (try again at the next turn boundary); `unsupported` is a Stack without the route. */
+/** TIER-STATUS-01: the governor's own Max window as GET /stack/v1/memory reports it. Absent on a Stack older than the field. */
+export interface StackMaxWindow { state: "none" | "draining" | "open"; owner: string | null; since: string | null }
 export type StackReducedResult =
   | { state: "ok"; reduced: boolean; swapMs?: number }
   | { state: "waiting"; reduced: boolean }
@@ -183,7 +185,7 @@ export interface StackClient {
   /** GET and POST /stack/v1/memory/reclaim. Absent on older Stacks (404). */
   reclaimList?(opts?: { signal?: AbortSignal }): Promise<StackReclaimList>;
   reclaimRun?(opts?: { signal?: AbortSignal }): Promise<StackReclaimResult>;
-  memory?(opts?: { signal?: AbortSignal }): Promise<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad; reduced_chat?: boolean }>;
+  memory?(opts?: { signal?: AbortSignal }): Promise<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad; reduced_chat?: boolean; max_window?: StackMaxWindow }>;
   /** POST /stack/v1/tiers/reduced `{on}` (TIER-WIRE-02): enter, renew (`on: true` again) or leave the Reduced chat model. Absent on a Stack that cannot (the method is optional, and a 404 answers `unsupported`). */
   setReducedChat?(on: boolean, opts?: { signal?: AbortSignal }): Promise<StackReducedResult>;
   /** GET /stack/v1/memory/daily?days=N. Absent on older Stacks. */
@@ -522,7 +524,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     capabilities: (opts) => call("/stack/v1/capabilities", { method: "GET" }, json<StackCapabilities>, opts),
     reclaimList: (opts) => call("/stack/v1/memory/reclaim", { method: "GET" }, json<StackReclaimList>, opts),
     reclaimRun: (opts) => call("/stack/v1/memory/reclaim", { method: "POST" }, json<StackReclaimResult>, opts),
-    memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad; reduced_chat?: boolean }>, opts),
+    memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad; reduced_chat?: boolean; max_window?: StackMaxWindow }>, opts),
     async setReducedChat(on, opts) {
       try {
         // 200 {ok:true, swap_ms, reduced} and 202 {ok:false, waiting:true, reduced} both come back as success statuses.

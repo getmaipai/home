@@ -3,6 +3,7 @@
 // clip from a route (Make another, Animate this picture) passes the same age and surface gate as the chat tool and
 // the same prompt check, so a route is never a way around either. A child, a teen, a guest and a spoken or shared
 // surface are refused here exactly as in the tool.
+import { PERSISTED_HOLDS, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
@@ -63,7 +64,8 @@ const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullab
 
 export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   const hold = job.riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
-  if (hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(hold)) return jobQueueCopy("queued", hold as "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain", job.position, null, audience);
+  if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
+  if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
   if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.phase === "paused: low memory") return "Paused: low memory";
   // A job waiting on memory is not waiting in a line: with nothing ahead of it, "You are next" is wrong, so it gets the memory words.

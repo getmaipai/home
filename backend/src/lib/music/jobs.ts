@@ -21,7 +21,7 @@ import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { slotRun } from "@/lib/tiers";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
 export { getMusicJobFor, jobsForConversation, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
@@ -36,14 +36,14 @@ registerQueueProvider(() => {
   for (const job of pendingMusicJobs()) if (!jobs.has(job.id)) jobs.set(job.id, job);
   return [...jobs.values()].map((job) => {
     const request = job.request as MusicRequest & { memoryRequeues?: number };
-    const phaseHold = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].find((reason) => job.stage === `held:${reason}`) as QueueJob["riseReason"] | undefined;
+    const phaseHold = PERSISTED_HOLDS.find((reason) => job.stage === `held:${reason}`) as QueueJob["riseReason"] | undefined;
     const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "other", category: "music", tier: requestTier(job.request), state: job.state === "running" ? "running" : "queued", createdAt: job.createdAt,
       position: job.position, estimateSeconds: job.etaSeconds, riseReason: phaseHold, typicalSeconds: 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveMusicJob(job); },
       stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelMusicJob(owner as PersonRow, job.id); } : undefined,
       release: job.state === "queued" && !job.stackJob ? () => releaseMusic(job) : undefined,
-      save: () => { job.position = queued.position ?? null; if (queued.riseReason && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(queued.riseReason)) job.stage = `held:${queued.riseReason}`; else if (job.stage?.startsWith("held:")) job.stage = "queued"; persistMusicJob(job); } };
+      save: () => { job.position = queued.position ?? null; if (queued.riseReason && PERSISTED_HOLDS.includes(queued.riseReason)) job.stage = `held:${queued.riseReason}`; else if (job.stage?.startsWith("held:")) job.stage = "queued"; persistMusicJob(job); } };
   });
 });
 /**

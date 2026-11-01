@@ -1,6 +1,7 @@
 // IMGGEN-UI-01: the picture card's routes. Signed-in, per person: a job is readable and stoppable by its owner only
 // (nobody sees another person's pictures, a parent included). Starting a variation passes the same age and surface
 // gate as the chat tool and the same prompt check, so a route is never a way around either (IMGGEN-SAFE-01).
+import { PERSISTED_HOLDS, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
@@ -50,7 +51,8 @@ const JobSchema = z.object({
 
 export function phaseLabel(job: PictureJob, audience: "adult" | "child" = "adult"): string {
   const hold = (job as PictureJob & { riseReason?: string }).riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
-  if (hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(hold)) return jobQueueCopy("queued", hold as "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain", job.position, null, audience);
+  if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
+  if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
   if (job.state === "queued") return job.position && job.position > 1 ? jobQueueCopy("queued", "picture_line", job.position, null, audience).replace("N", String(job.position)) : jobQueueCopy("queued", "picture_engine", null, null, audience);
   if (job.phase === "waiting for memory") return jobQueueCopy("waiting_memory", "picture_memory", null, null, audience);
   if (job.phase === "paused: low memory") return JOB_QUEUE_COPY.picture_paused_memory[audience];

@@ -24,7 +24,7 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { addedChatChoiceStates, startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
-import { activeProfileLine, endMaxWindow, openMaxWindow } from "@/lib/jobs/householdQueue";
+import { activeProfileLine, answerFitAsk, currentMaxWindow, endMaxWindow, pendingFitAsk } from "@/lib/jobs/householdQueue";
 import { closedAppsLines } from "@/lib/jobs/closeApps";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
@@ -213,8 +213,8 @@ const windowRoute = createRoute({
   middleware: [requireRole("owner", "admin")] as const,
   responses: { 200: { content: { "application/json": { schema: z.object({ open: z.boolean(), minutes_left: z.number().int().nullable(), line: z.string().nullable(), profile: z.string().nullable(), closed_apps: z.array(z.string()) }) } }, description: "The open Max window, if any." }, ...refusals },
 });
-aiChoicesRoutes.openapi(windowRoute, (c) => {
-  const open = openMaxWindow();
+aiChoicesRoutes.openapi(windowRoute, async (c) => {
+  const open = await currentMaxWindow();
   return c.json({ open: open !== null, minutes_left: open?.minutesLeft ?? null, line: open ? MAX_RUNNING_LINE : null, profile: activeProfileLine(), closed_apps: closedAppsLines() }, 200);
 });
 const stopWindowRoute = createRoute({
@@ -223,6 +223,21 @@ const stopWindowRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.object({ stopped: z.boolean() }) } }, description: "True when a Max job was running and has been stopped." }, ...refusals },
 });
 aiChoicesRoutes.openapi(stopWindowRoute, async (c) => c.json({ stopped: await endMaxWindow() }, 200));
+
+const jobAskRoute = createRoute({
+  method: "post", path: "/jobs/{id}/fit-answer", tags: ["AI"], summary: "Answer a job's question: run it at the lower tier now (allow) or keep waiting for the tier that was picked (wait) (TIER-PRIO-07)",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) }), body: { content: { "application/json": { schema: z.object({ answer: z.enum(["allow", "wait"]) }) } }, required: true } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ answered: z.boolean() }) } }, description: "True when the question was open and is now answered; false when there is nothing to answer (it already started, was answered, or timed out into waiting)." }, ...refusals },
+});
+aiChoicesRoutes.openapi(jobAskRoute, (c) => {
+  const person = c.get("person");
+  const id = c.req.valid("param").id;
+  const ask = pendingFitAsk(id);
+  // Only the person who made the job, or an admin, can answer for it.
+  if (ask && ask.personId !== person.id && person.role !== "owner" && person.role !== "admin") return c.json({ error: "Only the person who made this, or an admin, can answer.", code: "forbidden" }, 403) as never;
+  return c.json({ answered: ask ? answerFitAsk(id, c.req.valid("json").answer) : false }, 200);
+});
 
 const leaseShape = z.object({ state: z.enum(["off", "starting", "held", "releasing"]), held_by_you: z.boolean(), pinned: z.boolean(), can_use: z.boolean(), releases_in_seconds: z.number().int().nullable() });
 const leaseView = (person: { id: string; role: string }) => {

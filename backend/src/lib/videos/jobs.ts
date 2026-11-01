@@ -9,7 +9,7 @@ import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
@@ -145,7 +145,7 @@ registerQueueProvider(() => {
   for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
   for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
   return [...jobs.values()].map((job) => {
-    const phaseHold = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
+    const phaseHold = PERSISTED_HOLDS.find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
     const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "video", state: job.state, tier: requestTier(job.request), createdAt: job.createdAt,
       position: job.position, estimateSeconds: job.estimateSeconds, riseReason: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 ? "requeued_memory" : job.riseReason ?? phaseHold, typicalSeconds: 140,
       headOfClass: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 };
@@ -153,7 +153,7 @@ registerQueueProvider(() => {
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveVideoJob(job); },
       stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelVideoJob(owner as PersonRow, job.id); } : undefined,
       release: job.state === "queued" && !job.stackJob ? () => releaseVideo(job) : undefined,
-      save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; if (queued.riseReason && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; persistVideoJob(job); } };
+      save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; if (queued.riseReason && PERSISTED_HOLDS.includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; persistVideoJob(job); } };
   });
 });
 
