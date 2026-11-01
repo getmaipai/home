@@ -38,19 +38,19 @@ describe("toArticleViewData", () => {
     expect(toArticleViewData({ ...base, description: "American actor and producer", reading_minutes: 3 }, opts).description).toBe("American actor and producer");
   });
 
-  test("the category chip opens its category when the page can show one", () => {
+  test("the category is the breadcrumb link that opens it, and there is no second chip", () => {
     const seen: string[] = [];
     const data = toArticleViewData({ ...base, kicker: "Actor" }, { ...opts, onCategory: (category) => seen.push(category) });
-    data.onKicker?.();
+    data.breadcrumb![1]!.onClick!();
     expect(seen).toEqual(["Actor"]);
-    expect(toArticleViewData({ ...base, kicker: "Actor" }, opts).onKicker).toBeUndefined();
+    expect(data.kicker).toBeUndefined();
+    expect(toArticleViewData({ ...base, kicker: "Actor" }, opts).breadcrumb![1]!.onClick).toBeUndefined();
   });
 
-  test("an infobox picture means no hero, a floated first figure and a kicker chip", () => {
+  test("an infobox picture means no hero, a floated first figure", () => {
     const data = toArticleViewData({ ...base, kicker: "Actor · Producer", lead_image: { src: "/api/reference/media/wiki/z.jpg", alt: "Z" }, infobox: { title: "Zendaya", image: { src: "/api/reference/media/wiki/z.jpg", alt: "Z" }, rows: [{ label: "Born", value: "1996" }] } }, opts);
     expect(data.image).toBeUndefined();
     expect(data.floatFirstFigure).toBe(true);
-    expect(data.kickerStyle).toBe("chip");
     expect(data.infobox?.image?.src).toContain("/api/reference/media/");
   });
 

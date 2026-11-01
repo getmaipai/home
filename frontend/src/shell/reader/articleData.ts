@@ -73,8 +73,7 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
   const standfirst = article.infobox && article.infobox.rows.length ? undefined : article.lead;
   return {
     title: article.title,
-    ...(kicker ? { kicker, kickerStyle: "chip" as const } : {}),
-    ...(kicker && options.onCategory ? { onKicker: () => options.onCategory!(kicker) } : {}),
+    // The category is the breadcrumb's middle link, so the header draws no second category chip above the title.
     // The same header row as a News story: source line with the snapshot date and reading time, Save and Listen in one place.
     // A book that reports no snapshot date keeps the plain source line instead.
     // The provider row carries the article's own name and its picture (when the book has one) instead of the book's name.
