@@ -1,5 +1,6 @@
 {
   "id": "v-the-series",
+  "production": "V: The Series, the single-season American TV series of 1984 to 1985 that followed the original miniseries and V: The Final Battle (not the 2009 reboot, not the miniseries)",
   "utterance": "the tv series V (the 80s one, not the 2000s one) only had one season. tell me your best educated guess what would have happened if they finished the story",
   "topics": [
     { "name": "why the series was cancelled", "anyOf": ["cancel", "ratings", "ended after", "not renewed"] },
@@ -8,5 +9,5 @@
     { "name": "an explicit guess", "anyOf": ["my guess", "educated guess", "likely", "probably"] }
   ],
   "minSites": 3,
-  "wrongAttributions": [{ "name": "Kenneth Johnson" }]
+  "watchedPeople": [{ "name": "Kenneth Johnson" }]
 }

@@ -39,7 +39,14 @@ try {
   const { db } = await import("@/db");
   const { conversationTurns } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
-  const { judgeResearchAnswer } = await import("./researchEval");
+  const { judgeResearch } = await import("./researchEval");
+  const { researchEvidence } = await import("@/lib/turnMachine/research");
+  // The credit judge is one plain, non-thinking call to the Stack's chat model per sentence that names a watched person.
+  const judge = async (prompt: string): Promise<string> => {
+    const response = await fetch(`${process.env.MAIPAI_STACK_URL}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages: [{ role: "user", content: prompt }], max_tokens: 120, temperature: 0 }) });
+    const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    return body.choices?.[0]?.message?.content ?? "";
+  };
   const people = runner.createBenchPeople();
   for (const style of wanted) {
     registerActiveChatLease(null);
@@ -56,7 +63,8 @@ try {
     const outcomes = row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; status: string; args?: { expression?: string; scope?: string }; result?: { data?: { rows?: unknown[] } } }[]) : [];
     const searches = outcomes.filter((o) => o.packageId === "websearch");
     const sources = (result.value.sources ?? []).map((s) => ({ site: s.site, title: s.title?.slice(0, 80) }));
-    const verdict = judgeResearchAnswer(research, { answer: result.value.reply.text, sources: (result.value.sources ?? []).map((s) => ({ site: s.site, url: s.url })), queries: searches.map((o) => o.args?.expression ?? "") });
+    const evidence = researchEvidence(outcomes as unknown as Parameters<typeof researchEvidence>[0]);
+    const verdict = await judgeResearch(research, { answer: result.value.reply.text, sources: (result.value.sources ?? []).map((s) => ({ site: s.site, url: s.url })), queries: searches.map((o) => o.args?.expression ?? ""), evidence }, judge);
     console.log(redact(JSON.stringify({ style, seconds: Math.round(ms / 100) / 10, rounds: searches.length, queries: searches.map((o) => `${o.args?.expression ?? ""} [scope ${o.args?.scope ?? "unset"}, ${o.status}, ${o.result?.data?.rows?.length ?? 0} rows]`), sources, answer: result.value.reply.text, verdict }, null, 2)));
   }
   registerActiveChatLease(null);
