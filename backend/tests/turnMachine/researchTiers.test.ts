@@ -106,14 +106,14 @@ afterEach(() => {
 });
 
 /** Runs one turn against a model that wants to search `wantedRounds` times (a different query each round), then answers. */
-async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number; utterance?: string } = {}) {
+async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number; utterance?: string; reply?: string } = {}) {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const requests: ChatCompletionRequest[] = [];
   let made = 0; // searches the scripted model has asked for so far (a skipped or empty search leaves no tool message to count)
   const stub = startStubLlmServer(0, {
     scriptedChatReply: (request: ChatCompletionRequest) => {
       requests.push(request);
-      return "It ended after one season [1] and the creator said more was planned [3].";
+      return opts.reply ?? "It ended after one season [1] and the creator said more was planned [3].";
     },
     scriptedToolCalls: (request: ChatCompletionRequest) => {
       if (!request.tools || request.tools.length === 0 || request.tool_choice === "none") return undefined;
@@ -694,4 +694,26 @@ describe("the same research path handles every kind of subject", () => {
       expect((result.value.sources ?? []).at(-1)?.title).toBe(topic.title);
     });
   }
+});
+
+describe("names and facts no source gives are marked (RESEARCH-FABRICATION-01)", () => {
+  test("a Max sentence naming someone no source, note or article contains is marked, and a sentence with only sourced names is not", async () => {
+    await holdMax();
+    __setClaimJudgeForTests(async () => '{"supported": true}');
+    const { result } = await turn("owner", 1, { max: true, reply: "A review by Marcus Quillon found the blender noisy [1]. The Alder 200 is sold in two colors [2]." });
+    expect(result.value.reply.text).toContain("Marcus Quillon found the blender noisy [1] (not in the sources).");
+    expect(result.value.reply.text).toContain("two colors [2].");
+    expect(result.value.reply.text).not.toContain("colors [2] (not in the sources)");
+  });
+
+  test("an uncited sentence that states a fact goes to the claim judge against the notes and the article; a general one does not", async () => {
+    await holdMax();
+    const judged: string[] = [];
+    __setClaimJudgeForTests(async (prompt) => { judged.push(prompt); return '{"supported": false}'; });
+    __setStageWritersForTests({ brief: async () => null, analysis: async () => null });
+    const { result } = await turn("owner", 1, { max: true, reply: "It ended soon after, with 57 episodes still unmade. That is a hard thing to say plainly [1]." });
+    expect(judged.some((p) => p.includes("57 episodes still unmade"))).toBe(true);
+    expect(judged.some((p) => p.includes("hard thing to say"))).toBe(true);
+    expect(result.value.reply.text).toContain("unmade (not confirmed by the sources)");
+  });
 });

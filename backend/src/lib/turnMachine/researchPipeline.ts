@@ -202,7 +202,7 @@ ${backbone ? `${backbone}\n\n` : ""}${ledger}
 
 Work from these notes and the article only. Answer with one JSON object and nothing else:
 {"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}], "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]}
-"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). Use at most 8 claims and 4 guesses.`;
+"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). Use at most 8 claims and 4 guesses. Name no person, title, number or detail that the notes and the article do not contain.`;
 }
 
 export function parseAnalysis(text: string | null, valid: ReadonlySet<number>): Analysis | null {

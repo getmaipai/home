@@ -9,9 +9,10 @@ import type { AgeBand } from "@/lib/ageBand";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { TurnBudget } from "./contract";
 import { plainQuery } from "./entityPin";
+import { hasFactCue } from "./fabrication";
 
 /** Appended to the final answering instruction of a research turn. */
-export const RESEARCH_ANSWER_CLAUSE = "Say where each claim comes from (the site, or who was interviewed) beside its [n]. Say plainly which parts are your own guess and which the sources state. If the sources disagree or are thin, say so.";
+export const RESEARCH_ANSWER_CLAUSE = "Say where each claim comes from (the site, or who was interviewed) beside its [n]. Say plainly which parts are your own guess and which the sources state. If the sources disagree or are thin, say so. Name no person, title or figure that the sources do not give.";
 
 export type AnswerStyle = "instant" | "thinking" | "max";
 
@@ -246,7 +247,7 @@ export interface ClaimCheckResult { text: string; checked: number; unsupported: 
  * do not back keeps its words, loses its citation markers and gains "(not confirmed by the sources)", so a citation never points at a page
  * that does not say it. A sentence whose sources gave no text is skipped, an unreadable or missing judge answer leaves the sentence as
  * written, and the whole check stops at its time cap. The judge calls run a few at a time. */
-export async function checkClaims(text: string, evidence: readonly string[], judge: ClaimJudge, opts: { concurrency?: number; deadlineMs?: number; maxChecks?: number; now?: () => number } = {}): Promise<ClaimCheckResult> {
+export async function checkClaims(text: string, evidence: readonly string[], judge: ClaimJudge, opts: { concurrency?: number; deadlineMs?: number; maxChecks?: number; now?: () => number; uncitedPassages?: string } = {}): Promise<ClaimCheckResult> {
   const now = opts.now ?? Date.now;
   const stopAt = now() + (opts.deadlineMs ?? 25_000);
   const parts = text.split(/(?<=[.!?])(\s+)/);
@@ -254,7 +255,11 @@ export async function checkClaims(text: string, evidence: readonly string[], jud
   let noText = 0;
   parts.forEach((part, index) => {
     const numbers = [...part.matchAll(/\[(\d{1,3})\]/g)].map((m) => Number(m[1]));
-    if (numbers.length === 0) return;
+    // RESEARCH-FABRICATION-01: a sentence with no citation that states a fact (a figure or a name) is judged against the notes and the article.
+    if (numbers.length === 0) {
+      if (opts.uncitedPassages && opts.uncitedPassages.trim() !== "" && part.trim().length > 20 && hasFactCue(part)) jobs.push({ index, sentence: part.trim(), passages: opts.uncitedPassages });
+      return;
+    }
     const passages = [...new Set(numbers)].map((n) => (evidence[n - 1] ?? "").trim()).filter(Boolean).join("\n---\n");
     if (passages === "") { noText += 1; return; }
     jobs.push({ index, sentence: part.trim(), passages });
