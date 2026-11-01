@@ -81,6 +81,19 @@ describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd,
     }
   });
 
+  // Owner, 2026-11-01: "I don't see the conversation icon any more." While a written reply (a long Thinking or
+  // Max answer) ran, the button was absent, so the icon came and went. It stays, dimmed, and cannot start a call.
+  test("stays visible but disabled while a written turn runs", async () => {
+    const restore = stubEngines([{ id: "stt", state: "ready" }, { id: "tts", state: "ready" }]);
+    try {
+      const view = renderWithQueryClient(<AdminContext.Provider value><VoiceSessionProvider value={{ open: false, setOpen: () => {} }}><ComposerVoiceControls disabled /></VoiceSessionProvider></AdminContext.Provider>);
+      const button = await view.findByLabelText("Start a voice conversation");
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
   for (const bad of ["offline", "notInstalled"]) {
     test(`absent when tts is ${bad}`, async () => {
       const restore = stubEngines([

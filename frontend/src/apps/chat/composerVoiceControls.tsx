@@ -41,11 +41,11 @@ const AudioWaveformIcon = getIcon("audio-waveform");
 // shows only while a call is open, with aria-pressed saying the same. The kit's `elements/tooltip-icon-button` has no touch-target
 // floor of its own, so the 48px hit area (docs/UI.md) is the
 // `before:-inset-3` pseudo-element passed through className.
-function WaveformButton({ onClick, engineDown, on }: { onClick: () => void; engineDown?: string | undefined; on: boolean }) {
+function WaveformButton({ onClick, engineDown, on, busy }: { onClick: () => void; engineDown?: string | undefined; on: boolean; busy: boolean }) {
   return (
     <TooltipIconButton
       tooltip={engineDown === undefined ? "Start a voice conversation" : `Start a voice conversation. ${engineDown}`}
-      disabled={engineDown !== undefined}
+      disabled={engineDown !== undefined || busy}
       type="button"
       variant={on ? "default" : "ghost"}
       size="icon"
@@ -71,6 +71,8 @@ export function ComposerVoiceControls({ disabled = false, engineDown }: { disabl
   // posture the rest of this file already takes for a role that isn't
   // ready.
   const session = useVoiceSession();
-  if (!useVoiceCallReady(disabled, engineDown)) return null;
-  return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} on={session?.open === true} />;
+  // A running written turn dims the button, it never removes it: a long Thinking or Max answer would otherwise
+  // make the icon vanish and come back (owner, 2026-11-01).
+  if (!useVoiceCallReady(false, engineDown)) return null;
+  return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} on={session?.open === true} busy={disabled} />;
 }
