@@ -190,6 +190,11 @@ export function madeFiles(person: PersonRow, appId: "music" | "videos"): MadeLib
   return files.filter((file) => !savedFileIds.has(file.id));
 }
 
+/** One made clip as a shelf row (Made at home, and the Create page's creations). */
+export function madeVideoRow(file: MadeLibraryFile) {
+  return { id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video" as const, thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" };
+}
+
 export function madeFileFor(person: PersonRow, appId: "music" | "videos", id: string): MadeLibraryFile | null {
   return madeFiles(person, appId).find((file) => file.id === id) ?? null;
 }
@@ -315,6 +320,12 @@ export interface DataParams {
   length?: string;
   within?: string;
   show?: string;
+  /** Videos' Make a video page echoes its picked choices back as one row (lib/media/videoCreateApp.ts): the words and the pickers' values. */
+  prompt?: string;
+  orientation?: string;
+  seconds?: string;
+  tier?: string;
+  recipe?: string;
   limit?: number;
 }
 
@@ -553,7 +564,7 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
         ? (params.scope === "people" ? videoCreationPeople(person, params.id) : videoCreation(person, params.id)) as never
         : null;
     case "made-at-home":
-      return appId === "videos" ? madeFiles(person, "videos").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
+      return appId === "videos" ? madeFiles(person, "videos").slice(0, params.limit ? limit : 16).map(madeVideoRow) : null;
     case "featured": {
       // A billboard wants pictures: the newest items that have one, else the newest.
       const items = queryItems(person, appId, { limit: 12 });

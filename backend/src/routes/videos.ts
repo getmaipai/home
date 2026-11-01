@@ -21,6 +21,7 @@ import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
+import { makeVideoFor } from "@/lib/videos/make";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
@@ -299,6 +300,25 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
     return c.json({ error: plainVideoFailure(error), code: error instanceof StackVideoError ? error.code : "failed" }, status) as never;
   }
+});
+
+// VIDEO-CREATE-01: Make a video, from words alone, on the Create page. The same definition the chat tool runs (lib/videos/make.ts).
+const makeRoute = createRoute({
+  method: "post", path: "/make", tags: ["Videos"], summary: "Make a video from words (the Create page); adults on their own screen only", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({
+    prompt: z.string().trim().min(3).max(1200).describe("What the video shows."),
+    orientation: z.enum(["landscape", "portrait"]).optional(),
+    seconds: z.number().int().min(1).max(30).optional().describe("Length in seconds; the most this level makes is used when it is longer."),
+    tier: z.enum(["standard", "boost", "max"]).optional().describe("The level to make it at. Max needs an admin's OK; without it the request is refused."),
+    recipe: z.string().trim().min(1).max(40).optional().describe("A recipe id from the package's `recipes` data (a camera move or style); its wording goes to the model after the prompt."),
+  }) } } } },
+  responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card for the new clip." }, ...refusals },
+});
+videosRoutes.openapi(makeRoute, async (c) => {
+  const actor = c.get("person");
+  const result = await makeVideoFor(actor, c.req.valid("json"));
+  if (!result.ok) return c.json({ error: result.error, code: result.code }, result.status) as never;
+  return c.json(videoCardView(actor, result.job, true, await readyFlags(actor)), 200);
 });
 
 const animateRoute = createRoute({

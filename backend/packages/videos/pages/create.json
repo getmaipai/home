@@ -4,9 +4,96 @@
   "title": "Create",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "film",
-      "text": "Creating videos comes here soon."
+      "type": "search",
+      "state": "prompt",
+      "label": "Describe a video",
+      "placeholder": "Describe a video and press Enter",
+      "submit": {
+        "navigate": {
+          "to": "/apps/videos/make-video",
+          "state": {
+            "prompt": "{q}"
+          }
+        }
+      }
+    },
+    {
+      "type": "section",
+      "heading": "Ideas to start with",
+      "children": [
+        {
+          "type": "list",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "starters"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{prompt}",
+          "item_media_field": "sparkles",
+          "row_action": {
+            "icon": "arrow-right",
+            "label": "Use {title}",
+            "action": {
+              "navigate": {
+                "to": "/apps/videos/make-video",
+                "state": {
+                  "prompt": "{prompt}"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "heading": "Making now",
+      "children": [
+        {
+          "type": "list",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "making"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{status}",
+          "item_media_field": "film",
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "film",
+            "text": "Nothing is being made right now."
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recent creations",
+      "bind": {
+        "source": "package",
+        "path": "made-at-home"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      }
     }
   ]
 }

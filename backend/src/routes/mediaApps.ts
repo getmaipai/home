@@ -9,6 +9,7 @@ import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
+import "@/lib/media/videoCreateApp"; // registers Videos' Create data ids (recipes, making, creations)
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
 import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
@@ -18,6 +19,7 @@ import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -46,6 +48,11 @@ function paramsOf(body: Body): DataParams {
     show: typeof body.show === "string" ? body.show : undefined,
     filter: typeof body.filter === "string" && body.filter !== "" ? body.filter : undefined,
     year: coerceNumber(body.year),
+    prompt: typeof body.prompt === "string" ? body.prompt.slice(0, 1200) : undefined,
+    orientation: typeof body.orientation === "string" ? body.orientation : undefined,
+    seconds: typeof body.seconds === "string" || typeof body.seconds === "number" ? String(body.seconds) : undefined,
+    tier: typeof body.tier === "string" ? body.tier : undefined,
+    recipe: typeof body.recipe === "string" ? body.recipe : undefined,
     limit: coerceNumber(body.limit),
   };
 }
@@ -130,6 +137,17 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status as 400 | 403 | 404);
     });
   }
+
+  // VIDEO-CREATE-01: the Make a video form's submit. The page may only call under /api/plugins/videos, so the action lives here; the rule is lib/videos/make.ts.
+  routes.post("/actions/make", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "make")) return next();
+    const read = readMakeBody(await bodyOf(c.req.raw));
+    if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
+    const made = await makeVideoFor(person, read.body);
+    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
 
   routes.post("/actions/lyrics", requireAuth, async (c, next) => {
     const person = c.get("person");

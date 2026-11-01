@@ -4,9 +4,181 @@
   "title": "Make a video",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "film",
-      "text": "Making a video comes here soon."
+      "type": "section",
+      "heading": "Describe your video",
+      "children": [
+        {
+          "type": "search",
+          "state": "prompt",
+          "label": "What should the video show?",
+          "placeholder": "Describe your video"
+        },
+        {
+          "type": "picker",
+          "variant": "select",
+          "state": "orientation",
+          "label": "Shape",
+          "placeholder": "Shape",
+          "leading": [
+            {
+              "value": "landscape",
+              "label": "Landscape",
+              "icon": "rectangle-horizontal"
+            },
+            {
+              "value": "portrait",
+              "label": "Portrait",
+              "icon": "rectangle-vertical"
+            }
+          ]
+        },
+        {
+          "type": "picker",
+          "variant": "select",
+          "state": "seconds",
+          "label": "Length",
+          "placeholder": "Length",
+          "leading": [
+            {
+              "value": "3",
+              "label": "3 seconds"
+            },
+            {
+              "value": "5",
+              "label": "5 seconds"
+            },
+            {
+              "value": "10",
+              "label": "10 seconds"
+            }
+          ]
+        },
+        {
+          "type": "picker",
+          "variant": "select",
+          "state": "tier",
+          "label": "Level",
+          "placeholder": "Level",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "tiers"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "label"
+        },
+        {
+          "type": "picker",
+          "variant": "select",
+          "state": "recipe",
+          "label": "Camera move",
+          "placeholder": "Camera move",
+          "leading": [
+            {
+              "value": "none",
+              "label": "No camera move"
+            }
+          ],
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "options"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "label"
+        },
+        {
+          "type": "list",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "make",
+              "prompt": "$state.prompt",
+              "orientation": "$state.orientation",
+              "seconds": "$state.seconds",
+              "tier": "$state.tier",
+              "recipe": "$state.recipe"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{summary}",
+          "item_media_field": "film",
+          "row_action": {
+            "icon": "play",
+            "label": "Make this video",
+            "action": {
+              "call": {
+                "target": "/api/plugins/videos/actions/make",
+                "method": "POST",
+                "args": {
+                  "prompt": "{prompt}",
+                  "orientation": "{orientation}",
+                  "seconds": "{seconds}",
+                  "tier": "{tier}",
+                  "recipe": "{recipe}"
+                }
+              }
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "film",
+            "text": "Describe your video above, then choose Make this video."
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "heading": "Making now",
+      "children": [
+        {
+          "type": "list",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "making"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{status}",
+          "item_media_field": "film",
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "film",
+            "text": "Nothing is being made right now."
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recent creations",
+      "bind": {
+        "source": "package",
+        "path": "made-at-home"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      }
     }
   ]
 }

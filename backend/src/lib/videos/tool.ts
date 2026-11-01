@@ -23,6 +23,7 @@ import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
 import { chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
 import { StackVideoError } from "./stack";
+import { videoRecipeFor, withVideoRecipe } from "./recipes";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 
@@ -64,11 +65,23 @@ export function latestGeneratedPictureId(actor: PersonRow, conversationId: strin
   return row?.id ?? null;
 }
 
+/** What a video call needs of its caller: a chat turn passes its TurnState; the Create page's route (VIDEO-CREATE-01) passes just the person and
+ * no conversation, and its own `audience`. */
+export type GenerateVideoState = Pick<TurnState, "actor" | "temporary"> & {
+  persona?: TurnState["persona"] | null;
+  conversationId: string | null;
+  turnId: string | null;
+  ephemeral?: boolean;
+  images?: TurnState["images"];
+} & Partial<Pick<TurnState, "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "utterance">>;
+
 export interface RunGenerateVideoInput {
-  state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
+  state: GenerateVideoState;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;
+  /** The caller's own audience (the Create route's); a turn leaves it out and the audience is read from the turn. */
+  audience?: VideoAudience;
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -87,7 +100,7 @@ const PHOTO_ATTACH_LINE = "Attach one photo to your message.";
 
 export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
-  const audience = videoAudienceOf(state, input.spoken);
+  const audience = input.audience ?? videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
   const refusal = videoRefusalFor(audience, args);
   if (refusal) return refused(callId, args, refusal);
 
@@ -112,10 +125,11 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let portrait = args.orientation === "portrait";
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
   const refuseWith = (line: string) => refused(callId, args, { kind: "child", why: "photos", line });
+  if (from && !state.conversationId) return refuseWith("A picture can start a video from a chat. Open a chat, then ask for it there.");
   if (isAttached(from)) {
     const attached = state.images ?? [];
     if (attached.length !== 1) return refuseWith(PHOTO_ATTACH_LINE);
-    const photo = loadUploadedPhoto(actor, state.conversationId, attached[0]!.id, temporary);
+    const photo = loadUploadedPhoto(actor, state.conversationId!, attached[0]!.id, temporary);
     if (!photo.ok) return refuseWith(photo.line);
     // The input-side floor: CSAM candidate screening and the stricter minor lane checks.
     const screened = await screenInputImage(photo.bytes, prompt, viewerOf(actor, audience.band));
@@ -123,8 +137,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     image = photo.base64; imageSource = "uploaded"; sourceFileId = photo.id;
     if (photo.width && photo.height) portrait = photo.height > photo.width;
   } else if (from) {
-    const id = /^(latest|last|this|that)$/i.test(from) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId) : latestGeneratedPictureId(actor, state.conversationId)) : from;
-    const ref = id ? loadGeneratedReference(actor, state.conversationId, id, temporary) : null;
+    const id = /^(latest|last|this|that)$/i.test(from) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId!) : latestGeneratedPictureId(actor, state.conversationId!)) : from;
+    const ref = id ? loadGeneratedReference(actor, state.conversationId!, id, temporary) : null;
     if (!ref || !ref.ok) {
       return outcomeOf({
         callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
@@ -158,6 +172,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const longSpeechNote = choice.quality === "detailed" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
   const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
 
+  // VIDEO-CREATE-01: a recipe's wording goes to the Stack after the person's words; the card keeps only what they typed. A child gets none.
+  const recipe = kid ? null : videoRecipeFor(args.recipe);
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
   if (kid && !slot) return refused(callId, args, { kind: "child", why: "daily_limit", line: CHILD_VIDEO_LIMIT_LINE });
   try {
@@ -172,7 +188,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       sourceFileId,
       tier: jobTier("video", tierAsked.tier, choice.quality),
       body: {
-        prompt: kid ? forceCartoon(prompt) : withVideoTriggerWords(prompt, adapter),
+        prompt: kid ? forceCartoon(prompt) : withVideoRecipe(withVideoTriggerWords(prompt, adapter), recipe),
         size,
         seconds,
         ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}),

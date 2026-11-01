@@ -1,6 +1,6 @@
 {
   "id": "videos",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "app",
   "category": "Media",
   "display": "Videos",
@@ -133,7 +133,8 @@
         "icon": "film",
         "nav": true,
         "kind": "schema",
-        "module": "create"
+        "module": "create",
+        "min_role": "adult"
       },
       {
         "id": "make-video",
@@ -141,7 +142,8 @@
         "icon": "film",
         "nav": true,
         "kind": "schema",
-        "module": "make-video"
+        "module": "make-video",
+        "min_role": "adult"
       },
       {
         "id": "creations",
@@ -149,7 +151,8 @@
         "icon": "library",
         "nav": true,
         "kind": "schema",
-        "module": "creations"
+        "module": "creations",
+        "min_role": "adult"
       }
     ],
     "data": [
@@ -175,10 +178,6 @@
       },
       {
         "id": "more-from",
-        "rows": "list"
-      },
-      {
-        "id": "liked",
         "rows": "list"
       },
       {
@@ -215,6 +214,10 @@
       },
       {
         "id": "item-actions",
+        "rows": "list"
+      },
+      {
+        "id": "recipes",
         "rows": "list"
       }
     ],

@@ -6,7 +6,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
-import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
+import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
@@ -230,8 +230,8 @@ export function readVideoFile(actor: PersonRow, job: VideoJob, fileId: string): 
     if (!clip || clip.ownerPersonId !== actor.id || Date.now() - clip.createdAt > TEMP_MS) return null;
     return { bytes: clip.bytes, mediaType: clip.mediaType };
   }
-  if (!job.conversationId) return null;
-  const read = readAttachmentForConversation(actor, job.conversationId, fileId);
+  // VIDEO-CREATE-01: a clip made on the Create page belongs to no chat; it is the person's own Library file.
+  const read = job.conversationId ? readAttachmentForConversation(actor, job.conversationId, fileId) : readAttachment(actor, fileId);
   return read.ok ? { bytes: read.value.bytes, mediaType: read.value.record.media_type } : null;
 }
 
@@ -457,7 +457,8 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
     if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
     const conversationId = job.conversationId;
-    if (!conversationId) throw new Error("no conversation");
+    // VIDEO-CREATE-01: no conversation means the Create page made it; the clip and poster are kept Library files, not chat attachments.
+    if (!conversationId && job.temporary) throw new Error("no conversation");
     const width = clip.width ?? 832;
     const height = clip.height ?? 480;
     const quality = clip.quality === "detailed" ? "detailed" as const : "quick" as const;
@@ -466,15 +467,22 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     if (job.temporary) {
       const id = newFileId();
       const posterId = newFileId();
-      storeTemporaryClip({ id, conversationId, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
-      storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
+      storeTemporaryClip({ id, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
+      storeTemporaryClip({ id: posterId, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
       file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     } else {
-      if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
+      const own = conversationId === null;
+      if (!own && (!job.turnId || !(await waitForTurnRow(job.turnId)))) throw new Error("turn row never appeared");
       if (signal.aborted) return;
-      const made = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "video/mp4", bytes: video, provenance: `video-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta })}`, deduplicate: false, retention: "conversation" });
+      const clipProvenance = `video-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta })}`;
+      const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height,  })}`;
+      const made = own
+        ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept" })
+        : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation" });
       if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
-      const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height,  })}`, deduplicate: false, retention: "conversation" });
+      const madePoster = own
+        ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "kept" })
+        : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "conversation" });
       if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
       file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     }
