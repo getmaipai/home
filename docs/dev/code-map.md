@@ -79,7 +79,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/chatHeaderBar.tsx` | ChatHeaderBar |
 | `frontend/src/apps/chat/chatHeaderData.tsx` | ChatHeaderDataProvider, useChatHeaderData, useSetChatHeaderData |
 | `frontend/src/apps/chat/chatProjects.tsx` | chatFoldersQueryKey, useChatProjects |
-| `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ChatComposerNotice, ChatMessageQueue, MODEL_EFFORTS |
+| `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ChatComposerNotice, ChatMessageQueue, ComposerTrailingWithThinkingMode |
 | `frontend/src/apps/chat/chatToolUis.tsx` | SpecSheetToolRender, ArtifactCardToolRender, ProducedArtifactCard, ConfirmToolRender, AskToolRender, ProjectFinishedArtifact |
 | `frontend/src/apps/chat/companionComposerMentions.tsx` | CompanionComposerMentions |
 | `frontend/src/apps/chat/composerAddMenu.tsx` | unwiredControlsAreEnabled, __setUnwiredControlsForTests, PackageScopeContext, PhotoUploadsContext, attachmentAddErrorMessage, ComposerAddMenu |
@@ -368,7 +368,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, pictureFailureWords, storedImages |
-| `backend/src/lib/chatLease.ts` | DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld |
+| `backend/src/lib/chatLease.ts` | LEASE_GRACE_MS, DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld |
 | `backend/src/lib/chatLeaseRuntime.ts` | __resetChatLeaseForTests, getChatLease, startChatLease |
 | `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState, addedChatChoiceStates |
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |

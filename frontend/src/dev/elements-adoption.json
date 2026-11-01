@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-01T17:32:55.524Z",
+  "generatedAt": "2026-11-01T17:38:31.318Z",
   "kitTag": "ui-v0.5.449",
   "items": [
     {
@@ -236,7 +236,7 @@
       "group": "answer",
       "verdict": "unassessed",
       "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "approval-card.tsx",
@@ -1023,7 +1023,7 @@
       "group": "composer",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "moon-disc.tsx",
