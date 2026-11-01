@@ -1,7 +1,7 @@
-// RESEARCH-PIN-01 (senior review of the V runs, 2026-11-01): before any web search, a research turn pins WHAT the person means to one
+// RESEARCH-PIN-01 (senior review of the live research runs, 2026-11-01): before any web search, a research turn pins WHAT the person means to one
 // canonical article (from the offline library, else the live Wikimedia API when the household allows it for an adult), and every later
-// search carries that article's distinctive words. The live V runs showed why: with a bare title ("V") the engines returned a singer,
-// listicles and the wrong production, and the old guard that stripped any year the question had not spelled out made it worse ("80s"
+// search carries that article's distinctive words. The live runs showed why: with a bare one-letter title the engines returned a person,
+// lists and the wrong work, and the old guard that stripped any year the question had not spelled out made it worse ("the 80s"
 // is not "1984"). The pin replaces that guard's job: the anchor's own title, years and lead are the words searches may carry.
 // Nothing here names a subject or a kind of question; the model picks among real article titles and the code reads the title's shape.
 import type { PersonRow } from "@/types";
@@ -40,13 +40,13 @@ export type CandidateFinder = (query: string, person: PersonRow, signal?: AbortS
 export type PinWriter = (prompt: string) => Promise<string | null>;
 
 export interface EntityAnchor {
-  /** The article's title as written ("Name (1999 film)"). */
+  /** The article's title as written ("Name (1999 edition)"). */
   title: string;
   /** The title before its qualifier ("Name"). */
   baseName: string;
   /** Four-digit years in the title (the disambiguating qualifier). */
   years: string[];
-  /** What a search carries to name this subject: the title with its brackets taken out ("Name 1999 film"). */
+  /** What a search carries to name this subject: the title with its brackets taken out ("Name 1999 edition"). */
   phrase: string;
   /** The article's opening, a few sentences. */
   lead: string;
@@ -175,7 +175,7 @@ Candidate articles:
 ${list}
 
 Answer with one JSON object and nothing else: {"pick": 1}
-"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, a franchise overview or a different one with a similar name), or 0 when no candidate is clearly it or two fit equally well. Use only what the question says.`;
+"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, an overview of a broader topic or a different one with a similar name), or 0 when no candidate is clearly it or two fit equally well. Use only what the question says.`;
 }
 
 export function parsePick(text: string | null, count: number): number | null {
@@ -238,7 +238,7 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 const hasWord = (text: string, word: string): boolean => new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(word)}(?![\\p{L}\\p{N}])`, "iu").test(text);
 
 /** A search as plain keywords: quotation marks, boolean words, minus signs, site: operators and brackets taken out, spaces closed up. The
- * engines return nothing for the long quoted and OR forms (the live V runs). */
+ * engines return nothing for the long quoted and OR forms (live runs). */
 export function plainQuery(query: string): string {
   return query
     .replace(/\b(?:site|inurl|intitle|filetype):\S+/gi, " ")

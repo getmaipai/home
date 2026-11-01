@@ -85,11 +85,13 @@ describe("the backbone", () => {
     expect(bb!.text).toContain("aired for one season");
   });
 
-  test("the block names the article and the number the writer cites it by", async () => {
+  test("the block names the article and the number the writer cites it by; an article that is no source is background the writer is told not to cite", async () => {
     __setBackboneWriterForTests(async () => '{"sections": [3]}');
     const bb = (await pickBackbone(anchor(), "q", []))!;
     expect(backboneBlock(bb, 7)).toContain("cite it as [7]");
     expect(backboneBlock(bb, 7)).toContain("Harbor Lights (1984 television series)");
+    expect(backboneBlock(bb, null)).toContain("do not cite it");
+    expect(backboneBlock(bb, null)).not.toContain("[");
   });
 
   test("the article is a source of the reply: a library article by its library address, a live one by its public address", () => {

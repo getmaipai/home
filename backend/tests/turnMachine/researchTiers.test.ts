@@ -647,3 +647,51 @@ describe("page reading skips a refusing site and the junk hosts, and goes on (RE
     expect(asked.length).toBe(4);
   });
 });
+
+// One code path for every kind of subject (owner ruling 2026-11-01): the same pin, backbone and search rules run for each of these, with no branch
+// on the topic. researchNoTopicWords.test.ts keeps topic words out of the source; this proves the path itself.
+describe("the same research path handles every kind of subject", () => {
+  const SUBJECTS = [
+    { name: "medicine", utterance: "how long does a typical chest cold last in an adult", plan: "typical chest cold last adult", title: "Chest cold", heading: "Prognosis", fact: "Deep fact: the usual course of a chest cold is about three weeks.", keys: ["Chest", "cold"], years: [] as string[] },
+    { name: "law and tax", utterance: "can an employee deduct a home office on their federal taxes", plan: "employee deduct home office federal taxes", title: "Home office deduction (United States)", heading: "Eligibility", fact: "Deep fact: an employee generally cannot deduct a home office under current federal rules.", keys: ["Home", "office"], years: [] },
+    { name: "product comparison", utterance: "which is better for a small kitchen, the Alder 200 or the Birch 300 blender", plan: "Alder 200 Birch 300 blender small kitchen", title: "Alder 200 (blender)", heading: "Specifications", fact: "Deep fact: the Alder 200 is 18 centimeters wide and weighs two kilograms.", keys: ["Alder", "200"], years: [] },
+    { name: "science", utterance: "why is sea level rising faster in some places than in others", plan: "sea level rising faster places others", title: "Sea level rise", heading: "Regional variation", fact: "Deep fact: land subsidence and ocean currents make the rise uneven between regions.", keys: ["Sea", "level"], years: [] },
+    { name: "local history", utterance: "when was the Stonebridge covered bridge built and who paid for it", plan: "Stonebridge covered bridge built paid", title: "Stonebridge, Ohio", heading: "History", fact: "Deep fact: the covered bridge was built in 1868 and paid for by a county levy.", keys: ["Stonebridge"], years: [] },
+    { name: "software how-to", utterance: "how do I roll back a database migration in the Quill framework", plan: "roll back database migration Quill framework", title: "Quill (2019 software framework)", heading: "Migrations", fact: "Deep fact: the rollback command reverses the most recent migration batch.", keys: ["Quill"], years: ["2019"] },
+    { name: "a TV case", utterance: "why was the television series Harbor Lights cancelled after one season", plan: "Harbor Lights television series cancelled", title: "Harbor Lights (1984 television series)", heading: "Reception", fact: "Deep fact: ratings fell to 57th of 77 shows and the network cancelled it in March 1985.", keys: ["Harbor", "Lights"], years: ["1984"] },
+  ];
+  const BRIEF = (subject: string) => JSON.stringify({ subject, answer_type: "an explanation", must_contain: ["the key fact"], ambiguous: false, options: [], question: "", assumption: "" });
+
+  for (const topic of SUBJECTS) {
+    test(`${topic.name}: the subject is pinned, every search carries its name, and the deep fact of the article reaches the writing round as a numbered source`, async () => {
+      await holdMax();
+      const article = {
+        title: topic.title,
+        lead: `${topic.title} opening.`,
+        source: "library" as const,
+        book: "wikipedia_en_all_maxi",
+        path: topic.title.replace(/[^A-Za-z0-9]+/g, "_"),
+        sections: [
+          { heading: "Overview", text: "overview filler. ".repeat(200) },
+          { heading: topic.heading, text: `${"detail filler. ".repeat(300)}${topic.fact}` },
+        ],
+      };
+      __setStageWritersForTests({
+        brief: async () => BRIEF(topic.name),
+        analysis: async () => JSON.stringify({ claims: [{ claim: "The article states the key fact.", status: "established", sources: [4] }], conflicts: [], gaps: [], guesses: [] }),
+      });
+      __setEntityPinForTests({ finder: async () => [{ title: topic.title, snippet: "s", load: async () => article }, { title: "Something else", snippet: "x", load: async () => null }], writer: async () => '{"pick": 1}' });
+      __setBackboneWriterForTests(async () => '{"sections": [2]}');
+      __setQueryWriterForTests(async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["the key fact"], queries: [topic.plan] }) : JSON.stringify({ queries: [] })));
+      const { requests, result } = await turn("owner", 1, { max: true, thinking: true, utterance: topic.utterance });
+      expect(searxQueries.length).toBe(1);
+      for (const key of topic.keys) expect(searxQueries[0]!.toLowerCase()).toContain(key.toLowerCase());
+      for (const year of topic.years) expect(searxQueries[0]).toContain(year);
+      expect(searxQueries[0]!.split(/\s+/).length).toBeLessThanOrEqual(8 + topic.title.split(/\s+/).length);
+      const instruction = lastRequest(requests).messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
+      expect(instruction).toContain(topic.fact);
+      expect(instruction).toContain("cite it as [4]");
+      expect((result.value.sources ?? []).at(-1)?.title).toBe(topic.title);
+    });
+  }
+});

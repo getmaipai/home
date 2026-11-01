@@ -1,0 +1,30 @@
+{
+  "comment": "Justified generic uses of a banned topic word in the research code. Each entry names the file, the word and why the word is not a topic: nothing in the research path may branch on, or be written for, one kind of subject.",
+  "allow": [
+    {
+      "file": "nodes/context.ts",
+      "word": "episode",
+      "reason": "the memory subsystem's own record type (recalled conversation episodes), unrelated to a subject of research"
+    },
+    {
+      "file": "nodes/context.ts",
+      "word": "episodes",
+      "reason": "same: the memory episodes prompt block"
+    },
+    {
+      "file": "contract.ts",
+      "word": "episode",
+      "reason": "the context item source kind 'episode' (a recalled conversation), unrelated to a subject of research"
+    },
+    {
+      "file": "contract.ts",
+      "word": "episodes",
+      "reason": "same: memory episodes in the context contract"
+    },
+    {
+      "file": "nodes/model.ts",
+      "word": "film",
+      "reason": "the answer-pictures feature's own list of picture-worthy kinds of subject (SHOW_IMAGES_REASK_INSTRUCTION); it is not part of the research path"
+    }
+  ]
+}

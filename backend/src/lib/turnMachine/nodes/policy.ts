@@ -187,7 +187,7 @@ function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly str
   const sourceTerms = tokenize(sourceTexts.join(" "));
   const sourceSquashed = wordsOf(sourceTexts.join(" ")).join("");
   // SEARCH-ANSWER-05: only a field the manifest marks `grounded: "conversation"` also grounds on the
-  // recent assistant turns (a follow-up like "show me the poster" names no film; the last reply did).
+  // recent assistant turns (a follow-up like "show me the poster" names no work; the last reply did).
   const hasWidened = conversationTexts.length > 0 && Object.values(schema?.properties ?? {}).some((p) => p.grounded === "conversation");
   const conversationTerms = hasWidened ? tokenize(conversationTexts.join(" ")) : new Set<string>();
   for (const [key, value] of Object.entries(args)) {

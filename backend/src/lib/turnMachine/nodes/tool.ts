@@ -349,7 +349,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     }
     // Max with the admin's web switch off keeps its first search ordinary and searches the offline library after that.
     const libraryOnlyNow = tool === "websearch" && researchRun?.libraryOnly === true && researchRun.searches > 0;
-    // Research goes past the offline library's overview: after its first search, a research turn searches the web (the live V run
+    // Research goes past the offline library's overview: after its first search, a research turn searches the web (a live run
     // showed the model choosing the library every round and getting only an encyclopedia page).
     const webNow = tool === "websearch" && researchRun !== undefined && researchRun.libraryOnly !== true && (researchRun.searches > 0 || state.answerStyle === "max");
     if (tool === "websearch" && researchRun) researchRun.searches += 1;

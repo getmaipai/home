@@ -22,7 +22,7 @@ export function answerStyleFor(input: { thinking?: boolean; max?: boolean; maxLe
   return input.thinking === true ? "thinking" : "instant";
 }
 
-/** Room for the model's reasoning on top of the visible reply, by style. The live V run (2026-11-01) showed both Thinking and Max
+/** Room for the model's reasoning on top of the visible reply, by style. A live run (2026-11-01) showed both Thinking and Max
  * replies cut off after a few words: the reasoning over several searches' evidence used the whole 512-token allowance and the
  * ceiling with it, so the visible answer stopped mid-sentence. The visible ceiling stays the record's; only the reasoning room grows. */
 export const THINKING_ALLOWANCE_FACTOR = { thinking: 4, max: 12 } as const;
@@ -41,7 +41,7 @@ export function budgetForStyle(budget: TurnBudget, style: AnswerStyle): TurnBudg
 /** RESEARCH-CLOCK-01 (Jesse, 2026-11-01: "we can't have 8-minute runs, no one will wait"): research is bounded by wall-clock time, and the
  * round counts (4 and 12) are only ceilings. The cap is the moment the WRITING starts, counted from the start of the turn: at
  * NO_NEW_ROUND_SHARE of it no new round starts, and at it page reading stops and the answer is written from the notes so far. Measured on
- * the Studio (2026-11-01, the V question): the analysis takes 3 to 10 seconds and the writing 25 to 35 more, and the answer streams while
+ * the Studio (2026-11-01, a long research question): the analysis takes 3 to 10 seconds and the writing 25 to 35 more, and the answer streams while
  * it is written, so the first words reach the person about 5 to 10 seconds after the cap. Adult written answers have no cap on their own
  * length (rule 5); the cap is on the searching. */
 export const RESEARCH_CAP_MS = { thinking: 35_000, max: 75_000 } as const;
@@ -288,15 +288,15 @@ const QUERY_NAME = /\b[A-Z][a-z]+(?:\s+(?:[A-Z]\.|[A-Z][a-z]+)){1,2}\b/g;
 const QUERY_YEAR = /\b(?:19|20)\d{2}\b/g;
 
 /** Names and years a search query carries that neither the person's question nor anything the searches returned has shown: details
- * the model supplied from its own memory. A research query built on one can aim at the wrong subject (the live V run searched a
- * miniseries' year and a producer's name for a different, later show), so such a search waits until a source has shown the detail. */
+ * the model supplied from its own memory. A research query built on one can aim at the wrong subject (a live run searched the year and a maker's name of an
+ * earlier work for a different, later one), so such a search waits until a source has shown the detail. */
 export function memoryDetailsIn(query: string, allowedText: string): string[] {
   const allowed = allowedText.toLowerCase();
   const found = [...(query.match(QUERY_NAME) ?? []), ...(query.match(QUERY_YEAR) ?? [])];
   return [...new Set(found.filter((detail) => !allowed.includes(detail.toLowerCase())))];
 }
 
-/** The query with those memory details taken out and the spaces closed up ("V 1984 TV series finale" becomes "V TV series finale"). */
+/** The query with those memory details taken out and the spaces closed up ("Alder 1984 handbook review" becomes "Alder handbook review"). */
 export function withoutMemoryDetails(query: string, allowedText: string): string {
   let cleaned = query;
   for (const detail of memoryDetailsIn(query, allowedText)) cleaned = cleaned.split(detail).join(" ");

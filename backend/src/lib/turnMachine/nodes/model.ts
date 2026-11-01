@@ -972,7 +972,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, `backbone wait end (${backbone ? `${backbone.chars} chars, ${backbone.headings.length} sections` : "none"})`);
     }
     const backboneNumber = state.outcomes.flatMap((o) => o.sources ?? []).length + 1;
-    const backboneText = backbone ? backboneBlock(backbone, backboneNumber) : "";
+    const backboneCited = backbone?.source ? backboneNumber : null;
+    const backboneText = backbone ? backboneBlock(backbone, backboneCited) : "";
     const noFindings = { notes: [], ledger: { text: "", notes: 0, dropped: 0 }, read: 0, dropped: 0 };
     if (researching && state.researchBudget && state.researchBudget.notes.size > 0) {
       markResearch(state, "stage 3 notes wait start");
@@ -987,14 +988,14 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, `stage 3 ledger: ${findings.ledger.notes} notes kept of ${state.pageNotes.length} written (${findings.ledger.text.length} chars) from ${findings.read} pages; note calls ${stats?.calls ?? 0} (${Math.round((stats?.ms ?? 0) / 100) / 10} s of light-model time), quotes dropped ${stats?.droppedQuotes ?? 0}`);
       if ((haveLedger || backbone) && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backbone ? [backboneNumber] : [])]), state.answerStyle!, signal, backboneText);
+        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backboneCited !== null ? [backboneCited] : [])]), state.answerStyle!, signal, backboneText);
         markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
       }
       replyExtra = replyBrief(brief, state.researchAnalysis ?? null, findings.ledger.text, assumption);
     } else if (researching && (assumption || backbone)) {
       if (backbone && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set([backboneNumber]), state.answerStyle!, signal, backboneText);
+        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set(backboneCited !== null ? [backboneCited] : []), state.answerStyle!, signal, backboneText);
         markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
       }
       replyExtra = replyBrief(brief, state.researchAnalysis ?? null, "", assumption);

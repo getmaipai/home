@@ -1,6 +1,6 @@
-// RESEARCH-BACKBONE-01 (senior review of the V runs, 2026-11-01): the pinned article is the research turn's backbone source. The live runs
-// kept 2,500 characters of it and lost the sections that answer a "why did it end" or "what came after" question (reception, production,
-// aftermath, follow-ups sat at characters 6,900 to 11,200 of a 11,800 character article). Here the writer is handed the article's lead and
+// RESEARCH-BACKBONE-01 (senior review of the live research runs, 2026-11-01): the pinned article is the research turn's backbone source. The live runs
+// kept 2,500 characters of it and lost the sections that answer a "why did it happen" or "what came next" question (they sat at characters 6,900 to
+// 11,200 of an 11,800 character article). Here the writer is handed the article's lead and
 // the sections that bear on the question's parts, uncut within a budget, with no light-model pass over them. Which sections is one short
 // chat-model choice over the article's real headings, with a word-overlap fallback; no list of section names decides it.
 import { complete } from "@/lib/llm";
@@ -122,7 +122,10 @@ export async function pickBackbone(anchor: EntityAnchor, question: string, wante
   return { title: article.title, text: body, headings, chars: body.length, source: backboneSource(article) };
 }
 
-/** The block the writing round gets for the backbone article, cited by its source number. */
-export function backboneBlock(backbone: Backbone, sourceNumber: number): string {
-  return `Backbone article, read in full by section, cite it as [${sourceNumber}] (${backbone.title}):\n${backbone.text}`;
+/** The block the writing round gets for the backbone article, cited by its source number (null: the article cannot be named as a source,
+ * so it is background only and the writer is told not to cite it). */
+export function backboneBlock(backbone: Backbone, sourceNumber: number | null): string {
+  return sourceNumber === null
+    ? `Background article, read in full by section; it has no source number, so do not cite it (${backbone.title}):\n${backbone.text}`
+    : `Backbone article, read in full by section, cite it as [${sourceNumber}] (${backbone.title}):\n${backbone.text}`;
 }

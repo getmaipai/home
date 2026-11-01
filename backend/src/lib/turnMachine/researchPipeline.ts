@@ -22,7 +22,7 @@ export function __setStageWritersForTests(writers: { brief?: StageWriter | undef
   analysisOverride = writers?.analysis;
 }
 
-/** Stage 1 runs on the chat model without thinking (about 2 to 3 seconds): the small model took a TV show for a person's life story and
+/** Stage 1 runs on the chat model without thinking (about 2 to 3 seconds): the small model took a title for a person's life story and
  * never found a question underspecified. */
 function chatBriefWriter(signal?: AbortSignal): StageWriter {
   return async (prompt) => {
