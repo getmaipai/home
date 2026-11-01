@@ -5,8 +5,8 @@ export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable"
 export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup" | "microphone_missing" | "microphone_busy";
 export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adultNoRepairs: string; minor: string }> = {
   listening_lost: {
-    adult: "Home is restarting or updating, so voice listening stopped. It will be back in a minute; then tap the waveform to start again.",
-    adultNoRepairs: "Home is restarting or updating, so voice listening stopped. It will be back in a minute; then tap the waveform to start again.",
+    adult: "One moment. Voice listening will be back in about a minute; then tap the waveform to start again.",
+    adultNoRepairs: "One moment. Voice listening will be back in about a minute; then tap the waveform to start again.",
     minor: "I can't hear you right now. Please tell a grown-up.",
   },
   listening_engine: {
@@ -62,31 +62,31 @@ interface FailureCopy {
  * failure line under a reply, three lines at most on a phone. */
 export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
   busy: {
-    adult: "The AI is still starting up or busy. Give it a moment, then send that again.",
-    minor: "I'm still waking up. Try again in a moment.",
+    adult: "One moment. Send that again in a bit.",
+    minor: "One moment. Try again soon.",
   },
   memory: {
-    adult: "The computer is low on memory. Close an app, then try again in a moment.",
-    minor: "I can't wake up all the way right now. Try again soon.",
+    adult: "One moment. Try again in a bit.",
+    minor: "One moment. Ask again soon.",
   },
   // CHAT-CALM-ERRORS-01b: the Stack answered with the role's state
   // `installed` (its engine stopped), so nothing will start on a retry
   // until someone starts it again.
   stopped: {
-    adult: "The AI was stopped, so that reply didn't finish. Send it again once chat is back.",
+    adult: "That reply didn't finish. Send it again in a moment.",
     minor: "I had to stop. Try again in a moment.",
   },
   slow: {
-    adult: "That took too long, so the AI stopped answering. Send it again.",
-    minor: "That took me too long. Try asking again.",
+    adult: "That took too long. Send it again.",
+    minor: "That took too long. Ask again.",
   },
   unreachable: {
     adult: "I can't reach the AI on this computer. Check it's running, then try again.",
     minor: "I can't get to my thinking part right now. Please tell a grown-up.",
   },
   engine_computer: {
-    adult: "I can't reach the engine computer right now. Your message is safe; send it again once chat is back.",
-    adultAway: "I can't reach the engine computer from here. Your message is safe; send it again when you are home or once the connection is back.",
+    adult: "I can't reach the AI computer right now. Your message is safe; send it again once chat is back.",
+    adultAway: "I can't reach the AI computer from here. Your message is safe; send it again when you are home or once the connection is back.",
     minor: "I can't get to my thinking part right now. Please tell a grown-up.",
   },
   context_too_large: {
@@ -115,8 +115,8 @@ export interface ComposerNotice {
 
 const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
   paused: {
-    adult: "Chat is paused. Your message waits here.",
-    teen: "Chat is paused. Your message waits here.",
+    adult: "Your message is saved. Back soon.",
+    teen: "Your message is saved. Back soon.",
     child: "I'm taking a break. Ask a grown-up.",
     repairs_link: "Open Repairs",
   },
@@ -133,16 +133,16 @@ const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
  * composer line, Welcome state and Send hold); only the words differ. */
 const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "paused_by_admin" | "offline" | "gpu", ComposerNotice> = {
   restarting: {
-    adult: "Chat is restarting. Back soon.",
-    teen: "Chat is restarting. Back soon.",
-    child: "I'm waking up. Back soon.",
+    adult: "One moment. Back soon.",
+    teen: "One moment. Back soon.",
+    child: "One moment. Back soon.",
     repairs_link: null,
   },
   memory: {
-    adult: "Low on memory. Chat is paused.",
-    teen: "Low on memory. Chat is paused.",
+    adult: "One moment. Back soon.",
+    teen: "One moment. Back soon.",
     child: "I need a rest. Try again soon.",
-    repairs_link: "Open Repairs",
+    repairs_link: null,
   },
   not_installed: {
     adult: "The AI isn't installed. Ask an owner.",
@@ -150,12 +150,12 @@ const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_cha
     child: "I'm not ready yet. Ask a grown-up.",
     repairs_link: "Open Repairs",
   },
-  mode_change: { adult: "Getting ready. Back in about a minute.", teen: "Getting ready. Back in about a minute.", child: "Getting ready. Back in about a minute.", repairs_link: null, more: "Home is getting ready for a big job. Chat is paused until it finishes." },
-  reduced_swap: { adult: "Switching chat. Back in about 15 seconds.", teen: "Switching chat. Back in about 15 seconds.", child: "Switching chat. Back in about 15 seconds.", repairs_link: null, more: "Chat is changing to a different model so a big job has room. It comes back by itself." },
-  gpu: { adult: "Chat is paused. Restart the Mac.", teen: "Chat is paused. Ask a grown-up.", more: "This Mac's graphics compiler is not responding. An owner can restart the Mac when nobody is using it.", child: "I need a rest. Ask a grown-up.", repairs_link: "Open Repairs" },
+  mode_change: { adult: "Getting ready. Back in about a minute.", teen: "Getting ready. Back in about a minute.", child: "Getting ready. Back in about a minute.", repairs_link: null, more: "Home is getting ready for another job. Chat comes back by itself." },
+  reduced_swap: { adult: "One moment. Back in about 15 seconds.", teen: "One moment. Back in about 15 seconds.", child: "One moment. Back in about 15 seconds.", repairs_link: null, more: "Chat comes back by itself in a few seconds." },
+  gpu: { adult: "Chat needs a reboot of the Mac.", teen: "Chat needs a reboot. Ask a grown-up.", more: "An owner can reboot the Mac when it is quiet.", child: "I need a rest. Ask a grown-up.", repairs_link: "Open Repairs" },
   paused_by_admin: {
-    adult: "An admin paused chat.",
-    teen: "An admin paused chat.",
+    adult: "An admin turned chat off for now.",
+    teen: "An admin turned chat off for now.",
     child: "Chat is resting. Ask a grown-up.",
     repairs_link: null,
   },
@@ -188,17 +188,17 @@ export function composerNotice(availability: "ready" | "starting" | "unavailable
 export type MakingKind = "image" | "video";
 export type MakingCause = "restarting" | "memory" | "not_installed" | "mode_change" | "offline" | "gpu";
 
-const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string; engine: string }> = {
-  image: { thing: "picture", Thing: "Picture", things: "Pictures", engine: "picture engine" },
-  video: { thing: "video", Thing: "Video", things: "Videos", engine: "video engine" },
+const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string }> = {
+  image: { thing: "picture", Thing: "Picture", things: "Pictures" },
+  video: { thing: "video", Thing: "Video", things: "Videos" },
 };
 
 function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "unknown"): ComposerNotice {
-  const { thing, Thing, things, engine } = MAKING_NOUN[kind];
+  const { Thing, things } = MAKING_NOUN[kind];
   switch (cause) {
     case "memory": return {
-      adult: `This computer is low on memory, so ${thing} making is paused. It starts again by itself when memory frees up.`,
-      teen: `This computer is low on memory, so ${thing} making is paused. It starts again by itself when memory frees up.`,
+      adult: `Waiting for its turn. ${Thing} making starts by itself in a moment.`,
+      teen: `Waiting for its turn. ${Thing} making starts by itself in a moment.`,
       child: `${things} are resting for a bit. Try again soon.`,
       repairs_link: null,
     };
@@ -209,32 +209,32 @@ function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "un
       repairs_link: null,
     };
     case "mode_change": return {
-      adult: `Home is busy with a big job, so ${thing} making is paused. It comes back when the job finishes.`,
-      teen: `Home is busy with a big job, so ${thing} making is paused. It comes back when the job finishes.`,
-      child: "I'm busy with a big job. Try again later.",
+      adult: `${Thing} making starts again by itself when another job finishes.`,
+      teen: `${Thing} making starts again by itself when another job finishes.`,
+      child: "${Things} are getting ready. Try again later.",
       repairs_link: null,
     };
     case "gpu": return {
-      adult: `${things} are paused because this Mac's graphics compiler is not responding. An owner can restart the Mac when nobody is using it.`,
-      teen: `${things} are paused because this Mac's graphics compiler is not responding. Ask a grown-up to restart the Mac.`,
+      adult: `${Thing} making needs a reboot of the Mac. An owner can do it when it is quiet.`,
+      teen: `${Thing} making needs a reboot of the Mac. Ask a grown-up.`,
       child: `${things} are resting. Ask a grown-up.`,
       repairs_link: "Open Repairs",
     };
     case "restarting": return {
-      adult: `The ${engine} is restarting. ${things} will be back by themselves in a minute.`,
-      teen: `The ${engine} is restarting. ${things} will be back by themselves in a minute.`,
+      adult: `One moment. ${things} will be back by themselves in about a minute.`,
+      teen: `One moment. ${things} will be back by themselves in about a minute.`,
       child: `${things} are waking up. Try again in a minute.`,
       repairs_link: null,
     };
     case "starting": return {
-      adult: `The ${engine} is getting ready. Try again in a moment.`,
-      teen: `The ${engine} is getting ready. Try again in a moment.`,
+      adult: `${Thing} making is getting ready. Try again in a moment.`,
+      teen: `${Thing} making is getting ready. Try again in a moment.`,
       child: `${things} are waking up. Try again in a moment.`,
       repairs_link: null,
     };
     case "offline": return {
-      adult: `The ${engine} isn't answering. An owner can check Repairs.`,
-      teen: `The ${engine} isn't answering. Ask a grown-up to check Repairs.`,
+      adult: `${Thing} making isn't answering. An owner can check Repairs.`,
+      teen: `${Thing} making isn't answering. Ask a grown-up to check Repairs.`,
       child: `${things} aren't working right now. Ask a grown-up.`,
       repairs_link: "Check Repairs",
     };

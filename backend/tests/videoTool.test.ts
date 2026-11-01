@@ -198,7 +198,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
       expect(fake.submitted).toHaveLength(3);
       expect(getVideoJobFor(people.owner, value.video!.id)!.createdAt).toBe(createdAt);
-      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("The computer ran low on memory, so the job stopped. Try again when there is room.");
+      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("The job stopped before it finished. Try again in a few minutes.");
     });
   });
 
@@ -220,7 +220,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat");
       expect(value.video).toBeDefined();
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
-      expect(getVideoJobFor(people.owner, value.video!.id)?.error).toContain("low on memory");
+      expect(getVideoJobFor(people.owner, value.video!.id)?.error).toContain("stopped before it finished");
     });
   });
 

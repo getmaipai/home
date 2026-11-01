@@ -1,4 +1,4 @@
-// TIER-PRIO-07: the two answers a held Boost or Max job's card offers when the job would only fit at a lower level.
+// TIER-PRIO-07: the two answers a held Boost or Max job's card offers when the level they picked is not ready.
 // The card carries `fit_ask` only while the question is open and only for the job's owner or an admin.
 import { toast } from "sonner";
 import { requestJson } from "@/lib/api";
@@ -16,7 +16,7 @@ const FAILED = "Home could not send your answer. Check your connection and tap t
 const LATE = "That question already closed. The job is moving on by itself, so there is nothing more to do.";
 
 /** The two buttons, or undefined when the card is not asking this viewer. `refresh` reloads the card after the answer. */
-export function fitAskActions(fitAsk: { job_id: string } | null | undefined, refresh: () => void): PendingAction[] | undefined {
+export function fitAskActions(fitAsk: { job_id: string; picked?: string | null; actual?: string | null } | null | undefined, refresh: () => void): PendingAction[] | undefined {
   if (!fitAsk) return undefined;
   const send = (answer: FitAnswer) => () => {
     void fitAskApi.answer(fitAsk.job_id, answer)
@@ -24,7 +24,7 @@ export function fitAskActions(fitAsk: { job_id: string } | null | undefined, ref
       .catch(() => { toast.error(FAILED); refresh(); });
   };
   return [
-    { label: "Make it now at the lower level", onSelect: send("allow"), variant: "default" },
-    { label: "Wait for room", onSelect: send("wait") },
+    { label: `Make it now with ${fitAsk.actual ?? "Standard"}`, onSelect: send("allow"), variant: "default" },
+    { label: fitAsk.picked ? `Wait for ${fitAsk.picked}` : "Wait for it", onSelect: send("wait") },
   ];
 }

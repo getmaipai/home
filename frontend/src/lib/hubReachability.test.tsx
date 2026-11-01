@@ -25,7 +25,7 @@ describe("hubErrorMessage", () => {
   test("says Home is restarting when the hub is down, and keeps the hub's own words when it answered", () => {
     expect(hubErrorMessage(new TypeError("Failed to fetch"))).toBe(HUB_DOWN_LINE);
     expect(hubErrorMessage(new ApiError("Wrong passcode", 401))).toBe("Wrong passcode");
-    expect(HUB_DOWN_LINE).toBe("Home is restarting or updating. It will be back in a minute.");
+    expect(HUB_DOWN_LINE).toBe("One moment. Home will be back in about a minute.");
   });
 });
 

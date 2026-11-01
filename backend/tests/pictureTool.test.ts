@@ -191,7 +191,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       expect(value.reply.text).toBe("I started it for you.");
       await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "failed");
       const job = getPictureJob(people.owner, value.picture!.id)!;
-      expect(job.error).toBe("I couldn't make that picture. The picture model ran out of memory. Try again or change the request.");
+      expect(job.error).toBe("I couldn't make that picture. Pictures and videos need a minute. Try again or change the request.");
       expect(cardView(people.owner, job, true).files).toHaveLength(0);
     });
   });
@@ -205,7 +205,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     await until(() => getPictureJob(people.owner, job.id)?.state === "failed");
     expect(fake.jobs).toHaveLength(3);
     expect(getPictureJob(people.owner, job.id)?.createdAt).toBe(createdAt);
-    expect(getPictureJob(people.owner, job.id)?.error).toContain("computer ran low on memory");
+    expect(getPictureJob(people.owner, job.id)?.error).toContain("The job stopped before it finished");
   });
 
   test("a Stack refusal is stored on the queued card after Home submits it (rule 6)", async () => {

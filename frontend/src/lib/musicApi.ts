@@ -9,8 +9,8 @@ export interface MusicCard {
   id: string;
   task: string;
   state: "queued" | "running" | "done" | "failed" | "cancelled";
-  /** TIER-PRIO-07: set while the card asks whether to run at a lower level now and this person may answer; null otherwise. */
-  fit_ask?: { job_id: string } | null;
+  /** TIER-PRIO-07: set while the card asks whether to make it now with the level it can run at and this person may answer; null otherwise. */
+  fit_ask?: { job_id: string; picked?: string | null; actual?: string | null } | null;
   stage: string | null;
   /** The plain stage label for the current short stage, or the shared busy line while queued. */
   stage_label: string;

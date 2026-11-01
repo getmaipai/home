@@ -68,11 +68,11 @@ export const PICTURE_FAILED_PREFIX = "I couldn't make that picture.";
 export function plainFailure(error: unknown): string {
   if (error instanceof StackPicturesError) {
     switch (error.code) {
-      case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
-      case "queue_full": return `${PICTURE_FAILED_PREFIX} The picture engine has a full line right now. Try again in a minute.`;
+      case "coding_mode": return "Pictures, videos and songs will be back in a little while. Please try again later.";
+      case "queue_full": return `${PICTURE_FAILED_PREFIX} Pictures have a full line right now. Try again in a minute.`;
       case "no_memory": return `${PICTURE_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a minute.`;
       case "not_installed": case "unsupported": return `${PICTURE_FAILED_PREFIX} No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.`;
-      case "unreachable": case "no_stack": return `${PICTURE_FAILED_PREFIX} The picture engine isn't answering. Check that the engine is running, then try again.`;
+      case "unreachable": case "no_stack": return `${PICTURE_FAILED_PREFIX} Pictures aren't available right now. Try again in a minute.`;
       case "lora_not_allowed": return `${PICTURE_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;
       case "unknown_lora": case "wrong_base_model": return `${PICTURE_FAILED_PREFIX} That style isn't available any more. Choose another or leave it out.`;
       default: return `${PICTURE_FAILED_PREFIX} ${trimSentence(error.message)} Try again or change the request.`;

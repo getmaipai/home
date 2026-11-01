@@ -8,8 +8,8 @@ afterEach(() => { setReducedChat(null); __setRoleHealthForTests({}); });
 describe("reduced chat line", () => {
   test("words per band, with minutes only when known", () => {
     expect(reducedChatNotice(12).adult).toBe("Chat is simpler for a few minutes.");
-    expect(reducedChatNotice(12).more).toBe("Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused.");
-    expect(reducedChatNotice(null).more).toBe("Chat is simpler while a big job runs. Answers are shorter and some extras may be paused.");
+    expect(reducedChatNotice(12).more).toBe("Chat is simpler for a little while (about 12 minutes). Answers are shorter, and everything comes back after.");
+    expect(reducedChatNotice(null).more).toBe("Chat is simpler for a little while. Answers are shorter, and everything comes back after.");
     expect(reducedChatNotice(3).child).toBe("Chat is a bit simpler for now.");
   });
 

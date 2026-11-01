@@ -5,7 +5,7 @@ import { ApiError } from "@/lib/api";
  * answer", used wherever the app used to print "Could not reach the hub".
  * A hub restarts for a minute or two during an update, so the line says that
  * and what happens next. */
-export const HUB_DOWN_LINE = "Home is restarting or updating. It will be back in a minute.";
+export const HUB_DOWN_LINE = "One moment. Home will be back in about a minute.";
 
 /** The hub itself did not answer: the request never got a response (refused,
  * dropped, no network), or a proxy in front of it said so (502, 504, or a 503

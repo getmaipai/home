@@ -567,7 +567,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
     const maxActions = card.max_offered && card.can_vary ? [{
       id: "make-max",
       label: "Make it Max",
-      hint: making.reason ?? "The biggest model. It uses the whole computer, so other big jobs wait",
+      hint: making.reason ?? "The best quality. Other jobs wait while it works",
       disabled: retrying || making.disabled,
       onSelect: () => { setRetrying(true); void picturesApi.again(card.id, "detailed", undefined, "max").then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
     }] : [];

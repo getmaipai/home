@@ -140,13 +140,13 @@ describe("music jobs and their private files", () => {
     const id = musicForOutcomes([out])!.id;
     await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "failed");
     expect(fake.submitted).toHaveLength(3);
-    expect(getMusicJobFor(people.owner, id)).toMatchObject({ errorCode: "no_memory", errorLine: expect.stringContaining("low on memory") });
+    expect(getMusicJobFor(people.owner, id)).toMatchObject({ errorCode: "no_memory", errorLine: expect.stringContaining("stopped before it finished") });
     expect(JSON.stringify(out)).not.toContain("PRIVATE_RAW_LYRICS");
     fake.refuse = { status: 503, code: "no_memory", error: "PRIVATE_RAW_LYRICS" };
     const failed = await runGenerateMusic({ state: musicState(people.owner, true), args: ARGS, callId: "c", spoken: false });
     const queuedId = musicForOutcomes([failed])!.id;
     await waitForMusic(() => getMusicJobFor(people.owner, queuedId)?.state === "failed");
-    expect(getMusicJobFor(people.owner, queuedId)?.errorLine).toContain("low on memory"); expect(JSON.stringify(failed)).not.toContain("PRIVATE_RAW_LYRICS");
+    expect(getMusicJobFor(people.owner, queuedId)?.errorLine).toContain("stopped before it finished"); expect(JSON.stringify(failed)).not.toContain("PRIVATE_RAW_LYRICS");
   });
   test("forgetting turns and chats keeps finished songs; forgetting the person deletes requests and stops watchers without resurrecting them", async () => {
     const state = musicState(people.owner);

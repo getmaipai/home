@@ -34,7 +34,7 @@ export function availableAnswerTokens(context: ReasoningContext): number {
 /** Typed failure for an empty non-streaming completion. */
 export class EmptyLengthError extends Error {
   readonly code = "empty_length";
-  constructor() { super("The AI used its generation room without answering. Try again with a shorter conversation."); this.name = "EmptyLengthError"; }
+  constructor() { super("The AI ran out of length before it answered. Try again with a shorter conversation."); this.name = "EmptyLengthError"; }
 }
 let retryCount = 0;
 export function emptyLengthRetryCount(): number { return retryCount; }
@@ -45,5 +45,5 @@ export function logEmptyLengthRetry(role: string, model: string | undefined, ans
 
 export class ContextTooLargeError extends Error {
   readonly code = "context_too_large";
-  constructor() { super("The conversation leaves too little answer room. Try a shorter conversation."); }
+  constructor() { super("This conversation is too long to answer. Try a shorter one, or start a new chat."); }
 }

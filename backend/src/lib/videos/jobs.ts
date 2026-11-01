@@ -86,13 +86,13 @@ export const VIDEO_FAILED_PREFIX = "I couldn't make that video.";
 export function plainVideoFailure(error: unknown): string {
   if (error instanceof StackVideoError) {
     switch (error.code) {
-      case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
+      case "coding_mode": return "Pictures, videos and songs will be back in a little while. Please try again later.";
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;
       case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.`;
-      case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Videos need a Mac with 128 GB of memory.`;
-      case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} The video engine isn't answering. Check that the engine is running, then try again.`;
+      case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Try a picture instead.`;
+      case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} Videos aren't available right now. Try again in a minute.`;
       case "lora_not_allowed": case "unknown_lora": case "wrong_base_model": case "lora_changed": case "lora_missing": return `${VIDEO_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;
       case "reference_not_generated": case "reference_source_required": case "reference_image_refused": case "bad_image": return `${VIDEO_FAILED_PREFIX} I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.`;
       case "timeout": return `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`;
@@ -445,7 +445,7 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     const video = await fetchClip(stackJob);
     const poster = await fetchPoster(stackJob);
     if (signal.aborted) return;
-    if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video engine sent a file I couldn't read. Try again.`; saveVideoJob(job); return; }
+    if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video didn't come out right. Try again.`; saveVideoJob(job); return; }
     // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
     // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
     const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);

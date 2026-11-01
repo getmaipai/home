@@ -70,8 +70,8 @@ const band = (adult: string, child: string, more?: string): ComposerNotice => ({
 export function transitionNotice(kind: TransitionKind, elapsedMs: number): ComposerNotice {
   if (isRunningLong(kind, elapsedMs)) return band(RUNNING_LONG_LINE, RUNNING_LONG_LINE);
   const phrase = waitPhrase(estimateSeconds(kind));
-  if (kind === "mode_change") return band(`Getting ready. Back in about ${phrase}.`, `Getting ready. Back in about ${phrase}.`, "Home is getting ready for a big job. Chat is paused until it finishes, and your message stays here.");
-  return band(`Switching chat. Back in about ${phrase}.`, `Switching chat. Back in about ${phrase}.`, "Chat is changing to a different model so a big job has room. It comes back by itself.");
+  if (kind === "mode_change") return band(`Getting ready. Back in about ${phrase}.`, `Getting ready. Back in about ${phrase}.`, "Chat comes back by itself, and your message stays here.");
+  return band(`One moment. Back in about ${phrase}.`, `One moment. Back in about ${phrase}.`, "Chat comes back by itself in a few seconds.");
 }
 
 /** A coding-mode change is the Stack's own transaction, so Home learns its length by watching the health poll: first sighting of "switching" starts the clock, the first "stable" stops it and records. Returns the elapsed milliseconds while it runs, else null. */

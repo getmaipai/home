@@ -42,7 +42,7 @@ describe("picture and video health rows", () => {
     expect(await roleHealth("image")).toMatchObject({ availability: "starting", cause: "restarting" });
     const video = (await collectHealth()).engines.video!;
     expect(video).toMatchObject({ availability: "starting", cause: "restarting" });
-    expect(video.notice?.adult).toBe("The video engine is restarting. Videos will be back by themselves in a minute.");
+    expect(video.notice?.adult).toBe("One moment. Videos will be back by themselves in about a minute.");
   });
 
   test("unavailable with cause memory while the watchdog pauses generation, and the line has no figures", async () => {
@@ -53,7 +53,7 @@ describe("picture and video health rows", () => {
       expect(row).toMatchObject({ availability: "unavailable", cause: "memory", alive: false });
       for (const line of [row.notice!.adult, row.notice!.teen, row.notice!.child]) expect(line).not.toMatch(FIGURE);
     }
-    expect(health.engines.image!.notice!.adult).toContain("low on memory");
+    expect(health.engines.image!.notice!.adult).toContain("Waiting for its turn");
     // A paused generator is not a broken hub: `ok` still reads only chat, embed, background and voice.
     expect(health.ok).toBe(health.engines.chat.alive !== false && health.engines.embed.alive !== false && health.engines.background.alive !== false && health.engines.voice.alive !== false && health.sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed"));
   });

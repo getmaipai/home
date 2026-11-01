@@ -84,7 +84,7 @@ function useChatReadiness(): { availability: "ready" | "starting" | "unavailable
  * to the kit Thread's `engineDown`; Home's own slots read it here, so the
  * controls never disagree about whether chat is up. */
 export function engineDownReason(availability: "ready" | "starting" | "unavailable"): string | undefined {
-  return availability === "ready" ? undefined : availability === "starting" ? "Getting ready, one moment" : "Chat is paused";
+  return availability === "ready" ? undefined : availability === "starting" ? "Getting ready, one moment" : "One moment. Back soon.";
 }
 
 export function useEngineDownReason(): string | undefined {
@@ -113,8 +113,8 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
   const apps = useStatusApps().data;
   if (readiness.hubDown) {
     const text = person.age_band === "child"
-      ? (readiness.hubDown === "offline" ? "I'm taking a break. Ask a grown-up." : "I'm waking up. Back soon.")
-      : (readiness.hubDown === "offline" ? "The AI isn't answering." : "Chat is restarting. Back soon.");
+      ? (readiness.hubDown === "offline" ? "I'm taking a break. Ask a grown-up." : "One moment. Back soon.")
+      : (readiness.hubDown === "offline" ? "The AI isn't answering." : "One moment. Back soon.");
     return { text, repairsLink: readiness.hubDown === "offline" && isOwnerOrAdminRole(person.role) ? "Check Repairs" : null };
   }
   // TIER-HOME-03: chat is on its simpler model while a Max job runs. It still answers, so this is a line, never a hold on Send.

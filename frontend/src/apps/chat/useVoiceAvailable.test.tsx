@@ -36,7 +36,7 @@ describe("useVoiceAvailable", () => {
 describe("engineDownReason", () => {
   test("ready has no reason; paused and starting each have a short one", () => {
     expect(engineDownReason("ready")).toBeUndefined();
-    expect(engineDownReason("unavailable")).toBe("Chat is paused");
+    expect(engineDownReason("unavailable")).toBe("One moment. Back soon.");
     expect(engineDownReason("starting")).toBe("Getting ready, one moment");
   });
 });

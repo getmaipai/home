@@ -87,14 +87,14 @@ describe("answerNode: a failed generation is told by its kind (THIN-DL-02)", () 
     const adult = await answerNode(ADULT, { kind: "model_failed", failure: "engine_computer" as FailureKind }, SIGNAL);
     const teen = await answerNode({ plan: { age_band: "teen" }, outcomes: [] } as unknown as TurnState, { kind: "model_failed", failure: "engine_computer" as FailureKind }, SIGNAL);
     const child = await answerNode(CHILD, { kind: "model_failed", failure: "engine_computer" as FailureKind }, SIGNAL);
-    expect(adult.output.text).toBe("I can't reach the engine computer right now. Your message is safe; send it again once chat is back.");
+    expect(adult.output.text).toBe("I can't reach the AI computer right now. Your message is safe; send it again once chat is back.");
     expect(teen.output.text).toBe(FAILURE_COPY.unreachable.minor);
     expect(child.output.text).toBe(FAILURE_COPY.unreachable.minor);
     for (const text of [teen.output.text, child.output.text]) {
-      expect(text).not.toContain("engine computer");
+      expect(text).not.toContain("AI computer");
       expect(text).not.toMatch(/address|tailnet|path|admin/i);
     }
-    expect(failureLine("engine_computer" as FailureKind, false, true)).toBe("I can't reach the engine computer from here. Your message is safe; send it again when you are home or once the connection is back.");
+    expect(failureLine("engine_computer" as FailureKind, false, true)).toBe("I can't reach the AI computer from here. Your message is safe; send it again when you are home or once the connection is back.");
     expect(failureLine("engine_computer" as FailureKind, true, true)).toBe(FAILURE_COPY.unreachable.minor);
   });
   test("a picture or video job already started: the failed phrasing round says it is coming, never that something went wrong", async () => {

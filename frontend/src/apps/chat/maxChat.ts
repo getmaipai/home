@@ -9,10 +9,10 @@ import { chatLeaseApi, type ChatLeaseView } from "@/lib/chatLeaseApi";
 import type { ChatComposerNoticeValue } from "@/apps/chat/chatThreadContexts";
 
 // CHAT-NOTICE-SHORT-01: every line is one short sentence pair (about 40 characters); the long explanation is the line's tooltip (`more`).
-export const MAX_CONFIRM_LINE = "Max takes over. Big jobs wait.";
+export const MAX_CONFIRM_LINE = "Max takes over. Other jobs wait.";
 export const MAX_SELF_TEST_LINE = "Max needs a quick test first.";
 export const MAX_RUNNING_LONG_LINE = "Taking longer than usual. Still working.";
-const MAX_CONFIRM_MORE = "Max uses the big model. Big pictures, videos and songs wait while you use it, and Home goes back by itself when you stop.";
+const MAX_CONFIRM_MORE = "Max gives the best answers. Pictures, videos and songs wait while you use it, and Home goes back by itself when you stop.";
 const DEFAULT_MAX_LOAD_S = 60;
 const DEFAULT_SELF_TEST_S = 35;
 /** The same rule as the Home side (chatTransitions.ts waitPhrase): rounded to 5 seconds, "a minute" past 50. */

@@ -4,7 +4,7 @@ import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackReducedChat } from "@/lib/reducedChat";
 import { stackMaxWindow } from "./stackWindow";
-import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
+import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLevels, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -292,7 +292,7 @@ export function trackChatLease<T extends { release(): void }>(personId: string, 
 
 /** TIER-PRIO-07: a Boost or Max job that would only fit below the tier its person picked asks first (`ask`). In memory only: the question's words and the answer, never an app or a name. */
 export const FIT_ASK_TIMEOUT_MS = 10 * 60_000;
-interface FitAsk { personId: string; askedAt: number; line: string | null; answer: "allow" | "wait" | null }
+interface FitAsk { personId: string; askedAt: number; line: string | null; levels?: { picked: string; actual: string }; answer: "allow" | "wait" | null }
 const fitAsks = new Map<string, FitAsk>();
 let fitAskTimeoutMs = FIT_ASK_TIMEOUT_MS;
 export function setFitAskTimeoutForTests(ms: number | null): void { fitAskTimeoutMs = ms ?? FIT_ASK_TIMEOUT_MS; }
@@ -305,10 +305,10 @@ export function pendingFitAsk(jobId: string, now = Date.now()): { personId: stri
   return left > 0 ? { personId: ask.personId, line: ask.line, secondsLeft: Math.ceil(left / 1000) } : null;
 }
 /** The card field for an open question: `{ job_id }` when the job is asking and this person may answer (the job's owner or an admin), else null. */
-export function answerableFitAsk(person: { id: string; role: string }, jobId: string): { job_id: string } | null {
+export function answerableFitAsk(person: { id: string; role: string }, jobId: string): { job_id: string; picked: string | null; actual: string | null } | null {
   const ask = pendingFitAsk(jobId);
   if (!ask) return null;
-  return ask.personId === person.id || person.role === "owner" || person.role === "admin" ? { job_id: jobId } : null;
+  return ask.personId === person.id || person.role === "owner" || person.role === "admin" ? { job_id: jobId, picked: fitAsks.get(jobId)?.levels?.picked ?? null, actual: fitAsks.get(jobId)?.levels?.actual ?? null } : null;
 }
 /** The person's answer: Allow runs the job at the lower tier now, Wait keeps it queued for the tier they picked. False when no question is open. */
 export function answerFitAsk(jobId: string, answer: "allow" | "wait"): boolean {
@@ -522,6 +522,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
                 // TIER-PRIO-07: the person decides whether to run lower now (Allow) or wait for the tier they picked (Wait). No answer in ten minutes counts as Wait, so nothing stays stuck on a question.
                 const ask = fitAsks.get(entry.job.id) ?? { personId: entry.job.personId, askedAt: now, line: null, answer: null as FitAsk["answer"] };
                 ask.line = admission.askLine;
+                ask.levels = admissionFitAskLevels(fit);
                 fitAsks.set(entry.job.id, ask);
                 if (ask.answer === null && now - ask.askedAt >= fitAskTimeoutMs) ask.answer = "wait";
                 if (ask.answer !== "allow") {

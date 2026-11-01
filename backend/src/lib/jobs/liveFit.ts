@@ -138,8 +138,12 @@ export function askLine(result: FitResult, audience: "admin" | "adult" | "child"
   if (result.outcome !== "ask" || !result.applied || audience === "child") return null;
   const picked = tierName[result.requested?.tier ?? result.leadTier];
   const actual = tierName[result.leadTier];
-  const sentence = `Making this at ${actual}, not ${picked}: there is not enough room right now`;
-  return audience === "admin" ? `${sentence} (${picked} needs about ${Math.round(result.requestedNeedGb)} GB, ${Math.round(result.haveGb)} GB is free). Wait for ${picked} instead?` : `${sentence}. Wait for ${picked} instead?`;
+  if (audience === "admin") return `Making this at ${actual}, not ${picked}: there is not enough room right now (${picked} needs about ${Math.round(result.requestedNeedGb)} GB, ${Math.round(result.haveGb)} GB is free). Wait for ${picked} instead?`;
+  return `${picked} is not ready right now. Pick below.`;
+}
+/** The level names a person already knows, for the two answer buttons: the one they picked and the one it would run at now. */
+export function askLevels(result: FitResult): { picked: string; actual: string } {
+  return { picked: tierName[result.requested?.tier ?? result.leadTier], actual: tierName[result.leadTier] };
 }
 
 export function appliedProfile(result: FitResult): { lowered: number; queued: number; off: number; closed_apps: number; closed_bytes: number } {

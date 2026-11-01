@@ -261,7 +261,7 @@ export function ComposerTrailingWithThinkingMode() {
       {max.visible ? (
         <ElementsButton
           type="button" variant={max.pressed ? "secondary" : "ghost"} size="sm" aria-pressed={max.pressed} disabled={max.disabled || (engineDown !== undefined && !max.pressed)} onClick={max.press}
-          title={max.pressed ? "Max is on. Tap to go back to the standard model." : "Max uses the big model. Big pictures, videos and songs wait while you use it, and Home goes back by itself when you stop."}
+          title={max.pressed ? "Max is on. Tap to go back to the standard model." : "Max gives the best answers. Pictures, videos and songs wait while you use it, and Home goes back by itself when you stop."}
         >
           {max.label}
         </ElementsButton>

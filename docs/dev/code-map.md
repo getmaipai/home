@@ -505,7 +505,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobs/closeApps.ts` | realHelper, closeSettingsFrom, closableApps, pickSmallestSet, closeForJob, reopenForJob |
 | `backend/src/lib/jobs/householdQueue.ts` | PERSISTED_HOLDS, activeProfileLine, resetActivePlanForTests, openMaxWindow, currentMaxWindow, endMaxWindow |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
-| `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, appliedProfile, stagesFor, chatMayReturnBetweenStages |
+| `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, askLevels, appliedProfile, stagesFor |
 | `backend/src/lib/jobs/profileSource.ts` | hardwareFromBudget, rowsFromSetting, weightsFromPriority, profileSourceFromSettings |
 | `backend/src/lib/jobs/profileTable.ts` | validateProfileTable |
 | `backend/src/lib/jobs/queuePolicy.ts` | STRICT_BONUS, queuePolicyFromSettings, wireQueuePolicy |

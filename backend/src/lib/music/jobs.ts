@@ -80,7 +80,7 @@ export function plainMusicFailure(code: string): string {
   if (code === "stems_failed") return "The stems could not be made. Try again in a minute.";
   const prefix = "I couldn't make that song.";
   switch (code) {
-    case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
+    case "coding_mode": return "Pictures, videos and songs will be back in a little while. Please try again later.";
     case "already_making": return "You already have a song being made. Wait for it to finish, or stop it first.";
     case "storage_full": return `${prefix} Your storage is full. Delete some files in Settings, Storage, then try again.`;
     case "no_memory": return `${prefix} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;

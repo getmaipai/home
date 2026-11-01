@@ -228,7 +228,7 @@ describe("ChatMessageError", () => {
     expect(retry().disabled).toBe(false);
     act(() => setAvailability("unavailable"));
     await waitFor(() => expect(retry().disabled).toBe(true));
-    expect(retry().textContent).toContain("Chat is paused");
+    expect(retry().textContent).toContain("One moment. Back soon.");
     act(() => setAvailability("ready"));
     await waitFor(() => expect(view.container.textContent).toContain("Recovered."));
     expect(attempts).toBe(2);

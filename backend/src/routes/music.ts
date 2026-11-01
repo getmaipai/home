@@ -55,7 +55,7 @@ const cardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
-  fit_ask: z.object({ job_id: z.string() }).nullable().describe("Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
+  fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),

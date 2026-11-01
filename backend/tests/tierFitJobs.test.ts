@@ -129,7 +129,7 @@ describe("a job that would fall below its pick asks, and the answer is wired", (
     const job = getPictureJob(actor, value.picture!.id)!;
     await settle();
     expect(image.submitted.length).toBe(0);
-    expect(phaseLabel(job)).toContain("Wait for Boost instead?");
+    expect(phaseLabel(job)).toContain("Boost is not ready right now");
     const answered = await client.post(`/api/ai/jobs/${job.id}/fit-answer`, { answer: "allow" });
     expect(answered.status).toBe(200);
     expect(await answered.json()).toEqual({ answered: true });
@@ -145,7 +145,7 @@ describe("a job that would fall below its pick asks, and the answer is wired", (
     expect(await (await client.post(`/api/ai/jobs/${job.id}/fit-answer`, { answer: "wait" })).json()).toEqual({ answered: true });
     await settle();
     expect(image.submitted.length).toBe(0);
-    expect(phaseLabel(job)).toBe("Waiting for room for a bigger job.");
+    expect(phaseLabel(job)).toBe("Waiting for its turn.");
     freeGb = 60; await releaseHouseholdQueue();
     await until(() => image.submitted.length === 1);
   });
@@ -155,8 +155,8 @@ describe("a job that would fall below its pick asks, and the answer is wired", (
     const value = await turn(actor, "generate_image", { tier: "boost" });
     const job = getPictureJob(actor, value.picture!.id)!;
     await settle();
-    expect(phaseLabel(job)).toContain("Wait for Boost instead?");
-    await until(() => phaseLabel(job) === "Waiting for room for a bigger job.", 4_000);
+    expect(phaseLabel(job)).toContain("Boost is not ready right now");
+    await until(() => phaseLabel(job) === "Waiting for its turn.", 4_000);
     expect(image.submitted.length).toBe(0);
   });
   test("a person who did not make the job cannot answer it, and 'lower without asking' skips the question", async () => {
@@ -184,9 +184,9 @@ describe("the cards carry the question so the buttons can answer it", () => {
     await settle();
     const card = async (path: string) => (await (await client.get(path)).json()) as { fit_ask?: { job_id: string } | null; items?: { fit_ask: { job_id: string } | null }[] };
     const picCard = await card(`/api/pictures/jobs/${pic.picture!.id}`);
-    expect(picCard.fit_ask).toEqual({ job_id: pic.picture!.id });
+    expect(picCard.fit_ask).toMatchObject({ job_id: pic.picture!.id, picked: "Boost" });
     const vidCard = await card(`/api/videos/jobs/${vid.video!.id}`);
-    expect(vidCard.items![0]!.fit_ask).toEqual({ job_id: vid.video!.id });
+    expect(vidCard.items![0]!.fit_ask).toMatchObject({ job_id: vid.video!.id, picked: "Boost" });
     await client.post(`/api/ai/jobs/${pic.picture!.id}/fit-answer`, { answer: "wait" });
     expect((await card(`/api/pictures/jobs/${pic.picture!.id}`)).fit_ask).toBeNull();
   });

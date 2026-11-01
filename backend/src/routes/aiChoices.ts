@@ -208,7 +208,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
 });
 
 const TIER_STACK_CATEGORY: Record<string, TierStackCategory> = { chat: "chat", pictures: "pictures", videos: "video", music: "music", voice: "voice" };
-const MAX_RUNNING_LINE = "A Max job is running and everything big waits. Stop it to give the room back; chat returns to normal.";
+const MAX_RUNNING_LINE = "A Max job is running and other jobs wait. Stop it and chat returns to normal.";
 const windowRoute = createRoute({
   method: "get", path: "/tier-window", tags: ["AI"], summary: "Whether a Max job holds the computer, what each category does meanwhile and which apps were closed, for admins only (TIER-HOME-03, TIER-PRIO-05)",
   middleware: [requireRole("owner", "admin")] as const,

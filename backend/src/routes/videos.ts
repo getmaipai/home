@@ -10,7 +10,7 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
-import { jobQueueCopy } from "@/lib/jobQueueCopy";
+import { jobQueueCopy, JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -57,7 +57,7 @@ const ItemSchema = z.object({
   error: z.string().nullable(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
-  fit_ask: z.object({ job_id: z.string() }).nullable().describe("Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
+  fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
   clip: z.object({ url: z.string(), poster_url: z.string(), width: z.number(), height: z.number(), seconds: z.number().nullable(), seed: z.number().nullable(), file_id: z.string(), poster_file_id: z.string(), has_sound: z.boolean().describe("The clip has a sound track the model made (speech included).") }).nullable(),
 });
@@ -68,7 +68,7 @@ export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
   if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
   if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
-  if (job.phase === "paused: low memory") return "Paused: low memory";
+  if (job.phase === "paused: low memory") return JOB_QUEUE_COPY.picture_paused_memory[audience];
   // A job waiting on memory is not waiting in a line: with nothing ahead of it, "You are next" is wrong, so it gets the memory words.
   if (job.phase === "waiting for memory") return jobQueueCopy("waiting_memory", job.riseReason ?? "memory_elsewhere", job.position, null, audience);
   if (job.state === "queued" || job.phase === "queued") return jobQueueCopy("queued", job.riseReason ?? "queue", job.position, job.estimateSeconds ?? null, audience);

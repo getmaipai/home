@@ -33,9 +33,9 @@ describe("chat transition times", () => {
   });
   test("every line is one short sentence pair, no em dash, and switches to running-long after 1.5x", () => {
     const fresh = transitionNotice("enter_reduced", 1000);
-    expect(fresh.adult).toBe("Switching chat. Back in about 15 seconds.");
+    expect(fresh.adult).toBe("One moment. Back in about 15 seconds.");
     expect(transitionNotice("mode_change", 0).adult).toBe("Getting ready. Back in about a minute.");
-    expect(transitionNotice("enter_reduced", 24_000).adult).toBe("Switching chat. Back in about 15 seconds.");
+    expect(transitionNotice("enter_reduced", 24_000).adult).toBe("One moment. Back in about 15 seconds.");
     expect(transitionNotice("enter_reduced", 24_100).adult).toBe("Taking longer than usual. Still working.");
     for (const n of [fresh, transitionNotice("mode_change", 0)]) for (const line of [n.adult, n.teen, n.child]) { expect(line.length).toBeLessThanOrEqual(45); expect(line).not.toContain("—"); }
   });
@@ -50,7 +50,7 @@ describe("chat transition times", () => {
     beginTransition("enter_reduced", Date.now() - 3000);
     __setRoleHealthForTests({ chat: { availability: "starting", reason: null, cause: "reduced_swap" } });
     const { engines } = await collectHealth();
-    expect(engines.chat.notice?.adult).toBe("Switching chat. Back in about a minute.");
-    expect(engines.chat.notice?.child).toBe("Switching chat. Back in about a minute.");
+    expect(engines.chat.notice?.adult).toBe("One moment. Back in about a minute.");
+    expect(engines.chat.notice?.child).toBe("One moment. Back in about a minute.");
   });
 });

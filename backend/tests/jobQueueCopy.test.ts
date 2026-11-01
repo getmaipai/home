@@ -28,10 +28,9 @@ describe("job queue copy", () => {
     expect(jobQueueCopy("waiting_memory", "making_room", null, null, "adult")).not.toContain("about");
   });
 
-  test("never-fit lines name both memory values", () => {
+  test("never-fit lines name no sizes", () => {
     const reason: JobQueueReason = { kind: "never_fit", job: "video", neededGb: 44, availableGb: 32 };
-    expect(jobQueueCopy("never_fit", reason, null, null, "adult")).toContain("44 GB");
-    expect(jobQueueCopy("never_fit", reason, null, null, "adult")).toContain("32 GB");
+    expect(jobQueueCopy("never_fit", reason, null, null, "adult")).not.toMatch(/GB|memory/i);
   });
 
   test("the table covers each supported state and reason", () => {
@@ -61,15 +60,15 @@ describe("job queue copy", () => {
   });
 
   test("tier wait copy uses position and optional estimates for adults and children", () => {
-    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, 360, "adult")).toBe("A bigger job is running. Yours is number 2 (about 6 minutes).");
-    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, null, "adult")).toBe("A bigger job is running. Yours is number 2.");
-    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, 360, "child")).toBe("A big job is running. You are number 2.");
+    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, 360, "adult")).toBe("Another job is running. Yours is number 2 (about 6 minutes).");
+    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, null, "adult")).toBe("Another job is running. Yours is number 2.");
+    expect(jobQueueCopy("queued", "bigger_job_ahead", 2, 360, "child")).toBe("Another job is running. You are number 2.");
     expect(jobQueueCopy("queued", "max_window", 1, 720, "adult")).toBe("Home is running a Max job and will be back to normal in about 12 minutes. Yours starts after it.");
     expect(jobQueueCopy("queued", "max_window", 1, null, "adult")).toBe("Home is running a Max job and will be back to normal. Yours starts after it.");
-    expect(jobQueueCopy("queued", "max_window", 1, 720, "child")).toBe("Home is busy with a big job. Yours starts after it.");
+    expect(jobQueueCopy("queued", "max_window", 1, 720, "child")).toBe("Waiting for its turn. Yours starts after.");
     expect(jobQueueCopy("queued", "max_drain", 1, 60, "adult")).toBe("Max starts when the jobs ahead finish (about 1 minutes). New jobs wait behind it.");
     expect(jobQueueCopy("queued", "max_drain", 1, null, "adult")).toBe("Max starts when the jobs ahead finish. New jobs wait behind it.");
-    expect(jobQueueCopy("queued", "max_drain", 1, null, "child")).toBe("Home is busy with a big job. Yours starts after it.");
+    expect(jobQueueCopy("queued", "max_drain", 1, null, "child")).toBe("Waiting for its turn. Yours starts after.");
     expect(jobQueueCopy("started", "still_running", null, 120, "adult")).toBe("Still running, about 2 minutes more.");
     expect(jobQueueCopy("started", "still_running", null, null, "adult")).toBe("Still running.");
     expect(jobQueueCopy("started", "still_running", null, null, "child")).toBe("Still running. It will be done soon.");
@@ -77,10 +76,10 @@ describe("job queue copy", () => {
 });
 
 test("tier admission copy is exact for adults and children", () => {
-  expect(jobQueueCopy("queued", "tier_ask", null, null, "adult")).toBe("Not enough room for the tier you picked. Waiting for your answer on this card.");
+  expect(jobQueueCopy("queued", "tier_ask", null, null, "adult")).toBe("It is not ready right now. Pick below.");
   expect(jobQueueCopy("queued", "tier_ask", null, null, "child")).toBe("Waiting for a grown-up to say yes.");
-  expect(jobQueueCopy("queued", "tier_no_room", null, null, "adult")).toBe("Waiting for room for a bigger job.");
-  expect(jobQueueCopy("queued", "tier_no_room", null, null, "child")).toBe("Waiting for room.");
+  expect(jobQueueCopy("queued", "tier_no_room", null, null, "adult")).toBe("Waiting for its turn.");
+  expect(jobQueueCopy("queued", "tier_no_room", null, null, "child")).toBe("Waiting for its turn.");
 });
 
 test("a video waiting for memory with nothing ahead says why, never \"You are next\"", async () => {

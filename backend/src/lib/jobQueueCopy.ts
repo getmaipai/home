@@ -31,7 +31,7 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
   boost: { adult: "An admin moved a job to the front.", child: "A job goes first." },
   moved_up: { adult: "You moved up in line.", child: "You are next." },
   waiting_long: {
-    adult: "Still waiting. It starts when the computer is free, or tap Cancel.",
+    adult: "Still waiting. It starts by itself, or tap Cancel.",
     child: "Still waiting. It will start soon.",
   },
   behind_chat: {
@@ -39,56 +39,56 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     child: "Waiting for the chat to finish, then it's your turn.",
   },
   making_room: {
-    adult: "Waiting for memory. Home is putting away another model.",
-    child: "Making room.",
+    adult: "Waiting for its turn. It starts by itself, or tap Cancel.",
+    child: "Waiting for its turn.",
   },
   memory_elsewhere: {
-    adult: "Waiting for memory. Something else on this computer is using it. Your job starts as soon as there is room, or tap Cancel.",
-    child: "The computer is full right now. Your job starts when there is room.",
+    adult: "Waiting for its turn. It starts by itself, or tap Cancel.",
+    child: "Waiting for its turn. It starts by itself.",
   },
   requeued_memory: {
-    adult: "The computer ran low on memory, so your job will start again from the beginning when there is room. Nothing to do.",
-    child: "The computer got too full. Your job will start again soon.",
+    adult: "Your job hit a snag, so it will start again from the beginning soon. Nothing to do.",
+    child: "Your job will start again soon.",
   },
   low_memory_failure: {
-    adult: "The computer ran low on memory, so the job stopped. Try again when there is room.",
-    child: "The computer ran low on memory, so the job stopped. Try again later.",
+    adult: "The job stopped before it finished. Try again in a few minutes.",
+    child: "The job stopped. Try again later.",
   },
   started: { adult: "Starting.", child: "Starting now." },
-  paused_chat: { adult: "Paused while chat is working.", child: "Paused while chat is working." },
+  paused_chat: { adult: "Waiting for its turn.", child: "Waiting for its turn." },
   coding_mode: {
-    adult: "Home is in coding mode. Your job starts by itself when it is back to normal, or tap Cancel.",
-    child: "Home is busy with a big job. Your job starts when it is done.",
+    adult: "Waiting for its turn. It starts by itself, or tap Cancel.",
+    child: "Waiting for its turn.",
   },
-  tier_ask: { adult: "Not enough room for the tier you picked. Waiting for your answer on this card.", child: "Waiting for a grown-up to say yes." },
-  tier_no_room: { adult: "Waiting for room for a bigger job.", child: "Waiting for room." },
+  tier_ask: { adult: "It is not ready right now. Pick below.", child: "Waiting for a grown-up to say yes." },
+  tier_no_room: { adult: "Waiting for its turn.", child: "Waiting for its turn." },
   quiet_wait: { adult: "Waiting for a quiet moment in chat.", child: "Waiting for a quiet moment." },
-  profile_lowered: { adult: "Waiting while a big job uses the room. It starts by itself when that job ends, or tap Cancel.", child: "Waiting for a big job to finish." },
+  profile_lowered: { adult: "Waiting for another job to finish. It starts by itself, or tap Cancel.", child: "Waiting for another job to finish." },
   cooldown_wait: { adult: "Chat just returned to normal. Your job starts in a few minutes, or tap Cancel.", child: "Your job starts in a few minutes." },
-  reduced_chat: { adult: "Chat is simpler while a big job runs (about N minutes). Answers are shorter and some extras may be paused.", child: "Chat is a little simpler for a few minutes." },
+  reduced_chat: { adult: "Answers are shorter for now (about N minutes). Everything comes back after.", child: "Chat is a little simpler for a few minutes." },
   bigger_job_ahead: {
-    adult: "A bigger job is running. Yours is number N (about M minutes).",
-    child: "A big job is running. You are number N.",
+    adult: "Another job is running. Yours is number N (about M minutes).",
+    child: "Another job is running. You are number N.",
   },
   max_window: {
     adult: "Home is running a Max job and will be back to normal in about N minutes. Yours starts after it.",
-    child: "Home is busy with a big job. Yours starts after it.",
+    child: "Waiting for its turn. Yours starts after.",
   },
   max_chat: {
-    adult: "Someone is using Max chat, so big jobs wait. Yours starts by itself when they are done, or tap Cancel.",
-    child: "Home is busy with a big job. Yours starts after it.",
+    adult: "Someone is using Max chat, so other jobs wait. Yours starts by itself when they are done, or tap Cancel.",
+    child: "Waiting for its turn. Yours starts after.",
   },
   max_drain: {
     adult: "Max starts when the jobs ahead finish (about N minutes). New jobs wait behind it.",
-    child: "Home is busy with a big job. Yours starts after it.",
+    child: "Waiting for its turn. Yours starts after.",
   },
-  heavy_slot: { adult: "Another big job is running; this one starts when it finishes.", child: "A big job is running. Yours starts when it finishes." },
+  heavy_slot: { adult: "Another job is running; this one starts when it finishes.", child: "Another job is running. Yours starts when it finishes." },
   fairness_wait: { adult: "Other people's jobs go first this round; this one is next.", child: "Other people's jobs go first this round. Yours is next." },
   picture_line: { adult: "Waiting in line, number N", child: "Waiting in line, number N" },
-  picture_engine: { adult: "Waiting for the picture engine", child: "Waiting for the picture engine" },
-  picture_memory: { adult: "Waiting for memory to free up", child: "Waiting for memory to free up" },
-  picture_paused_memory: { adult: "Paused: low memory", child: "Paused: low memory" },
-  picture_starting: { adult: "Getting the picture model ready", child: "Getting the picture model ready" },
+  picture_engine: { adult: "Waiting for its turn", child: "Waiting for its turn" },
+  picture_memory: { adult: "Waiting for its turn", child: "Waiting for its turn" },
+  picture_paused_memory: { adult: "Waiting for its turn", child: "Waiting for its turn" },
+  picture_starting: { adult: "Getting the picture ready", child: "Getting the picture ready" },
   still_running: { adult: "Still running, about N minutes more.", child: "Still running. It will be done soon." },
 };
 
@@ -115,7 +115,7 @@ export function jobQueueCopy(
 ): string {
   if (typeof reason === "object") {
     const words = kindWords(reason.job);
-    const adult = `This ${words.adult} needs about ${reason.neededGb} GB of memory and this computer has ${reason.availableGb} GB for pictures and videos after chat. ${reason.smallerOption ?? words.alternative}, or ask an admin to change the memory settings.`;
+    const adult = `This ${words.adult} can't be made here right now. Try ${words.alternative}, or ask an admin.`;
     const child = `This computer can't make ${words.child}. Try ${reason.job === "video" ? "a picture" : reason.job === "song" ? "a shorter song" : "again later"} instead.`;
     return audience === "adult" ? adult : child;
   }
@@ -161,7 +161,7 @@ export function jobQueueCopy(
     return `${line} (${estimateText(estimateSeconds)}).`;
   }
   if (state === "started" && reason === "started" && typeof estimateSeconds === "number" && Number.isFinite(estimateSeconds)) {
-    return audience === "adult" ? `${line} Loading the model (${estimateText(estimateSeconds)}).` : line;
+    return audience === "adult" ? `${line} Getting ready (${estimateText(estimateSeconds)}).` : line;
   }
   return line;
 }

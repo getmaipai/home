@@ -59127,12 +59127,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "stop_id": {
                       "type": "string",
@@ -59479,12 +59489,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "stop_id": {
                       "type": "string",
@@ -59814,12 +59834,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "stop_id": {
                       "type": "string",
@@ -60125,12 +60155,22 @@
                             "properties": {
                               "job_id": {
                                 "type": "string"
+                              },
+                              "picked": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actual": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
-                              "job_id"
+                              "job_id",
+                              "picked",
+                              "actual"
                             ],
-                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                           },
                           "max_offered": {
                             "type": "boolean",
@@ -60585,12 +60625,22 @@
                             "properties": {
                               "job_id": {
                                 "type": "string"
+                              },
+                              "picked": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actual": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
-                              "job_id"
+                              "job_id",
+                              "picked",
+                              "actual"
                             ],
-                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                           },
                           "max_offered": {
                             "type": "boolean",
@@ -60904,12 +60954,22 @@
                             "properties": {
                               "job_id": {
                                 "type": "string"
+                              },
+                              "picked": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actual": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
-                              "job_id"
+                              "job_id",
+                              "picked",
+                              "actual"
                             ],
-                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                           },
                           "max_offered": {
                             "type": "boolean",
@@ -61211,12 +61271,22 @@
                             "properties": {
                               "job_id": {
                                 "type": "string"
+                              },
+                              "picked": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actual": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
-                              "job_id"
+                              "job_id",
+                              "picked",
+                              "actual"
                             ],
-                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                           },
                           "max_offered": {
                             "type": "boolean",
@@ -80174,12 +80244,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -80480,12 +80560,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -80804,12 +80894,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -81136,12 +81236,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -81463,12 +81573,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -81794,12 +81914,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -82137,12 +82267,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -82471,12 +82611,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",
@@ -82808,12 +82958,22 @@
                       "properties": {
                         "job_id": {
                           "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
-                        "job_id"
+                        "job_id",
+                        "picked",
+                        "actual"
                       ],
-                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
                     },
                     "cut": {
                       "type": "string",

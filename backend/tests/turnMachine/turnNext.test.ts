@@ -1815,22 +1815,22 @@ describe("turnNext.ts: THIN-1C, the Stack's reason for refusing to start the AI 
     return fixture;
   }
 
-  test("a chat turn refused with #203's exact 503 body says the computer is low on memory, and the health row shows chat offline with that reason", async () => {
+  test("a chat turn refused with #203's exact 503 body gives the calm line, and the health row shows chat offline with that reason", async () => {
     const fixture = refusingStack();
     try {
       const result = await runTurnNext(people.owner, "chat", "hi");
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("expected the refused turn, not a reply");
       expect(result.code).toBe("engine_unavailable");
-      expect(result.error).toContain("low on memory");
-      expect(result.error.toLowerCase()).toContain("try again in a moment");
+      expect(result.error).toContain("One moment");
+      expect(result.error.toLowerCase()).toContain("try again in a bit");
       expect(result.error).not.toBe(COMPOSE_FAILURE_LINE);
       // The health data the status page reads: chat offline, with the
       // same household wording, never the Stack's raw diagnostic.
       const health = await collectHealth();
       expect(health.ok).toBe(false);
       expect(health.engines.chat.availability).toBe("unavailable");
-      expect(health.engines.chat.detail).toContain("low on memory");
+      expect(health.engines.chat.detail).toContain("One moment");
       expect(JSON.stringify(health)).not.toContain("memory budget");
       // Repairs keeps the Stack's own words, as before.
       const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.chat");
@@ -1854,7 +1854,7 @@ describe("turnNext.ts: THIN-1C, the Stack's reason for refusing to start the AI 
       }
       expect(thrown).toBeInstanceOf(StreamUnavailable);
       expect(thrown).toMatchObject({ code: "engine_unavailable" });
-      expect((thrown as Error).message).toContain("low on memory");
+      expect((thrown as Error).message).toContain("One moment");
     } finally {
       fixture.stop();
       __resetStackEngineForTests();
@@ -3731,7 +3731,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
         const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.turnId)).get();
         expect(delivered).toContain(FIRST_SENTENCE);
-        expect(delivered).toContain("I can't reach the engine computer right now. Your message is safe; send it again once chat is back.");
+        expect(delivered).toContain("I can't reach the AI computer right now. Your message is safe; send it again once chat is back.");
         expect(row?.userText).toBe("Please keep this exact message");
         expect(row?.replyText).toBe(delivered);
         const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { failure_kind?: string }[] };

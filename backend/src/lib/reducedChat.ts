@@ -12,7 +12,7 @@ export function reducedChatState(): { minutesLeft: number | null } | null { retu
 /** TIER-HOME-03 (resource-tiers section 8): the line under the chat input while a Max window runs chat on its simpler model. Chat still answers, so this is shown beside a ready composer and never holds Send. */
 export function reducedChatNotice(minutesLeft: number | null): ComposerNotice {
   const when = minutesLeft === null ? "" : ` (about ${Math.max(1, Math.round(minutesLeft))} minutes)`;
-  return { adult: "Chat is simpler for a few minutes.", teen: "Chat is simpler for a few minutes.", child: "Chat is a bit simpler for now.", repairs_link: null, more: `Chat is simpler while a big job runs${when}. Answers are shorter and some extras may be paused.` };
+  return { adult: "Chat is simpler for a few minutes.", teen: "Chat is simpler for a few minutes.", child: "Chat is a bit simpler for now.", repairs_link: null, more: `Chat is simpler for a little while${when}. Answers are shorter, and everything comes back after.` };
 }
 
 /** TIER-WIRE-02: how a request to the Stack's Reduced chat model came out. `waiting`: a chat turn is in flight, ask again at the next turn boundary. `unsupported`: an older Stack without the route. `failed`: refused, unreachable or an unreadable answer. */

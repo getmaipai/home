@@ -61,12 +61,12 @@ describe("the hub not answering (a restart)", () => {
   test("reads as starting with the restart line, no Repairs link yet", async () => {
     const v = await view({ role: "owner", age_band: "adult" });
     await waitFor(() => expect(v.result.current.availability).toBe("starting"));
-    expect(v.result.current.notice).toEqual({ text: "The AI is restarting. Chat will start again by itself in a minute.", repairsLink: null });
+    expect(v.result.current.notice).toEqual({ text: "One moment. Back soon.", repairsLink: null });
   });
 
   test("a child gets the child words", async () => {
     const v = await view({ role: "child", age_band: "child" });
-    await waitFor(() => expect(v.result.current.notice?.text).toBe("I'm waking up. Try again in a minute."));
+    await waitFor(() => expect(v.result.current.notice?.text).toBe("One moment. Back soon."));
   });
 
   test("after a minute it is unavailable and an owner is sent to Repairs", async () => {
@@ -156,7 +156,7 @@ describe("the hub itself did not answer", () => {
   const adapter: ChatModelAdapter = {
     async *run() {
       runs += 1;
-      if (!hubUp) throw new ChatTurnError("Home is restarting or updating. It will be back in a minute.", "hub_unreachable");
+      if (!hubUp) throw new ChatTurnError("One moment. Home will be back in about a minute.", "hub_unreachable");
       yield { content: [{ type: "text", text: "Sunny." }] };
     },
   };
@@ -166,7 +166,7 @@ describe("the hub itself did not answer", () => {
   }
   beforeEach(() => { runs = 0; hubUp = false; });
 
-  test("the message says Home is restarting; when the hub answers the request is sent once more, and only once", async () => {
+  test("the message says Home is back in a minute; when the hub answers the request is sent once more, and only once", async () => {
     let probes = 0;
     globalThis.fetch = mock((url: string | URL | Request) => {
       if (String(url).includes("/api/health")) {
@@ -178,7 +178,7 @@ describe("the hub itself did not answer", () => {
     const view = renderWithQueryClient(<Harness />);
     fireEvent.change(view.getByRole("textbox", { name: "Message input" }), { target: { value: "make it a video" } });
     fireEvent.click(view.getByRole("button", { name: "Send message" }));
-    await waitFor(() => expect(view.container.textContent).toContain("Home is restarting or updating. It will be back in a minute."));
+    await waitFor(() => expect(view.container.textContent).toContain("One moment. Home will be back in about a minute."));
     expect(view.container.textContent).not.toContain("Could not reach the hub");
     expect(runs).toBe(1);
     hubUp = true;

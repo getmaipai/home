@@ -1780,7 +1780,7 @@ describe("createChatModelAdapter errors", () => {
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(ChatTurnError);
-      expect((error as Error).message).toBe("Home is restarting or updating. It will be back in a minute.");
+      expect((error as Error).message).toBe("One moment. Home will be back in about a minute.");
       expect(error).toMatchObject({ code: "hub_unreachable", turnId: undefined });
     } finally {
       env.restore();

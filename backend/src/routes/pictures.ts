@@ -45,7 +45,7 @@ const JobSchema = z.object({
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
   max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
   size: z.string().describe("The size being made, like 1024x1024."),
-  fit_ask: z.object({ job_id: z.string() }).nullable().describe("Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
+  fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
 

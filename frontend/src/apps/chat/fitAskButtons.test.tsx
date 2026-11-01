@@ -9,7 +9,7 @@ import { fitAskApi, fitAskActions } from "@/lib/fitAsk";
 
 afterEach(cleanup);
 
-const base = { id: "pic-1", state: "queued", percent: 0, label: "Not enough room for the tier you picked. Waiting for your answer on this card.", position: 1, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 1000, prompt: "a red fox", kind: "generate", conversation_id: "c1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1" } as PictureCard;
+const base = { id: "pic-1", state: "queued", percent: 0, label: "Max is not ready right now. Pick below.", position: 1, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 1000, prompt: "a red fox", kind: "generate", conversation_id: "c1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1" } as PictureCard;
 const props = { toolCallId: "t", toolName: "picture", args: {}, argsText: "{}", result: { id: "pic-1" }, isError: false, status: { type: "complete" }, addResult: () => undefined, resume: () => undefined } as unknown as ComponentProps<typeof PictureProgressToolRender>;
 
 function stub(data: PictureCard, answer: () => Promise<{ answered: boolean }> = async () => ({ answered: true })) {
@@ -21,13 +21,13 @@ function stub(data: PictureCard, answer: () => Promise<{ answered: boolean }> = 
 
 describe("the question buttons on a held job", () => {
   test("a queued picture that asks shows both buttons; each sends its answer and the card reloads", async () => {
-    const restore = stub({ ...base, fit_ask: { job_id: "pic-1" } });
+    const restore = stub({ ...base, fit_ask: { job_id: "pic-1", picked: "Max", actual: "Standard" } });
     const v = renderWithQueryClient(<PictureProgressToolRender {...props} />);
-    await waitFor(() => expect(v.getByRole("button", { name: "Make it now at the lower level" })).toBeTruthy());
-    expect(v.getByText(/Waiting for your answer/)).toBeTruthy();
-    fireEvent.click(v.getByRole("button", { name: "Make it now at the lower level" }));
+    await waitFor(() => expect(v.getByRole("button", { name: "Make it now with Standard" })).toBeTruthy());
+    expect(v.getByText(/Max is not ready right now/)).toBeTruthy();
+    fireEvent.click(v.getByRole("button", { name: "Make it now with Standard" }));
     await waitFor(() => expect(fitAskApi.answer).toHaveBeenCalledWith("pic-1", "allow"));
-    fireEvent.click(v.getByRole("button", { name: "Wait for room" }));
+    fireEvent.click(v.getByRole("button", { name: "Wait for Max" }));
     await waitFor(() => expect(fitAskApi.answer).toHaveBeenCalledWith("pic-1", "wait"));
     await waitFor(() => expect((picturesApi.card as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThan(2));
     restore();
@@ -37,17 +37,17 @@ describe("the question buttons on a held job", () => {
     const restore = stub({ ...base, fit_ask: null });
     const v = renderWithQueryClient(<PictureProgressToolRender {...props} />);
     await waitFor(() => expect(v.container.querySelector('[data-slot="image-generation"]')).toBeTruthy());
-    expect(v.queryByRole("button", { name: "Wait for room" })).toBeNull();
+    expect(v.queryByRole("button", { name: "Wait for Max" })).toBeNull();
     restore();
-    const running = stub({ ...base, state: "running", fit_ask: { job_id: "pic-1" } });
+    const running = stub({ ...base, state: "running", fit_ask: { job_id: "pic-1", picked: "Max", actual: "Standard" } });
     const w = renderWithQueryClient(<PictureProgressToolRender {...props} />);
     await waitFor(() => expect(w.container.querySelectorAll('[data-slot="image-generation"]').length).toBeGreaterThan(0));
-    expect(w.queryByRole("button", { name: "Wait for room" })).toBeNull();
+    expect(w.queryByRole("button", { name: "Wait for Max" })).toBeNull();
     running();
   });
 
   test("fitAskActions is undefined without a question and the labels are the two plain answers", () => {
     expect(fitAskActions(null, () => {})).toBeUndefined();
-    expect(fitAskActions({ job_id: "x" }, () => {})!.map((a) => a.label)).toEqual(["Make it now at the lower level", "Wait for room"]);
+    expect(fitAskActions({ job_id: "x", picked: "Max", actual: "Standard" }, () => {})!.map((a) => a.label)).toEqual(["Make it now with Standard", "Wait for Max"]);
   });
 });

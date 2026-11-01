@@ -1,4 +1,4 @@
-import { appliedProfile, askLine, liveFit, type FitResult, type MemoryNow } from "./liveFit";
+import { appliedProfile, askLevels, askLine, liveFit, type FitResult, type MemoryNow } from "./liveFit";
 import { closableApps, closeForJob, realHelper, type CloseHelper, type CloseSettings } from "./closeApps";
 import type { Category, CellState, Hardware, ProfileRow, Tier } from "./profileTable";
 
@@ -76,4 +76,5 @@ export async function fitForAdmission(job: { id?: string; jobClass: "picture" | 
 }
 
 export function admissionFitProfile(fit: FitResult) { return appliedProfile(fit); }
+export function admissionFitAskLevels(fit: FitResult): { picked: string; actual: string } { return askLevels(fit); }
 export function admissionFitAskLine(fit: FitResult, audience: "adult" | "child" = "adult"): string | null { return askLine(fit, audience); }
