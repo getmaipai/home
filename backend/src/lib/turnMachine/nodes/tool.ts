@@ -6,7 +6,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
 import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
-import { isRepeatQuery, memoryDetailsIn, researchEvidence, withoutMemoryDetails } from "../research";
+import { isRepeatQuery, markResearch, memoryDetailsIn, researchCutAt, researchEvidence, withoutMemoryDetails } from "../research";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
 import type { TurnAskField } from "@/wire";
@@ -116,6 +116,8 @@ async function waitForImageLead(done: Promise<void>): Promise<boolean> {
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
   const researchRun = state.answerStyle !== undefined && state.answerStyle !== "instant" && state.budget.rounds > 1 ? (state.researchBudget ??= newResearchBudget(state.answerStyle === "max" && state.researchLibraryOnly === true)) : undefined;
+  // RESEARCH-CLOCK-01: page reading of this turn stops at the style's cut-off time.
+  if (researchRun) researchRun.deadlineAt ??= researchCutAt(state);
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
   // ANSWER-IMG-02: a round's show_images call starts its picture pipeline
@@ -342,8 +344,10 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
         uncached = weatherPlace.uncached;
       }
     }
+    if (researchRun && tool === "websearch") markResearch(state, `search ${researchRun.searches} start`);
     const raced = await withDeadline(researchRun ? runWithResearchBudget(researchRun, () => runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) })) : runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
     const durationMs = Date.now() - startedAt;
+    if (researchRun && tool === "websearch") markResearch(state, `search ${researchRun.searches} end (${raced === "deadline" ? "deadline" : "done"}, ${durationMs} ms)`);
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: resumedAsk ? "ask" : "tool_call", ...(resumedAsk ? {} : { args }), errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });
       outcomes.push(outcome);

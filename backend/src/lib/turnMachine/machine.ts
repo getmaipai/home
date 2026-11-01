@@ -5,7 +5,7 @@
 // per row, invoke wraps the node call (runNode() below owns the
 // deadline and the trace entry, both section 11's own requirements),
 // and every transition matches the table's own "Exits" column.
-import { isResearchStyle, roundAddedNothing } from "./research";
+import { isResearchStyle, researchNoNewRound, roundAddedNothing } from "./research";
 import { setup, fromPromise, assign } from "xstate";
 import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contract";
 
@@ -150,7 +150,7 @@ export const turnMachine = setup({
         deadlineFor(input, modelNodeDeadlineMs(input.turnState)),
         input.turnState,
         input.abortSignal,
-        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds, roundsUsed: input.roundsUsed, retry: retryRound(input) },
+        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds && !researchNoNewRound(input.turnState), roundsUsed: input.roundsUsed, retry: retryRound(input) },
         modelNode,
       ),
     ),
@@ -233,7 +233,7 @@ export const turnMachine = setup({
       const entries = (event as unknown as { output: PolicyOutput }).output.entries;
       return entries.length > 0 && entries.every((e) => !e.decision.allow && e.decision.reason === "ungrounded_args" && isDecorativeTool(e.proposal.request.tool));
     },
-    moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
+    moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds && !researchNoNewRound(context.turnState),
     // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
     // here: it sent a round whose every outcome failed straight to
     // `answer` with a deterministic outage line. A failed tool never fails

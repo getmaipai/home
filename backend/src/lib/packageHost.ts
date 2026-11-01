@@ -1508,6 +1508,9 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
  * (each also goes through the per-host pace, robots check and SSRF guard
  * in searxngPageRead). The reasoning is in docs/dev.md. */
 export const SEARCH_PAGES_MAX = 3;
+/** RESEARCH-CLOCK-01: the first searches of a research run read this many pages each. */
+const RESEARCH_FIRST_SEARCHES = 3;
+const RESEARCH_FIRST_SEARCH_PAGES = 2;
 /** Characters of page text kept per page for the model (three pages stay
  * well inside the tool message's budget). */
 const SEARCH_PAGE_TEXT_CHARS = 2_500;
@@ -1556,7 +1559,9 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * the ones that finish inside the step's time budget are kept. */
 async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand, signal?: AbortSignal, temporary = false): Promise<SearxngSearchResult> {
   const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
-  const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : SEARCH_PAGES_MAX;
+  // RESEARCH-CLOCK-01: a research run's first searches read only their top two pages (cheap first); later searches read three.
+  const researchStart = currentResearchBudget();
+  const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : researchStart && researchStart.searches <= RESEARCH_FIRST_SEARCHES ? RESEARCH_FIRST_SEARCH_PAGES : SEARCH_PAGES_MAX;
   const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : SEARCH_PAGE_TEXT_CHARS;
   const deduped = { ...found, rows: dedupeRows(found.rows) };
   const result = minorBand ? floorSearchResult(deduped, minorBand) : dropBlockedSites(deduped);
@@ -1579,22 +1584,22 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     hosts.add(host);
     candidates.push(row);
   }
-  // One request at a time in rank order, so the pace and the first
-  // signal mean something; a 403, a 429 or the pace running out ends the
-  // search's page reading, and the step's time budget ends it too. A page
-  // already in flight at the budget is abandoned (it keeps its own
-  // 10 second timeout) and that row keeps its snippet.
-  const deadline = Date.now() + searchPagesBudgetMs;
+  // A plain search reads its pages one at a time in rank order, so the pace and the first signal mean something; a 403, a 429 or the
+  // pace running out ends the search's page reading, and the step's time budget ends it too. A research run (RESEARCH-CLOCK-01) reads
+  // its pages at the same moment instead: they are all on different sites, so no site is asked twice at once, and the run's cut-off
+  // time ends the reading wherever it is. A page already in flight at the budget is abandoned (it keeps its own 10 second timeout)
+  // and that row keeps its snippet.
+  const deadline = Math.min(Date.now() + searchPagesBudgetMs, runBudget?.deadlineAt ?? Infinity);
   const pages: SearxngPage[] = [];
   let first: PageReadResult | undefined;
-  for (const row of candidates) {
-    if (signal?.aborted) break;
+  const readOne = async (row: SearxngRow): Promise<{ page: SearxngPage; doc: PageReadResult } | "stop" | null> => {
+    if (signal?.aborted) return "stop";
     const remaining = deadline - Date.now();
-    if (remaining <= 0) break;
+    if (remaining <= 0) return "stop";
     let timer: ReturnType<typeof setTimeout> | undefined;
     const rowHost = runBudget ? new URL(row.url!).hostname : "";
     if (runBudget) {
-      if (runBudget.declined) break;
+      if (runBudget.declined) return "stop";
       await waitForHostPace(runBudget, rowHost);
       notePageRead(runBudget, rowHost);
     }
@@ -1603,23 +1608,38 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
       read.catch(() => {}); // an abandoned read that fails later is not an unhandled rejection
       const doc = await Promise.race([
         read,
-        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), remaining); }),
+        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), Math.max(0, deadline - Date.now())); }),
       ]);
-      if (!doc) break;
+      if (!doc) return "stop";
       const text = doc.text.trim().slice(0, pageChars);
-      if (!text) continue;
-      first ??= doc;
-      pages.push({ url: row.url!, title: doc.title || row.title, text });
+      if (!text) return null;
+      return { page: { url: row.url!, title: doc.title || row.title, text }, doc };
     } catch (err) {
       if (err instanceof PageDeclinedError) {
         // A site refused: a research run reads no more pages at all (owner ruling 2026-11-01).
         if (runBudget) noteDeclined(runBudget);
-        break;
+        return "stop";
       }
-      if (err instanceof HostError && err.code === "rate_limited") break; // Home's own page pace ran out: this search stops reading, the run goes on
-      // Any other failure falls back to the row's own snippet.
+      if (err instanceof HostError && err.code === "rate_limited") return "stop"; // Home's own page pace ran out: this search stops reading, the run goes on
+      return null; // Any other failure falls back to the row's own snippet.
     } finally {
       clearTimeout(timer);
+    }
+  };
+  if (runBudget) {
+    const read = await Promise.all(candidates.map((row) => readOne(row)));
+    for (const item of read) {
+      if (item === null || item === "stop") continue;
+      first ??= item.doc;
+      pages.push(item.page);
+    }
+  } else {
+    for (const row of candidates) {
+      const item = await readOne(row);
+      if (item === "stop") break;
+      if (item === null) continue;
+      first ??= item.doc;
+      pages.push(item.page);
     }
   }
   if (pages.length === 0) return result;

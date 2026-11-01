@@ -19,6 +19,8 @@ export interface ResearchRunBudget {
   libraryOnly: boolean;
   /** Counts only, for the run's trace (rule 6a: no queries, URLs or titles in logs). */
   searches: number;
+  /** RESEARCH-CLOCK-01: the moment (ms since the epoch) page reading stops for this turn. */
+  deadlineAt?: number;
 }
 
 const store = new AsyncLocalStorage<ResearchRunBudget>();

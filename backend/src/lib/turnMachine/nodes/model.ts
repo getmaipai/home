@@ -1,4 +1,4 @@
-import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, type QueryWriter } from "../research";
+import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -780,7 +780,10 @@ function chatQueryWriter(signal: AbortSignal): QueryWriter {
 }
 
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
+  const timed = isResearchStyle(state.answerStyle, state.budget);
+  if (timed) markResearch(state, `model start (${input.toolsAllowed ? "may search" : "answers"})`);
   const result = await modelRound(state, input, signal);
+  if (timed) markResearch(state, `model end (${result.output.kind})`);
   if (!input.retry || result.output.kind !== "tool_calls") return result;
   const offered = new Set(state.lastTools.map((t) => t.id));
   const calls = result.output.calls.filter((c) => offered.has(c.tool) && !isRepeatOfFailed(c, state.outcomes));
@@ -1039,7 +1042,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // THIN-5A: a turn that shows no reasoning never asks the engine to think
   // (llm.ts forces it off with dropReasoning), so the reply ceiling, the
   // record and the empty-reply retry all see the effective flag.
-  const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
+  // RESEARCH-CLOCK-01: a research turn's later search-choosing rounds do not think (the query writer already proposes the searches); the
+  // reasoning is spent on the first round, which plans, and on the answering round, which reads the notes. A direct answer from a later
+  // search round simply comes without it.
+  const researchToolRound = continuing && !isPhrasingRound;
+  const thinkingOn = !researchToolRound && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   // Hold a plain media request until its tool call is known; also hold the follow-up after a successful music start,
   // even when the person's wording did not plainly name a song.

@@ -37,6 +37,40 @@ export function budgetForStyle(budget: TurnBudget, style: AnswerStyle): TurnBudg
   return { ...budget, ...room, rounds, deadlines_ms: { ...d, total: d.total + (rounds - budget.rounds) * (d.model + d.tool) } };
 }
 
+/** RESEARCH-CLOCK-01 (Jesse, 2026-11-01: "we can't have 8-minute runs, no one will wait"): research is bounded by wall-clock time, and the
+ * round counts (4 and 12) are only ceilings. From the start of the turn: at NO_NEW_ROUND_SHARE of the cap no new round starts, and at the cap
+ * page reading stops and the answer is written from the notes so far. Adult written answers have no cap on their own length (rule 5); the
+ * cap is on the searching, so the answer then streams as soon as it can. */
+export const RESEARCH_CAP_MS = { thinking: 75_000, max: 150_000 } as const;
+export const NO_NEW_ROUND_SHARE = 0.7;
+let capOverride: { thinking: number; max: number } | undefined;
+/** Tests: replaces the caps (milliseconds); undefined restores them. */
+export function __setResearchCapForTests(caps: { thinking: number; max: number } | undefined): void { capOverride = caps; }
+
+export function researchCapMs(style: AnswerStyle | undefined): number | undefined {
+  return style === "thinking" || style === "max" ? (capOverride ?? RESEARCH_CAP_MS)[style] : undefined;
+}
+
+/** True once a research turn is past 70% of its cap: the machine starts no new tool round. */
+export function researchNoNewRound(state: { answerStyle?: AnswerStyle; startedAt: number }, now: number = Date.now()): boolean {
+  const cap = researchCapMs(state.answerStyle);
+  return cap !== undefined && now - state.startedAt >= cap * NO_NEW_ROUND_SHARE;
+}
+
+/** The moment (ms since the epoch) page reading and note waiting stop for this turn; undefined for Instant. */
+export function researchCutAt(state: { answerStyle?: AnswerStyle; startedAt: number }): number | undefined {
+  const cap = researchCapMs(state.answerStyle);
+  return cap === undefined ? undefined : state.startedAt + cap;
+}
+
+/** The time-line a research turn leaves for the bench and the trace: milliseconds since the turn began, labels only (rule 6a). */
+export type ResearchMarkSink = (turnId: string, atMs: number, what: string) => void;
+let markSink: ResearchMarkSink | undefined;
+export function __setResearchMarkSinkForTests(sink: ResearchMarkSink | undefined): void { markSink = sink; }
+export function markResearch(state: { turnId: string; startedAt: number }, what: string): void {
+  markSink?.(state.turnId, Date.now() - state.startedAt, what);
+}
+
 /** Whether this turn may take more than one tool round (the first-round note and the later nudges apply). */
 export const isResearchStyle = (style: AnswerStyle | undefined, budget: TurnBudget): boolean => style !== undefined && style !== "instant" && budget.rounds > 1;
 

@@ -16,7 +16,7 @@ import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
-import { budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
+import { __setResearchCapForTests, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
@@ -27,6 +27,7 @@ let people: BenchPeople;
 let searx: ReturnType<typeof Bun.serve>;
 let searxQueries: string[] = [];
 let sameResults = false;
+let searxDelayMs = 0;
 
 const UTTERANCE = "the 1980s TV series V only had one season, tell me why the series was cancelled and what happened after";
 const QUERIES = [
@@ -59,16 +60,18 @@ beforeEach(() => {
   __setToolOfferOverridesForTests(["websearch"]);
   searxQueries = [];
   sameResults = false;
+  searxDelayMs = 0;
   __setClaimJudgeForTests(async () => '{"supported": true}');
   __setQueryWriterForTests(async () => null);
   searx = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch: (req) => {
+    fetch: async (req) => {
       const url = new URL(req.url);
       if (url.pathname === "/config") return Response.json({ engines: [] });
       const q = url.searchParams.get("q") ?? "";
       searxQueries.push(q);
+      if (searxDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, searxDelayMs));
       const n = sameResults ? 1 : searxQueries.length;
       return Response.json({ results: [1, 2, 3].map((i) => ({ title: `Page ${n}.${i} about ${q}`, url: `https://site${n}x${i}.example/page`, content: `Snippet ${n}.${i} for ${q}` })) });
     },
@@ -342,5 +345,45 @@ describe("one question runs at most twelve searches", () => {
     await holdMax();
     await turn("owner", 13, { max: true, perRound: 3 });
     expect(searxQueries.length).toBe(12);
+  });
+});
+
+describe("research is bounded by the clock, and the round counts are only ceilings", () => {
+  afterEach(() => __setResearchCapForTests(undefined));
+
+  test("no new round starts at 70% of the cap, the cut-off is the cap, and Instant has neither", () => {
+    const started = 1_000_000;
+    expect(researchNoNewRound({ answerStyle: "thinking", startedAt: started }, started + 52_000)).toBe(false);
+    expect(researchNoNewRound({ answerStyle: "thinking", startedAt: started }, started + 52_500)).toBe(true);
+    expect(researchNoNewRound({ answerStyle: "max", startedAt: started }, started + 104_000)).toBe(false);
+    expect(researchNoNewRound({ answerStyle: "max", startedAt: started }, started + 105_000)).toBe(true);
+    expect(researchNoNewRound({ answerStyle: "instant", startedAt: started }, started + 999_000)).toBe(false);
+    expect(researchCutAt({ answerStyle: "thinking", startedAt: started })).toBe(started + 75_000);
+    expect(researchCutAt({ answerStyle: "max", startedAt: started })).toBe(started + 150_000);
+    expect(researchCutAt({ answerStyle: "instant", startedAt: started })).toBeUndefined();
+  });
+
+  test("a Thinking turn past 70% of its cap after one slow search answers instead of searching again", async () => {
+    __setResearchCapForTests({ thinking: 400, max: 400 });
+    searxDelayMs = 500;
+    const { result } = await turn("owner", 4, { thinking: true });
+    expect(searxQueries.length).toBe(1);
+    expect(result.value.reply.text.length).toBeGreaterThan(0);
+  });
+
+  test("the same turn with time to spare still uses its rounds", async () => {
+    const { result } = await turn("owner", 4, { thinking: true });
+    expect(searxQueries.length).toBe(4);
+    expect(result.value.reply.text.length).toBeGreaterThan(0);
+  });
+
+  test("the first round plans with thinking, the later search rounds do not think, and the answering round does", async () => {
+    const { requests } = await turn("owner", 4, { thinking: true });
+    const asString = (r: ChatCompletionRequest) => JSON.stringify(r);
+    const searching = requests.filter((r) => (r.tools?.length ?? 0) > 0 && r.tool_choice !== "none");
+    expect(searching.length).toBeGreaterThan(1);
+    expect(asString(searching[0]!)).toContain('"enable_thinking":true');
+    for (const r of searching.slice(1)) expect(asString(r)).toContain('"enable_thinking":false');
+    expect(asString(requests.at(-1)!)).toContain('"enable_thinking":true');
   });
 });

@@ -40,7 +40,10 @@ try {
   const { conversationTurns } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
   const { judgeResearch } = await import("./researchEval");
-  const { researchEvidence } = await import("@/lib/turnMachine/research");
+  const { researchEvidence, __setResearchMarkSinkForTests } = await import("@/lib/turnMachine/research");
+  // RESEARCH-CLOCK-01: the time-line of each turn (milliseconds since it began, labels only), printed with the result.
+  let marks: string[] = [];
+  __setResearchMarkSinkForTests((_turnId, at, what) => { marks.push(`${(at / 1000).toFixed(1)}s ${what}`); });
   // The credit judge is one plain, non-thinking call to the Stack's chat model per sentence that names a watched person.
   const judge = async (prompt: string): Promise<string> => {
     const response = await fetch(`${process.env.MAIPAI_STACK_URL}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages: [{ role: "user", content: prompt }], max_tokens: 120, temperature: 0 }) });
@@ -55,6 +58,7 @@ try {
       registerActiveChatLease(lease);
       await lease.acquire(people.owner!);
     }
+    marks = [];
     const started = Date.now();
     const result = await runTurnNext(people.owner!, "chat", research.utterance, { thinking: style !== "instant", max: style === "max" });
     const ms = Date.now() - started;
@@ -65,7 +69,7 @@ try {
     const sources = (result.value.sources ?? []).map((s) => ({ site: s.site, title: s.title?.slice(0, 80) }));
     const evidence = researchEvidence(outcomes as unknown as Parameters<typeof researchEvidence>[0]);
     const verdict = await judgeResearch(research, { answer: result.value.reply.text, sources: (result.value.sources ?? []).map((s) => ({ site: s.site, url: s.url })), queries: searches.map((o) => o.args?.expression ?? ""), evidence }, judge);
-    console.log(redact(JSON.stringify({ style, seconds: Math.round(ms / 100) / 10, rounds: searches.length, queries: searches.map((o) => `${o.args?.expression ?? ""} [scope ${o.args?.scope ?? "unset"}, ${o.status}, ${o.result?.data?.rows?.length ?? 0} rows]`), sources, answer: result.value.reply.text, verdict }, null, 2)));
+    console.log(redact(JSON.stringify({ style, seconds: Math.round(ms / 100) / 10, rounds: searches.length, timeline: marks, queries: searches.map((o) => `${o.args?.expression ?? ""} [scope ${o.args?.scope ?? "unset"}, ${o.status}, ${o.result?.data?.rows?.length ?? 0} rows]`), sources, answer: result.value.reply.text, verdict }, null, 2)));
   }
   registerActiveChatLease(null);
   runner.cleanupBenchPeople(people);
