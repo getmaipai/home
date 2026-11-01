@@ -1,5 +1,7 @@
 # Music Studio: design draft (2026-10-31)
 
+> **Amended 2026-11-01 by [music-listen-create-2026-11-01.md](music-listen-create-2026-11-01.md):** one Music app with Listen and Create (Q1), stems for anyone's own files (Q3), no licence gating (Q2), plus made bands and albums, own lyrics, playback first and a new slice order. Where they differ, the newer note wins.
+
 Status (2026-10-31): proposed; architect re-ruling pending; Q1 and Q6 wait on Jesse before S1. No code. Item: MUSIC-STUDIO-01.
 Research date 2026-10-31. Web facts come from search snippets and a few fetched pages; anything marked (unverified) was not read
 at its primary source and must be checked before a row is built on it.
