@@ -83,6 +83,15 @@ made bands and albums, own-lyrics tools.
 4. C1 Listen/Create switch and Songs I made; C2 Create with recipes and own lyrics; then C3 to C10 as in section 7 of the design note. Each slice ships its chat tool and card.
 5. Preview every UI slice at 1440 and 390 wide and judge it against the leader benchmark before handing it over.
 
+## 5a. Idea queued: R1 "Describe what you want" station search (owner, 2026-11-01)
+
+Jesse: station filters by country and genre are not enough (a German station can play US rock), and nothing may be hard coded for the US or any genre; "just need some smart AI interpreting the description and allowing filtering". Shape agreed in chat, not yet in the design note and not yet architect-ruled (add it as a Radio slice after P1, with a short note amendment and a re-ruling):
+- A description box on Radio. The household chat model turns the words into a structured query (genre tags, language, era, mood, where the music comes from versus where the station sits). Rule 1: the model decides, no word list or regex.
+- Home fetches a broad candidate set from the directory (tag and language), and the model ranks it against the description from each station's name, tags, language, country, homepage and its own knowledge. Optional second step: peek at the now-playing text of the top candidates for a few seconds to confirm the music (on the person's request only, behind the household radio switch, the same switch as the directory).
+- Each result shows a one-line reason; the interpreted filters show as editable chips; the person's wording is never stored (rule 6a). Results cache for a few minutes. Engine not ready: the usual S6 status line, and the plain country and genre filter bar still works.
+- Also planned in the same slice: a plain genre, country and language filter bar (Home already passes country and tag to the directory and the records carry language).
+- Not hard coded: no country list, genre map or "US" special case beyond the directory's own tag and country fields.
+
 ## 6. Practical notes for the next session
 
 - `wt.sh start` needs `bun` on the PATH: `export PATH="$HOME/.bun/bin:$PATH"`. Source `data-scratch/bin/https-git.env` before any git, `wt.sh` or push.
