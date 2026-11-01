@@ -163,3 +163,97 @@ describe("gitnet_env", () => {
     expect(other).toMatch(/^serveraliveinterval 10$/m);
   });
 });
+
+// GITNET-02: git talks to GitHub over https first (gh, the keychain, then the token file), with the ssh path as the fallback.
+describe("https first", () => {
+  const token = "ghp_TESTTOKEN_do_not_leak_0123456789";
+  let tokenFile = "";
+  let ghBin = "";
+  beforeAll(() => {
+    tokenFile = join(scratch, "gh-token");
+    writeFileSync(tokenFile, `${token}\n`);
+    ghBin = join(scratch, "ghbin");
+    mkdirSync(ghBin, { recursive: true });
+    writeFileSync(join(ghBin, "gh"), "#!/bin/bash\nexit 0\n");
+    chmodSync(join(ghBin, "gh"), 0o755);
+  });
+  const httpsEnv = (extra: Record<string, string> = {}) => ({ GITNET_TOKEN_FILE: tokenFile, PATH: `${fakeBin}:${ghBin}:${process.env.PATH ?? ""}`, ...extra });
+
+  test("an ssh-shaped push URL of github is rewritten to https, and the alias too", () => {
+    const repo = join(scratch, "httpsrepo");
+    Bun.spawnSync(["git", "init", "-q", repo]);
+    Bun.spawnSync(["git", "-C", repo, "remote", "add", "origin", "https://github.com/example/home.git"]);
+    Bun.spawnSync(["git", "-C", repo, "remote", "set-url", "--push", "origin", "git@github.com:example/home.git"]);
+    const plain = sh(`git -C ${repo} remote get-url --push origin`, httpsEnv());
+    expect(plain.out.trim()).toBe("git@github.com:example/home.git");
+    const rewritten = sh(`gitnet_env ${repo}; git -C ${repo} remote get-url --push origin; git ls-remote --get-url git@github-jessewebdotcom:example/home.git; git ls-remote --get-url ssh://git@github.com/example/home.git`, httpsEnv());
+    expect(rewritten.out.trim().split("\n")).toEqual(["https://github.com/example/home.git", "https://github.com/example/home.git", "https://github.com/example/home.git"]);
+    const off = sh(`GITNET_TRANSPORT=ssh gitnet_env ${repo}; git -C ${repo} remote get-url --push origin`, httpsEnv());
+    expect(off.out.trim()).toBe("git@github.com:example/home.git");
+  });
+
+  test("the credential helpers are tried in order: gh, the keychain, the token file; entries the caller exported stay below them", () => {
+    const run = sh(`export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=lander; gitnet_env /nonexistent; echo "base=$GITNET_BASE_CONFIG_COUNT count=$GIT_CONFIG_COUNT"; git config --get-all credential.helper; git config --get user.name`, httpsEnv());
+    const lines = run.out.split("\n");
+    expect(lines[0]).toBe("base=1 count=8");
+    // An empty value resets the list, so the helpers git really tries are the ones after the last empty entry (a system-wide helper may come first).
+    const all = lines.slice(1, -2);
+    const helpers = all.slice(all.lastIndexOf("") + 1);
+    expect(all.lastIndexOf("")).toBeGreaterThanOrEqual(0);
+    expect(helpers[0]).toMatch(/^!\S*\/gh auth git-credential$/);
+    expect(helpers[1]).toBe("osxkeychain");
+    expect(helpers[2]).toContain(`cat '${tokenFile}'`);
+    expect(helpers).toHaveLength(3);
+    expect(lines.at(-2)).toBe("lander");
+  });
+
+  test("the token never appears in an argument, the environment, stuck.log or the output of a stuck git", () => {
+    const dump = join(scratch, "dump.txt");
+    writeFileSync(dump, "");
+    stubGit(`case " $* " in *" push "*) ;; *) exit 0;; esac\n{ ps -o command= -p $$; env; ps -E -o command= -p $$ 2>/dev/null; } >> ${dump}\nsleep 600`);
+    const run = sh(`GITNET_TIMEOUT=2 GITNET_HTTPS_TIMEOUT=1 GITNET_TRIES=1 gitnet_env /nonexistent; GITNET_TIMEOUT=2 GITNET_TRIES=1 gitnet push origin main; echo rc=$?`, httpsEnv());
+    expect(run.out).toContain("rc=124");
+    expect(readFileSync(dump, "utf8").length).toBeGreaterThan(50);
+    for (const text of [readFileSync(dump, "utf8"), run.out, run.err, readFileSync(stuck, "utf8")]) expect(text).not.toContain(token);
+  });
+
+  test("a refused https login is retried once over ssh, https is skipped for a while, and an expired memory tries https again", () => {
+    const log = join(scratch, "calls-auth");
+    writeFileSync(log, "");
+    rmSync(join(scratch, "state", "https-bad-until"), { force: true });
+    // GIT_CONFIG_COUNT is 0 over ssh and above 0 over https here, which is how the stub tells the two apart.
+    stubGit(`case " $* " in *" push "*) ;; *) exit 0;; esac\nif [ "\${GIT_CONFIG_COUNT:-0}" -gt 0 ]; then echo https >> ${log}; echo "fatal: Authentication failed for 'https://github.com/example/home.git/'" >&2; exit 128; fi\necho ssh >> ${log}\necho pushed`);
+    const first = sh(`gitnet_env /nonexistent; gitnet push origin main; echo "rc=$?"; gitnet push origin main; echo "rc=$?"`, httpsEnv());
+    expect(first.out).toContain("pushed");
+    expect(first.out.match(/rc=0/g)).toHaveLength(2);
+    expect(first.err).toContain("over https was refused");
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["https", "ssh", "ssh"]);
+    expect(existsSync(join(scratch, "state", "https-bad-until"))).toBe(true);
+    writeFileSync(join(scratch, "state", "https-bad-until"), "1");
+    writeFileSync(log, "");
+    sh(`gitnet_env /nonexistent; gitnet push origin main`, httpsEnv());
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["https", "ssh"]);
+  });
+
+  test("an https try that does not answer is given up on early and the next try goes over ssh", () => {
+    const log = join(scratch, "calls-https-hang");
+    writeFileSync(log, "");
+    rmSync(join(scratch, "state", "https-bad-until"), { force: true });
+    stubGit(`case " $* " in *" push "*) ;; *) exit 0;; esac\nif [ "\${GIT_CONFIG_COUNT:-0}" -gt 0 ]; then echo https >> ${log}; sleep 600; fi\necho ssh >> ${log}\necho pushed`);
+    const run = sh(`gitnet_env /nonexistent; GITNET_TIMEOUT=60 GITNET_HTTPS_TIMEOUT=2 GITNET_TRIES=2 GITNET_BACKOFF=0 gitnet push origin main; echo "rc=$?"`, httpsEnv());
+    expect(run.out).toContain("rc=0");
+    expect(run.seconds).toBeLessThan(15);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["https", "ssh"]);
+  });
+
+  test("a push rejected over https is returned as it is: no ssh retry, nothing remembered", () => {
+    const log = join(scratch, "calls-https-rejected");
+    writeFileSync(log, "");
+    rmSync(join(scratch, "state", "https-bad-until"), { force: true });
+    stubGit(`case " $* " in *" push "*) ;; *) exit 0;; esac\necho call >> ${log}\necho ' ! [rejected] main -> main (fetch first)' >&2\nexit 1`);
+    const run = sh(`gitnet_env /nonexistent; gitnet push origin main; echo "rc=$?"`, httpsEnv());
+    expect(run.out).toContain("rc=1");
+    expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1);
+    expect(existsSync(join(scratch, "state", "https-bad-until"))).toBe(false);
+  });
+});

@@ -12,6 +12,14 @@
 #                                runs the command in its own process group with a hard wall clock; on timeout it signals only
 #                                that group (the pid it started, never a pattern), writes one line to $GITNET_STUCK_LOG and
 #                                returns 124. While it runs, $GITNET_OPS_DIR/<pid>.op names it so `pipeline.sh status` can show it.
+#   gitnet_https_env             GITNET-02: git talks to GitHub over https first (measured 0.3 to 0.45 s per push, 5 of 5, against an
+#                                ssh path that drops on port 22). Per process only, through GIT_CONFIG_* entries appended after any the
+#                                caller already exported: ssh-shaped github URLs (git@github.com:, ssh://git@github.com/, the
+#                                git@github-jessewebdotcom: alias; the push URL included) are rewritten to https://github.com/, and the
+#                                credential helpers are tried in order: gh, the keychain, the token file. The token never appears in an
+#                                argument or in the environment: the helper reads the file when git asks. When https authentication
+#                                fails or times out, gitnet retries over the ssh path above and remembers for GITNET_HTTPS_BAD_SECONDS
+#                                (default 600) to go straight to ssh. GITNET_TRANSPORT=ssh turns https off.
 #   gitnet [-C dir] <git args>   `git` through bounded_run, with GITNET_TRIES attempts (default 3) retried only after a
 #                                timeout or a connection-class failure (a rejected push is not retried). GITNET_TIMEOUT
 #                                (default 90 s) bounds each attempt. Sets GITNET_TIMED_OUT=1 when the last failure was a timeout.
@@ -42,6 +50,47 @@ EOF
   printf '%s\n' "$cfg"
 }
 
+# GITNET-02: append the https rewrite and the credential helper chain to the caller's GIT_CONFIG_* entries. Entries at or above
+# GITNET_BASE_CONFIG_COUNT are the https ones: running a git child with GIT_CONFIG_COUNT=$GITNET_BASE_CONFIG_COUNT drops them (the ssh fallback).
+gitnet_https_env() {
+  [[ "${GITNET_TRANSPORT:-auto}" != ssh ]] || return 0
+  [[ "${GITNET_HTTPS_SET:-}" != 1 ]] || return 0
+  local n="${GIT_CONFIG_COUNT:-0}" gh token_file
+  [[ "$n" =~ ^[0-9]+$ ]] || n=0
+  export GITNET_BASE_CONFIG_COUNT="$n"
+  gitnet_cfg_add() { export "GIT_CONFIG_KEY_${n}=$1" "GIT_CONFIG_VALUE_${n}=$2"; n=$((n + 1)); }
+  gitnet_cfg_add url.https://github.com/.insteadOf git@github.com:
+  gitnet_cfg_add url.https://github.com/.insteadOf ssh://git@github.com/
+  gitnet_cfg_add url.https://github.com/.insteadOf git@github-jessewebdotcom:
+  gitnet_cfg_add credential.helper ''
+  gh="$(command -v gh 2>/dev/null || true)"
+  [[ -z "$gh" ]] || gitnet_cfg_add credential.helper "!$gh auth git-credential"
+  gitnet_cfg_add credential.helper osxkeychain
+  token_file="${GITNET_TOKEN_FILE:-$HOME/.config/maipai/gh-token}"
+  if [[ -s "$token_file" ]]; then
+    gitnet_cfg_add credential.helper "!f() { echo username=JesseWebDotCom; echo \"password=\$(cat '$token_file')\"; }; f"
+  fi
+  unset -f gitnet_cfg_add
+  export GIT_CONFIG_COUNT="$n" GIT_TERMINAL_PROMPT=0 GITNET_HTTPS_SET=1
+}
+
+# True while an https authentication failure or timeout is remembered: git goes straight to the ssh path.
+gitnet_https_bad() {
+  local state f until
+  state="${GITNET_STATE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/maipai-gitnet}"
+  f="$state/https-bad-until"
+  [[ -f "$f" ]] || return 1
+  until="$(cat "$f" 2>/dev/null || echo 0)"
+  [[ "$until" =~ ^[0-9]+$ ]] || return 1
+  (( until > $(date +%s) ))
+}
+gitnet_https_mark_bad() {
+  local state
+  state="${GITNET_STATE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/maipai-gitnet}"
+  mkdir -p "$state" 2>/dev/null || return 0
+  echo "$(( $(date +%s) + ${GITNET_HTTPS_BAD_SECONDS:-600} ))" > "$state/https-bad-until" 2>/dev/null || true
+}
+
 gitnet_env() {
   [[ "${GITNET_ENV_SET:-}" != ssh ]] || return 0
   local repo="${1:-.}" base cfg
@@ -54,6 +103,7 @@ gitnet_env() {
   fi
   export GIT_HTTP_LOW_SPEED_LIMIT="${GIT_HTTP_LOW_SPEED_LIMIT:-1000}" GIT_HTTP_LOW_SPEED_TIME="${GIT_HTTP_LOW_SPEED_TIME:-30}" GIT_TERMINAL_PROMPT=0
   export GITNET_ENV_SET="${GITNET_ENV_SET:-https}"
+  gitnet_https_env
 }
 
 # bounded_run <seconds> <label> <command...>: 124 on timeout, otherwise the command's own status.
@@ -105,23 +155,50 @@ bounded_run() {
 }
 
 GITNET_RETRY_RE='timed out|time out|connection (reset|closed|refused)|could not resolve|broken pipe|kex_exchange|connect to host|unable to access|early eof|the remote end hung up|rpc failed|http 5[0-9][0-9]|returned error: 5[0-9][0-9]'
+# What an https credential problem looks like; the ssh path is tried once instead (and https is skipped for a while).
+GITNET_AUTH_RE='authentication failed|could not read (username|password)|invalid username or password|terminal prompts disabled|returned error: 40[13]|http 40[13]|access denied|repository not found|bad credentials|invalid credentials'
 
 gitnet() {
-  local dir="" secs tries label attempt=1 rc err
+  local dir="" secs asecs tries label attempt=1 rc err mode=ssh
   if [[ "${1:-}" == -C ]]; then dir="$2"; shift 2; fi
   secs="${GITNET_TIMEOUT:-90}"; tries="${GITNET_TRIES:-3}"; label="${GITNET_LABEL:-git ${1:-}}"
+  [[ "${GITNET_HTTPS_SET:-}" != 1 ]] || gitnet_https_bad || mode=https
   GITNET_TIMED_OUT=0
   err="$(mktemp "${TMPDIR:-/tmp}/gitnet.XXXXXX")" || err=/dev/null
   while :; do
     rc=0
-    if [[ -n "$dir" ]]; then bounded_run "$secs" "$label" git -C "$dir" "$@" 2>"$err" || rc=$?
-    else bounded_run "$secs" "$label" git "$@" 2>"$err" || rc=$?; fi
+    asecs="$secs"
+    # https answers in under a second when it works; a slow or stuck https try is given up on early and the next try goes over ssh.
+    if [[ "$mode" == https ]] && (( secs > ${GITNET_HTTPS_TIMEOUT:-30} )); then asecs="${GITNET_HTTPS_TIMEOUT:-30}"; fi
+    if [[ "$mode" == https ]]; then
+      if [[ -n "$dir" ]]; then bounded_run "$asecs" "$label" git -C "$dir" "$@" 2>"$err" || rc=$?
+      else bounded_run "$asecs" "$label" git "$@" 2>"$err" || rc=$?; fi
+    else
+      # The https entries are the ones at or above GITNET_BASE_CONFIG_COUNT: dropping them leaves the caller's own config and the ssh path.
+      if [[ "${GITNET_HTTPS_SET:-}" == 1 ]]; then
+        if [[ -n "$dir" ]]; then GIT_CONFIG_COUNT="${GITNET_BASE_CONFIG_COUNT:-0}" bounded_run "$asecs" "$label" git -C "$dir" "$@" 2>"$err" || rc=$?
+        else GIT_CONFIG_COUNT="${GITNET_BASE_CONFIG_COUNT:-0}" bounded_run "$asecs" "$label" git "$@" 2>"$err" || rc=$?; fi
+      elif [[ -n "$dir" ]]; then bounded_run "$asecs" "$label" git -C "$dir" "$@" 2>"$err" || rc=$?
+      else bounded_run "$asecs" "$label" git "$@" 2>"$err" || rc=$?; fi
+    fi
     [[ "$err" == /dev/null ]] || cat "$err" >&2
     if (( rc == 0 )); then GITNET_TIMED_OUT=0; break; fi
     GITNET_TIMED_OUT=0; (( rc != 124 )) || GITNET_TIMED_OUT=1
+    if [[ "$mode" == https ]]; then
+      if (( rc == 124 )); then
+        gitnet_https_mark_bad
+        echo "gitnet: $label over https did not answer in ${asecs}s; ssh is used next and for the next ${GITNET_HTTPS_BAD_SECONDS:-600}s" >&2
+        mode=ssh
+      elif [[ "$err" != /dev/null ]] && grep -Eqi "$GITNET_AUTH_RE" "$err"; then
+        gitnet_https_mark_bad
+        echo "gitnet: $label over https was refused ($(grep -Eio "$GITNET_AUTH_RE" "$err" | head -n 1)); trying ssh" >&2
+        mode=ssh
+        continue
+      fi
+    fi
     (( attempt < tries )) || break
     if (( rc == 124 )) || { [[ "$err" != /dev/null ]] && grep -Eqi "$GITNET_RETRY_RE" "$err"; }; then
-      if (( GITNET_TIMED_OUT )); then echo "gitnet: $label timed out after ${secs}s; retry $((attempt + 1)) of $tries" >&2
+      if (( GITNET_TIMED_OUT )); then echo "gitnet: $label timed out after ${asecs}s; retry $((attempt + 1)) of $tries" >&2
       else echo "gitnet: $label failed on the connection; retry $((attempt + 1)) of $tries" >&2; fi
       sleep "${GITNET_BACKOFF:-$((attempt * 3))}"
       attempt=$((attempt + 1))
