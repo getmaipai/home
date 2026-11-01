@@ -144,7 +144,7 @@ TIER-STEMS-03. Nothing here changes MUSIC-GEN-14: a recording still cannot be a 
 ### 10.2 Gates and privacy (RULES.md applies, nothing leaves the home)
 
 1. **Surface and identity gates run first; the age refusal is removed.** A guest, a spoken turn and a shared screen cannot split a file (the `edit_music` gates). Owner ruling 2026-11-01 (section 10.7): a child or teen may split a file they own, from the Library file action (Create is hidden for them), and no model or tier choice ever reaches a minor (rule 8). The from-file route uses the same `musicRouteAudience` and `musicDenial` as the existing stems route in
-   `routes/music.ts`, and refuses before any bytes are read. Started in Incognito (a temporary conversation), the split and its stems are temporary, as `source.temporary` does on the song route.
+   `routes/music.ts`, minus the age refusal (section 10.7; do not build the old gate back in), and refuses before any bytes are read. Started in Incognito (a temporary conversation), the split and its stems are temporary, as `source.temporary` does on the song route.
 2. **Local only.** The file's bytes go from Home to the Stack on the same machine over loopback and nowhere else; the worker has no network at
    run time; no new outbound connection (docs/PRIVACY.md unchanged). Rule 6a: the bytes are not logged, the Stack keeps the source only for the
    job and deletes it on completion, failure or cancel, and Home stores only the stems. The Stack request carries no file name; no log line, queue reason, music

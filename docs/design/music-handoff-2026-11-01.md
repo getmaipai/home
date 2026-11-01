@@ -11,7 +11,7 @@ what was found, decided, landed and left open so the next session starts where t
 | Music design note (Listen and Create, bands and albums, own lyrics, chat tools and cards, leader benchmark, slices P1 and C1 to C10) | On GitHub `main` (latest d7de9ead5). Docs only, so nothing changed on the hub. |
 | Stem note section 10.7 (no age gate on stems) | On GitHub `main`, same landing. |
 | Proposed platform rule S7 (what an app can make, chat can ask for; creative apps split into Listen/Watch/View and Create) | NOT on `main`. On branch `wt/fair-heron-music-chat-cards-note` (commits c485fa2d1, e1bc56b28 and later), owner-approved 2026-11-01 in his words. It edits `RULES.md`, a safety surface, so the lander runs the sharded backend tests, and `main` has a failing test (`STT-SMARTTURN-01B`, `backend/tests/sttReopenNoSideEffects.test.ts`, "a cancelled first turn leaves no judge-eligible row", fails on a docs-only branch). Land S7 when `main` is green again. `chatTurn.test.ts` and `wyoming.test.ts` also failed in the lander but pass alone (load). |
-| Architect verdict | REJECTED twice on text; all listed fixes are applied on `main`. A third ruling is pending. Records: `data-scratch/architect/MUSIC-STUDIO-01.verdict`. Nothing music is built before APPROVED. |
+| Architect verdict | **APPROVED on the third pass** (2026-11-01; two earlier REJECTED on text, all fixed). Two optional wording edits after it (stem 10.2 point 1 "minus the age refusal", C4 "when their music lane is open") are applied. Record: `data-scratch/architect/MUSIC-STUDIO-01.verdict`. Rule S7 is still proposed, not in `RULES.md`. |
 | Code | Only the radio fix. No Studio, stems, sound, band or lyrics code exists. |
 
 ## 2. Owner decisions (Jesse, 2026-11-01)
@@ -77,7 +77,7 @@ made bands and albums, own-lyrics tools.
 
 ## 5. Next steps, in order
 
-1. Get the third architect ruling on the music note (read origin/main; fixes are listed in the verdict record).
+1. (Done) Architect ruling APPROVED. Build may start with P1.
 2. Land rule S7 once `main` is green (fix or wait for `STT-SMARTTURN-01B`; do not skip the safety tests).
 3. P1 playback and radio reliability, commons first (rule 9(c)): reconnect with backoff, dead-station state, gapless and crossfade, a saved queue, sleep timer and media keys. Reuse check before building (Media Chrome, Web Audio, `hls.js` already pinned).
 4. C1 Listen/Create switch and Songs I made; C2 Create with recipes and own lyrics; then C3 to C10 as in section 7 of the design note. Each slice ships its chat tool and card.

@@ -162,7 +162,7 @@ Every UI slice is previewed at 1440 and 390 wide and judged against these leader
 | C1 | M | Listen/Create switch, Songs I made, Song page, versions, Download, Share | Sage switches to Create, opens a made song, steps versions |
 | C2 | M | Create with recipes and **own lyrics** plus Help me write, cover art on every song | a recipe tap and a pasted lyric each make a song with a cover |
 | C3 | S | Song actions on existing tasks (Extend, Style, Instrumental, Variation, Rewrite the chorus) | each adds one version, old stays |
-| C4 | L | Stems for made songs, and for any person's own file from the Library action (section 3.4; a minor uses the Library action because Create is hidden for them), mixer, Make a song from this mix (made songs only) | a 3 min song splits in under 30 s; mute vocals, save as a new file |
+| C4 | L | Stems for made songs, and for any person's own file from the Library action (section 3.4; a minor uses the Library action, and Create when their music lane is open (C8)), mixer, Make a song from this mix (made songs only) | a 3 min song splits in under 30 s; mute vocals, save as a new file |
 | C5 | L | Made bands and albums (spec first, then Home, then Create pages) | "Describe your band" yields a band with art and back story, then a four-track album that plays in Listen |
 | C6 | L | `AudioEditor` Element and peaks; Trim, Fade, Loop, Rewrite a region | drag a region, type the change, get a version |
 | C7 | M | Sounds maker (ACE-Step first, optional engine after its bench) | three sounds from one prompt in under 20 s; a loop has no seam click |
