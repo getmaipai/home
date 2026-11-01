@@ -20,6 +20,7 @@ import { budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQ
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
+import { __setClaimJudgeForTests } from "@/lib/turnMachine/nodes/answer";
 
 let people: BenchPeople;
 let searx: ReturnType<typeof Bun.serve>;
@@ -57,6 +58,7 @@ beforeEach(() => {
   __setToolOfferOverridesForTests(["websearch"]);
   searxQueries = [];
   sameResults = false;
+  __setClaimJudgeForTests(async () => '{"supported": true}');
   searx = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -75,6 +77,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  __setClaimJudgeForTests(undefined);
   searx.stop(true);
   registerActiveChatLease(null);
   __setPageReaderForTests(null);
@@ -170,6 +173,22 @@ describe("research rounds follow the answer style", () => {
     expect(note).toContain("one angle per search");
     expect(note).toContain("4 to 8 angles that matter for this particular question");
     expect(note).not.toMatch(/[A-Z][a-z]+ [A-Z][a-z]+ (?:created|wrote)/);
+  });
+
+  test("a Max sentence its cited sources do not back is marked not confirmed and loses its citation numbers", async () => {
+    await holdMax();
+    __setClaimJudgeForTests(async (prompt) => (prompt.includes("creator said more was planned") ? '{"supported": false}' : '{"supported": true}'));
+    const { result } = await turn("owner", 3, { max: true });
+    expect(result.value.reply.text).toContain("(not confirmed by the sources)");
+    expect(result.value.reply.text).not.toContain("[3]");
+  });
+
+  test("an Instant answer is never claim-checked", async () => {
+    let calls = 0;
+    __setClaimJudgeForTests(async () => { calls += 1; return '{"supported": false}'; });
+    const { result } = await turn("owner", 1);
+    expect(calls).toBe(0);
+    expect(result.value.reply.text).not.toContain("not confirmed");
   });
 
   test("Max stops at twelve rounds", async () => {

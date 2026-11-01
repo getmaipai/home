@@ -1,4 +1,6 @@
-import { dropUnknownCitations, dropUnsupportedCredits, researchEvidence } from "../research";
+import { checkClaims, dropUnknownCitations, dropUnsupportedCredits, evidenceBySource, researchEvidence, type ClaimJudge } from "../research";
+import { completeBackground } from "@/lib/llm";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { MUSIC_NOT_HERE_LINE, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 // U2c, the `answer` node (turn-machine-state-record-2026-09-22.md's
 // state table): "the model's final text or the package reply, the
@@ -116,6 +118,15 @@ export function missedLookupLine(outcomes: readonly ToolExecutionOutcome[]): str
     : "I couldn't look that up just now. Try again in a little while, or ask me something else.";
 }
 
+let claimJudgeOverride: ClaimJudge | undefined;
+/** Tests: replaces the claim check's judge (the Stack's light model by default); undefined restores it. */
+export function __setClaimJudgeForTests(judge: ClaimJudge | undefined): void { claimJudgeOverride = judge; }
+/** RESEARCH-CLAIM-01: one short, non-thinking call to the Stack's light model per cited sentence. */
+const lightModelJudge: ClaimJudge = async (prompt) => {
+  const result = await completeBackground([{ role: "user", content: prompt }], { max_tokens: 40 });
+  return result.ok ? result.text : null;
+};
+
 export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) => {
   switch (input.kind) {
     case "policy_refused":
@@ -178,7 +189,11 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // ... and drops a sentence that credits a named person no fetched source named.
       const credited = research ? dropUnsupportedCredits(cited.text, researchEvidence(state.outcomes), state.utterance) : { text: cited.text, dropped: 0 };
       const note = credited.dropped > 0 ? "\n\nI left out a statement about who made or wrote something, because none of the sources I read named them." : "";
-      return { outcome: { ok: true }, output: { text: `${credited.text}${note}`, sources } };
+      // RESEARCH-CLAIM-01: a sentence its cited sources do not back is marked "not confirmed by the sources" (admin switch research.claim_check, default on).
+      const claims = research && sources.length > 0 && getHouseholdSettingValue("research.claim_check") !== false
+        ? await checkClaims(credited.text, evidenceBySource(state.outcomes), claimJudgeOverride ?? lightModelJudge)
+        : { text: credited.text };
+      return { outcome: { ok: true }, output: { text: `${claims.text}${note}`, sources } };
     }
     case "from_outcomes": {
       // COMMAND-FAIL-01: this text is machine.ts's own last-resort

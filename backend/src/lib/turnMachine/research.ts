@@ -159,3 +159,77 @@ export function researchEvidence(outcomes: readonly ToolExecutionOutcome[]): str
   }
   return parts.join("\n");
 }
+
+/** The text each numbered source gave this turn, in source-number order (index 0 is [1]): the fetched page when one was read, else the
+ * search row's title and snippet. A source with no text at all is an empty string. */
+export function evidenceBySource(outcomes: readonly ToolExecutionOutcome[]): string[] {
+  const byUrl = new Map<string, string>();
+  for (const outcome of outcomes) {
+    const data = outcome.result?.data as { rows?: { url?: unknown; title?: unknown; snippet?: unknown }[]; pages?: { url?: unknown; text?: unknown; title?: unknown }[] } | undefined;
+    for (const row of data?.rows ?? []) if (typeof row.url === "string" && !byUrl.has(row.url)) byUrl.set(row.url, `${String(row.title ?? "")}. ${String(row.snippet ?? "")}`);
+    for (const page of data?.pages ?? []) if (typeof page.url === "string") byUrl.set(page.url, `${String(page.title ?? "")}. ${String(page.text ?? "")}`);
+  }
+  return outcomes.flatMap((o) => o.sources ?? []).map((source) => byUrl.get(source.url) ?? "");
+}
+
+/** One model call: a prompt in, the model's text out, or null when the model is unavailable. */
+export type ClaimJudge = (prompt: string) => Promise<string | null>;
+
+export const CLAIM_UNCONFIRMED = " (not confirmed by the sources)";
+
+export function claimPrompt(sentence: string, passages: string): string {
+  return `You check one sentence from a research answer against the passages its cited sources returned.
+Sentence: "${sentence}"
+
+Passages:
+"""
+${passages.slice(0, 6000)}
+"""
+
+Answer with one JSON object and nothing else: {"supported": true | false}
+"supported" is true only when a passage above states what the sentence claims (the facts, names, dates and who said or did what). A sentence that says it is a guess, an opinion or what is likely is supported. If the passages say something different, or say nothing about it, answer false.`;
+}
+
+export interface ClaimCheckResult { text: string; checked: number; unsupported: number; skipped: number }
+
+/** The reply's claim check: every sentence that cites [n] is judged against the passages of the sources it cites. A sentence the passages
+ * do not back keeps its words, loses its citation markers and gains "(not confirmed by the sources)", so a citation never points at a page
+ * that does not say it. A sentence whose sources gave no text is skipped, an unreadable or missing judge answer leaves the sentence as
+ * written, and the whole check stops at its time cap. The judge calls run a few at a time. */
+export async function checkClaims(text: string, evidence: readonly string[], judge: ClaimJudge, opts: { concurrency?: number; deadlineMs?: number; maxChecks?: number; now?: () => number } = {}): Promise<ClaimCheckResult> {
+  const now = opts.now ?? Date.now;
+  const stopAt = now() + (opts.deadlineMs ?? 25_000);
+  const parts = text.split(/(?<=[.!?])(\s+)/);
+  const jobs: { index: number; sentence: string; passages: string }[] = [];
+  let noText = 0;
+  parts.forEach((part, index) => {
+    const numbers = [...part.matchAll(/\[(\d{1,3})\]/g)].map((m) => Number(m[1]));
+    if (numbers.length === 0) return;
+    const passages = [...new Set(numbers)].map((n) => (evidence[n - 1] ?? "").trim()).filter(Boolean).join("\n---\n");
+    if (passages === "") { noText += 1; return; }
+    jobs.push({ index, sentence: part.trim(), passages });
+  });
+  const limited = jobs.slice(0, opts.maxChecks ?? 24);
+  const unsupportedAt = new Set<number>();
+  let checked = 0;
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < limited.length && now() < stopAt) {
+      const job = limited[next++]!;
+      let reply: string | null = null;
+      try { reply = await judge(claimPrompt(job.sentence.replace(/"/g, "'"), job.passages)); } catch { reply = null; }
+      if (reply === null) continue;
+      checked += 1;
+      const supported = (() => { try { return (JSON.parse(reply.match(/\{[\s\S]*?\}/)?.[0] ?? "{}") as { supported?: unknown }).supported !== false; } catch { return true; } })();
+      if (!supported) unsupportedAt.add(job.index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, opts.concurrency ?? 3) }, () => worker()));
+  const out = parts.map((part, index) => {
+    if (!unsupportedAt.has(index)) return part;
+    const bare = part.replace(/\s?\[\d{1,3}\]/g, "").replace(/\s+$/, "");
+    const punct = bare.match(/[.!?]$/)?.[0] ?? "";
+    return `${punct ? bare.slice(0, -1) : bare}${CLAIM_UNCONFIRMED}${punct}`;
+  });
+  return { text: out.join(""), checked, unsupported: unsupportedAt.size, skipped: noText + (jobs.length - checked) };
+}
