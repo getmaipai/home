@@ -258,6 +258,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       deps.onReplyState?.("waiting");
       const provisionalSpeaker = deps.getSelectedSpeaker?.();
       if (provisionalSpeaker) yield { metadata: { custom: { answered_by: provisionalSpeaker } } };
+      // Each metadata yield replaces the whole `custom` object, so the speaker rides on every one of them (an activity line, its
+      // clearing, the finished reply), never dropping the companion's face mid-turn.
+      const speakerCustom = (): { answered_by?: import("@maipai/home-backend/src/wire").AnsweredBy } => {
+        const speaker = answeredBy ?? provisionalSpeaker;
+        return speaker ? { answered_by: speaker } : {};
+      };
 
       // Stop whatever an earlier live reply was still speaking - never two
       // voices at once. A manual "Listen" replay (chatListen.ts) stops
@@ -497,7 +503,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             }
             if (activityShown) {
               activityShown = false;
-              yield { metadata: { custom: {} } };
+              yield { metadata: { custom: speakerCustom() } };
             }
             yield { content: buildContent() };
             continue;
@@ -540,7 +546,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // the conditional content one just below, which would miss
               // exactly that case.
               activityShown = false;
-              yield { metadata: { custom: {} } };
+              yield { metadata: { custom: speakerCustom() } };
             }
             // Only yield once there's something to show. An empty delta
             // yielding anyway would hand assistant-ui a real (if empty)
@@ -583,7 +589,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // "the moment someone without audio needs that indicator most"
             // was the gap (a cue playing has never had any VISIBLE trace).
             activityShown = true;
-            yield { metadata: { custom: { activity: event.text.replace(/\[[A-Za-z ]+\]\s*/g, "") } } };
+            yield { metadata: { custom: { ...speakerCustom(), activity: event.text.replace(/\[[A-Za-z ]+\]\s*/g, "") } } };
           } else if (event.type === "status") {
             // CHAT-16 (Session A): a real TurnStreamEvent member
             // (backend/src/wire.ts, BACKLOG.md's "Engine emits `status`
@@ -592,7 +598,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // text verbatim, the same "no spinner icon invented"
             // instruction that also means no per-stage icon or color.
             activityShown = true;
-            yield { metadata: { custom: { activity: event.text } } };
+            yield { metadata: { custom: { ...speakerCustom(), activity: event.text } } };
           } else if (event.type === "done") {
             sawTerminalEvent = true;
             deps.onConnection?.({ phase: "online" });
@@ -788,6 +794,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {
                 custom: {
+                  ...speakerCustom(),
                   ...(event.value.answered_by ? { answered_by: event.value.answered_by } : {}),
                   source: event.value.source,
                   // 4.3, "offer, never block" (SAFETY-NOTICE-01): the crisis
@@ -828,7 +835,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             reasoningText += event.text;
             if (activityShown) {
               activityShown = false;
-              yield { metadata: { custom: {} } };
+              yield { metadata: { custom: speakerCustom() } };
             }
             yield { content: buildContent() };
             continue;
@@ -843,7 +850,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // this error (it never reaches anyone else's stream) is kept in
             // the message metadata, so the details control reads it before a
             // reload and in a temporary chat, where nothing is stored.
-            if (event.detail) yield { metadata: { custom: { turnId: resumeTurnId, failureDetail: event.detail } } };
+            if (event.detail) yield { metadata: { custom: { ...speakerCustom(), turnId: resumeTurnId, failureDetail: event.detail } } };
             // Pass event.code through (e.g., "safety_refused" from backend)
             // so error handling can distinguish coded errors from generic ones.
             throw new ApiError(event.error, 503, event.code || "unavailable");

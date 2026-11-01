@@ -515,6 +515,22 @@ describe("createChatModelAdapter streaming", () => {
       expect(first.value?.metadata?.custom?.answered_by).toEqual(selected);
     } finally { env.restore(); }
   });
+  test("the companion stays on the reply through every activity line, the first text and the finished reply", async () => {
+    const selected = { companion_id: "rivet", name: "Rivet", look: null, via: "conversation" as const };
+    const env = stubEnvironment(ndjsonStream([
+      { type: "turn_meta", conversation_id: "c1", turn_id: "t1" },
+      { type: "status", stage: "lookup", text: "Looking that up." },
+      { type: "spoken_cue", text: "One sec." },
+      { type: "delta", text: "Hello" },
+      { type: "done", value: { reply: { text: "Hello" }, source: "model", safety: SAFETY, turn_id: "t1" } },
+    ]));
+    try {
+      const { yields } = await collect([fakeUserMessage("Hi")], undefined, undefined, undefined, undefined, undefined, { getSelectedSpeaker: () => selected });
+      const withMetadata = yields.filter((y) => y.metadata?.custom !== undefined);
+      expect(withMetadata.length).toBeGreaterThanOrEqual(4);
+      for (const y of withMetadata) expect((y.metadata!.custom as { answered_by?: { companion_id: string } }).answered_by?.companion_id).toBe("rivet");
+    } finally { env.restore(); }
+  });
   test("the server's turn_meta speaker replaces the provisional one", async () => {
     const selected = { companion_id: "rivet", name: "Rivet", look: null, via: "conversation" as const };
     const answering = { companion_id: "bruno", name: "Bruno", look: null, via: "mention" as const };
