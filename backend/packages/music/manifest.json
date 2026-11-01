@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -107,7 +107,10 @@
           "id": "create",
           "mode": "create",
           "pages": [
-            "create"
+            "create",
+            "make-song",
+            "make-band",
+            "creations"
           ]
         }
       ]
@@ -231,9 +234,33 @@
         "id": "create",
         "label": "Create",
         "icon": "music",
-        "nav": false,
+        "nav": true,
         "kind": "schema",
         "module": "create"
+      },
+      {
+        "id": "make-song",
+        "label": "Make a song",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "make-song"
+      },
+      {
+        "id": "make-band",
+        "label": "Make a band",
+        "icon": "users",
+        "nav": true,
+        "kind": "schema",
+        "module": "make-band"
+      },
+      {
+        "id": "creations",
+        "label": "My creations",
+        "icon": "library",
+        "nav": true,
+        "kind": "schema",
+        "module": "creations"
       }
     ],
     "data": [

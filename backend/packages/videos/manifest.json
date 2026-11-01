@@ -1,6 +1,6 @@
 {
   "id": "videos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "app",
   "category": "Media",
   "display": "Videos",
@@ -63,7 +63,9 @@
           "id": "create",
           "mode": "create",
           "pages": [
-            "create"
+            "create",
+            "make-video",
+            "creations"
           ]
         }
       ]
@@ -129,9 +131,25 @@
         "id": "create",
         "label": "Create",
         "icon": "film",
-        "nav": false,
+        "nav": true,
         "kind": "schema",
         "module": "create"
+      },
+      {
+        "id": "make-video",
+        "label": "Make a video",
+        "icon": "film",
+        "nav": true,
+        "kind": "schema",
+        "module": "make-video"
+      },
+      {
+        "id": "creations",
+        "label": "My creations",
+        "icon": "library",
+        "nav": true,
+        "kind": "schema",
+        "module": "creations"
       }
     ],
     "data": [

@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-make-band",
+  "title": "Make a band",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "users",
+      "text": "Making a band like one you love comes here soon."
+    }
+  ]
+}

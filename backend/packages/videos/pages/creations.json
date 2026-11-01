@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "videos-creations",
+  "title": "My creations",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "library",
+      "text": "Your videos will show up here."
+    }
+  ]
+}

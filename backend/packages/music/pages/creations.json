@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-creations",
+  "title": "My creations",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "library",
+      "text": "Your songs and bands will show up here."
+    }
+  ]
+}
