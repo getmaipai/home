@@ -5,7 +5,7 @@
 // the seven points in docs/design/ai-models-simple-2026-10-25.md, section 6.
 import { buildAiCards } from "../../../shared/aiChoices";
 import type { AiCard, AiChoice, AiChoicesInput, AiChoicesResult, AiComponentLike } from "../../../shared/aiChoices";
-import type { DiskPlan, DiskRow } from "../../../shared/diskPlanMath";
+import { rowHasModel, type DiskPlan, type DiskRow } from "../../../shared/diskPlanMath";
 
 export interface UnusedItem { id: string; name: string; bytes: number; reason: string; lastUsedAt: string | null }
 export interface UnusedResult { items: UnusedItem[]; totalBytes: number }
@@ -63,7 +63,7 @@ function byRowId(plan: DiskPlan): Map<string, DiskRow> {
 function rowOf(context: UnusedContext, component: AiComponentLike): DiskRow | null {
   const own = context.rows.get(component.id);
   if (own) return own;
-  for (const row of context.plan.rows) if (row.model_ids.includes(component.id)) return row;
+  for (const row of context.plan.rows) if (rowHasModel(row, component.id)) return row;
   return null;
 }
 
@@ -80,7 +80,7 @@ function buildContext(input: UnusedInput): UnusedContext {
         if (choice.id === `chat.added.${component.id}`) selected.add(component.id);
         // The same row-to-component match as aiChoices: the component is its
         // own row or one of the row's models.
-        if (choice.rowIds.some((rowId) => component.id === rowId || (rows.get(rowId)?.model_ids.includes(component.id) ?? false))) {
+        if (choice.rowIds.some((rowId) => component.id === rowId || (rowHasModel(rows.get(rowId) ?? { model_ids: [] }, component.id)))) {
           selected.add(component.id);
         }
       }
@@ -151,7 +151,7 @@ export function whyKept(input: UnusedInput, componentId: string): string | null 
 function matchingChoice(context: UnusedContext, component: UnusedComponent): { card: AiCard; choice: AiChoice } | null {
   for (const card of context.cards.cards) {
     for (const choice of card.choices) {
-      if (choice.rowIds.some((rowId) => component.id === rowId || (context.rows.get(rowId)?.model_ids.includes(component.id) ?? false))) return { card, choice };
+      if (choice.rowIds.some((rowId) => component.id === rowId || rowHasModel(context.rows.get(rowId) ?? { model_ids: [] }, component.id))) return { card, choice };
     }
   }
   return null;

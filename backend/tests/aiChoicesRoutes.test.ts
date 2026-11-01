@@ -263,6 +263,20 @@ describe("choosing", () => {
     expect(deletes()).toEqual([]);
     expect(getHouseholdSettingValue("generation.music.enabled")).toBe(false);
   });
+  test("choosing the Stems switch installs the HTDemucs component", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/ai/choices/stems", { choice: "stems.standard" });
+    expect(res.status).toBe(200);
+    expect(installs()).toEqual([idOf("stems")]);
+  });
+
+  test("the finer and six-part splitters install by the Stack's hyphenated component ids", async () => {
+    const { client } = await owner();
+    components = everything([]).map((entry) => ({ ...entry, id: entry.id === "htdemucs_ft" ? "htdemucs-ft" : entry.id === "htdemucs_6s" ? "htdemucs-6s" : entry.id }));
+    expect((await client.post("/api/ai/choices/stems", { choice: "stems.finer" })).status).toBe(200);
+    expect((await client.post("/api/ai/choices/stems", { choice: "stems.more" })).status).toBe(200);
+    expect(installs()).toEqual(["htdemucs-ft", "htdemucs-6s"]);
+  });
 });
 
 describe("set everything to recommended", () => {

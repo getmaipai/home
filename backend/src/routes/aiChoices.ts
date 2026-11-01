@@ -12,7 +12,7 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
 import { holdsMax } from "@/lib/tiers";
 import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
-import type { DiskPlan } from "../../../shared/diskPlanMath";
+import { rowHasModel, type DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
 import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from "@/lib/aiUnused";
 import { installStackComponent, listStackComponents, listTierCandidates, type TierStackCategory, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
@@ -101,7 +101,7 @@ function componentIdsFor(state: AiState, choice: AiChoice, match: (component: St
   for (const rowId of choice.rowIds) {
     const row = rows.get(rowId);
     if (!row || row.kind !== "model" || row.model_ids.length === 0) continue;
-    const matches = state.components.filter((component) => component.id === row.id || row.model_ids.includes(component.id));
+    const matches = state.components.filter((component) => component.id === row.id || rowHasModel(row, component.id));
     if (matches.length === 0) { ids.push(row.model_ids[0] ?? row.id); continue; }
     for (const component of matches.filter(match)) ids.push(component.id);
   }
@@ -114,7 +114,7 @@ function plainName(state: AiState, id: string): string {
   const rows = new Map(state.plan.rows.map((row) => [row.id, row] as const));
   const { cards } = buildAiCards(choicesInput(state));
   for (const card of cards) for (const choice of card.choices) {
-    if (choice.rowIds.some((rowId) => id === rowId || (rows.get(rowId)?.model_ids.includes(id) ?? false))) return qualified(card, choice);
+    if (choice.rowIds.some((rowId) => id === rowId || rowHasModel(rows.get(rowId) ?? { model_ids: [] }, id))) return qualified(card, choice);
   }
   return plainPartName(state.components.find((component) => component.id === id) ?? {});
 }

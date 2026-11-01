@@ -113,3 +113,9 @@ export function tierForLevel(level: DiskLevel, machineTier: DiskPlan["tier"]): D
   const cap = TIER_LEVEL_CAP[level];
   return TIER_ORDER.indexOf(cap) < TIER_ORDER.indexOf(machineTier) ? cap : machineTier;
 }
+
+/** True when a plan row's model is the Stack component `id`. The Stack writes a model's pin id with underscores (htdemucs_ft) and its component id with hyphens (htdemucs-ft); both name one part. */
+export function rowHasModel(row: { model_ids: string[] }, id: string): boolean {
+  const key = (value: string) => value.replace(/_/g, "-");
+  return row.model_ids.some((model) => key(model) === key(id));
+}

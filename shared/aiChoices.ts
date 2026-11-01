@@ -5,7 +5,7 @@
 // Home's backend and the setup wizard share it, so it imports only
 // ./diskPlanMath and nothing from backend/ or frontend/.
 
-import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
+import { rowHasModel, sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
 export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "stems" | "voice" | "wakeword" | "vision" | "coding";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
@@ -81,7 +81,7 @@ function engineRowsOf(plan: DiskPlan, row: DiskRow): DiskRow[] {
 
 function matchingComponents(components: AiComponentLike[] | null, row: DiskRow): AiComponentLike[] {
   if (!components) return [];
-  return components.filter((component) => component.id === row.id || row.model_ids.includes(component.id));
+  return components.filter((component) => component.id === row.id || rowHasModel(row, component.id));
 }
 
 interface RowState { state: AiChoice["state"]; percent: number | null; failure: string | null; unsupported: AiComponentLike | null }
@@ -410,7 +410,7 @@ export function recommendedPlan(input: AiChoicesInput): AiRecommendedPlan {
   const installRows = [...accepted].sort((a, b) => (a.need === b.need ? a.download_bytes - b.download_bytes : a.need === "required" ? -1 : 1));
   const installRowIds = installRows.map((row) => row.id);
   const installComponentIds = installRows.map((row) => {
-    const match = components?.find((component) => component.id === row.id || row.model_ids.includes(component.id));
+    const match = components?.find((component) => component.id === row.id || rowHasModel(row, component.id));
     if (match) return match.id;
     return row.model_ids[0] ?? row.id;
   });
