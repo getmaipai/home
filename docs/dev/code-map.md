@@ -922,6 +922,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
 | `backend/src/lib/turnErrorDetail.ts` | canReadErrorDetail, turnOwnerId, turnErrorDetail, turnErrorDetailFrom, missingTurnErrorDetail, statsForViewer |
+| `backend/src/lib/turnMachine/backbone.ts` | BACKBONE_CHARS, __setBackboneWriterForTests, choosePrompt, parseChosen, overlapChoice, backboneSource |
 | `backend/src/lib/turnMachine/bareCompare.ts` | startBareCompare |
 | `backend/src/lib/turnMachine/blockEvents.ts` | acceptPackageBlocks, blockEventsFor |
 | `backend/src/lib/turnMachine/budget.ts` | FIRST_TOKEN_DEADLINE_MS, STALL_DEADLINE_MS, MINOR_ALWAYS_THINKING_DEADLINES_MS, __setToolOfferOverridesForTests, NO_RECORD_BUDGET, resolveTurnBudget |
