@@ -91,7 +91,7 @@ describe("seedDemoHousehold", () => {
     const stations = await get("/api/plugins/music/radio/stations") as unknown;
     expect(JSON.stringify(stations)).toContain("Porchlight FM");
     const settings = await get("/api/settings?scope=household") as { key: string; value: unknown }[];
-    for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia"]) expect(settings.find((setting) => setting.key === key)?.value).toBe(false);
+    for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia", "music.album_art_online"]) expect(settings.find((setting) => setting.key === key)?.value).toBe(false);
   }, 60_000);
 
   test("demo music files are generated, tagged and small", () => {

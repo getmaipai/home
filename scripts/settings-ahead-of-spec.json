@@ -8,6 +8,7 @@
   "music.lyrics_online",
   "music.musicbrainz_match",
   "music.artist_wikimedia",
+  "music.album_art_online",
   "stack.engines.stt.smart_turn",
   "notifications.remind.due.telegram",
   "notifications.alarm.due.telegram",

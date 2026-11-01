@@ -1,7 +1,7 @@
 // MUSIC-WIKI-01: the artist photo and bio pass, against an offline Wikimedia fixture (no real network).
 import { beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { db } from "@/db";
 import { mediaItems, musicArtistProfiles } from "@/db/schema";
 import { TestClient } from "./client";
@@ -191,4 +191,15 @@ test("a none answer is kept, not asked again, until it is old", async () => {
   const later = () => Date.now() + 91 * 24 * 60 * 60 * 1000;
   await runArtistProfilePass({ client, now: later });
   expect(asked).toBe(2);
+});
+
+test("a kept photo whose file was cleared from the cache is fetched again", async () => {
+  const [first] = await artistIds() as [string];
+  db.update(mediaItems).set({ musicbrainzArtistId: ART }).where(eq(mediaItems.id, first)).run();
+  const f = fixture(wikidata("Q42"), extract(BIO));
+  await runArtistProfilePass({ client: mb("Q42"), fetchJson: f.fetchJson, fetchPhoto: f.fetchPhoto });
+  rmSync(artistPhotoFile(ART)!.path);
+  expect(artistProfileFor(ART)!.photoUrl).toBeNull();
+  expect(await runArtistProfilePass({ client: mb("Q42"), fetchJson: f.fetchJson, fetchPhoto: f.fetchPhoto })).toMatchObject({ considered: 1, found: 1 });
+  expect(artistProfileFor(ART)!.photoUrl).toBe(`/api/media/artists/${ART}/photo`);
 });

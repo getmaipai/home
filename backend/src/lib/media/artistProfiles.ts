@@ -222,7 +222,10 @@ export async function runArtistProfilePass(deps: ProfilePassDeps = {}): Promise<
     const known = new Map(db.select().from(musicArtistProfiles).all().map((row) => [row.musicbrainzArtistId, row]));
     const due = ids.filter((id) => {
       const row = known.get(id);
-      return !row || (row.status !== "found" && now() - Date.parse(row.checkedAt) > RECHECK_MS);
+      if (!row) return true;
+      // The cache was cleared: a kept photo whose file is gone is fetched again.
+      if (row.status === "found") return !!row.photoFile && !existsSync(join(photoDir(), row.photoFile));
+      return now() - Date.parse(row.checkedAt) > RECHECK_MS;
     }).slice(0, deps.budget ?? PASS_BUDGET);
     let failuresInARow = 0;
     for (const id of due) {

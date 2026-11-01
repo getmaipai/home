@@ -555,6 +555,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
 | `backend/src/lib/mdns.ts` | mdnsHostLabel, advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising |
 | `backend/src/lib/media/access.ts` | isMediaAdmin, discoveryAllowed, allowlistMode, noDiscovery, sourceVisibleTo, liveSourceById |
+| `backend/src/lib/media/albumCoverStore.ts` | ALBUM_ART_KEY, COVER_PATH_PREFIX, COVER_TYPES, albumArtEnabled, coverDir, albumCoverFile |
+| `backend/src/lib/media/albumCovers.ts` | coverArtArchiveFetch, runAlbumCoverPass, kickAlbumCovers |
 | `backend/src/lib/media/appHost.ts` | MEDIA_APPS, MEDIA_APP_IDS, isMediaAppId, laterKindOf, mediaAppAllowed, allowlistOnly |
 | `backend/src/lib/media/artistProfiles.ts` | ARTIST_WIKIMEDIA_KEY, artistWikimediaEnabled, wikimediaFetchPhoto, shortBio, lookupArtistProfile, mostCommon |
 | `backend/src/lib/media/band.ts` | trips, bandOkAtIngest, mediaBandOf, allowedBandsFor, bandAllows |

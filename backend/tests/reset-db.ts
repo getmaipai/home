@@ -18,6 +18,7 @@ import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 import { __resetSkillCacheForTests } from "@/lib/skills";
 import { __resetPackageQuietWindowsForTests } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { forgetAlbumCovers } from "@/lib/media/albumCoverStore";
 import { __forgetStackOutagesForTests } from "@/lib/stackEngine";
 import {
   people,
@@ -60,6 +61,7 @@ import {
   mediaWatchSessions,
   mediaItems,
   musicArtistProfiles,
+  musicAlbumCovers,
   mediaSources,
   newsInterests,
   newsSaves,
@@ -223,6 +225,8 @@ export function resetDb(): void {
   db.delete(mediaWatchDays).run();
   db.delete(mediaItems).run();
   db.delete(musicArtistProfiles).run();
+  db.delete(musicAlbumCovers).run();
+  forgetAlbumCovers();
   db.delete(mediaSources).run();
   db.delete(newsInterests).run(); // NEWS-02: reference people
   db.delete(newsSaves).run();

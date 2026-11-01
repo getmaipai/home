@@ -2001,6 +2001,18 @@ export const musicArtistProfiles = sqliteTable("music_artist_profiles", {
   provenance: text("provenance").notNull(),
 });
 
+// MUSIC-DATA-01: a local copy of an album's front cover from the Cover Art Archive, keyed by the MusicBrainz release group id.
+// A reconstructible cache, not a household record: the image file lives in the cache data class. status: found | none (no cover).
+export const musicAlbumCovers = sqliteTable("music_album_covers", {
+  musicbrainzReleaseGroupId: text("musicbrainz_release_group_id").primaryKey(),
+  status: text("status").notNull(),
+  file: text("file"),
+  mime: text("mime"),
+  checkedAt: text("checked_at").notNull(),
+  hlc: text("hlc").notNull(),
+  provenance: text("provenance").notNull(),
+});
+
 export const mediaItems = sqliteTable(
   "media_items",
   {

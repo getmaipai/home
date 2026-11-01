@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -64,6 +64,15 @@
       "who": "the Wikimedia Foundation and the MetaBrainz Foundation",
       "opt_in": false,
       "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
+    },
+    {
+      "id": "cover-art-archive",
+      "destination": "the Cover Art Archive (coverartarchive.org, which hands the picture over from archive.org)",
+      "when": "in the background after a library scan, once for each album that has no art in its files or folder and that MusicBrainz matched, to keep the front cover on your computer. Turn it off under Music settings.",
+      "what": "the album's public MusicBrainz release group id, plus your home's internet address. Never anyone's name, a song title from your library, an account, a cookie or listening history.",
+      "who": "the MetaBrainz Foundation and the Internet Archive",
+      "opt_in": false,
+      "retention": "unknown, see the Cover Art Archive's and the Internet Archive's own policies"
     }
   ],
   "permissions": [
@@ -71,7 +80,9 @@
     "net:www.wikidata.org",
     "net:en.wikipedia.org",
     "net:commons.wikimedia.org",
-    "net:upload.wikimedia.org"
+    "net:upload.wikimedia.org",
+    "net:coverartarchive.org",
+    "net:archive.org"
   ],
   "notifications": [],
   "cache": {

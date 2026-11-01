@@ -24,6 +24,12 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
     level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "music.album_art_online", scope: "household", selector: "boolean", default: true,
+    label: "Fetch album covers from the Cover Art Archive",
+    help: "In the background, Home asks the Cover Art Archive for the front cover of an album that has no art in its files or folder, using only the album's public MusicBrainz id, and keeps the picture on your computer. Nothing about your home is sent. Art in your files or folders is never replaced. Off stops it; covers already kept stay, and other albums show the generated cover.",
+    level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "generation.music.enabled",
     scope: "household",
     selector: "boolean",

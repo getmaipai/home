@@ -16,6 +16,7 @@ import { bandOkAtIngest } from "./band";
 import { draftsForDirectory, type Draft, type DirListing, type FileEntry, type IngestContext } from "./ingest";
 import { decidePlayable } from "./kinds";
 import { healMadeSources } from "./heal";
+import { kickAlbumCovers } from "./albumCovers";
 import { kickArtistProfiles } from "./artistProfiles";
 import { kickMusicBrainzMatch } from "./musicbrainzMatch";
 import { itemToRow, MediaItem, sourceFromRow, type MediaItemRow, type MediaSource } from "./model";
@@ -365,7 +366,7 @@ export function scanRoot(sourceId: string, deps: ScanDeps = {}): Promise<ScanSum
       } while (entry.again);
       // MUSIC-MB-01: ids for new songs are looked up in the background, never on the scan's own path (rule 6).
       // MUSIC-WIKI-01: once artists have ids, their photo and bio are fetched the same way.
-      if (summary.status === "ok") void kickMusicBrainzMatch().then(() => kickArtistProfiles()).catch(() => undefined);
+      if (summary.status === "ok") void kickMusicBrainzMatch().then(() => kickArtistProfiles()).then(() => kickAlbumCovers()).catch(() => undefined);
       return summary;
     } finally {
       running.delete(sourceId);

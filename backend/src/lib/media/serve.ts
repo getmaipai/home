@@ -12,6 +12,7 @@ import { attachmentFilePath, getAttachment, readAttachment } from "@/lib/attachm
 import type { PersonRow } from "@/types";
 import type { MediaItem } from "./model";
 import { readableItem } from "./access";
+import { albumCoverFile, COVER_PATH_PREFIX } from "./albumCoverStore";
 import { IMAGE_TYPES } from "./kinds";
 import { readEmbeddedCover } from "./parsers/audioTags";
 import { readEpubCover } from "./parsers/epub";
@@ -137,6 +138,12 @@ export async function serveItemArtwork(actor: PersonRow, item: MediaItem): Promi
     const read = readAttachment(actor, art.file_id);
     if (!read.ok) return { error: "That picture is not available to you.", status: 404 };
     return new Response(read.value.bytes as never, { status: 200, headers: { ...BASE_HEADERS, "cache-control": "private, max-age=300", "content-type": read.value.record.media_type } });
+  }
+  if (art.path?.startsWith(COVER_PATH_PREFIX)) {
+    // MUSIC-DATA-01: the kept Cover Art Archive cover; a cleared cache gives a 404 and the page shows the generated cover.
+    const cover = item.musicbrainz_release_group_id && art.path === `${COVER_PATH_PREFIX}${item.musicbrainz_release_group_id}` ? albumCoverFile(item.musicbrainz_release_group_id) : null;
+    if (!cover) return { error: "No picture for this item.", status: 404 };
+    return new Response(Bun.file(cover.path), { status: 200, headers: { ...BASE_HEADERS, "cache-control": "private, max-age=300", "content-type": cover.mime } });
   }
   if (art.path) {
     const abs = resolveUnderRoot(item.source_id, art.path);

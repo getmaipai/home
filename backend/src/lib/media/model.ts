@@ -5,6 +5,7 @@ import { MediaItem } from "@maipai/spec/gen/ts/media-item.js";
 import { MediaSource } from "@maipai/spec/gen/ts/media-source.js";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
+import { COVER_PATH_PREFIX, coveredGroups } from "./albumCoverStore";
 import type { mediaItems, mediaSources, mediaProgress, mediaCollections } from "@/db/schema";
 
 export { MediaItem, MediaSource, MediaProgress, MediaCollection };
@@ -24,12 +25,19 @@ function json<T>(text: string | null, fallback: T): T {
   }
 }
 
+/** MUSIC-DATA-01: a track with no art of its own (and none removed by a person) reads as having the kept Cover Art Archive cover. */
+function artworkOf(row: MediaItemRow): unknown {
+  if (row.artwork) return json(row.artwork, null);
+  if (row.kind !== "track" || !row.musicbrainzReleaseGroupId || (row.lockedFields ?? "").includes("artwork")) return null;
+  return coveredGroups().has(row.musicbrainzReleaseGroupId) ? { path: `${COVER_PATH_PREFIX}${row.musicbrainzReleaseGroupId}` } : null;
+}
+
 export function itemFromRow(row: MediaItemRow): MediaItem {
   const location = row.locFileId ? { file_id: row.locFileId } : row.locRootId && row.locPath !== null ? { root_id: row.locRootId, path: row.locPath } : { url: row.locUrl ?? "" };
   return MediaItem.parse({
     id: row.id, kind: row.kind, title: row.title, subtitle: row.subtitle, description: row.description, source_id: row.sourceId,
     parent_id: row.parentId, location, media_type: row.mediaType, duration_s: row.durationS, size: row.size, width: row.width, height: row.height,
-    video_codec: row.videoCodec, audio_codec: row.audioCodec, playable: row.playable, artwork: json(row.artwork, null), previews: json(row.previews, null),
+    video_codec: row.videoCodec, audio_codec: row.audioCodec, playable: row.playable, artwork: artworkOf(row), previews: json(row.previews, null),
     chapters: json(row.chapters, []), subtitles: json(row.subtitles, []), lyrics: json(row.lyrics, null), locked_fields: json(row.lockedFields, []), series: row.series, season: row.season, episode: row.episode,
     artist: row.artist, album: row.album, album_artist: row.albumArtist,
     musicbrainz_recording_id: row.musicbrainzRecordingId, musicbrainz_artist_id: row.musicbrainzArtistId, musicbrainz_release_group_id: row.musicbrainzReleaseGroupId, track_no: row.trackNo, disc_no: row.discNo, year: row.year, genre: row.genre,

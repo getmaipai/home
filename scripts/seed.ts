@@ -125,7 +125,7 @@ const DEMO_STATIONS = [
  * a liked set, some history and two saved stations. The lookups that call outside services are switched off first, so seeding sends
  * nothing anywhere. The station addresses are example.com placeholders: they show on the pages but do not play. */
 async function seedDemoMusic(baseUrl: string, dataDir: string, cookie: string): Promise<void> {
-  for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia"]) {
+  for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia", "music.album_art_online"]) {
     await requireOk(await request(baseUrl, "/api/settings", { method: "PUT", cookie, body: JSON.stringify({ scope: "household", key, value: false }) }), `setting ${key} failed`);
   }
   const folder = join(dataDir, "demo-music");

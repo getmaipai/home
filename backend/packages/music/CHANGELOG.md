@@ -2,6 +2,12 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.11] - 2026-11-01
+
+### Added
+
+- A new `cover-art-archive` data source, on by default: for an album that has no art in its files or folder and that MusicBrainz matched, Home keeps the front cover from the Cover Art Archive on your computer and shows it as the album art. Only the album's public MusicBrainz id is sent. Art in your files or folders, or set by you, is never replaced. An owner turns it off with "Fetch album covers from the Cover Art Archive" under Music settings; without it albums show the generated cover.
+
 ## [0.3.10] - 2026-11-01
 
 ### Added
