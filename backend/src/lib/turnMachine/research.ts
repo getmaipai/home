@@ -366,8 +366,8 @@ export async function writeQueriesChecked(writer: QueryWriter, utterance: string
   if (reply === null) return null;
   const planned = parsePlannedQueries(reply);
   const kept: string[] = [];
-  const allowed = `${utterance}\n${digest}`;
-  for (const query of planned) if (!isRepeatQuery([...progress.queries, ...kept], query) && memoryDetailsIn(query, allowed).length === 0) kept.push(query);
+  // A name or year the model supplied from memory is not filtered out here: the tool node runs the search without it (RESEARCH-QUERY-03).
+  for (const query of planned) if (!isRepeatQuery([...progress.queries, ...kept], query)) kept.push(query);
   return { queries: kept.slice(0, count), proposed: planned.length };
 }
 

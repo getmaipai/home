@@ -9,7 +9,7 @@
 // No prompt here names a subject or a kind of question.
 import { complete, completeBackground } from "@/lib/llm";
 import { notesLedger, squash, type Ledger, type PageKind, type PageNote } from "./pageNotes";
-import { isRepeatQuery, memoryDetailsIn, queryWriterPrompt, researchProgress, type AnswerStyle, type QueryWriter } from "./research";
+import { isRepeatQuery, queryWriterPrompt, researchProgress, type AnswerStyle, type QueryWriter } from "./research";
 
 /** One model call: a prompt in, text out, or null when the model is unavailable. */
 export type StageWriter = (prompt: string) => Promise<string | null>;
@@ -128,7 +128,8 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
   const data = jsonOf(reply);
   if (!data) return { subQuestions: [], queries: [] };
   const kept: string[] = [];
-  for (const query of strings(data.queries, 12, 140)) if (query.length > 3 && !isRepeatQuery(kept, query) && memoryDetailsIn(query, utterance).length === 0) kept.push(query);
+  // A name or year from memory stays in the plan: the tool node runs the search without it (RESEARCH-QUERY-03).
+  for (const query of strings(data.queries, 12, 140)) if (query.length > 3 && !isRepeatQuery(kept, query)) kept.push(query);
   return { subQuestions: strings(data.sub_questions, 6, 160), queries: kept.slice(0, count) };
 }
 

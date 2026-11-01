@@ -58,13 +58,13 @@ describe("stage 1: what is this person asking", () => {
 
 describe("stage 2: what data is needed", () => {
   const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" };
-  test("the plan carries the brief into the writer's prompt and returns sub-questions and searches, dropping a search built on a name from memory", async () => {
+  test("the plan carries the brief into the writer's prompt and returns sub-questions and searches (a name from memory stays: the tool node runs that search without it)", async () => {
     const prompts: string[] = [];
     const plan = await planData(async (prompt) => { prompts.push(prompt); return '{"sub_questions":["why it ended","what came next"],"queries":["the show ended why","Jane Smith show interview"]}'; }, brief, "why did the show end", 4);
     expect(prompts[0]).toContain(briefBlock(brief));
     expect(prompts[0]).toContain("sub_questions");
     expect(plan.subQuestions).toEqual(["why it ended", "what came next"]);
-    expect(plan.queries).toEqual(["the show ended why"]);
+    expect(plan.queries).toEqual(["the show ended why", "Jane Smith show interview"]);
   });
   test("a writer that is down gives an empty plan", async () => {
     expect(await planData(async () => null, brief, "q", 4)).toEqual({ subQuestions: [], queries: [] });

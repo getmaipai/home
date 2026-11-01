@@ -1146,7 +1146,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // reasoning is spent on the first round, which plans, and on the answering round, which reads the notes. A direct answer from a later
   // search round simply comes without it.
   const researchToolRound = continuing && !isPhrasingRound;
-  const thinkingOn = !researchToolRound && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
+  // The analysis (stage 4) was the thinking: when one was made, the writing round does not think again.
+  const thinkingOn = !researchToolRound && !(isPhrasingRound && state.researchAnalysis) && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   // Hold a plain media request until its tool call is known; also hold the follow-up after a successful music start,
   // even when the person's wording did not plainly name a song.

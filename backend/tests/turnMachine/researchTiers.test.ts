@@ -503,10 +503,10 @@ describe("a question that could mean two things", () => {
 });
 
 describe("the gap check ends the searching only when the writer itself finds nothing more to search", () => {
-  test("a proposal list the filters emptied (a name from memory) leaves the model free to search again", async () => {
+  test("a proposal list the repeat filter emptied leaves the model free to search again", async () => {
     await holdMax();
     let calls = 0;
-    __setQueryWriterForTests(async () => { calls += 1; return calls === 1 ? JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: ["Jane Smith interview about the question"] }); });
+    __setQueryWriterForTests(async () => { calls += 1; return calls === 1 ? JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }); });
     await turn("owner", 1, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
     expect(searxQueries).toEqual(["Harbor Lights television series cancelled", "Harbor Lights series ratings one season"]);
   });
