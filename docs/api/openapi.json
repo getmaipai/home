@@ -27823,6 +27823,7 @@
                               "pictures",
                               "video",
                               "music",
+                              "stems",
                               "tools",
                               "loras"
                             ]

@@ -18,7 +18,7 @@ import { dropMusicStatusCache } from "@/lib/music/ready";
 export const componentsRoutes = apiRouter();
 
 const ComponentSchema = z.object({
-  id: z.string(), label: z.string(), summary: z.string(), group: z.enum(["chat", "voice", "pictures", "video", "music", "tools", "loras"]), kind: z.enum(["model", "lora"]),
+  id: z.string(), label: z.string(), summary: z.string(), group: z.enum(["chat", "voice", "pictures", "video", "music", "stems", "tools", "loras"]), kind: z.enum(["model", "lora"]),
   state: z.enum(["installed", "installing", "notInstalled", "failed"]),
   size_bytes: z.number().nullable(), download_bytes: z.number(), full_bytes: z.number(), required_free_bytes: z.number(),
   plan_need: z.enum(["required", "recommended", "optional"]).nullable(), requirement: z.enum(["required", "optional", "unsupported"]), requirement_reason: z.string().nullable(),

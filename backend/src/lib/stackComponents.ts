@@ -5,7 +5,7 @@
 import { getStackUrl } from "@/lib/stackEngine";
 import { ackCovers, currentLicenceAck } from "@/lib/licenceAcceptance";
 
-export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "tools" | "loras";
+export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "stems" | "tools" | "loras";
 export interface StackComponent {
   id: string; label: string; summary: string; group: ComponentGroup; kind: "model" | "lora";
   state: "installed" | "installing" | "notInstalled" | "failed";

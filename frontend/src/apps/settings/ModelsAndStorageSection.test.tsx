@@ -56,6 +56,19 @@ describe("Models and storage", () => {
     v.restore();
   });
 
+  test("stem splitting is its own Stems category, recommended and not installed on an upgraded hub", async () => {
+    const v = mount(overview([
+      row({ id: "htdemucs", label: "Music: HTDemucs stem splitter", summary: "Separates a song into vocals, drums, bass and other.", group: "stems", plan_need: "recommended", requirement: "optional", state: "notInstalled", download_bytes: 300_000_000, can_install: true }),
+      row({}),
+    ]));
+    await waitFor(() => expect(v.getByRole("heading", { name: "Stems" })).toBeTruthy());
+    const part = v.getByTestId("component-htdemucs");
+    expect(v.getByRole("heading", { name: "Stems" }).parentElement?.textContent ?? "").toContain("Music: HTDemucs stem splitter");
+    expect(part.textContent).toContain("Recommended, not installed");
+    expect(part.textContent).toContain("Download about 300 MB");
+    v.restore();
+  });
+
   test("lists the parts by group with size, state, last use and the room left", async () => {
     const v = mount(overview([
       row({}),
