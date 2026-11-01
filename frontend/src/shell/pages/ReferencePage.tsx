@@ -39,7 +39,7 @@ export function ReferencePage({ person }: { person?: Roster } = {}) {
   }
 
   return <Page title={title} hideTitle>
-    <div className="flex min-w-0 flex-1 flex-col gap-5 p-4">
+    <div className={`flex min-w-0 flex-1 flex-col gap-5 px-4 pb-4 ${book && path ? "pt-0" : "pt-4"}`}>
       {book && path ? null : <form onSubmit={(event) => { event.preventDefault(); search(query, book); }} className="flex min-w-0 gap-2">
         <Input aria-label="Search reference" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search articles" autoComplete="off" />
         <Button type="submit">Search</Button>
