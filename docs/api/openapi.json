@@ -8860,6 +8860,10 @@
                     "nullable": true,
                     "description": "The companion for this chat."
                   },
+                  "device_id": {
+                    "type": "string",
+                    "description": "A robot this side chat is about."
+                  },
                   "mode": {
                     "nullable": true,
                     "description": "chat, research or temporary."
@@ -33628,8 +33632,14 @@
                     "type": "string",
                     "enum": [
                       "mute",
-                      "unmute"
+                      "unmute",
+                      "find_me"
                     ]
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30
                   }
                 },
                 "required": [
@@ -33670,6 +33680,16 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You cannot use this robot",
             "content": {
               "application/json": {
                 "schema": {
