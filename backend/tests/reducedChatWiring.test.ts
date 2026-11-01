@@ -118,7 +118,7 @@ describe("Reduced chat reaches the Stack", () => {
       const chat = await chatNotice();
       expect(chat.cause).not.toBe("tier_reduced");
       expect(chat.notice?.adult ?? "").not.toContain("simpler");
-      expect(activeProfileLine()).toBe("Video: Max");
+      expect(await activeProfileLine()).toBe("Video: Max");
     } finally { remove(); }
   });
 

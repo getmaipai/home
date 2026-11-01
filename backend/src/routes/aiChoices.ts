@@ -215,7 +215,7 @@ const windowRoute = createRoute({
 });
 aiChoicesRoutes.openapi(windowRoute, async (c) => {
   const open = await currentMaxWindow();
-  return c.json({ open: open !== null, minutes_left: open?.minutesLeft ?? null, line: open ? MAX_RUNNING_LINE : null, profile: activeProfileLine(), closed_apps: closedAppsLines() }, 200);
+  return c.json({ open: open !== null, minutes_left: open?.minutesLeft ?? null, line: open ? MAX_RUNNING_LINE : null, profile: await activeProfileLine(), closed_apps: closedAppsLines() }, 200);
 });
 const stopWindowRoute = createRoute({
   method: "post", path: "/tier-window/stop", tags: ["AI"], summary: "Stop the running Max job so the room and chat come back (TIER-HOME-03)",

@@ -439,7 +439,7 @@ describe("household queue", () => {
     try {
       await releaseHouseholdQueue();
       await releaseHouseholdQueue();
-      expect(activeProfileLine()).toBe("Chat: Reduced · Pictures: Boost · Video: Max · Music: waiting");
+      expect(await activeProfileLine()).toBe("Chat: Reduced · Pictures: Boost · Video: Max · Music: waiting");
       expect(songReleased).toBe(0);
       expect(song.riseReason).toBe("profile_lowered");
       expect(saves).toBe(1);
@@ -447,7 +447,7 @@ describe("household queue", () => {
       remove();
       const again = registerQueueProvider(() => [{ job: song, save: () => { saves += 1; }, release: async () => { songReleased += 1; } }]);
       try { await releaseHouseholdQueue(); } finally { again(); }
-      expect(activeProfileLine()).toBeNull();
+      expect(await activeProfileLine()).toBeNull();
       expect(song.riseReason).toBeNull();
       expect(songReleased).toBe(1);
     } finally { setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); resetActivePlanForTests(); setReducedChat(null); }

@@ -2,7 +2,7 @@
 import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
 import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
-import { enterStackReducedChat, leaveStackReducedChat, setReducedChat } from "@/lib/reducedChat";
+import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackReducedChat } from "@/lib/reducedChat";
 import { stackMaxWindow } from "./stackWindow";
 import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
@@ -60,16 +60,22 @@ function scheduleReducedRenewal(): void {
 let currentEntries: QueueStoreEntry[] = [];
 
 /** The plan of the Boost or Max job now running (TIER-PRIO-04/05): what each category does while it runs. Kept in memory only; no person, no app name. */
-interface ActivePlan { jobId: string; lead: Category; cells: Partial<Record<Category, CellState>> }
+interface ActivePlan { jobId: string; tier: "boost" | "max"; lead: Category; cells: Partial<Record<Category, CellState>> }
 let activePlan: ActivePlan | null = null;
 let pendingPlan: ActivePlan | null = null;
 const PLAN_WORDS: Partial<Record<Category, string>> = { chat: "Chat", picture: "Pictures", video: "Video", music: "Music", tools: "Tools" };
 const PLAN_ORDER: Category[] = ["chat", "picture", "video", "music", "tools"];
-/** The admin-only status text, for example `Chat: Reduced · Pictures: Boost · Video: Max · Music: waiting`. Null when no profile is active. */
-export function activeProfileLine(): string | null {
-  if (!activePlan) return null;
+/** The admin-only status text, for example `Chat: Reduced · Pictures: Boost · Video: Max · Music: waiting`. Null when no profile is active.
+ * Chat is named Reduced only when the Stack itself reports `reduced_chat` (a Boost job whose live-fit lowers chat, a refused swap, or a Max job that did not need it says nothing about chat).
+ * A Max job planned to lower chat that has not started says it will simplify when the job starts. */
+export async function activeProfileLine(): Promise<string | null> {
+  if (!activePlan) {
+    const waiting = pendingPlan && pendingPlan.tier === "max" && pendingPlan.cells.chat === "reduced" && currentEntries.some((entry) => entry.job.id === pendingPlan!.jobId && entry.job.state === "queued");
+    return waiting ? "Chat: will simplify when the job starts" : null;
+  }
   const plan = activePlan;
-  const parts = PLAN_ORDER.filter((category) => plan.cells[category] !== undefined).map((category) => {
+  const stackReduced = plan.cells.chat === "reduced" ? await stackReducedChat() : false;
+  const parts = PLAN_ORDER.filter((category) => plan.cells[category] !== undefined && !(category === "chat" && plan.cells.chat === "reduced" && !stackReduced)).map((category) => {
     const state = plan.cells[category]!;
     return `${PLAN_WORDS[category]}: ${state === "queued" ? "waiting" : state === "off" ? "off" : state[0]!.toUpperCase() + state.slice(1)}`;
   });
@@ -544,6 +550,8 @@ export async function releaseHouseholdQueue(): Promise<void> {
                 }
                 downshiftRequestedAt.delete(entry.job.id);
                 if (entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait") { entry.job.riseReason = null; entry.save(); }
+                // Recorded before the Max swap so a job still waiting for its turn boundary can say it will simplify chat when it starts.
+                if (fit.applied) pendingPlan = { jobId: entry.job.id, tier: entry.job.tier as "boost" | "max", lead: fit.applied.lead, cells: Object.fromEntries(Object.entries(fit.applied.cells).map(([category, cell]) => [category, cell.state])) };
                 if (entry.job.tier === "max") {
                   // TIER-WIRE-02: ask the Stack to swap chat to its Reduced model before the Max job starts.
                   const entered = await enterStackReducedChat();
@@ -555,10 +563,10 @@ export async function releaseHouseholdQueue(): Promise<void> {
                   }
                   if (entered === "ok") { reducedChatJobId = entry.job.id; lastReducedRenewAt = now; }
                   // An older Stack (404) or a refused swap leaves chat normal with no line; the plan then does not claim Reduced chat.
-                  else if (fit.applied.cells.chat) delete (fit.applied.cells as Record<string, unknown>).chat;
+                  else if (fit.applied.cells.chat) { delete (fit.applied.cells as Record<string, unknown>).chat; if (pendingPlan) delete pendingPlan.cells.chat; }
                 }
               }
-              if (fit.applied) pendingPlan = { jobId: entry.job.id, lead: fit.applied.lead, cells: Object.fromEntries(Object.entries(fit.applied.cells).map(([category, cell]) => [category, cell.state])) };
+              if (fit.applied) pendingPlan = { jobId: entry.job.id, tier: entry.job.tier as "boost" | "max", lead: fit.applied.lead, cells: Object.fromEntries(Object.entries(fit.applied.cells).map(([category, cell]) => [category, cell.state])) };
             }
           } catch { /* Fit is advisory: admission proceeds as it did before. */ }
         }
