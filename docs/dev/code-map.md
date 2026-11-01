@@ -940,7 +940,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/policy.ts` | argsGrounded, policyNode |
 | `backend/src/lib/turnMachine/nodes/safety.ts` | safetyNode, safetyRoute, inputSafetyAfterFailure, applySafety |
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
-| `backend/src/lib/turnMachine/pageNotes.ts` | NOTE_WINDOW_CHARS, NOTE_WINDOWS_MAX, NOTES_PER_WINDOW, NOTES_PER_PAGE, NOTE_QUOTE_MAX, NOTE_TEXT_MAX |
+| `backend/src/lib/turnMachine/pageNotes.ts` | NOTE_EXCERPT_CHARS, NOTES_PER_PAGE, NOTE_QUOTE_MAX, NOTE_TEXT_MAX, NOTE_CONCURRENCY, NOTES_WAIT_MS |
 | `backend/src/lib/turnMachine/research.ts` | RESEARCH_ANSWER_CLAUSE, answerStyleFor, THINKING_ALLOWANCE_FACTOR, budgetForStyle, RESEARCH_CAP_MS, NO_NEW_ROUND_SHARE |
 | `backend/src/lib/turnMachine/researchPipeline.ts` | __setStageWritersForTests, briefPrompt, parseBrief, understand, CLARIFY_MARK, clarifyingQuestion |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
