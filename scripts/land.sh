@@ -6,7 +6,10 @@ usage() { echo "usage: bash scripts/land.sh [--detach] [--queue-anyway] [--timeo
 die() { echo "land.sh: $1" >&2; exit "${2:-1}"; }
 # GITNET-01: remote git operations are bounded and retried (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; gitnet_env; else GITNET_TIMED_OUT=0; gitnet() { git "$@"; }; fi
+if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; gitnet_env; else
+  GITNET_TIMED_OUT=0; gitnet() { git "$@"; }
+  pipeline_main_sha() { git -C "${1:-.}" rev-parse --verify -q 'origin/main^{commit}'; }
+fi
 
 mode=queue
 timeout_seconds=3600
@@ -70,8 +73,8 @@ PY
         [[ -f "$note_md" ]] && cat "$note_md"
         if [[ "$result" == landed ]]; then return 0; fi
         # A stale bounce can overwrite a landed note (a second request for the same branch); the commit itself decides.
-        if GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet fetch -q origin main && git merge-base --is-ancestor "$expected" origin/main; then
-          echo "landed: ${expected:0:7} is on origin/main"
+        if { GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet fetch -q origin main || true; } && git merge-base --is-ancestor "$expected" "$(pipeline_main_sha . 2>/dev/null || echo origin/main)"; then
+          echo "landed: ${expected:0:7} is on main"
           return 0
         fi
         return 1
@@ -80,8 +83,8 @@ PY
     now="$(date +%s)"
     if (( now - last_fetch >= 60 )); then
       last_fetch="$now"
-      if GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet fetch -q origin main && git merge-base --is-ancestor "$expected" origin/main; then
-        echo "landed: ${expected:0:7} is on origin/main"
+      if { GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet fetch -q origin main || true; } && git merge-base --is-ancestor "$expected" "$(pipeline_main_sha . 2>/dev/null || echo origin/main)"; then
+        echo "landed: ${expected:0:7} is on main"
         return 0
       fi
     fi
@@ -120,9 +123,12 @@ if (( ! queue_anyway )); then
 fi
 dirty="$(git status --porcelain --untracked-files=no)"
 [[ -z "$dirty" ]] || die "tracked changes are uncommitted; commit by file name or discard, then run land.sh again."
-gitnet fetch origin || die "could not fetch origin$( ((GITNET_TIMED_OUT)) && echo ' (GitHub did not answer in time)'); check network and git credentials, then run land.sh again."
-ahead="$(git rev-list --count origin/main..HEAD)" || die "could not compare your branch with origin/main; fetch and repair the checkout, then retry."
-(( ahead > 0 )) || die "branch has no commit over origin/main; make and commit a change, then run land.sh again."
+# OUTBOX-01: GitHub being slow or down does not stop a landing request; the lander lands on its own main and pushes afterwards.
+gitnet fetch origin || echo "land.sh: GitHub did not answer$( ((GITNET_TIMED_OUT)) && echo ' in time'); queueing against the last known main (the lander catches GitHub up later)." >&2
+base="$(pipeline_main_sha . 2>/dev/null || true)"
+[[ -n "$base" ]] || die "no main to compare with; fetch origin once the network is back, then run land.sh again."
+ahead="$(git rev-list --count "$base..HEAD")" || die "could not compare your branch with main; fetch and repair the checkout, then retry."
+(( ahead > 0 )) || die "branch has no commit over origin/main or the landed main; make and commit a change, then run land.sh again."
 watch_data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
 if [[ -f "$watch_data/last-run" ]]; then
   watch_sha="$(cat "$watch_data/last-run" 2>/dev/null || true)"
@@ -154,7 +160,7 @@ PY
       flaky) echo "main: flaky at ${watch_sha:0:7}: ${watch_files:-unknown}" ;;
       red)
         echo "main: red at ${watch_sha:0:7}: ${watch_files:-unknown} (culprit ${watch_culprit:0:7})"
-        changed_files="$(git diff --name-only origin/main...HEAD 2>/dev/null || true)"
+        changed_files="$(git diff --name-only "$base"...HEAD 2>/dev/null || true)"
         for failing_file in $watch_files; do
           failing_dir="${failing_file%/*}"
           for changed_file in $changed_files; do
@@ -169,7 +175,9 @@ PY
     esac
   fi
 fi
-gitnet push --force-with-lease -u origin "HEAD:refs/heads/$branch" || die "could not push $branch to origin$( ((GITNET_TIMED_OUT)) && echo ' (GitHub did not answer in time)'); resolve the push error, then run land.sh again."
+# The lander reads the commit from this repository (every worktree shares one object store), so this GitHub copy of the branch is a backup,
+# not a step the landing waits on: one short try, and a failure only gets a note.
+GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet push --force-with-lease -u origin "HEAD:refs/heads/$branch" || echo "land.sh: $branch was not copied to GitHub$( ((GITNET_TIMED_OUT)) && echo ' (it did not answer in time)'); the landing goes ahead from this repository." >&2
 sha="$(git rev-parse HEAD)"
 requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Milliseconds, so two requests in one second never share a name (macOS date has no %N).

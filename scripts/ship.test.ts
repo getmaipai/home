@@ -54,6 +54,14 @@ describe("ship pipeline", () => {
     git(main, "checkout", "-b", "side"); writeFileSync(join(main, "side.txt"), "side\n"); git(main, "add", "."); git(main, "commit", "-m", "side"); const side = git(main, "rev-parse", "HEAD"); git(main, "checkout", "main");
     const out = run([side, "--before-green"]); expect(out.status).toBe(1); expect(out.stderr).toContain("not on origin/main"); expect(existsSync(join(scratch, "promote.calls"))).toBe(false);
   }, 60_000);
+  test("refuses a commit that is landed but not on GitHub main yet, and says why, but ships one that is", () => {
+    git(main, "checkout", "-b", "landed-not-pushed"); writeFileSync(join(main, "landed.txt"), "landed\n"); git(main, "add", "."); git(main, "commit", "-m", "landed, outbox not done"); const landed = git(main, "rev-parse", "HEAD"); git(main, "checkout", "main");
+    git(main, "update-ref", "refs/pipeline/main", landed);
+    try {
+      const out = run([landed, "--before-green"]); expect(out.status).toBe(1); expect(out.stderr).toContain("landed but not on GitHub main yet"); expect(out.stderr).toContain("pipeline.sh status"); expect(out.stderr).not.toContain("land it first");
+      const onGithub = run([sha, "--before-green", "--dry-run"]); expect(onGithub.status).toBe(0);
+    } finally { git(main, "update-ref", "-d", "refs/pipeline/main"); }
+  }, 60_000);
   test("requires a green marker or records the before-green override", () => {
     const missing = run([sha]); expect(missing.status).toBe(1); expect(missing.stderr).toContain("--before-green");
     mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n"); const green = run([sha]); if (green.status !== 0) throw new Error(green.stderr + green.stdout); expect(green.status).toBe(0); expect(green.stdout).toContain("shipped:");

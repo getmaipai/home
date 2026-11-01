@@ -30,7 +30,7 @@ describe("land queue", () => {
     writeFileSync(notePath, JSON.stringify({ branch: "wt/wait_fallback", sha, status: "bounced", reason: "stale" }));
     const result = run("land.sh", ["wait", "--timeout", "1"], wt);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain(`landed: ${sha.slice(0, 7)} is on origin/main`);
+    expect(result.stdout).toContain(`landed: ${sha.slice(0, 7)} is on main`);
   });
 });
 

@@ -26,12 +26,20 @@ if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 # A fetch that never answers used to freeze the watcher with its pid file held; now it times out, retries and logs. Plain git until the lib exists.
 gitnet_lib="$bin/gitnet.sh"
 [[ -f "$gitnet_lib" ]] || gitnet_lib="$main/scripts/lib/gitnet.sh"
+# OUTBOX-01: this script and the helper are separate snapshots taken from origin/main (the lander refreshes both, one after the other). A new
+# script that finds an older helper takes the helper from origin/main itself before it sources it, so the two never run out of step.
+if [[ "$gitnet_lib" == "$bin/gitnet.sh" && -f "$gitnet_lib" ]] && ! grep -q 'pipeline_main_sha()' "$gitnet_lib" 2>/dev/null; then
+  helper_tmp="$gitnet_lib.new"
+  if git -C "$main" show "origin/main:scripts/lib/gitnet.sh" >"$helper_tmp" 2>/dev/null && grep -q 'pipeline_main_sha()' "$helper_tmp"; then mv -f "$helper_tmp" "$gitnet_lib"; else rm -f "$helper_tmp"; fi
+fi
 if [[ -f "$gitnet_lib" ]]; then source "$gitnet_lib"
 else
   gitnet_env() { :; }
   bounded_run() { shift 2; "$@"; }
   gitnet() { git "$@"; }
+  pipeline_main_sha() { git -C "${1:-.}" rev-parse origin/main; }
 fi
+declare -F pipeline_main_sha >/dev/null || pipeline_main_sha() { git -C "${1:-.}" rev-parse origin/main; }
 mkdir -p "$data/ops"
 GITNET_TIMED_OUT=0
 export GITNET_OPS_DIR="$data/ops" GITNET_STUCK_LOG="$data/stuck.log"
@@ -432,14 +440,16 @@ file_issue() {
 run_once() {
   local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
   local bisect_started bisect_budget bisect_spent
-  GITNET_LABEL="watcher fetch" gitnet -C "$checkout" fetch origin || { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed$( ((GITNET_TIMED_OUT)) && echo ' (timed out)')" >> "$data/watcher.log"; return 0; }
-  head="$(git -C "$checkout" rev-parse origin/main)"
+  # OUTBOX-01: the watcher tests the pipeline's main, which is a landing ahead of GitHub's while the outbox is still pushing, so a slow
+  # or failed fetch only gets a log line; the landed commits are tested all the same.
+  GITNET_LABEL="watcher fetch" gitnet -C "$checkout" fetch origin || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"
+  head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
   if ! wait_for_quiet; then return 0; fi
-  GITNET_LABEL="watcher fetch (after quiet wait)" gitnet -C "$checkout" fetch origin || { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed after quiet wait$( ((GITNET_TIMED_OUT)) && echo ' (timed out)')" >> "$data/watcher.log"; return 0; }
-  head="$(git -C "$checkout" rev-parse origin/main)"
+  GITNET_LABEL="watcher fetch (after quiet wait)" gitnet -C "$checkout" fetch origin || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed after quiet wait$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"
+  head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi

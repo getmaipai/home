@@ -18,12 +18,25 @@ if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 # The lib is a snapshot taken from origin/main like this script; until it is present the plain, unbounded behaviour below applies.
 gitnet_lib="$bin/gitnet.sh"
 [[ -f "$gitnet_lib" ]] || gitnet_lib="$main/scripts/lib/gitnet.sh"
+# OUTBOX-01: this script and the helper are separate snapshots taken from origin/main (the lander refreshes both, one after the other). A new
+# script that finds an older helper takes the helper from origin/main itself before it sources it, so the two never run out of step.
+if [[ "$gitnet_lib" == "$bin/gitnet.sh" && -f "$gitnet_lib" ]] && ! grep -q 'pipeline_main_sha()' "$gitnet_lib" 2>/dev/null; then
+  helper_tmp="$gitnet_lib.new"
+  if git -C "$main" show "origin/main:scripts/lib/gitnet.sh" >"$helper_tmp" 2>/dev/null && grep -q 'pipeline_main_sha()' "$helper_tmp"; then mv -f "$helper_tmp" "$gitnet_lib"; else rm -f "$helper_tmp"; fi
+fi
 if [[ -f "$gitnet_lib" ]]; then source "$gitnet_lib"
 else
   gitnet_lib=""
   gitnet_env() { :; }
   bounded_run() { shift 2; "$@"; }
   gitnet() { git "$@"; }
+  PIPELINE_MAIN_REF=refs/pipeline/main
+  pipeline_main_sha() { git -C "${1:-.}" rev-parse --verify -q 'origin/main^{commit}'; }
+  pipeline_main_state() { echo unknown; }
+fi
+if [[ -n "$gitnet_lib" ]] && ! declare -F pipeline_main_sha >/dev/null; then
+  error "the network helper $gitnet_lib predates OUTBOX-01 and origin/main could not be read to refresh it; run bash scripts/pipeline.sh start once GitHub answers."
+  exit 1
 fi
 mkdir -p "$data/ops"
 GITNET_TIMED_OUT=0
@@ -193,11 +206,11 @@ update_main_checkout() {
     lock_path="$(git -C "$main" rev-parse --git-path index.lock 2>/dev/null || true)"
     [[ "$lock_path" = /* ]] || lock_path="$main/$lock_path"
     if [[ -e "$lock_path" ]]; then reason="index is locked"
-    elif ! GITNET_LABEL="main checkout fetch" gitnet -C "$main" fetch origin main >/dev/null 2>&1; then reason="could not fetch origin/main"
     else
-      origin_main="$(git -C "$main" rev-parse origin/main 2>/dev/null || true)"
-      if [[ -z "$branch" ]] && { [[ -z "$head" || -z "$origin_main" ]] || ! git -C "$main" merge-base --is-ancestor "$head" "$origin_main"; }; then reason="diverged (detached HEAD is not an ancestor of origin/main)"
-      elif git -C "$main" merge --ff-only origin/main >/dev/null 2>&1; then
+      # OUTBOX-01: the main checkout follows the pipeline's main, so a landing shows here even while GitHub lags (the outbox does the fetching).
+      origin_main="$(pipeline_main_sha "$main" 2>/dev/null || true)"
+      if [[ -z "$branch" ]] && { [[ -z "$head" || -z "$origin_main" ]] || ! git -C "$main" merge-base --is-ancestor "$head" "$origin_main"; }; then reason="diverged (detached HEAD is not an ancestor of the landed main)"
+      elif [[ -n "$origin_main" ]] && git -C "$main" merge --ff-only "$origin_main" >/dev/null 2>&1; then
         echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout fast-forwarded to $(git -C "$main" rev-parse --short HEAD)" >> "$data/lander.log"
         reinstall_main_dependencies "$head"
         return 0
@@ -210,7 +223,7 @@ update_main_checkout() {
 safety_surface_files() {
   local changed="$1" glob regex file matches=""
   local globs
-  globs="$(git -C "$checkout" show origin/main:scripts/wt.sh 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)"
+  globs="$(git -C "$checkout" show "$(pipeline_main_sha "$checkout" 2>/dev/null || echo origin/main):scripts/wt.sh" 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)"
   [[ -n "$globs" ]] || return 0
   for file in $changed; do
     for glob in $globs; do
@@ -278,6 +291,17 @@ net_fail() {
   echo "deferred: $branch (try $n): $reason"
 }
 
+# An entry that cannot land until a person acts (GitHub's main and the landed main diverged) waits without being bounced; the
+# status page prints the reason next to it. The pause repeats, so it lands by itself once the cause is cleared.
+hold_entry() {
+  local request="$1" branch="$2" reason="$3" base
+  base="$(basename "$request")"; mkdir -p "$(defer_dir)"
+  printf '%s\n' $(( $(date +%s) + ${MAIPAI_LAND_HOLD_SECONDS:-300} )) >"$(defer_dir)/$base.until"
+  printf '%s\n' "$reason" >"$(defer_dir)/$base.reason"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) held $branch: $reason" >> "$data/lander.log"
+  echo "held: $branch: $reason"
+}
+
 # The oldest request that is not waiting out a network pause.
 next_request() {
   local f now until
@@ -300,16 +324,165 @@ try: print(json.load(open(sys.argv[1])).get('note', ''))
 except Exception: print('')
 PY
 )"
-  main_sha="$(git -C "$checkout" rev-parse origin/main 2>/dev/null || git -C "$checkout" rev-parse HEAD 2>/dev/null || echo unknown)"
+  main_sha="$(pipeline_main_sha "$checkout" 2>/dev/null || true)"; [[ -n "$main_sha" ]] || main_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo unknown)"
   seconds=$(( $(date +%s) - started )); slug="${branch//\//-}"
   atomic_json_note "$branch" "$sha" bounced "$reason" "$main_sha" "$output" "$seconds" "$landing_note"
   log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" bounced "$seconds" "$reason"
-  rm -f "$request" "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until
+  rm -f "$request" "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until "$(defer_dir)/$(basename "$request")".reason
   echo "bounced: $branch at $sha: $reason"
 }
 
+# OUTBOX-01 (2026-11-01): a landing is complete when the change is on the pipeline's own main (refs/pipeline/main, see gitnet.sh),
+# verified, and visible to the watcher, new worktrees and dev. Getting it to GitHub is the outbox's job: it pushes the tip in order
+# (fast-forward only, never forced), retries with a growing pause, and never holds up the next landing. A slow or failed push only
+# makes `pipeline.sh status` say how far main is ahead of GitHub.
+outbox_dir="$data/outbox"
+mkdir -p "$outbox_dir"
+outbox_clear() { rm -f "$outbox_dir/pending-since" "$outbox_dir/tries" "$outbox_dir/next-try" "$outbox_dir/last-error" "$outbox_dir/diverged"; }
+outbox_mark_pending() { [[ -s "$outbox_dir/pending-since" ]] || date +%s >"$outbox_dir/pending-since"; }
+outbox_log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) outbox: $1" >> "$data/lander.log"; }
+
+# After a successful push: branches that landed leave GitHub too (best effort; a branch that never reached GitHub is simply absent).
+outbox_delete_branches() {
+  local list="$outbox_dir/delete-branches" branch
+  [[ -s "$list" ]] || return 0
+  while IFS= read -r branch; do
+    [[ "$branch" == wt/* ]] || continue
+    GITNET_TRIES=1 GITNET_TIMEOUT=45 GITNET_LABEL="delete remote branch" gitnet -C "$checkout" push origin --delete "$branch" >/dev/null 2>&1 || true
+  done <"$list"
+  rm -f "$list"
+}
+
+outbox_flush() {
+  local force="${1:-}" now next p o cur n delay errfile reason
+  now="$(date +%s)"
+  p="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+  if [[ -z "$p" ]]; then outbox_clear; return 0; fi
+  if [[ "$force" != force ]]; then
+    next="$(cat "$outbox_dir/next-try" 2>/dev/null || echo 0)"; [[ "$next" =~ ^[0-9]+$ ]] || next=0
+    (( next <= now )) || return 0
+  fi
+  GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="outbox fetch" gitnet -C "$checkout" fetch -q origin main >/dev/null 2>&1 || true
+  o="$(git -C "$checkout" rev-parse --verify -q 'origin/main^{commit}' 2>/dev/null || true)"
+  if [[ -n "$o" ]]; then
+    if [[ "$o" == "$p" ]] || git -C "$checkout" merge-base --is-ancestor "$p" "$o" 2>/dev/null; then
+      # GitHub already has everything this flush started with (or more). A landing may have moved the ref meanwhile, so the ref only
+      # follows GitHub when it still holds the value this flush read, and pending state is cleared only when nothing newer is waiting.
+      [[ "$o" == "$p" ]] || git -C "$checkout" update-ref "$PIPELINE_MAIN_REF" "$o" "$p" 2>/dev/null || true
+      cur="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+      if [[ "$cur" == "$p" || "$cur" == "$o" ]]; then outbox_clear; else date +%s >"$outbox_dir/pending-since"; fi
+      outbox_delete_branches; return 0
+    fi
+    if ! git -C "$checkout" merge-base --is-ancestor "$o" "$p" 2>/dev/null; then
+      outbox_mark_pending
+      date +%s >"$outbox_dir/diverged"
+      # Look again in five minutes (not every poll): the cause needs a person, and a reset-to-github clears this pause.
+      printf '%s\n' $(( $(date +%s) + ${MAIPAI_LAND_HOLD_SECONDS:-300} )) >"$outbox_dir/next-try"
+      outbox_log "STUCK: GitHub main (${o:0:7}) has commits the landed main (${p:0:7}) does not contain; nothing is force-pushed. See bash scripts/pipeline.sh outbox"
+      return 1
+    fi
+  fi
+  rm -f "$outbox_dir/diverged"
+  outbox_mark_pending
+  errfile="$(mktemp "$data/.outbox.XXXXXX")"
+  if GITNET_TRIES=2 GITNET_LABEL="push main (outbox)" gitnet -C "$checkout" push origin "$p:refs/heads/main" >"$errfile" 2>&1; then
+    cat "$errfile" >> "$data/lander.log" 2>/dev/null || true
+    rm -f "$errfile" "$outbox_dir/tries" "$outbox_dir/next-try" "$outbox_dir/last-error"
+    cur="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+    if [[ "$cur" == "$p" ]]; then outbox_clear; else date +%s >"$outbox_dir/pending-since"; fi
+    outbox_log "pushed ${p:0:7} to GitHub"
+    outbox_delete_branches
+    # Worktrees whose branch just reached GitHub's main can go now (the sweep needs the branch tip on origin/main).
+    if [[ "${serving:-0}" == 1 ]]; then sweep_worktrees; fi
+    return 0
+  fi
+  reason="$(grep -v '^[[:space:]]*$' "$errfile" | tail -n 1 | cut -c1-200)"
+  cat "$errfile" >> "$data/lander.log" 2>/dev/null || true
+  rm -f "$errfile"
+  n="$(cat "$outbox_dir/tries" 2>/dev/null || echo 0)"; [[ "$n" =~ ^[0-9]+$ ]] || n=0; n=$(( n + 1 ))
+  delay=$(( ${MAIPAI_LAND_OUTBOX_BASE_SECONDS:-30} * (1 << (n > 6 ? 5 : n - 1)) ))
+  (( delay <= ${MAIPAI_LAND_OUTBOX_MAX_SECONDS:-900} )) || delay="${MAIPAI_LAND_OUTBOX_MAX_SECONDS:-900}"
+  printf '%s\n' "$n" >"$outbox_dir/tries"
+  printf '%s\n' $(( $(date +%s) + delay )) >"$outbox_dir/next-try"
+  printf '%s\n' "${reason:-the push failed}" >"$outbox_dir/last-error"
+  outbox_log "push of ${p:0:7} failed (try $n, next in ${delay}s): ${reason:-the push failed}"
+  return 1
+}
+
+# One flush at a time. The lock records the pid of the process that started it ($$ is the lander even inside the background subshell,
+# and macOS bash 3.2 has no BASHPID); a lock whose lander is gone, or that is older than ten minutes (the push is bounded to far less), is taken over.
+outbox_flush_locked() {
+  local lock="$outbox_dir/flush.lock" holder rc=0
+  if ! mkdir "$lock" 2>/dev/null; then
+    holder="$(cat "$lock/pid" 2>/dev/null || true)"
+    if [[ "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null && [[ -z "$(find "$lock" -maxdepth 0 -mmin +10 2>/dev/null)" ]]; then return 0; fi
+    rm -rf "$lock"; mkdir "$lock" 2>/dev/null || return 0
+  fi
+  echo "$$" >"$lock/pid"
+  outbox_flush "$@" || rc=$?
+  rm -rf "$lock"
+  return "$rc"
+}
+
+# After a landing: in the daemon the push runs in the background so the next entry starts at once; run-once pushes in the foreground.
+outbox_kick() {
+  # Not forced: after a failed push the pause the outbox set still applies, so a landing never starts a push while GitHub is known to be down.
+  if [[ "${serving:-0}" == 1 ]]; then ( outbox_flush_locked >/dev/null 2>&1 ) & disown 2>/dev/null || true
+  else outbox_flush_locked || true; fi
+}
+
+outbox_tick() {
+  local now next
+  [[ -s "$outbox_dir/pending-since" ]] || return 0
+  now="$(date +%s)"; next="$(cat "$outbox_dir/next-try" 2>/dev/null || echo 0)"; [[ "$next" =~ ^[0-9]+$ ]] || next=0
+  (( next <= now )) || return 0
+  ( outbox_flush_locked >/dev/null 2>&1 ) & disown 2>/dev/null || true
+}
+
+# Landed commits that GitHub does not have, found again after a restart that lost the pending marker.
+outbox_resume_check() {
+  case "$(pipeline_main_state "$checkout")" in
+    ahead*|diverged) outbox_mark_pending ;;
+  esac
+}
+
+outbox_cmd() {
+  case "${1:-status}" in
+    flush) outbox_flush_locked force || true; echo "outbox: $(outbox_summary)" ;;
+    status) echo "outbox: $(outbox_summary)" ;;
+    reset-to-github)
+      # Diverged only: park the landed-but-unpushed commits on a branch so nothing is lost, then follow GitHub's main.
+      local o p parked
+      GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$checkout" fetch -q origin main >/dev/null 2>&1 || true
+      o="$(git -C "$checkout" rev-parse --verify -q 'origin/main^{commit}')" || { error "no origin/main to follow; fetch and retry."; return 1; }
+      p="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+      if [[ -n "$p" && "$p" != "$o" ]] && ! git -C "$checkout" merge-base --is-ancestor "$p" "$o"; then
+        parked="wt/outbox-parked-$(date -u +%Y%m%d-%H%M%S)"
+        git -C "$checkout" branch "$parked" "$p" || { error "could not park the landed commits; nothing changed."; return 1; }
+        echo "parked the landed commits on $parked (land it again with land.sh from a worktree of that branch)"
+      fi
+      git -C "$checkout" update-ref "$PIPELINE_MAIN_REF" "$o"
+      outbox_clear
+      echo "outbox: the pipeline's main now follows GitHub main at ${o:0:7}" ;;
+    *) error "usage: bash scripts/lander.sh outbox [status|flush|reset-to-github]"; return 2 ;;
+  esac
+}
+
+outbox_summary() {
+  local state since now next tries err
+  state="$(pipeline_main_state "$checkout")"; now="$(date +%s)"
+  case "$state" in
+    sync|unknown) echo "GitHub main is in sync" ;;
+    diverged) echo "STUCK: GitHub main and the landed main diverged" ;;
+    ahead*)
+      since="$(cat "$outbox_dir/pending-since" 2>/dev/null || echo "$now")"; [[ "$since" =~ ^[0-9]+$ ]] || since="$now"
+      tries="$(cat "$outbox_dir/tries" 2>/dev/null || echo 0)"; next="$(cat "$outbox_dir/next-try" 2>/dev/null || echo 0)"; err="$(cat "$outbox_dir/last-error" 2>/dev/null || true)"
+      echo "main is ahead of GitHub by ${state#ahead } commits (oldest $(( (now - since) / 60 )) min), push retrying (try $tries${err:+, last error: $err})" ;;
+  esac
+}
+
 run_one() {
-  local request="$1" branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
+  local request="$1" base base_state ref_before local_branch branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
   local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
@@ -343,26 +516,38 @@ PY
     rm -f "$output"; return 0
   fi
   phase "fetching origin"
-  if ! GITNET_LABEL="fetch origin" gitnet -C "$checkout" fetch origin; then net_fail "$request" "$branch" "$sha" "fetch" "$started" "$output"; rm -f "$output"; return 0; fi
-  if git -C "$checkout" merge-base --is-ancestor "$sha" origin/main; then
-    main_sha="$(git -C "$checkout" rev-parse origin/main)"
+  # OUTBOX-01: GitHub being slow or down does not stop a landing. The fetch refreshes what GitHub has; when it fails the landing
+  # goes on from the pipeline's own main and the outbox catches GitHub up later.
+  if ! GITNET_LABEL="fetch origin" gitnet -C "$checkout" fetch origin; then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) GitHub did not answer the fetch; landing on the pipeline's own main" >> "$data/lander.log"; fi
+  base_state="$(pipeline_main_state "$checkout")"
+  if [[ "$base_state" == diverged ]]; then
+    hold_entry "$request" "$branch" "GitHub main has commits the landed main does not contain (STUCK); an owner must run bash scripts/pipeline.sh outbox reset-to-github"; rm -f "$output"; return 0
+  fi
+  ref_before="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+  base="$(pipeline_main_sha "$checkout")"
+  if [[ -z "$base" ]]; then bounce "$request" "$branch" "$sha" "the lander has no main to land on; run bash scripts/pipeline.sh checkout and land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
+  if git -C "$checkout" merge-base --is-ancestor "$sha" "$base"; then
+    main_sha="$base"
     seconds=$(( $(date +%s) - started ))
-    atomic_json_note "$branch" "$sha" landed "already on origin/main" "$main_sha" "$output" "$seconds" "$landing_note"
-    log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "already on origin/main"
+    atomic_json_note "$branch" "$sha" landed "already on main" "$main_sha" "$output" "$seconds" "$landing_note"
+    log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "already on main"
     rm -f "$request" "$output"
     echo "landed: $branch at $sha (already on main)"
     sweep_worktrees
     return 0
   fi
-  origin_branch="$(git -C "$checkout" rev-parse --verify "origin/$branch" 2>/dev/null || true)"
-  if [[ "$origin_branch" != "$sha" ]]; then bounce "$request" "$branch" "$sha" "branch not on origin at $sha; run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
-  prev_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo origin/main)"
+  # The branch's commits live in this repository (every worktree shares one object store), so the landing needs no GitHub copy of the branch.
+  if ! git -C "$checkout" cat-file -e "$sha^{commit}" 2>/dev/null; then bounce "$request" "$branch" "$sha" "commit $sha is not in this repository; run land.sh again from the worktree" "$started" "$output"; rm -f "$output"; return 0; fi
+  local_branch="$(git -C "$checkout" rev-parse --verify -q "refs/heads/$branch" 2>/dev/null || true)"
+  origin_branch="$(git -C "$checkout" rev-parse --verify -q "origin/$branch" 2>/dev/null || true)"
+  if [[ "$local_branch" != "$sha" && "$origin_branch" != "$sha" ]]; then bounce "$request" "$branch" "$sha" "branch $branch is no longer at $sha; run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
+  prev_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo "$base")"
   if ! git -C "$checkout" checkout --detach "$sha"; then bounce "$request" "$branch" "$sha" "could not check out $sha; inspect the warm checkout, then land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
   phase "rebasing"
-  if ! git -C "$checkout" rebase origin/main; then
+  if ! git -C "$checkout" rebase "$base"; then
     conflict="$(git -C "$checkout" diff --name-only --diff-filter=U || true)"
     git -C "$checkout" rebase --abort || true
-    reason="rebase conflict in: ${conflict:-unknown files}; rebase onto origin/main in your worktree, then land.sh again"
+    reason="rebase conflict in: ${conflict:-unknown files}; rebase onto origin/main in your worktree (fetch first), then land.sh again"
     bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
   fi
   local rebased_sha package_changed
@@ -430,7 +615,7 @@ PY
   phase "static check"
   run_static_check "$output" || { bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; }
 
-  changed_files="$(git -C "$checkout" diff --name-only origin/main...HEAD 2>/dev/null || true)"
+  changed_files="$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)"
   safety_files="$(safety_surface_files "$changed_files")"
   if [[ -n "$safety_files" ]]; then
     t2_started="$(date +%s)"
@@ -443,42 +628,31 @@ PY
     landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests took ${t2_seconds}s"
   fi
 
-  for attempt in 1 2 3; do
-    phase "pushing to main"
-    if GITNET_TRIES=2 GITNET_LABEL="push main" gitnet -C "$checkout" push origin HEAD:refs/heads/main; then
-      main_sha="$(git -C "$checkout" rev-parse HEAD)"
-      GITNET_TRIES=1 GITNET_TIMEOUT=45 GITNET_LABEL="delete remote branch" gitnet -C "$checkout" push origin --delete "$branch" >>"$data/lander.log" 2>&1 || echo "lander.sh: could not delete remote $branch; remove it when convenient." >&2
-      seconds=$(( $(date +%s) - started ))
-      atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds" "$landing_note"
-      log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
-      rm -f "$request" "$output"
-      echo "landed: $branch at $sha"
-      bounded_run "${MAIPAI_LAND_MAP_SECONDS:-120}" "worktree map" bash "$main/scripts/worktree-map.sh" build >>"$data/lander.log" 2>&1 || true
-      update_main_checkout
-      sweep_worktrees
-      return 0
-    fi
-    if (( GITNET_TIMED_OUT )); then net_fail "$request" "$branch" "$sha" "push" "$started" "$output"; rm -f "$output"; return 0; fi
-    if (( attempt == 3 )); then break; fi
-    before_rebase="$(git -C "$checkout" rev-parse HEAD)"
-    changed="$(git -C "$checkout" diff --name-only origin/main...HEAD || true)"
-    GITNET_LABEL="fetch origin (retry)" gitnet -C "$checkout" fetch origin || break
-    if ! git -C "$checkout" rebase origin/main; then
-      git -C "$checkout" rebase --abort || true
-      break
-    fi
-    after_rebase="$(git -C "$checkout" rev-parse HEAD)"
-    intersect=""
-    if [[ -n "$changed" ]]; then
-      intersect="$(comm -12 <(printf '%s\n' "$changed" | sort -u) <(git -C "$checkout" diff --name-only "$before_rebase" "$after_rebase" | sort -u))"
-    fi
-    if [[ -n "$intersect" ]]; then
-      phase "static check (after rebase)"
-      run_static_check "$output" || { bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; }
-    fi
-  done
-  bounce "$request" "$branch" "$sha" "main moved three times during landing; run land.sh again" "$started" "$output"
-  rm -f "$output"
+  # OUTBOX-01: land on the pipeline's own main. Only the lander moves this ref and the rebase above started from it, so the move is a
+  # plain fast-forward; GitHub gets it from the outbox right after (in the foreground for run-once, in the background in the daemon).
+  phase "landing on main"
+  main_sha="$(git -C "$checkout" rev-parse HEAD)"
+  if ! git -C "$checkout" merge-base --is-ancestor "$base" "$main_sha"; then
+    bounce "$request" "$branch" "$sha" "the landed main moved while this entry ran; run land.sh again" "$started" "$output"; rm -f "$output"; return 0
+  fi
+  # Compare-and-swap: the ref still holds what this entry started from, or the move is not made (a background flush may have moved it forward).
+  if ! git -C "$checkout" update-ref "$PIPELINE_MAIN_REF" "$main_sha" "${ref_before:-0000000000000000000000000000000000000000}" 2>/dev/null; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) landed main moved while $branch was being checked; the entry stays queued and starts again" >> "$data/lander.log"
+    rm -f "$output"; return 0
+  fi
+  outbox_mark_pending
+  printf '%s\n' "$branch" >>"$outbox_dir/delete-branches"
+  seconds=$(( $(date +%s) - started ))
+  atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds" "$landing_note"
+  log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
+  rm -f "$request" "$output"
+  echo "landed: $branch at $sha"
+  phase "pushing to GitHub"
+  outbox_kick
+  bounded_run "${MAIPAI_LAND_MAP_SECONDS:-120}" "worktree map" bash "$main/scripts/worktree-map.sh" build >>"$data/lander.log" 2>&1 || true
+  update_main_checkout
+  sweep_worktrees
+  return 0
 }
 
 run_once() {
@@ -518,11 +692,11 @@ try: print(json.load(open(sys.argv[1])).get('branch',''))
 except Exception: pass
 PY
 )"
-    if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer" "$(defer_dir)/$(basename "$newer")".n "$(defer_dir)/$(basename "$newer")".until; fi
+    if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer" "$(defer_dir)/$(basename "$newer")".n "$(defer_dir)/$(basename "$newer")".until "$(defer_dir)/$(basename "$newer")".reason; fi
   done
   run_one "$request"
   rm -f "$data/current-entry"
-  [[ -f "$request" ]] || rm -f "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until
+  [[ -f "$request" ]] || rm -f "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until "$(defer_dir)/$(basename "$request")".reason
   ring_waiters || true
 }
 
@@ -543,6 +717,8 @@ serve() {
   trap 'stop_requested=1; if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi' TERM INT HUP
   trap 'rm -f "$data/lander.pid"' EXIT
   if ! checkout_warm; then rm -f "$pidfile"; trap - EXIT; return 1; fi
+  serving=1
+  outbox_resume_check
   set +e
   while :; do
     now="$(date +%s)"
@@ -554,6 +730,7 @@ serve() {
         echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) code refreshed from origin/main; restarting lander" >> "$data/lander.log"
         exec bash "$bin/lander.sh" "$@"
       fi
+      outbox_resume_check
       REFRESH_SKIP_FETCH=1 refresh_snapshot gitnet.sh scripts/lib/gitnet.sh >/dev/null || true
       snapshot_hash="$(git -C "$main" hash-object "$bin/gitnet.sh" 2>/dev/null || true)"
       if [[ -n "$snapshot_hash" && "$snapshot_hash" != "$lib_hash" ]]; then
@@ -563,6 +740,7 @@ serve() {
     fi
     ring_waiters || true
     run_once || echo "lander.sh: run-once failed; inspect the request and lander.log, then restart with bash scripts/pipeline.sh start." >&2
+    outbox_tick
     if (( stop_requested )); then break; fi
     sleep "$poll" & sleep_pid=$!
     wait "$sleep_pid" || true
@@ -579,5 +757,6 @@ case "${1:-}" in
   checkout) checkout_warm ;;
   run-once) checkout_warm && run_once ;;
   serve) serve "$@" ;;
-  *) error "usage: bash scripts/lander.sh refresh | run-once | serve | checkout"; exit 2 ;;
+  outbox) shift; outbox_cmd "$@" ;;
+  *) error "usage: bash scripts/lander.sh refresh | run-once | serve | checkout | outbox [status|flush|reset-to-github]"; exit 2 ;;
 esac

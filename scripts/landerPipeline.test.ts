@@ -107,7 +107,7 @@ describe("lander pipeline", () => {
     git(main, "fetch", "origin");
     expect(run("lander.sh", ["run-once"]).status).toBe(0);
     expect(note("already_main").status).toBe("landed");
-    expect(note("already_main").reason).toBe("already on origin/main");
+    expect(note("already_main").reason).toBe("already on main");
     expect(queueFiles()).toHaveLength(0);
   }, 60_000);
 

@@ -8,7 +8,9 @@ live="${MAIPAI_SHIP_LIVE:-/usr/local/maipai-home}"
 git fetch -q origin main 2>/dev/null || echo "where.sh: could not fetch GitHub; using the last known origin/main." >&2
 short="$(git rev-parse --short "$sha")"
 echo "Change $short: $(git log -1 --format=%s "$sha" | cut -c1-80)"
-if git merge-base --is-ancestor "$sha" origin/main 2>/dev/null; then echo "GitHub main: yes"; else echo "GitHub main: NO (only in a branch or worktree: $(git branch --contains "$sha" --format='%(refname:short)' | head -3 | paste -sd, -))"; fi
+if git merge-base --is-ancestor "$sha" origin/main 2>/dev/null; then echo "GitHub main: yes"
+elif git rev-parse --verify -q 'refs/pipeline/main^{commit}' >/dev/null && git merge-base --is-ancestor "$sha" refs/pipeline/main 2>/dev/null; then echo "GitHub main: NOT YET (landed on the pipeline's main; the push to GitHub is pending: $(git rev-list --count origin/main..refs/pipeline/main 2>/dev/null || echo '?') commits ahead; see bash scripts/pipeline.sh status)"
+else echo "GitHub main: NO (only in a branch or worktree: $(git branch --contains "$sha" --format='%(refname:short)' | head -3 | paste -sd, -))"; fi
 tags="$(git tag --contains "$sha" 2>/dev/null | head -3 | paste -sd, -)"
 echo "Release tag: ${tags:-none}"
 tagfile="$live/.installed-tag"

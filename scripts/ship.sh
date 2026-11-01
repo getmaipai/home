@@ -11,7 +11,7 @@ common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a
 main="$(cd "$(dirname "$common")" && pwd -P)"
 cd "$(git rev-parse --show-toplevel)"
 # GITNET-01: remote git operations are bounded and retried (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
-if [[ -f scripts/lib/gitnet.sh ]]; then source scripts/lib/gitnet.sh; gitnet_env; else GITNET_TIMED_OUT=0; gitnet() { git "$@"; }; fi
+if [[ -f scripts/lib/gitnet.sh ]]; then source scripts/lib/gitnet.sh; gitnet_env; else GITNET_TIMED_OUT=0; gitnet() { git "$@"; }; PIPELINE_MAIN_REF=refs/pipeline/main; pipeline_main_state() { echo unknown; }; fi
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 [[ -z "$git_env" || ! -f "$git_env" ]] || source "$git_env"
 data="${MAIPAI_SHIP_DATA:-$main/data-scratch/ship}"
@@ -50,10 +50,17 @@ fi
 before_green=0; tag_after=0; dry=0; adopt_empty_live=0; allow_big_copy=0; reinstall=0; retry=0; target=main
 while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --allow-big-copy) allow_big_copy=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
-gitnet fetch origin || die "could not fetch origin$( ((GITNET_TIMED_OUT)) && echo ' (GitHub did not answer in time)'); check network access and retry."
+# A fetch GitHub does not answer only leaves origin/main at its last known value, which can make this check stricter, never looser.
+gitnet fetch origin || echo "ship.sh: GitHub did not answer$( ((GITNET_TIMED_OUT)) && echo ' in time'); judging against the last known origin/main." >&2
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
 else sha="$(git rev-parse --verify "$target^{commit}" 2>/dev/null)" || die "could not resolve $target to a commit; fetch or check the SHA and retry."; fi
-git merge-base --is-ancestor "$sha" origin/main || die "${sha:0:7} is not on origin/main; land it first with bash scripts/land.sh"
+if ! git merge-base --is-ancestor "$sha" origin/main; then
+  # OUTBOX-01: a commit can be landed (on the pipeline's main) before the outbox has pushed it. A hub install pins what GitHub has, so wait for it.
+  if git rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" >/dev/null && git merge-base --is-ancestor "$sha" "$PIPELINE_MAIN_REF" 2>/dev/null; then
+    die "${sha:0:7} is landed but not on GitHub main yet (the lander is still pushing it: $(pipeline_main_state . | sed 's/^ahead \([0-9]*\)$/main is ahead of GitHub by \1 commits/')); run bash scripts/pipeline.sh status, and ship again once it says 'GitHub main: in sync'."
+  fi
+  die "${sha:0:7} is not on origin/main; land it first with bash scripts/land.sh"
+fi
 label="sha-${sha:0:7}"
 if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
 # The live hub is the install on the Mac Studio. Keep its marker beside the

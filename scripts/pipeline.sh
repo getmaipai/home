@@ -19,7 +19,11 @@ git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 # GITNET-01: remote git operations are bounded (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; gitnet_env "$main"; else GITNET_TIMED_OUT=0; gitnet() { git "$@"; }; fi
+if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; gitnet_env "$main"; else
+  GITNET_TIMED_OUT=0; gitnet() { git "$@"; }
+  pipeline_main_sha() { git -C "${1:-.}" rev-parse --verify -q 'origin/main^{commit}'; }
+  pipeline_main_state() { echo unknown; }
+fi
 
 refresh_snapshot() {
   local script="$1" current="$bin/$1" tmp="$bin/$1.new"
@@ -229,6 +233,35 @@ if lander_up:
 PY
 }
 
+# OUTBOX-01: how far the pipeline's main is ahead of GitHub (landed commits the outbox has not pushed yet), one line.
+outbox_status() {
+  local state since tries next err now dir="$data/outbox"
+  state="$(pipeline_main_state "$main" 2>/dev/null || echo unknown)"; now="$(date +%s)"
+  case "$state" in
+    sync) echo "GitHub main: in sync" ;;
+    diverged) echo "STUCK: GitHub main and the landed main diverged; nothing is force-pushed. Run bash scripts/pipeline.sh outbox reset-to-github (it parks the landed commits on a branch first)" ;;
+    ahead*)
+      since="$(cat "$dir/pending-since" 2>/dev/null || echo "$now")"; [[ "$since" =~ ^[0-9]+$ ]] || since="$now"
+      tries="$(cat "$dir/tries" 2>/dev/null || echo 0)"; [[ "$tries" =~ ^[0-9]+$ ]] || tries=0
+      next="$(cat "$dir/next-try" 2>/dev/null || echo 0)"; [[ "$next" =~ ^[0-9]+$ ]] || next=0
+      err="$(cat "$dir/last-error" 2>/dev/null || true)"
+      if (( tries > 0 )); then
+        echo "GitHub main: main is ahead of GitHub by ${state#ahead } commits (oldest $(( (now - since) / 60 )) min), push retrying (try $tries$( (( next > now )) && echo ", next in $(( next - now ))s")${err:+, last error: $err})"
+      else
+        echo "GitHub main: main is ahead of GitHub by ${state#ahead } commits (oldest $(( (now - since) / 60 )) min), push pending"
+      fi ;;
+    *) echo "GitHub main: unknown (no origin/main in this clone yet)" ;;
+  esac
+}
+
+# outbox [status|flush|reset-to-github]: runs the lander's own outbox commands (the running daemon's copy of the code).
+outbox_cmd() {
+  local script="$bin/lander.sh"
+  [[ -f "$script" ]] || script="$main/scripts/lander.sh"
+  shift
+  bash "$script" outbox "${1:-status}"
+}
+
 status() {
   local fetched=1
   GITNET_TRIES=1 GITNET_TIMEOUT=20 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || fetched=0
@@ -238,6 +271,7 @@ status() {
   code_status lander.sh
   code_status watcher.sh
   watch_main_status
+  outbox_status
   local f branch sha requested age now queue_count vals deferred_note deferred_until
   queue_count="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | wc -l | tr -d ' ')"
   echo "queue: $queue_count"
@@ -257,7 +291,10 @@ except Exception: print(0)' "$requested" "$now")"
     deferred_note=""
     if [[ -f "$data/deferred/$(basename "$f").until" ]]; then
       deferred_until="$(cat "$data/deferred/$(basename "$f").until" 2>/dev/null || echo 0)"; [[ "$deferred_until" =~ ^[0-9]+$ ]] || deferred_until=0
-      if (( deferred_until > now )); then deferred_note=" (GitHub did not answer; try $(cat "$data/deferred/$(basename "$f").n" 2>/dev/null || echo 1), next in $(( deferred_until - now ))s)"; fi
+      if (( deferred_until > now )); then
+        if [[ -s "$data/deferred/$(basename "$f").reason" ]]; then deferred_note=" (held: $(cat "$data/deferred/$(basename "$f").reason"); next look in $(( deferred_until - now ))s)"
+        else deferred_note=" (GitHub did not answer; try $(cat "$data/deferred/$(basename "$f").n" 2>/dev/null || echo 1), next in $(( deferred_until - now ))s)"; fi
+      fi
     fi
     echo "  $branch ${sha:0:7} ${age}s$deferred_note"
   done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
@@ -328,7 +365,10 @@ elif kind == 'main-green':
 print(out)
 PY
 )"
-  if [[ -z "$result" && "$kind" == sha ]] && GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 && git -C "$main" merge-base --is-ancestor "$a1" origin/main 2>/dev/null; then result="landed $a1 (on origin/main)"; fi
+  if [[ -z "$result" && "$kind" == sha ]]; then
+    GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+    if git -C "$main" merge-base --is-ancestor "$a1" "$(pipeline_main_sha "$main" 2>/dev/null || echo origin/main)" 2>/dev/null; then result="landed $a1 (on main)"; fi
+  fi
   if [[ -n "$result" ]]; then echo "$result"; return 0; fi
   if (( tmo == 0 )); then echo "pipeline.sh: timed out waiting for $kind $a1" >&2; return 2; fi
   ( sleep "$tmo"; echo TIMEOUT >&3 ) &
@@ -401,6 +441,7 @@ case "${1:-}" in
   status) status ;;
   wait) wait_cmd "$@" ;;
   sweep) shift; sweep "$@" ;;
+  outbox) outbox_cmd "$@" ;;
   install-service) install_service "$@" ;;
   uninstall-service) uninstall_service ;;
   start)
@@ -470,5 +511,5 @@ case "${1:-}" in
       *) error "usage: bash scripts/pipeline.sh fsmonitor on | off | status"; exit 2 ;;
     esac
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | fsmonitor on|off|status | start | stop | stack off|on|status | sweep [--dry-run] | install-service [--load] | uninstall-service"; exit 2 ;;
+  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | fsmonitor on|off|status | start | stop | stack off|on|status | sweep [--dry-run] | outbox [status|flush|reset-to-github] | install-service [--load] | uninstall-service"; exit 2 ;;
 esac

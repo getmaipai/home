@@ -209,3 +209,36 @@ gitnet() {
   [[ "$err" == /dev/null ]] || rm -f "$err"
   return "$rc"
 }
+
+# OUTBOX-01 (2026-11-01): the pipeline's main and GitHub's main are two things. The lander lands a change on the local ref
+# refs/pipeline/main first (shared by every worktree of this repo; `git fetch` never touches it) and pushes it to GitHub from an
+# outbox afterwards, so a slow or failed push never blocks landing, the watcher's tests, a new worktree or dev.
+#
+#   pipeline_main_sha [repo]     the commit the pipeline treats as main: refs/pipeline/main while it descends from origin/main
+#                                (landed, maybe not on GitHub yet), otherwise origin/main.
+#   pipeline_main_state [repo]   one word and maybe a number: `sync` (same commit as origin/main), `ahead N` (N landed commits
+#                                GitHub has not got yet), `diverged` (GitHub main has commits the landed ones do not descend from;
+#                                nothing is ever force-pushed), or `unknown` (no origin/main in this clone).
+PIPELINE_MAIN_REF="${PIPELINE_MAIN_REF:-refs/pipeline/main}"
+
+pipeline_main_sha() {
+  local repo="${1:-.}" o p
+  o="$(git -C "$repo" rev-parse --verify -q 'origin/main^{commit}' 2>/dev/null || true)"
+  p="$(git -C "$repo" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+  if [[ -n "$p" && -n "$o" ]] && git -C "$repo" merge-base --is-ancestor "$o" "$p" 2>/dev/null; then printf '%s\n' "$p"; return 0; fi
+  if [[ -n "$o" ]]; then printf '%s\n' "$o"; return 0; fi
+  [[ -z "$p" ]] || printf '%s\n' "$p"
+}
+
+pipeline_main_state() {
+  local repo="${1:-.}" o p n
+  o="$(git -C "$repo" rev-parse --verify -q 'origin/main^{commit}' 2>/dev/null || true)"
+  p="$(git -C "$repo" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+  if [[ -z "$o" ]]; then echo unknown; return 0; fi
+  if [[ -z "$p" || "$p" == "$o" ]] || git -C "$repo" merge-base --is-ancestor "$p" "$o" 2>/dev/null; then echo sync; return 0; fi
+  if git -C "$repo" merge-base --is-ancestor "$o" "$p" 2>/dev/null; then
+    n="$(git -C "$repo" rev-list --count "$o..$p" 2>/dev/null || echo 0)"
+    echo "ahead $n"; return 0
+  fi
+  echo diverged
+}
