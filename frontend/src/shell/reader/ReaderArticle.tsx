@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArticleSpeechContext, ArticleView, type ArticleAction, type ArticlePreview } from "@maipai/ui/src/primitives/ArticleView";
-import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { ArticleSkeleton } from "@maipai/ui/src/primitives/ArticleSkeleton";
 import { api, ApiError, type ReferenceArticleView } from "@/lib/api";
 import { toArticleViewData } from "./articleData";
 import { useReferenceSaves } from "./saves";
@@ -68,7 +68,7 @@ export function ReaderArticle({ book, path, routeFor, appName, canDiscuss, onApp
   useEffect(() => { setKeyPoints(null); }, [storyId]);
   const discussable = canDiscuss === true && discussMessage(book, path).split("/").pop()!.length <= MAX_REF_ID;
   const available: ArticleAction[] = discussable ? [...ARTICLE_ACTIONS, "discuss"] : ARTICLE_ACTIONS;
-  if (query.isPending) return <RouteSkeleton label="Loading article" />;
+  if (query.isPending) return <ArticleSkeleton />;
   if (query.isError) {
     if (query.error instanceof ApiError && query.error.status === 404) return <>{unavailable ?? <p role="status">This article is not available.</p>}</>;
     return <p role="alert">Could not load this article.</p>;

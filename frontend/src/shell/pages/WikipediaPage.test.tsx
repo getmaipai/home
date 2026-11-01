@@ -102,6 +102,7 @@ describe("Wikipedia app", () => {
     fireEvent.click(within(view.getByRole("navigation", { name: "Wikipedia sections" })).getByRole("button", { name: "Saved" }));
     expect(await view.findByRole("link", { name: /Aurora/ })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Remove Aurora from Saved" }));
+    fireEvent.click(await view.findByRole("button", { name: "Remove" }));
     expect(await view.findByText(/Nothing saved yet/)).toBeTruthy();
   });
 
