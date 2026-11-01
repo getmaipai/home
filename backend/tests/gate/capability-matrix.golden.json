@@ -6246,6 +6246,492 @@
     "result": "allow"
   },
   {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max",
+    "capability": "tier.max",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_parent"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:needs_parent_unavailable"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_parent"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_parent"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:needs_parent_unavailable"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_parent"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "tier.max:<category>",
+    "capability": "tier.max:<category>",
+    "parameters": {
+      "tier.max:<category>": "image"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
     "id": "use:<package>",
     "capability": "use:storybook",
     "band": "child",
