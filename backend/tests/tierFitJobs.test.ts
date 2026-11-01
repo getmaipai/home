@@ -174,3 +174,21 @@ describe("a job that would fall below its pick asks, and the answer is wired", (
     await until(() => image.submitted.length === 1);
   });
 });
+
+describe("the cards carry the question so the buttons can answer it", () => {
+  test("a picture card and a video card give the owner fit_ask while asking, and null after the answer", async () => {
+    freeGb = 20; configure();
+    const { client, actor } = await signedIn();
+    const pic = await turn(actor, "generate_image", { tier: "boost" });
+    const vid = await turn(actor, "generate_video", { tier: "boost" });
+    await settle();
+    const card = async (path: string) => (await (await client.get(path)).json()) as { fit_ask?: { job_id: string } | null; items?: { fit_ask: { job_id: string } | null }[] };
+    const picCard = await card(`/api/pictures/jobs/${pic.picture!.id}`);
+    expect(picCard.fit_ask).toEqual({ job_id: pic.picture!.id });
+    const vidCard = await card(`/api/videos/jobs/${vid.video!.id}`);
+    expect(vidCard.items![0]!.fit_ask).toEqual({ job_id: vid.video!.id });
+    await client.post(`/api/ai/jobs/${pic.picture!.id}/fit-answer`, { answer: "wait" });
+    expect((await card(`/api/pictures/jobs/${pic.picture!.id}`)).fit_ask).toBeNull();
+  });
+});
+

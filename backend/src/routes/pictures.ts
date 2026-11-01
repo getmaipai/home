@@ -1,7 +1,7 @@
 // IMGGEN-UI-01: the picture card's routes. Signed-in, per person: a job is readable and stoppable by its owner only
 // (nobody sees another person's pictures, a parent included). Starting a variation passes the same age and surface
 // gate as the chat tool and the same prompt check, so a route is never a way around either (IMGGEN-SAFE-01).
-import { PERSISTED_HOLDS, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
+import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
@@ -45,6 +45,7 @@ const JobSchema = z.object({
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
   max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
   size: z.string().describe("The size being made, like 1024x1024."),
+  fit_ask: z.object({ job_id: z.string() }).nullable().describe("Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
 
@@ -98,7 +99,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
     id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? getLive(active.id)?.stageLabel : null) ?? phaseLabel(active, kid ? "child" : "adult") : "", position: active ? active.position : null,
     ...(active && active.state === "running" ? withheldFromYoung(actor, liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`)) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
-    error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
+    error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id, fit_ask: active && active.state === "queued" && !kid ? answerableFitAsk(actor, active.id) : null,
     can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
     ...qualityFields(last, detailedReadyNow, canVary && root.kind !== "edit" && !active),
     max_offered: canVary && root.kind !== "edit" && !active && !kid && maxOffered(actor, "image"),

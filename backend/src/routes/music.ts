@@ -1,5 +1,5 @@
 import { getPictureJob } from "@/lib/pictures/jobs";
-import { PERSISTED_HOLDS, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
+import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { pictureDenial } from "@/lib/pictures/policy";
 import { startSongCover } from "@/lib/music/cover";
@@ -55,6 +55,7 @@ const cardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
+  fit_ask: z.object({ job_id: z.string() }).nullable().describe("Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),
@@ -148,6 +149,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     conversation_id: root.temporary ? null : root.conversationId, made_from_file: root.request.ownedFile === true,
     id: root.id, task: root.task, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
+    fit_ask: root.state === "queued" && laneOf(musicRouteAudience(actor)) !== "child" ? answerableFitAsk(actor, root.id) : null,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
     versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job) })),

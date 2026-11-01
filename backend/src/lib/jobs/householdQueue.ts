@@ -298,6 +298,12 @@ export function pendingFitAsk(jobId: string, now = Date.now()): { personId: stri
   const left = fitAskTimeoutMs - (now - ask.askedAt);
   return left > 0 ? { personId: ask.personId, line: ask.line, secondsLeft: Math.ceil(left / 1000) } : null;
 }
+/** The card field for an open question: `{ job_id }` when the job is asking and this person may answer (the job's owner or an admin), else null. */
+export function answerableFitAsk(person: { id: string; role: string }, jobId: string): { job_id: string } | null {
+  const ask = pendingFitAsk(jobId);
+  if (!ask) return null;
+  return ask.personId === person.id || person.role === "owner" || person.role === "admin" ? { job_id: jobId } : null;
+}
 /** The person's answer: Allow runs the job at the lower tier now, Wait keeps it queued for the tier they picked. False when no question is open. */
 export function answerFitAsk(jobId: string, answer: "allow" | "wait"): boolean {
   const ask = fitAsks.get(jobId);
