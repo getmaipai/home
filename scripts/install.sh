@@ -679,6 +679,19 @@ restore_snapshot() {
   log "Restored your data from ${snap}"
 }
 
+# SHIP-ROLLBACK-02: the data copy is put back only when the failed upgrade got as far as starting the hub (the migrations).
+# A failure before that never touched the data, so the live data stays as it is.
+mark_migrations_started() { date +%s > "${1}/.migrations-started"; }
+rollback_restore_data() {
+  local root="$1" tag="$2"
+  if [ ! -f "${root}/.migrations-started" ]; then
+    log "The failed upgrade stopped before the migrations began, so your data was not changed and stays as it is."
+    return 0
+  fi
+  restore_snapshot "$root" "$tag" || return 1
+  rm -f "${root}/.migrations-started"
+}
+
 # ---- Logs: size-capped copies, daily, for the files launchd owns ----
 install_log_rotation() {
   local os="$1" dir="$2" plist="${LOGROTATE_PLIST:-/Library/LaunchDaemons/com.maipai.logrotate.plist}"
@@ -1945,13 +1958,16 @@ main() {
   local stack_only="no"
   local plan_flag="" plan_flag_seen="no"
   local plan_flag_count=0
-  local version_flag="" commit_flag="" rollback="no"
+  local version_flag="" commit_flag="" rollback="no" rollback_to=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dry-run) dry_run="yes" ;;
       --engine-computer) engine_computer="yes" ;;
       --stack-only) stack_only="yes" ;;
       --rollback) rollback="yes" ;;
+      --to)
+        [ "$#" -ge 2 ] || die "--to needs the release tag to go back to, such as v0.1.0 or sha-1234567."
+        rollback_to="$2"; shift ;;
       --version)
         [ "$#" -ge 2 ] || die "--version needs a release tag such as v0.1.0. Run bash scripts/install.sh --help for the next step."
         version_flag="$2"; shift ;;
@@ -2062,6 +2078,7 @@ main() {
 
   local tag
   if [ "$rollback" = "yes" ]; then
+    if [ -n "$rollback_to" ]; then previous_tag="$rollback_to"; fi
     [ -n "$previous_tag" ] || die "there is no earlier version to go back to: ${install_root}/.previous-tag does not exist. Rollback only works after an upgrade made by this installer."
     tag="$previous_tag"
   elif [ -n "$version_flag" ]; then
@@ -2149,6 +2166,8 @@ main() {
         || die "could not save a copy of your data before upgrading (is the disk full?). Nothing was changed. Free up space, then run the installer again."
       record_previous_tag "$install_root" "$installed_tag" "$tag"
     fi
+    # Cleared for every new upgrade; written again just before the service starts (when the migrations can first run).
+    if [ "$rollback" = "no" ]; then rm -f "${install_root}/.migrations-started"; fi
     rm -rf "${install_root}.new"
     fetch_release_source "$tag" "${install_root}.new" \
       || die "could not download ${REPO}@${tag}. Check that this computer can reach github.com, then run the installer again. Nothing was changed."
@@ -2171,12 +2190,12 @@ main() {
       --exclude=/data --exclude=/data.rolled-back-* --exclude=/backups --exclude=/received-backups \
       --exclude=/stack --exclude=/.bun --exclude=/upgrade-backups \
       --exclude=/backend/node_modules --exclude=/frontend/node_modules \
-      --exclude=/.installed-tag --exclude=/.previous-tag --exclude=/.stack-port-base --exclude=/.install-user \
+      --exclude=/.installed-tag --exclude=/.previous-tag --exclude=/.migrations-started --exclude=/.stack-port-base --exclude=/.install-user \
       "${install_root}.new/" "${install_root}/"
     rm -rf "${install_root}.new"
     INSTALL_STAGE="replaced"
     if [ "$rollback" = "yes" ]; then
-      restore_snapshot "$install_root" "$tag" || die "could not restore the data copy from ${tag}. Your current data is still in ${install_root}/data. Run the installer with --rollback again, or restore a copy by hand from ${install_root}/upgrade-backups."
+      rollback_restore_data "$install_root" "$tag" || die "could not restore the data copy from ${tag}. Your current data is still in ${install_root}/data. Run the installer with --rollback again, or restore a copy by hand from ${install_root}/upgrade-backups."
     fi
   else
     fetch_release_source "$tag" "$install_root" \
@@ -2228,6 +2247,8 @@ main() {
   fi
   valid_port "$stack_port" || stack_port="$STACK_PORT_BASE"
 
+  # From here the hub can start and run its migrations: a rollback must now bring the data copy back (SHIP-ROLLBACK-02).
+  mark_migrations_started "$install_root"
   if [ "$os" = "linux" ]; then
     ensure_service_user_linux
     install_stack_step_unit "$install_root"

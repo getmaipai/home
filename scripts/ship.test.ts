@@ -66,6 +66,28 @@ describe("ship pipeline", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad"); const out = run([sha]); expect(out.status).toBe(1);
     expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha + "\n--rollback"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"rolled_back"'); expect(out.stdout).toContain("rolled back to v0.0.1");
   }, 60_000);
+  test("(d) the rollback goes to the release that was live when the ship began", () => {
+    rmSync(join(scratch, "promote.calls"), { force: true });
+    writeFileSync(join(live, ".installed-tag"), "v0.0.7\n"); writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad");
+    const out = run([sha]); expect(out.status).toBe(1);
+    expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain("--rollback v0.0.7\n"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"before_tag":"v0.0.7"');
+  }, 60_000);
+  test("(e) a rollback that worked says the hub answers and never says it failed", () => {
+    writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad");
+    const out = run([sha]); expect(out.status).toBe(1); expect(out.stdout).toContain("rolled back to v0.0.1; hub answers"); expect(out.stdout).not.toContain("Rollback failed"); expect(out.stdout).not.toContain("unknown");
+  }, 60_000);
+  test("a failed rollback names the real data directory, not unknown", () => {
+    writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "promote.fail"), "x");
+    try { const out = run([sha]); expect(out.status).toBe(1); expect(out.stdout).toContain("Rollback failed"); expect(out.stdout).toContain(`data directory ${live}/data`); expect(out.stdout).not.toContain("unknown"); }
+    finally { rmSync(join(scratch, "promote.fail"), { force: true }); }
+  }, 60_000);
+  test("a promote that stopped before the install (exit 75) is not rolled back", () => {
+    rmSync(join(scratch, "promote.calls"), { force: true });
+    writeFileSync(join(watch, "green", sha), "green\n");
+    const p75 = join(scratch, "promote75"); writeFileSync(p75, "#!/usr/bin/env bash\necho \"$*\" >> '" + join(scratch, "promote.calls") + "'\nif [[ \"$1\" == --check ]]; then echo ok; exit 0; fi\nexit 75\n"); chmodSync(p75, 0o755);
+    const out = run([sha], { MAIPAI_PROMOTE_BIN: p75 }); expect(out.status).toBe(1);
+    expect(readFileSync(join(scratch, "promote.calls"), "utf8")).not.toContain("--rollback"); expect(out.stdout).toContain("aborted before the install started"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain("aborted_before_install");
+  }, 60_000);
   test("a commit that is already live and answering is not promoted again, unless asked", () => {
     const calls = () => (existsSync(join(scratch, "promote.calls")) ? readFileSync(join(scratch, "promote.calls"), "utf8") : "");
     rmSync(join(scratch, "health.fail"), { force: true });

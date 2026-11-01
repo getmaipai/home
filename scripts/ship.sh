@@ -190,7 +190,7 @@ if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   refused_file="$live/data/logs/launchd.err.log"; before_refused=0
   [[ -f "$refused_file" ]] && before_refused="$(grep -c 'app refused' "$refused_file" 2>/dev/null || true)" || true
   start="$(date +%s)"; log="$data/$start-${sha:0:7}.log"
-  if ! eval "$sudo_cmd \"$promote\" \"$sha\"" >"$log" 2>&1; then promote_status=1; else promote_status=0; fi
+  if eval "$sudo_cmd \"$promote\" \"$sha\"" >"$log" 2>&1; then promote_status=0; else promote_status=$?; fi
   expected_live_tag="$label"
   health_ok() {
     if [[ -n "$health_cmd" ]]; then eval "$health_cmd"; return $?; fi
@@ -202,12 +202,25 @@ if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   }
   wait_health() { local deadline=$(( $(date +%s) + health_timeout )); while (( $(date +%s) <= deadline )); do health_ok && return 0; sleep 2; done; return 1; }
   result=shipped
+  # The helper exits 64, 75 or 77 when it stopped before the installer started (SHIP-ROLLBACK-02): nothing was changed, so there is nothing to roll back.
+  if [[ "$promote_status" == 64 || "$promote_status" == 75 || "$promote_status" == 77 ]]; then
+    finish="$(date +%s)"; seconds=$((finish-start)); printf '{"ts":%s,"sha":"%s","label":"%s","before_tag":"%s","result":"aborted_before_install","before_green":%s,"seconds":%s}\n' "$finish" "$sha" "$label" "$before_tag" "$([[ $before_green == 1 ]] && echo true || echo false)" "$seconds" >> "$data/shipped.jsonl"
+    echo "ship aborted before the install started; the live hub was not touched and still runs $before_tag. Check the install log at $log, then run the ship again."; exit 1
+  fi
   if (( promote_status != 0 )) || ! wait_health; then
     expected_live_tag="$before_tag"
-    if eval "$sudo_cmd \"$promote\" --rollback" >>"$log" 2>&1 && wait_health; then result=rolled_back; outcome="rolled back to $(cat "$live/.installed-tag" 2>/dev/null || echo unknown)"; else
+    # Go back to the release that was live when this ship began, never an older one.
+    rollback_args="--rollback"; [[ "$before_tag" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+|sha-[0-9a-f]{7})$ ]] && rollback_args="--rollback $before_tag"
+    active_data="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("dataDir") or "")' "$lock_path" 2>/dev/null || true)"; [[ -n "$active_data" ]] || active_data="$live/data"
+    if eval "$sudo_cmd \"$promote\" $rollback_args" >>"$log" 2>&1; then
+      if wait_health || { if [[ -n "$health_cmd" ]]; then eval "$health_cmd" >/dev/null 2>&1; else curl -fsS "$web_url" >/dev/null 2>&1; fi; }; then
+        result=rolled_back; outcome="rolled back to $(cat "$live/.installed-tag" 2>/dev/null || echo "$before_tag"); hub answers (data directory $active_data)"
+      else
+        result=rollback_failed; outcome="Rolled back to $(cat "$live/.installed-tag" 2>/dev/null || echo "$before_tag"), but the hub is not answering at $web_url (data directory $active_data). Check the install log at $log."
+      fi
+    else
       result=rollback_failed
       if curl -fsS "$web_url" >/dev/null 2>&1; then answering="answering"; else answering="not answering"; fi
-      active_data="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("dataDir", "unknown"))' "$lock_path" 2>/dev/null || echo unknown)"
       outcome="Rollback failed. The live hub is $answering at $web_url and uses data directory $active_data. Check the install log at $log."
     fi
     finish="$(date +%s)"; seconds=$((finish-start)); printf '{"ts":%s,"sha":"%s","label":"%s","before_tag":"%s","result":"%s","before_green":%s,"seconds":%s}\n' "$finish" "$sha" "$label" "$before_tag" "$result" "$([[ $before_green == 1 ]] && echo true || echo false)" "$seconds" >> "$data/shipped.jsonl"
