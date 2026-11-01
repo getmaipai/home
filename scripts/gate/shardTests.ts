@@ -138,12 +138,14 @@ export function chooseShardCount(opts: {
   /** The one-minute load average. Workers are capped at the cores the host has left, never below two, so a Studio already at
    * load 60 to 90 (2026-10-30) is not handed ten more test processes by every gate and the watcher at once. */
   load?: number;
+  /** Floor for the load cap (default 2). The watcher raises it so a busy host cannot starve its own run down to two workers. */
+  minShards?: number;
 }): number {
   const reclaimableGb = Math.min(opts.freeGb, Math.max(0, (opts.totalGb ?? Number.POSITIVE_INFINITY) - (opts.engineGb ?? 0) - (opts.osReserveGb ?? 0)));
   const gbPerShard = opts.gbPerShard ?? 1.25;
   const byCores = Math.max(1, opts.cores - 2);
   const byMem = Math.max(1, Math.floor(reclaimableGb / gbPerShard));
-  const byLoad = opts.load === undefined || !Number.isFinite(opts.load) ? Number.POSITIVE_INFINITY : Math.max(2, opts.cores - Math.round(opts.load));
+  const byLoad = opts.load === undefined || !Number.isFinite(opts.load) ? Number.POSITIVE_INFINITY : Math.max(opts.minShards !== undefined && Number.isInteger(opts.minShards) && opts.minShards > 0 ? opts.minShards : 2, opts.cores - Math.round(opts.load));
   const safeMaximum = Math.max(1, Math.min(byCores, byMem, byLoad, opts.files, 16));
   const forced = Number.parseInt(opts.env ?? "", 10);
   if (Number.isInteger(forced) && forced > 0) return Math.min(forced, safeMaximum);
@@ -427,6 +429,7 @@ export async function run(opts: RunOptions): Promise<number> {
   const maxWorkers = files.length === 0 ? 0 : chooseShardCount({
     env: process.env.MAIPAI_GATE_SHARDS,
     cores: cpus().length, load: loadavg()[0],
+    minShards: Number.parseInt(process.env.MAIPAI_GATE_MIN_SHARDS ?? "", 10) || undefined,
     freeGb: initialResources.reclaimableGb + initialReservedGb,
     totalGb: initialResources.totalGb,
     engineGb,

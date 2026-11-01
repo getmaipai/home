@@ -109,11 +109,14 @@ run_suite() {
         frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-12}"; root=. ;;
         scripts) shards="${MAIPAI_WATCH_SCRIPTS_SHARDS:-8}"; root=. ;;
       esac
+      min_shards="${MAIPAI_WATCH_MIN_SHARDS:-8}"
+      [[ "$min_shards" =~ ^[0-9]+$ ]] || min_shards=8
+      (( min_shards > shards )) && min_shards="$shards"
       leg_limit="${MAIPAI_WATCH_LEG_MAX_SECONDS:-1500}"
       [[ "$leg_limit" =~ ^[0-9]+$ ]] || leg_limit=1500
       timed_out=""
       local_started="$(date +%s)"
-      (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && exec perl -e 'setpgrp(0, 0); exec @ARGV' -- bash -c 'started=$(date +%s); nice -n 10 bun scripts/gate/shardTests.ts --dir "$1" --root "$2" --shards "$3"; rc=$?; printf "%s %s\n" "$rc" "$(( $(date +%s) - started ))" > "$4"; exit "$rc"' _ "$leg" "$root" "$shards" "$leg_status") >"$leg_output" 2>&1 &
+      (cd "$checkout" && export MAIPAI_GATE_MIN_SHARDS="$min_shards" MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && exec perl -e 'setpgrp(0, 0); exec @ARGV' -- bash -c 'started=$(date +%s); nice -n ${MAIPAI_WATCH_NICE:-0} bun scripts/gate/shardTests.ts --dir "$1" --root "$2" --shards "$3"; rc=$?; printf "%s %s\n" "$rc" "$(( $(date +%s) - started ))" > "$4"; exit "$rc"' _ "$leg" "$root" "$shards" "$leg_status") >"$leg_output" 2>&1 &
       leg_pid=$!
       if (( leg_limit > 0 )); then
         ( sleep "$leg_limit"; if kill -0 "$leg_pid" 2>/dev/null; then : > "$leg_status.timeout"; kill -TERM -"$leg_pid" 2>/dev/null || true; sleep 10; kill -KILL -"$leg_pid" 2>/dev/null || true; fi ) &
@@ -176,10 +179,10 @@ failing_files() {
 
 rerun_file() {
   local file="$1" command="${MAIPAI_WATCH_RERUN_CMD:-}"
-  if [[ -n "$command" ]]; then (cd "$checkout" && nice -n 10 bash -c "$command \"\$1\"" _ "$file")
-  elif [[ "$file" == backend/* ]]; then (cd "$checkout/backend" && nice -n 10 bun test --timeout 20000 "${file#backend/}")
-  elif [[ "$file" == frontend/* ]]; then (cd "$checkout/frontend" && nice -n 10 bun test --timeout 20000 "${file#frontend/}")
-  elif [[ "$file" == scripts/* ]]; then (cd "$checkout" && nice -n 10 bun test --timeout 20000 "$file")
+  if [[ -n "$command" ]]; then (cd "$checkout" && nice -n ${MAIPAI_WATCH_NICE:-0} bash -c "$command \"\$1\"" _ "$file")
+  elif [[ "$file" == backend/* ]]; then (cd "$checkout/backend" && nice -n ${MAIPAI_WATCH_NICE:-0} bun test --timeout 20000 "${file#backend/}")
+  elif [[ "$file" == frontend/* ]]; then (cd "$checkout/frontend" && nice -n ${MAIPAI_WATCH_NICE:-0} bun test --timeout 20000 "${file#frontend/}")
+  elif [[ "$file" == scripts/* ]]; then (cd "$checkout" && nice -n ${MAIPAI_WATCH_NICE:-0} bun test --timeout 20000 "$file")
   else return 1
   fi
 }

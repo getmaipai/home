@@ -45,6 +45,12 @@ describe("readShardLog", () => {
 });
 
 describe("chooseShardCount", () => {
+  test("minShards raises the load floor but never beyond the file count", () => {
+    const base = { cores: 18, freeGb: 100, files: 100, load: 45 };
+    expect(chooseShardCount({ ...base })).toBe(2);
+    expect(chooseShardCount({ ...base, minShards: 8 })).toBe(8);
+    expect(chooseShardCount({ ...base, minShards: 8, files: 3 })).toBe(3);
+  });
   test("a loaded host gets fewer workers: cores left after the load, never below two, no cap when the load is unknown", () => {
     const base = { cores: 18, freeGb: 100, files: 100 };
     expect(chooseShardCount({ ...base })).toBe(16);
@@ -390,5 +396,14 @@ describe("gate probes under a launchd-style PATH", () => {
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
+  });
+});
+
+describe("watcher.sh shard floor", () => {
+  test("sets MAIPAI_GATE_MIN_SHARDS and no longer hardcodes nice -n 10", () => {
+    const text = require("node:fs").readFileSync(require("node:path").join(import.meta.dir, "..", "watcher.sh"), "utf8") as string;
+    expect(text).toContain("MAIPAI_GATE_MIN_SHARDS");
+    expect(text).toContain("MAIPAI_WATCH_NICE");
+    expect(text).not.toContain("nice -n 10");
   });
 });
