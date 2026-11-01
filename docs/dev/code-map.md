@@ -525,7 +525,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
-| `backend/src/lib/listActions.ts` | LIST_ACTIONS, PARENT_CAN_DO_THAT, runListAction |
+| `backend/src/lib/listActionNames.ts` | LIST_ACTIONS |
+| `backend/src/lib/listActions.ts` | PARENT_CAN_DO_THAT, runListAction |
 | `backend/src/lib/listContext.ts` | lastListContextFor |
 | `backend/src/lib/listResolver.ts` | similarity, fuzzy, visibleListById, resolveList, resolveItems, isListPronoun |
 | `backend/src/lib/lists.ts` | listLists, getList, createList, findOrCreateStandingList, updateList, deleteList |
