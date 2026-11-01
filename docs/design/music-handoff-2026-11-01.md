@@ -92,6 +92,20 @@ Jesse: station filters by country and genre are not enough (a German station can
 - Also planned in the same slice: a plain genre, country and language filter bar (Home already passes country and tag to the directory and the records carry language).
 - Not hard coded: no country list, genre map or "US" special case beyond the directory's own tag and country fields.
 
+## 5b. Review of a ChatGPT suggestion list (owner pasted it, 2026-11-01)
+
+Verdict: mostly the same plan, plus three useful additions. Details:
+- **Already in our plan:** library and player, persistent bands and albums, stems and a stem mixer, waveform editor (wavesurfer.js behind a kit `AudioEditor`), sound effects, practice mode, export, ACE-Step as the song engine, Stable Audio Open as an optional sound engine, covers as both artwork and musical covers (separate flows already), immutable takes and versions, the "Play this versus Edit this" boundary (we use no streaming provider and no scraping).
+- **Adopt (new):** (1) the band flow "create a band, make two song previews, approve its sound, then build the first album" becomes the band creator's order in slice C5; (2) store a band's approved reference tracks and generation settings, and bench whether the same band keeps one singer identity (ACE-Step reference audio or a small LoRA; a prompt or seed alone does not guarantee it) before promising it; (3) album-wide finishing: matched loudness (the existing loudness task), credits ("Made here" provenance) and sequencing on the album page.
+- **Do not adopt:** a separate Music service or a parallel `MusicEngine` interface (the Stack engine catalog and roles already carry capabilities and the S6 health row gates controls; a second interface breaks org principle 1); a project file format in v1 (the main note stores mix levels and trim points in the job request); Navidrome (GPLv3 server, Home scans folders itself; an optional "connect your server" slice stays later); Music Assistant and room playback (later, with the robot and Apple TV clients); Tone.js (only if the stem mixer needs sample-accurate scheduling; start with the kit Player and the Web Audio API); streaming-provider SDKs (MusicKit, Spotify) are out of scope and the "never extract audio from a provider" line is already our rule.
+- **Check before relying on:** `mlx-audio-separator` as another stem option beside the measured Demucs path (TIER-STEMS-03 already plans model options); Rubber Band is GPL or commercial (ffmpeg `atempo` first; our product is AGPL-3.0, so GPL code is compatible, but verify the build). Its own claims about ACE-Step's REST server and MLX scripts match what the Stack already uses.
+- **Uploaded demos and "generate accompaniment" from a person's recording:** still closed (MUSIC-GEN-14 is Jesse's decision; stems of an owned file are never a creative source).
+
+## 5c. Made radio (owner, 2026-11-01)
+
+Stations that write their own songs while the previous one plays, with save, previous, and a unique title, band and cover for every song:
+designed in [music-made-radio-2026-11-01.md](music-made-radio-2026-11-01.md) (proposed, architect ruling pending, slice G1 after P1 and C1 to C5).
+
 ## 6. Practical notes for the next session
 
 - `wt.sh start` needs `bun` on the PATH: `export PATH="$HOME/.bun/bin:$PATH"`. Source `data-scratch/bin/https-git.env` before any git, `wt.sh` or push.
