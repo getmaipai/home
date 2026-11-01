@@ -9,6 +9,9 @@ export const REMINDER_ACTIONS = ["create_reminder", "edit_reminder", "snooze_rem
 /** Alarm actions on `timer`. `set_alarm`, `cancel_alarm` and `list_alarms` exist in alarmCalls.ts; the rest are ASSIST-REMIND-01. */
 export const ALARM_ACTIONS = ["set_alarm", "edit_alarm", "enable_alarm", "disable_alarm", "skip_next_alarm", "cancel_alarm", "delete_alarm", "list_alarms"] as const;
 
+/** Timer actions on `timer` that are not alarm actions: report the time left on running timers. */
+export const TIMER_ACTIONS = ["list_timers"] as const;
+
 /** ASSIST-UNDO-03: takes back the speaker's latest change; on both tools. */
 export const UNDO_ACTION = "undo";
 
@@ -20,7 +23,7 @@ export const EXISTING_FOLDS = {
 
 export const ACTIONS_BY_TOOL: Record<"remind" | "timer", readonly string[]> = {
   remind: [...LIST_ACTIONS, ...REMINDER_ACTIONS, UNDO_ACTION],
-  timer: [...ALARM_ACTIONS, UNDO_ACTION],
+  timer: [...ALARM_ACTIONS, ...TIMER_ACTIONS, UNDO_ACTION],
 };
 
 /** What a call with no `action` means: a plain reminder on `remind`, a plain timer on `timer`. */

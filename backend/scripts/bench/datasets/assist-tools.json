@@ -1559,6 +1559,26 @@
    ]
   },
   {
+   "id": "al-33",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "How much time is left on my timer",
+   "tool": "timer",
+   "action": "list_timers",
+   "keyArgs": {},
+   "split": "dev"
+  },
+  {
+   "id": "al-34",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "What timers do I have running",
+   "tool": "timer",
+   "action": "list_timers",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
    "id": "un-05",
    "area": "alarms",
    "kind": "positive",
