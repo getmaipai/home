@@ -243,6 +243,8 @@ main ${args.join(" ")}`]);
     mkdirSync(join(root, "install"));
     writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
     writeFileSync(join(root, "install", ".previous-tag"), "v0.0.8\n");
+    // A finished upgrade leaves the migrations marker in place (SHIP-ROLLBACK-02), so rolling back that release restores its data copy.
+    writeFileSync(join(root, "install", ".migrations-started"), "1\n");
     try {
       const trace = join(root, "trace");
       const stubs = `
