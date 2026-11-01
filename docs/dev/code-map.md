@@ -929,7 +929,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/policy.ts` | argsGrounded, policyNode |
 | `backend/src/lib/turnMachine/nodes/safety.ts` | safetyNode, safetyRoute, inputSafetyAfterFailure, applySafety |
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
-| `backend/src/lib/turnMachine/research.ts` | RESEARCH_ANSWER_CLAUSE, answerStyleFor, budgetForStyle, isResearchStyle, firstRoundNote, researchProgress |
+| `backend/src/lib/turnMachine/research.ts` | RESEARCH_ANSWER_CLAUSE, answerStyleFor, THINKING_ALLOWANCE_FACTOR, budgetForStyle, isResearchStyle, firstRoundNote |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
 | `backend/src/lib/turnMachine/toolGates.ts` | __resetToolGateLatchForTests, budgetWithTurnToolGates |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
