@@ -56,15 +56,15 @@ function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
   return <HeaderSearch scope={{ label }} remote={remote} />;
 }
 
-/** The app's search and mode switch, centred in the free space between the title and the buttons. Registered in the header's left slot
- * (after the title) because that group is the one that grows; the right group only holds what sits beside the avatar. */
+/** The app's search and mode switch, centred on the whole header row (the sticky header is its positioning parent), so it sits over the
+ * middle of the right pane whatever the title and the buttons weigh. Registered in the header's left slot; the right group only holds what sits beside the avatar. */
 function PackageAppHeaderCenter() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   if (!state) return null;
   const { header } = state;
   const modes = header?.modes ?? [];
   return (
-    <div className="flex min-w-0 flex-1 items-center justify-center gap-3" data-testid="app-header-center">
+    <div className="absolute left-1/2 top-1/2 flex w-max max-w-[calc(100%-26rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-3" data-testid="app-header-center">
       {header?.search && state.searchTo ? <AppSearch label={state.label} searchTo={state.searchTo} /> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
