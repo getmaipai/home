@@ -233,3 +233,69 @@ export async function checkClaims(text: string, evidence: readonly string[], jud
   });
   return { text: out.join(""), checked, unsupported: unsupportedAt.size, skipped: noText + (jobs.length - checked) };
 }
+
+/** One model call that writes searches: a prompt in, text out, or null when the model is unavailable. */
+export type QueryWriter = (prompt: string) => Promise<string | null>;
+
+/** The titles the searches so far returned, one per line with their site, for the query writer to take names from. */
+export function resultDigest(outcomes: readonly ToolExecutionOutcome[], max = 24): string {
+  const lines: string[] = [];
+  for (const outcome of outcomes) {
+    if (outcome.packageId !== "websearch") continue;
+    const data = outcome.result?.data as { rows?: { title?: unknown; snippet?: unknown; url?: unknown }[] } | undefined;
+    for (const row of data?.rows ?? []) {
+      if (lines.length >= max) return lines.join("\n");
+      const site = typeof row.url === "string" ? (() => { try { return new URL(row.url).hostname.replace(/^www\./, ""); } catch { return ""; } })() : "";
+      lines.push(`- ${site}: ${String(row.title ?? "").slice(0, 110)}. ${String(row.snippet ?? "").slice(0, 140)}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+/** The prompt for the query writer: a dedicated step that writes the next searches for this question. It names no subject and no
+ * angle of its own; the angles come from the question and the names from the question and the results already read. */
+export function queryWriterPrompt(utterance: string, progress: ResearchProgress, digest: string, count: number): string {
+  const searched = progress.queries.length > 0 ? progress.queries.map((q) => `- ${q}`).join("\n") : "(none yet)";
+  const found = digest.trim() === "" ? "(nothing read yet)" : digest;
+  return `You write web searches for a research assistant.
+The person asked: "${utterance.replace(/"/g, "'")}"
+
+Searches already run:
+${searched}
+
+What the results showed so far (site: title, snippet):
+${found}
+
+Write up to ${count} new web searches. Rules:
+- Each search is specific: the exact name of the subject, the year or version when known, and ONE angle. A search with only a bare name is too vague.
+- Choose the angles that matter for this particular question and vary them (what happened and why; what the people involved said in interviews or official statements; what came after; how it was received; the original documents). Split a question that has several parts into one search per part.
+- Take names only from the question or from the results shown above. Never add a name from your own memory. If the results do not yet say who made or ran the subject, write a search that finds that first.
+- Never repeat or lightly reword a search already run. If a result was thin, write the search again with the names and titles the results gave.
+- For any part of the question still unanswered or backed by one site, write a search that targets it.
+Reply with one JSON object and nothing else: {"queries": ["...", "..."]}`;
+}
+
+export function parsePlannedQueries(text: string): string[] {
+  try {
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { queries?: unknown };
+    return Array.isArray(parsed.queries) ? parsed.queries.filter((q): q is string => typeof q === "string" && q.trim().length > 3).map((q) => q.trim().slice(0, 140)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The searches the writer proposes, minus any that repeats an earlier search of the turn or an earlier proposal. Empty when the writer is unavailable. */
+export async function writeQueries(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<string[]> {
+  let reply: string | null = null;
+  try { reply = await writer(queryWriterPrompt(utterance, progress, digest, count)); } catch { reply = null; }
+  if (reply === null) return [];
+  const kept: string[] = [];
+  for (const query of parsePlannedQueries(reply)) if (!isRepeatQuery([...progress.queries, ...kept], query)) kept.push(query);
+  return kept.slice(0, count);
+}
+
+/** Added to a research round's note when the query writer proposed searches. The model still chooses what to search. */
+export function suggestedSearchesNote(queries: readonly string[]): string {
+  if (queries.length === 0) return "";
+  return ` Searches worth running, written for this question: ${queries.map((q) => `"${q.replace(/"/g, "'")}"`).join("; ")}. Run them one at a time, reword one if you have a better idea, and skip any that no longer matter.`;
+}

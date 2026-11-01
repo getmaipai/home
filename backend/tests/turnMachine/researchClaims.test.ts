@@ -68,3 +68,27 @@ describe("the claim check", () => {
     expect(evidence[1]).toContain("snippet b");
   });
 });
+
+describe("the query writer", () => {
+  test("its prompt names no subject of its own, carries the question, the searches already run and the results, and bans memory names", async () => {
+    const { queryWriterPrompt } = await import("@/lib/turnMachine/research");
+    const prompt = queryWriterPrompt("why did the show end", { queries: ["show ended why"], sites: ["a.example"] }, "- a.example: A title. A snippet.", 4);
+    expect(prompt).toContain("why did the show end");
+    expect(prompt).toContain("- show ended why");
+    expect(prompt).toContain("a.example: A title");
+    expect(prompt).toContain("Never add a name from your own memory");
+    expect(prompt).not.toMatch(/miniseries|franchise|network|comic/i);
+  });
+
+  test("proposals that repeat an earlier search or each other are dropped, the rest kept in order", async () => {
+    const { writeQueries } = await import("@/lib/turnMachine/research");
+    const writer = async () => JSON.stringify({ queries: ["show ended why cancelled", "the show ended, why cancelled", "interview with the producers about the planned ending", "interview with the producers about the planned ending!"] });
+    const kept = await writeQueries(writer, "q", { queries: ["show ended why cancelled"], sites: [] }, "", 4);
+    expect(kept).toEqual(["interview with the producers about the planned ending"]);
+  });
+
+  test("a down, throwing or unreadable writer proposes nothing", async () => {
+    const { writeQueries } = await import("@/lib/turnMachine/research");
+    for (const writer of [async () => null, async () => { throw new Error("down"); }, async () => "not json"]) expect(await writeQueries(writer, "q", { queries: [], sites: [] }, "", 4)).toEqual([]);
+  });
+});

@@ -1,4 +1,4 @@
-import { NO_WEB_RESULTS_CLAUSE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress } from "../research";
+import { NO_WEB_RESULTS_CLAUSE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -9,7 +9,7 @@ import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // come from the same call turnNext.ts forwards to the client.
 import { foldedBlock } from "@/lib/systemFold";
 import { notePrefix } from "@/lib/prefixPrewarm";
-import { startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
+import { complete, startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { missingRequired } from "@/lib/capabilities";
@@ -766,6 +766,19 @@ function noToolsTurn(state: TurnState): boolean {
  * byte-identical to a call that already failed is dropped, and when nothing is
  * left the round becomes the phrasing round. The model still decides what to
  * try (rule 1); no word rule picks the tool. */
+let queryWriterOverride: QueryWriter | undefined;
+/** Tests: replaces the query writer (the chat model, one short non-thinking call); undefined restores it. */
+export function __setQueryWriterForTests(writer: QueryWriter | undefined): void { queryWriterOverride = writer; }
+/** RESEARCH-QUERY-01: how many searches the writer proposes per round (the first round plans the whole question). */
+const WRITER_QUERIES_FIRST = 6;
+const WRITER_QUERIES_LATER = 3;
+function chatQueryWriter(signal: AbortSignal): QueryWriter {
+  return async (prompt) => {
+    const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 320, temperature: 0.3, thinking: false, signal });
+    return result.ok ? result.value.text : null;
+  };
+}
+
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
   const result = await modelRound(state, input, signal);
   if (!input.retry || result.output.kind !== "tool_calls") return result;
@@ -979,7 +992,9 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const history = recovered?.history ?? state.messages;
     const evidenceChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
-    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, researchProgress(state.outcomes), roundsLeft)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}` };
+    const progressSoFar = researchProgress(state.outcomes);
+    const proposed = await writeQueries(queryWriterOverride ?? chatQueryWriter(signal), input.utterance, progressSoFar, resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
+    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}` };
     messages = phrasedOutcomes.length === 0
       ? [...history, nudge]
       : [...history, toolCallAssistantMessage(phrasedOutcomes), ...toolResultMessages(phrasedOutcomes, evidenceChars, promptSurfaceClass !== "written", certaintyGate, sourceNumberOffsets(state.outcomes)), nudge];
@@ -999,7 +1014,9 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 
   // RESEARCH-TIER-01: the first round of a research turn is told it may search more than once (Max: split the question first).
   // `state.messages` keeps the messages without the note, so the answering round does not repeat it.
-  const firstRoundMessages = researching && toolsAllowed && !continuing && !input.retry && !isPhrasingRound && state.outcomes.length === 0 ? withResearchNote(messages, firstRoundNote(state.answerStyle!, state.budget.rounds)) : null;
+  const firstRoundWanted = researching && toolsAllowed && !continuing && !input.retry && !isPhrasingRound && state.outcomes.length === 0;
+  const firstRoundQueries = firstRoundWanted ? await writeQueries(queryWriterOverride ?? chatQueryWriter(signal), input.utterance, researchProgress([]), "", Math.min(WRITER_QUERIES_FIRST, state.budget.rounds)) : [];
+  const firstRoundMessages = firstRoundWanted ? withResearchNote(messages, `${firstRoundNote(state.answerStyle!, state.budget.rounds)}${suggestedSearchesNote(firstRoundQueries)}`) : null;
   state.messages = continuing ? state.messages : messages;
   if (firstRoundMessages) messages = firstRoundMessages;
   if (!isPhrasingRound) state.lastTools = tools;

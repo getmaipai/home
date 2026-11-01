@@ -21,6 +21,7 @@ import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
 import { __setClaimJudgeForTests } from "@/lib/turnMachine/nodes/answer";
+import { __setQueryWriterForTests } from "@/lib/turnMachine/nodes/model";
 
 let people: BenchPeople;
 let searx: ReturnType<typeof Bun.serve>;
@@ -59,6 +60,7 @@ beforeEach(() => {
   searxQueries = [];
   sameResults = false;
   __setClaimJudgeForTests(async () => '{"supported": true}');
+  __setQueryWriterForTests(async () => null);
   searx = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -78,6 +80,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __setClaimJudgeForTests(undefined);
+  __setQueryWriterForTests(undefined);
   searx.stop(true);
   registerActiveChatLease(null);
   __setPageReaderForTests(null);
@@ -189,6 +192,19 @@ describe("research rounds follow the answer style", () => {
     const { result } = await turn("owner", 1);
     expect(calls).toBe(0);
     expect(result.value.reply.text).not.toContain("not confirmed");
+  });
+
+  test("the query writer's searches reach the first round and each later round, and a writer that is down changes nothing", async () => {
+    await holdMax();
+    const prompts: string[] = [];
+    __setQueryWriterForTests(async (prompt) => { prompts.push(prompt); return JSON.stringify({ queries: [prompts.length === 1 ? "first planned search about the series ending" : "second planned search using found names", "V series 2009 reboot"] }); });
+    const { requests } = await turn("owner", 2, { max: true });
+    const first = requests.find((r) => toolMessages(r).length === 0 && r.tool_choice !== "none")!;
+    expect(first.messages.filter((m) => m.role === "user").at(-1)!.content!.toString()).toContain("first planned search about the series ending");
+    const second = requests.find((r) => toolMessages(r).length === 1 && r.tool_choice !== "none")!;
+    expect(second.messages.at(-1)!.content!.toString()).toContain("second planned search using found names");
+    expect(prompts[1]).toContain("V series 2009 reboot".split(" ")[0]!); // the later prompt lists the searches already run
+    expect(prompts[1]).toContain("Searches already run");
   });
 
   test("Max stops at twelve rounds", async () => {
