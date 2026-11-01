@@ -62,8 +62,8 @@ tag blocks them. It does not: the pinned tag directory is the immutable one, but
    and work in the path it prints last.
 2. Add the prop or variant with a test beside it in commons. Run that package's own test and `tsc --noEmit`, then commit by file name.
 3. Land on commons main from that worktree with `bash scripts/wt.sh land`. If it refuses, stop and report why.
-4. Do not tag. A new `ui-vX.Y.Z` tag is a library release, and only Jesse says yes to it. Stop there and end the report with
-   `STATE: blocked [Jesse: yes to tag ui-vX.Y.Z]`, naming the commons commit that holds the change.
+4. Tag it yourself. A new `ui-vX.Y.Z` tag is a library release; Jesse decided (2026-11-01) that sessions take their own
+   recommendation on tags, spec changes and releases and do not ask. Cut and push the next tag from the landed commons commit.
 5. After the tag exists, the Home change is the normal pin bump in this file's first section, then the screen change that uses the new prop.
 
 ## Running the gate: prerequisites, docs scope and the lock
