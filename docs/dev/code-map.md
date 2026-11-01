@@ -20,12 +20,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/albums.json` | music | Albums |
 | `backend/packages/music/pages/artist.json` | music | Artist |
 | `backend/packages/music/pages/artists.json` | music | Artists |
+| `backend/packages/music/pages/create.json` | music | Create |
 | `backend/packages/music/pages/index.json` | music | Listen now |
 | `backend/packages/music/pages/liked.json` | music | Liked |
 | `backend/packages/music/pages/play.json` | music | Now playing |
 | `backend/packages/music/pages/playlist.json` | music | Playlist |
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
 | `backend/packages/music/pages/radio.json` | music | Radio |
+| `backend/packages/music/pages/search.json` | music | Search |
 | `backend/packages/music/pages/songs.json` | music | Songs |
 | `backend/packages/music/pages/station.json` | music | Station |
 | `backend/packages/news/pages/channel.json` | news | Channel |
@@ -52,9 +54,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/shows/pages/shows.json` | shows | Shows |
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
+| `backend/packages/videos/pages/create.json` | videos | Create |
 | `backend/packages/videos/pages/history.json` | videos | History |
 | `backend/packages/videos/pages/index.json` | videos | Videos |
 | `backend/packages/videos/pages/library.json` | videos | Library |
+| `backend/packages/videos/pages/search.json` | videos | Search |
 | `backend/packages/videos/pages/watch-later.json` | videos | Watch later |
 | `backend/packages/videos/pages/watch.json` | videos | Watch |
 | `backend/packages/weather/pages/index.json` | weather | Weather |
@@ -587,6 +591,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/search.ts` | searchMedia |
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
+| `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/memory.ts` | validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord, remember |
