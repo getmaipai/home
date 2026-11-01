@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test";
 import { headerFor } from "@/lib/apps";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
-import type { PersonRow } from "@/db/schema";
+import type { PersonRow } from "@/types";
 
 const person = (role: string): PersonRow => ({ role } as PersonRow);
 const manifest = { id: "demo", min_role: "child" } as PackageManifest;
