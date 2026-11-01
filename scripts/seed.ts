@@ -2,6 +2,7 @@
 import { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { seedToursDisabledForCapture } from "./screenshotTourSeed";
+import { DEMO_ALBUMS, writeDemoMusic } from "./seedMusic";
 
 export interface SeedOptions {
   baseUrl: string;
@@ -10,6 +11,8 @@ export interface SeedOptions {
   stackUrl?: string | null;
   searxngUrl?: string | null;
   homePlace?: string | null;
+  /** False skips the demo music (the default is to seed it). */
+  music?: boolean;
 }
 
 export interface SeedResult {
@@ -109,7 +112,54 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
       method: "PUT", cookie, body: JSON.stringify({ scope: "household", key: "household.home", value: entity.id }),
     }), "setting household.home failed");
   }
+  if (options.music !== false) await seedDemoMusic(options.baseUrl, options.dataDir, cookie);
   return { cookie, people };
+}
+
+const DEMO_STATIONS = [
+  { name: "Porchlight FM", url: "https://radio.example.com/porchlight", tags: ["indie", "chill"], country_code: "US", codec: "mp3", bitrate_kbps: 128 },
+  { name: "Quill Radio", url: "https://radio.example.com/quill", tags: ["folk", "acoustic"], country_code: "US", codec: "aac", bitrate_kbps: 96 },
+];
+
+/** MUSIC-DEMO-01: generated tunes, covers and lyrics in a folder of the dev data directory, added as a library folder, then a playlist,
+ * a liked set, some history and two saved stations. The lookups that call outside services are switched off first, so seeding sends
+ * nothing anywhere. The station addresses are example.com placeholders: they show on the pages but do not play. */
+async function seedDemoMusic(baseUrl: string, dataDir: string, cookie: string): Promise<void> {
+  for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia"]) {
+    await requireOk(await request(baseUrl, "/api/settings", { method: "PUT", cookie, body: JSON.stringify({ scope: "household", key, value: false }) }), `setting ${key} failed`);
+  }
+  const folder = join(dataDir, "demo-music");
+  writeDemoMusic(folder);
+  const added = await request(baseUrl, "/api/media/sources", { method: "POST", cookie, body: JSON.stringify({ label: "Demo music", path: folder, kinds: ["track"], prune: false }) });
+  await requireOk(added, "adding the demo music folder failed");
+  const expected = DEMO_ALBUMS.reduce((sum, album) => sum + album.tracks.length, 0);
+  const byTitle = new Map<string, string>();
+  for (let attempt = 0; attempt < 120 && byTitle.size < expected; attempt++) {
+    const page = await request(baseUrl, "/api/media/items?kind=track&limit=200", { cookie });
+    await requireOk(page, "listing demo tracks failed");
+    for (const item of (await page.json() as { items: { id: string; title: string }[] }).items) byTitle.set(item.title, item.id);
+    if (byTitle.size < expected) await Bun.sleep(500);
+  }
+  if (byTitle.size < expected) throw new Error(`the demo music scan found ${byTitle.size} of ${expected} tracks`);
+  const idOf = (title: string): string => byTitle.get(title) ?? (() => { throw new Error(`demo track ${title} was not scanned`); })();
+
+  const playlistResponse = await request(baseUrl, "/api/media/collections", { method: "POST", cookie, body: JSON.stringify({ kind: "playlist", title: "Evening wind-down" }) });
+  await requireOk(playlistResponse, "making the demo playlist failed");
+  const playlist = await playlistResponse.json() as { id: string };
+  for (const title of ["Lamp and Lullaby", "Low Tide", "Porch Light", "Morning Fog", "Fireflies", "Small Hours"]) {
+    await requireOk(await request(baseUrl, `/api/media/collections/${playlist.id}/items`, { method: "POST", cookie, body: JSON.stringify({ media_id: idOf(title) }) }), `adding ${title} to the playlist failed`);
+  }
+  for (const title of ["Paper Lanterns", "Night Shift", "Sunday Drive", "Fiddle Road", "Window Seat"]) {
+    await requireOk(await request(baseUrl, "/api/media/collections/liked/items", { method: "POST", cookie, body: JSON.stringify({ media_id: idOf(title) }) }), `liking ${title} failed`);
+  }
+  for (const [title, seconds] of [["Sunday Drive", 24], ["Window Seat", 24], ["Chrome Garden", 24], ["Orchard Gate", 24], ["Kitchen Dance", 9]] as const) {
+    await requireOk(await request(baseUrl, `/api/media/progress/${idOf(title)}`, {
+      method: "PUT", cookie, body: JSON.stringify({ position: { seconds }, duration_s: 24, event: seconds >= 24 ? "finish" : "play", immediate: true }),
+    }), `recording a play of ${title} failed`);
+  }
+  for (const station of DEMO_STATIONS) {
+    await requireOk(await request(baseUrl, "/api/plugins/music/radio/stations", { method: "POST", cookie, body: JSON.stringify(station) }), `saving station ${station.name} failed`);
+  }
 }
 
 function parseArgs(args: string[]): SeedOptions {

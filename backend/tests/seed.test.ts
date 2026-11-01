@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { waitForBackendPort } from "../../scripts/screenshotRuntime";
 import { seedDemoHousehold } from "../../scripts/seed";
+import { coverPng, DEMO_ALBUMS, synthTune, wavWithId3 } from "../../scripts/seedMusic";
 import { TOUR_AUTOSTART_SETTING } from "../../scripts/screenshotTourSeed";
 
 const backendDir = join(import.meta.dir, "..");
@@ -77,6 +78,27 @@ describe("seedDemoHousehold", () => {
     const entities = await entitiesResponse.json() as { id: string; name: string }[];
     const home = settings.find((setting) => setting.key === "household.home")?.value;
     expect(entities.find((entity) => entity.id === home)?.name).toBe("Seattle, WA");
+  });
+
+  test("seeds demo music: tracks, a playlist, likes, stations, and the outside lookups off", async () => {
+    const get = async (path: string) => (await fetch(`${base}${path}`, { headers: { Cookie: seeded.cookie } })).json() as Promise<any>;
+    const tracks = await get("/api/media/items?kind=track&limit=200");
+    expect(tracks.total).toBe(DEMO_ALBUMS.reduce((sum, album) => sum + album.tracks.length, 0));
+    expect(new Set(tracks.items.map((item: { artist?: string; subtitle?: string }) => item.artist ?? item.subtitle))).toEqual(new Set(DEMO_ALBUMS.map((album) => album.artist)));
+    const collections = await get("/api/media/collections") as { kind: string; title: string; items: unknown[] }[];
+    expect(collections.find((entry) => entry.kind === "playlist")?.items.length).toBe(6);
+    expect(collections.find((entry) => entry.kind === "liked")?.items.length).toBe(5);
+    const stations = await get("/api/plugins/music/radio/stations") as unknown;
+    expect(JSON.stringify(stations)).toContain("Porchlight FM");
+    const settings = await get("/api/settings?scope=household") as { key: string; value: unknown }[];
+    for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia"]) expect(settings.find((setting) => setting.key === key)?.value).toBe(false);
+  }, 60_000);
+
+  test("demo music files are generated, tagged and small", () => {
+    expect(coverPng(120, "x", 32).subarray(1, 4).toString()).toBe("PNG");
+    const wav = wavWithId3(synthTune("Test", 1), Buffer.from("ID3"));
+    expect(wav.subarray(0, 4).toString()).toBe("RIFF");
+    expect(DEMO_ALBUMS.flatMap((album) => [album.artist, album.album, ...album.tracks.map((track) => track.title)]).join(" ")).not.toMatch(/\b(beatles|taylor|drake)\b/i);
   });
 
   test("command form prints a JSON result", async () => {
