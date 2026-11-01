@@ -4,6 +4,7 @@
 // Max switches live here and nowhere else (RULES.md S4).
 import vocab from "@maipai/spec/vocab/resource-tiers.json";
 import type { AiJobId } from "../../../../shared/aiChoices";
+import { SLOT_LEVELS_READ, SLOT_OPTIONS_READ } from "../../../../shared/tierSlotOptions";
 
 export type SlotTier = "reduced" | "standard" | "boost" | "max";
 export type SlotWho = "everyone" | "assigned" | "admins";
@@ -22,11 +23,16 @@ export const TIERED_JOBS: Partial<Record<AiJobId, { category: string; role: stri
 };
 
 export const slotKey = (role: string, tier: SlotTier) => `engines.${role}.tier.${tier}`;
-export const optionDefs = (category: string): OptionDef[] => (vocab.categories.find((c) => c.id === category)?.options ?? []) as OptionDef[];
+/** The options a slot of this category may carry that something reads (`SLOT_OPTIONS_READ`): the dialog offers no switch that does nothing. */
+export const optionDefs = (category: string): OptionDef[] => ((vocab.categories.find((c) => c.id === category)?.options ?? []) as OptionDef[]).filter((def) => (SLOT_OPTIONS_READ[category] ?? []).includes(def.id));
 const whoDefault = (tier: SlotTier): SlotWho => (vocab.who_default as Record<string, SlotWho>)[tier] ?? "everyone";
 
-/** Tiers an admin can configure for a category. Reduced is the system's own, offered only for chat as "Let big jobs simplify chat". */
-export const configurableTiers = (job: AiJobId): SlotTier[] => (job === "chat" ? ["standard", "boost", "max", "reduced"] : ["standard", "boost", "max"]);
+/** Tiers an admin can configure for a category: the levels something reads (`SLOT_LEVELS_READ`). Reduced is the system's own, offered only for chat as "Let big jobs simplify chat". */
+export const configurableTiers = (job: AiJobId): SlotTier[] => {
+  const category = TIERED_JOBS[job]?.category ?? "";
+  const levels: SlotTier[] = [...(SLOT_LEVELS_READ[category] ?? ["standard"])];
+  return job === "chat" ? [...levels, "reduced"] : levels;
+};
 
 /** The stored value of a slot key read as a draft; anything unreadable reads as the tier's default slot. */
 export function draftOf(stored: unknown, tier: SlotTier): SlotDraft {
@@ -63,20 +69,23 @@ export function whoChoices(tier: SlotTier): SlotWho[] {
 export function consequences(drafts: SlotDrafts, job: AiJobId, title: string): string[] {
   const lines: string[] = [];
   const name = title.toLowerCase();
-  if (!isOn(drafts.boost)) lines.push(`Boost is off for ${name}. A request for Boost is made at Standard, and Boost jobs not yet started are made at Standard.`);
-  if (!isOn(drafts.max)) lines.push(`Max is off for ${name}. Nobody can start a Max window for it, including admins. A Max job already running finishes.`);
+  const levels = configurableTiers(job);
+  if (levels.includes("boost") && !isOn(drafts.boost)) lines.push(`Boost is off for ${name}. A request for Boost is made at Standard, and Boost jobs not yet started are made at Standard.`);
+  if (levels.includes("max") && !isOn(drafts.max)) lines.push(`Max is off for ${name}. Nobody can start a Max window for it, including admins. A Max job already running finishes.`);
   if (job === "chat" && !isOn(drafts.reduced)) lines.push("Big jobs will not simplify chat, so a Max job that needs more room than the rest leaves is not offered.");
-  if (isOn(drafts.boost) && drafts.boost.model !== "recommended" && drafts.boost.model === drafts.standard.model && JSON.stringify(drafts.boost.options) === JSON.stringify(drafts.standard.options)) lines.push("Boost is the same as Standard, so Boost will be hidden.");
+  if (levels.includes("boost") && isOn(drafts.boost) && drafts.boost.model !== "recommended" && drafts.boost.model === drafts.standard.model && JSON.stringify(drafts.boost.options) === JSON.stringify(drafts.standard.options)) lines.push("Boost is the same as Standard, so Boost will be hidden.");
   return lines;
 }
 
 /** The one line under a row on AI and models: what each level is, in words. A person's name or an app's name never appears (making-space note section 9); Max says who holds it. */
 export function levelsLine(drafts: SlotDrafts, job: AiJobId, models: ReadonlyArray<{ id: string; label: string }>): string {
   const name = (d: SlotDraft) => !isOn(d) ? "off" : d.model === "recommended" ? "recommended" : models.find((m) => m.id === d.model)?.label ?? "your pick";
-  const parts = [`Standard: ${name(drafts.standard)}`, `Boost: ${name(drafts.boost)}`];
-  parts.push(!isOn(drafts.max) ? "Max: off" : drafts.max.model === "recommended" ? "Max: no model of its own yet" : `Max: ${name(drafts.max)}`);
+  const levels = configurableTiers(job);
+  const parts = [`Standard: ${name(drafts.standard)}`];
+  if (levels.includes("boost")) parts.push(`Boost: ${name(drafts.boost)}`);
+  if (levels.includes("max")) parts.push(!isOn(drafts.max) ? "Max: off" : drafts.max.model === "recommended" ? "Max: no model of its own yet" : `Max: ${name(drafts.max)}`);
   if (job === "chat") parts.push(`Simplify chat for big jobs: ${isOn(drafts.reduced) ? "on" : "off"}`);
-  return `${parts.join(" · ")}. Max is for admins and anyone an admin assigns.`;
+  return `${parts.join(" · ")}.${levels.includes("max") ? " Max is for admins and anyone an admin assigns." : ""}`;
 }
 
 export const FAMILY_NOTE = "Models in one family keep the same look and voice at every level, and switch faster.";

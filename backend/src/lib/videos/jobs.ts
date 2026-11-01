@@ -16,6 +16,8 @@ import { allVideoAdapters } from "./adapters";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { videoBodyForSlot } from "./slotBody";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
@@ -159,7 +161,12 @@ async function releaseVideo(job: VideoJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
     const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
-    const submitted = await submitVideo({ ...(storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds }), timeout_ms: 1 });
+    // TIER-HOME-04: the level's saved slot is read now, so the pick made in the dialog is what this job runs with.
+    const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
+    const base = storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds };
+    const slotted = owner ? videoBodyForSlot(base, requestTier(job.request), speakerAgeBand(owner, new Date()), laneOfPerson(owner)) : null;
+    if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
+    const submitted = await submitVideo({ ...(slotted?.body ?? base), timeout_ms: 1 });
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job; liveJobs.set(job.id, job); persistVideoJob(job);
     void ensureKeyframeHelper();

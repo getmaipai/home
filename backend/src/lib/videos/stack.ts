@@ -105,6 +105,8 @@ export interface VideoBody {
   audience: "all-ages" | "adult";
   /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;
+  /** TIER-HOME-04: the level the job runs at, from the slot (`lib/videos/slotBody.ts`); left out at Standard. */
+  tier?: "boost" | "max";
   timeout_ms: number;
 }
 

@@ -21,10 +21,10 @@ describe("summarize", () => {
     expect(max).toMatchObject({ tier: "max", model: "Off", kind: "off" });
   });
 
-  test("chat lists the simplify level and it starts off", () => {
+  test("chat lists Standard and the simplify level (nothing reads a chat Boost or Max pick), and simplify starts off", () => {
     const levels = summarize({ ...row, job: "chat" } as GlanceRow, drafts(), null);
-    expect(levels.map((l) => l.tier)).toEqual(["standard", "boost", "max", "reduced"]);
-    expect(levels[3]).toMatchObject({ kind: "off" });
+    expect(levels.map((l) => l.tier)).toEqual(["standard", "reduced"]);
+    expect(levels[1]).toMatchObject({ kind: "off" });
   });
 });
 

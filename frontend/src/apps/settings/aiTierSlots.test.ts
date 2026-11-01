@@ -29,8 +29,18 @@ describe("slot drafts", () => {
     expect(configurableTiers("videos")).toEqual(["standard", "boost", "max"]);
   });
 
-  test("the chat options come from the spec: thinking is a switch", () => {
-    expect(optionDefs("chat").find((o) => o.id === "thinking")?.type).toBe("boolean");
+  test("only levels something reads are offered: chat and voice have Standard alone (chat adds Reduced), music has no Max", () => {
+    expect(configurableTiers("chat")).toEqual(["standard", "reduced"]);
+    expect(configurableTiers("voice")).toEqual(["standard"]);
+    expect(configurableTiers("music")).toEqual(["standard", "boost"]);
+    expect(consequences(drafts({ max: withOn(draftOf(undefined, "max"), false), boost: withOn(draftOf(undefined, "boost"), false) }), "voice", "Voice")).toEqual([]);
+    expect(levelsLine(drafts(), "chat", [])).toBe("Standard: recommended · Simplify chat for big jobs: off.");
+  });
+
+  test("only options something reads are offered, with their types from the spec", () => {
+    expect(optionDefs("video").map((o) => o.id)).toEqual(["resolution", "length_seconds"]);
+    expect(optionDefs("video").find((o) => o.id === "length_seconds")?.type).toBe("number");
+    for (const category of ["chat", "image", "music", "voice"]) expect(optionDefs(category)).toEqual([]);
   });
 
   test("consequence lines say what a switch does before it is saved", () => {
@@ -43,8 +53,8 @@ describe("slot drafts", () => {
   });
 
   test("the levels line names models and states, never a person or an app", () => {
-    const line = levelsLine(drafts({ max: withOn(draftOf(undefined, "max"), false) }), "chat", []);
-    expect(line).toBe("Standard: recommended · Boost: recommended · Max: off · Simplify chat for big jobs: off. Max is for admins and anyone an admin assigns.");
+    const line = levelsLine(drafts({ max: withOn(draftOf(undefined, "max"), false) }), "videos", []);
+    expect(line).toBe("Standard: recommended · Boost: recommended · Max: off. Max is for admins and anyone an admin assigns.");
     expect(levelsLine(drafts({ max: draftOf({ model: "big-one", options: {} }, "max") }), "videos", [{ id: "big-one", label: "Big One" }])).toContain("Max: Big One");
     expect(levelsLine(drafts(), "videos", [])).toContain("Max: no model of its own yet");
   });

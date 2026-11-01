@@ -98,6 +98,28 @@ export function slotOptionsFor(category: TierCategory, tier: Tier, band: AgeBand
   return optionsForBand(category, readSlot(category, tier).options, band);
 }
 
+/** What a job queued at `requested` runs with right now (TIER-HOME-04): the saved slot's model and options. */
+export interface SlotRun {
+  /** The level it really runs at: a level whose slot is switched off is made at the level below it, down to Standard. */
+  tier: Tier;
+  lowered: boolean;
+  /** The slot's model id; null when it is `recommended` (the resolver's own pick) or the level is Standard (Standard's model is the role's own choice). */
+  model: string | null;
+  options: Record<string, TierOptionValue>;
+}
+
+/**
+ * The ONE place a saved slot record (`engines.<role>.tier.<tier>`) is turned into what a job runs with. Every category's Stack request is built from
+ * this, read when the job is sent, so changing a level's model in the AI and models dialog changes the next job at that level and an `off` level
+ * makes the job at Standard (the dialog's consequence text). Age gates ran before this and are not loosened: a minor's options are the defaults.
+ */
+export function slotRun(category: TierCategory, requested: Tier, band: AgeBand): SlotRun {
+  let tier = requested;
+  while (tier !== "standard" && slotIsOff(category, tier)) tier = LADDER[LADDER.indexOf(tier) - 1]!;
+  const slot = readSlot(category, tier);
+  return { tier, lowered: tier !== requested, model: tier === "standard" || slot.model === "recommended" || slot.model === "off" ? null : slot.model, options: slotOptionsFor(category, tier, band) };
+}
+
 /** Quick is Standard and Detailed is Boost. A person who may not use Boost here gets Quick, whatever was asked or the household default says. */
 export function allowedQuality(person: PersonRow, category: TierCategory, quality: "quick" | "detailed", band?: AgeBand): "quick" | "detailed" {
   if (quality === "quick") return quality;

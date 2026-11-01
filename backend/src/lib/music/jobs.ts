@@ -19,6 +19,8 @@ import { provenanceFor } from "./commercial";
 import { m4aSeconds } from "./m4a";
 import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { slotRun } from "@/lib/tiers";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
 export { getMusicJobFor, jobsForConversation, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
@@ -44,13 +46,27 @@ registerQueueProvider(() => {
       save: () => { job.position = queued.position ?? null; if (queued.riseReason && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(queued.riseReason)) job.stage = `held:${queued.riseReason}`; else if (job.stage?.startsWith("held:")) job.stage = "queued"; persistMusicJob(job); } };
   });
 });
+/**
+ * TIER-HOME-04: the Stack body of a song at the level it was queued at, with that level's saved slot read now (`slotRun`, lib/tiers.ts). A level
+ * switched off since the song was queued is sent at Standard (the Quick maker, no tier). The music engine has one model, so the slot's model is
+ * not sent; its options are not read by the engine (`SLOT_OPTIONS_READ`, shared/tierSlotOptions.ts).
+ */
+export function slotBodyFor(job: MusicJob, base: Omit<MusicBody, "timeout_ms">): Omit<MusicBody, "timeout_ms"> {
+  const body = { ...base }; delete body.tier;
+  if (body.task === "edit") return body;
+  const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
+  const run = slotRun("music", requestTier(job.request), owner ? speakerAgeBand(owner, new Date()) : "child");
+  if (run.lowered) { body.quality = "quick"; const request = job.request as { quality?: string; tier?: string }; request.quality = "quick"; request.tier = "standard"; }
+  if (run.tier === "boost" || run.tier === "max") body.tier = run.tier;
+  return body;
+}
 async function releaseMusic(job: MusicJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
     const storedBody = (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody;
     const submitted = job.task === "stems"
       ? { job: await submitStems(storedBody?.source ?? "", storedBody?.source_sha256 ?? "", storedBody?.origin), done: null }
-      : await submitMusic({ ...(storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
+      : await submitMusic({ ...slotBodyFor(job, storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
     if (job.state !== "queued" || !liveJobs.has(job.id)) { void cancelOrDeleteMusic(submitted.job); return; }
     job.stackJob = submitted.job; saveMusicJob(job);
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();

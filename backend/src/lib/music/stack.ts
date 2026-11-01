@@ -14,6 +14,7 @@ export interface MusicBody {
   task: "text2music" | "cover" | "repaint" | "extend" | "edit";
   caption: string; lyrics?: string; instrumental?: boolean; duration_s: number;
   bpm?: number; key?: string; language?: string; seed?: number; quality?: "quick" | "detailed";
+  /** TIER-HOME-04: the level the song runs at, from the slot (`slotBodyFor` in lib/music/jobs.ts); left out at Standard. */ tier?: "boost" | "max";
   source?: string; source_sha256?: string; from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end";
   strength?: number; edit?: { op: "trim" | "fade" | "loudness"; from_s?: number; to_s?: number; seconds?: number; where?: "in" | "out" | "both"; lufs?: number };
   /** Stems only: an audio file the person owns, which the Stack may split and nothing else. */ origin?: "owned_file";
