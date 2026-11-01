@@ -52,6 +52,15 @@ A station is a described sound that keeps making songs: "late-night synthwave fo
 - **Variations:** "More like this" starts a branch of the station from one song; "Remake this" uses the existing song tasks.
 - **Share:** a station and its kept songs follow the normal household share pointer (private by default).
 
+## 3a. After you keep it: edit the song, the band, the album (owner, 2026-11-01)
+
+A kept song is an ordinary made song, so everything Create does works on it, with no separate "station song" path:
+- **Edit the song:** the Song page and its Edit tools (rewrite a part, extend, restyle, instrumental, stems, new lyrics, new cover, rename) with versions; the original take is never lost. An edit can also start from the Now Playing screen ("Edit this song"). Editing a song that is not kept yet keeps it first, so no work is lost.
+- **Edit the band:** keeping a song also adds its house band to the Library as a band (`made-artist`), so the Band page exists for it. Rename it, rewrite the back story, change members, remake the portrait or logo, change its style words. The band is one record that songs point to, so a rename shows everywhere at once; audio already made is not rewritten, and new style words apply to songs made after the change (the page says so in plain words).
+- **Edit the album:** a person can gather kept songs by one band into an album (an `album` collection): order, cover, liner notes, matched loudness. Moving a song between bands or albums is an edit of its album and artist fields, never a new file.
+- **From chat:** the existing `edit_music` for songs, and `make_band` with an edit mode for the band (no new tool per field), both inside the conditional music set and its cap of 5. The Station card carries "Edit this song" and "Edit this band" buttons that open the same pages.
+- **Gates:** edits run the song gates again (policy, as-sung check for sung changes), exactly as an edit in Create.
+
 ## 4. Chat and Create (rule S7, proposed)
 
 - Chat tool `make_station` (conditional music set, rule 1): describe a station, get a **Station card** (a kit Element in `commons`): the
@@ -72,7 +81,7 @@ surface rules. No outbound connection: every model runs in the Stack.
 | # | Size | Slice | Done when |
 |---|---|---|---|
 | G1a | M | Bench: sustained songs per hour with chat and a picture job running, Standard and p64; tier buffer defaults | the measured numbers are in this note |
-| G1b | L | Station engine: record reuse, house bands, rolling buffer, title and band uniqueness index, keep, previous, expiry | a station plays three songs back to back with the next generated during the previous; Keep adds a Library song; Previous replays the earlier file |
+| G1b | L | Station engine: record reuse, house bands, rolling buffer, title and band uniqueness index, keep (adds the song and its band to the Library), previous, expiry | a station plays three songs back to back with the next generated during the previous; Keep adds a Library song and its band; Previous replays the earlier file; the kept song and its band both open in Create and edit |
 | G1c | M | Station card, `make_station`, Create Stations section | the same card draws in chat and Create; a station starts from a sentence |
 
 Preview at 1440 and 390 wide against the leader benchmark (main note, section 6a) before handing over.
