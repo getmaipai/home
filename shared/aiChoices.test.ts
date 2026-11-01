@@ -42,11 +42,11 @@ function component(overrides: Partial<AiComponentLike> & { id: string }): AiComp
   };
 }
 
-test("builds the nine job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
+test("builds the ten job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
     const result = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
-    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "vision", "coding"]);
+    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding"]);
     for (const card of result.cards) {
       if (card.choices.length === 0) {
         expect(card.unavailable).not.toBeNull();
