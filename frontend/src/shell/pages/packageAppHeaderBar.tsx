@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components
 import HeaderSearch, { type SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
 import type { AppRow } from "@/lib/api";
 import { navigateOf } from "@/shell/useAppSidebar";
+import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { getIcon } from "@maipai/ui/src/icons";
 import { iconNames } from "@maipai/ui/src/icons";
 
@@ -55,24 +56,41 @@ function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
   return <HeaderSearch scope={{ label }} remote={remote} />;
 }
 
+/** The app's search and mode switch, centred in the free space between the title and the buttons. Registered in the header's left slot
+ * (after the title) because that group is the one that grows; the right group only holds what sits beside the avatar. */
+function PackageAppHeaderCenter() {
+  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
+  if (!state) return null;
+  const { header } = state;
+  const modes = header?.modes ?? [];
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-center gap-3" data-testid="app-header-center">
+      {header?.search && state.searchTo ? <AppSearch label={state.label} searchTo={state.searchTo} /> : null}
+      {modes.length > 1 && state.mode ? (
+        <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
+          <TabsList variant="pill" aria-label={`${state.label} mode`}>
+            {modes.map((mode) => <TabsTrigger key={mode.id} value={mode.id}>{mode.label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
+      ) : null}
+    </div>
+  );
+}
+
+/** The header's left slot for a package app: the page title, then the centred search and modes. */
+export function PackageAppHeaderLeft() {
+  return <><PageHeaderTitle /><PackageAppHeaderCenter /></>;
+}
+
 export function PackageAppHeaderActions() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   const navigate = useNavigate();
   if (!state) return null;
   const { header } = state;
   const open = (action: unknown) => { const target = navigateOf(action); if (target) navigate(target.to, { state: { pageState: target.state } }); };
-  const modes = header?.modes ?? [];
   const primary = header?.actions?.primary;
   const more = header?.actions?.more ?? [];
   return <>
-    {header?.search && state.searchTo ? <AppSearch label={state.label} searchTo={state.searchTo} /> : null}
-    {modes.length > 1 && state.mode ? (
-      <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
-        <TabsList variant="pill" aria-label={`${state.label} mode`}>
-          {modes.map((mode) => <TabsTrigger key={mode.id} value={mode.id}>{mode.label}</TabsTrigger>)}
-        </TabsList>
-      </Tabs>
-    ) : null}
     {primary ? <Button type="button" onClick={() => open(primary.open)}>{primary.label}</Button> : null}
     {more.length > 0 ? (
       <DropdownMenu>

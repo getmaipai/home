@@ -1,5 +1,4 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
@@ -24,7 +23,7 @@ import { navigateOf, useAppSidebar } from "@/shell/useAppSidebar";
 import { rememberMode, rememberedMode, resolveMode, sidebarInMode } from "@/shell/appHeaderModes";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
-import { PackageAppHeaderActions, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
+import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import "./packageAppNews.css";
 
@@ -203,7 +202,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // On a phone the app's name and its two icon buttons live in the shell's top bar, not in a row of the page.
   const phone = useIsPhoneLayout();
   const inShellBar = phone && app !== undefined;
-  useHeaderExtra(PageHeaderTitle, PackageAppHeaderActions);
+  useHeaderExtra(PackageAppHeaderLeft, PackageAppHeaderActions);
   // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Search last when the
   // app has a search page; a page that plays something (a video, a book) draws no bar.
   const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search")) : null;
@@ -318,12 +317,12 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
   const framed = sidebarProps ? (
-    <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
+    <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
       <SectionSidebar standalone density="compact" {...sidebarProps} />
       {content}
     </div>
   ) : content;
-  return media && hubActive ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
+  return media && hubActive ? <MediaHubFrame packageId={packageId} railed={sidebarProps !== null}>{framed}</MediaHubFrame> : framed;
 }
 
 /** Where an app's search sends the typed words: the search node's `submit` navigate target. */

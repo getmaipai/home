@@ -10,7 +10,7 @@ import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/h
 
 /** MEDIA-HUB-05: the media hub's left column, beside the page content: the media apps the person may open as the kit's one section
  * sidebar. The app rows come from the same shared catalog the app pages read (`useAppRows` via `mediaNav`), in the hub's own order. */
-export function MediaHubFrame({ packageId, children }: { packageId: string; children: ReactNode }) {
+export function MediaHubFrame({ packageId, railed = false, children }: { packageId: string; railed?: boolean; children: ReactNode }) {
   useHeaderExtra(PageHeaderTitle);
   const rows = useAppRows();
   const navigate = useNavigate();
@@ -43,8 +43,8 @@ export function MediaHubFrame({ packageId, children }: { packageId: string; chil
     navigate(`/media/search?q=${encodeURIComponent(q)}`);
   };
   return (
-    <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="media-hub-frame" data-testid="media-hub-frame">
-      <SectionSidebar standalone density="compact" search={{ value: draft, onChange: setDraft, label: "Search Media", onSubmit: submitSearch }} groups={[{ id: "media-apps", items }]} />
+    <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="media-hub-frame" data-testid="media-hub-frame">
+      <SectionSidebar standalone density="compact" collapsed={railed} collapsedStyle="rail" search={{ value: draft, onChange: setDraft, label: "Search Media", onSubmit: submitSearch }} groups={[{ id: "media-apps", items }]} />
       {children}
     </div>
   );
