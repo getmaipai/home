@@ -59067,6 +59067,19 @@
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
@@ -59095,6 +59108,7 @@
                     "switch_to",
                     "max_offered",
                     "size",
+                    "fit_ask",
                     "stop_id"
                   ]
                 }
@@ -59405,6 +59419,19 @@
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
@@ -59433,6 +59460,7 @@
                     "switch_to",
                     "max_offered",
                     "size",
+                    "fit_ask",
                     "stop_id"
                   ]
                 }
@@ -59726,6 +59754,19 @@
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
@@ -59754,6 +59795,7 @@
                     "switch_to",
                     "max_offered",
                     "size",
+                    "fit_ask",
                     "stop_id"
                   ]
                 }
@@ -60023,6 +60065,19 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "fit_ask": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "job_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "job_id"
+                            ],
+                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                          },
                           "max_offered": {
                             "type": "boolean",
                             "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
@@ -60091,6 +60146,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "fit_ask",
                           "max_offered",
                           "clip"
                         ]
@@ -60469,6 +60525,19 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "fit_ask": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "job_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "job_id"
+                            ],
+                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                          },
                           "max_offered": {
                             "type": "boolean",
                             "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
@@ -60537,6 +60606,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "fit_ask",
                           "max_offered",
                           "clip"
                         ]
@@ -60774,6 +60844,19 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "fit_ask": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "job_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "job_id"
+                            ],
+                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                          },
                           "max_offered": {
                             "type": "boolean",
                             "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
@@ -60842,6 +60925,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "fit_ask",
                           "max_offered",
                           "clip"
                         ]
@@ -61067,6 +61151,19 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "fit_ask": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "job_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "job_id"
+                            ],
+                            "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                          },
                           "max_offered": {
                             "type": "boolean",
                             "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
@@ -61135,6 +61232,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "fit_ask",
                           "max_offered",
                           "clip"
                         ]
@@ -80016,6 +80114,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -80184,6 +80295,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -80308,6 +80420,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -80476,6 +80601,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -80618,6 +80744,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -80786,6 +80925,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -80936,6 +81076,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -81104,6 +81257,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -81249,6 +81403,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -81417,6 +81584,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -81566,6 +81734,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -81734,6 +81915,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -81895,6 +82077,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -82063,6 +82258,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -82215,6 +82411,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -82383,6 +82592,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
@@ -82538,6 +82748,19 @@
                     "task": {
                       "type": "string"
                     },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ],
+                      "description": "Set while this card is asking whether to run at a lower level now (TIER-PRIO-07) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
                     "cut": {
                       "type": "string",
                       "nullable": true,
@@ -82706,6 +82929,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "fit_ask",
                     "cut",
                     "max_seconds",
                     "progress",
