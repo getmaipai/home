@@ -72965,6 +72965,60 @@
                             ],
                             "default": null
                           },
+                          "musicbrainz_recording_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                          },
+                          "musicbrainz_artist_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                          },
+                          "musicbrainz_release_group_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                          },
                           "track_no": {
                             "anyOf": [
                               {
@@ -73711,6 +73765,60 @@
                           ],
                           "default": null
                         },
+                        "musicbrainz_recording_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                              "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                        },
+                        "musicbrainz_artist_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                              "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                        },
+                        "musicbrainz_release_group_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                              "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                        },
                         "track_no": {
                           "anyOf": [
                             {
@@ -74403,6 +74511,60 @@
                               }
                             ],
                             "default": null
+                          },
+                          "musicbrainz_recording_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                          },
+                          "musicbrainz_artist_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                          },
+                          "musicbrainz_release_group_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
                           },
                           "track_no": {
                             "anyOf": [
@@ -75098,6 +75260,60 @@
                               }
                             ],
                             "default": null
+                          },
+                          "musicbrainz_recording_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                          },
+                          "musicbrainz_artist_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                          },
+                          "musicbrainz_release_group_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
                           },
                           "track_no": {
                             "anyOf": [
@@ -75871,6 +76087,60 @@
                         }
                       ],
                       "default": null
+                    },
+                    "musicbrainz_recording_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                          "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MusicBrainz recording id (lowercase UUID) for this track, or null when unmatched."
+                    },
+                    "musicbrainz_artist_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                          "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MusicBrainz artist id (lowercase UUID) for the track artist, or null when unmatched."
+                    },
+                    "musicbrainz_release_group_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                          "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MusicBrainz release group id (lowercase UUID) for the album, or null when unmatched."
                     },
                     "track_no": {
                       "anyOf": [
