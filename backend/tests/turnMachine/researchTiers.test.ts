@@ -207,12 +207,19 @@ describe("research rounds follow the answer style", () => {
     expect(prompts[1]).toContain("Searches already run");
   });
 
-  test("a research search built on a name or year from memory is skipped, and the next round is told to find it from the sources", async () => {
+  test("a research search built on a name or year from memory runs without it, and the next round is told", async () => {
     await holdMax();
-    const { requests } = await turn("owner", 3, { max: true, queries: ["V series Ted White season two plans", "V series 1983 miniseries ending", "V series ending interview"] });
-    expect(searxQueries).toEqual(["V series ending interview"]);
-    const later = requests.filter((r) => r.tool_choice !== "none" && toolMessages(r).length === 0).at(-1)!;
-    expect(JSON.stringify(later.messages)).toContain("not yet shown by the question or any source");
+    const { requests } = await turn("owner", 2, { max: true, queries: ["V series Ted White season two plans 1983", "V series ending interview"] });
+    expect(searxQueries[0]).toBe("V series season two plans");
+    expect(searxQueries[1]).toBe("V series ending interview");
+    const later = requests.filter((r) => r.tool_choice !== "none" && toolMessages(r).length === 1).at(-1)!;
+    expect(JSON.stringify(later.messages)).toContain("ran without a name or year");
+  });
+
+  test("a Max research turn searches the web from its first search", async () => {
+    await holdMax();
+    await turn("owner", 1, { max: true, scope: "reference" });
+    expect(searxQueries.length).toBe(1);
   });
 
   test("Max stops at twelve rounds", async () => {

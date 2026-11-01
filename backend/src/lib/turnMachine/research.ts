@@ -246,8 +246,15 @@ export function memoryDetailsIn(query: string, allowedText: string): string[] {
   return [...new Set(found.filter((detail) => !allowed.includes(detail.toLowerCase())))];
 }
 
-/** Said to the model in the next round when a search of this turn was skipped for carrying details from memory. */
-export const MEMORY_QUERY_SKIPPED_NOTE = "A search that used a name or year not yet shown by the question or any source was skipped; first search to find out from the sources who made it and when, then use what they show.";
+/** The query with those memory details taken out and the spaces closed up ("V 1984 TV series finale" becomes "V TV series finale"). */
+export function withoutMemoryDetails(query: string, allowedText: string): string {
+  let cleaned = query;
+  for (const detail of memoryDetailsIn(query, allowedText)) cleaned = cleaned.split(detail).join(" ");
+  return cleaned.replace(/\s{2,}/g, " ").trim();
+}
+
+/** Said to the model in the next round when a search of this turn ran without a name or year from memory. */
+export const MEMORY_QUERY_SKIPPED_NOTE = "A search ran without a name or year that neither the question nor any source had shown yet; find out from the sources who made it and when, then use the names and dates they show.";
 
 /** One model call that writes searches: a prompt in, text out, or null when the model is unavailable. */
 export type QueryWriter = (prompt: string) => Promise<string | null>;

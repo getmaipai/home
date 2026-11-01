@@ -994,7 +994,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
     const progressSoFar = researchProgress(state.outcomes);
     const proposed = await writeQueries(queryWriterOverride ?? chatQueryWriter(signal), input.utterance, progressSoFar, resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
-    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}${state.outcomes.some((o) => o.errorCode === "memory_query") ? ` ${MEMORY_QUERY_SKIPPED_NOTE}` : ""}` };
+    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}${state.outcomes.some((o) => o.errorCode === "memory_query" || o.queryRewritten === true) ? ` ${MEMORY_QUERY_SKIPPED_NOTE}` : ""}` };
     messages = phrasedOutcomes.length === 0
       ? [...history, nudge]
       : [...history, toolCallAssistantMessage(phrasedOutcomes), ...toolResultMessages(phrasedOutcomes, evidenceChars, promptSurfaceClass !== "written", certaintyGate, sourceNumberOffsets(state.outcomes)), nudge];

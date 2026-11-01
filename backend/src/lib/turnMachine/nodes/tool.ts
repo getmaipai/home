@@ -6,7 +6,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
 import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
-import { isRepeatQuery, memoryDetailsIn, researchEvidence } from "../research";
+import { isRepeatQuery, memoryDetailsIn, researchEvidence, withoutMemoryDetails } from "../research";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
 import type { TurnAskField } from "@/wire";
@@ -167,7 +167,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // KEEP_READ_PAGE=1` is that bench's own on/off toggle, the same
     // shape `llm.ts`'s `MAIPAI_BENCH_CACHE_PROMPT_FALSE` already uses -
     // never read outside a bench, never a real household setting.
-    const args = modelFacingArgs(tool, proposal.request.args);
+    let args = modelFacingArgs(tool, proposal.request.args);
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
@@ -302,18 +302,29 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
       continue;
     }
-    // RESEARCH-QUERY-01: a research search built on a name or year from the model's memory (nothing shown it yet) is skipped, so the
-    // next round searches to find the subject first and builds on what the sources show.
-    if (tool === "websearch" && researchRun && memoryDetailsIn(String((args as { expression?: unknown }).expression ?? ""), `${state.utterance}\n${researchEvidence([...state.outcomes, ...outcomes])}`).length > 0) {
-      outcomes.push(outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "memory_query", durationMs: 0, failureKind: "found_nothing" }));
-      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
-      continue;
+    // RESEARCH-QUERY-01: a research search built on a name or year from the model's memory (nothing has shown it yet) runs without it,
+    // so the search finds the subject first and the next round builds on what the sources show. The next round is told (errorCode on the
+    // outcome is not set: the search itself ran).
+    let queryRewritten = false;
+    if (tool === "websearch" && researchRun) {
+      const asked = String((args as { expression?: unknown }).expression ?? "");
+      const allowed = `${state.utterance}\n${researchEvidence([...state.outcomes, ...outcomes])}`;
+      if (memoryDetailsIn(asked, allowed).length > 0) {
+        const cleaned = withoutMemoryDetails(asked, allowed);
+        if (cleaned.length < 4) {
+          outcomes.push(outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "memory_query", durationMs: 0, failureKind: "found_nothing" }));
+          toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
+          continue;
+        }
+        args = { ...(args as Record<string, unknown>), expression: cleaned };
+        queryRewritten = true;
+      }
     }
     // Max with the admin's web switch off keeps its first search ordinary and searches the offline library after that.
     const libraryOnlyNow = tool === "websearch" && researchRun?.libraryOnly === true && researchRun.searches > 0;
     // Research goes past the offline library's overview: after its first search, a research turn searches the web (the live V run
     // showed the model choosing the library every round and getting only an encyclopedia page).
-    const webNow = tool === "websearch" && researchRun !== undefined && researchRun.libraryOnly !== true && researchRun.searches > 0;
+    const webNow = tool === "websearch" && researchRun !== undefined && researchRun.libraryOnly !== true && (researchRun.searches > 0 || state.answerStyle === "max");
     if (tool === "websearch" && researchRun) researchRun.searches += 1;
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}), ...(libraryOnlyNow ? { scope: "reference" } : webNow ? { scope: "web" } : {}) } : args;
     const startedAt = Date.now();
@@ -364,6 +375,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       status: result.ok ? "succeeded" : "failed",
       via: resumedAsk ? "ask" : "tool_call",
       ...(resumedAsk ? {} : { args }),
+      ...(queryRewritten ? { queryRewritten: true } : {}),
       result: finalValue,
       // SEARCH-EMPTY-01: this carried only the numeric HTTP-style
       // status, never the semantic HostError code a real caller (a

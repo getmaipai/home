@@ -188,6 +188,8 @@ export interface ToolExecutionOutcome {
   at?: string;
   result?: PluginResult;
   errorCode?: string;
+  /** RESEARCH-QUERY-02: the search ran without a name or year from the model's memory that nothing had shown yet. */
+  queryRewritten?: boolean;
   /** THIN-1E: how long the call ran, for the admin error detail. */
   durationMs?: number;
   /** Safe for the household; never a developer diagnostic. A failed tool run
