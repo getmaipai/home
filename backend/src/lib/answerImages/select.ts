@@ -336,9 +336,12 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     if (kept.length === 0) return skip("no_candidates");
 
     const sources: AnswerImageSource[] = kept.map((c, i) => ({ id: `c${i}`, url: c.url, leadImage: c.lead }));
-    // ZIM-IMG-02: pictures that all come from the household's own library have no third-party host to wait on, so they get the longer limit.
-    const libraryOnly = kept.every((c) => c.source === "library");
-    const fetchDeadline = libraryOnly && input.libraryDeadlineAt !== undefined ? input.libraryDeadlineAt : input.deadlineAt;
+    // ZIM-IMG-02: a set holding any of the household's own library pictures gets the longer limit. The lookups before the fetch
+    // (Wikimedia item, Commons list) can use up the web deadline in a busy hub (live trace 2026-10-31: dropped_by_fetch deadline,
+    // none_survived, with 6 library pictures found); library pictures have no third-party host to wait on, and the web ones still
+    // stop at the fetch's own 2.5 s cap.
+    const hasLibrary = kept.some((c) => c.source === "library");
+    const fetchDeadline = hasLibrary && input.libraryDeadlineAt !== undefined ? Math.max(input.libraryDeadlineAt, input.deadlineAt ?? 0) : input.deadlineAt;
     const fetched = await fetchAnswerImages(sources, { ...deps.fetchOptions, ...(fetchDeadline !== undefined ? { deadlineAt: fetchDeadline } : {}) });
     trace.dropped_by_fetch = fetched.dropped_by_fetch;
     trace.dropped_by_quality = fetched.dropped_by_quality as Record<string, number>;

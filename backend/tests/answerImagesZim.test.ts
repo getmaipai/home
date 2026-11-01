@@ -81,6 +81,17 @@ describe("ZIM-IMG-01: library pictures lead the row", () => {
     expect(result.trace.sources?.library).toBe(7);
   });
 
+  test("a web deadline already past (a busy hub) does not drop the library pictures: they keep their own longer limit", async () => {
+    use([TOWER], async () => [image(1), image(2)]);
+    const past = Date.now() - 1_000;
+    const without = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [], deadlineAt: past });
+    expect(without.set).toBeNull();
+    expect(without.trace.dropped_by_fetch?.deadline).toBe(1);
+    const withLimit = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [], deadlineAt: past, libraryDeadlineAt: Date.now() + 10_000 });
+    expect(withLimit.set?.items.length).toBeGreaterThanOrEqual(2);
+    expect(withLimit.set!.items[0]!.source.site).toBe("Wikipedia (offline library)");
+  });
+
   test("with only two library pictures they come first and Commons fills the rest", async () => {
     const { log } = use([TOWER], async () => [image(1), image(2)]);
     const result = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
