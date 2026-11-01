@@ -320,12 +320,6 @@ export interface DataParams {
   length?: string;
   within?: string;
   show?: string;
-  /** Videos' Make a video page echoes its picked choices back as one row (lib/media/videoCreateApp.ts): the words and the pickers' values. */
-  prompt?: string;
-  orientation?: string;
-  seconds?: string;
-  tier?: string;
-  recipe?: string;
   limit?: number;
 }
 

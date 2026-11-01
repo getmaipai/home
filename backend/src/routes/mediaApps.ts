@@ -48,11 +48,6 @@ function paramsOf(body: Body): DataParams {
     show: typeof body.show === "string" ? body.show : undefined,
     filter: typeof body.filter === "string" && body.filter !== "" ? body.filter : undefined,
     year: coerceNumber(body.year),
-    prompt: typeof body.prompt === "string" ? body.prompt.slice(0, 1200) : undefined,
-    orientation: typeof body.orientation === "string" ? body.orientation : undefined,
-    seconds: typeof body.seconds === "string" || typeof body.seconds === "number" ? String(body.seconds) : undefined,
-    tier: typeof body.tier === "string" ? body.tier : undefined,
-    recipe: typeof body.recipe === "string" ? body.recipe : undefined,
     limit: coerceNumber(body.limit),
   };
 }

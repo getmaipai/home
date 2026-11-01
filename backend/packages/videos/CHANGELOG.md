@@ -4,6 +4,10 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-01
+
+- VIDEO-CREATE-01 (V1a): Make a video and the Create home use the kit prompt bar (words, Shape, Length, Camera move and the Standard, Boost and Max segment for the levels you may use) instead of the placeholder form.
+
 ## [0.1.2] - 2026-11-01
 
 - VIDEO-CREATE-01 (V1a): Create mode works for words-to-video. Create, Make a video (words, shape, length, level and a camera move from a list of eight) and My creations replace the placeholders; Make a video and a recent creations shelf show what is being made and what was made. The three Create pages are for adults only; Browse is unchanged for everyone.

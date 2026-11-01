@@ -457,13 +457,23 @@ export function listApps(person: PersonRow): AppRow[] {
 }
 
 /** One page document of a visible app. */
+/** A page whose lists depend on the person (a prompt bar's tier segment) is filled here, once per request, from the one source of each list;
+ * the page JSON holds the structure only. The fill gets its own copy of the document. */
+export type AppPageFill = (person: PersonRow, page: Record<string, unknown>) => void;
+const appPageFills = new Map<string, AppPageFill>();
+export function registerAppPageFill(packageId: string, pageId: string, fill: AppPageFill): void { appPageFills.set(`${packageId}/${pageId}`, fill); }
+
 export function getAppPage(person: PersonRow, packageId: string, pageId: string): AppResult<unknown> {
   const app = visibleApp(person, packageId);
   if (!app) return NOT_FOUND;
   const entry = app.contributes.pages!.find((page) => page.id === pageId);
   const doc = entry ? app.pages.get(entry.module) : undefined;
   if (!entry || doc === undefined || !pageVisibleTo(person, app.manifest, entry)) return { ok: false, status: 404, error: "no such page" };
-  return { ok: true, status: 200, value: doc };
+  const fill = appPageFills.get(`${packageId}/${pageId}`);
+  if (!fill || typeof doc !== "object" || doc === null) return { ok: true, status: 200, value: doc };
+  const copy = structuredClone(doc) as Record<string, unknown>;
+  fill(person, copy);
+  return { ok: true, status: 200, value: copy };
 }
 
 // ---- The data call -------------------------------------------------------------------------

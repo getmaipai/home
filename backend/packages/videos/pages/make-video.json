@@ -4,135 +4,42 @@
   "title": "Make a video",
   "body": [
     {
-      "type": "section",
-      "heading": "Describe your video",
-      "children": [
+      "type": "prompt_bar",
+      "label": "What should the video show?",
+      "placeholder": "Describe your video",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "chips": [
         {
-          "type": "search",
-          "state": "prompt",
-          "label": "What should the video show?",
-          "placeholder": "Describe your video"
-        },
-        {
-          "type": "picker",
-          "variant": "select",
           "state": "orientation",
           "label": "Shape",
-          "placeholder": "Shape",
-          "leading": [
+          "default": "landscape",
+          "options": [
             {
               "value": "landscape",
-              "label": "Landscape",
-              "icon": "rectangle-horizontal"
+              "label": "Landscape"
             },
             {
               "value": "portrait",
-              "label": "Portrait",
-              "icon": "rectangle-vertical"
+              "label": "Portrait"
             }
           ]
-        },
-        {
-          "type": "picker",
-          "variant": "select",
-          "state": "seconds",
-          "label": "Length",
-          "placeholder": "Length",
-          "leading": [
-            {
-              "value": "3",
-              "label": "3 seconds"
-            },
-            {
-              "value": "5",
-              "label": "5 seconds"
-            },
-            {
-              "value": "10",
-              "label": "10 seconds"
-            }
-          ]
-        },
-        {
-          "type": "picker",
-          "variant": "select",
-          "state": "tier",
-          "label": "Level",
-          "placeholder": "Level",
-          "bind": {
-            "source": "package",
-            "path": "recipes",
-            "params": {
-              "scope": "tiers"
-            }
-          },
-          "item_key_field": "id",
-          "item_label_field": "label"
-        },
-        {
-          "type": "picker",
-          "variant": "select",
-          "state": "recipe",
-          "label": "Camera move",
-          "placeholder": "Camera move",
-          "leading": [
-            {
-              "value": "none",
-              "label": "No camera move"
-            }
-          ],
-          "bind": {
-            "source": "package",
-            "path": "recipes",
-            "params": {
-              "scope": "options"
-            }
-          },
-          "item_key_field": "id",
-          "item_label_field": "label"
-        },
-        {
-          "type": "list",
-          "bind": {
-            "source": "package",
-            "path": "recipes",
-            "params": {
-              "scope": "make",
-              "prompt": "$state.prompt",
-              "orientation": "$state.orientation",
-              "seconds": "$state.seconds",
-              "tier": "$state.tier",
-              "recipe": "$state.recipe"
-            }
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{summary}",
-          "item_media_field": "film",
-          "row_action": {
-            "icon": "play",
-            "label": "Make this video",
-            "action": {
-              "call": {
-                "target": "/api/plugins/videos/actions/make",
-                "method": "POST",
-                "args": {
-                  "prompt": "{prompt}",
-                  "orientation": "{orientation}",
-                  "seconds": "{seconds}",
-                  "tier": "{tier}",
-                  "recipe": "{recipe}"
-                }
-              }
-            }
-          },
-          "empty_state": {
-            "type": "empty_state",
-            "icon": "film",
-            "text": "Describe your video above, then choose Make this video."
+        }
+      ],
+      "submit_label": "Make",
+      "submit": {
+        "call": {
+          "target": "/api/plugins/videos/actions/make",
+          "method": "POST",
+          "args": {
+            "prompt": "{prompt}",
+            "orientation": "{orientation}",
+            "seconds": "{seconds}",
+            "tier": "{tier}",
+            "recipe": "{recipe}"
           }
         }
-      ]
+      }
     },
     {
       "type": "section",

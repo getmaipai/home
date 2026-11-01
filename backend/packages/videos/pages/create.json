@@ -4,15 +4,17 @@
   "title": "Create",
   "body": [
     {
-      "type": "search",
-      "state": "prompt",
+      "type": "prompt_bar",
       "label": "Describe a video",
-      "placeholder": "Describe a video and press Enter",
+      "placeholder": "Describe a video",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "submit_label": "Next",
       "submit": {
         "navigate": {
           "to": "/apps/videos/make-video",
           "state": {
-            "prompt": "{q}"
+            "prompt": "{prompt}"
           }
         }
       }

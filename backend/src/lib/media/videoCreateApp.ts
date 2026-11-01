@@ -9,7 +9,9 @@ import { getVideoJobFor } from "@/lib/videos/jobs";
 import { VIDEO_RECIPES, VIDEO_STARTERS } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
-import { videoRecipeFor } from "@/lib/videos/recipes";
+import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
+import { registerAppPageFill } from "@/lib/apps";
+import type { PersonRow } from "@/types";
 import { registerMediaAppData } from "./appHost";
 
 /** One plain line for what a Create job is doing now. */
@@ -19,33 +21,37 @@ function statusLine(state: string, percent: number, error: string | null): strin
   return error ?? "It did not finish. Try again.";
 }
 
-const asOf = () => new Date().toISOString();
-const field = (value: unknown): string => (typeof value === "string" ? value : "");
+/** The levels this person may use (Boost needs the Boost model and their say; Max needs the Max slot and their say). Standard alone is no choice, so no segment. */
+export function videoTierSegment(person: PersonRow): Record<string, unknown> | null {
+  const band = speakerAgeBand(person, new Date());
+  const tiers = [
+    { id: "standard", label: "Standard", hint: `Up to ${QUICK_MAX_SECONDS} seconds` },
+    ...(allowedQuality(person, "video", "detailed", band) === "detailed" ? [{ id: "boost", label: "Boost", hint: `Up to ${DETAILED_MAX_SECONDS} seconds, with sound` }] : []),
+    ...(maxOffered(person, "video", band) ? [{ id: "max", label: "Max", hint: "The best the home can make" }] : []),
+  ];
+  return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
+}
+
+/** The Make page's lists, each from its one source: lengths from the engine ceilings (quality.ts), camera moves from recipes.ts, levels from tiers.ts. */
+registerAppPageFill("videos", "make-video", (person, page) => {
+  const body = Array.isArray(page.body) ? page.body as Array<Record<string, unknown>> : [];
+  const bar = body.find((node) => node.type === "prompt_bar");
+  if (!bar) return;
+  const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
+  bar.chips = [
+    ...chips,
+    { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: [3, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS].map((value) => ({ value, label: `${value} seconds` })) },
+    { state: "recipe", label: "Camera move", default: "none", options: [{ value: "none", label: "No camera move" }, ...VIDEO_RECIPES.map(({ id, label }) => ({ value: id, label }))] },
+  ];
+  const tier = videoTierSegment(person);
+  if (tier) bar.tier = tier;
+});
 
 registerMediaAppData("videos", (person, dataId, params) => {
   if (dataId !== "recipes") return null;
   switch (params.scope) {
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
-    // A picker draws {rows}: the camera moves, and the levels this person may use (Max only when they hold it and a Max model is set).
-    case "options": return { as_of: asOf(), rows: VIDEO_RECIPES.map(({ id, label }) => ({ id, label })) };
-    case "tiers": {
-      const band = speakerAgeBand(person, new Date());
-      const rows = [{ id: "standard", label: "Standard" }, ...(allowedQuality(person, "video", "detailed", band) === "detailed" ? [{ id: "boost", label: "Boost" }] : []), ...(maxOffered(person, "video", band) ? [{ id: "max", label: "Max" }] : [])];
-      return { as_of: asOf(), rows };
-    }
     case "starters": return VIDEO_STARTERS.map((idea) => ({ ...idea }));
-    // The kit's pickers and search box write page state; only a data call can read it back, so this row echoes the choices
-    // (sent as `prompt`, `orientation`, `seconds`, `tier`, `recipe`) and its row action carries them to the Make action.
-    case "make": {
-      const prompt = field(params.prompt).trim();
-      if (prompt.length < 3) return [];
-      const recipe = videoRecipeFor(params.recipe);
-      const orientation = field(params.orientation) === "portrait" ? "portrait" : "landscape";
-      const seconds = field(params.seconds);
-      const tier = field(params.tier);
-      const summary = [orientation === "portrait" ? "Portrait" : "Landscape", seconds ? `${seconds} seconds` : null, tier ? `${tier[0]!.toUpperCase()}${tier.slice(1)} level` : null, recipe?.label ?? null].filter(Boolean).join(", ");
-      return [{ id: "make", title: "Make this video", summary, prompt, orientation, seconds, tier, recipe: recipe?.id ?? "" }];
-    }
     case "making": {
       const newest = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), isNull(videoJobs.conversationId))).orderBy(desc(videoJobs.createdAt)).get();
       const job = newest ? getVideoJobFor(person, newest.id) : null;

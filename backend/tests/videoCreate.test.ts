@@ -9,7 +9,10 @@ import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { VIDEO_RECIPES, videoRecipeFor, withVideoRecipe } from "@/lib/videos/recipes";
-import { MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
+import { MAX_NEEDS_ADMIN_LINE, allowedQuality, maxOffered } from "@/lib/tiers";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
+import { videoTierSegment } from "@/lib/media/videoCreateApp";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { until } from "./pictureFixture";
@@ -143,20 +146,33 @@ describe("POST /api/videos/make", () => {
   });
 });
 
-describe("the Make a video page's pickers and action", () => {
-  test("the echo row carries the page's choices to the action; the pickers list what this person may use", async () => {
+describe("the Make a video page and action", () => {
+  test("the served Make page holds the prompt bar with the recipes, lengths and only the levels this person may use", async () => {
     const { adult } = await household();
-    const post = async (body: Record<string, unknown>) => (await adult.client.post("/api/plugins/videos/data/recipes", body)).json() as Promise<any>;
-    expect(await post({ scope: "make" })).toEqual([]);
-    expect(await post({ scope: "make", prompt: "hi" })).toEqual([]);
-    const [row] = await post({ scope: "make", prompt: BOAT, orientation: "portrait", seconds: "10", tier: "boost", recipe: "aerial" });
-    expect(row).toMatchObject({ prompt: BOAT, orientation: "portrait", seconds: "10", tier: "boost", recipe: "aerial", title: "Make this video" });
-    expect(row.summary).toBe("Portrait, 10 seconds, Boost level, Aerial");
-    const options = await post({ scope: "options" });
-    expect(options.rows.map((r: { id: string }) => r.id)).toEqual(VIDEO_RECIPES.map((r) => r.id));
-    const tiers = await post({ scope: "tiers" });
-    expect(tiers.rows.map((r: { label: string }) => r.label)).not.toContain("Max");
-    expect(tiers.rows[0]).toEqual({ id: "standard", label: "Standard" });
+    const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const bar = page.body.find((node) => node.type === "prompt_bar")!;
+    expect(bar.submit.call.target).toBe("/api/plugins/videos/actions/make");
+    const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
+    expect(chip("orientation").options.map((o: { value: string }) => o.value)).toEqual(["landscape", "portrait"]);
+    expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([3, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS]);
+    expect(chip("recipe").options.map((o: { value: string }) => o.value)).toEqual(["none", ...VIDEO_RECIPES.map((r) => r.id)]);
+    // Levels: Standard first; Max only when the person is offered it, Boost only when they may use it; one level alone shows no segment.
+    const adultRow = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
+    const expected = ["standard", ...(allowedQuality(adultRow, "video", "detailed", speakerAgeBand(adultRow, new Date())) === "detailed" ? ["boost"] : []), ...(maxOffered(adultRow, "video", speakerAgeBand(adultRow, new Date())) ? ["max"] : [])];
+    if (expected.length === 1) expect(bar.tier).toBeUndefined();
+    else expect(bar.tier.tiers.map((t: { id: string }) => t.id)).toEqual(expected);
+    expect(bar.tier?.tiers.map((t: { id: string }) => t.id) ?? []).not.toContain("max");
+    expect(videoTierSegment({ ...adultRow, role: "adult" })).toEqual(bar.tier ?? null);
+    // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
+    const again = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    expect(again.body.find((node) => node.type === "prompt_bar")!.chips).toHaveLength(3);
+  });
+
+  test("the prompt bar's submit args fill from the item and the action takes them", async () => {
+    const { adult } = await household();
+    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, orientation: "portrait", seconds: 10, tier: "standard", recipe: "none" });
+    expect(res.status).toBe(200);
+    expect(fake.submitted[0]!.size).toBe("480x832");
   });
 
   test("untouched fields arrive as {name} and mean not given; a typed shape, length and recipe name are used", async () => {
