@@ -52,6 +52,26 @@ describe("AiGlance Apply", () => {
     release();
   });
 
+  test("the Stems switch (three switch choices) stages the standard splitter and Apply posts it", async () => {
+    const posts: string[] = [];
+    const mk = (id: string, label: string, recommended: boolean) => ({ ...wakeChoice, id, job: "stems", label, name: label, recommended, rowIds: [id] });
+    const stems = { id: "stems", title: "Stems", summary: "Split songs", chip: "", choices: [mk("stems.standard", "Split songs into stems", true), mk("stems.finer", "Finer stem splitter", false), mk("stems.more", "Guitar and piano parts", false)], notReady: false, unavailable: null };
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return Promise.resolve(Response.json({ ok: true, started: [] })); }
+      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [stems] }));
+      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as typeof fetch;
+    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
+    fireEvent.click(await view.findByRole("switch", { name: /Stems/ }));
+    fireEvent.click(await view.findByRole("button", { name: "Apply changes" }));
+    await waitFor(() => expect(posts.length).toBeGreaterThan(0));
+    expect(posts[0]).toContain("/api/ai/choices/stems");
+    expect(posts[0]).toContain("stems.standard");
+  });
+
   test("a row whose model is downloading shows the progress, and a failed one says so", async () => {
     const serve = (choice: object) => {
       globalThis.fetch = ((input: RequestInfo | URL) => {
