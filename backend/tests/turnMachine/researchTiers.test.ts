@@ -24,6 +24,7 @@ import { __setClaimJudgeForTests } from "@/lib/turnMachine/nodes/answer";
 import { __setQueryWriterForTests } from "@/lib/turnMachine/nodes/model";
 import { __setNoteWriterForTests } from "@/lib/turnMachine/pageNotes";
 import { __setStageWritersForTests } from "@/lib/turnMachine/researchPipeline";
+import { __setEntityPinForTests } from "@/lib/turnMachine/entityPin";
 
 let people: BenchPeople;
 let searx: ReturnType<typeof Bun.serve>;
@@ -90,6 +91,7 @@ afterEach(() => {
   __setQueryWriterForTests(undefined);
   __setNoteWriterForTests(undefined);
   __setStageWritersForTests(undefined);
+  __setEntityPinForTests(undefined);
   searx.stop(true);
   registerActiveChatLease(null);
   __setPageReaderForTests(null);
@@ -518,5 +520,40 @@ describe("the gap check ends the searching only when the writer itself finds not
     const { result } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
     expect(searxQueries).toEqual(["Harbor Lights television series cancelled"]);
     expect(result.value.reply.text).toContain("It ended after one season");
+  });
+});
+
+describe("the pinned subject rides every research search (RESEARCH-PIN-01)", () => {
+  const BRIEF = JSON.stringify({ subject: "the series", answer_type: "an explanation", must_contain: ["why it ended"], ambiguous: false, options: [], question: "", assumption: "" });
+  const candidate = (title: string) => ({ title, snippet: `${title} snippet`, load: async () => ({ title, lead: `${title} is a show.`, sections: [], source: "library" as const }) });
+
+  test("a Max turn pins the article first, and its searches carry the name and year even though the question only said 'the 80s'", async () => {
+    await holdMax();
+    __setStageWritersForTests({ brief: async () => BRIEF, analysis: async () => null });
+    __setEntityPinForTests({ finder: async () => [candidate("Harbor (franchise)"), candidate("Harbor (1984 television series)")], writer: async () => '{"pick": 2}' });
+    const prompts: string[] = [];
+    __setQueryWriterForTests(async (prompt) => {
+      prompts.push(prompt);
+      return prompts.length === 1 ? JSON.stringify({ sub_questions: ["why it ended"], queries: ["series cancelled why", '"creator" OR "producer" interview plans for a second season of the show'] }) : JSON.stringify({ queries: [] });
+    });
+    await turn("owner", 2, { max: true, utterance: "the 80s series only had one season, why was it cancelled" });
+    expect(prompts[0]).toContain("pinned to the article");
+    expect(searxQueries.length).toBe(2);
+    for (const q of searxQueries) {
+      expect(q).toContain("Harbor");
+      expect(q).toContain("1984");
+      expect(q).not.toContain('"');
+      expect(q).not.toContain(" OR ");
+      expect(q.split(/\s+/).length).toBeLessThanOrEqual(8);
+    }
+  });
+
+  test("a turn whose subject no article clearly names searches as before, only cleaned to plain keywords", async () => {
+    await holdMax();
+    __setStageWritersForTests({ brief: async () => BRIEF, analysis: async () => null });
+    __setEntityPinForTests({ finder: async () => [candidate("One"), candidate("Two")], writer: async () => '{"pick": 0}' });
+    __setQueryWriterForTests(async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["x"], queries: ['"series" cancelled one season'] }) : JSON.stringify({ queries: [] })));
+    await turn("owner", 1, { max: true });
+    expect(searxQueries).toEqual(["series cancelled one season"]);
   });
 });

@@ -132,8 +132,8 @@ export function briefBlock(brief: Brief): string {
   return `What the person is asking: ${brief.subject}. A good answer is: ${brief.answerType || "a complete answer"}. It must contain: ${brief.mustContain.length > 0 ? brief.mustContain.join("; ") : "what the question asks"}.`;
 }
 
-export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number): Promise<DataPlan> {
-  const base = queryWriterPrompt(utterance, researchProgress([]), "", count);
+export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = ""): Promise<DataPlan> {
+  const base = queryWriterPrompt(utterance, researchProgress([]), "", count, anchorNote);
   const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "queries": ["..."]}.` : base;
   let reply: string | null = null;
   try { reply = await writer(prompt); } catch { reply = null; }

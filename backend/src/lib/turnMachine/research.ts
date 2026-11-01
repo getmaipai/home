@@ -324,12 +324,12 @@ export function resultDigest(outcomes: readonly ToolExecutionOutcome[], max = 24
 
 /** The prompt for the query writer: a dedicated step that writes the next searches for this question. It names no subject and no
  * angle of its own; the angles come from the question and the names from the question and the results already read. */
-export function queryWriterPrompt(utterance: string, progress: ResearchProgress, digest: string, count: number): string {
+export function queryWriterPrompt(utterance: string, progress: ResearchProgress, digest: string, count: number, anchorNote = ""): string {
   const searched = progress.queries.length > 0 ? progress.queries.map((q) => `- ${q}`).join("\n") : "(none yet)";
   const found = digest.trim() === "" ? "(nothing read yet)" : digest;
   return `You write web searches for a research assistant.
 The person asked: "${utterance.replace(/"/g, "'")}"
-
+${anchorNote ? `${anchorNote}\n` : ""}
 Searches already run:
 ${searched}
 
@@ -339,8 +339,8 @@ ${found}
 ${digest.trim() === "" ? "Nothing has been read yet, so write only searches that identify the subject and how it turned out: what it is, when it was made or aired, who made it, how it ended. Include no person's name and no year unless the question gave it.\n" : ""}Write up to ${count} new web searches. Rules:
 - Each search is specific: the exact name of the subject, the year or version when known, and ONE angle. A search with only a bare name is too vague.
 - Choose the angles that matter for this particular question and vary them (what happened and why; what the people involved said in interviews or official statements; what came after; how it was received; the original documents). Split a question that has several parts into one search per part.
-- Take names only from the question or from the results shown above. Never add a name from your own memory. If the results do not yet say who made or ran the subject, write a search that finds that first.
-- Write plain keyword searches: no quotation marks, no "or", no operators. The search engines return nothing for them.
+- Take names only from the question, the pinned subject or the results shown above. Never add a name from your own memory. If the results do not yet say who made or ran the subject, write a search that finds that first.
+- Write plain keyword searches of 3 to 8 words: no quotation marks, no "or", no operators. The search engines return nothing for them.
 - Never repeat or lightly reword a search already run. If a result was thin, write the search again with the names and titles the results gave.
 - For any part of the question still unanswered or backed by one site, write a search that targets it.
 Reply with one JSON object and nothing else: {"queries": ["...", "..."]}`;
@@ -356,16 +356,16 @@ export function parsePlannedQueries(text: string): string[] {
 }
 
 /** The searches the writer proposes, minus any that repeats an earlier search of the turn or an earlier proposal. Empty when the writer is unavailable. */
-export async function writeQueries(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<string[]> {
-  return (await writeQueriesChecked(writer, utterance, progress, digest, count))?.queries ?? [];
+export async function writeQueries(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number, anchorNote = ""): Promise<string[]> {
+  return (await writeQueriesChecked(writer, utterance, progress, digest, count, anchorNote))?.queries ?? [];
 }
 
 /** The same, but with the writer's own count: `proposed` is how many searches it wrote before any were filtered out, so a caller can tell
  * "the writer sees nothing more to search" (0) from "everything it wrote was a repeat or built on a name from memory" (more than 0 but
  * `queries` empty). Null when the writer is unavailable. */
-export async function writeQueriesChecked(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<{ queries: string[]; proposed: number } | null> {
+export async function writeQueriesChecked(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number, anchorNote = ""): Promise<{ queries: string[]; proposed: number } | null> {
   let reply: string | null = null;
-  try { reply = await writer(queryWriterPrompt(utterance, progress, digest, count)); } catch { reply = null; }
+  try { reply = await writer(queryWriterPrompt(utterance, progress, digest, count, anchorNote)); } catch { reply = null; }
   if (reply === null) return null;
   const planned = parsePlannedQueries(reply);
   const kept: string[] = [];

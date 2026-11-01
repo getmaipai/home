@@ -884,6 +884,14 @@ async function wikipediaGetJson(url: string, base: string, hint: string, signal?
   }
 }
 
+/** RESEARCH-PIN-01: one rate-limited, User-Agent-compliant GET against the live Wikimedia API (the same budget and contract as the
+ * summary fallback), parsed as a JSON object; null on any failure. The caller has already passed the source-mode gate. */
+export async function wikimediaApiJson(pathAndQuery: string, hint: string, signal?: AbortSignal, deadlineAt?: number): Promise<Record<string, unknown> | null> {
+  const base = wikipediaBaseUrl();
+  return wikipediaGetJson(`${base}${pathAndQuery}`, base, hint, signal, deadlineAt);
+}
+
+
 // SEARCH-SAFE-01 finding, not fixed here: Wikipedia's own REST API
 // (`/w/rest.php/v1/search/page`, `/api/rest_v1/page/summary/...`, both
 // called below) takes no safe-search or content-rating parameter at

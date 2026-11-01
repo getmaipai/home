@@ -10,6 +10,7 @@ import { researchQuestion } from "../researchPipeline";
 import { NOTE_CONCURRENCY, currentNoteWriter, makeGate, newNoteStats, writePageNotes } from "../pageNotes";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { isRepeatQuery, markResearch, memoryDetailsIn, researchCutAt, researchEvidence, withoutMemoryDetails } from "../research";
+import { anchorQuery } from "../entityPin";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
 import type { TurnAskField } from "@/wire";
@@ -322,8 +323,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // outcome is not set: the search itself ran).
     let queryRewritten = false;
     if (tool === "websearch" && researchRun) {
+      // RESEARCH-PIN-01: a research search is plain keywords naming the pinned subject (its name and years), at most eight words.
+      const anchor = state.entityAnchor ?? null;
+      const anchored = anchorQuery(String((args as { expression?: unknown }).expression ?? ""), anchor);
+      if (anchored !== "") args = { ...(args as Record<string, unknown>), expression: anchored };
       const asked = String((args as { expression?: unknown }).expression ?? "");
-      const allowed = `${state.utterance}\n${researchEvidence([...state.outcomes, ...outcomes])}`;
+      // The pinned article's title and opening are words a search may carry; only a name or year from the model's own memory is held back.
+      const allowed = `${state.utterance}\n${anchor?.text ?? ""}\n${researchEvidence([...state.outcomes, ...outcomes])}`;
       if (memoryDetailsIn(asked, allowed).length > 0) {
         const cleaned = withoutMemoryDetails(asked, allowed);
         if (cleaned.length < 4) {

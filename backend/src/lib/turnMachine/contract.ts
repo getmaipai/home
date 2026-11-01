@@ -181,6 +181,8 @@ export interface TurnState {
   /** RESEARCH-PIPELINE-01: stage 1's brief, stage 2's plan and stage 4's analysis of a research turn (each set when its stage ran). */
   researchBrief?: import("./researchPipeline").Brief | null;
   researchPlan?: import("./researchPipeline").DataPlan;
+  /** RESEARCH-PIN-01: the article stage 1 pinned the subject to (null: none was clearly it), whose name and years every research search carries. */
+  entityAnchor?: import("./entityPin").EntityAnchor | null;
   researchAnalysis?: import("./researchPipeline").Analysis | null;
   /** RESEARCH-PIPELINE-01: the searches the gap check proposed for the round about to run (set by the model node just before the round). */
   nextQueries?: string[];

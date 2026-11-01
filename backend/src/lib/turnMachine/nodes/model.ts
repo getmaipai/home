@@ -1,5 +1,6 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
+import { anchorBlock, pinEntity } from "../entityPin";
 import { analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
@@ -799,7 +800,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   else if (timed && input.toolsAllowed && !input.retry && state.outcomes.length > 0 && !noToolsTurn(state)) {
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
     markResearch(state, "gap check start");
-    const proposed = await writeQueriesChecked(queryWriterOverride ?? chatQueryWriter(signal), researchQuestion(state.messages, input.utterance), researchProgress(state.outcomes), resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
+    const proposed = await writeQueriesChecked(queryWriterOverride ?? chatQueryWriter(signal), researchQuestion(state.messages, input.utterance), researchProgress(state.outcomes), resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft), anchorBlock(state.entityAnchor ?? null));
     markResearch(state, `gap check end (${proposed === null ? "writer down" : `${proposed.queries.length} searches, ${proposed.proposed} written`})`);
     if (proposed !== null) state.nextQueries = proposed.queries;
     // Done only when the writer itself sees nothing more to search; a list the filters emptied (repeats, names from memory) leaves the model to search.
@@ -1106,8 +1107,13 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, "asks which one is meant");
       return { outcome: { ok: true }, output: { kind: "text", text: clarifyingQuestion(brief!), thinking: false } };
     }
+    // RESEARCH-PIN-01: the subject is pinned to one article before any search, and every search carries its name and years.
+    markResearch(state, "stage 1 pin start");
+    const pinned = await pinEntity(brief, rq, state.actor, signal);
+    state.entityAnchor = pinned.anchor;
+    markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates)`);
     markResearch(state, "stage 2 plan start");
-    const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds));
+    const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor));
     markResearch(state, "stage 2 plan end");
     state.researchPlan = plan;
     firstRoundQueries = plan.queries;
