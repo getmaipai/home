@@ -12,6 +12,12 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
     level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "music.musicbrainz_match", scope: "household", selector: "boolean", default: true,
+    label: "Match my songs to MusicBrainz",
+    help: "In the background, Home sends each library song's title, artist, album and track number to MusicBrainz, about one song a second, to find its public MusicBrainz id. Nothing else leaves your home. Off stops it; ids already found stay.",
+    level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "generation.music.enabled",
     scope: "household",
     selector: "boolean",

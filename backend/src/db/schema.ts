@@ -2017,6 +2017,12 @@ export const mediaItems = sqliteTable(
     artist: text("artist"),
     album: text("album"),
     albumArtist: text("album_artist"),
+    // MUSIC-MB-01: optional MusicBrainz ids (spec media-item), from an embedded tag or the background match. The checked key
+    // is hub-internal: the normalised text last searched, so an unmatched song is not searched again until its text changes.
+    musicbrainzRecordingId: text("musicbrainz_recording_id"),
+    musicbrainzArtistId: text("musicbrainz_artist_id"),
+    musicbrainzReleaseGroupId: text("musicbrainz_release_group_id"),
+    musicbrainzCheckedKey: text("musicbrainz_checked_key"),
     trackNo: integer("track_no"),
     discNo: integer("disc_no"),
     year: integer("year"),

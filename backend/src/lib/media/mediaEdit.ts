@@ -82,6 +82,8 @@ export function editMediaItem(person: PersonRow, appId: MediaAppId, body: Record
   if (changed.includes("title")) update.title = next.title;
   if (changed.includes("description")) update.description = next.description;
   if (changed.includes("artist")) update.artist = next.artist;
+  // MUSIC-MB-01: a person changed what the song is called or who made it, so a MusicBrainz match for the old text no longer holds.
+  if (changed.includes("title") || changed.includes("artist")) Object.assign(update, { musicbrainzRecordingId: null, musicbrainzArtistId: null, musicbrainzReleaseGroupId: null, musicbrainzCheckedKey: null });
   if (changed.includes("artwork")) update.artwork = set.artwork ? JSON.stringify({ file_id: set.artwork }) : null;
   db.update(mediaItems).set(update).where(eq(mediaItems.id, item.id)).run();
 

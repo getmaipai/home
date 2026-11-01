@@ -31,7 +31,8 @@ export function itemFromRow(row: MediaItemRow): MediaItem {
     parent_id: row.parentId, location, media_type: row.mediaType, duration_s: row.durationS, size: row.size, width: row.width, height: row.height,
     video_codec: row.videoCodec, audio_codec: row.audioCodec, playable: row.playable, artwork: json(row.artwork, null), previews: json(row.previews, null),
     chapters: json(row.chapters, []), subtitles: json(row.subtitles, []), lyrics: json(row.lyrics, null), locked_fields: json(row.lockedFields, []), series: row.series, season: row.season, episode: row.episode,
-    artist: row.artist, album: row.album, album_artist: row.albumArtist, track_no: row.trackNo, disc_no: row.discNo, year: row.year, genre: row.genre,
+    artist: row.artist, album: row.album, album_artist: row.albumArtist,
+    musicbrainz_recording_id: row.musicbrainzRecordingId, musicbrainz_artist_id: row.musicbrainzArtistId, musicbrainz_release_group_id: row.musicbrainzReleaseGroupId, track_no: row.trackNo, disc_no: row.discNo, year: row.year, genre: row.genre,
     author: row.author, narrator: row.narrator, series_index: row.seriesIndex, locator_kind: row.locatorKind, external: json(row.external, null),
     advisory: { explicit: row.advisoryExplicit, source: row.advisorySource }, band_ok: row.bandOk, verified_by_person_id: row.verifiedByPersonId,
     added_at: row.addedAt, fingerprint: row.fingerprint, hidden: row.hidden, deleted_at: row.deletedAt, trash_until: row.trashUntil,
@@ -45,6 +46,8 @@ export interface ItemExtras {
   missingSince: string | null;
   pages: number | null;
   probeFailedFp: string | null;
+  /** MUSIC-MB-01: the text the background match last searched (hub-internal). */
+  musicbrainzCheckedKey?: string | null;
 }
 
 export function itemToRow(item: MediaItem, scan: ItemExtras = { lastSeenScan: null, missingSince: null, pages: null, probeFailedFp: null }): MediaItemRow {
@@ -55,7 +58,8 @@ export function itemToRow(item: MediaItem, scan: ItemExtras = { lastSeenScan: nu
     mediaType: item.media_type, durationS: item.duration_s, size: item.size, width: item.width, height: item.height, videoCodec: item.video_codec, audioCodec: item.audio_codec,
     playable: item.playable, artwork: item.artwork ? JSON.stringify(item.artwork) : null, previews: item.previews ? JSON.stringify(item.previews) : null,
     chapters: JSON.stringify(item.chapters), subtitles: JSON.stringify(item.subtitles), lyrics: item.lyrics ? JSON.stringify(item.lyrics) : null, lockedFields: item.locked_fields.length > 0 ? JSON.stringify(item.locked_fields) : null, series: item.series, season: item.season, episode: item.episode,
-    artist: item.artist, album: item.album, albumArtist: item.album_artist, trackNo: item.track_no, discNo: item.disc_no, year: item.year, genre: item.genre,
+    artist: item.artist, album: item.album, albumArtist: item.album_artist,
+    musicbrainzRecordingId: item.musicbrainz_recording_id, musicbrainzArtistId: item.musicbrainz_artist_id, musicbrainzReleaseGroupId: item.musicbrainz_release_group_id, musicbrainzCheckedKey: scan.musicbrainzCheckedKey ?? null, trackNo: item.track_no, discNo: item.disc_no, year: item.year, genre: item.genre,
     author: item.author, narrator: item.narrator, seriesIndex: item.series_index, locatorKind: item.locator_kind,
     external: item.external ? JSON.stringify(item.external) : null, externalId: item.external ? item.external.id : null,
     advisoryExplicit: item.advisory.explicit, advisorySource: item.advisory.source, bandOk: item.band_ok, verifiedByPersonId: item.verified_by_person_id,

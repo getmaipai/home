@@ -128,6 +128,10 @@ process.env.MAIPAI_EMBED_PORT = String(reserveFreePort());
 // override-then-restore shape every test already uses for
 // MAIPAI_BENCH_KEEP_READ_PAGE and friends).
 process.env.MAIPAI_WIKIPEDIA_BASE_URL = "http://127.0.0.1:1";
+// MUSIC-MB-01: the music matcher never reaches the real musicbrainz.org from a test.
+process.env.MAIPAI_MUSICBRAINZ_BASE_URL = "http://127.0.0.1:1";
+// A scan does not start the background pass in tests; tests call runMusicBrainzPass with a fake client.
+process.env.MAIPAI_MUSICBRAINZ_NO_AUTOSTART = "1";
 
 // Defer imports that reach the database until after MAIPAI_DATA_DIR is set.
 const [{ __setDefaultStackClientForTests }, { startDefaultScriptedStack, setDefaultScriptedStackFixture }] = await Promise.all([

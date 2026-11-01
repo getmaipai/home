@@ -28,6 +28,10 @@ export interface AudioTags {
   container: string | null;
   explicit: boolean;
   hasEmbeddedArt: boolean;
+  /** MUSIC-MB-01: MusicBrainz ids a tagger (Picard, beets) embedded, lowercase UUIDs, or null. */
+  musicbrainzRecordingId: string | null;
+  musicbrainzArtistId: string | null;
+  musicbrainzReleaseGroupId: string | null;
   chapters: AudioChapter[];
 }
 
@@ -48,6 +52,13 @@ export function explicitFromNative(native: Record<string, ITag[]>): boolean {
     }
   }
   return false;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function uuid(value: unknown): string | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  const lower = typeof first === "string" ? first.trim().toLowerCase() : "";
+  return UUID.test(lower) ? lower : null;
 }
 
 function text(value: string | undefined | null): string | null {
@@ -79,6 +90,9 @@ export function tagsFromMetadata(meta: IAudioMetadata): AudioTags {
     container: text(format.container),
     explicit: explicitFromNative(meta.native),
     hasEmbeddedArt: (common.picture?.length ?? 0) > 0,
+    musicbrainzRecordingId: uuid(common.musicbrainz_recordingid),
+    musicbrainzArtistId: uuid(common.musicbrainz_artistid),
+    musicbrainzReleaseGroupId: uuid(common.musicbrainz_releasegroupid),
     chapters,
   };
 }

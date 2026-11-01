@@ -6,6 +6,7 @@
   "news.default_topics.teen",
   "news.default_topics.child",
   "music.lyrics_online",
+  "music.musicbrainz_match",
   "stack.engines.stt.smart_turn",
   "notifications.remind.due.telegram",
   "notifications.alarm.due.telegram",

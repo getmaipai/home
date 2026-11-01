@@ -16,6 +16,7 @@ import { bandOkAtIngest } from "./band";
 import { draftsForDirectory, type Draft, type DirListing, type FileEntry, type IngestContext } from "./ingest";
 import { decidePlayable } from "./kinds";
 import { healMadeSources } from "./heal";
+import { kickMusicBrainzMatch } from "./musicbrainzMatch";
 import { itemToRow, MediaItem, sourceFromRow, type MediaItemRow, type MediaSource } from "./model";
 import { createStackProber, type Prober } from "./prober";
 import { extensionOf } from "./parsers/text";
@@ -104,7 +105,7 @@ function rootAttributable(row: typeof mediaSources.$inferSelect): boolean {
   return true;
 }
 
-function recordFor(scanned: Draft, source: MediaSource, existing: MediaItemRow | undefined, parentId: string | null, bandFloor: MediaItem["band_ok"] | null, now: string): { item: MediaItem; extras: { pages: number | null; probeFailedFp: string | null } } {
+function recordFor(scanned: Draft, source: MediaSource, existing: MediaItemRow | undefined, parentId: string | null, bandFloor: MediaItem["band_ok"] | null, now: string): { item: MediaItem; extras: { pages: number | null; probeFailedFp: string | null; musicbrainzCheckedKey: string | null } } {
   // An edited field is locked: the existing row's value wins over the scanned one.
   const locked = (existing?.lockedFields ? JSON.parse(existing.lockedFields) : []) as MediaItem["locked_fields"];
   const draft: Draft = { ...scanned };
@@ -115,6 +116,9 @@ function recordFor(scanned: Draft, source: MediaSource, existing: MediaItemRow |
     if (locked.includes("artist")) draft.artist = existing.artist;
     if (locked.includes("artwork")) draft.artworkPath = (existing.artwork ? (JSON.parse(existing.artwork) as { path?: string }).path : null) ?? null;
   }
+  // MUSIC-MB-01: an id a tagger embedded wins; otherwise a matched id is kept for as long as the song's own text is unchanged.
+  const sameText = !!existing && existing.title === draft.title && existing.artist === draft.artist && existing.album === draft.album;
+  const keep = <T,>(fromTag: T | null, old: T | null | undefined): T | null => fromTag ?? (sameText ? old ?? null : null);
   const oldLyrics = existing?.lyrics ? JSON.parse(existing.lyrics) as MediaItem["lyrics"] : null;
   const lyrics = draft.lyrics ?? (oldLyrics && ["made", "lrclib"].includes(oldLyrics.source) ? oldLyrics : null);
   const verdict = bandOkAtIngest({ explicit: draft.explicit, title: draft.title, description: draft.description, lyrics: lyrics?.text, also: [draft.subtitle, draft.artist, draft.album, draft.series, draft.author] });
@@ -126,13 +130,15 @@ function recordFor(scanned: Draft, source: MediaSource, existing: MediaItemRow |
     location: { root_id: source.id, path: draft.rel }, media_type: draft.mediaType, duration_s: draft.durationS, size: draft.size, width: draft.width, height: draft.height,
     video_codec: draft.videoCodec, audio_codec: draft.audioCodec, playable: draft.playable, artwork: keptArtwork !== undefined ? keptArtwork : draft.artworkPath ? { path: draft.artworkPath } : null, previews: null,
     chapters: draft.chapters, subtitles: [], series: draft.series, season: draft.season, episode: draft.episode, artist: draft.artist, album: draft.album, album_artist: draft.albumArtist,
+    musicbrainz_recording_id: keep(draft.musicbrainzRecordingId, existing?.musicbrainzRecordingId), musicbrainz_artist_id: keep(draft.musicbrainzArtistId, existing?.musicbrainzArtistId),
+    musicbrainz_release_group_id: keep(draft.musicbrainzReleaseGroupId, existing?.musicbrainzReleaseGroupId),
     track_no: draft.trackNo, disc_no: draft.discNo, year: draft.year, genre: draft.genre, author: draft.author, narrator: draft.narrator, series_index: draft.seriesIndex,
     locator_kind: draft.locatorKind, external: null, lyrics, locked_fields: locked, advisory: { explicit: draft.explicit, source: verdict.advisorySource }, band_ok: band,
     verified_by_person_id: existing?.verifiedByPersonId ?? null, added_at: existing?.addedAt ?? now, fingerprint: draft.fingerprint || null, hidden: existing?.hidden ?? false,
     deleted_at: existing?.deletedAt && existing.missingSince === null ? existing.deletedAt : null, trash_until: existing?.deletedAt && existing.missingSince === null ? existing.trashUntil : null,
     created_at: existing?.createdAt ?? now, hlc: nextHlc(), provenance: `scan:${source.id}`,
   });
-  return { item, extras: { pages: draft.pages, probeFailedFp: null } };
+  return { item, extras: { pages: draft.pages, probeFailedFp: null, musicbrainzCheckedKey: sameText ? existing?.musicbrainzCheckedKey ?? null : null } };
 }
 
 async function runScan(sourceId: string, deps: ScanDeps): Promise<ScanSummary> {
@@ -238,8 +244,8 @@ async function runScan(sourceId: string, deps: ScanDeps): Promise<ScanSummary> {
   return finish();
 }
 
-function persist(item: MediaItem, prior: MediaItemRow | undefined, scanId: string, extras: { pages: number | null; probeFailedFp: string | null }): void {
-  const values = itemToRow(item, { lastSeenScan: scanId, missingSince: null, pages: extras.pages, probeFailedFp: extras.probeFailedFp });
+function persist(item: MediaItem, prior: MediaItemRow | undefined, scanId: string, extras: { pages: number | null; probeFailedFp: string | null; musicbrainzCheckedKey: string | null }): void {
+  const values = itemToRow(item, { lastSeenScan: scanId, missingSince: null, pages: extras.pages, probeFailedFp: extras.probeFailedFp, musicbrainzCheckedKey: extras.musicbrainzCheckedKey });
   if (prior) {
     const { id: _id, createdAt: _created, ...rest } = values;
     db.update(mediaItems).set(rest).where(eq(mediaItems.id, prior.id)).run();
@@ -356,6 +362,8 @@ export function scanRoot(sourceId: string, deps: ScanDeps = {}): Promise<ScanSum
         entry.again = false;
         summary = await runScan(sourceId, deps);
       } while (entry.again);
+      // MUSIC-MB-01: ids for new songs are looked up in the background, never on the scan's own path (rule 6).
+      if (summary.status === "ok") void kickMusicBrainzMatch().catch(() => undefined);
       return summary;
     } finally {
       running.delete(sourceId);

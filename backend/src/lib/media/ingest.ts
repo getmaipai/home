@@ -48,6 +48,9 @@ export interface Draft {
   artist: string | null;
   album: string | null;
   albumArtist: string | null;
+  musicbrainzRecordingId: string | null;
+  musicbrainzArtistId: string | null;
+  musicbrainzReleaseGroupId: string | null;
   trackNo: number | null;
   discNo: number | null;
   year: number | null;
@@ -78,7 +81,7 @@ function blank(kind: MediaKind, title: string, rel: string, file: FileEntry | nu
   return {
     kind, title, subtitle: null, description: null, rel, mediaType: mediaTypeOfExtension(ext), size: file?.size ?? null, durationS: null, width: null, height: null,
     videoCodec: null, audioCodec: null, playable: "unknown", artworkPath: null, chapters: [], series: null, season: null, episode: null, artist: null, album: null,
-    albumArtist: null, trackNo: null, discNo: null, year: null, genre: null, author: null, narrator: null, seriesIndex: null, locatorKind: "none", explicit: false,
+    albumArtist: null, musicbrainzRecordingId: null, musicbrainzArtistId: null, musicbrainzReleaseGroupId: null, trackNo: null, discNo: null, year: null, genre: null, author: null, narrator: null, seriesIndex: null, locatorKind: "none", explicit: false,
     pages: null, fingerprint: file ? fingerprintOf(file) : "", lyrics: null, children: [],
   };
 }
@@ -179,6 +182,9 @@ function trackDraft(file: FileEntry, relDir: string, tags: AudioTags | null, ctx
     draft.artist = tags.artist;
     draft.album = tags.album;
     draft.albumArtist = tags.albumArtist;
+    draft.musicbrainzRecordingId = tags.musicbrainzRecordingId;
+    draft.musicbrainzArtistId = tags.musicbrainzArtistId;
+    draft.musicbrainzReleaseGroupId = tags.musicbrainzReleaseGroupId;
     draft.discNo = tags.discNo;
     draft.year = tags.year;
     draft.genre = tags.genre;

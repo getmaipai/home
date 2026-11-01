@@ -2,6 +2,12 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.9] - 2026-11-01
+
+### Changed
+
+- The `musicbrainz` data source is on by default and now also covers the background match of library songs to MusicBrainz ids (title, artist, album and track number as text, about one song a second). An owner turns it off with "Match my songs to MusicBrainz" under Music settings.
+
 ## [0.3.7] - 2026-10-28
 
 ### Added

@@ -178,11 +178,11 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 ## Music
 
-**What it is for:** Looking up facts about a music artist.
+**What it is for:** Looking up facts about a music artist, and matching your songs to their public MusicBrainz entries.
 
-**When it happens:** Home asks MusicBrainz when someone asks about an artist.
+**When it happens:** Home asks MusicBrainz when someone asks about an artist. It also matches the songs in your music library to MusicBrainz in the background after a scan, about one song a second. This is on by default. An owner or admin can turn it off with **Match my songs to MusicBrainz** in Music settings. Songs already matched stay matched.
 
-**What it sends:** The artist's name. It sends no other personal details.
+**What it sends:** For an artist question, the artist's name. For the background match, each song's title, artist, album and track number from its file, plus your home's internet address. It sends no other personal details.
 
 **Who can use it:** Everyone. The package floor is child.
 
