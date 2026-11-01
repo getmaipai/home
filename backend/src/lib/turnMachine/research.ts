@@ -21,14 +21,20 @@ export function answerStyleFor(input: { thinking?: boolean; max?: boolean; maxLe
   return input.thinking === true ? "thinking" : "instant";
 }
 
-/** The budget this style runs on: more rounds, and a total deadline that grows by each added round's model and tool time. */
+/** Room for the model's reasoning on top of the visible reply, by style. The live V run (2026-11-01) showed both Thinking and Max
+ * replies cut off after a few words: the reasoning over several searches' evidence used the whole 512-token allowance and the
+ * ceiling with it, so the visible answer stopped mid-sentence. The visible ceiling stays the record's; only the reasoning room grows. */
+export const THINKING_ALLOWANCE_FACTOR = { thinking: 4, max: 12 } as const;
+
+/** The budget this style runs on: more rounds, more reasoning room, and a total deadline that grows by each added round's model and tool time. */
 export function budgetForStyle(budget: TurnBudget, style: AnswerStyle): TurnBudget {
   if (style === "instant" || !budget.model_transitions || budget.rounds < 1) return budget;
   const thinking = budget.rounds_thinking ?? budget.rounds;
   const rounds = Math.max(budget.rounds, style === "max" ? Math.max(budget.rounds_max ?? thinking, thinking) : thinking);
-  if (rounds === budget.rounds) return budget;
   const d = budget.deadlines_ms;
-  return { ...budget, rounds, deadlines_ms: { ...d, total: d.total + (rounds - budget.rounds) * (d.model + d.tool) } };
+  const room = budget.thinking_budget_tokens_toggled > 0 ? { thinking_budget_tokens_toggled: budget.thinking_budget_tokens_toggled * THINKING_ALLOWANCE_FACTOR[style] } : {};
+  if (rounds === budget.rounds && Object.keys(room).length === 0) return budget;
+  return { ...budget, ...room, rounds, deadlines_ms: { ...d, total: d.total + (rounds - budget.rounds) * (d.model + d.tool) } };
 }
 
 /** Whether this turn may take more than one tool round (the first-round note and the later nudges apply). */
@@ -37,7 +43,7 @@ export const isResearchStyle = (style: AnswerStyle | undefined, budget: TurnBudg
 /** Added to the first round of a research turn. */
 export function firstRoundNote(style: AnswerStyle, rounds: number): string {
   if (style === "max") {
-    return `This question deserves research. First work out exactly which work, edition, production or version I mean: a franchise can have several (a miniseries, a sequel, a weekly series, a remake), so pick the one my own words describe and say which you chose. Search for that production's own makers, network, dates and how it ended before you write any follow-up query, and from then on use the names and titles the sources gave you, never names you assume; do not credit a person with a work unless a source says so. Write each query specific: the exact title, the year, and one angle (why it ended, what its makers said in interviews, the planned next season or ending, books, comics, sequels or a remake, behind the scenes, retrospectives), one angle per search, never repeating an earlier query. If a search comes back thin, rewrite it with the names found so far. For every part still unanswered, or backed by only one site, search again. Prefer more than one site and a primary source such as an interview. You may search up to ${rounds} times; stop as soon as every part is answered.`;
+    return `This question deserves research. Work in this order. (1) Say exactly which subject, version, edition, person, product or event I mean, from my own words; if several fit, pick the one my words describe and say which you chose. (2) Find the authoritative or primary sources for that subject first (the people or bodies that own, wrote, made or govern it; original documents, interviews, official statements), and from then on use only the names and titles those sources gave; never credit a person or body with a work or a claim unless a source says so. (3) Decide the 4 to 8 angles that matter for this particular question and search each one on its own: one angle per search, a specific query (the exact name, the year or version, and the angle), never repeating an earlier query. (4) If a search comes back thin, rewrite the query using what you have found so far. (5) For any part still unanswered, or backed by only one source, search again. You may search up to ${rounds} times; stop as soon as every part is answered.`;
   }
   return `You may search more than once. If the first results leave part of the question unanswered, search again with a different query before you answer. You may search up to ${rounds} times.`;
 }
@@ -68,7 +74,7 @@ export function continuationInstruction(style: AnswerStyle, utterance: string, p
   const left = `You have ${roundsLeft} more search${roundsLeft === 1 ? "" : "es"} available.`;
   const question = `my question: "${utterance.replace(/"/g, "'")}"`;
   if (style === "max") {
-    return `${searched} ${read} ${left} Check what is still missing for ${question}. If a part is unanswered, if a claim rests on one site, or if no primary source (an interview, the makers' own words) has been looked at, search again with a different, more specific query that uses the names and titles found so far. Do not credit anyone with a work unless a source says so. Cite sources by their numbers. If nothing important is missing, answer now. ${RESEARCH_ANSWER_CLAUSE}`;
+    return `${searched} ${read} ${left} Check what is still missing for ${question}. If a part is unanswered, if a claim rests on one site, or if no primary source (an official statement, an interview, the original document) has been looked at, search again with a different, more specific query that uses the names and titles found so far. Do not credit anyone with a work or a claim unless a source says so. Cite sources by their numbers. If nothing important is missing, answer now. ${RESEARCH_ANSWER_CLAUSE}`;
   }
   return `${searched} ${read} ${left} If something important for ${question} is still missing, search again with a different query; otherwise answer now. ${RESEARCH_ANSWER_CLAUSE}`;
 }

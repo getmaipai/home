@@ -16,7 +16,8 @@ import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
-import { dropUnknownCitations, roundAddedNothing } from "@/lib/turnMachine/research";
+import { budgetForStyle, dropUnknownCitations, roundAddedNothing } from "@/lib/turnMachine/research";
+import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
 
@@ -160,9 +161,10 @@ describe("research rounds follow the answer style", () => {
     const { requests } = await turn("owner", 1, { max: true });
     const first = requests.find((r) => toolMessages(r).length === 0 && r.tool_choice !== "none")!;
     const note = first.messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
-    expect(note).toContain("exactly which work, edition, production or version I mean");
-    expect(note).toContain("never names you assume");
+    expect(note).toContain("Say exactly which subject, version, edition, person, product or event I mean");
+    expect(note).toContain("use only the names and titles those sources gave");
     expect(note).toContain("one angle per search");
+    expect(note).toContain("4 to 8 angles that matter for this particular question");
     expect(note).not.toMatch(/[A-Z][a-z]+ [A-Z][a-z]+ (?:created|wrote)/);
   });
 
@@ -235,5 +237,16 @@ describe("the stop rule, the citation check, the page budget and the stored step
     ]);
     expect(researchStepsFor(stored, "teen")).toBeUndefined();
     expect(researchStepsFor(JSON.stringify([JSON.parse(stored)[0]]), "adult")).toBeUndefined();
+  });
+});
+
+describe("the reasoning room grows with the style so a long research answer is not cut off", () => {
+  test("Thinking gets four times and Max twelve times the record's reasoning allowance; Instant keeps it", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    expect(base.thinking_budget_tokens_toggled).toBeGreaterThan(0);
+    expect(budgetForStyle(base, "instant").thinking_budget_tokens_toggled).toBe(base.thinking_budget_tokens_toggled);
+    expect(budgetForStyle(base, "thinking").thinking_budget_tokens_toggled).toBe(base.thinking_budget_tokens_toggled * 4);
+    expect(budgetForStyle(base, "max").thinking_budget_tokens_toggled).toBe(base.thinking_budget_tokens_toggled * 12);
+    expect(budgetForStyle(base, "max").reply_ceiling_tokens).toBe(base.reply_ceiling_tokens);
   });
 });
