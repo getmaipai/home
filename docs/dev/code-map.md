@@ -21,8 +21,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/artist.json` | music | Artist |
 | `backend/packages/music/pages/artists.json` | music | Artists |
 | `backend/packages/music/pages/create.json` | music | Create |
+| `backend/packages/music/pages/creations.json` | music | My creations |
 | `backend/packages/music/pages/index.json` | music | Listen now |
 | `backend/packages/music/pages/liked.json` | music | Liked |
+| `backend/packages/music/pages/make-band.json` | music | Make a band |
+| `backend/packages/music/pages/make-song.json` | music | Make a song |
 | `backend/packages/music/pages/play.json` | music | Now playing |
 | `backend/packages/music/pages/playlist.json` | music | Playlist |
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
@@ -55,9 +58,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
 | `backend/packages/videos/pages/create.json` | videos | Create |
+| `backend/packages/videos/pages/creations.json` | videos | My creations |
 | `backend/packages/videos/pages/history.json` | videos | History |
 | `backend/packages/videos/pages/index.json` | videos | Videos |
 | `backend/packages/videos/pages/library.json` | videos | Library |
+| `backend/packages/videos/pages/make-video.json` | videos | Make a video |
 | `backend/packages/videos/pages/search.json` | videos | Search |
 | `backend/packages/videos/pages/watch-later.json` | videos | Watch later |
 | `backend/packages/videos/pages/watch.json` | videos | Watch |
