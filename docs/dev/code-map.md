@@ -372,7 +372,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, pictureFailureWords, storedImages |
-| `backend/src/lib/chatLease.ts` | LEASE_GRACE_MS, DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld |
+| `backend/src/lib/chatLease.ts` | LEASE_GRACE_MS, DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld, chatLeaseHeldBy |
 | `backend/src/lib/chatLeaseRuntime.ts` | __resetChatLeaseForTests, getChatLease, startChatLease |
 | `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState, addedChatChoiceStates |
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
@@ -740,6 +740,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/replyConstraints.ts` | parseReplyConstraint, setReplyConstraint, constraintsFor, bannedPhrasesFor, clearReplyConstraints |
 | `backend/src/lib/replyParityJudge.ts` | judgeReplyParity |
 | `backend/src/lib/replyVariation.ts` | pickVariant, REFUSAL_FIRST, REFUSAL_REPEAT, pickRefusalVariant, PLUGIN_ERROR_VARIANTS, PLUGIN_DONE_VARIANTS |
+| `backend/src/lib/researchBudget.ts` | RESEARCH_PAGES_MAX, RESEARCH_HOST_PAGES_MAX, RESEARCH_HOST_PACE_MS, RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget |
 | `backend/src/lib/resourceDay.ts` | describeResourceDay, readResourceDay |
 | `backend/src/lib/resourceGovernor.ts` | __setGovernorTuningForTestsOnly, __resetGovernorTuningForTests, __stopAllGovernorsForTests, systemAvailableBytes, startResourceGovernor |
 | `backend/src/lib/restoreStaging.ts` | RestoreRefused, pendingRestore, cancelPendingRestore, moveDbSet, dbSetExists, partialMoveInProgress |
@@ -928,6 +929,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/policy.ts` | argsGrounded, policyNode |
 | `backend/src/lib/turnMachine/nodes/safety.ts` | safetyNode, safetyRoute, inputSafetyAfterFailure, applySafety |
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
+| `backend/src/lib/turnMachine/research.ts` | RESEARCH_ANSWER_CLAUSE, answerStyleFor, budgetForStyle, isResearchStyle, firstRoundNote, researchProgress |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
 | `backend/src/lib/turnMachine/toolGates.ts` | __resetToolGateLatchForTests, budgetWithTurnToolGates |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
