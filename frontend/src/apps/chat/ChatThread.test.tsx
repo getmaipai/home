@@ -111,7 +111,7 @@ afterEach(() => {
 });
 
 describe("ChatThread", () => {
-  test("search outage keeps the model's answer and shows the web search banner", async () => {
+  test("search outage keeps the model's answer and adds no banner (RULES S6)", async () => {
     const status = spyOn(api, "statusApps").mockResolvedValue([{
       id: "chat", name: "Chat", state: "degraded", reason: "Chat is working, but search is limited right now.",
     }] as never);
@@ -122,22 +122,12 @@ describe("ChatThread", () => {
     act(() => searchBannerRuntime!.thread.composer.setText("Look this up"));
     act(() => searchBannerRuntime!.thread.composer.send());
     expect(await view.findByText("I couldn't look that up just now, but here's what I know.")).toBeTruthy();
-    expect(await view.findByText("Web search is unavailable")).toBeTruthy();
-    expect(view.getByText(/check Settings under Search, then Repairs/)).toBeTruthy();
-    status.mockRestore();
-  });
-
-  test("healthy web search has no banner", async () => {
-    const status = spyOn(api, "statusApps").mockResolvedValue([{
-      id: "chat", name: "Chat", state: "operational", reason: null,
-    }] as never);
-    const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness /></MemoryRouter>);
-    await waitFor(() => expect(view.container.querySelector('[role="status"]')).toBeNull());
     expect(view.queryByText("Web search is unavailable")).toBeNull();
+    expect(view.container.querySelector('[role="alert"]')).toBeNull();
     status.mockRestore();
   });
 
-  test("an owner's deliberate web search switch-off has distinct wording", async () => {
+  test("an owner's deliberate web search switch-off adds no banner to the chat page", async () => {
     const status = spyOn(api, "statusApps").mockResolvedValue([{
       id: "chat", name: "Chat", state: "operational", reason: null,
     }] as never);
@@ -145,8 +135,8 @@ describe("ChatThread", () => {
       key: "search.source_mode.web", value: "offline",
     }] as never);
     const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness /></MemoryRouter>);
-    expect(await view.findByText("Web search is off")).toBeTruthy();
-    expect(view.getByText(/turned off for this home/)).toBeTruthy();
+    await waitFor(() => expect(view.container.querySelector("textarea, [contenteditable]")).not.toBeNull());
+    expect(view.queryByText("Web search is off")).toBeNull();
     expect(view.queryByText("Web search is unavailable")).toBeNull();
     status.mockRestore();
     settings.mockRestore();

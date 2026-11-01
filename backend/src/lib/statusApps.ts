@@ -214,6 +214,8 @@ export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed 
   if (state === "operational") return null;
   if (state === "waiting_for_internet") return `${app.name} is waiting for the internet.`;
   const failed = needs.find((need) => need.required && need.state === "down");
+  // A hosted robot's Bot app is also an "engine" need; it must not read as the AI being down.
+  if (failed?.kind === "engine" && failed.id.startsWith("robot-host:")) return `${app.name} isn't running. An owner can start it again from Repairs.`;
   if (failed?.kind === "engine") return `${app.name} isn't working: MaiPai's AI isn't running.`;
   if (!failed && needs.some((need) => need.required && need.state === "degraded")) return `${app.name} is starting up.`;
   const limited = needs.find((need) => need.kind === "service" && need.state === "degraded");
@@ -224,7 +226,7 @@ export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed 
     const errorClass = serviceDetail(componentForNeed(limited)).last_error_class;
     return errorClass === "http_429" || errorClass === "access_wall"
       ? `${limited.name} is limiting requests from this home for a while.`
-      : `${limited.name} isn't answering reliably right now. It is checked again every few minutes.`;
+      : `${limited.name} isn't answering right now. Chat still works without it, and Home checks again soon.`;
   }
   if (failed?.kind === "service") return `${app.name} isn't working: ${failed.name} isn't reachable.`;
   if (failed?.id === "hub") return `${app.name} isn't working: MaiPai Home isn't running.`;

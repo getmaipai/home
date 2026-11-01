@@ -121,6 +121,21 @@ describe("appReason (STATUS-REASON-01)", () => {
   });
 });
 
+describe("appReason names a robot brain that is not running, not the AI (2026-11-01)", () => {
+  test("the sidecar need gets its own plain line", () => {
+    const app = { id: "robot-host:device-x", name: "Robot brain for StackChan", needs: [] };
+    const brain = { kind: "engine", id: "robot-host:device-x", name: "Robot brain", purpose: "Run StackChan", required: true, state: "down" };
+    const text = appReason(app as never, "down", [brain] as never);
+    expect(text).toBe("Robot brain for StackChan isn't running. An owner can start it again from Repairs.");
+    expect(text).not.toContain("AI");
+  });
+  test("a real AI engine keeps the AI line", () => {
+    const chat = { id: "chat", name: "Chat", needs: [] };
+    const ai = { kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "x", required: true, state: "down" };
+    expect(appReason(chat as never, "down", [ai] as never)).toBe("Chat isn't working: MaiPai's AI isn't running.");
+  });
+});
+
 describe("appReason names the real cause of a degraded service (MOBILE-LIVE-01)", () => {
   const chat = { id: "chat", name: "Chat", needs: [] };
   const search = { kind: "service", id: "searxng", name: "Household web search", purpose: "Search", required: false, state: "degraded" };
@@ -134,7 +149,7 @@ describe("appReason names the real cause of a degraded service (MOBILE-LIVE-01)"
     await recordServiceOutcome("searxng", { ok: false, error: new Error("timed out") }, new Date(t - 1000));
     const text = appReason(chat as never, "degraded", [base, search] as never);
     expect(text).not.toContain("limiting requests");
-    expect(text).toContain("Household web search isn't answering reliably");
+    expect(text).toBe("Household web search isn't answering right now. Chat still works without it, and Home checks again soon.");
     __resetServiceHealthForTests();
   });
 

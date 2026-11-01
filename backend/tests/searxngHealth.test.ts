@@ -194,6 +194,37 @@ describe("checkSearxngHealth", () => {
     }
   });
 
+  // 2026-11-01: after a hub restart two failed calls in a row marked search
+  // "degraded" on the Status page with no Repairs item open, so the probe
+  // stayed on the hourly cadence and the page said "isn't answering" for up
+  // to an hour although SearXNG was fine.
+  test("a degraded service state with no open issue still probes again at once and heals the state", async () => {
+    const { __resetServiceHealthForTests, recordServiceOutcome, serviceState } = await import("@/lib/serviceHealth");
+    __resetServiceHealthForTests();
+    let requests = 0;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
+      fetch: () => {
+        requests++;
+        return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "The third planet." }] });
+      },
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await checkSearxngHealth(); // healthy first probe starts the hourly clock
+      const t = Date.now();
+      await recordServiceOutcome("searxng", { ok: false, error: new Error("timed out") }, new Date(t - 2000));
+      await recordServiceOutcome("searxng", { ok: false, error: new Error("timed out") }, new Date(t - 1000));
+      expect(serviceState("service:searxng")).toBe("degraded");
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+      await checkSearxngHealth();
+      expect(requests).toBe(2);
+      expect(serviceState("service:searxng")).toBe("operational");
+    } finally {
+      server.stop(true);
+      __resetServiceHealthForTests();
+    }
+  });
+
   test("a real result clears both issues", async () => {
     setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
     await checkSearxngHealth();

@@ -2,9 +2,6 @@ import { useMaxSendHold } from "@/apps/chat/maxChat";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
-import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { AdminToolFallback, DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
@@ -13,8 +10,6 @@ import { ChatAvailabilityContext, engineDownReason } from "@/apps/chat/useChatAv
 import { useComposerFocus } from "@/apps/chat/useComposerFocus";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
-import { useStatusApps } from "@/shell/useStatusApps";
-import { isSearchLimitedChat } from "@/shell/statusApps";
 import { messageForTurn } from "./chatTurnDeepLinkModel";
 import { useReplyFace } from "@/apps/chat/useReplyFace";
 import "@/apps/chat/chatOriginHighlight.css";
@@ -107,14 +102,6 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   const [originMissing, setOriginMissing] = useState(false);
   const [originHighlight, setOriginHighlight] = useState<OriginHighlightStyle | null>(null);
   const handledOrigin = useRef<string | null>(null);
-  const statusApps = useStatusApps().data;
-  const searchDown = Array.isArray(statusApps) && statusApps.some(isSearchLimitedChat);
-  const householdSettings = useQuery({
-    queryKey: ["settings-values", "household"],
-    queryFn: () => api.settingsValues("household"),
-  });
-  const webSearchOff = Array.isArray(householdSettings.data)
-    && householdSettings.data.some((setting) => setting.key === "search.source_mode.web" && setting.value === "offline");
   useEffect(() => {
     if (!originConversationId || !originTurnId || originRemoteId !== originConversationId || originIsLoading) return;
     const key = `${originConversationId}:${originTurnId}`;
@@ -225,17 +212,6 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
       <div className="flex justify-center">
         <ChatConnectionBanner />
       </div>
-      {webSearchOff ? (
-        <Alert role="status">
-          <AlertTitle>Web search is off</AlertTitle>
-          <AlertDescription>Web search is turned off for this home. An owner can turn it on in Settings under Search.</AlertDescription>
-        </Alert>
-      ) : searchDown ? (
-        <Alert role="status">
-          <AlertTitle>Web search is unavailable</AlertTitle>
-          <AlertDescription>Home could not reach web search. An owner can check Settings under Search, then Repairs if it still does not work.</AlertDescription>
-        </Alert>
-      ) : null}
       <ChatExtrasContext.Provider value={extraContext}>
         {originMissing ? <p role="status" className="px-4 py-2 text-sm text-muted-foreground">That message is no longer available. This chat is open at the end.</p> : null}
         {originHighlight ? <div data-origin-highlight aria-hidden="true" className="pointer-events-none z-50 rounded-lg border-2 border-primary bg-primary/10 motion-reduce:transition-none" style={{ "--origin-left": originHighlight["--origin-left"], "--origin-top": originHighlight["--origin-top"], "--origin-width": originHighlight["--origin-width"], "--origin-height": originHighlight["--origin-height"] } as CSSProperties} /> : null}

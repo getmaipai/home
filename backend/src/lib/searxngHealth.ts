@@ -20,6 +20,7 @@ import { searxngSearch, SEARXNG_NO_RESULTS_TEXT } from "@/lib/packageHost";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { recordSearchHealth } from "@/lib/searchHealthState";
 import { listIssues } from "@/lib/issues";
+import { serviceState } from "@/lib/serviceHealth";
 
 // "Earth" rather than something topical/timely: a canary query only
 // works if it's as close to guaranteed-to-return-something as a query
@@ -70,6 +71,10 @@ export function __setLastSearxngCanaryResultForTests(baseUrl: string | null, che
 // hour. Reads the full history and filters on `resolved_at` alone, the
 // one field that actually means "genuinely fixed".
 function searchIsCurrentlyUnhealthy(): boolean {
+  // The Status page marks search degraded after two failed calls in a row, with no Repairs item open (a restart can do
+  // that). Without this the probe stayed hourly and the page kept saying search was not answering after it had recovered.
+  const state = serviceState("service:searxng");
+  if (state === "degraded" || state === "outage") return true;
   return listIssues({ includeResolved: true }).some((i) => i.source === "websearch" && !i.resolved_at && (i.key === "searxng_unreachable" || i.key === "searxng_empty"));
 }
 
@@ -96,7 +101,7 @@ export function __resetSearxngHealthThrottleForTests(): void {
 // `unresponsive_engines` at all (the stale-install case this file's own
 // header names), where a real query returning nothing is ordinary and
 // never raises anything (SEARCH-EMPTY-01's own distinction, kept).
-export async function checkSearxngHealth(): Promise<void> {
+async function probeSearxng(): Promise<void> {
   const url = getHouseholdSettingValue("search.searxng_url") as string | undefined;
   // Not configured is not a fault - web search is opt-in, and every
   // other household setting this optional gets the identical "nothing to
@@ -154,4 +159,25 @@ export async function checkSearxngHealth(): Promise<void> {
   }
   lastProbeJsonOk = true;
   await recordSearchHealth({ kind: "ok" });
+}
+
+// A state that is not healthy is looked at again after 1, 2 and 5 minutes before the scheduler's own 15-minute tick takes
+// over, so a blip around a restart clears on the Status page within a minute or two, not at the next tick.
+const RECHECK_DELAYS_MS = [60_000, 120_000, 300_000];
+let recheckAttempt = 0;
+let recheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+export async function checkSearxngHealth(): Promise<void> {
+  try { await probeSearxng(); }
+  finally { armSearxngRecheck(); }
+}
+
+function armSearxngRecheck(): void {
+  if (!getHouseholdSettingValue("search.searxng_url") || !searchIsCurrentlyUnhealthy()) { recheckAttempt = 0; return; }
+  if (process.env.NODE_ENV === "test" || recheckTimer !== null) return;
+  const delay = RECHECK_DELAYS_MS[recheckAttempt];
+  if (delay === undefined) return;
+  recheckAttempt++;
+  recheckTimer = setTimeout(() => { recheckTimer = null; void checkSearxngHealth(); }, delay);
+  recheckTimer.unref?.();
 }
