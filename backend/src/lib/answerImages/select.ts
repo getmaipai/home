@@ -152,7 +152,7 @@ function clip(text: string, max: number): string {
 /** The pictures for `subject` that `actor` (in `band`) may see. Never
  * throws: any failure is no pictures (rule 6). `deadlineAt` is when the
  * picture fetch must stop so the set is ready inside the turn's budget. */
-export async function selectAnswerImages(input: { subject: string; kind?: string; actor: PersonRow; band: AgeBand; roster: readonly string[]; deadlineAt?: number; shown?: ShownPictures }): Promise<AnswerImageSelection> {
+export async function selectAnswerImages(input: { subject: string; kind?: string; actor: PersonRow; band: AgeBand; roster: readonly string[]; deadlineAt?: number; libraryDeadlineAt?: number; shown?: ShownPictures }): Promise<AnswerImageSelection> {
   const subject = input.subject.trim().slice(0, 200);
   const trace: AnswerImageTrace = { subject };
   const skip = (why: AnswerImageSkip): AnswerImageSelection => ({ set: null, trace: { ...trace, skipped: why } });
@@ -336,7 +336,10 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     if (kept.length === 0) return skip("no_candidates");
 
     const sources: AnswerImageSource[] = kept.map((c, i) => ({ id: `c${i}`, url: c.url, leadImage: c.lead }));
-    const fetched = await fetchAnswerImages(sources, { ...deps.fetchOptions, ...(input.deadlineAt !== undefined ? { deadlineAt: input.deadlineAt } : {}) });
+    // ZIM-IMG-02: pictures that all come from the household's own library have no third-party host to wait on, so they get the longer limit.
+    const libraryOnly = kept.every((c) => c.source === "library");
+    const fetchDeadline = libraryOnly && input.libraryDeadlineAt !== undefined ? input.libraryDeadlineAt : input.deadlineAt;
+    const fetched = await fetchAnswerImages(sources, { ...deps.fetchOptions, ...(fetchDeadline !== undefined ? { deadlineAt: fetchDeadline } : {}) });
     trace.dropped_by_fetch = fetched.dropped_by_fetch;
     trace.dropped_by_quality = fetched.dropped_by_quality as Record<string, number>;
     if (fetched.duplicate_check && fetched.duplicate_check.pairs > 0) trace.duplicate_check = fetched.duplicate_check;

@@ -30,6 +30,11 @@ import { selectAnswerImages, type AnswerImageSelection, type AnswerImageTrace } 
 export const SHOW_IMAGES_TOOL_ID = "show_images";
 /** The whole pipeline's wall budget beside the answer; past it, no pictures. */
 export const ANSWER_IMAGES_BUDGET_MS = 4_000;
+/** ZIM-IMG-02: the household's own library reads from a cold disk can take
+ * several seconds (a first article read measured 10 s on the live hub), so
+ * library pictures get this longer wall limit; web pictures keep the short
+ * fetch deadline above. A late gallery still appears when it is ready. */
+export const ANSWER_IMAGES_LIBRARY_BUDGET_MS = 15_000;
 /** The part of that budget kept for validating and caching what arrived:
  * the picture fetch stops this long before the budget ends (ANSWER-IMG-05,
  * measured 2026-10-06: about 175 ms per 1280 px photo, four at a time). */
@@ -180,10 +185,11 @@ export function startAnswerImages(state: TurnState, subject: string, kind = "", 
   const run = (entry: AnswerImageTurnState): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const budget = new Promise<AnswerImageSelection>((resolve) => {
-      timer = setTimeout(() => resolve({ set: null, trace: { subject: entry.subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
+      timer = setTimeout(() => resolve({ set: null, trace: { subject: entry.subject, skipped: "error" } }), ANSWER_IMAGES_LIBRARY_BUDGET_MS);
     });
     const deadlineAt = Date.now() + ANSWER_IMAGES_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
-    return Promise.race([selectAnswerImages({ subject: entry.subject, kind: many ? "" : kind, actor: state.actor, band, roster, deadlineAt, ...(shown ? { shown } : {}) }), budget])
+    const libraryDeadlineAt = Date.now() + ANSWER_IMAGES_LIBRARY_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
+    return Promise.race([selectAnswerImages({ subject: entry.subject, kind: many ? "" : kind, actor: state.actor, band, roster, deadlineAt, libraryDeadlineAt, ...(shown ? { shown } : {}) }), budget])
       .catch((): AnswerImageSelection => ({ set: null, trace: { subject: entry.subject, skipped: "error" } }))
       .then((selection) => {
         clearTimeout(timer);
