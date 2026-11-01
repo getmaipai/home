@@ -814,6 +814,12 @@ describe("household companion routes", () => {
     expect(progress.label).toBe("Waiting for memory, then trying again"); expect((await request(`companions/${stopId}/states/jobs/run/${job}`, adult, "DELETE")).status).toBe(204);
     for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${stopId}/states/jobs/run/${job}`, adult)).json(); if (progress.state === "cancelled") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress.state).toBe("cancelled"); expect(videoNumber).toBe(1); expect(submitted).toHaveLength(4);
+
+    const waitId = await prepare("Stack makes room"); __setTakeRetryWaitMsForTests(30_000);
+    __setVideosFetchForTests((async (input, init) => { const url = new URL(String(input)), method = init?.method ?? "GET"; if (url.pathname === "/v1/videos/generations" && method === "POST") return Response.json({ job: "room-1" }, { status: 202 }); if (url.pathname.endsWith("/room-1") && method === "GET") return Response.json({ job: "room-1", state: "running", phase: "Put the picture model away to make room.", progress: 0, data: [] }); if (url.pathname.endsWith("/room-1") && method === "DELETE") return new Response(null, { status: 204 }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const roomStarted = await request(`companions/${waitId}/states/idle/generate`, adult, "POST", { count: 1 }); const { job: roomJob } = await roomStarted.json() as { job: string };
+    for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${waitId}/states/jobs/run/${roomJob}`, adult)).json(); if (/Not started yet/.test(progress.label)) break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress.label).toBe("Not started yet: Put the picture model away to make room."); expect((await request(`companions/${waitId}/states/jobs/run/${roomJob}`, adult, "DELETE")).status).toBe(204);
   });
 
   test("refuses minor, unapproved sheet and unavailable video engine before submitting", async () => {

@@ -94,7 +94,8 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         const prompt = takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
-        run.label = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
+        const makingLabel = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
+        run.label = makingLabel;
         let take: CompanionTake | null = null;
         let stackJob: string | null = null;
         let engineFailure = false;
@@ -116,7 +117,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
                 if (status.state === "failed") throw new StackVideoError(500, status.code ?? "video_failed", status.error ?? "The video engine could not make this clip. Try again.", stackJob);
                 if (status.state === "cancelled") throw Object.assign(new Error("The video engine stopped this clip. Try again."), { cancelled: true });
                 if (status.state === "done") done = status.data;
-                else { const progress = Math.max(0, Math.min(99, status.progress)); run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
+                else { const progress = Math.max(0, Math.min(99, status.progress)); run.label = progress === 0 && status.phase ? `Not started yet: ${status.phase}` : makingLabel; run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
                 if (!done) await new Promise((resolve) => setTimeout(resolve, TAKE_POLL_MS));
               }
               break;
