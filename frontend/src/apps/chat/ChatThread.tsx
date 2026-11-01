@@ -245,7 +245,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
           components={{
             ...THREAD_SLOTS,
             ToolFallback: BoundToolFallbackGuard,
-            composerNoticeLayout: "truncate",
+            composerNoticeLayout: "wrap",
             // CHAT-COMPOSER-SLOT-01: the notice line is always there, empty or not.
             composerNoticeReserve: true,
             onEditSend,

@@ -44,14 +44,15 @@ describe("composer notice slot keeps its line", () => {
     test(`${name}: an empty slot is the fixed one-line slot`, async () => {
       const el = await slot(messages, null);
       expect(el.querySelector("[data-chat-notice]")).toBeNull();
-      expect(el.className).toContain("h-6");
-      expect(el.className).toContain("truncate");
+      expect(el.className).toContain("min-h-6");
+      expect(el.className).toContain("whitespace-normal");
     });
     test(`${name}: a notice fills the same fixed slot`, async () => {
       const el = await slot(messages, NOTICE);
       expect(el.querySelector("[data-chat-notice-text]")?.textContent).toBe(NOTICE.text);
-      expect(el.className).toContain("h-6");
-      expect(el.className).toContain("truncate");
+      expect(el.className).toContain("min-h-6");
+      expect(el.className).toContain("whitespace-normal");
+      expect(el.className).not.toContain("truncate");
     });
   }
 });
