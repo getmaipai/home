@@ -369,7 +369,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, pictureFailureWords, storedImages |
 | `backend/src/lib/chatLease.ts` | DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld |
-| `backend/src/lib/chatLeaseRuntime.ts` | getChatLease, startChatLease |
+| `backend/src/lib/chatLeaseRuntime.ts` | __resetChatLeaseForTests, getChatLease, startChatLease |
 | `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState, addedChatChoiceStates |
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
 | `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts |
