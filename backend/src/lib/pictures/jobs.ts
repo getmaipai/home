@@ -156,7 +156,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
         status = await getGenerationJob(job.stackJob);
       } catch (error) {
         if (stopped(job) || controller.signal.aborted) return;
-        if (error instanceof StackPicturesError && error.status === 404) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} The engine lost track of it, most likely because it restarted. Try again.`; savePictureJob(job); return; }
+        if (error instanceof StackPicturesError && error.status === 404) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It did not finish. Try again.`; savePictureJob(job); return; }
         // A single missed poll is not a failure; the next one decides.
         await sleep(POLL_MS * 2, controller.signal);
         continue;
@@ -330,7 +330,7 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
 export function resumePictureJobs(): void {
   for (const job of unfinishedStoredJobs()) {
     const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-    if (!person) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} Home restarted before it finished. Try again.`; savePictureJob(job); continue; }
+    if (!person) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It did not finish. Try again.`; savePictureJob(job); continue; }
     if (!job.stackJob) { markLive(job); continue; }
     void watch(job, person as PersonRow);
   }

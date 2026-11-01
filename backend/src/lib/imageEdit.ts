@@ -112,16 +112,16 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
   if (!photoUploadsAllowed(actor) && !childOwnCartoonsOnly(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), limits: {} };
   const comment: EditToolState = await commentState(actor);
   const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment }, limits: {} });
-  if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't available: no editing engine is set up on this computer.", "unavailable");
+  if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't set up on this computer yet. Ask an admin to set them up.", "unavailable");
   let status: StackImageToolsStatus | null;
   try {
     status = toolsStatusForTests !== undefined ? toolsStatusForTests : await getStackClient().imageTools();
   } catch (error) {
     // An older Stack answers 404 for a route it does not have: the tools are not installed there.
-    if (error instanceof StackError && error.status === 404) return withStackDown("Editing tools aren't installed. The engine on this computer needs its next update to add them.", "not_installed");
-    return withStackDown("Editing tools aren't reachable right now. Check that the engine is running, then try again.", "unavailable");
+    if (error instanceof StackError && error.status === 404) return withStackDown("Editing tools aren't installed yet. Ask an admin to update Home.", "not_installed");
+    return withStackDown("Editing tools aren't ready right now. Try again in a few minutes.", "unavailable");
   }
-  if (!status) return withStackDown("Editing tools aren't installed. The engine on this computer needs its next update to add them.", "not_installed");
+  if (!status) return withStackDown("Editing tools aren't installed yet. Ask an admin to update Home.", "not_installed");
   if (status.state === "unsupported") {
     const why = status.reason ? ` ${status.reason}` : "";
     return withStackDown(`Editing tools aren't installed on this computer.${why}`.trim(), "not_installed");
@@ -132,7 +132,7 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
   const needs = (key: string, fallbackOk: boolean, what: string): EditToolState => {
     if (preparing) return { enabled: false, reason: prepareReason };
     if (status!.models[key] === true || fallbackOk) return { enabled: true };
-    return { enabled: false, reason: `${what} isn't installed yet. Install the editing models from the engine's model list, then try again.` };
+    return { enabled: false, reason: `${what} isn't installed yet. Ask an admin to install the editing models, then try again.` };
   };
   const tools: Record<EditToolKey, EditToolState> = {
     markup: { enabled: true },
@@ -308,7 +308,7 @@ export function editErrorFrom(error: unknown): ImageEditError {
   if (error instanceof StackError) {
     let code = "failed";
     try { const parsed = error.body ? JSON.parse(error.body) as { code?: string } : null; if (parsed?.code) code = parsed.code; } catch { /* the body was not JSON */ }
-    if (error.kind === "unreachable" || error.kind === "offline") return new ImageEditError(503, "The editing tools aren't running. Check that the engine on this computer is running, then try again.", "unavailable");
+    if (error.kind === "unreachable" || error.kind === "offline") return new ImageEditError(503, "The editing tools aren't ready right now. Try again in a few minutes.", "unavailable");
     if (error.kind === "timeout") return new ImageEditError(502, "The editing tools took too long. Try a smaller picture.", "timeout");
     if (error.kind === "cancelled") return new ImageEditError(409, "The edit was cancelled.", "cancelled");
     const status = error.status;
@@ -458,7 +458,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     const referenceSource = loadSource(actor, conversationId, input.referenceId, false);
     if (referenceSource.id === source.id) throw new ImageEditError(422, "Choose a different picture to draw on than the one you are changing.", "reference_same");
     const status = await pictureEngineStatus().catch(() => null);
-    if ((status?.edit?.references ?? 0) < 1) throw new ImageEditError(503, "The picture engine on this computer needs its next update before it can use a second picture.", "references_unsupported");
+    if ((status?.edit?.references ?? 0) < 1) throw new ImageEditError(503, "Using a second picture needs an update first. Ask an admin to update Home.", "references_unsupported");
     const referenceGenerated = await isGeneratedPicture(actor, referenceSource);
     const referencePrepared = await prepareEditSource({ audience: editorAudience(actor), bytes: referenceSource.bytes, generated: referenceGenerated, text: prompt });
     if (!referencePrepared.ok) throw new ImageEditError(referencePrepared.status, referencePrepared.line, referencePrepared.code);
@@ -496,7 +496,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
 function commentErrorFrom(error: unknown): ImageEditError {
   if (error instanceof ImageEditError) return error;
   if (error instanceof StackPicturesError) {
-    if (error.code === "unreachable" || error.code === "no_stack") return new ImageEditError(503, "The picture engine isn't answering. Check that the engine is running, then try again.", "unavailable");
+    if (error.code === "unreachable" || error.code === "no_stack") return new ImageEditError(503, "Pictures are not ready yet. Try again in a few minutes.", "unavailable");
     if (error.code === "queue_full" || error.code === "no_memory") return new ImageEditError(503, error.message, error.code);
     if (error.status === 422) return new ImageEditError(422, error.message, error.code);
     if (error.status === 503) return new ImageEditError(503, error.message, error.code);
@@ -538,7 +538,7 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     return { state: status.state, job: jobId, percent: status.progress > 0 ? Math.min(99, Math.round(status.progress)) : null, label: status.position && status.position > 1 ? `Waiting your turn (${status.position})` : OP_LABEL.comment };
   }
   if (status.state === "cancelled") { jobs.delete(jobId); return { state: "cancelled", error: "The change was cancelled. Nothing was changed.", code: "cancelled" }; }
-  if (status.state === "failed") { jobs.delete(jobId); return { state: "failed", error: status.error ?? "The picture engine could not make that change. Try again, or describe it differently.", code: status.code ?? "failed" }; }
+  if (status.state === "failed") { jobs.delete(jobId); return { state: "failed", error: status.error ?? "That change did not work. Try again, or describe it differently.", code: status.code ?? "failed" }; }
   job.finalising = (async () => {
     // The finished picture is kept as a preview first; the engine's copy is deleted only after that worked.
     const source = loadSource(actor, job.conversationId, job.sourceId, true);

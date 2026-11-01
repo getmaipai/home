@@ -40,7 +40,7 @@ export const CHECKS: CanaryCheck[] = [
     id: "chat_hello", name: "Chat answers", group: "chat", timeoutMs: 125_000, title: "Chat is not answering",
     async run(deps) {
       const role = await deps.chatRole();
-      if (role.availability === "unavailable") return fail("The chat engine is not running.", "Open Repairs for the engine problem, or restart the AI from Settings, AI.", "dead");
+      if (role.availability === "unavailable") return fail("Chat is not running.", "Open Repairs for the problem, or restart the AI from Settings, AI.", "dead");
       const probe = await deps.chat({ text: "hi", timeoutMs: 120_000 });
       const bad = transport(probe, "Chat");
       if (bad) return bad;
@@ -52,7 +52,7 @@ export const CHECKS: CanaryCheck[] = [
     id: "embed", name: "Memory search", group: "chat", timeoutMs: 20_000, title: "Memory search is not working",
     async run(deps) {
       const result = await deps.embed();
-      return result.ok && result.dims > 0 ? pass() : fail("The embedding engine did not return a result, so memory and search ranking cannot work.", CHECK_AGAIN);
+      return result.ok && result.dims > 0 ? pass() : fail("Memory search did not return a result, so memory and search ranking cannot work.", CHECK_AGAIN);
     },
   },
   {
@@ -91,8 +91,8 @@ export const CHECKS: CanaryCheck[] = [
     id: "stt_tts_loopback", name: "Voice in and out", group: "voice", timeoutMs: 120_000, title: "Voice is not working",
     async run(deps) {
       const result = await deps.loopback(LOOPBACK_PHRASE);
-      if (!result.ok) return fail(result.stage === "stt" ? "The speech engine could not turn the test audio back into words." : "The voice engine could not say the test phrase.", "Check the voice engine in Settings, Voice, then run the checks again.");
-      if (!wordMatch(LOOPBACK_PHRASE, result.heard)) return fail("Voice in and out disagree: the voice engine said a test phrase and the speech engine heard something different.", "Check the voice and speech engines in Settings, Voice, then run the checks again.");
+      if (!result.ok) return fail(result.stage === "stt" ? "Voice could not turn the test audio back into words." : "Voice could not say the test phrase.", "Check Settings, Voice, then run the checks again.");
+      if (!wordMatch(LOOPBACK_PHRASE, result.heard)) return fail("Voice in and out disagree: voice said a test phrase and listening heard something different.", "Check Settings, Voice, then run the checks again.");
       return pass();
     },
   },
@@ -126,9 +126,9 @@ export const CHECKS: CanaryCheck[] = [
     id: "image_tiny", name: "Pictures", group: "pictures", timeoutMs: 240_000, title: "Picture making is not working",
     async run(deps) {
       // In coding mode picture jobs wait on purpose, so a missing test picture is not a fault.
-      if (chatLeaseHeld()) return { kind: "skip", reason: "Home is busy with a big job, so pictures wait." };
+      if (chatLeaseHeld()) return { kind: "skip", reason: "Another job is running, so pictures wait." };
       const result = await deps.image();
-      return result.ok ? pass() : fail("The picture engine did not make a small test picture.", "Open Settings, Pictures and videos, check the picture model, then run the checks again.");
+      return result.ok ? pass() : fail("Pictures did not make a small test picture.", "Open Settings, Pictures and videos, check the picture model, then run the checks again.");
     },
   },
 ];

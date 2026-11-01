@@ -33,7 +33,7 @@ describe("lib/tts.ts synthesizeSpeech()", () => {
     if (!result.ok) {
       expect(result.status).toBe(503);
       expect(result.code).toBe("unavailable");
-      expect(result.error).toBe("Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.");
+      expect(result.error).toBe("Home can't speak right now. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.");
     }
   });
   test("rejects an empty string", async () => {
@@ -310,7 +310,7 @@ describe("lib/tts.ts routed through a configured Stack", () => {
     if (!result.ok) {
       expect(result.status).toBe(503);
       expect(result.code).toBe("unavailable");
-      expect(result.error).toBe("Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.");
+      expect(result.error).toBe("Home can't speak right now. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.");
     }
     const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.tts");
     expect(issue?.detail).toBe("the tts engine process is not running");

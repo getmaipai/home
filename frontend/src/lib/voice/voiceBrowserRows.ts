@@ -75,7 +75,7 @@ export function voiceChoices(voices: readonly StackVoice[], stored: string | nul
   const hit = others.find((option) => option.value === stored || option.id === stored || presetNameForVoice(option.id, [stored]) === stored);
   if (hit) return { options, selected: hit, notice: null };
   // An address (catalog or recorded voice) that is not on the list is also set aside, by its plain name.
-  return { options, selected: first, notice: `${storedVoiceName(stored)} is not available with this engine, using the default voice.` };
+  return { options, selected: first, notice: `${storedVoiceName(stored)} is not available here, using the default voice.` };
 }
 
 /** The Stack voice id the Test button plays for an option. The default voice plays the engine's own default: its

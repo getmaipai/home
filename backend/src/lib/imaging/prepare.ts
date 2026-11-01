@@ -20,7 +20,7 @@ export async function preparePicture(bytes: Uint8Array, options: PrepareOptions 
   if (!meta.width || !meta.height) throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again.");
   const threshold = options.upscaleBelowShortSide ?? options.size;
   if (Math.min(meta.width, meta.height) < threshold) {
-    if (!options.upscale) throw new Error("The upscaler isn't installed. Install it from the engine's model list, then try again.");
+    if (!options.upscale) throw new Error("The upscaler isn't installed. Ask an admin to install it, then try again.");
     current = await options.upscale(current); steps.push("upscale");
     meta = await sharp(current, { limitInputPixels: 40_000_000, failOn: "error" }).metadata();
   }
@@ -29,7 +29,7 @@ export async function preparePicture(bytes: Uint8Array, options: PrepareOptions 
     try { transparent = (await sharp(current).stats()).channels[3]?.min !== 255; } catch { /* decode at fit gives the caller's normal error */ }
   }
   if (!transparent && !options.skipBackgroundRemoval) {
-    if (!options.removeBackground) throw new Error("The background remover isn't installed. Install it from the engine's model list, then try again.");
+    if (!options.removeBackground) throw new Error("The background remover isn't installed. Ask an admin to install it, then try again.");
     const before = current;
     current = await options.removeBackground(current);
     // The remover can find nothing to lift out (a drawing, a flat logo, a plain wall). Keep the picture as it was rather than refuse it.

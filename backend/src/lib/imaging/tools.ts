@@ -27,7 +27,7 @@ export async function fetchImageToolResult(job: string, options: { signal?: Abor
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function toolMissing(operation: string): string {
   const name = operation === "remove_background" ? "background remover" : operation === "upscale" ? "upscaler" : "image tool";
-  return `The ${name} isn't installed. Install it from the engine's model list, then try again.`;
+  return `The ${name} isn't installed. Ask an admin to install it, then try again.`;
 }
 
 export async function runImageTool(operation: string, bytes: Uint8Array, options: ImageToolOptions = {}): Promise<ImageToolResult> {
@@ -49,7 +49,7 @@ export async function runImageTool(operation: string, bytes: Uint8Array, options
     throw new Error(operation === "remove_background" ? "The background remover took too long. Try a smaller picture." : BUSY);
   } catch (error) {
     if (error instanceof Error && !(error instanceof StackError)) throw error;
-    if (error instanceof StackError && (error.kind === "unreachable" || error.kind === "offline")) throw new Error("The editing tools aren't running. Check that the engine on this computer is running, then try again.");
+    if (error instanceof StackError && (error.kind === "unreachable" || error.kind === "offline")) throw new Error("The editing tools aren't ready right now. Try again in a few minutes.");
     if (error instanceof StackError && error.kind === "timeout") throw new Error(operation === "remove_background" ? "The background remover took too long. Try a smaller picture." : BUSY);
     throw new Error(operation === "remove_background" ? "The background remover could not finish. Check the editing tools and try again." : BUSY);
   }

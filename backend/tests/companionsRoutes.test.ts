@@ -509,7 +509,7 @@ describe("household companion routes", () => {
     if (!created.ok) throw new Error(created.error);
     const small = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 180, height: 180, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 166, top: 166 }]).png().toBuffer());
     __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: ["remove_background", "erase", "resize"], reason: null } satisfies StackImageToolsStatus);
-    __setStackClientForTests({ imageEdit: async () => { throw new Error("The upscaler isn't installed. Install it from the engine's model list, then try again."); } } as never);
+    __setStackClientForTests({ imageEdit: async () => { throw new Error("The upscaler isn't installed. Ask an admin to install it, then try again."); } } as never);
     const result = await upload(`companions/${created.value.id}/look/upload`, adult, small);
     expect(result.status).toBe(400);
     expect(((await result.json()) as { error: string }).error).toContain("The upscaler isn't installed");
@@ -800,7 +800,7 @@ describe("household companion routes", () => {
       let progress: any;
       for (let i = 0; i < 200; i++) { progress = await (await request(`companions/${id}/states/jobs/run/${job}`, adult)).json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
       expect(progress.state).toBe(expectedState); expect(sent).toHaveLength(Math.min(cancelCount + 1, 2)); if (cancelCount === 1 && expectedState === "done") expect(sent[0]?.seed).not.toBe(sent[1]?.seed);
-      if (expectedState === "failed") expect(progress.error).toBe("The video engine stopped this clip. Try again.");
+      if (expectedState === "failed") expect(progress.error).toBe("The video was stopped. Try again.");
       submitted.push(...sent);
     };
     const onceId = await prepare("Retry once"); await runScenario(onceId, 1, "done");
@@ -1323,6 +1323,6 @@ describe("household companion routes", () => {
     const image = await keyedPicture(), original = addVersion(made.value.id, image, { source: "upload", label: "Opaque source", width: 512, height: 512, from: null });
     __setImageToolsForTests({ state: "idle", phase: null, vision: false, models: { isnet: false, lama: true, esrgan: true }, limits: {}, operations: ["resize"], reason: null } satisfies StackImageToolsStatus);
     const response = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: true });
-    expect(response.status).toBe(400); expect(await response.json()).toEqual({ error: "The background remover isn't installed. Install it from the engine's model list, then try again." }); expect(readLook(made.value.id).versions).toHaveLength(1);
+    expect(response.status).toBe(400); expect(await response.json()).toEqual({ error: "The background remover isn't installed. Ask an admin to install it, then try again." }); expect(readLook(made.value.id).versions).toHaveLength(1);
   });
 });

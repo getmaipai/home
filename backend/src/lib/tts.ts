@@ -10,7 +10,7 @@ import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
 import { householdVoiceSpeech } from "@/lib/clonedVoices";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
-const TTS_UNAVAILABLE_COPY = "Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
+const TTS_UNAVAILABLE_COPY = "Home can't speak right now. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
 
 // Bound a speech request generously above any real reply length.
 const MAX_TEXT_LENGTH = 4_000;

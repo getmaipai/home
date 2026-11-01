@@ -57095,7 +57095,7 @@
         "tags": [
           "Image editor"
         ],
-        "summary": "Ask for a change in words; the picture engine changes the pointed-at area and returns a preview to apply",
+        "summary": "Ask for a change in words; the pictures are changed in the pointed-at area and returns a preview to apply",
         "parameters": [
           {
             "schema": {
@@ -58986,7 +58986,7 @@
                     },
                     "label": {
                       "type": "string",
-                      "description": "One plain line for the card: what the engine is doing now."
+                      "description": "One plain line for the card: what is happening now."
                     },
                     "position": {
                       "type": "number",
@@ -58995,7 +58995,7 @@
                     "stage_label": {
                       "type": "string",
                       "nullable": true,
-                      "description": "While running: the engine's stage in words (\"Drawing, step 2 of 4\")."
+                      "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
                     },
                     "eta_seconds": {
                       "type": "number",
@@ -59230,7 +59230,7 @@
             }
           },
           "502": {
-            "description": "The picture engine refused it",
+            "description": "Pictures could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -59240,7 +59240,7 @@
             }
           },
           "503": {
-            "description": "The picture engine is not available",
+            "description": "Pictures are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -59348,7 +59348,7 @@
                     },
                     "label": {
                       "type": "string",
-                      "description": "One plain line for the card: what the engine is doing now."
+                      "description": "One plain line for the card: what is happening now."
                     },
                     "position": {
                       "type": "number",
@@ -59357,7 +59357,7 @@
                     "stage_label": {
                       "type": "string",
                       "nullable": true,
-                      "description": "While running: the engine's stage in words (\"Drawing, step 2 of 4\")."
+                      "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
                     },
                     "eta_seconds": {
                       "type": "number",
@@ -59592,7 +59592,7 @@
             }
           },
           "502": {
-            "description": "The picture engine refused it",
+            "description": "Pictures could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -59602,7 +59602,7 @@
             }
           },
           "503": {
-            "description": "The picture engine is not available",
+            "description": "Pictures are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -59693,7 +59693,7 @@
                     },
                     "label": {
                       "type": "string",
-                      "description": "One plain line for the card: what the engine is doing now."
+                      "description": "One plain line for the card: what is happening now."
                     },
                     "position": {
                       "type": "number",
@@ -59702,7 +59702,7 @@
                     "stage_label": {
                       "type": "string",
                       "nullable": true,
-                      "description": "While running: the engine's stage in words (\"Drawing, step 2 of 4\")."
+                      "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
                     },
                     "eta_seconds": {
                       "type": "number",
@@ -59937,7 +59937,7 @@
             }
           },
           "502": {
-            "description": "The picture engine refused it",
+            "description": "Pictures could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -59947,7 +59947,7 @@
             }
           },
           "503": {
-            "description": "The picture engine is not available",
+            "description": "Pictures are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -60089,7 +60089,7 @@
                           },
                           "label": {
                             "type": "string",
-                            "description": "One plain line for the card: what the engine is doing now."
+                            "description": "One plain line for the card: what is happening now."
                           },
                           "position": {
                             "type": "number",
@@ -60305,7 +60305,7 @@
             }
           },
           "502": {
-            "description": "The video engine refused it",
+            "description": "Videos could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -60315,7 +60315,7 @@
             }
           },
           "503": {
-            "description": "The video engine is not available",
+            "description": "Videos are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -60559,7 +60559,7 @@
                           },
                           "label": {
                             "type": "string",
-                            "description": "One plain line for the card: what the engine is doing now."
+                            "description": "One plain line for the card: what is happening now."
                           },
                           "position": {
                             "type": "number",
@@ -60775,7 +60775,7 @@
             }
           },
           "502": {
-            "description": "The video engine refused it",
+            "description": "Videos could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -60785,7 +60785,7 @@
             }
           },
           "503": {
-            "description": "The video engine is not available",
+            "description": "Videos are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -60888,7 +60888,7 @@
                           },
                           "label": {
                             "type": "string",
-                            "description": "One plain line for the card: what the engine is doing now."
+                            "description": "One plain line for the card: what is happening now."
                           },
                           "position": {
                             "type": "number",
@@ -61104,7 +61104,7 @@
             }
           },
           "502": {
-            "description": "The video engine refused it",
+            "description": "Videos could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -61114,7 +61114,7 @@
             }
           },
           "503": {
-            "description": "The video engine is not available",
+            "description": "Videos are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -61205,7 +61205,7 @@
                           },
                           "label": {
                             "type": "string",
-                            "description": "One plain line for the card: what the engine is doing now."
+                            "description": "One plain line for the card: what is happening now."
                           },
                           "position": {
                             "type": "number",
@@ -61421,7 +61421,7 @@
             }
           },
           "502": {
-            "description": "The video engine refused it",
+            "description": "Videos could not be made",
             "content": {
               "application/json": {
                 "schema": {
@@ -61431,7 +61431,7 @@
             }
           },
           "503": {
-            "description": "The video engine is not available",
+            "description": "Videos are not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -62089,7 +62089,7 @@
             }
           },
           "503": {
-            "description": "The video engine is not available",
+            "description": "Videos are not ready",
             "content": {
               "application/json": {
                 "schema": {

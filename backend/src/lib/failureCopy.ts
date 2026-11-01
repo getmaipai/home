@@ -10,8 +10,8 @@ export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adult
     minor: "I can't hear you right now. Please tell a grown-up.",
   },
   listening_engine: {
-    adult: "Home can't hear you right now because its listening engine is not running. Type your message instead, or open Repairs to check it.",
-    adultNoRepairs: "Home can't hear you right now because its listening engine is not running. Type your message instead, or ask an owner or admin to check it.",
+    adult: "Home can't hear you right now. Type your message instead, or open Repairs to check it.",
+    adultNoRepairs: "Home can't hear you right now. Type your message instead, or ask an owner or admin to check it.",
     minor: "I can't hear you right now. Please tell a grown-up.",
   },
   speaking_failed: {

@@ -90,7 +90,7 @@ export function plainMusicFailure(code: string): string {
     case "bad_range": return `${prefix} That part is outside the song. Give the start and end in seconds.`;
     case "too_long": return `${prefix} That song is too long for this computer. Ask for a shorter one.`;
     case "timeout": return `${prefix} It took longer than expected. Try again, or ask for a shorter song.`;
-    default: return `${prefix} The music engine did not finish it. Try again or change the request.`;
+    default: return `${prefix} The song did not finish. Try again or change the request.`;
   }
 }
 function sleep(ms: number, signal: AbortSignal): Promise<void> {

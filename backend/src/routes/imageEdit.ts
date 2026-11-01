@@ -147,7 +147,7 @@ imageEditRoutes.openapi(saveRoute, async (c) => {
 });
 
 const commentRoute = createRoute({
-  method: "post", path: "/pictures/{id}/comment", tags: ["Image editor"], summary: "Ask for a change in words; the picture engine changes the pointed-at area and returns a preview to apply", middleware: [requireAuth] as const,
+  method: "post", path: "/pictures/{id}/comment", tags: ["Image editor"], summary: "Ask for a change in words; the pictures are changed in the pointed-at area and returns a preview to apply", middleware: [requireAuth] as const,
   request: { params: pictureParams, body: { content: { "application/json": { schema: z.object({ conversation_id: z.string().min(1).max(80), prompt: z.string().min(1).max(2000), region: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable().optional(), mask: z.string().max(14_000_000).nullable().optional().describe("IMGEDIT-01: a painted area as a base64 PNG (white is the part to change). Only that area can differ from the original."), reference_id: z.string().min(1).max(80).nullable().optional().describe("IMGEDIT-01: another picture of this chat the change draws on.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: ProgressSchema } }, description: "Running with a job to poll at GET /jobs/{job}, then done with a preview to apply (POST /previews/{token}/apply). Nothing changes until it is applied." }, ...refusals },
 });

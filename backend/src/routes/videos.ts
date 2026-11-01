@@ -46,7 +46,7 @@ const ItemSchema = z.object({
   id: z.string(),
   state: z.enum(["queued", "running", "done", "failed", "cancelled"]),
   percent: z.number(),
-  label: z.string().describe("One plain line for the card: what the engine is doing now."),
+  label: z.string().describe("One plain line for the card: what is happening now."),
   position: z.number().nullable(),
   eta_seconds: z.number().nullable().describe("While running: seconds left, from earlier clips of this size and length."),
   step: z.number().nullable(), steps: z.number().nullable(),
@@ -123,7 +123,7 @@ async function readyFlags(actor: PersonRow): Promise<{ quick: boolean; detailed:
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
-const refusals = errorResponses({ 401: "Not signed in", 403: "Videos are off for this profile", 404: "No such video job", 422: "That request is not allowed", 502: "The video engine refused it", 503: "The video engine is not available" });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Videos are off for this profile", 404: "No such video job", 422: "That request is not allowed", 502: "Videos could not be made", 503: "Videos are not ready" });
 
 const statusRoute = createRoute({
   method: "get", path: "/status", tags: ["Videos"], summary: "Whether this person can make videos now, and why not", middleware: [requireAuth] as const,
@@ -369,14 +369,14 @@ videosRoutes.openapi(settingsRoute, async (c) => {
   let adapters: Awaited<ReturnType<typeof allVideoAdapters>> = [];
   try { adapters = await allVideoAdapters(); } catch { adapters = []; }
   return c.json({
-    state: engine?.state ?? "unavailable", available: engine?.available === true, reason: engine?.reason ?? (engine ? null : "The engine isn't answering."), tier: engine?.tier ?? null,
+    state: engine?.state ?? "unavailable", available: engine?.available === true, reason: engine?.reason ?? (engine ? null : "Videos are not ready yet. Try again in a few minutes."), tier: engine?.tier ?? null,
     model_installed: engine?.qualities ? engine.qualities.quick.installed : engine?.model?.installed === true, limits: VIDEO_LIMITS_LINE,
     quality: householdVideoQuality(),
     detailed: (() => {
       const detailed = engine?.qualities?.detailed;
       return {
         installed: detailed?.installed === true, available: detailed?.available === true,
-        reason: detailed && !detailed.available ? detailed.memory.reason ?? engine?.reason ?? null : engine && !engine.qualities ? "The engine on this computer does not have Detailed videos yet. Update it from Settings, Engines and AI." : null,
+        reason: detailed && !detailed.available ? detailed.memory.reason ?? engine?.reason ?? null : engine && !engine.qualities ? "Detailed videos need an update first. Ask an admin to update Home." : null,
         download_bytes: detailed?.install.remaining_bytes ?? 0, component: "ltx-2-3-distilled-mlx", licence: detailed?.licence ?? null, lora_base_model: detailed?.lora_base_model ?? "ltx-2.3",
       };
     })(),
@@ -436,7 +436,7 @@ const addAdapterRoute = createRoute({
     name: z.string().trim().min(1).max(80), licence: z.string().trim().min(1).max(120), licence_acknowledged: z.enum(["true", "false"]).optional(),
     source_url: z.string().max(500).optional(), classification: z.enum(["all-ages", "adult-only"]).optional(), trigger_words: z.string().max(400).optional(),
   }) } } } },
-  responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Added." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 409: "Already in the library", 413: "Too large", 422: "The file cannot be used", 503: "The video engine is not available" }) },
+  responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Added." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 409: "Already in the library", 413: "Too large", 422: "The file cannot be used", 503: "Videos are not ready" }) },
 });
 videosRoutes.openapi(addAdapterRoute, async (c) => {
   const form = c.req.valid("form");

@@ -20,7 +20,7 @@ import type { CompanionTake } from "@/lib/companionStates";
 export const TAKE_RUN_BUSY_LINE = "A clip is already being made for this companion. Wait for it or stop it.";
 export const TAKE_QUICK_NOT_READY_LINE = "Making a character's clips needs the standard video model. An admin can install it in Settings, Pictures and videos.";
 export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start it again.";
-export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.";
+export const TAKE_RUN_TIMEOUT_LINE = "The video took too long. Try again.";
 export const TAKE_RETRY_WAIT_MS = 60_000;
 /** How often Home asks the engine about a running video job (a quick clip takes about 70 seconds; the old two second wait added up to two seconds per take). */
 export const TAKE_POLL_MS = 500;
@@ -114,8 +114,8 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
                 if (run.cancelled) break;
                 if (Date.now() > deadline) throw new Error(TAKE_RUN_TIMEOUT_LINE);
                 const status = await getVideoJob(stackJob);
-                if (status.state === "failed") throw new StackVideoError(500, status.code ?? "video_failed", status.error ?? "The video engine could not make this clip. Try again.", stackJob);
-                if (status.state === "cancelled") throw Object.assign(new Error("The video engine stopped this clip. Try again."), { cancelled: true });
+                if (status.state === "failed") throw new StackVideoError(500, status.code ?? "video_failed", status.error ?? "The video could not be made. Try again.", stackJob);
+                if (status.state === "cancelled") throw Object.assign(new Error("The video was stopped. Try again."), { cancelled: true });
                 if (status.state === "done") done = status.data;
                 else { const progress = Math.max(0, Math.min(99, status.progress)); run.label = progress === 0 && status.phase ? `Not started yet: ${status.phase}` : makingLabel; run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
                 if (!done) await new Promise((resolve) => setTimeout(resolve, TAKE_POLL_MS));
@@ -155,9 +155,9 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           engineFailure = isEngineFailure(error);
           if (engineFailure) consecutiveEngineFailures++; else consecutiveEngineFailures = 0;
           if (run.cancelled) break;
-          if ((error as { cancelled?: boolean })?.cancelled) { run.error = error instanceof Error ? error.message : "The video engine stopped this clip. Try again."; run.state = "failed"; break; }
+          if ((error as { cancelled?: boolean })?.cancelled) { run.error = error instanceof Error ? error.message : "The video was stopped. Try again."; run.state = "failed"; break; }
           if (engineShouldStop(error) || consecutiveEngineFailures >= 2) {
-            run.error = error instanceof Error ? error.message : "The video engine could not continue. Check it, then try again.";
+            run.error = error instanceof Error ? error.message : "The video could not continue. Try again in a few minutes.";
             run.state = "failed"; break;
           }
         }

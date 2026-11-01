@@ -102,7 +102,7 @@ export function __setPicturesFetchForTests(fn: typeof fetch | null): void { fetc
 function baseUrl(): string {
   if (fetchForTests) return "http://127.0.0.1:1";
   const url = getStackUrl();
-  if (!url) throw new StackPicturesError(503, "no_stack", "The engine isn't set up on this computer yet. Ask an admin to check Settings, Engine.");
+  if (!url) throw new StackPicturesError(503, "no_stack", "Pictures are not set up on this computer yet. Ask an admin.");
   return url.replace(/\/$/, "");
 }
 
@@ -114,7 +114,7 @@ async function request(path: string, init: RequestInit & { timeoutMs?: number } 
     return await doFetch(baseUrl() + path, { ...rest, signal });
   } catch (error) {
     if (error instanceof StackPicturesError) throw error;
-    throw new StackPicturesError(503, "unreachable", "The picture engine isn't answering. Check that the engine is running, then try again.");
+    throw new StackPicturesError(503, "unreachable", "Pictures are not ready yet. Try again in a few minutes.");
   }
 }
 
@@ -122,7 +122,7 @@ async function failure(res: Response): Promise<never> {
   let body: { error?: unknown; code?: unknown; job?: unknown } = {};
   try { body = await res.json() as typeof body; } catch { /* a body that is not JSON carries no detail */ }
   const code = typeof body.code === "string" ? body.code : null;
-  const message = plainMakingLine("image", code, typeof body.error === "string" && body.error ? body.error : `The picture engine answered ${res.status}.`);
+  const message = plainMakingLine("image", code, typeof body.error === "string" && body.error ? body.error : "Pictures could not be made right now. Try again in a few minutes.");
   // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
   const state = makingStateOf(code);
   if (state === "memory" || state === "restarting") rememberMediaRefusal("image", state, code!, message);
@@ -135,7 +135,7 @@ export async function submitGeneration(body: GenerationBody): Promise<{ job: str
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("image");
     const parsed = await res.json() as { job?: string; data?: StackPic[] };
-    if (!parsed.job) throw new StackPicturesError(502, "bad_reply", "The picture engine's answer was not understood. Try again.");
+    if (!parsed.job) throw new StackPicturesError(502, "bad_reply", "That did not work. Try again.");
     return { job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) && parsed.data.length > 0 ? parsed.data : null };
   }
   return failure(res);
@@ -147,7 +147,7 @@ export async function submitEdit(form: FormData): Promise<{ job: string }> {
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("image");
     const parsed = await res.json() as { job?: string };
-    if (!parsed.job) throw new StackPicturesError(502, "bad_reply", "The picture engine's answer was not understood. Try again.");
+    if (!parsed.job) throw new StackPicturesError(502, "bad_reply", "That did not work. Try again.");
     return { job: parsed.job };
   }
   return failure(res);

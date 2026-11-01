@@ -92,7 +92,7 @@ export function plainVideoFailure(error: unknown): string {
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;
       case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.`;
       case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Try a picture instead.`;
-      case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} Videos aren't available right now. Try again in a minute.`;
+      case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} Videos are not ready yet. Try again in a few minutes.`;
       case "lora_not_allowed": case "unknown_lora": case "wrong_base_model": case "lora_changed": case "lora_missing": return `${VIDEO_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;
       case "reference_not_generated": case "reference_source_required": case "reference_image_refused": case "bad_image": return `${VIDEO_FAILED_PREFIX} I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.`;
       case "timeout": return `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`;
@@ -380,7 +380,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       try {
         status = await getVideoJob(job.stackJob);
       } catch (error) {
-        if (error instanceof StackVideoError && error.status === 404) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The engine lost track of it, most likely because it restarted. Try again.`; saveVideoJob(job); return; }
+        if (error instanceof StackVideoError && error.status === 404) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It did not finish. Try again.`; saveVideoJob(job); return; }
         // A single missed poll is not a failure; the next one decides.
         await sleep(POLL_MS * 2, controller.signal);
         continue;
@@ -513,7 +513,7 @@ export function resumeVideoJobs(): void {
 
 async function resume(job: VideoJob): Promise<void> {
   const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-  if (!person) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} Home restarted before it finished. Try again.`; saveVideoJob(job); return; }
+  if (!person) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It did not finish. Try again.`; saveVideoJob(job); return; }
   liveJobs.set(job.id, job);
   if (!job.stackJob) return;
   void watch(job, person as PersonRow);

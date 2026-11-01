@@ -72,7 +72,7 @@ export function plainFailure(error: unknown): string {
       case "queue_full": return `${PICTURE_FAILED_PREFIX} Pictures have a full line right now. Try again in a minute.`;
       case "no_memory": return `${PICTURE_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a minute.`;
       case "not_installed": case "unsupported": return `${PICTURE_FAILED_PREFIX} No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.`;
-      case "unreachable": case "no_stack": return `${PICTURE_FAILED_PREFIX} Pictures aren't available right now. Try again in a minute.`;
+      case "unreachable": case "no_stack": return `${PICTURE_FAILED_PREFIX} Pictures are not ready yet. Try again in a few minutes.`;
       case "lora_not_allowed": return `${PICTURE_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;
       case "unknown_lora": case "wrong_base_model": return `${PICTURE_FAILED_PREFIX} That style isn't available any more. Choose another or leave it out.`;
       default: return `${PICTURE_FAILED_PREFIX} ${trimSentence(error.message)} Try again or change the request.`;

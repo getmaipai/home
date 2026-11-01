@@ -55,7 +55,7 @@ describe("VoiceBrowserSection", () => {
   test("a stored voice the engine does not offer falls back to the default with one plain line, never a dead select", async () => {
     const view = renderPage(three(), ["default", "alba", "javert", "mira"], { voice: "vera" });
     expect((await trigger(view)).textContent).toBe("Built-in voice (Home's default)");
-    view.getByText("Vera is not available with this engine, using the default voice.");
+    view.getByText("Vera is not available here, using the default voice.");
     expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(false);
   });
   test("one built-in voice (the Chatterbox shape): a saved Javert shows the default voice, the select works, Test plays the engine voice, the stale choice is moved to default once", async () => {
@@ -63,13 +63,13 @@ describe("VoiceBrowserSection", () => {
     const box = await trigger(view);
     expect(box.textContent).toBe("Built-in voice (Home's default)");
     expect(box.hasAttribute("disabled") || box.getAttribute("data-disabled") !== null).toBe(false);
-    view.getByText("Javert is not available with this engine, using the default voice.");
+    view.getByText("Javert is not available here, using the default voice.");
     const start = spyOn(voicePreviewPlayer, "start").mockImplementation(async () => {});
     fireEvent.click(view.getByRole("button", { name: "Test" }));
     expect(start).toHaveBeenCalledWith("chatterbox-turbo-voice-default");
     // The page moves the unavailable saved voice to the default once, and keeps the line.
     await waitFor(() => expect(api.setSetting).toHaveBeenCalledWith("person:person-1", "tts.voice_id", "default"));
-    await waitFor(() => view.getByText("Javert is not available with this engine, using the default voice."));
+    await waitFor(() => view.getByText("Javert is not available here, using the default voice."));
     expect(document.body.textContent).not.toMatch(/chatterbox/i);
   });
   test("choosing another voice saves at once and confirms quietly", async () => {

@@ -37,7 +37,7 @@ describe("voice browser helpers", () => {
   test("voiceChoices: a saved name the engine does not offer falls back with one plain line", () => {
     const c = voiceChoices([v("chatterbox-turbo-voice-default", "Chatterbox default", "chatterbox-turbo")], "javert", ["default", "alba", "javert"]);
     expect(c.selected.value).toBe("default");
-    expect(c.notice).toBe("Javert is not available with this engine, using the default voice.");
+    expect(c.notice).toBe("Javert is not available here, using the default voice.");
   });
   test("voiceChoices: a saved preset the engine offers is selected, no notice; other engine ids are kept together", () => {
     const voices = [v("p-voice-alba", "Alba"), v("p-voice-javert", "Javert"), v("cb-ref-nova", "Nova", "chatterbox-turbo")];

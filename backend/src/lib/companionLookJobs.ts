@@ -254,7 +254,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
       const fraction = typeof stack.progress_fraction === "number" ? stack.progress_fraction * 100 : stack.progress;
       job.percent = Math.max(0, Math.min(99, Math.round(fraction)));
     }
-    else if (stack.state === "failed") { job.state = "failed"; job.error = stack.error || "The picture engine could not finish. Try again."; activeByCompanion.delete(companionId); }
+    else if (stack.state === "failed") { job.state = "failed"; job.error = stack.error || "The picture could not be finished. Try again."; activeByCompanion.delete(companionId); }
     else if (stack.state === "cancelled") { job.state = "cancelled"; activeByCompanion.delete(companionId); }
     else {
       if (!job.finalising) job.finalising = (async () => {

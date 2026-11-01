@@ -9,7 +9,7 @@ import type { StackVideoStatus } from "@/lib/videos/stack";
 
 export const COMPANION_STILL_MODEL_MISSING_LINE = "The chosen picture model is not installed or available. An admin can install it in Settings, AI and models.";
 export const COMPANION_CLIP_MODEL_MISSING_LINE = "The chosen video model is not installed or available. An admin can install it in Settings, AI and models.";
-export const COMPANION_MODEL_MISMATCH_LINE = "The engine used a different model than the one chosen. Try again.";
+export const COMPANION_MODEL_MISMATCH_LINE = "The picture came out different from the one chosen. Try again.";
 export const COMPANION_EDIT_MODEL = QUICK_MODEL;
 
 export interface CompanionArtChoice { model: string; quality: "quick" | "detailed"; }

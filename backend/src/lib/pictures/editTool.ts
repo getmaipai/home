@@ -33,7 +33,7 @@ export function nameEditModel(form: FormData): void {
 const NOT_FOUND_LINE = "I can't find that picture any more. Attach it again and ask once more.";
 const NOTHING_TO_CHANGE_LINE = "There is no picture to change yet. Attach one, or ask me to make one first.";
 const EDIT_NOT_SET_UP_LINE = "Changing a picture needs the picture model to be installed and running on this computer. An admin can check Settings, Pictures and videos.";
-const REFERENCES_MISSING_LINE = "The picture engine on this computer needs its next update before it can use a second picture. I can still change the one picture on its own.";
+const REFERENCES_MISSING_LINE = "Using a second picture needs an update first. Ask an admin to update Home. I can still change the one picture on its own.";
 
 export interface RunEditInput {
   state: Pick<TurnState, "actor" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;

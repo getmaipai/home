@@ -212,7 +212,7 @@ describe("picture editor routes", () => {
     stub.script.reply = async () => { throw new StackError("unreachable", "refused"); };
     const down = await client.postForm(`/api/image-edit/pictures/${picture.id}/edit`, editForm(conversation.value.id, { operation: "resize", width: "20", height: "15" }));
     expect(down.status).toBe(503);
-    expect(((await down.json()) as { error: string }).error).toContain("aren't running");
+    expect(((await down.json()) as { error: string }).error).toContain("aren't ready right now");
   });
 
   test("markup uploads are re-encoded without metadata and saved as a version", async () => {

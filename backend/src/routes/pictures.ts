@@ -27,9 +27,9 @@ const JobSchema = z.object({
   id: z.string(),
   state: z.enum(["queued", "running", "done", "failed", "cancelled"]),
   percent: z.number(),
-  label: z.string().describe("One plain line for the card: what the engine is doing now."),
+  label: z.string().describe("One plain line for the card: what is happening now."),
   position: z.number().nullable(),
-  stage_label: z.string().nullable().describe("While running: the engine's stage in words (\"Drawing, step 2 of 4\")."),
+  stage_label: z.string().nullable().describe("While running: the stage in words (\"Drawing, step 2 of 4\")."),
   eta_seconds: z.number().nullable().describe("While running: seconds left, from earlier pictures of this size."),
   step: z.number().nullable(), steps: z.number().nullable(),
   preview_url: z.string().nullable().describe("While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."),
@@ -107,7 +107,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
-const refusals = errorResponses({ 401: "Not signed in", 403: "Pictures are off for this profile", 404: "No such picture job", 409: "A picture is still being made", 422: "That request is not allowed", 502: "The picture engine refused it", 503: "The picture engine is not available" });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Pictures are off for this profile", 404: "No such picture job", 409: "A picture is still being made", 422: "That request is not allowed", 502: "Pictures could not be made", 503: "Pictures are not ready" });
 
 const statusRoute = createRoute({
   method: "get", path: "/status", tags: ["Pictures"], summary: "Whether this person can make pictures now, and why not", middleware: [requireAuth] as const,

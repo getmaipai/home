@@ -57,7 +57,7 @@ export function readyStatusForTests(overrides: Partial<StackImageStatus> = {}): 
 }
 
 const NO_PICTURE_MODEL = "No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.";
-const PICTURE_ENGINE_UNREACHABLE = "I can't reach the picture engine on this computer right now. Check that the MaiPai Stack is running, then try again.";
+const PICTURE_ENGINE_UNREACHABLE = "Pictures are not ready yet. Try again in a few minutes.";
 
 /** Why a picture cannot be made now, in the person's terms: the engine's own reason, else "cannot reach it" when the Stack
  * did not answer at all, else "no model". A Stack that is down is not a missing model (found by the generation QA). */

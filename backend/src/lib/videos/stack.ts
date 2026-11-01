@@ -125,7 +125,7 @@ export function __setVideosFetchForTests(fn: typeof fetch | null): void { fetchF
 function baseUrl(): string {
   if (fetchForTests) return "http://127.0.0.1:1";
   const url = getStackUrl();
-  if (!url) throw new StackVideoError(503, "no_stack", "The engine isn't set up on this computer yet. Ask an admin to check Settings, Engine.");
+  if (!url) throw new StackVideoError(503, "no_stack", "Videos are not set up on this computer yet. Ask an admin.");
   return url.replace(/\/$/, "");
 }
 
@@ -137,7 +137,7 @@ async function request(path: string, init: RequestInit & { timeoutMs?: number } 
     return await doFetch(baseUrl() + path, { ...rest, signal });
   } catch (error) {
     if (error instanceof StackVideoError) throw error;
-    throw new StackVideoError(503, "unreachable", "The video engine isn't answering. Check that the engine is running, then try again.");
+    throw new StackVideoError(503, "unreachable", "Videos are not ready yet. Try again in a few minutes.");
   }
 }
 
@@ -145,7 +145,7 @@ async function failure(res: Response): Promise<never> {
   let body: { error?: unknown; code?: unknown; job?: unknown } = {};
   try { body = await res.json() as typeof body; } catch { /* a body that is not JSON carries no detail */ }
   const code = typeof body.code === "string" ? body.code : null;
-  const message = plainMakingLine("video", code, typeof body.error === "string" && body.error ? body.error : `The video engine answered ${res.status}.`);
+  const message = plainMakingLine("video", code, typeof body.error === "string" && body.error ? body.error : "Videos could not be made right now. Try again in a few minutes.");
   // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
   const state = makingStateOf(code);
   if (state === "memory" || state === "restarting") rememberMediaRefusal("video", state, code!, message);
@@ -158,7 +158,7 @@ export async function submitVideo(body: VideoBody): Promise<{ job: string; done:
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("video");
     const parsed = await res.json() as { job?: string; data?: StackClip[] };
-    if (!parsed.job) throw new StackVideoError(502, "bad_reply", "The video engine's answer was not understood. Try again.");
+    if (!parsed.job) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
     return { job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) && parsed.data.length > 0 ? parsed.data : null };
   }
   return failure(res);

@@ -31,7 +31,7 @@ export interface StackMusicJob {
   eta_seconds?: number | null; position?: number | null; code?: string | null; data?: StackSong[];
 }
 export class StackMusicError extends Error {
-  constructor(readonly status: number, readonly code: string) { super("The music engine could not complete the request. Try again."); this.name = "StackMusicError"; }
+  constructor(readonly status: number, readonly code: string) { super("The song could not be made. Try again."); this.name = "StackMusicError"; }
 }
 let fetchForTests: typeof fetch | null = null;
 export function __setMusicFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }

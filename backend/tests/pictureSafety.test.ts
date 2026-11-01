@@ -360,8 +360,8 @@ describe("why a picture cannot be made", () => {
   test("a Stack that did not answer is not reported as a missing model", async () => {
     const { pictureNotReadyReason } = await import("@/lib/pictures/ready");
     const { videoNotReadyReason } = await import("@/lib/videos/ready");
-    expect(pictureNotReadyReason(null)).toContain("can't reach the picture engine");
-    expect(videoNotReadyReason(null)).toContain("can't reach the video engine");
+    expect(pictureNotReadyReason(null)).toContain("Pictures are not ready yet");
+    expect(videoNotReadyReason(null)).toContain("Videos are not ready yet");
     expect(pictureNotReadyReason({ state: "off", reason: "Pictures are off." } as never)).toBe("Pictures are off.");
     expect(pictureNotReadyReason({ state: "not-installed", reason: null } as never)).toContain("No picture model is installed");
     expect(videoNotReadyReason({ state: "not-installed", reason: null } as never)).toContain("No video model is installed");
