@@ -1041,7 +1041,7 @@ function availableRotationPool(pool: string[]): string[] {
 const SEARCH_ENGINE_COUNT = 3;
 /** The last this-many searches an engine was asked in are its health. */
 const ENGINE_HEALTH_WINDOW = 10;
-const searxngEngineHealth = new Map<string, { ok: boolean; count: number }[]>();
+const searxngEngineHealth = new Map<string, { ok: boolean; count: number; junk?: boolean }[]>();
 
 /** A small in-memory health score: the share of recent searches the engine
  * answered with results (smoothed, so one miss does not sink an engine and an
@@ -1072,26 +1072,62 @@ function pickSearchEngines(pool: string[], exclude: readonly string[] = [], coun
  * leaves the one debug line that makes the score observable. Each result names
  * the engines that returned it. A response whose results carry no engine names
  * at all says nothing about any engine, so it scores none. */
-function recordEngineHealth(asked: readonly string[] | null | undefined, value: Record<string, unknown>, unresponsive: readonly string[]): void {
+const ENGINE_QUERY_STOP = new Set(["the", "and", "for", "with", "from", "that", "this", "what", "why", "how", "did", "was", "are", "about", "into"]);
+const queryWordsOf = (text: string): Set<string> => new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1 && !ENGINE_QUERY_STOP.has(w)));
+/** Junk results: an engine that returns many rows none of which shares a couple of the query's words is answering a different question
+ * (the live V runs: one engine returned ten rows about a singer for an eight-word query about a TV series). Counts words only. */
+function resultIsRelevant(raw: { title?: unknown; content?: unknown }, want: ReadonlySet<string>): boolean {
+  if (want.size === 0) return true;
+  const have = queryWordsOf(`${typeof raw.title === "string" ? raw.title : ""} ${typeof raw.content === "string" ? raw.content : ""}`);
+  let shared = 0;
+  for (const w of want) if (have.has(w)) shared += 1;
+  return shared >= Math.min(want.size, Math.max(2, Math.ceil(want.size * 0.4)));
+}
+/** Two searches in a row where an engine returned at least this many rows and none was relevant benches it. */
+const JUNK_ROWS_MIN = 5;
+
+/** Scores the engines one request asked for from what SearXNG answered, and
+ * leaves the one debug line that makes the score observable. Each result names
+ * the engines that returned it. A response whose results carry no engine names
+ * at all says nothing about any engine, so it scores none. An engine's count is
+ * its RELEVANT rows; one that returns only unrelated rows twice in a row is
+ * benched like one that is suspended. */
+export function recordEngineHealth(asked: readonly string[] | null | undefined, value: Record<string, unknown>, unresponsive: readonly string[], query = ""): void {
   if (!asked || asked.length === 0) return;
   const results = Array.isArray(value.results) ? value.results : [];
+  const want = queryWordsOf(query);
   const counts = new Map<string, number>();
+  const relevant = new Map<string, number>();
   let attributed = false;
   for (const raw of results) {
-    const row = raw as { engine?: unknown; engines?: unknown };
+    const row = raw as { engine?: unknown; engines?: unknown; title?: unknown; content?: unknown };
     const names = Array.isArray(row.engines) ? row.engines.filter((n): n is string => typeof n === "string") : typeof row.engine === "string" ? [row.engine] : [];
     if (names.length > 0) attributed = true;
-    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+    const good = resultIsRelevant(row, want);
+    for (const name of names) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+      if (good) relevant.set(name, (relevant.get(name) ?? 0) + 1);
+    }
   }
-  const answered = asked.filter((name) => (counts.get(name) ?? 0) > 0);
+  const answered = asked.filter((name) => (relevant.get(name) ?? 0) > 0);
   console.debug(`[search] engines asked=${asked.join(",")} answered=${answered.join(",")} unresponsive=${unresponsive.filter((n) => asked.includes(n)).join(",")} results=${results.length}`);
   if (results.length > 0 && !attributed) return;
   for (const name of asked) {
-    const count = counts.get(name) ?? 0;
-    const history = [...(searxngEngineHealth.get(name) ?? []), { ok: count > 0 && !unresponsive.includes(name), count }];
-    searxngEngineHealth.set(name, history.slice(-ENGINE_HEALTH_WINDOW));
+    const count = relevant.get(name) ?? 0;
+    const rows = counts.get(name) ?? 0;
+    const junk = rows >= JUNK_ROWS_MIN && count === 0;
+    const history = [...(searxngEngineHealth.get(name) ?? []), { ok: count > 0 && !unresponsive.includes(name), count, ...(junk ? { junk: true } : {}) }];
+    const kept = history.slice(-ENGINE_HEALTH_WINDOW);
+    searxngEngineHealth.set(name, kept);
+    if (junk && kept.length >= 2 && kept.at(-2)?.junk === true) {
+      searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
+      console.warn(`[search] engine ${name} benched for ${SEARXNG_ENGINE_BENCH_MS / 60000} minutes: it returned ${rows} rows unrelated to the query twice in a row`);
+    }
   }
 }
+
+/** Until when an engine is benched (a suspended engine, or one that kept returning unrelated rows); 0 when it is not. */
+export function engineBenchedUntil(name: string): number { return searxngBenchedUntil.get(name) ?? 0; }
 
 /** `host.integration.call("searxng", "search", { query })`'s real
  * implementation - SearXNG's own `/search?q=...&format=json` (its
@@ -1426,8 +1462,11 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
       const unresponsiveNames = Array.isArray(value.unresponsive_engines)
         ? value.unresponsive_engines.flatMap((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string" ? [raw[0]] : [])
         : [];
-      for (const name of unresponsiveNames) searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
-      recordEngineHealth(opts.safeEngines, value, unresponsiveNames);
+      for (const name of unresponsiveNames) {
+        if ((searxngBenchedUntil.get(name) ?? 0) <= Date.now()) console.warn(`[search] engine ${name} benched for ${SEARXNG_ENGINE_BENCH_MS / 60000} minutes: it reported itself unavailable`);
+        searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
+      }
+      recordEngineHealth(opts.safeEngines, value, unresponsiveNames, query);
       const unresponsiveEngines = unresponsiveNames.length > 0;
       // SEARCH-HEALTH-02: one suspended upstream engine among several is
       // routine and says nothing about whether search works; the service
