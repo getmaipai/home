@@ -47,7 +47,7 @@ STACK_REPO="getmaipai/stack"
 # the Chatterbox Turbo voice engine (VOICE-STUDIO-01), voices made from a clip with their own temperature and pitch (VOICES-02) and, from 2026-10-21, the optional Qwen3.6-35B-A3B chat model and a chat-model choice that survives a restart (MODEL-SWITCH-01) and the media job that finishes a companion character's clip (CMEDIA-STACK-01). A bump to this line
 # must be checked against every one of those: an old value silently rebuilds
 # the Stack without them.
-STACK_TAG="dcce981a23c4e95e6dbc8e91819d5c43b9eee608"
+STACK_TAG="71b1db501801bd0e92a438fc790ed8f91cfe1965"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
