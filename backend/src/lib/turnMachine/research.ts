@@ -37,7 +37,7 @@ export const isResearchStyle = (style: AnswerStyle | undefined, budget: TurnBudg
 /** Added to the first round of a research turn. */
 export function firstRoundNote(style: AnswerStyle, rounds: number): string {
   if (style === "max") {
-    return `This question deserves research. Before you search, split it into the separate things that need looking up (what the subject actually is, why something happened, what came after, what the people involved said in interviews, books or follow-ups) and look each one up with its own search, one step at a time, each with a different query. Prefer more than one site and a primary source such as an interview or the creators' own words. You may search up to ${rounds} times; stop as soon as every part is answered.`;
+    return `This question deserves research. First work out exactly which work, edition, production or version I mean: a franchise can have several (a miniseries, a sequel, a weekly series, a remake), so pick the one my own words describe and say which you chose. Search for that production's own makers, network, dates and how it ended before you write any follow-up query, and from then on use the names and titles the sources gave you, never names you assume; do not credit a person with a work unless a source says so. Write each query specific: the exact title, the year, and one angle (why it ended, what its makers said in interviews, the planned next season or ending, books, comics, sequels or a remake, behind the scenes, retrospectives), one angle per search, never repeating an earlier query. If a search comes back thin, rewrite it with the names found so far. For every part still unanswered, or backed by only one site, search again. Prefer more than one site and a primary source such as an interview. You may search up to ${rounds} times; stop as soon as every part is answered.`;
   }
   return `You may search more than once. If the first results leave part of the question unanswered, search again with a different query before you answer. You may search up to ${rounds} times.`;
 }
@@ -68,7 +68,7 @@ export function continuationInstruction(style: AnswerStyle, utterance: string, p
   const left = `You have ${roundsLeft} more search${roundsLeft === 1 ? "" : "es"} available.`;
   const question = `my question: "${utterance.replace(/"/g, "'")}"`;
   if (style === "max") {
-    return `${searched} ${read} ${left} Check what is still missing for ${question}. If a part is unanswered, if everything so far came from one site, or if no primary source (an interview, the creators' own words) has been looked at, search again with a different query. Cite sources by their numbers. If nothing important is missing, answer now. ${RESEARCH_ANSWER_CLAUSE}`;
+    return `${searched} ${read} ${left} Check what is still missing for ${question}. If a part is unanswered, if a claim rests on one site, or if no primary source (an interview, the makers' own words) has been looked at, search again with a different, more specific query that uses the names and titles found so far. Do not credit anyone with a work unless a source says so. Cite sources by their numbers. If nothing important is missing, answer now. ${RESEARCH_ANSWER_CLAUSE}`;
   }
   return `${searched} ${read} ${left} If something important for ${question} is still missing, search again with a different query; otherwise answer now. ${RESEARCH_ANSWER_CLAUSE}`;
 }

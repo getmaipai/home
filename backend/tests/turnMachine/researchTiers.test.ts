@@ -155,6 +155,17 @@ describe("research rounds follow the answer style", () => {
     expect(result.value.reply.text).toContain("[3]");
   });
 
+  test("Max's first round is told to pick the production the person means and to use the names the sources give, with no names of its own", async () => {
+    await holdMax();
+    const { requests } = await turn("owner", 1, { max: true });
+    const first = requests.find((r) => toolMessages(r).length === 0 && r.tool_choice !== "none")!;
+    const note = first.messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
+    expect(note).toContain("exactly which work, edition, production or version I mean");
+    expect(note).toContain("never names you assume");
+    expect(note).toContain("one angle per search");
+    expect(note).not.toMatch(/[A-Z][a-z]+ [A-Z][a-z]+ (?:created|wrote)/);
+  });
+
   test("Max stops at twelve rounds", async () => {
     await holdMax();
     await turn("owner", 13, { max: true });

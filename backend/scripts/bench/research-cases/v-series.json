@@ -1,0 +1,12 @@
+{
+  "id": "v-the-series",
+  "utterance": "the tv series V (the 80s one, not the 2000s one) only had one season. tell me your best educated guess what would have happened if they finished the story",
+  "topics": [
+    { "name": "why the series was cancelled", "anyOf": ["cancel", "ratings", "ended after", "not renewed"] },
+    { "name": "what its makers planned next", "anyOf": ["second season", "season two", "planned", "intended ending", "interview"] },
+    { "name": "later follow-ups", "anyOf": ["novel", "book", "comic", "reboot", "2009"] },
+    { "name": "an explicit guess", "anyOf": ["my guess", "educated guess", "likely", "probably"] }
+  ],
+  "minSites": 3,
+  "wrongAttributions": [{ "name": "Kenneth Johnson" }]
+}
