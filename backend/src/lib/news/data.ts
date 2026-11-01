@@ -307,6 +307,9 @@ export async function moreData(person: PersonRow, body: Record<string, unknown>,
   if (!shelfEnabled()) return emptyBlocks(false);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
+  // The list under an article answers only once the article does: it is instant, so asked alone it would draw first and the page would
+  // look like a channel for the moment before the story arrives. The article's fetch is shared (the same page, stored once).
+  await articleBlock(item, env).catch(() => null);
   const key = topicsShown(item, viewer.band)[0];
   const topic = key ? topicById(key) : undefined;
   if (!topic) return emptyBlocks(false);
