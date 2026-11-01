@@ -18,6 +18,7 @@ const FOLDS: Record<string, Record<string, string>> = {
     disable_alarm: "alarm:disable:",
     skip_next_alarm: "alarm:skip:",
     delete_alarm: "alarm:delete:",
+    undo: "undo:last:",
   },
   remind: {
     cancel_reminder: "reminder:cancel:",
@@ -27,6 +28,7 @@ const FOLDS: Record<string, Record<string, string>> = {
     edit_reminder: "reminder:edit:",
     snooze_reminder: "reminder:snooze:",
     complete_reminder: "reminder:complete:",
+    undo: "undo:last:",
   },
 };
 
@@ -147,7 +149,7 @@ export function parseListCall(text: string): ListCall | null {
 
 /** Stops an expression that starts with a reserved prefix from being read as a host call. */
 export function neutralizeReservedPrefix(expression: unknown): unknown {
-  return typeof expression === "string" ? expression.replace(/^(\s*)(alarm|reminder):/i, "$1$2 ") : expression;
+  return typeof expression === "string" ? expression.replace(/^(\s*)(alarm|reminder|undo):/i, "$1$2 ") : expression;
 }
 
 /** What a reminder action says beyond which reminder it means. */

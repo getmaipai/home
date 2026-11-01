@@ -605,6 +605,26 @@
    "split": "dev"
   },
   {
+   "id": "un-01",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Actually, take that last item back off",
+   "tool": "remind",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "dev"
+  },
+  {
+   "id": "un-02",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Never mind, put the list the way it was",
+   "tool": "remind",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
    "id": "re-01",
    "area": "reminders",
    "kind": "positive",
@@ -1064,6 +1084,26 @@
    ]
   },
   {
+   "id": "un-03",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Undo that reminder I just made",
+   "tool": "remind",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "dev"
+  },
+  {
+   "id": "un-04",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Scratch that, I did not want it set",
+   "tool": "remind",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
    "id": "al-01",
    "area": "alarms",
    "kind": "positive",
@@ -1517,6 +1557,26 @@
      "assistant": "You have a 6:30 alarm and a 7:00 alarm."
     }
    ]
+  },
+  {
+   "id": "un-05",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Undo the alarm change please",
+   "tool": "timer",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "dev"
+  },
+  {
+   "id": "un-06",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Oops, reverse what you just did with my alarm",
+   "tool": "timer",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "heldout"
   },
   {
    "id": "ng-01",

@@ -30,9 +30,10 @@
           "reorder",
           "clear_done",
           "show_list",
-          "find_list"
+          "find_list",
+          "undo"
         ],
-        "description": "What to do. Omit it for a new reminder. The first six values act on reminders, the rest on lists."
+        "description": "What to do. Omit it for a new reminder. The first six values act on reminders, the rest on lists. Use undo when the person asks to take back the last change."
       },
       "list": {
         "type": "string",

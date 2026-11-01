@@ -19,6 +19,8 @@ Every write goes in this order:
 2. `recordToolAudit` in `backend/src/lib/toolAudit.ts`: one row per decision, counts only, no list names or items.
 3. `recordUndo` in `backend/src/lib/toolUndo.ts`: stores an inverse for reversible actions, valid 10 minutes. The route is `/api/tool-undo` (`backend/src/routes/toolUndo.ts`, mounted in `backend/src/app.ts`); `runUndo` checks owner, expiry and use.
 
+The model's `undo` action (widened schema only, on `remind` and `timer`) folds to the private prefix `undo:last:` (reserved and neutralized like `alarm:` and `reminder:`). The host runs `undoLatest` in `backend/src/lib/toolUndo.ts`: the speaker's newest unexpired, unused `tool_undo` row, through `runUndo`, so it writes the text-free audit row and never reaches another person's row. `brakeFor` allows it for any known speaker (minors included) and still refuses an unknown one. Replies: "Undone." or "There is nothing to undo."
+
 Settings keys `tools.remind.mode`, `tools.timer.mode` and `tools.lists.mode` are in `backend/src/settings/toolBrakeKeys.ts` (labels Reminder actions, Timer actions, List actions; default do).
 
 ## Turning on the model path

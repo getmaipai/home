@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { toolUndo, scheduledJobs, lists } from "@/db/schema";
 import { newToolUndoId } from "@/lib/id";
@@ -189,4 +189,18 @@ export function runUndo(
     .run();
   recordToolAudit({ personId: actor.id, tool: row.tool, action: row.action, decision: "undo", band: actor.role });
   return { ok: true };
+}
+
+/** ASSIST-UNDO-03: the model's `undo` action. Runs the speaker's own most recent unexpired, unused Undo row as that
+ * person, never anyone else's. The reply is a plain sentence; runUndo writes the text-free audit row. */
+export function undoLatest(actor: PersonRow, now = new Date()): { done: boolean; reply: string } {
+  purgeExpiredUndo(now);
+  const row = db.select().from(toolUndo)
+    .where(and(eq(toolUndo.personId, actor.id), isNull(toolUndo.usedAt), gt(toolUndo.expiresAt, now.toISOString())))
+    .orderBy(desc(toolUndo.expiresAt))
+    .get();
+  if (!row) return { done: false, reply: "There is nothing to undo." };
+  return runUndo(actor, row.id, now).ok
+    ? { done: true, reply: "Undone." }
+    : { done: false, reply: "I couldn't undo that." };
 }

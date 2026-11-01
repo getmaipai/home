@@ -24,6 +24,10 @@ export function brakeFor(input: ToolBrakeInput): ToolBrakeResult {
   const unknownSpeaker = input.actor.role === "guest" || input.actor.role === "unknown" || !input.actor.id;
   if (unknownSpeaker) return { decision: "never", reason: "unknown_speaker" };
 
+  // ASSIST-UNDO-03: undoing the speaker's own latest change is always allowed for a known speaker; it can only reverse
+  // what that person did, so neither the household mode, a minor's band nor a tainted run needs a card.
+  if (input.action === "undo") return { decision: "do" };
+
   const minor = MINOR_ROLES.has(input.actor.band) || MINOR_ROLES.has(input.actor.role);
   const householdList = input.tool === "lists" && input.listScope === "household";
   if (minor) {

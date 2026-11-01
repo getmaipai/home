@@ -90,7 +90,7 @@ import { lastListContextFor } from "@/lib/listContext";
 import { ALARM_ACTION_NAMES, runAlarmAction, type AlarmActionName } from "@/lib/alarmActions";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
-import { recordListContext, recordUndo, type UndoInverse } from "@/lib/toolUndo";
+import { recordListContext, recordUndo, undoLatest, type UndoInverse } from "@/lib/toolUndo";
 import { handleAlarmChat } from "@/lib/alarmChat";
 import { parseAlarmCall, parseListCall, parseReminderPayload, type AlarmCall, type ListCall } from "@/lib/alarmCalls";
 import { lastReminderIdFor, runReminderAction } from "@/lib/reminderActions";
@@ -2128,8 +2128,14 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
   // ASSIST-REMIND-01: an alarm phrase reaches `timer` (a reminder cancel or list reaches `remind`) as a structured action
   // folded into the op text ("alarm:set:...", written by plugins.ts), the way the list phrases do. The alarm engine does
   // the work; its answer rides the capture so the reply and the card keep the old alarm wording.
+  function runUndoCall(): void {
+    const result = undoLatest(actor);
+    if (runtime.capture) runtime.capture.alarm = { task: result.reply, when_text: "", action: result.done ? "undo" : "list" };
+  }
+
   function runAlarmCall(call: AlarmCall): void {
     requirePermission("reminders:write");
+    if (call.action === "undo") return runUndoCall();
     if (call.action === "list_timers") {
       const now = new Date();
       const rows = db.select().from(scheduledJobs)
@@ -2175,6 +2181,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
   // and list names) runs through one function. Which reminder is meant is resolved in code, among this person's own.
   function runReminderCall(call: AlarmCall): void {
     requirePermission("reminders:write");
+    if (call.action === "undo") return runUndoCall();
     const band = runtime.band ?? speakerAgeBand(actor, new Date());
     const result = runReminderAction(actor, call.action, parseReminderPayload(call.rest), { lastReminderId: lastReminderIdFor(actor.id) });
     recordToolAudit({ personId: actor.id, tool: manifest.id, action: call.action, decision: "do", band });

@@ -405,6 +405,7 @@ describe("the widened schemas promise only what the backend runs", () => {
       complete_reminder: { expression: "call Nadia back" },
       cancel_reminder: { expression: "call Nadia back" },
       list_reminders: { expression: "reminders" },
+      undo: {},
     };
     for (const action of widened("remind").args.properties.action.enum) {
       if (isListAction(action)) {

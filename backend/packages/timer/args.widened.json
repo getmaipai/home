@@ -19,9 +19,10 @@
           "cancel_alarm",
           "delete_alarm",
           "list_alarms",
-          "list_timers"
+          "list_timers",
+          "undo"
         ],
-        "description": "What to do with an alarm or running timers. Omit it for a plain timer."
+        "description": "What to do with an alarm or running timers. Omit it for a plain timer. Use undo when the person asks to take back the last change."
       }
     }
   }

@@ -74,6 +74,7 @@ These are built, but they are switched off. They do not work yet. MaiPai will tu
 - "Move those to the other list."
 - "Copy my list but without eggs."
 - "Reorder my list."
+- "Undo that." It takes back your latest change from the last 10 minutes and says "Undone." If there is nothing to take back, it says "There is nothing to undo." It only ever undoes your own changes.
 
 Until then, use the words above. They work the same way every time.
 

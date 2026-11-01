@@ -18,8 +18,8 @@ const ROSTER = (
 
 describe("assist-tools dataset", () => {
   const count = (pick: (r: AssistRow) => boolean) => rows.filter(pick).length;
-  test("about 120 rows, with 20 negatives and about 30 to 40 per area", () => {
-    expect(rows.length).toBe(120);
+  test("about 126 rows, with 20 negatives and about 30 to 40 per area", () => {
+    expect(rows.length).toBe(126);
     expect(count((r) => r.kind === "negative")).toBe(20);
     expect(count((r) => r.area === "negatives")).toBe(20);
     for (const area of ["lists", "reminders", "alarms"]) expect(count((r) => r.area === area)).toBeGreaterThanOrEqual(30);
@@ -34,8 +34,8 @@ describe("assist-tools dataset", () => {
     }
   });
   test("the split is half and half overall and within each area", () => {
-    expect(count((r) => r.split === "dev")).toBe(60);
-    expect(count((r) => r.split === "heldout")).toBe(60);
+    expect(count((r) => r.split === "dev")).toBe(63);
+    expect(count((r) => r.split === "heldout")).toBe(63);
     for (const area of ["lists", "reminders", "alarms", "negatives"]) {
       expect(count((r) => r.area === area && r.split === "dev")).toBe(count((r) => r.area === area && r.split === "heldout"));
     }
