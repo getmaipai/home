@@ -247,6 +247,18 @@ test("a story whose page is slow opens on its summary within the grace, and the 
   expect(publisher.requests.filter((path) => path === "/story")).toHaveLength(1);
 });
 
+test("a story with a topic carries that topic as the channel its category label opens; one without carries none", async () => {
+  await pages({ "/topic": async () => new Response(articleHtml(), { headers: { "content-type": "text/html" } }) });
+  const env = cardEnv({ personId: null, band: "adult" })!;
+  const tagged = putItem(feeds.household, ADULT_HOST, { path: "/topic", topics: ["science"] });
+  const withTopic = await articleBlock(tagged, env) as { props: { kicker: string; kicker_channel?: { kind: string; key: string } } };
+  expect(withTopic.props.kicker).toBe("Science");
+  expect(withTopic.props.kicker_channel).toEqual({ kind: "topic", key: "science" });
+  const plain = putItem(feeds.household, ADULT_HOST, { path: "/topic" });
+  const without = await articleBlock(plain, env) as { props: { kicker_channel?: unknown } };
+  expect(without.props.kicker_channel).toBeUndefined();
+});
+
 test("a spent page pace or a timeout is not remembered as no picture: nothing is stored and the next pass tries again", async () => {
   const { __setPageFetchForTests } = await import("@/lib/packageHost");
   let fail: Error | null = new HostError("rate_limited", "Web pages are rate-limited - try again shortly");

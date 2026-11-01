@@ -260,14 +260,15 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   // no text, never "This story is not available". A child's story whose every sentence the gate removed stays hidden.
   const blocks: ArticleBlock[] = gated.length > 0 ? gated : band === "child" ? [] : [{ type: "note", text: `The text of this story did not load. Press Try again, or open it at ${publisher}.` }];
   if (blocks.length === 0) return null;
-  const topic = topicsShown(item, band).map((id) => topicById(id)?.label).find((label): label is string => !!label);
+  const topicId = topicsShown(item, band).find((id) => !!topicById(id)?.label);
+  const topic = topicId ? topicById(topicId)?.label : undefined;
   const image = imageOf(item, title, publisher, env);
   const speech = speechFor(title, blocks);
   return {
     id: stableBlockId("article", item.id), kind: "article", schema_version: 1, producer: "news",
     alt: `${title}, ${publisher}`.slice(0, 300), provenance: "news data story", created_at: new Date().toISOString(), hlc: nextHlc(),
     props: {
-      story_id: storyIdOf(item), item_id: item.id, kicker: topic ?? publisher, title,
+      story_id: storyIdOf(item), item_id: item.id, kicker: topic ?? publisher, ...(topicId ? { kicker_channel: { kind: "topic" as const, key: topicId } } : {}), title,
       byline: { publisher, site: hostOf(item.canonical_url) || publisher, published_at: publishedAtOf(item), outlets: 1, reading_s: loaded.reading_s },
       ...(sourceIconUrlOf(item) ? { sourceIconUrl: sourceIconUrlOf(item) } : {}),
       ...(image ? { image } : {}),
