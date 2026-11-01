@@ -1,12 +1,12 @@
 {
-  "description": "Timers and alarms. Start a timer for a length of time, report the time left on running timers, or set, change, turn on, turn off, skip the next ring of, cancel, delete or list alarms. Use list_timers only when asked about running timers. Pass the time and name in the person's words in expression. When two alarms fit the description, ask which one instead of guessing.",
+  "description": "Timers and alarms (wake-ups and recurring rings), never reminders. Start a timer for a length of time, report the time left on running timers, or set, change, rename, turn on, turn off, skip the next ring of, cancel, delete or list alarms, or take back the last alarm change. Use list_timers only when asked about running timers. Pass the time, repeat days and name in the person's words in expression. Act directly on a named alarm instead of listing alarms first. If more than one alarm could fit, or none was named, reply with a short question and make no call.",
   "args": {
     "type": "object",
     "properties": {
       "expression": {
         "type": "string",
         "minLength": 1,
-        "description": "The length of time for a timer, or the alarm's time, repeat days and name in the person's words, such as 6:30 every weekday called gym."
+        "description": "The length of time for a timer, or the alarm's time, repeat days and name in the person's words, such as 6:30 every weekday called gym. For edit_alarm give which alarm and what changes."
       },
       "action": {
         "type": "string",
@@ -22,7 +22,7 @@
           "list_timers",
           "undo"
         ],
-        "description": "What to do with an alarm or running timers. Omit it for a plain timer. Use undo when the person asks to take back the last change."
+        "description": "What to do. Always give it for an alarm, including set_alarm; omit it only for a plain countdown timer. Use cancel_alarm to stop an alarm for good in ordinary wording, delete_alarm only when they ask to delete or remove it entirely, disable_alarm to keep it but silence it, skip_next_alarm for one ring only. Use undo for any request to take back or reverse the last change."
       }
     }
   }

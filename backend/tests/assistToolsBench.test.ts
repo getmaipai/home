@@ -18,10 +18,10 @@ const ROSTER = (
 
 describe("assist-tools dataset", () => {
   const count = (pick: (r: AssistRow) => boolean) => rows.filter(pick).length;
-  test("about 128 rows, with 20 negatives and about 30 to 40 per area", () => {
-    expect(rows.length).toBe(128);
-    expect(count((r) => r.kind === "negative")).toBe(20);
-    expect(count((r) => r.area === "negatives")).toBe(20);
+  test("168 rows, with 28 negatives and about 30 to 40 per area", () => {
+    expect(rows.length).toBe(168);
+    expect(count((r) => r.kind === "negative")).toBe(28);
+    expect(count((r) => r.area === "negatives")).toBe(28);
     for (const area of ["lists", "reminders", "alarms"]) expect(count((r) => r.area === area)).toBeGreaterThanOrEqual(30);
   });
   test("ids are unique and every row has the required fields", () => {
@@ -33,11 +33,17 @@ describe("assist-tools dataset", () => {
       expect(typeof r.keyArgs).toBe("object");
     }
   });
-  test("the split is half and half overall and within each area", () => {
+  test("the original 128 rows split half and half, and the 40 f2- rows are all held out", () => {
+    const original = rows.filter((r) => !r.id.startsWith("f2-"));
+    const fresh = rows.filter((r) => r.id.startsWith("f2-"));
+    expect(original.length).toBe(128);
+    expect(fresh.length).toBe(40);
+    expect(fresh.every((r) => r.split === "heldout")).toBe(true);
+    expect(fresh.filter((r) => r.kind === "negative").length).toBe(8);
     expect(count((r) => r.split === "dev")).toBe(64);
-    expect(count((r) => r.split === "heldout")).toBe(64);
+    expect(count((r) => r.split === "heldout")).toBe(104);
     for (const area of ["lists", "reminders", "alarms", "negatives"]) {
-      expect(count((r) => r.area === area && r.split === "dev")).toBe(count((r) => r.area === area && r.split === "heldout"));
+      expect(original.filter((r) => r.area === area && r.split === "dev").length).toBe(original.filter((r) => r.area === area && r.split === "heldout").length);
     }
   });
   test("expected tools and actions exist in the action lists", () => {

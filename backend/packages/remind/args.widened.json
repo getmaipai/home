@@ -1,5 +1,5 @@
 {
-  "description": "Reminders and lists. Set, change, snooze, finish, cancel or show reminders, and create, change, copy, reorder, empty or show lists and the things on them. Pass words, never ids: the list as the person named it, the items as they said them. When the person says that or those, leave the words out and the last list or items are used. When two lists or reminders fit the name, ask which one instead of guessing.",
+  "description": "Reminders and lists, never alarms or timers. Set, change, snooze, finish, cancel or show reminders, and create, rename, copy, empty or show lists, add, remove, check off, edit, move or reorder the things on them, or take back the last change. Pass words, never ids: the list as the person named it, the items as they said them. Act directly: do not look a list or reminder up first, since the host finds it by name. When the person says that or those, leave the words out and the last list or items are used. If a request could mean more than one list or reminder, or names none and none was mentioned, reply with a short question and make no call.",
   "args": {
     "type": "object",
     "properties": {
@@ -33,7 +33,7 @@
           "find_list",
           "undo"
         ],
-        "description": "What to do. Omit it for a new reminder. The first six values act on reminders, the rest on lists. Use undo when the person asks to take back the last change."
+        "description": "What to do. Always give it for a list action or a change to an existing reminder; omit it only to make a brand new reminder. The first six values act on reminders, the rest on lists. Moving a reminder to a new time is edit_reminder; pushing it later by a length of time is snooze_reminder. Showing what was asked to be remembered is list_reminders. Use undo for any request to take back, reverse or revert the last change, including taking an item back off."
       },
       "list": {
         "type": "string",
@@ -41,14 +41,14 @@
       },
       "to_list": {
         "type": "string",
-        "description": "The target list for move_items."
+        "description": "The list that receives the items for move_items. The list field holds the list they come from."
       },
       "items": {
         "type": "array",
         "items": {
           "type": "string"
         },
-        "description": "Item words, one string per item, such as oat milk."
+        "description": "Item words, one string per item, as the person said them. Required for add_items, remove_items, check_items, uncheck_items and move_items unless they said those."
       },
       "name": {
         "type": "string",
@@ -66,7 +66,7 @@
         "items": {
           "type": "string"
         },
-        "description": "Item words in the order they should appear for reorder."
+        "description": "For reorder: the item words that go first, in the order wanted. Omit it for a sort the person describes in general terms."
       },
       "reminder": {
         "type": "string",

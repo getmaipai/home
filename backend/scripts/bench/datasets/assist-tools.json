@@ -800,9 +800,9 @@
    "kind": "positive",
    "utterance": "Push the casserole reminder back by thirty minutes",
    "tool": "remind",
-   "action": "edit_reminder",
+   "action": "snooze_reminder",
    "keyArgs": {
-    "expression": [
+    "reminder": [
      "casserole"
     ]
    },
@@ -1793,6 +1793,562 @@
    "area": "negatives",
    "kind": "negative",
    "utterance": "What does snooze actually do to your sleep",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-01",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Open a new list for the beach weekend",
+   "tool": "remind",
+   "action": "create_list",
+   "keyArgs": {
+    "name": [
+     "beach"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-02",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Throw sunscreen and flip flops on the beach list",
+   "tool": "remind",
+   "action": "add_items",
+   "keyArgs": {
+    "list": [
+     "beach"
+    ],
+    "items": [
+     "sunscreen",
+     "flip flops"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-03",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Add paper towels to the shopping list",
+   "tool": "remind",
+   "action": "add_items",
+   "keyArgs": {
+    "list": [
+     "shopping"
+    ],
+    "items": [
+     "paper towels"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-04",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Drop the stapler from the office supplies list",
+   "tool": "remind",
+   "action": "remove_items",
+   "keyArgs": {
+    "list": [
+     "office"
+    ],
+    "items": [
+     "stapler"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-05",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Got the paint, tick it off the garage list",
+   "tool": "remind",
+   "action": "check_items",
+   "keyArgs": {
+    "list": [
+     "garage"
+    ],
+    "items": [
+     "paint"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-06",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Call my pantry list the kitchen restock instead",
+   "tool": "remind",
+   "action": "rename_list",
+   "keyArgs": {
+    "list": [
+     "pantry"
+    ],
+    "name": [
+     "kitchen"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-07",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Read me what is on the school supplies list",
+   "tool": "remind",
+   "action": "show_list",
+   "keyArgs": {
+    "list": [
+     "school"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-08",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Send the spare keys and the charger from my travel list over to the carry on list",
+   "tool": "remind",
+   "action": "move_items",
+   "keyArgs": {
+    "list": [
+     "travel"
+    ],
+    "to_list": [
+     "carry"
+    ],
+    "items": [
+     "keys",
+     "charger"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-09",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "On the errands list put the post office stop first",
+   "tool": "remind",
+   "action": "reorder",
+   "keyArgs": {
+    "list": [
+     "errands"
+    ],
+    "order": [
+     "post office"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-10",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Wipe the finished items off my chores list",
+   "tool": "remind",
+   "action": "clear_done",
+   "keyArgs": {
+    "list": [
+     "chores"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-11",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Make a second copy of the packing list called weekend trip, leave out the umbrella",
+   "tool": "remind",
+   "action": "copy_list",
+   "keyArgs": {
+    "list": [
+     "packing"
+    ],
+    "name": [
+     "weekend"
+    ],
+    "exclude": [
+     "umbrella"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-12",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Remind me to water the tomatoes tomorrow morning",
+   "tool": "remind",
+   "action": "create_reminder",
+   "keyArgs": {
+    "expression": [
+     "tomatoes"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-13",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Ping me at four to pick up the dry cleaning",
+   "tool": "remind",
+   "action": "create_reminder",
+   "keyArgs": {
+    "expression": [
+     "dry cleaning"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-14",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Tell me to stretch every hour this afternoon",
+   "tool": "remind",
+   "action": "create_reminder",
+   "keyArgs": {
+    "expression": [
+     "stretch"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-15",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "The oil change reminder should say tire rotation too",
+   "tool": "remind",
+   "action": "edit_reminder",
+   "keyArgs": {
+    "reminder": [
+     "oil change"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-16",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Delay the trash reminder by fifteen minutes",
+   "tool": "remind",
+   "action": "snooze_reminder",
+   "keyArgs": {
+    "reminder": [
+     "trash"
+    ],
+    "minutes": [
+     "15"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-17",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Done with the thank you cards, you can close that reminder out",
+   "tool": "remind",
+   "action": "complete_reminder",
+   "keyArgs": {
+    "reminder": [
+     "cards"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-18",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Drop the reminder about the parking permit",
+   "tool": "remind",
+   "action": "cancel_reminder",
+   "keyArgs": {
+    "reminder": [
+     "parking"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-19",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Which reminders do I have for today",
+   "tool": "remind",
+   "action": "list_reminders",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-20",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Move the vet appointment reminder to next friday",
+   "tool": "remind",
+   "action": "edit_reminder",
+   "keyArgs": {
+    "reminder": [
+     "vet"
+    ],
+    "when": [
+     "friday"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-21",
+   "area": "reminders",
+   "kind": "positive",
+   "utterance": "Nudge me about the recycling again in twenty minutes",
+   "tool": "remind",
+   "action": "snooze_reminder",
+   "keyArgs": {
+    "reminder": [
+     "recycling"
+    ],
+    "minutes": [
+     "20"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-22",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Wake me up at 5:50 tomorrow",
+   "tool": "timer",
+   "action": "set_alarm",
+   "keyArgs": {
+    "expression": [
+     "5:50"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-23",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Set an alarm for 6 pm every sunday called meal prep",
+   "tool": "timer",
+   "action": "set_alarm",
+   "keyArgs": {
+    "expression": [
+     "6",
+     "sunday",
+     "meal prep"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-24",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Alarm at half past nine on weekends please",
+   "tool": "timer",
+   "action": "set_alarm",
+   "keyArgs": {
+    "expression": [
+     "9:30"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-25",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Move my school run alarm from 7:15 to 7:05",
+   "tool": "timer",
+   "action": "edit_alarm",
+   "keyArgs": {
+    "expression": [
+     "7:15",
+     "7:05"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-26",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Switch the weekend alarm back on",
+   "tool": "timer",
+   "action": "enable_alarm",
+   "keyArgs": {
+    "expression": [
+     "weekend"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-27",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Silence the 5:50 alarm for now but keep it",
+   "tool": "timer",
+   "action": "disable_alarm",
+   "keyArgs": {
+    "expression": [
+     "5:50"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-28",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Don't let the monday alarm go off this once",
+   "tool": "timer",
+   "action": "skip_next_alarm",
+   "keyArgs": {
+    "expression": [
+     "monday"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-29",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Stop the meal prep alarm for good",
+   "tool": "timer",
+   "action": "cancel_alarm",
+   "keyArgs": {
+    "expression": [
+     "meal prep"
+    ]
+   },
+   "split": "heldout"
+  },
+  {
+   "id": "f2-30",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Which alarms do I have going",
+   "tool": "timer",
+   "action": "list_alarms",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-31",
+   "area": "lists",
+   "kind": "positive",
+   "utterance": "Oops, bring back whatever you just removed",
+   "tool": "remind",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-32",
+   "area": "alarms",
+   "kind": "positive",
+   "utterance": "Take back that last alarm edit",
+   "tool": "timer",
+   "action": "undo",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-33",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "Why do people keep a to do list",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-34",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "Read me a poem about waking up early",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-35",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "What is the longest a person can nap",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-36",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "How do I write a good shopping list for a party",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-37",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "Tell me a joke about timers",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-38",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "I keep forgetting names, any memory tricks",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-39",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "What time does the sun come up in winter",
+   "tool": "none",
+   "action": "none",
+   "keyArgs": {},
+   "split": "heldout"
+  },
+  {
+   "id": "f2-40",
+   "area": "negatives",
+   "kind": "negative",
+   "utterance": "Explain how a reminder app works in simple words",
    "tool": "none",
    "action": "none",
    "keyArgs": {},
