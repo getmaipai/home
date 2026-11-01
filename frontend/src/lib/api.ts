@@ -694,7 +694,8 @@ export interface VisionModelInfo {
 }
 
 export interface HostTuneItem { id: string; title: string; why: string; mode: "auto" | "consent" | "advice"; state: "ok" | "needs" | "unknown" | "applied"; current: string; proposed: string }
-export interface SetupCloseApps { installed: boolean; apps: { bundleId: string; name: string }[] }
+export interface HelperInstall { result: "installed" | "no_toolchain" | "nobody_logged_in" | "not_mac" | "failed"; message: string }
+export interface SetupCloseApps { installed: boolean; can_install: boolean; apps: { bundleId: string; name: string }[] }
 export interface HostTuneView { supported: boolean; items: HostTuneItem[] }
 
 export class ApiError extends Error {
@@ -1048,6 +1049,7 @@ export const api = {
   /** Wizard (before an owner): start or restart the AI engine install on this computer. */
   setupEngineInstall: () => request<{ started: true }>("/api/setup/engine-install", { method: "POST" }),
   setupCloseApps: () => request<SetupCloseApps>("/api/setup/close-apps"),
+  setupCloseAppsInstall: () => request<HelperInstall>("/api/setup/close-apps/install", { method: "POST", body: JSON.stringify({}) }),
   setupCloseAppsTest: () => request<{ result: "ok" | "no_helper" | "not_allowed" }>("/api/setup/close-apps/test", { method: "POST", body: JSON.stringify({}) }),
   setupHostTune: () => request<HostTuneView>("/api/setup/host-tune"),
   setupHostTuneApply: (id: string) => request<{ item: HostTuneItem }>("/api/setup/host-tune/apply", { method: "POST", body: JSON.stringify({ id }) }),

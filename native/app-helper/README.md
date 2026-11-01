@@ -12,4 +12,4 @@ It answers three requests, one JSON object per line, on a unix socket that only 
 The never-close floor (Finder, Dock, login window, System Settings, remote-access tools, anything from MaiPai) is refused here whatever the caller says.
 The helper sends no signal and has no force quit; a test fails the build if the sources contain one.
 
-Build and test: `swift build` and `swift test` in this folder. Signing and installing the LaunchAgent are done by the installer in a later item.
+Build and test: `swift build` and `swift test` in this folder. `scripts/app-helper.sh install` builds it for this Mac (ad hoc signed) and installs the LaunchAgent; `install.sh` and the Close apps card call it.

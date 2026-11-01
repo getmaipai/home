@@ -1045,6 +1045,23 @@ ensure_service_user_linux() {
   find "$INSTALL_ROOT_LINUX" -mindepth 1 -maxdepth 1 ! -name stack -exec chown -R "${SERVICE_USER}:${SERVICE_USER}" {} +
 }
 
+# The Mac app helper (native/app-helper): a small user-level LaunchAgent that lets Home list and quit big apps when a job needs room.
+# It is installed for the person logged in at the Mac's own screen, built on this Mac, with no privileges and nothing sent anywhere;
+# `bash scripts/app-helper.sh remove` undoes it. Installing it does not turn Close apps on. Never fails the install: without the Swift
+# toolchain or a login session the Close apps card and the setup wizard show "Helper not installed" with an Install button.
+install_app_helper() {
+  local os="$1" dir="$2"
+  [ "$os" = "darwin" ] || return 0
+  [ -f "${dir}/scripts/app-helper.sh" ] || return 0
+  log "Installing the Mac app helper (it lets Home close big apps for room, only if you turn that on)."
+  local status=0
+  bash "${dir}/scripts/app-helper.sh" install || status=$?
+  if [ "$status" -ne 0 ]; then
+    log "The Mac app helper was not installed (exit ${status}). Home works without it. Install it later from Settings, AI and models, Performance, Close apps."
+  fi
+  return 0
+}
+
 install_launchd_daemon() {
   local dir="$1" bun_bin="$2" port="$3" stack_port="${4:-$STACK_PORT_BASE}"
   local plist="${HOME_PLIST:-/Library/LaunchDaemons/com.maipai.home.plist}"
@@ -2276,6 +2293,8 @@ main() {
     wait_for_url "http://127.0.0.1:${stack_port}/healthz" "The MaiPai Stack" 20 \
       || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
   fi
+
+  install_app_helper "$os" "$install_root"
 
   install_maipai_command "$install_root"
 

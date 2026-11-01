@@ -15,7 +15,7 @@ export function usePerformanceSettings() {
   return { ready: settings.isSuccess, value, write };
 }
 
-export interface RunningApps { installed: boolean; apps: { bundleId: string; name: string; bytes: number; frontmost: boolean }[] }
+export interface RunningApps { installed: boolean; can_install?: boolean; apps: { bundleId: string; name: string; bytes: number; frontmost: boolean }[] }
 export function useRunningApps() {
   return useQuery({ queryKey: ["performance-apps"], queryFn: () => request<RunningApps>("/api/performance/apps").catch((): RunningApps => ({ installed: false, apps: [] })), staleTime: 15_000 });
 }

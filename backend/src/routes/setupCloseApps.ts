@@ -4,6 +4,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter } from "@/lib/openapi";
 import { accessRefusal } from "@/routes/setupFolders";
 import { listHelperApps } from "@/lib/appHelperClient";
+import { canInstallHelper, installHelper } from "@/lib/appHelperInstall";
 import { probeCloseApps } from "@/lib/closeAppsProbe";
 import { readCapabilities } from "@/lib/memoryRoom";
 
@@ -17,13 +18,13 @@ const errs = {
 
 const listRoute = createRoute({
   method: "get", path: "/close-apps", tags: ["Setup"], summary: "Is the Mac app helper running, and which apps are open",
-  responses: { 200: { content: { "application/json": { schema: z.object({ installed: z.boolean(), apps: z.array(z.object({ bundleId: z.string(), name: z.string() })) }) } }, description: "Names are returned to the wizard and never stored." }, ...errs },
+  responses: { 200: { content: { "application/json": { schema: z.object({ installed: z.boolean(), can_install: z.boolean(), apps: z.array(z.object({ bundleId: z.string(), name: z.string() })) }) } }, description: "Names are returned to the wizard and never stored. can_install is true on a Mac that carries the helper installer, so the wizard can offer Install helper when installed is false." }, ...errs },
 });
 setupCloseAppsRoutes.openapi(listRoute, async (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
   const listing = await listHelperApps();
-  return c.json({ installed: listing.installed, apps: listing.apps.map(({ bundleId, name }) => ({ bundleId, name })) }, 200);
+  return c.json({ installed: listing.installed, can_install: canInstallHelper(), apps: listing.apps.map(({ bundleId, name }) => ({ bundleId, name })) }, 200);
 });
 
 const testRoute = createRoute({
@@ -34,6 +35,16 @@ setupCloseAppsRoutes.openapi(testRoute, async (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
   return c.json({ result: await probeCloseApps() }, 200);
+});
+
+const installRoute = createRoute({
+  method: "post", path: "/close-apps/install", tags: ["Setup"], summary: "Install the Mac app helper for the person at this Mac",
+  responses: { 200: { content: { "application/json": { schema: z.object({ result: z.enum(["installed", "no_toolchain", "nobody_logged_in", "not_mac", "failed"]), message: z.string() }) } }, description: "installed once the helper answers; any other result says in plain words what to do next. Close apps stays Off either way." }, ...errs },
+});
+setupCloseAppsRoutes.openapi(installRoute, async (c) => {
+  const refusal = accessRefusal(c);
+  if (refusal) return refusal as never;
+  return c.json(await installHelper(), 200);
 });
 
 const capRoute = createRoute({

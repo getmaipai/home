@@ -85,6 +85,7 @@ describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
       run_install_preflight() { t "run_install_preflight $1 $2 $3"; }
       setup_stack() { t setup_stack; mkdir -p "$1/stack"; echo 8771 > "$1/stack/.port"; }
       install_launchd_daemon() { t "install_launchd_daemon $3 $4"; }
+      install_app_helper() { t "install_app_helper $1"; }
       ${extra}
     `;
     const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${stubs}
@@ -112,6 +113,7 @@ main ${args.join(" ")}`]);
         "install_launchd_daemon 3000 8770",
         "install_log_rotation",
         "wait_for_url http://127.0.0.1:3000/",
+        "install_app_helper darwin",
       ]);
       expect(existsSync(join(root, "install", "stack"))).toBe(false);
       expect(readFileSync(join(root, "install", ".stack-port-base"), "utf8").trim()).toBe("8770");
@@ -259,7 +261,7 @@ main ${args.join(" ")}`]);
         restore_snapshot() { t "restore_snapshot $2"; }
         find_free_port() { echo "$1"; }; ensure_bun_system_wide() { :; }; clear_quarantine_and_sign() { :; }
         build_app() { :; }; run_install_preflight() { :; }
-        setup_stack() { :; }; install_launchd_daemon() { :; }; install_log_rotation() { :; }
+        setup_stack() { :; }; install_launchd_daemon() { :; }; install_log_rotation() { :; }; install_app_helper() { :; }
         wait_for_url() { :; }; print_reboot_note() { :; }
       `;
       const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${stubs}\nmain --rollback`]);

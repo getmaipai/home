@@ -8,6 +8,9 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle }
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { STARTER_ALWAYS, STARTER_NEVER, parseList, specKey, type StarterApp } from "@/apps/settings/performanceModel";
 import { useRunningApps } from "@/apps/settings/usePerformanceSettings";
+import { HelperStatusRow } from "@/apps/settings/HelperStatusRow";
+import { request } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Value = (key: string) => unknown;
 type Write = (changes: Record<string, unknown>) => Promise<void>;
@@ -71,6 +74,7 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
 
 export function CloseAppsSettings({ value, write }: { value: Value; write: Write }) {
   const running = useRunningApps();
+  const client = useQueryClient();
   const options = specKey(MODE).copy?.options ?? {};
   const mode = value(MODE) === "automatic" ? "automatic" : "off";
   const names = new Map<string, string>([...STARTER_ALWAYS, ...STARTER_NEVER, ...(running.data?.apps ?? []).map((app) => ({ bundleId: app.bundleId, name: app.name }))].map((app) => [app.bundleId, app.name]));
@@ -95,6 +99,7 @@ export function CloseAppsSettings({ value, write }: { value: Value; write: Write
           </ItemGroup>
         </RadioGroup>
         {error ? <p role="alert">{error}</p> : null}
+        {running.isSuccess && !running.data.installed ? <HelperStatusRow canInstall={running.data.can_install === true} install={() => request("/api/performance/apps/install", { method: "POST", body: "{}" })} onInstalled={() => void client.invalidateQueries({ queryKey: ["performance-apps"] })} /> : null}
         <AppList kind="always" value={value} write={write} names={names} candidates={candidates} starter={STARTER_ALWAYS} />
         <AppList kind="never" value={value} write={write} names={names} candidates={candidates} starter={STARTER_NEVER} />
       </CardContent>

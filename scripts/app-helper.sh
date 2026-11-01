@@ -7,8 +7,10 @@
 #   bash scripts/app-helper.sh status               show the agent, the binary and the socket
 #   bash scripts/app-helper.sh remove               unload the agent and delete its files
 #
-# Home calls install only after an admin turns the feature on (auto-close-apps design note, sections 5 and 6);
-# a fresh install of Home does not load it. No file here is ever written outside the person's own home folder.
+# Installing the helper does not turn the feature on (presets leave Close apps Off); it only lets Home see and quit apps once an admin does.
+# scripts/install.sh (macOS) and the setup wizard / Close apps card ("Install helper") both call `install`. Run as root (they are),
+# it re-runs itself as the person logged in at the Mac's own screen, so nothing is built or written as root.
+# No file here is ever written outside that person's own home folder. Exit codes: 10 no Swift toolchain, 11 nobody logged in, 12 launchd refused.
 set -euo pipefail
 
 label="ai.maipai.app-helper"
@@ -23,14 +25,20 @@ sock="$support/app-helper.sock"
 log="${MAIPAI_APP_HELPER_LOG:-$HOME/Library/Logs/MaiPai/app-helper.log}"
 plist="$agents_dir/$label.plist"
 
-die() { echo "app-helper: $*" >&2; exit 1; }
+die() { echo "app-helper: $*" >&2; exit "${2:-1}"; }
+is_root() { [[ "${MAIPAI_TEST_UID:-$(id -u)}" == 0 ]]; }
+scratch="${MAIPAI_APP_HELPER_SCRATCH:-$support/swift-build}"
 
 case "${1:-}" in
   build)
-    out="${2:-$here/data-scratch/app-helper-build}"
-    command -v swift >/dev/null || die "the Swift toolchain is missing. Install Xcode or its command line tools, then run this again."
-    (cd "$pkg" && swift build -c release --arch arm64 --arch x86_64 >&2)
-    built="$(cd "$pkg" && swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/maipai-app-helper"
+    out="${2:-$support/build}"
+    if ! xcode-select -p >/dev/null 2>&1 || ! command -v swift >/dev/null; then
+      die "the Swift toolchain is missing. At the Mac's own screen open Terminal, run xcode-select --install, wait for it to finish, then install the helper again." 10
+    fi
+    # Built for this Mac's own chip into the person's own folder (the install folder is root-owned), so it is quick and needs no privileges.
+    arch_flags=(--arch "${MAIPAI_APP_HELPER_ARCH:-$(uname -m)}")
+    (cd "$pkg" && swift build -c release "${arch_flags[@]}" --scratch-path "$scratch" >&2)
+    built="$(cd "$pkg" && swift build -c release "${arch_flags[@]}" --scratch-path "$scratch" --show-bin-path)/maipai-app-helper"
     [[ -x "$built" ]] || die "the build produced no binary at $built. Read the build output above."
     mkdir -p "$out"
     cp "$built" "$out/maipai-app-helper"
@@ -39,9 +47,19 @@ case "${1:-}" in
     echo "$out/maipai-app-helper"
     ;;
   install)
-    [[ "$(id -u)" != 0 ]] || die "run this as the logged-in person, not root: the helper must live in that person's session."
+    if is_root; then
+      # The helper must live in the logged-in person's session, so root hands the whole install to that person.
+      who="${MAIPAI_CONSOLE_USER:-$(stat -f%Su /dev/console 2>/dev/null || true)}"
+      if [[ -z "$who" || "$who" == root || "$who" == loginwindow ]]; then
+        die "nobody is logged in at the Mac's own screen. Log in there (the lock screen counts as logged out), then install the helper again." 11
+      fi
+      uid="$(id -u "$who" 2>/dev/null)" || die "$who is not an account on this Mac. Log in at the Mac's own screen as the person who uses it, then install the helper again." 11
+      home="$(dscl . -read "/Users/$who" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+      [[ -n "$home" ]] || home="/Users/$who"
+      exec "$launchctl_cmd" asuser "$uid" sudo -u "$who" env "HOME=$home" bash "$here/scripts/app-helper.sh" install ${2:+"$2"}
+    fi
     src="${2:-}"
-    if [[ -z "$src" ]]; then src="$("$0" build)" || exit 1; fi
+    if [[ -z "$src" ]]; then src="$(bash "$0" build)" || exit $?; fi
     [[ -x "$src" ]] || die "$src is not an executable. Build it with: bash scripts/app-helper.sh build"
     mkdir -p "$bin_dir" "$agents_dir" "$(dirname "$log")"
     chmod 700 "$support"
@@ -59,7 +77,7 @@ with open(out, "wb") as f:
 PY
     uid="$(id -u)"
     "$launchctl_cmd" bootout "gui/$uid" "$plist" >/dev/null 2>&1 || true
-    "$launchctl_cmd" bootstrap "gui/$uid" "$plist" || die "launchd would not load the helper (error 5 means nobody is logged in at the Mac's own screen). Log in there and run this again."
+    "$launchctl_cmd" bootstrap "gui/$uid" "$plist" || die "launchd would not load the helper (error 5 means nobody is logged in at the Mac's own screen). Log in there and run this again." 12
     echo "installed $plist"
     ;;
   status)
