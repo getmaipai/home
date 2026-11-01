@@ -63,6 +63,22 @@ describe("PerformanceSettings", () => {
     expect(puts.find((put) => put.key === "resources.preset")?.value).toBe("custom");
     expect(await view.findByTestId("profile-table")).toBeTruthy();
   });
+  test("the Queue section saves the per-person limit, an aging delay and a strict kind", async () => {
+    const puts = serve({ ...PRESET_VALUES.chat_first });
+    const view = renderWithQueryClient(<PerformanceSettings {...as("admin")} />);
+    fireEvent.click(await view.findByText("Customize"));
+    const limit = await view.findByLabelText("Big jobs at once per person") as HTMLInputElement;
+    expect(limit.value).toBe("1");
+    fireEvent.change(limit, { target: { value: "2" } });
+    fireEvent.blur(limit);
+    await waitFor(() => expect(puts.find((put) => put.key === "resources.max_concurrent_per_person")?.value).toBe(2));
+    const aging = await view.findByLabelText("Minutes before waiting songs move up") as HTMLInputElement;
+    fireEvent.change(aging, { target: { value: "15" } });
+    fireEvent.blur(aging);
+    await waitFor(() => expect(puts.find((put) => put.key === "resources.max_wait_before_aging.music")?.value).toBe(15));
+    fireEvent.click(await view.findByLabelText("Videos always go first"));
+    await waitFor(() => expect(puts.find((put) => put.key === "resources.strict.video")?.value).toBe(true));
+  });
   test("the host-tune list shows for the owner only and Apply updates the row", async () => {
     serve({ ...PRESET_VALUES.chat_first });
     const admin = renderWithQueryClient(<PerformanceSettings {...as("admin")} />);

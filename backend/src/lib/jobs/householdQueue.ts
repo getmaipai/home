@@ -109,7 +109,10 @@ export async function endMaxWindow(): Promise<boolean> {
   return true;
 }
 
-let queuePolicy: ScorePolicy = DEFAULT_POLICY;
+/** TIER-PRIO-02/06: where the queue reads its policy (class order, aging delay, strict kinds, per-person limit). Null means the shipped defaults. */
+let policySource: (() => ScorePolicy) | null = null;
+export function setQueuePolicySource(source: (() => ScorePolicy) | null): void { policySource = source; }
+function queuePolicy(): ScorePolicy { try { return policySource?.() ?? DEFAULT_POLICY; } catch { return DEFAULT_POLICY; } }
 type UsageCredit = { personId: string; seconds: number; at: number };
 const usageCredits: UsageCredit[] = [];
 export function recordUsage(personId: string, runningSeconds: number, now: number): void {
@@ -143,7 +146,7 @@ function category(job: QueueJob): JobCategory { return job.category ?? (job.jobC
 export function order(jobs: readonly QueueJob[], now: number, usage: Readonly<Record<string, number>> = {}): QueuePosition[] {
   const waiting = jobs.filter((job) => job.state === "queued" && !job.childDailyCapReached);
   const scoredJobs: ScoreJob[] = jobs.map((job) => ({ id: job.id, personId: job.personId, category: category(job), state: job.state === "running" ? "running" : "queued", createdAt: createdAt(job), adminBoost: job.adminBoost, childDailyCapReached: job.childDailyCapReached }));
-  const ranked = scoreJobs(scoredJobs, queuePolicy, now, usage);
+  const ranked = scoreJobs(scoredJobs, queuePolicy(), now, usage);
   const head = waiting.filter((job) => job.headOfClass).sort((a, b) => createdAt(a) - createdAt(b));
   const headIds = new Set(head.map((job) => job.id));
   const ordered = [...head, ...ranked.filter((item) => !headIds.has(item.id)).map((item) => waiting.find((job) => job.id === item.id)!).filter(Boolean)];
@@ -344,7 +347,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
       if (overtaker) {
         const pair = [job, jobs.find((candidate) => candidate.id === overtaker.id)!];
         const usage = usageLastHour(now);
-        const scored = scoreJobs(pair.map((candidate) => ({ id: candidate.id, personId: candidate.personId, category: category(candidate), state: candidate.state === "running" ? "running" : "queued", createdAt: createdAt(candidate), adminBoost: candidate.adminBoost, childDailyCapReached: candidate.childDailyCapReached })), queuePolicy, now, usage);
+        const scored = scoreJobs(pair.map((candidate) => ({ id: candidate.id, personId: candidate.personId, category: category(candidate), state: candidate.state === "running" ? "running" : "queued", createdAt: createdAt(candidate), adminBoost: candidate.adminBoost, childDailyCapReached: candidate.childDailyCapReached })), queuePolicy(), now, usage);
         const difference = (a: typeof scored[number], b: typeof scored[number]): ScoreReason | null => {
           const diffs: [ScoreReason, number][] = [["class", a.terms.classWeight - b.terms.classWeight], ["aging", a.terms.aging - b.terms.aging], ["fair_share", a.terms.fairShare - b.terms.fairShare], ["boost", a.terms.boost - b.terms.boost]];
           return diffs.filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "arrival";
@@ -488,10 +491,12 @@ export async function releaseHouseholdQueue(): Promise<void> {
       }
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));
-      const runningPeople = new Set(entries.filter((entry) => entry.job.state === "running").map((entry) => entry.job.personId));
+      const policy = queuePolicy();
+      const runningByPerson = new Map<string, number>();
+      for (const entry of entries) if (entry.job.state === "running") runningByPerson.set(entry.job.personId, (runningByPerson.get(entry.job.personId) ?? 0) + 1);
       for (const item of positions) {
         const entry = byId.get(item.id);
-        if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId) || heldByPlan(entry.job)) continue;
+        if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || (runningByPerson.get(entry.job.personId) ?? 0) >= policy.maxConcurrentPerPerson || heldByPlan(entry.job)) continue;
         if ((entry.job.tier === "boost" || entry.job.tier === "max") && getProfileSource() !== null) {
           try {
             const fit = await fitForAdmission(entry.job as { id: string; jobClass: "picture" | "video" | "other"; category?: string; tier: "boost" | "max" }, stackBudget);
@@ -555,6 +560,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
         if (pendingPlan && pendingPlan.jobId !== entry.job.id) pendingPlan = null;
         if (entry.job.tier === "max") { tierState.startedSinceMax = []; tierState.lastMaxPersonId = entry.job.personId; }
         else if (!tierState.startedSinceMax.includes(entry.job.personId)) tierState.startedSinceMax = [...tierState.startedSinceMax, entry.job.personId];
+        runningByPerson.set(entry.job.personId, (runningByPerson.get(entry.job.personId) ?? 0) + 1);
         try { await entry.release(); if (pendingPlan?.jobId === entry.job.id) activePlan = pendingPlan; } catch { /* The job store records a submit failure; other kinds can proceed. */ }
       }
     } while (releaseAgain);

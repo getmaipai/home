@@ -28,6 +28,7 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
+import type { PersonRow } from "@/types";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
 
@@ -54,7 +55,7 @@ afterEach(() => {
 });
 
 const isPhrasing = (request: ChatCompletionRequest) => request.messages.some((m) => m.role === "tool");
-async function turn(actor: typeof people.owner, tool: string, args: Record<string, unknown>): Promise<TurnValue> {
+async function turn(actor: PersonRow, tool: string, args: Record<string, unknown>): Promise<TurnValue> {
   const call = { id: "call-t", name: tool, args: JSON.stringify({ prompt: "a paper boat floating down a rainy street, soft light", ...args }) };
   let value: TurnValue | undefined;
   await withStub({ calls: (request: ChatCompletionRequest) => (request.tool_choice === "none" || isPhrasing(request) ? undefined : [call]), reply: () => "On its way." }, async () => {

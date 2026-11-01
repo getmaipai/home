@@ -10,9 +10,10 @@ import { CATEGORIES, CATEGORY_WORDS, ROW_WORDS, cellOptions, parseList, parsePro
 
 type Value = (key: string) => unknown;
 type Write = (changes: Record<string, unknown>) => Promise<void>;
+const QUEUE_KINDS = ["image", "video", "music"] as const;
 const CELL_WORDS: Record<Cell, string> = { reduced: "Reduced", standard: "Standard", boost: "Boost", max: "Max", queued: "Waits", off: "Off" };
 
-function NumberRow({ id, value, write, onError }: { id: string; value: Value; write: Write; onError: (message: string) => void }) {
+function NumberRow({ id, value, write, onError, unit = "seconds" }: { id: string; value: Value; write: Write; onError: (message: string) => void; unit?: string }) {
   const entry = specKey(id) as ReturnType<typeof specKey> & { range?: { min?: number; max?: number } };
   const min = entry.range?.min ?? 0;
   const [draft, setDraft] = useState<string | null>(null);
@@ -21,7 +22,7 @@ function NumberRow({ id, value, write, onError }: { id: string; value: Value; wr
     if (draft === null) return;
     const next = Number(draft);
     setDraft(null);
-    if (!Number.isFinite(next) || next < min || (entry.range?.max !== undefined && next > entry.range.max)) return onError(`${entry.label} must be a whole number of seconds from ${min}${entry.range?.max !== undefined ? ` to ${entry.range.max}` : ""}.`);
+    if (!Number.isFinite(next) || next < min || (entry.range?.max !== undefined && next > entry.range.max)) return onError(`${entry.label} must be a whole number of ${unit} from ${min}${entry.range?.max !== undefined ? ` to ${entry.range.max}` : ""}.`);
     write({ [id]: Math.round(next) }).catch(() => onError("Home could not save that change. Check your connection and try again."));
   };
   return (
@@ -72,6 +73,21 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
             </ItemActions>
           </Item>
           <NumberRow id="resources.cooldown_seconds" value={value} write={write} onError={setError} />
+        </ItemGroup>
+      </section>
+      <section aria-label="Queue">
+        <ItemGroup variant="card">
+          <NumberRow id="resources.max_concurrent_per_person" value={value} write={write} onError={setError} unit="jobs" />
+          {QUEUE_KINDS.map((kind) => <NumberRow key={kind} id={`resources.max_wait_before_aging.${kind}`} value={value} write={write} onError={setError} unit="minutes" />)}
+          {QUEUE_KINDS.map((kind) => {
+            const id = `resources.strict.${kind}`;
+            return (
+              <Item key={id} size="setting">
+                <ItemContent><ItemTitle>{specKey(id).label}</ItemTitle><ItemDescription clamp={false}>{specKey(id).help}</ItemDescription></ItemContent>
+                <ItemActions><Switch aria-label={specKey(id).label} checked={value(id) === true} onCheckedChange={(on) => save({ [id]: on })} /></ItemActions>
+              </Item>
+            );
+          })}
         </ItemGroup>
       </section>
       <section aria-label="Lower without asking">
