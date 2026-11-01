@@ -68,7 +68,7 @@ describe("RemindersPage", () => {
     try {
       const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       expect(await view.findByRole("button", { name: /Shopping/ })).toHaveTextContent("1");
-      expect(view.getByRole("button", { name: /To-do/ })).toHaveTextContent("0");
+      expect(view.getByRole("button", { name: /To-do/ })).not.toHaveTextContent(/\d/);
       const composer = view.getByRole("textbox", { name: "Add an item" });
       fireEvent.change(composer, { target: { value: "Apples" } });
       fireEvent.submit(composer.closest("form")!);
@@ -113,8 +113,8 @@ describe("RemindersPage", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
-      expect(await view.findByRole("button", { name: /Today/ })).toHaveTextContent("0");
-      expect(view.getByRole("button", { name: /Scheduled/ })).toHaveTextContent("0");
+      expect(await view.findByRole("button", { name: /Today/ })).not.toHaveTextContent(/\d/);
+      expect(view.getByRole("button", { name: /Scheduled/ })).not.toHaveTextContent(/\d/);
       fireEvent.click(view.getByRole("button", { name: /Scheduled/ }));
       expect(await view.findByRole("heading", { name: "Scheduled" })).toBeInTheDocument();
     } finally { restore(); globalThis.fetch = original; }
@@ -188,7 +188,7 @@ describe("RemindersPage", () => {
       const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       const column = await view.findByLabelText("Reminder lists");
       const buttons = Array.from(column.querySelectorAll("button"));
-      expect(buttons.map((button) => button.textContent?.replace(/\s+/g, " ").trim())).toEqual(["+", "Today0", "Scheduled0", "Shopping1", "To-do0", "Personal0"]);
+      expect(buttons.map((button) => button.textContent?.replace(/\s+/g, " ").trim())).toEqual(["+", "Today", "Scheduled", "Shopping1", "To-do", "Personal"]);
       expect(await view.findByText("YOUR LIST")).toBeInTheDocument();
       expect(view.getByText("A few things to pick up")).toBeInTheDocument();
       expect(view.getByText(/2026|October|November/)).toBeInTheDocument();
