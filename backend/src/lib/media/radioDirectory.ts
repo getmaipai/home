@@ -32,17 +32,22 @@ const cache = new Map<string, { expiresAt: number; stations: DirectoryStation[] 
 const inFlight = new Map<string, Promise<RadioResult>>();
 const knownFaviconAddresses = new Set<string>();
 // A directory result is short-lived authority to preview that exact station, scoped to its household.
-const previewable = new Map<string, { expiresAt: number; stations: Map<string, DirectoryStation> }>();
+const PREVIEW_MS = 10 * 60_000;
+const previewable = new Map<string, Map<string, { expiresAt: number; station: DirectoryStation }>>();
 
 let pausedUntil = 0;
 export function __resetRadioDirectoryForTests(): void { pausedUntil = 0; cache.clear(); inFlight.clear(); knownFaviconAddresses.clear(); previewable.clear(); }
+/** Every shelf on the Radio page asks on its own, so results are merged (never replaced) and each station expires ten minutes after it was shown. */
 export function rememberPreviewStations(householdId: string, stations: readonly DirectoryStation[], now = Date.now()): void {
-  previewable.set(householdId, { expiresAt: now + 10 * 60_000, stations: new Map(stations.map((station) => [station.id, station])) });
+  const known = previewable.get(householdId) ?? new Map();
+  for (const [id, entry] of known) if (entry.expiresAt <= now) known.delete(id);
+  for (const station of stations) known.set(station.id, { expiresAt: now + PREVIEW_MS, station });
+  previewable.set(householdId, known);
 }
 export function previewStationFor(householdId: string, id: string, now = Date.now()): DirectoryStation | null {
-  const entry = previewable.get(householdId);
-  if (!entry || entry.expiresAt <= now) { previewable.delete(householdId); return null; }
-  return entry.stations.get(id) ?? null;
+  const entry = previewable.get(householdId)?.get(id);
+  if (!entry || entry.expiresAt <= now) return null;
+  return entry.station;
 }
 export function radioDirectoryHasFavicon(address: string): boolean { return knownFaviconAddresses.has(address); }
 export function __rememberRadioFaviconForTests(address: string): void { knownFaviconAddresses.add(address); }

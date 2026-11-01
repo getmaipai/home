@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { __resetRateLimiterForTests as resetBuckets } from "@/lib/rateLimiter";
-import { __resetRadioDirectoryForTests, findStations, radioDirectoryAllowed, stationOf } from "@/lib/media/radioDirectory";
+import { __resetRadioDirectoryForTests, findStations, previewStationFor, radioDirectoryAllowed, rememberPreviewStations, stationOf, type DirectoryStation } from "@/lib/media/radioDirectory";
 
 const row = { stationuuid: "abc-1", name: " Cabin FM ", url_resolved: "https://stream.example.com/live.mp3", favicon: "http://img.example.com/a.png", tags: "Jazz, Blues ,,", countrycode: "us", codec: "MP3", bitrate: 128, hls: 0 };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -62,5 +62,22 @@ describe("findStations", () => {
     expect(calls).toBe(3);
     expect((await findStations({ kind: "popular" }, { fetch: fail, nowMs: () => t0 + 1000 })).ok).toBe(false);
     expect(calls).toBe(3);
+  });
+});
+
+describe("preview stations", () => {
+  const station = (id: string): DirectoryStation => ({ id, name: id, url: "https://example.com/" + id, favicon: null, tags: [], country_code: null, codec: "mp3", bitrate_kbps: 128, hls: false });
+  beforeEach(() => __resetRadioDirectoryForTests());
+  test("a second shelf does not make the first shelf's stations unplayable", () => {
+    rememberPreviewStations("household", [station("popular-1")], 1_000);
+    rememberPreviewStations("household", [station("rock-1")], 2_000);
+    expect(previewStationFor("household", "popular-1", 3_000)?.id).toBe("popular-1");
+    expect(previewStationFor("household", "rock-1", 3_000)?.id).toBe("rock-1");
+  });
+  test("a station shown ten minutes ago is forgotten, newer ones stay", () => {
+    rememberPreviewStations("household", [station("old")], 0);
+    rememberPreviewStations("household", [station("new")], 9 * 60_000);
+    expect(previewStationFor("household", "old", 11 * 60_000)).toBeNull();
+    expect(previewStationFor("household", "new", 11 * 60_000)?.id).toBe("new");
   });
 });
