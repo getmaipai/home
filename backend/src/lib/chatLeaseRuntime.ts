@@ -6,9 +6,12 @@ import { getStackClient } from "@/lib/stackEngine";
 import { openMaxWindow, setChatLeaseSource, setChatTurnObserver } from "@/lib/jobs/householdQueue";
 
 let lease: ChatLease | null = null;
+let clock: () => number = Date.now;
+/** Tests only: drop the running lease and use this clock for the next one. */
+export function __resetChatLeaseForTests(now: () => number = Date.now): void { lease = null; clock = now; registerActiveChatLease(null); }
 export function getChatLease(): ChatLease {
   lease ??= createChatLease({
-    now: Date.now,
+    now: () => clock(),
     windowOpen: () => openMaxWindow() !== null,
     ready: async () => (await codingModeReadiness()).ready,
     swapToBig: () => getStackClient().setCodingMode("coding"),

@@ -63,6 +63,7 @@ import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { useMaxChat } from "@/apps/chat/maxChat";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
 
@@ -222,6 +223,10 @@ export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinkin
 export function ComposerTrailingWithThinkingMode() {
   const { mode, setMode } = useContext(ThinkingModeContext);
   const capability = useContext(ThinkingModeCapabilityContext);
+  // TIER-HOME-05: the Max chat chip beside the mode control. Only an adult who may hold Max sees it (the route says so; a teen's or
+  // child's page never asks). Tap to ask, Continue in the notice line to start, tap again to give it back.
+  const max = useMaxChat(useContext(ChatAgeBandContext) === "adult");
+  const engineDown = useEngineDownReason();
   return (
     <>
       {capability === "always" ? (
@@ -252,6 +257,14 @@ export function ComposerTrailingWithThinkingMode() {
             <ModelSelectorEffort label="Mode" />
           </ModelSelectorContent>
         </ModelSelectorRoot>
+      ) : null}
+      {max.visible ? (
+        <ElementsButton
+          type="button" variant={max.pressed ? "secondary" : "ghost"} size="sm" aria-pressed={max.pressed} disabled={max.disabled || (engineDown !== undefined && !max.pressed)} onClick={max.press}
+          title={max.pressed ? "Max is on. Tap to go back to the standard model." : "Max uses the big model. Big pictures, videos and songs wait while you use it, and Home goes back by itself when you stop."}
+        >
+          {max.label}
+        </ElementsButton>
       ) : null}
       <ComposerExtraControls />
     </>

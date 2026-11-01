@@ -31,7 +31,7 @@ Reduced; no household switch; decide and build without asking.
 
 ## Not built yet
 
-1. The composer's Standard/Boost/Max picker and the Max marker on the model chip (TIER-UI rows); the routes are ready for it.
+1. The composer's full Standard/Boost/Max picker (TIER-UI rows). Built 2026-11-01 (wired and tested, not yet proven on the live hub): a "Max" chip beside the Instant/Thinking control, shown only to an adult who may hold Max (never a teen or child; their page does not ask the route). Tap, then Continue in the composer notice line ("Max uses the big model; big jobs wait."), starting shows "Starting Max", tap again to give it back. A refusal uses the same notice line. When coding readiness says the self-test is the missing step (the Stack marks it stale after 7 days or when pins change), the notice reads "Max needs a self-test first." with Run self-test for an owner or admin (POST /api/coding/mode/self-test, then Home checks the readiness record every 3 seconds and returns to the confirm line); anyone else is told to ask an admin. The idle release and the one-minute timer already existed.
 2. Bench numbers (llama-server vs Splash chat) from the Stack session: they set the default big model and the swap estimate on the confirm line.
 3. S4 chaining (consecutive jobs keep chat Reduced inside one window) is passed as not chained; the cooldown covers the flap case.
 4. Removing the `coding.home_mode` key itself needs a commons spec tag.

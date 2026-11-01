@@ -31,6 +31,7 @@ import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
+import { codingModeReadiness } from "@/lib/codingMode";
 
 export const aiChoicesRoutes = apiRouter();
 
@@ -252,7 +253,13 @@ aiChoicesRoutes.openapi(leaseTakeRoute, async (c) => {
   const person = c.get("person");
   const body = await c.req.json().catch(() => ({})) as { pinned?: boolean };
   const result = await getChatLease().acquire(person, { pinned: body.pinned === true });
-  if (!result.ok) { const refusal = LEASE_REFUSAL[result.refusal]!; return c.json({ error: refusal.line, code: result.refusal }, refusal.status) as never; }
+  if (!result.ok) {
+    const refusal = LEASE_REFUSAL[result.refusal]!;
+    // not_ready names the step that is missing so the composer can offer it (a stale self-test is the common one, and an admin can run it).
+    const firstUnmet = result.refusal === "not_ready" ? (await codingModeReadiness().catch(() => null))?.first_unmet ?? null : null;
+    const line = firstUnmet === "self_test" ? "Max needs a self-test first." : refusal.line;
+    return c.json({ error: line, code: result.refusal, ...(result.refusal === "not_ready" ? { first_unmet: firstUnmet } : {}) }, refusal.status) as never;
+  }
   return c.json(leaseView(person), 200);
 });
 const leaseReleaseRoute = createRoute({
