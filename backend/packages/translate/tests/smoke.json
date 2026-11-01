@@ -1,5 +1,5 @@
 {
-  "description": "Smoke fixture for the bundled translate package: proves the recipe wiring (two llm_complete steps + pick + format) executes without throwing. The emulator's own canned reply, not a real translation - lib/smoke.ts's recipe_fixture kind runs against a HostEmulator, never a real chat model (spec/emulators/ts/host-emulator.ts).",
+  "description": "Smoke fixture for the bundled translate package: proves the recipe wiring (two llm_complete steps + pick + format) executes without throwing. The emulator's canned reply is not a BCP-47 code, so the interpreter leaves reply.language off; a real model answer such as es keeps it. The emulator's own canned reply, not a real translation - lib/smoke.ts's recipe_fixture kind runs against a HostEmulator, never a real chat model (spec/emulators/ts/host-emulator.ts).",
   "inputs": {
     "expression": "hello world to spanish"
   },
@@ -7,8 +7,7 @@
   "expected": {
     "reply": {
       "text": "[emulator: no model loaded, this is a canned reply]",
-      "speech": "[emulator: no model loaded, this is a canned reply]",
-      "language": "[emulator: no model loaded, this is a canned reply]"
+      "speech": "[emulator: no model loaded, this is a canned reply]"
     },
     "actions": [],
     "scheduled_jobs": [],
