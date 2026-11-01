@@ -15,6 +15,7 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { createListenStatus, createStoryListener, type ListenStatus } from "@/shell/newsListen";
+import { watchLiveReconnect } from "@/lib/media/liveReconnect";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
 import type Hls from "hls.js";
 
@@ -204,13 +205,15 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     if (!element) return;
     return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS), state: budgetState.current });
   }, [element]);
-  // Tell the person when a station or other media item cannot be decoded or fetched.
+  // A dropped live stream is retried with backoff; the person hears about it only after the last retry fails (liveReconnect.ts).
   useEffect(() => {
     if (!element || liveId === null) return;
-    const onError = () => pushRef.current("This station could not be played. Try again or choose another station.");
-    element.addEventListener("error", onError);
-    return () => element.removeEventListener("error", onError);
-  }, [element, liveId]);
+    return watchLiveReconnect(
+      element,
+      () => { if (hlsRef.current) { hlsRef.current.stopLoad(); hlsRef.current.startLoad(-1); } else element.load(); },
+      () => pushRef.current("This station could not be played. Try again or choose another station."),
+    );
+  }, [element, liveId, current?.src]);
   // RADIO-03: a live station. Pause then Play loads the stream again (the live edge, not a stale buffer); the song the station reports is
   // read from the hub a few seconds after sound starts and then every 15 s, only while it plays and this tab is visible.
   useEffect(() => {

@@ -4,14 +4,15 @@
 // stale buffer. Nothing is stored; the title lives in the held item's subtitle.
 import { request } from "@/lib/api";
 
-const STREAM_PREFIX = "/api/plugins/music/radio/stream/";
+// A saved station plays from /stream/, a station just shown on the Radio page (not saved yet) from /preview/; both are live and get the same handling.
+const STREAM_PREFIXES = ["/api/plugins/music/radio/stream/", "/api/plugins/music/radio/preview/"] as const;
 export const NOW_POLL_MS = 15_000;
 /** The first look comes a few seconds after sound starts, once the station has sent its first metadata block. */
 export const NOW_FIRST_MS = 4_000;
 
 /** The station id when `src` is a station's stream on this hub, else null. */
 export function liveStationIdOf(src: string): string | null {
-  const prefix = src.startsWith(STREAM_PREFIX) ? STREAM_PREFIX : null;
+  const prefix = STREAM_PREFIXES.find((candidate) => src.startsWith(candidate)) ?? null;
   if (!prefix) return null;
   const raw = src.slice(prefix.length).split(/[?#]/)[0] ?? "";
   const id = raw;

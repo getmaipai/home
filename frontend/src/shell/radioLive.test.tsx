@@ -70,6 +70,8 @@ describe("station helpers", () => {
     expect(liveStationIdOf(STREAM)).toBe("source-abc123");
     expect(liveStationIdOf("/api/plugins/music/radio/stream/a%20b?x=1")).toBe("a b");
     expect(liveStationIdOf("/api/media/items/x/content")).toBeNull();
+    // A station from the Radio page that is not saved yet plays from the preview route and is just as live (a dropped stream retries, the song shows).
+    expect(liveStationIdOf("/api/plugins/music/radio/preview/d1a54d2e-623e?hls=1")).toBe("d1a54d2e-623e");
     expect(liveStationIdOf("https://other.example.com/api/plugins/music/radio/stream/x")).toBeNull();
     expect(liveStationIdOf("/api/plugins/music/radio/stream/")).toBeNull();
   });
