@@ -69,7 +69,7 @@ const MUSIC_STAGE_LABELS: Record<string, string> = {
   planning: "Planning", lm: "Planning",
   making: "Making", dit: "Making", music: "Making", generating: "Making",
   vae: "Mixing", decoding: "Mixing", mixing: "Finishing", encoding: "Finishing", saving: "Finishing",
-  paused: "Paused while chat is working",
+  paused: jobQueueCopy("paused_chat", "paused_chat", null, null, "adult"),
 };
 const MUSIC_STAGE_INDEX: Record<string, number> = {
   loading: 1, starting: 1, planning: 2, lm: 2,

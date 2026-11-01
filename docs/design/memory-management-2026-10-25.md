@@ -250,7 +250,7 @@ One table for a picture, a video, a song or an image tool job. The state is the 
 | queued | 10 minutes waiting | queued (aged one class) | the same line; the estimate shortens |
 | queued | the person cancels | cancelled | "Cancelled" (existing) |
 | starting | the model is loaded | working | the Stack's stage and percent (existing) |
-| working | an interactive request starts | paused (reason: `chat`) | "Paused while chat is working" (existing) |
+| working | an interactive request starts | paused (reason: `chat`) | "Waiting for its turn." (2026-11-01: the Stack's "Paused while chat is working" is shown as the ordinary waiting words, MAX-LIVE-02) |
 | paused (chat) | 4 s after the last interactive request | working | progress resumes |
 | working or paused | watchdog CRITICAL | queued (reason: `memory`, re-queue 1 or 2) | the re-queued line (6.2) |
 | working or paused | third watchdog cancel | failed | the low-memory failure line (existing) |

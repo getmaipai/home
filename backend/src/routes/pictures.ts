@@ -18,7 +18,7 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
-import { JOB_QUEUE_COPY, jobQueueCopy } from "@/lib/jobQueueCopy";
+import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
 
 export const picturesRoutes = apiRouter();
 
@@ -96,7 +96,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
   const shown = active ?? last;
   const state = active ? active.state : files.length > 0 ? "done" as const : last.state;
   return {
-    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? getLive(active.id)?.stageLabel : null) ?? phaseLabel(active, kid ? "child" : "adult") : "", position: active ? active.position : null,
+    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? plainStageLabel(getLive(active.id)?.stageLabel, kid ? "child" : "adult") : null) ?? phaseLabel(active, kid ? "child" : "adult") : "", position: active ? active.position : null,
     ...(active && active.state === "running" ? withheldFromYoung(actor, liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`)) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id, fit_ask: active && active.state === "queued" && !kid ? answerableFitAsk(actor, active.id) : null,

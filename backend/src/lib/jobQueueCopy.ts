@@ -166,3 +166,9 @@ export function jobQueueCopy(
   return line;
 }
 
+
+/** MAX-LIVE-02: the Stack names a worker stopped while chat answers "Paused while chat is working"; a person is shown the card's ordinary waiting words, never "paused" (owner rule on resource wording). Any other stage text passes through. */
+export function plainStageLabel(label: string | null | undefined, audience: "adult" | "child" = "adult"): string | null {
+  if (typeof label !== "string") return null;
+  return /^paused\b/i.test(label.trim()) ? jobQueueCopy("paused_chat", "paused_chat", null, null, audience) : label;
+}

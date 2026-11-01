@@ -21,7 +21,7 @@ import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { slotRun } from "@/lib/tiers";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
 export { getMusicJobFor, jobsForConversation, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
@@ -73,7 +73,7 @@ async function releaseMusic(job: MusicJob): Promise<void> {
     if (!actor) { await cancelOrDeleteMusic(submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
     void watch(job, actor, submitted.done);
     if (job.task !== "stems") void startSongCover(actor, job).catch(() => {});
-  } catch (error) { if (error instanceof StackMusicError && error.code === "queue_full") { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
+  } catch (error) { if (error instanceof StackMusicError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
 }
 export function plainMusicFailure(code: string): string {
   if (code === "stems_unavailable") return "The stems could not be made. Try again in a minute.";

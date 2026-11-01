@@ -18,7 +18,7 @@ import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __resetAdapterCacheForTests } from "@/lib/pictures/adapters";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
-import { requestTier, resetFitAsksForTests, resetFitMemoryForTests, resetTierStateForTests, setBudgetReader, setFitAskTimeoutForTests, releaseHouseholdQueue } from "@/lib/jobs/householdQueue";
+import { requestTier, resetFitAsksForTests, resetFitMemoryForTests, resetTierStateForTests, setBudgetReader, setFitAskTimeoutForTests, setNoRoomRecheckForTests, releaseHouseholdQueue } from "@/lib/jobs/householdQueue";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
 import type { ProfileRow } from "@/lib/jobs/profileTable";
 import { TestClient } from "./client";
@@ -87,7 +87,7 @@ async function signedIn() {
   return { client, actor };
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve, 120));
-afterEach(() => { setProfileSource(null); setBudgetReader(null); setFitAskTimeoutForTests(null); resetFitAsksForTests(); resetFitMemoryForTests(); resetTierStateForTests(); });
+afterEach(() => { setNoRoomRecheckForTests(null); setProfileSource(null); setBudgetReader(null); setFitAskTimeoutForTests(null); resetFitAsksForTests(); resetFitMemoryForTests(); resetTierStateForTests(); });
 
 describe("live-fit runs for picture and video Boost jobs", () => {
   test("a Boost picture that fits is fitted (the profile is saved on the job) and reaches the Stack", async () => {
@@ -118,6 +118,42 @@ describe("live-fit runs for picture and video Boost jobs", () => {
     await turn(actor, "generate_image", { tier: "boost" });
     await settle();
     expect(image.submitted.length).toBe(0);
+  });
+});
+
+describe("a job held for lack of room wakes by itself (MAX-LIVE-02)", () => {
+  test("a Boost picture that did not fit starts once memory frees, with no other event to wake the queue", async () => {
+    freeGb = 5; configure(); setNoRoomRecheckForTests(100);
+    const { actor } = await signedIn();
+    await turn(actor, "generate_image", { tier: "boost" });
+    await settle();
+    expect(image.submitted.length).toBe(0);
+    freeGb = 60; // nothing calls the queue: the held job must look again by itself
+    await until(() => image.submitted.length >= 1, 4_000); // a held job left by the test above may start too
+  });
+});
+
+describe("a Max clip the Stack refuses for memory at submit is held, not failed (MAX-LIVE-02)", () => {
+  test("the card stays queued, nothing says memory, and the clip starts once the Stack accepts", async () => {
+    setHouseholdSettingValue("engines.video.tier.max", { model: "detailed", options: {}, who: "admins" });
+    setNoRoomRecheckForTests(100);
+    video.refuseSubmit = { status: 503, code: "no_memory", error: "Picture and video making is paused for a moment while this computer frees up memory." };
+    const { actor } = await signedIn();
+    const value = await turn(actor, "generate_video", { tier: "max" });
+    const job = getVideoJobFor(actor, value.video!.id)!;
+    await until(() => video.submitted.length >= 2, 4_000); // it asked again by itself
+    expect(job.state).toBe("queued");
+    expect(job.error).toBeNull();
+    expect((job.request as { tier?: string }).tier).toBe("max");
+    video.refuseSubmit = null;
+    await until(() => job.stackJob !== null, 4_000);
+    expect(job.state).not.toBe("failed");
+  });
+  test("a Standard clip keeps the stored refusal", async () => {
+    video.refuseSubmit = { status: 503, code: "no_memory", error: "x" };
+    const { actor } = await signedIn();
+    const value = await turn(actor, "generate_video", {});
+    await until(() => getVideoJobFor(actor, value.video!.id)?.state === "failed");
   });
 });
 

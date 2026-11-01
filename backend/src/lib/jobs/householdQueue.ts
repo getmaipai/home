@@ -318,6 +318,26 @@ export function answerFitAsk(jobId: string, answer: "allow" | "wait"): boolean {
   void releaseHouseholdQueue();
   return true;
 }
+/** MAX-LIVE-02: a job held as `tier_no_room` waits for memory the Stack reads live; nothing else wakes the queue when that memory frees (2026-11-01: a Max video sat held for two minutes at 83 GB free), so it looks again on its own. */
+const NO_ROOM_RECHECK_MS = 5_000;
+let noRoomRecheckMs = NO_ROOM_RECHECK_MS;
+let noRoomRecheck: ReturnType<typeof setTimeout> | null = null;
+export function setNoRoomRecheckForTests(ms: number | null): void { noRoomRecheckMs = ms ?? NO_ROOM_RECHECK_MS; if (noRoomRecheck) clearTimeout(noRoomRecheck); noRoomRecheck = null; }
+function scheduleNoRoomRecheck(): void {
+  if (noRoomRecheck) return;
+  noRoomRecheck = setTimeout(() => { noRoomRecheck = null; void releaseHouseholdQueue(); }, noRoomRecheckMs);
+  noRoomRecheck.unref?.();
+}
+/** MAX-LIVE-02: the Stack refused a Max job at submit with `no_memory` (its watchdog is not at normal). Home keeps the job queued and looks again in a few seconds instead of failing it, for about five minutes; a Standard or Boost job keeps the stored refusal (rule 6). Returns false when the job is not Max or the time is used up. */
+export const MAX_SUBMIT_MEMORY_HOLDS = 60;
+export function holdMaxAfterMemoryRefusal(request: object | null | undefined): boolean {
+  if (requestTier(request) !== "max") return false;
+  const state = request as { submitMemoryHolds?: number };
+  state.submitMemoryHolds = (state.submitMemoryHolds ?? 0) + 1;
+  if (state.submitMemoryHolds > MAX_SUBMIT_MEMORY_HOLDS) return false;
+  scheduleNoRoomRecheck();
+  return true;
+}
 let askRecheck: ReturnType<typeof setTimeout> | null = null;
 function scheduleAskRecheck(ms: number): void {
   if (askRecheck) clearTimeout(askRecheck);
@@ -528,12 +548,13 @@ export async function releaseHouseholdQueue(): Promise<void> {
                 if (ask.answer !== "allow") {
                   const reason = ask.answer === null ? "tier_ask" : "tier_no_room";
                   if (entry.job.riseReason !== reason) { entry.job.riseReason = reason; entry.save(); }
-                  if (ask.answer === null) scheduleAskRecheck(fitAskTimeoutMs - (now - ask.askedAt));
+                  if (ask.answer === null) scheduleAskRecheck(fitAskTimeoutMs - (now - ask.askedAt)); else scheduleNoRoomRecheck();
                   continue;
                 }
                 if (entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room") { entry.job.riseReason = null; entry.save(); }
               } else if (fit.outcome !== "run") {
                 if (entry.job.riseReason !== "tier_no_room") { entry.job.riseReason = "tier_no_room"; entry.save(); }
+                scheduleNoRoomRecheck();
                 continue;
               }
               if (fit.applied?.cells.chat?.state === "reduced") {

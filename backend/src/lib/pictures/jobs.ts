@@ -15,7 +15,7 @@ import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
 import { clearLive, updateLive } from "@/lib/genLive";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
@@ -51,7 +51,7 @@ async function releasePicture(job: PictureJob): Promise<void> {
     savePictureJob(job);
     void watch(job, db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow, submitted.done);
   } catch (error) {
-    if (error instanceof StackPicturesError && error.code === "queue_full") { job.phase = "queued"; saveJob(job); return; }
+    if (error instanceof StackPicturesError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.phase = "queued"; saveJob(job); return; }
     job.state = "failed"; job.error = plainFailure(error); queuedPictureSubmits.delete(job.id); savePictureJob(job);
   }
 }

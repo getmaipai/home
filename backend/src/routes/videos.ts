@@ -10,7 +10,7 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
-import { jobQueueCopy, JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
+import { jobQueueCopy, JOB_QUEUE_COPY, plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -93,7 +93,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
-    label: job.state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : job.state === "running" ? getLive(job.id)?.stageLabel ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
+    label: job.state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : job.state === "running" ? plainStageLabel(getLive(job.id)?.stageLabel, laneOfPerson(actor) === "child" ? "child" : "adult") ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
     position: job.position,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,

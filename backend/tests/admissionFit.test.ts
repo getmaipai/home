@@ -27,6 +27,13 @@ describe("admission fit", () => {
     expect(await fitForAdmission({ jobClass: "video", tier: "max" }, async () => { throw new Error("offline"); })).toBeNull();
     expect(await fitForAdmission({ jobClass: "picture", tier: "max" }, async () => ({ freeMemoryBytes: 62e9, loaded: [] }))).toBeNull();
   });
+  test("MAX-LIVE-02: a Max job whose peak the Stack has not measured is not judged by Home (it was held for good as 'no room'); the Stack's governor decides", async () => {
+    setProfileSource({ ...source, hw: { ...source.hw, peakGb: { video: { boost: 40 } } } });
+    expect(await fitForAdmission({ jobClass: "video", tier: "max" }, async () => ({ freeMemoryBytes: 30e9, loaded: [] }))).toBeNull();
+    expect(await fitForAdmission({ jobClass: "video", tier: "max" }, async () => ({ freeMemoryBytes: 90e9, loaded: [] }))).toBeNull();
+    // A Boost job with a measured peak is still judged.
+    expect((await fitForAdmission({ jobClass: "video", tier: "boost" }, async () => ({ freeMemoryBytes: 90e9, loaded: [] })))?.outcome).toBe("run");
+  });
   test("runs a matching row against live memory", async () => {
     setProfileSource(source);
     const result = await fitForAdmission({ jobClass: "video", tier: "max" }, async () => ({ freeMemoryBytes: 66e9, loaded: [] }));

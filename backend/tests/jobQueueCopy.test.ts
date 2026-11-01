@@ -99,3 +99,12 @@ test("quiet window and reduced chat lines", () => {
   expect(jobQueueCopy("queued", "reduced_chat", null, null, "adult")).not.toContain("N");
   expect(jobQueueCopy("queued", "reduced_chat", null, null, "child")).toBe("Chat is a little simpler for a few minutes.");
 });
+
+import { plainStageLabel } from "@/lib/jobQueueCopy";
+import { test as plainTest, expect as plainExpect } from "bun:test";
+plainTest("MAX-LIVE-02: the Stack's 'Paused while chat is working' reaches a person as ordinary waiting words; other stage text is untouched", () => {
+  plainExpect(plainStageLabel("Paused while chat is working")).toBe("Waiting for its turn.");
+  plainExpect(plainStageLabel("paused: low memory", "child")).toBe("Waiting for its turn.");
+  plainExpect(plainStageLabel("Making the motion and the sound, step 2 of 11")).toBe("Making the motion and the sound, step 2 of 11");
+  plainExpect(plainStageLabel(null)).toBeNull();
+});

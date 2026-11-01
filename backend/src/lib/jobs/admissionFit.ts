@@ -43,6 +43,8 @@ export async function fitForAdmission(job: { id?: string; jobClass: "picture" | 
   const lead: Category = job.jobClass === "picture" ? "picture" : job.jobClass === "video" ? "video" : job.category === "music" ? "music" : "tools";
   const row = configured.table.find((item) => item.lead === lead && item.tier === job.tier);
   if (!row) return null;
+  // MAX-LIVE-02: the Stack lists a tier's peak only once it is measured, and none exists for a Max pick an admin chose by hand (video Max, 2026-11-01). Without a figure the row needs an unknown amount, so Home would hold the job as "no room" for good; it gives no opinion and the Stack's governor (real memory, Max window, Reduced chat) decides.
+  if (job.tier === "max" && configured.hw.peakGb[lead]?.max === undefined) return null;
   try {
     // The room is what is really available now: the Stack's reading, less the working margin it keeps back (and the hysteresis band for a job that did not fit last time), never more than the model budget.
     let marginGb = configured.hw.marginGb;
