@@ -143,7 +143,7 @@ TIER-STEMS-03. Nothing here changes MUSIC-GEN-14: a recording still cannot be a 
 
 ### 10.2 Gates and privacy (RULES.md applies, nothing leaves the home)
 
-1. **Age and surface gates run first, unchanged.** The same `musicDenial` and audience check as `edit_music`: any child or teen (music is adult-only, `musicViewDenial`), a guest, a spoken turn and a shared screen cannot split a file either; teens have no music lane, so
+1. **Age and surface gates run first, unchanged** (the age part is replaced by section 10.7, owner ruling 2026-11-01: a child or teen may split a file; the surface and guest gates stay). The same `musicDenial` and audience check as `edit_music`: any child or teen (music is adult-only, `musicViewDenial`), a guest, a spoken turn and a shared screen cannot split a file either; teens have no music lane, so
    no model or tier choice ever reaches a minor (rule 8). The from-file route uses the same `musicRouteAudience` and `musicDenial` as the existing stems route in
    `routes/music.ts`, and refuses before any bytes are read. Started in Incognito (a temporary conversation), the split and its stems are temporary, as `source.temporary` does on the song route.
 2. **Local only.** The file's bytes go from Home to the Stack on the same machine over loopback and nowhere else; the worker has no network at
@@ -163,6 +163,10 @@ TIER-STEMS-03. Nothing here changes MUSIC-GEN-14: a recording still cannot be a 
    one under 12 minutes." Storage counts the stems like any Library file and the caps already apply.
 7. **No age loosening on the output.** Stems of an owned file are not content-checked (no text is added and the person owns the audio); adult
    unlock rules for explicit lyrics do not apply because Home neither writes nor reads lyrics here.
+
+### 10.7 Owner ruling 2026-11-01: no age gate on splitting
+
+Jesse, 2026-11-01: the only filtering for children and teens is around safety (sexual content and the like), so there is no reason to bar them from stem splitting; he asked to stop being asked about minors for features that make no content. Splitting separates audio the person already owns and writes no text, picture or sound that is new, so no safety check applies to it. Effect: section 10.2 point 1's age refusal is removed. A child or teen may split a file they own and mix the stems. Unchanged: the surface and guest gates; rule 8 (a minor never gets a model or tier choice, so the minor's split runs the Standard model); point 3 (a stem of an owned file is never a trim, edit or cover source, for anyone); and the safety floors on anything that generates (songs, lyrics, covers), which are in [music-listen-create-2026-11-01.md](music-listen-create-2026-11-01.md). Not built yet, so no code changes.
 
 ### 10.3 The other models as options of one family (TIER-STEMS-03)
 
