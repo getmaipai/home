@@ -368,13 +368,13 @@ describe("research is bounded by the clock, and the round counts are only ceilin
 
   test("no new round starts at 70% of the cap, the cut-off is the cap, and Instant has neither", () => {
     const started = 1_000_000;
-    expect(researchNoNewRound({ answerStyle: "thinking", startedAt: started }, started + 52_000)).toBe(false);
-    expect(researchNoNewRound({ answerStyle: "thinking", startedAt: started }, started + 52_500)).toBe(true);
-    expect(researchNoNewRound({ answerStyle: "max", startedAt: started }, started + 104_000)).toBe(false);
-    expect(researchNoNewRound({ answerStyle: "max", startedAt: started }, started + 105_000)).toBe(true);
+    expect(researchNoNewRound({ answerStyle: "thinking", startedAt: started }, started + 24_000)).toBe(false);
+    expect(researchNoNewRound({ answerStyle: "thinking", startedAt: started }, started + 24_500)).toBe(true);
+    expect(researchNoNewRound({ answerStyle: "max", startedAt: started }, started + 52_000)).toBe(false);
+    expect(researchNoNewRound({ answerStyle: "max", startedAt: started }, started + 52_500)).toBe(true);
     expect(researchNoNewRound({ answerStyle: "instant", startedAt: started }, started + 999_000)).toBe(false);
-    expect(researchCutAt({ answerStyle: "thinking", startedAt: started })).toBe(started + 75_000);
-    expect(researchCutAt({ answerStyle: "max", startedAt: started })).toBe(started + 150_000);
+    expect(researchCutAt({ answerStyle: "thinking", startedAt: started })).toBe(started + 35_000);
+    expect(researchCutAt({ answerStyle: "max", startedAt: started })).toBe(started + 75_000);
     expect(researchCutAt({ answerStyle: "instant", startedAt: started })).toBeUndefined();
   });
 
@@ -494,7 +494,7 @@ describe("a question that could mean two things", () => {
 
   test("Thinking never asks: it researches and states its reading in the first line of the answer", async () => {
     __setStageWritersForTests({ brief: async () => ambiguous });
-    __setQueryWriterForTests(writerWithGaps(["Harbor Lights television series end", "Harbor Lights series ratings"], [["Harbor Lights television series finale"]]));
+    __setQueryWriterForTests(writerWithGaps(["Harbor Lights television series end", "Harbor Lights series ratings"], [["Harbor Lights network schedule decision"]]));
     const { requests } = await turn("owner", 2, { thinking: true, utterance: "why did the television series Harbor Lights end" });
     expect(searxQueries.length).toBe(3);
     const instruction = lastRequest(requests).messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
@@ -503,12 +503,13 @@ describe("a question that could mean two things", () => {
 });
 
 describe("the gap check ends the searching only when the writer itself finds nothing more to search", () => {
-  test("a proposal list the repeat filter emptied leaves the model free to search again", async () => {
+  test("a proposal list that only repeats earlier searches ends the searching too", async () => {
     await holdMax();
     let calls = 0;
     __setQueryWriterForTests(async () => { calls += 1; return calls === 1 ? JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }); });
-    await turn("owner", 1, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
-    expect(searxQueries).toEqual(["Harbor Lights television series cancelled", "Harbor Lights series ratings one season"]);
+    const { result } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
+    expect(searxQueries).toEqual(["Harbor Lights television series cancelled"]);
+    expect(result.value.reply.text).toContain("It ended after one season");
   });
 
   test("a writer that proposes nothing at all ends the searching and the answer is written from the notes", async () => {

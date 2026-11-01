@@ -38,10 +38,12 @@ export function budgetForStyle(budget: TurnBudget, style: AnswerStyle): TurnBudg
 }
 
 /** RESEARCH-CLOCK-01 (Jesse, 2026-11-01: "we can't have 8-minute runs, no one will wait"): research is bounded by wall-clock time, and the
- * round counts (4 and 12) are only ceilings. From the start of the turn: at NO_NEW_ROUND_SHARE of the cap no new round starts, and at the cap
- * page reading stops and the answer is written from the notes so far. Adult written answers have no cap on their own length (rule 5); the
- * cap is on the searching, so the answer then streams as soon as it can. */
-export const RESEARCH_CAP_MS = { thinking: 75_000, max: 150_000 } as const;
+ * round counts (4 and 12) are only ceilings. The cap is the moment the WRITING starts, counted from the start of the turn: at
+ * NO_NEW_ROUND_SHARE of it no new round starts, and at it page reading stops and the answer is written from the notes so far. Measured on
+ * the Studio (2026-11-01, the V question): the analysis takes 3 to 10 seconds and the writing 25 to 35 more, and the answer streams while
+ * it is written, so the first words reach the person about 5 to 10 seconds after the cap. Adult written answers have no cap on their own
+ * length (rule 5); the cap is on the searching. */
+export const RESEARCH_CAP_MS = { thinking: 35_000, max: 75_000 } as const;
 export const NO_NEW_ROUND_SHARE = 0.7;
 let capOverride: { thinking: number; max: number } | undefined;
 /** Tests: replaces the caps (milliseconds); undefined restores them. */
@@ -338,6 +340,7 @@ ${digest.trim() === "" ? "Nothing has been read yet, so write only searches that
 - Each search is specific: the exact name of the subject, the year or version when known, and ONE angle. A search with only a bare name is too vague.
 - Choose the angles that matter for this particular question and vary them (what happened and why; what the people involved said in interviews or official statements; what came after; how it was received; the original documents). Split a question that has several parts into one search per part.
 - Take names only from the question or from the results shown above. Never add a name from your own memory. If the results do not yet say who made or ran the subject, write a search that finds that first.
+- Write plain keyword searches: no quotation marks, no "or", no operators. The search engines return nothing for them.
 - Never repeat or lightly reword a search already run. If a result was thin, write the search again with the names and titles the results gave.
 - For any part of the question still unanswered or backed by one site, write a search that targets it.
 Reply with one JSON object and nothing else: {"queries": ["...", "..."]}`;

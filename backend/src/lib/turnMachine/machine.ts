@@ -6,6 +6,7 @@
 // deadline and the trace entry, both section 11's own requirements),
 // and every transition matches the table's own "Exits" column.
 import { isResearchStyle, researchNoNewRound, roundAddedNothing } from "./research";
+import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { setup, fromPromise, assign } from "xstate";
 import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contract";
 
@@ -553,7 +554,7 @@ export const turnMachine = setup({
               assign(({ event }) => ({ step: event.output })),
               // RESEARCH-TIER-01: a research round that found nothing new ends the searching; the next model call is the answering round.
               // RESEARCH-CLOCK-01: so does a round that ends after 70% of the style's cap.
-              assign({ roundsUsed: ({ context, event }) => (isResearchStyle(context.turnState.answerStyle, context.turnState.budget) && (researchNoNewRound(context.turnState) || roundAddedNothing(context.turnState.outcomes, (event as unknown as { output: ToolOutput }).output.outcomes)) ? context.turnState.budget.rounds : context.roundsUsed + 1) }),
+              assign({ roundsUsed: ({ context, event }) => (isResearchStyle(context.turnState.answerStyle, context.turnState.budget) && (researchNoNewRound(context.turnState) || (context.turnState.researchBudget?.searches ?? 0) >= RESEARCH_SEARCHES_MAX || roundAddedNothing(context.turnState.outcomes, (event as unknown as { output: ToolOutput }).output.outcomes)) ? context.turnState.budget.rounds : context.roundsUsed + 1) }),
               "recordOutcomes",
               "derivePlanFromEvidence",
             ],

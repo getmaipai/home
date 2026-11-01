@@ -1,3 +1,4 @@
+import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { CLARIFY_MARK, analyse, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
@@ -791,14 +792,17 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // search round answer without them. A writer that is down leaves the decision to the model.
   let effective = input;
   state.nextQueries = undefined;
-  if (timed && input.toolsAllowed && !input.retry && state.outcomes.length > 0 && !noToolsTurn(state)) {
+  // The twelve searches a question may run are used up: this round writes the answer.
+  if (timed && input.toolsAllowed && state.researchBudget && state.researchBudget.searches >= RESEARCH_SEARCHES_MAX) effective = { ...input, toolsAllowed: false };
+  else if (timed && input.toolsAllowed && !input.retry && state.outcomes.length > 0 && !noToolsTurn(state)) {
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
     markResearch(state, "gap check start");
     const proposed = await writeQueriesChecked(queryWriterOverride ?? chatQueryWriter(signal), researchQuestion(state.messages, input.utterance), researchProgress(state.outcomes), resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
     markResearch(state, `gap check end (${proposed === null ? "writer down" : `${proposed.queries.length} searches, ${proposed.proposed} written`})`);
     if (proposed !== null) state.nextQueries = proposed.queries;
     // Done only when the writer itself sees nothing more to search; a list the filters emptied (repeats, names from memory) leaves the model to search.
-    if (proposed !== null && proposed.proposed === 0) effective = { ...input, toolsAllowed: false };
+    // Done when the writer has nothing more to search, or everything it wrote repeats an earlier search; a writer that is down leaves it to the model.
+    if (proposed !== null && proposed.queries.length === 0) effective = { ...input, toolsAllowed: false };
     else if (proposed !== null && proposed.queries.length > 0) {
       markResearch(state, `model skipped: the plan issues ${Math.min(proposed.queries.length, PLANNED_SEARCHES_PER_ROUND)} searches`);
       return { outcome: { ok: true }, output: { kind: "tool_calls", calls: plannedSearchCalls(proposed.queries, state.outcomes.length) } };
