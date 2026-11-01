@@ -1,7 +1,7 @@
 // RESEARCH-PIPELINE-01 / RESEARCH-NOTES-01: the five stages of a research turn, each tested alone and then as a chain of typed hand-offs.
 import { describe, expect, test } from "bun:test";
 import {
-  CLARIFY_MARK, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
+  CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
   researchQuestion, shouldAsk, understand, __setStageWritersForTests, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_WINDOW_CHARS, notesLedger, pageWindows, parseNotes, quoteInPage, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
@@ -17,7 +17,7 @@ describe("stage 1: what is this person asking", () => {
     expect(prompt).toContain("which one is better value");
     expect(prompt).toContain("I am looking at two laptops");
     expect(prompt).toContain("ONLY when");
-    expect(prompt).toContain("neither the question's own words nor the conversation so far settle which one is meant");
+    expect(prompt).toContain("neither the question's own words nor the conversation so far settle it");
     expect(prompt).not.toMatch(/miniseries|franchise|series|network/i);
   });
 
@@ -25,6 +25,7 @@ describe("stage 1: what is this person asking", () => {
     const ok = parseBrief('{"subject":"a TV show ending","answer_type":"an explanation","must_contain":["why it ended","what came next"],"ambiguous":false,"options":[],"assumption":"the 1984 series"}');
     expect(ok).toMatchObject({ subject: "a TV show ending", ambiguous: false, mustContain: ["why it ended", "what came next"] });
     expect(parseBrief('{"subject":"x","ambiguous":true,"options":["only one"]}')!.ambiguous).toBe(false);
+    expect(parseBrief('{"subject":"x","ambiguous":true,"options":[],"question":"Which show do you mean?"}')).toMatchObject({ ambiguous: true, question: "Which show do you mean?" });
     expect(parseBrief('{"subject":"x","ambiguous":true,"options":["the 1984 series","the 2009 series","a third"]}')).toMatchObject({ ambiguous: true, options: ["the 1984 series", "the 2009 series", "a third"] });
     expect(parseBrief("no idea")).toBeNull();
     expect(parseBrief(null)).toBeNull();
@@ -39,25 +40,31 @@ describe("stage 1: what is this person asking", () => {
   });
 
   test("a question is asked once: an ambiguous brief asks, an earlier question of this kind in the conversation stops it, a settled brief never asks", () => {
-    const ambiguous: Brief = { subject: "x", answerType: "", mustContain: [], ambiguous: true, options: ["the 1984 one", "the 2009 one"], assumption: "the 1984 one" };
+    const ambiguous: Brief = { subject: "x", answerType: "", mustContain: [], ambiguous: true, options: ["the 1984 one", "the 2009 one"], question: "", assumption: "the 1984 one" };
     const settled: Brief = { ...ambiguous, ambiguous: false, options: [] };
     expect(shouldAsk(ambiguous, [{ role: "user", content: "q" }])).toBe(true);
     expect(shouldAsk(settled, [{ role: "user", content: "q" }])).toBe(false);
     expect(shouldAsk(null, [])).toBe(false);
-    const asked = [{ role: "user", content: "q" }, { role: "assistant", content: `${CLARIFY_MARK}: the 1984 one or the 2009 one?` }, { role: "user", content: "pick for me" }];
+    const asked = [{ role: "user", content: "q" }, { role: "assistant", content: clarifyingQuestion(ambiguous) }, { role: "user", content: "pick for me" }];
     expect(askedBefore(asked)).toBe(true);
     expect(shouldAsk(ambiguous, asked)).toBe(false);
   });
 
+  test("a question that names no subject asks the model's own short question", () => {
+    const noSubject: Brief = { subject: "a show", answerType: "", mustContain: [], ambiguous: true, options: [], question: "Which show do you mean?", assumption: "" };
+    expect(clarifyingQuestion(noSubject)).toBe('Before I research this, which show do you mean? Say "pick for me" if you are not sure.');
+    expect(shouldAsk(noSubject, [{ role: "user", content: "why did it end" }])).toBe(true);
+  });
+
   test("after our question the person's reply is read as an answer to the original question", () => {
-    const history = [{ role: "user", content: "why did it end" }, { role: "assistant", content: `${CLARIFY_MARK}: A or B?` }, { role: "user", content: "pick for me" }];
+    const history = [{ role: "user", content: "why did it end" }, { role: "assistant", content: `${CLARIFY_MARK}, which one do you mean: A or B?` }, { role: "user", content: "pick for me" }];
     expect(researchQuestion(history, "pick for me")).toBe("why did it end (meaning: pick for me)");
     expect(researchQuestion([{ role: "user", content: "plain" }], "plain")).toBe("plain");
   });
 });
 
 describe("stage 2: what data is needed", () => {
-  const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" };
+  const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], question: "", assumption: "" };
   test("the plan carries the brief into the writer's prompt and returns sub-questions and searches (a name from memory stays: the tool node runs that search without it)", async () => {
     const prompts: string[] = [];
     const plan = await planData(async (prompt) => { prompts.push(prompt); return '{"sub_questions":["why it ended","what came next"],"queries":["the show ended why","Jane Smith show interview"]}'; }, brief, "why did the show end", 4);
@@ -181,7 +188,7 @@ describe("stage 4: the analysis", () => {
   test("analyse() sends the brief and the ledger to the model, and does nothing when there are no notes", async () => {
     const seen: string[] = [];
     __setStageWritersForTests({ analysis: async (prompt) => { seen.push(prompt); return reply; } });
-    const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" };
+    const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], question: "", assumption: "" };
     const findings = filterFindings([note({ url: "u1" })], numberOf(["u1"]), 3_000);
     const out = await analyse(brief, "why did it end", findings, valid, "max");
     expect(out!.claims.length).toBe(3);
@@ -197,7 +204,7 @@ describe("stage 4: the analysis", () => {
 describe("stage 5: the reply, and the chain of hand-offs", () => {
   test("the writing round is handed the analysis (established first, then guesses with their reasons, then gaps) and the ledger", () => {
     const analysis = parseAnalysis(JSON.stringify({ claims: [{ claim: "It ranked 57th of 77.", status: "established", sources: [1] }], conflicts: [], gaps: ["No interview."], guesses: [{ guess: "A short second season.", because: ["low ratings"], confidence: "low", sources: [1] }] }), new Set([1]))!;
-    const text = replyBrief({ subject: "s", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" }, analysis, "LEDGER TEXT", "I took this to mean the 1984 series.");
+    const text = replyBrief({ subject: "s", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], question: "", assumption: "" }, analysis, "LEDGER TEXT", "I took this to mean the 1984 series.");
     expect(text.startsWith('Begin with one plain sentence saying what you took the question to mean: "I took this to mean the 1984 series."')).toBe(true);
     expect(text.indexOf("established:")).toBeLessThan(text.indexOf("Not found:"));
     expect(text.indexOf("Not found:")).toBeLessThan(text.indexOf("Guesses to present as guesses"));

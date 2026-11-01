@@ -481,7 +481,7 @@ describe("a question that could mean two things", () => {
     __setStageWritersForTests({ brief: async () => ambiguous });
     const { result } = await turn("owner", 3, { max: true, thinking: true, utterance: "why did the television series Harbor Lights end" });
     expect(searxQueries.length).toBe(0);
-    expect(result.value.reply.text).toContain("Which one do you mean: the 1984 series or the 2009 series?");
+    expect(result.value.reply.text).toContain("Before I research this, which one do you mean: the 1984 series or the 2009 series?");
     expect(result.value.reply.text).toContain("pick for me");
   });
 

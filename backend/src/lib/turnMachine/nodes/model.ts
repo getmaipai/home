@@ -1,6 +1,6 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
-import { CLARIFY_MARK, analyse, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
+import { analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
@@ -775,6 +775,8 @@ export function __setQueryWriterForTests(writer: QueryWriter | undefined): void 
 /** RESEARCH-QUERY-01: how many searches the writer proposes per round (the first round plans the whole question). */
 /** RESEARCH-NOTES-01: with a notes ledger in the answering round, the raw page text of the sources shrinks to this many characters in all. */
 const RAW_EVIDENCE_WITH_LEDGER_CHARS = 4_500;
+/** The analysis may start up to this long after the cap (it takes 3 to 10 seconds). */
+const ANALYSIS_GRACE_MS = 15_000;
 const WRITER_QUERIES_FIRST = 6;
 const WRITER_QUERIES_LATER = 3;
 function chatQueryWriter(signal: AbortSignal): QueryWriter {
@@ -831,13 +833,6 @@ function recentConversation(messages: LlmMessage[]): string {
     .slice(-5, -1)
     .map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${(m.content as string).replace(/\s+/g, " ").slice(0, 400)}`)
     .join("\n");
-}
-
-/** The one question a Max turn asks when the readings would lead to different research. */
-function clarifyingQuestion(options: readonly string[]): string {
-  const labels = options.map((o) => o.replace(/[.?!]+$/, ""));
-  const list = labels.length <= 2 ? labels.join(" or ") : `${labels.slice(0, -1).join(", ")} or ${labels.at(-1)}`;
-  return `${CLARIFY_MARK}: ${list}? Say "pick for me" if you are not sure.`;
 }
 
 /** RESEARCH-TIER-01: the note joins the last user message of the first round's messages (a copy, the input is not touched). */
@@ -971,10 +966,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       state.outcomes.flatMap((o) => o.sources ?? []).forEach((source, index) => { if (!numberOf.has(source.url)) numberOf.set(source.url, index + 1); });
       const findings = filterFindings(state.pageNotes, numberOf, searchEvidenceMaxChars(state.budget.context_tokens));
       haveLedger = findings.ledger.notes > 0;
-      if (haveLedger && !researchPastCut(state)) {
+      const stats = state.researchBudget.noteStats;
+      markResearch(state, `stage 3 ledger: ${findings.ledger.notes} notes kept of ${state.pageNotes.length} written (${findings.ledger.text.length} chars) from ${findings.read} pages; note calls ${stats?.calls ?? 0} (${Math.round((stats?.ms ?? 0) / 100) / 10} s of light-model time), quotes dropped ${stats?.droppedQuotes ?? 0}`);
+      if (haveLedger && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
         state.researchAnalysis = await analyse(brief, rq, findings, new Set(numberOf.values()), state.answerStyle!, signal);
-        markResearch(state, "stage 4 analysis end");
+        markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
       }
       replyExtra = replyBrief(brief, state.researchAnalysis ?? null, findings.ledger.text, assumption);
     } else if (researching && assumption) {
@@ -1100,14 +1097,14 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   if (firstRoundWanted) {
     // Stage 1: what is this person asking. Stage 2: what data is needed (the sub-questions and the searches that fetch them).
     markResearch(state, "stage 1 understand start");
-    const brief: Brief | null = await understand(rq, recentConversation(state.messages));
+    const brief: Brief | null = await understand(rq, recentConversation(state.messages), signal);
     markResearch(state, "stage 1 understand end");
     state.researchBrief = brief;
     // Max asks at most one question, only when the readings would lead to different research, and not twice in one conversation.
     if (state.answerStyle === "max" && shouldAsk(brief, state.messages)) {
       state.messages = messages;
       markResearch(state, "asks which one is meant");
-      return { outcome: { ok: true }, output: { kind: "text", text: clarifyingQuestion(brief!.options), thinking: false } };
+      return { outcome: { ok: true }, output: { kind: "text", text: clarifyingQuestion(brief!), thinking: false } };
     }
     markResearch(state, "stage 2 plan start");
     const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds));

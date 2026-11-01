@@ -7,7 +7,7 @@
 //   4. analyse     - an analysis before any writing: what is established, reported, contested, missing, and the labelled guesses (the Analysis)
 //   5. replyBrief  - the instruction the writing round gets: the analysis and the ledger, in the order the answer should follow
 // No prompt here names a subject or a kind of question.
-import { complete, completeBackground } from "@/lib/llm";
+import { complete } from "@/lib/llm";
 import { notesLedger, squash, type Ledger, type PageKind, type PageNote } from "./pageNotes";
 import { isRepeatQuery, queryWriterPrompt, researchProgress, type AnswerStyle, type QueryWriter } from "./research";
 
@@ -22,10 +22,14 @@ export function __setStageWritersForTests(writers: { brief?: StageWriter | undef
   analysisOverride = writers?.analysis;
 }
 
-const lightWriter: StageWriter = async (prompt) => {
-  const result = await completeBackground([{ role: "user", content: prompt }], { max_tokens: 450 });
-  return result.ok ? result.text : null;
-};
+/** Stage 1 runs on the chat model without thinking (about 2 to 3 seconds): the small model took a TV show for a person's life story and
+ * never found a question underspecified. */
+function chatBriefWriter(signal?: AbortSignal): StageWriter {
+  return async (prompt) => {
+    const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 300, temperature: 0.1, thinking: false, ...(signal ? { signal } : {}) });
+    return result.ok ? result.value.text : null;
+  };
+}
 function chatAnalysisWriter(maxTokens: number, signal?: AbortSignal): StageWriter {
   return async (prompt) => {
     const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: maxTokens, temperature: 0.2, thinking: false, ...(signal ? { signal } : {}) });
@@ -51,8 +55,10 @@ export interface Brief {
   mustContain: string[];
   /** True only when the question could mean different things that would need different research AND nothing the person said settles it. */
   ambiguous: boolean;
-  /** When ambiguous: up to three short labels, one per reading. */
+  /** When ambiguous: up to three short labels, one per reading (empty when the question names no subject at all). */
   options: string[];
+  /** When ambiguous: the one short question to ask the person. */
+  question: string;
   /** One plain sentence saying what the question was taken to mean. */
   assumption: string;
 }
@@ -62,8 +68,9 @@ export function briefPrompt(utterance: string, recent: string): string {
 The person asked: "${utterance.replace(/"/g, "'")}"
 ${recent.trim() ? `\nThe conversation so far, most recent last:\n${recent.trim()}\n` : ""}
 Answer with one JSON object and nothing else:
-{"subject": "what it is about, in a few words", "answer_type": "the shape of a good answer", "must_contain": ["up to 5 things a good answer must contain for this question"], "ambiguous": false, "options": [], "assumption": "one plain sentence: what you took the question to mean"}
-"ambiguous" is true ONLY when the question could mean different things that would need different research AND neither the question's own words nor the conversation so far settle which one is meant. If the words already point to one reading, "ambiguous" is false. When true, "options" holds two or three short labels, one per reading.`;
+{"subject": "what it is about, in a few words", "answer_type": "the shape of a good answer", "must_contain": ["up to 5 things a good answer must contain for this question"], "ambiguous": false, "options": [], "question": "", "assumption": "one plain sentence: what you took the question to mean"}
+Use only what the question and the conversation say; add no detail of your own to "subject" or "assumption".
+"ambiguous" is true ONLY when it is unclear WHAT is meant (which version, edition, person, product, event, or what subject at all) AND neither the question's own words nor the conversation so far settle it. If the words already point to one reading, "ambiguous" is false. When true, "options" holds two or three short labels naming the readings themselves (never a description of the person, never "missing context"), or is empty when the question names no subject at all, and "question" is the one short question to ask ("Do you mean the A or the B?" or "Which one do you mean?").`;
 }
 
 export function parseBrief(text: string | null): Brief | null {
@@ -72,26 +79,31 @@ export function parseBrief(text: string | null): Brief | null {
   const subject = typeof data.subject === "string" ? data.subject.trim().slice(0, 120) : "";
   if (!subject) return null;
   const options = strings(data.options, 3, 80);
+  const question = typeof data.question === "string" ? data.question.trim().slice(0, 140) : "";
   return {
     subject,
     answerType: typeof data.answer_type === "string" ? data.answer_type.trim().slice(0, 120) : "",
     mustContain: strings(data.must_contain, 5, 160),
-    ambiguous: data.ambiguous === true && options.length >= 2,
+    ambiguous: data.ambiguous === true && (options.length >= 2 || question !== ""),
     options: data.ambiguous === true ? options : [],
+    question: data.ambiguous === true ? question : "",
     assumption: typeof data.assumption === "string" ? data.assumption.trim().slice(0, 200) : "",
   };
 }
 
-export async function understand(utterance: string, recent: string): Promise<Brief | null> {
+export async function understand(utterance: string, recent: string, signal?: AbortSignal): Promise<Brief | null> {
   let reply: string | null = null;
-  try { reply = await (briefOverride ?? lightWriter)(briefPrompt(utterance, recent)); } catch { reply = null; }
+  try { reply = await (briefOverride ?? chatBriefWriter(signal))(briefPrompt(utterance, recent)); } catch { reply = null; }
   return parseBrief(reply);
 }
 
-/** The line a Max turn ends on when it asks, and the marker an earlier question of this kind leaves in the conversation. */
-export const CLARIFY_MARK = "Which one do you mean";
-export function clarifyInstruction(options: readonly string[]): string {
-  return `Do not research yet. Ask the person exactly one short question, starting with "${CLARIFY_MARK}", that offers these readings: ${options.map((o) => `"${o.replace(/"/g, "'")}"`).join(", ")}. Add that they can say "pick for me" if they are not sure. Write nothing else.`;
+/** The marker every clarifying question of ours starts with, so a later turn can tell it was asked. */
+export const CLARIFY_MARK = "Before I research this";
+/** The question a Max turn asks: the readings when there are two or more, otherwise the model's own short question. */
+export function clarifyingQuestion(brief: Brief): string {
+  const labels = brief.options.map((o) => o.replace(/[.?!]+$/, ""));
+  const ask = labels.length >= 2 ? `which one do you mean: ${labels.length === 2 ? labels.join(" or ") : `${labels.slice(0, -1).join(", ")} or ${labels.at(-1)}`}?` : brief.question || "what exactly do you want me to look into?";
+  return `${CLARIFY_MARK}, ${ask.charAt(0).toLowerCase()}${ask.slice(1)} Say "pick for me" if you are not sure.`;
 }
 /** True once an earlier assistant message of this conversation asked this kind of question (it is not asked twice). */
 export const askedBefore = (history: readonly { role: string; content?: unknown }[]): boolean =>
@@ -108,9 +120,9 @@ export function researchQuestion(history: readonly { role: string; content?: unk
   }
   return utterance;
 }
-/** Whether a Max turn should ask instead of researching: ambiguous, two readings or more, not asked before. */
+/** Whether a Max turn should ask instead of researching: ambiguous, with a question to ask, and not asked before. */
 export const shouldAsk = (brief: Brief | null, history: readonly { role: string; content?: unknown }[]): boolean =>
-  brief !== null && brief.ambiguous && brief.options.length >= 2 && !askedBefore(history);
+  brief !== null && brief.ambiguous && (brief.options.length >= 2 || brief.question !== "") && !askedBefore(history);
 
 // ---------------------------------------------------------------- stage 2: what data do I need
 
