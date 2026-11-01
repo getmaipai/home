@@ -273,6 +273,7 @@
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
+                                "reduced_swap",
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
@@ -372,6 +373,7 @@
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
+                                "reduced_swap",
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
@@ -471,6 +473,7 @@
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
+                                "reduced_swap",
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
@@ -570,6 +573,7 @@
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
+                                "reduced_swap",
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
@@ -669,6 +673,7 @@
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
+                                "reduced_swap",
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
@@ -768,6 +773,7 @@
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
+                                "reduced_swap",
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
@@ -29251,6 +29257,21 @@
                     "releases_in_seconds": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "estimates": {
+                      "type": "object",
+                      "properties": {
+                        "max_load_s": {
+                          "type": "integer"
+                        },
+                        "self_test_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "max_load_s",
+                        "self_test_s"
+                      ]
                     }
                   },
                   "required": [
@@ -29258,7 +29279,8 @@
                     "held_by_you",
                     "pinned",
                     "can_use",
-                    "releases_in_seconds"
+                    "releases_in_seconds",
+                    "estimates"
                   ]
                 }
               }
@@ -29365,6 +29387,21 @@
                     "releases_in_seconds": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "estimates": {
+                      "type": "object",
+                      "properties": {
+                        "max_load_s": {
+                          "type": "integer"
+                        },
+                        "self_test_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "max_load_s",
+                        "self_test_s"
+                      ]
                     }
                   },
                   "required": [
@@ -29372,7 +29409,8 @@
                     "held_by_you",
                     "pinned",
                     "can_use",
-                    "releases_in_seconds"
+                    "releases_in_seconds",
+                    "estimates"
                   ]
                 }
               }
@@ -29464,6 +29502,21 @@
                     "releases_in_seconds": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "estimates": {
+                      "type": "object",
+                      "properties": {
+                        "max_load_s": {
+                          "type": "integer"
+                        },
+                        "self_test_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "max_load_s",
+                        "self_test_s"
+                      ]
                     }
                   },
                   "required": [
@@ -29471,7 +29524,8 @@
                     "held_by_you",
                     "pinned",
                     "can_use",
-                    "releases_in_seconds"
+                    "releases_in_seconds",
+                    "estimates"
                   ]
                 }
               }

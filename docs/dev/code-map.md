@@ -374,6 +374,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
 | `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts |
 | `backend/src/lib/chatTemplateTokens.ts` | stripChatTemplateTokens, ChatTemplateTokenFilter |
+| `backend/src/lib/chatTransitions.ts` | DEFAULT_TRANSITION_SECONDS, RUNNING_LONG_FACTOR, RUNNING_LONG_LINE, __resetTransitionsForTests, recordTransition, estimateSeconds |
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, renameClonedVoice, deleteClonedVoice, getClonedVoiceFile |
