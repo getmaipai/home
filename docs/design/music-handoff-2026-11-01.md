@@ -104,7 +104,7 @@ Verdict: mostly the same plan, plus three useful additions. Details:
 ## 5c. Made radio (owner, 2026-11-01)
 
 Stations that write their own songs while the previous one plays, with save, previous, and a unique title, band and cover for every song:
-designed in [music-made-radio-2026-11-01.md](music-made-radio-2026-11-01.md) (proposed, architect ruling pending, slice G1 after P1 and C1 to C5).
+designed in [music-made-radio-2026-11-01.md](music-made-radio-2026-11-01.md) (architect APPROVED 2026-11-01, slice G1 after P1 and C1 to C5; verdict record `data-scratch/architect/MUSIC-STUDIO-01-G1.verdict`).
 
 ## 6. Practical notes for the next session
 

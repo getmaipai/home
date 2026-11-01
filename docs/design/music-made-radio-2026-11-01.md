@@ -1,6 +1,6 @@
 # Music: made radio, stations that write their own songs (design draft, 2026-11-01)
 
-Status (2026-11-01): proposed; architect ruling pending. No code. Item: MUSIC-STUDIO-01, new slice G1 (after P1 and C1 to C5).
+Status (2026-11-01): architect APPROVED 2026-11-01 (verdict MUSIC-STUDIO-01-G1; name the Keep field in G1b before building). No code. Item: MUSIC-STUDIO-01, new slice G1 (after P1 and C1 to C5).
 Owner ask (Jesse, 2026-11-01): create a radio station by describing it, have AI songs generate and play, generate the next song while the
 previous one plays; and settle what happens when you want to save a song, go back to a previous one, and that every song has a unique
 title, band name and cover. Amends [music-listen-create-2026-11-01.md](music-listen-create-2026-11-01.md); that note wins elsewhere.
@@ -44,7 +44,7 @@ A station is a described sound that keeps making songs: "late-night synthwave fo
 
 - **Previous:** the station's history is the collection of songs it made, newest last. Previous and Next move through it; a song replays
   from its stored file, not regenerated. The Now Playing screen shows the last songs as a short list.
-- **Keep:** a heart (or "Keep this song") sets one field on the song's existing `media-item` (`origin: made`, as for a song made in Create, with its band, cover, lyrics and provenance): the existing listed flag if it fits, otherwise one additive spec field. It never makes a copy of the file or the record. Kept songs appear in Listen under Songs, Artists and Albums
+- **Keep:** a heart (or "Keep this song") sets one field on the song's existing `media-item` (`origin: made`, as for a song made in Create, with its band, cover, lyrics and provenance): the existing listed flag if it fits, otherwise one additive spec field (G1b names the field before it builds). It never makes a copy of the file or the record. Kept songs appear in Listen under Songs, Artists and Albums
   like any made song. One tap, no dialog.
 - **Unkept songs expire:** the station keeps its last 50 songs or 7 days, whichever is fewer, then removes unkept ones and their covers.
   Storage counts the history like any Library file and the existing caps apply. The expiry is shown once in plain words
@@ -61,7 +61,7 @@ A kept song is an ordinary made song, so everything Create does works on it, wit
 - **From chat:** the existing `edit_music` for songs, and `make_band` with an edit mode for the band (no new tool per field), both inside the conditional music set and its cap of 5. The Station card carries "Edit this song" and "Edit this band" buttons that open the same pages.
 - **Gates:** edits run the song gates again (policy, as-sung check for sung changes), exactly as an edit in Create.
 
-## 4. Chat and Create (rule S7, proposed)
+## 4. Chat and Create
 
 - Chat tool `make_station` (in the Band set of the conditional music tools, rule 1; bench rows: "start a station", "play me something like a rainy-day jazz station", and a negative row where a plain "play some jazz" must not start one): describe a station, get a **Station card** (a kit Element in `commons`; reuse check against `MusicTrack`, `Player` and the Radio tile (`media_shelf` square item), rule 9(c): it composes them and adds only the made-next line and the Keep, Previous and Next controls; its row goes in `UI-DECISIONS.md` before it is written): the
   station name and described sound, now playing with its cover and band, what is being made next, Keep, Previous, Next and a Stop button.
