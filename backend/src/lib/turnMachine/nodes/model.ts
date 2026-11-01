@@ -1,4 +1,6 @@
-import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, type QueryWriter } from "../research";
+import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
+import { CLARIFY_MARK, analyse, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
+import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -770,6 +772,8 @@ let queryWriterOverride: QueryWriter | undefined;
 /** Tests: replaces the query writer (the chat model, one short non-thinking call); undefined restores it. */
 export function __setQueryWriterForTests(writer: QueryWriter | undefined): void { queryWriterOverride = writer; }
 /** RESEARCH-QUERY-01: how many searches the writer proposes per round (the first round plans the whole question). */
+/** RESEARCH-NOTES-01: with a notes ledger in the answering round, the raw page text of the sources shrinks to this many characters in all. */
+const RAW_EVIDENCE_WITH_LEDGER_CHARS = 4_500;
 const WRITER_QUERIES_FIRST = 6;
 const WRITER_QUERIES_LATER = 3;
 function chatQueryWriter(signal: AbortSignal): QueryWriter {
@@ -782,7 +786,20 @@ function chatQueryWriter(signal: AbortSignal): QueryWriter {
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
   const timed = isResearchStyle(state.answerStyle, state.budget);
   if (timed) markResearch(state, `model start (${input.toolsAllowed ? "may search" : "answers"})`);
-  const result = await modelRound(state, input, signal);
+  // RESEARCH-PIPELINE-01: before a later search round the gap check asks the query writer what is still missing. Nothing new to search
+  // means the searching is done, and this round writes the answer from the notes and the analysis (stages 4 and 5) instead of letting a
+  // search round answer without them. A writer that is down leaves the decision to the model.
+  let effective = input;
+  state.nextQueries = undefined;
+  if (timed && input.toolsAllowed && !input.retry && state.outcomes.length > 0 && !noToolsTurn(state)) {
+    const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
+    markResearch(state, "gap check start");
+    const proposed = await writeQueriesChecked(queryWriterOverride ?? chatQueryWriter(signal), researchQuestion(state.messages, input.utterance), researchProgress(state.outcomes), resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
+    markResearch(state, `gap check end (${proposed === null ? "writer down" : `${proposed.length} searches`})`);
+    if (proposed !== null) state.nextQueries = proposed;
+    if (proposed !== null && proposed.length === 0) effective = { ...input, toolsAllowed: false };
+  }
+  const result = await modelRound(state, effective, signal);
   if (timed) markResearch(state, `model end (${result.output.kind})`);
   if (!input.retry || result.output.kind !== "tool_calls") return result;
   const offered = new Set(state.lastTools.map((t) => t.id));
@@ -790,6 +807,22 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if (calls.length === 0) return modelRound(state, { ...input, toolsAllowed: false, retry: false }, signal);
   return { ...result, output: { ...result.output, calls } };
 };
+
+/** The last few turns of the conversation as plain text for stage 1 (what the person already said settles what they mean). */
+function recentConversation(messages: LlmMessage[]): string {
+  return messages
+    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim() !== "")
+    .slice(-5, -1)
+    .map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${(m.content as string).replace(/\s+/g, " ").slice(0, 400)}`)
+    .join("\n");
+}
+
+/** The one question a Max turn asks when the readings would lead to different research. */
+function clarifyingQuestion(options: readonly string[]): string {
+  const labels = options.map((o) => o.replace(/[.?!]+$/, ""));
+  const list = labels.length <= 2 ? labels.join(" or ") : `${labels.slice(0, -1).join(", ")} or ${labels.at(-1)}`;
+  return `${CLARIFY_MARK}: ${list}? Say "pick for me" if you are not sure.`;
+}
 
 /** RESEARCH-TIER-01: the note joins the last user message of the first round's messages (a copy, the input is not touched). */
 function withResearchNote(messages: LlmMessage[], note: string): LlmMessage[] {
@@ -837,6 +870,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const toolsAllowed = input.toolsAllowed && !noToolsTurn(state);
   // RESEARCH-TIER-01: a Thinking or Max turn that may take more than one tool round.
   const researching = isResearchStyle(state.answerStyle, state.budget);
+  // RESEARCH-PIPELINE-01: the question the stages work on (an answer to our clarifying question reads as the original question).
+  const rq = researching ? researchQuestion(state.messages, input.utterance) : input.utterance;
   const continuing = researching && state.outcomes.length > 0 && toolsAllowed && !input.retry;
   let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName);
   if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
@@ -904,7 +939,33 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // THIN-4F: a spoken surface's answering round re-reads only the top rows' short text.
     // RESEARCH-TIER-01: source numbers run across every search of the turn, and the evidence is shared between them.
     const sourceNumbers = sourceNumberOffsets(state.outcomes);
-    const evidenceChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
+    // RESEARCH-PIPELINE-01: stage 3 hands the page notes over (filtered under a hard character budget), stage 4 analyses them, and the
+    // writing round (stage 5) is built from the analysis and the ledger. The raw page text then shrinks to the short share that still
+    // lets the model see the sources.
+    const brief = state.researchBrief ?? null;
+    const assumption = brief?.ambiguous ? brief.assumption || null : null;
+    let replyExtra = "";
+    let haveLedger = false;
+    if (researching && state.researchBudget && state.researchBudget.notes.size > 0) {
+      markResearch(state, "stage 3 notes wait start");
+      const wait = Math.max(2_000, Math.min(NOTES_WAIT_MS, (researchCutAt(state) ?? Date.now()) - Date.now()));
+      state.pageNotes = await settledNotes(state.researchBudget.notes, wait);
+      markResearch(state, "stage 3 notes wait end");
+      const numberOf = new Map<string, number>();
+      state.outcomes.flatMap((o) => o.sources ?? []).forEach((source, index) => { if (!numberOf.has(source.url)) numberOf.set(source.url, index + 1); });
+      const findings = filterFindings(state.pageNotes, numberOf, searchEvidenceMaxChars(state.budget.context_tokens));
+      haveLedger = findings.ledger.notes > 0;
+      if (haveLedger && !researchPastCut(state)) {
+        markResearch(state, "stage 4 analysis start");
+        state.researchAnalysis = await analyse(brief, rq, findings, new Set(numberOf.values()), state.answerStyle!, signal);
+        markResearch(state, "stage 4 analysis end");
+      }
+      replyExtra = replyBrief(brief, state.researchAnalysis ?? null, findings.ledger.text, assumption);
+    } else if (researching && assumption) {
+      replyExtra = replyBrief(brief, null, "", assumption);
+    }
+    const rawChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
+    const evidenceChars = haveLedger ? Math.min(rawChars, RAW_EVIDENCE_WITH_LEDGER_CHARS) : rawChars;
     const resultMessages = toolResultMessages(phrasedOutcomes, evidenceChars, surfaceClass === "spoken", certaintyGate, sourceNumbers);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,
@@ -931,7 +992,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       ? picturesOnlyInstruction(promptSurfaceClass, input.utterance, replayedSearchCount)
       : phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty, replayedSearchCount);
     // RESEARCH-TIER-01: a Thinking or Max answer names where each claim comes from and marks its guesses.
-    const phrasing = researching && !picturesOnly && searchResultCount > 0 ? `${basePhrasing} ${RESEARCH_ANSWER_CLAUSE}` : basePhrasing;
+    const phrasing = researching && !picturesOnly && searchResultCount > 0 ? `${basePhrasing} ${RESEARCH_ANSWER_CLAUSE}${haveLedger ? ` ${LEDGER_INSTRUCTION}` : ""}${replyExtra ? `\n\n${replyExtra}` : ""}` : basePhrasing;
     // SEARCH-ANSWER-01: when the one retry round produced results, the retry's
     // own instruction and the first round's misses are history, not news.
     const recovered = phrasedOutcomes.length > 0 ? recoveredRetry(state.messages) : null;
@@ -996,8 +1057,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const evidenceChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
     const progressSoFar = researchProgress(state.outcomes);
-    const proposed = await writeQueries(queryWriterOverride ?? chatQueryWriter(signal), input.utterance, progressSoFar, resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
-    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}${state.outcomes.some((o) => o.errorCode === "memory_query" || o.queryRewritten === true) ? ` ${MEMORY_QUERY_SKIPPED_NOTE}` : ""}` };
+    const proposed = state.nextQueries ?? [];
+    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, rq, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}${state.outcomes.some((o) => o.errorCode === "memory_query" || o.queryRewritten === true) ? ` ${MEMORY_QUERY_SKIPPED_NOTE}` : ""}` };
     messages = phrasedOutcomes.length === 0
       ? [...history, nudge]
       : [...history, toolCallAssistantMessage(phrasedOutcomes), ...toolResultMessages(phrasedOutcomes, evidenceChars, promptSurfaceClass !== "written", certaintyGate, sourceNumberOffsets(state.outcomes)), nudge];
@@ -1018,8 +1079,28 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // RESEARCH-TIER-01: the first round of a research turn is told it may search more than once (Max: split the question first).
   // `state.messages` keeps the messages without the note, so the answering round does not repeat it.
   const firstRoundWanted = researching && toolsAllowed && !continuing && !input.retry && !isPhrasingRound && state.outcomes.length === 0;
-  const firstRoundQueries = firstRoundWanted ? await writeQueries(queryWriterOverride ?? chatQueryWriter(signal), input.utterance, researchProgress([]), "", Math.min(WRITER_QUERIES_FIRST, state.budget.rounds)) : [];
-  const firstRoundMessages = firstRoundWanted ? withResearchNote(messages, `${firstRoundNote(state.answerStyle!, state.budget.rounds)}${suggestedSearchesNote(firstRoundQueries)}`) : null;
+  let firstRoundQueries: string[] = [];
+  let briefNote = "";
+  if (firstRoundWanted) {
+    // Stage 1: what is this person asking. Stage 2: what data is needed (the sub-questions and the searches that fetch them).
+    markResearch(state, "stage 1 understand start");
+    const brief: Brief | null = await understand(rq, recentConversation(state.messages));
+    markResearch(state, "stage 1 understand end");
+    state.researchBrief = brief;
+    // Max asks at most one question, only when the readings would lead to different research, and not twice in one conversation.
+    if (state.answerStyle === "max" && shouldAsk(brief, state.messages)) {
+      state.messages = messages;
+      markResearch(state, "asks which one is meant");
+      return { outcome: { ok: true }, output: { kind: "text", text: clarifyingQuestion(brief!.options), thinking: false } };
+    }
+    markResearch(state, "stage 2 plan start");
+    const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds));
+    markResearch(state, "stage 2 plan end");
+    state.researchPlan = plan;
+    firstRoundQueries = plan.queries;
+    briefNote = brief ? ` ${briefBlock(brief)}` : "";
+  }
+  const firstRoundMessages = firstRoundWanted ? withResearchNote(messages, `${firstRoundNote(state.answerStyle!, state.budget.rounds)}${briefNote}${suggestedSearchesNote(firstRoundQueries)}`) : null;
   state.messages = continuing ? state.messages : messages;
   if (firstRoundMessages) messages = firstRoundMessages;
   if (!isPhrasingRound) state.lastTools = tools;

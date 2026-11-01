@@ -22,6 +22,8 @@ import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDec
 import { researchStepsFor } from "@/lib/conversationHistory";
 import { __setClaimJudgeForTests } from "@/lib/turnMachine/nodes/answer";
 import { __setQueryWriterForTests } from "@/lib/turnMachine/nodes/model";
+import { __setNoteWriterForTests } from "@/lib/turnMachine/pageNotes";
+import { __setStageWritersForTests } from "@/lib/turnMachine/researchPipeline";
 
 let people: BenchPeople;
 let searx: ReturnType<typeof Bun.serve>;
@@ -63,6 +65,8 @@ beforeEach(() => {
   searxDelayMs = 0;
   __setClaimJudgeForTests(async () => '{"supported": true}');
   __setQueryWriterForTests(async () => null);
+  __setNoteWriterForTests(async () => null);
+  __setStageWritersForTests({ brief: async () => null, analysis: async () => null });
   searx = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -84,6 +88,8 @@ beforeEach(() => {
 afterEach(() => {
   __setClaimJudgeForTests(undefined);
   __setQueryWriterForTests(undefined);
+  __setNoteWriterForTests(undefined);
+  __setStageWritersForTests(undefined);
   searx.stop(true);
   registerActiveChatLease(null);
   __setPageReaderForTests(null);
@@ -94,7 +100,7 @@ afterEach(() => {
 });
 
 /** Runs one turn against a model that wants to search `wantedRounds` times (a different query each round), then answers. */
-async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number } = {}) {
+async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number; utterance?: string } = {}) {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const requests: ChatCompletionRequest[] = [];
   let made = 0; // searches the scripted model has asked for so far (a skipped or empty search leaves no tool message to count)
@@ -119,7 +125,7 @@ async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts:
   process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
   __resetLlmSupervisorForTests();
   try {
-    const result = await runTurnNext(people[who]!, "chat", UTTERANCE, opts);
+    const result = await runTurnNext(people[who]!, "chat", opts.utterance ?? UTTERANCE, opts);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     return { result, requests };
   } finally {
@@ -385,5 +391,103 @@ describe("research is bounded by the clock, and the round counts are only ceilin
     expect(asString(searching[0]!)).toContain('"enable_thinking":true');
     for (const r of searching.slice(1)) expect(asString(r)).toContain('"enable_thinking":false');
     expect(asString(requests.at(-1)!)).toContain('"enable_thinking":true');
+  });
+});
+
+// RESEARCH-NOTES-01 / RESEARCH-PIPELINE-01: a fact deep in a page reaches the answering round through the notes ledger and the analysis,
+// on four different kinds of question; a Max question that could mean two things asks once; a Thinking one states its reading.
+const TOPICS = [
+  { name: "a TV show's end", queries: ["Harbor Lights television series cancelled", "Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season", fact: "Deep fact: the show ranked 57th of 77 shows that season, which ended it." },
+  { name: "a medical question", queries: ["typical chest cold last adult", "chest cold duration adult cough"], utterance: "how long does a typical chest cold last in an adult", fact: "Deep fact: the usual course of a chest cold is 10 to 14 days with a cough that can linger." },
+  { name: "a tax question", queries: ["employee deduct home office federal taxes", "home office deduction employee federal taxes"], utterance: "can an employee deduct a home office on their federal taxes", fact: "Deep fact: employees cannot claim the home office deduction for tax years 2018 through 2025." },
+  { name: "a science question", queries: ["sea level rising faster some places", "sea level rising regional differences places others"], utterance: "why is sea level rising faster in some places than in others", fact: "Deep fact: the western Pacific has risen about three times the global average since 1993." },
+];
+/** A query writer that plans the first round, then proposes `gaps` more rounds of searches, then finds nothing new to search. */
+const writerWithGaps = (gaps: number) => {
+  let calls = 0;
+  return async () => {
+    calls += 1;
+    if (calls === 1) return JSON.stringify({ sub_questions: ["the key part"], queries: ["first angle on the question", "second angle on the question"] });
+    return JSON.stringify({ queries: calls - 1 <= gaps ? [`another angle number ${calls}`] : [] });
+  };
+};
+const longPage = (fact: string): string => `${"Opening material that says nothing useful about the question. ".repeat(170)}\n${fact}\n${"Closing material of no use either. ".repeat(60)}`;
+
+describe("deep facts reach the answer through the notes, on four kinds of question", () => {
+  for (const topic of TOPICS) {
+    test(`${topic.name}: the fact 10,000 characters into a page is in the writing round, and the raw page text is not what carries it`, async () => {
+      await holdMax();
+      __setPageReaderForTests(async (url) => ({ type: "document", file_id: "f", url, title: "A page", text: longPage(topic.fact), chunks: [], links: [], sections: [] }));
+      __setNoteWriterForTests(async (prompt) => {
+        const m = prompt.match(/Deep fact: [^.]*\./);
+        return JSON.stringify({ kind: "reputable", notes: m ? [{ topic: "the key part", note: "The page states the key fact.", quote: m[0], weight: 3 }] : [] });
+      });
+      __setStageWritersForTests({
+        brief: async () => JSON.stringify({ subject: topic.name, answer_type: "an explanation", must_contain: ["the key fact"], ambiguous: false, options: [], assumption: "" }),
+        analysis: async () => JSON.stringify({ claims: [{ claim: "The page states the key fact.", status: "established", sources: [1] }], conflicts: [], gaps: [], guesses: [{ guess: "Things would have continued the same way.", because: ["the key fact"], confidence: "low", sources: [1] }] }),
+      });
+      __setQueryWriterForTests(writerWithGaps(1));
+      const { requests, result } = await turn("owner", 2, { max: true, thinking: true, utterance: topic.utterance, queries: topic.queries });
+      const answering = lastRequest(requests);
+      const instruction = answering.messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
+      expect(instruction).toContain("Notes from the pages that were read");
+      expect(instruction).toContain(topic.fact);
+      expect(instruction).toContain("Analysis of the notes");
+      expect(instruction).toContain("Guesses to present as guesses");
+      expect(toolMessages(answering).map((m) => String(m.content)).join("")).not.toContain(topic.fact);
+      expect(result.value.reply.text.length).toBeGreaterThan(0);
+    });
+  }
+
+  test("an instant answer takes no notes and no analysis", async () => {
+    let noteCalls = 0;
+    __setNoteWriterForTests(async () => { noteCalls += 1; return null; });
+    await turn("owner", 2, { utterance: TOPICS[0]!.utterance });
+    expect(noteCalls).toBe(0);
+  });
+
+  test("the claim check reads the deep quote as a passage of its source", async () => {
+    await holdMax();
+    const topic = TOPICS[1]!;
+    __setPageReaderForTests(async (url) => ({ type: "document", file_id: "f", url, title: "A page", text: longPage(topic.fact), chunks: [], links: [], sections: [] }));
+    __setNoteWriterForTests(async (prompt) => {
+      const m = prompt.match(/Deep fact: [^.]*\./);
+      return JSON.stringify({ kind: "reputable", notes: m ? [{ topic: "the key part", note: "The page states it.", quote: m[0], weight: 3 }] : [] });
+    });
+    const judged: string[] = [];
+    __setClaimJudgeForTests(async (prompt) => { judged.push(prompt); return '{"supported": true}'; });
+    __setQueryWriterForTests(writerWithGaps(0));
+    await turn("owner", 1, { max: true, thinking: true, utterance: topic.utterance });
+    expect(judged.some((p) => p.includes(topic.fact))).toBe(true);
+  });
+});
+
+describe("a question that could mean two things", () => {
+  const ambiguous = JSON.stringify({ subject: "a show", answer_type: "an explanation", must_contain: [], ambiguous: true, options: ["the 1984 series", "the 2009 series"], assumption: "I took this to mean the 1984 series." });
+  const settled = JSON.stringify({ subject: "a show", answer_type: "an explanation", must_contain: [], ambiguous: false, options: [], assumption: "" });
+
+  test("Max asks once, researches nothing, and offers the readings", async () => {
+    await holdMax();
+    __setStageWritersForTests({ brief: async () => ambiguous });
+    const { result } = await turn("owner", 3, { max: true, thinking: true, utterance: "why did the television series Harbor Lights end" });
+    expect(searxQueries.length).toBe(0);
+    expect(result.value.reply.text).toContain("Which one do you mean: the 1984 series or the 2009 series?");
+    expect(result.value.reply.text).toContain("pick for me");
+  });
+
+  test("a question whose words already settle it is not asked", async () => {
+    await holdMax();
+    __setStageWritersForTests({ brief: async () => settled });
+    await turn("owner", 2, { max: true, thinking: true, utterance: "why did the 80s show, not the 2000s one, end" });
+    expect(searxQueries.length).toBe(2);
+  });
+
+  test("Thinking never asks: it researches and states its reading in the first line of the answer", async () => {
+    __setStageWritersForTests({ brief: async () => ambiguous });
+    __setQueryWriterForTests(writerWithGaps(1));
+    const { requests } = await turn("owner", 2, { thinking: true, utterance: "why did the television series Harbor Lights end" });
+    expect(searxQueries.length).toBe(2);
+    const instruction = lastRequest(requests).messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
+    expect(instruction).toContain('Begin with one plain sentence saying what you took the question to mean: "I took this to mean the 1984 series."');
   });
 });

@@ -187,11 +187,11 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       const research = state.answerStyle !== undefined && state.answerStyle !== "instant";
       const cited = research ? dropUnknownCitations(input.text, sources.length) : { text: input.text, dropped: 0 };
       // ... and drops a sentence that credits a named person no fetched source named.
-      const credited = research ? dropUnsupportedCredits(cited.text, researchEvidence(state.outcomes), state.utterance) : { text: cited.text, dropped: 0 };
+      const credited = research ? dropUnsupportedCredits(cited.text, `${researchEvidence(state.outcomes)}\n${(state.pageNotes ?? []).map((n) => `${n.note} ${n.quote}`).join("\n")}`, state.utterance) : { text: cited.text, dropped: 0 };
       const note = credited.dropped > 0 ? "\n\nI left out a statement about who made or wrote something, because none of the sources I read named them." : "";
       // RESEARCH-CLAIM-01: a sentence its cited sources do not back is marked "not confirmed by the sources" (admin switch research.claim_check, default on).
       const claims = research && sources.length > 0 && getHouseholdSettingValue("research.claim_check") !== false
-        ? await checkClaims(credited.text, evidenceBySource(state.outcomes), claimJudgeOverride ?? lightModelJudge)
+        ? await checkClaims(credited.text, evidenceBySource(state.outcomes, state.pageNotes ?? []), claimJudgeOverride ?? lightModelJudge)
         : { text: credited.text };
       return { outcome: { ok: true }, output: { text: `${claims.text}${note}`, sources } };
     }

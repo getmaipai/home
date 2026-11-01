@@ -1,0 +1,225 @@
+// RESEARCH-PIPELINE-01 / RESEARCH-NOTES-01: the five stages of a research turn, each tested alone and then as a chain of typed hand-offs.
+import { describe, expect, test } from "bun:test";
+import {
+  CLARIFY_MARK, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, type Brief,
+} from "@/lib/turnMachine/researchPipeline";
+import { NOTE_WINDOW_CHARS, notesLedger, pageWindows, parseNotes, quoteInPage, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
+import { evidenceBySource } from "@/lib/turnMachine/research";
+import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
+
+const note = (over: Partial<PageNote> & { url: string }): PageNote => ({ title: "T", kind: "reputable", topic: "why it ended", note: "It ended after low ratings.", quote: "ranked 57th of 77 shows that season", weight: 3, ...over });
+const numberOf = (urls: string[]): Map<string, number> => new Map(urls.map((u, i) => [u, i + 1]));
+
+describe("stage 1: what is this person asking", () => {
+  test("the prompt carries the question and the conversation, names no subject, and asks for ambiguity only when nothing settles it", () => {
+    const prompt = briefPrompt("which one is better value", "Person: I am looking at two laptops\nAssistant: Which two?");
+    expect(prompt).toContain("which one is better value");
+    expect(prompt).toContain("I am looking at two laptops");
+    expect(prompt).toContain("ONLY when");
+    expect(prompt).toContain("neither the question's own words nor the conversation so far settle which one is meant");
+    expect(prompt).not.toMatch(/miniseries|franchise|series|network/i);
+  });
+
+  test("a brief reads from the model's JSON; ambiguity needs two readings; a reply that is not JSON gives none", () => {
+    const ok = parseBrief('{"subject":"a TV show ending","answer_type":"an explanation","must_contain":["why it ended","what came next"],"ambiguous":false,"options":[],"assumption":"the 1984 series"}');
+    expect(ok).toMatchObject({ subject: "a TV show ending", ambiguous: false, mustContain: ["why it ended", "what came next"] });
+    expect(parseBrief('{"subject":"x","ambiguous":true,"options":["only one"]}')!.ambiguous).toBe(false);
+    expect(parseBrief('{"subject":"x","ambiguous":true,"options":["the 1984 series","the 2009 series","a third"]}')).toMatchObject({ ambiguous: true, options: ["the 1984 series", "the 2009 series", "a third"] });
+    expect(parseBrief("no idea")).toBeNull();
+    expect(parseBrief(null)).toBeNull();
+  });
+
+  test("understand() hands the model's reading on, and a model that is down gives null", async () => {
+    __setStageWritersForTests({ brief: async () => '{"subject":"a show","ambiguous":false,"options":[]}' });
+    expect((await understand("q", ""))!.subject).toBe("a show");
+    __setStageWritersForTests({ brief: async () => null });
+    expect(await understand("q", "")).toBeNull();
+    __setStageWritersForTests(undefined);
+  });
+
+  test("a question is asked once: an ambiguous brief asks, an earlier question of this kind in the conversation stops it, a settled brief never asks", () => {
+    const ambiguous: Brief = { subject: "x", answerType: "", mustContain: [], ambiguous: true, options: ["the 1984 one", "the 2009 one"], assumption: "the 1984 one" };
+    const settled: Brief = { ...ambiguous, ambiguous: false, options: [] };
+    expect(shouldAsk(ambiguous, [{ role: "user", content: "q" }])).toBe(true);
+    expect(shouldAsk(settled, [{ role: "user", content: "q" }])).toBe(false);
+    expect(shouldAsk(null, [])).toBe(false);
+    const asked = [{ role: "user", content: "q" }, { role: "assistant", content: `${CLARIFY_MARK}: the 1984 one or the 2009 one?` }, { role: "user", content: "pick for me" }];
+    expect(askedBefore(asked)).toBe(true);
+    expect(shouldAsk(ambiguous, asked)).toBe(false);
+  });
+
+  test("after our question the person's reply is read as an answer to the original question", () => {
+    const history = [{ role: "user", content: "why did it end" }, { role: "assistant", content: `${CLARIFY_MARK}: A or B?` }, { role: "user", content: "pick for me" }];
+    expect(researchQuestion(history, "pick for me")).toBe("why did it end (meaning: pick for me)");
+    expect(researchQuestion([{ role: "user", content: "plain" }], "plain")).toBe("plain");
+  });
+});
+
+describe("stage 2: what data is needed", () => {
+  const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" };
+  test("the plan carries the brief into the writer's prompt and returns sub-questions and searches, dropping a search built on a name from memory", async () => {
+    const prompts: string[] = [];
+    const plan = await planData(async (prompt) => { prompts.push(prompt); return '{"sub_questions":["why it ended","what came next"],"queries":["the show ended why","Jane Smith show interview"]}'; }, brief, "why did the show end", 4);
+    expect(prompts[0]).toContain(briefBlock(brief));
+    expect(prompts[0]).toContain("sub_questions");
+    expect(plan.subQuestions).toEqual(["why it ended", "what came next"]);
+    expect(plan.queries).toEqual(["the show ended why"]);
+  });
+  test("a writer that is down gives an empty plan", async () => {
+    expect(await planData(async () => null, brief, "q", 4)).toEqual({ subQuestions: [], queries: [] });
+  });
+});
+
+describe("page notes", () => {
+  const filler = (n: number): string => "The page talks about other things at some length. ".repeat(Math.ceil(n / 49)).slice(0, n);
+  const fact = "Deep fact: the show ranked 57th of 77 shows that season, which led to the cancellation.";
+  const page = `${filler(9_000)}\n${fact}\n${filler(3_000)}`;
+
+  test("a long page is read in windows, so a fact 9,000 characters in is reached", () => {
+    const windows = pageWindows(page);
+    expect(windows.length).toBeGreaterThan(1);
+    expect(windows.every((w) => w.length <= NOTE_WINDOW_CHARS + 5)).toBe(true);
+    expect(windows.some((w) => w.includes(fact))).toBe(true);
+  });
+
+  test("the quote check keeps a note whose quote is in the page (curly quotes and spacing aside) and drops one that is not", () => {
+    expect(quoteInPage("ranked 57th of 77   shows", "It ranked 57th of 77 shows that season")).toBe(true);
+    expect(quoteInPage("it said “no”", 'It said "no" to all')).toBe(true);
+    expect(quoteInPage("ranked first of 77 shows", "It ranked 57th of 77 shows that season")).toBe(false);
+    const reply = JSON.stringify({ kind: "primary", notes: [{ topic: "ratings", note: "It ranked 57th.", quote: "ranked 57th of 77 shows", weight: 3 }, { topic: "ratings", note: "Invented.", quote: "was the most watched show of the decade", weight: 3 }] });
+    const parsed = parseNotes(reply, "It ranked 57th of 77 shows that season");
+    expect(parsed.notes.length).toBe(1);
+    expect(parsed.dropped).toBe(1);
+    expect(parsed.kind).toBe("primary");
+  });
+
+  test("writePageNotes reads every window through the gate and keeps the deep note", async () => {
+    let calls = 0;
+    const writer = async (prompt: string) => {
+      calls += 1;
+      const m = prompt.match(/Deep fact: [^.]*\./);
+      return JSON.stringify({ kind: "reputable", notes: m ? [{ topic: "why it ended", note: "It ranked low.", quote: m[0], weight: 3 }] : [] });
+    };
+    const notes = await writePageNotes(writer, makeGate(2), "why did it end", { url: "https://a.example/p", title: "A", text: page });
+    expect(calls).toBe(pageWindows(page).length);
+    expect(notes.map((n) => n.quote)).toEqual(["Deep fact: the show ranked 57th of 77 shows that season, which led to the cancellation."]);
+  });
+
+  test("notes still being written when the wait ends are left out, finished ones are used", async () => {
+    const pending = new Map<string, Promise<PageNote[]>>([["a", Promise.resolve([note({ url: "a" })])], ["b", new Promise(() => {})]]);
+    const got = await settledNotes(pending, 30);
+    expect(got.map((n) => n.url)).toEqual(["a"]);
+  });
+});
+
+describe("stage 3: grab and filter", () => {
+  test("a repeated quote and a near-identical note are kept once, a thin note goes when stronger ones exist, a fan page goes when two better pages cover the part", () => {
+    const urls = ["u1", "u2", "u3", "u4", "u5"];
+    const notes = [
+      note({ url: "u1", kind: "primary" }),
+      note({ url: "u2", kind: "fan" }),
+      note({ url: "u3", kind: "reputable", quote: "a second reputable quote here", note: "A different point about ratings and slots." }),
+      note({ url: "u4", kind: "reputable", weight: 1, quote: "a thin remark nobody needs", note: "Thin remark." }),
+      note({ url: "u5", kind: "fan", quote: "fan page only quote here", note: "Fan chatter.", topic: "fan talk" }),
+    ];
+    const findings = filterFindings(notes, numberOf(urls), 5_000);
+    const kept = findings.notes.map((n) => n.url);
+    expect(kept).toContain("u1");
+    expect(kept).toContain("u3");
+    expect(kept).not.toContain("u2");
+    expect(kept).not.toContain("u4");
+    expect(kept).toContain("u5");
+    expect(findings.dropped).toBe(2);
+    expect(findings.read).toBe(5);
+  });
+
+  test("the ledger stays inside its budget, groups by part, and takes the parts in turns", () => {
+    const many = Array.from({ length: 30 }, (_, i) => note({ url: `u${i % 3}`, topic: `part ${i % 3}`, note: `Point number ${i} about this part.`, quote: `quote number ${i} lives in the page text` }));
+    const ledger = notesLedger(many, numberOf(["u0", "u1", "u2"]), 900);
+    expect(ledger.text.length).toBeLessThanOrEqual(900);
+    expect(ledger.text).toContain("About part 0:");
+    expect(ledger.text).toContain("About part 1:");
+    expect(ledger.text).toContain("About part 2:");
+    expect(ledger.dropped).toBeGreaterThan(0);
+  });
+
+  test("a claim check sees the deep quotes of a source as its passages", () => {
+    const outcome = { callId: "c", packageId: "websearch", status: "succeeded", sources: [{ url: "https://a.example/p", title: "A" }], result: { data: { rows: [{ url: "https://a.example/p", title: "A", snippet: "s" }], pages: [{ url: "https://a.example/p", title: "A", text: "opening only" }] } } } as unknown as ToolExecutionOutcome;
+    const evidence = evidenceBySource([outcome], [{ url: "https://a.example/p", quote: "ranked 57th of 77 shows" }]);
+    expect(evidence[0]).toContain("opening only");
+    expect(evidence[0]).toContain("ranked 57th of 77 shows");
+  });
+});
+
+describe("stage 4: the analysis", () => {
+  const valid = new Set([1, 2, 3]);
+  const reply = JSON.stringify({
+    claims: [
+      { claim: "It ranked 57th of 77.", status: "established", sources: [1] },
+      { claim: "A sequel was pitched.", status: "reported", sources: [2, 9] },
+      { claim: "Nothing cited here.", status: "established", sources: [9] },
+      { claim: "The network lost interest.", status: "inferred", sources: [] },
+    ],
+    conflicts: ["One page says March, another February."],
+    gaps: ["No interview with the makers."],
+    guesses: [{ guess: "It would have ended in a short second season.", because: ["low ratings", "a pitched sequel"], confidence: "medium", sources: [1, 2] }, { guess: "No reasons given.", because: [], confidence: "high", sources: [] }],
+  });
+
+  test("the analysis keeps only claims that cite real notes (an inferred one may cite none), drops a guess with no reasons, and keeps conflicts and gaps", () => {
+    const analysis = parseAnalysis(reply, valid)!;
+    expect(analysis.claims.map((c) => c.claim)).toEqual(["It ranked 57th of 77.", "A sequel was pitched.", "The network lost interest."]);
+    expect(analysis.claims[1]!.sources).toEqual([2]);
+    expect(analysis.claims[2]!.status).toBe("inferred");
+    expect(analysis.guesses.length).toBe(1);
+    expect(analysis.guesses[0]).toMatchObject({ confidence: "medium", sources: [1, 2] });
+    expect(analysis.conflicts.length).toBe(1);
+    expect(analysis.gaps.length).toBe(1);
+    expect(parseAnalysis("nope", valid)).toBeNull();
+  });
+
+  test("analyse() sends the brief and the ledger to the model, and does nothing when there are no notes", async () => {
+    const seen: string[] = [];
+    __setStageWritersForTests({ analysis: async (prompt) => { seen.push(prompt); return reply; } });
+    const brief: Brief = { subject: "a show ending", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" };
+    const findings = filterFindings([note({ url: "u1" })], numberOf(["u1"]), 3_000);
+    const out = await analyse(brief, "why did it end", findings, valid, "max");
+    expect(out!.claims.length).toBe(3);
+    expect(seen[0]).toContain(briefBlock(brief));
+    expect(seen[0]).toContain("ranked 57th of 77 shows that season");
+    expect(seen[0]).toBe(analysisPrompt(brief, "why did it end", findings.ledger.text));
+    const empty = filterFindings([], numberOf([]), 3_000);
+    expect(await analyse(brief, "q", empty, valid, "max")).toBeNull();
+    __setStageWritersForTests(undefined);
+  });
+});
+
+describe("stage 5: the reply, and the chain of hand-offs", () => {
+  test("the writing round is handed the analysis (established first, then guesses with their reasons, then gaps) and the ledger", () => {
+    const analysis = parseAnalysis(JSON.stringify({ claims: [{ claim: "It ranked 57th of 77.", status: "established", sources: [1] }], conflicts: [], gaps: ["No interview."], guesses: [{ guess: "A short second season.", because: ["low ratings"], confidence: "low", sources: [1] }] }), new Set([1]))!;
+    const text = replyBrief({ subject: "s", answerType: "an explanation", mustContain: ["why it ended"], ambiguous: false, options: [], assumption: "" }, analysis, "LEDGER TEXT", "I took this to mean the 1984 series.");
+    expect(text.startsWith('Begin with one plain sentence saying what you took the question to mean: "I took this to mean the 1984 series."')).toBe(true);
+    expect(text.indexOf("established:")).toBeLessThan(text.indexOf("Not found:"));
+    expect(text.indexOf("Not found:")).toBeLessThan(text.indexOf("Guesses to present as guesses"));
+    expect(text).toContain("- It ranked 57th of 77. [1]");
+    expect(text).toContain("(low) A short second season. because low ratings [1]");
+    expect(text).toContain("covering why it ended");
+    expect(text.endsWith("LEDGER TEXT")).toBe(true);
+  });
+
+  test("brief -> plan -> findings -> analysis -> reply: the source numbers a note carries are the ones the reply cites", async () => {
+    __setStageWritersForTests({
+      brief: async () => '{"subject":"a show ending","answer_type":"an explanation","must_contain":["why it ended"],"ambiguous":false,"options":[],"assumption":""}',
+      analysis: async () => '{"claims":[{"claim":"It ranked 57th of 77.","status":"established","sources":[2]}],"conflicts":[],"gaps":[],"guesses":[]}',
+    });
+    const brief = await understand("why did the show end", "");
+    const plan = await planData(async () => '{"sub_questions":["why it ended"],"queries":["the show ended why"]}', brief, "why did the show end", 3);
+    const findings = filterFindings([note({ url: "https://b.example/p" })], numberOf(["https://a.example/p", "https://b.example/p"]), 3_000);
+    const analysis = await analyse(brief, "why did the show end", findings, new Set([1, 2]), "max");
+    const reply = replyBrief(brief, analysis, findings.ledger.text, null);
+    expect(plan.queries).toEqual(["the show ended why"]);
+    expect(findings.ledger.text).toContain("- [2] (reputable)");
+    expect(reply).toContain("- It ranked 57th of 77. [2]");
+    __setStageWritersForTests(undefined);
+  });
+});

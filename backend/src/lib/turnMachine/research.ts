@@ -63,6 +63,12 @@ export function researchCutAt(state: { answerStyle?: AnswerStyle; startedAt: num
   return cap === undefined ? undefined : state.startedAt + cap;
 }
 
+/** True once a research turn is past its cap: the analysis is skipped and the notes wait is short. */
+export function researchPastCut(state: { answerStyle?: AnswerStyle; startedAt: number }, now: number = Date.now()): boolean {
+  const cut = researchCutAt(state);
+  return cut !== undefined && now >= cut;
+}
+
 /** The time-line a research turn leaves for the bench and the trace: milliseconds since the turn began, labels only (rule 6a). */
 export type ResearchMarkSink = (turnId: string, atMs: number, what: string) => void;
 let markSink: ResearchMarkSink | undefined;
@@ -196,14 +202,20 @@ export function researchEvidence(outcomes: readonly ToolExecutionOutcome[]): str
 
 /** The text each numbered source gave this turn, in source-number order (index 0 is [1]): the fetched page when one was read, else the
  * search row's title and snippet. A source with no text at all is an empty string. */
-export function evidenceBySource(outcomes: readonly ToolExecutionOutcome[]): string[] {
+export function evidenceBySource(outcomes: readonly ToolExecutionOutcome[], notes: readonly { url: string; quote: string }[] = []): string[] {
   const byUrl = new Map<string, string>();
   for (const outcome of outcomes) {
     const data = outcome.result?.data as { rows?: { url?: unknown; title?: unknown; snippet?: unknown }[]; pages?: { url?: unknown; text?: unknown; title?: unknown }[] } | undefined;
     for (const row of data?.rows ?? []) if (typeof row.url === "string" && !byUrl.has(row.url)) byUrl.set(row.url, `${String(row.title ?? "")}. ${String(row.snippet ?? "")}`);
     for (const page of data?.pages ?? []) if (typeof page.url === "string") byUrl.set(page.url, `${String(page.title ?? "")}. ${String(page.text ?? "")}`);
   }
-  return outcomes.flatMap((o) => o.sources ?? []).map((source) => byUrl.get(source.url) ?? "");
+  // RESEARCH-NOTES-01: the quotes taken from deep in a page (checked against it) are passages of that source too.
+  const quotes = new Map<string, string[]>();
+  for (const note of notes) quotes.set(note.url, [...(quotes.get(note.url) ?? []), note.quote]);
+  return outcomes.flatMap((o) => o.sources ?? []).map((source) => {
+    const deep = quotes.get(source.url);
+    return `${byUrl.get(source.url) ?? ""}${deep ? `\n${deep.join("\n")}` : ""}`.trim();
+  });
 }
 
 /** One model call: a prompt in, the model's text out, or null when the model is unavailable. */
@@ -342,9 +354,14 @@ export function parsePlannedQueries(text: string): string[] {
 
 /** The searches the writer proposes, minus any that repeats an earlier search of the turn or an earlier proposal. Empty when the writer is unavailable. */
 export async function writeQueries(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<string[]> {
+  return (await writeQueriesChecked(writer, utterance, progress, digest, count)) ?? [];
+}
+
+/** The same, but null when the writer is unavailable (so a caller can tell "nothing new to search" from "no answer"). */
+export async function writeQueriesChecked(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<string[] | null> {
   let reply: string | null = null;
   try { reply = await writer(queryWriterPrompt(utterance, progress, digest, count)); } catch { reply = null; }
-  if (reply === null) return [];
+  if (reply === null) return null;
   const kept: string[] = [];
   const allowed = `${utterance}\n${digest}`;
   for (const query of parsePlannedQueries(reply)) if (!isRepeatQuery([...progress.queries, ...kept], query) && memoryDetailsIn(query, allowed).length === 0) kept.push(query);

@@ -1613,6 +1613,8 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
       if (!doc) return "stop";
       const text = doc.text.trim().slice(0, pageChars);
       if (!text) return null;
+      // RESEARCH-NOTES-01: a research run's light model starts reading the page's whole text now, beside the other pages and the next round.
+      if (runBudget?.noteJob) runBudget.noteJob({ url: row.url!, title: doc.title || row.title || "", text: doc.text });
       return { page: { url: row.url!, title: doc.title || row.title, text }, doc };
     } catch (err) {
       if (err instanceof PageDeclinedError) {

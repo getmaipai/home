@@ -6,6 +6,9 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
 import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
+import { researchQuestion } from "../researchPipeline";
+import { NOTE_CONCURRENCY, currentNoteWriter, makeGate, newNoteStats, writePageNotes } from "../pageNotes";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { isRepeatQuery, markResearch, memoryDetailsIn, researchCutAt, researchEvidence, withoutMemoryDetails } from "../research";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
@@ -118,6 +121,16 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   const researchRun = state.answerStyle !== undefined && state.answerStyle !== "instant" && state.budget.rounds > 1 ? (state.researchBudget ??= newResearchBudget(state.answerStyle === "max" && state.researchLibraryOnly === true)) : undefined;
   // RESEARCH-CLOCK-01: page reading of this turn stops at the style's cut-off time.
   if (researchRun) researchRun.deadlineAt ??= researchCutAt(state);
+  // RESEARCH-NOTES-01: the light model writes notes from each page the run reads (admin switch research.page_notes, default on).
+  if (researchRun && !researchRun.noteJob && getHouseholdSettingValue("research.page_notes") !== false) {
+    const gate = makeGate(NOTE_CONCURRENCY);
+    const stats = researchRun.noteStats ??= newNoteStats();
+    const question = researchQuestion(state.messages, state.utterance);
+    researchRun.noteJob = (page) => {
+      if (researchRun.notes.has(page.url)) return;
+      researchRun.notes.set(page.url, writePageNotes(currentNoteWriter(), gate, question, page, stats).catch(() => []));
+    };
+  }
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
   // ANSWER-IMG-02: a round's show_images call starts its picture pipeline

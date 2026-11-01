@@ -4,6 +4,7 @@
 // ends page reading for the rest of the run. The run carries it through an AsyncLocalStorage so the page
 // reader (packageHost.ts) can honor it without a new argument on every tool call.
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { NoteStats, PageNote } from "@/lib/turnMachine/pageNotes";
 
 export const RESEARCH_PAGES_MAX = 40;
 export const RESEARCH_HOST_PAGES_MAX = 4;
@@ -21,12 +22,17 @@ export interface ResearchRunBudget {
   searches: number;
   /** RESEARCH-CLOCK-01: the moment (ms since the epoch) page reading stops for this turn. */
   deadlineAt?: number;
+  /** RESEARCH-NOTES-01: set by the tool node; the page reader hands each page it reads (its whole text) to it, and it starts the page's notes. */
+  noteJob?: (page: { url: string; title: string; text: string }) => void;
+  /** RESEARCH-NOTES-01: the notes being written, one promise per page address. */
+  notes: Map<string, Promise<PageNote[]>>;
+  noteStats?: NoteStats;
 }
 
 const store = new AsyncLocalStorage<ResearchRunBudget>();
 
 export function newResearchBudget(libraryOnly: boolean): ResearchRunBudget {
-  return { pages: 0, perHost: new Map(), declined: false, libraryOnly, searches: 0 };
+  return { pages: 0, perHost: new Map(), declined: false, libraryOnly, searches: 0, notes: new Map() };
 }
 export const runWithResearchBudget = <T>(budget: ResearchRunBudget, fn: () => T): T => store.run(budget, fn);
 export const currentResearchBudget = (): ResearchRunBudget | undefined => store.getStore();

@@ -176,6 +176,14 @@ export interface TurnState {
   answerStyle?: import("./research").AnswerStyle;
   /** RESEARCH-TIER-01: the page budget the rounds of a Thinking or Max turn share (created by the tool node on its first round). */
   researchBudget?: import("@/lib/researchBudget").ResearchRunBudget;
+  /** RESEARCH-NOTES-01: the notes written from the pages of a research turn, set when the answering round is built; the claim check reads their quotes. */
+  pageNotes?: import("./pageNotes").PageNote[];
+  /** RESEARCH-PIPELINE-01: stage 1's brief, stage 2's plan and stage 4's analysis of a research turn (each set when its stage ran). */
+  researchBrief?: import("./researchPipeline").Brief | null;
+  researchPlan?: import("./researchPipeline").DataPlan;
+  researchAnalysis?: import("./researchPipeline").Analysis | null;
+  /** RESEARCH-PIPELINE-01: the searches the gap check proposed for the round about to run (set by the model node just before the round). */
+  nextQueries?: string[];
   /** RESEARCH-TIER-01: the admin turned research.max_web off; Max's rounds after its first search read the offline library. */
   researchLibraryOnly?: boolean;
   replyLanguage?: string;

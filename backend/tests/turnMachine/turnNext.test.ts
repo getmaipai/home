@@ -1,3 +1,4 @@
+import { __setStageWritersForTests } from "@/lib/turnMachine/researchPipeline";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
 // U2 (docs/plans/turn-machine-state-record-2026-09-22.md, "Acceptance"):
 // the new path's own tests, mirroring conversationBench.test.ts's own
@@ -3412,6 +3413,8 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
   // empty on its first call (thinking on) and for real on the retry.
   test("a streamed turn's first attempt comes back empty (thinking on) and the retry's real answer still reaches the client and the log", async () => {
     let calls = 0;
+    // RESEARCH-PIPELINE-01: a Thinking turn's stage 1 is a model call of its own; this test counts the main model's attempts.
+    __setStageWritersForTests({ brief: async () => null });
     await withStub(
       {
         reply: () => {
@@ -3432,6 +3435,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         expect(row?.replyText).toContain("Sure, here's the answer you asked for.");
       },
     );
+    __setStageWritersForTests(undefined);
   });
 
   // A code review caught buildTurnValue()'s own crisis_resources reading
