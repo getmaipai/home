@@ -96,6 +96,8 @@ export interface ChatModelAdapterDeps {
   // NewChat reads the active conversation's selected mode. Undefined
   // for a minor (safety ruling, 2026-09-22): its request omits `thinking`.
   getThinking?(): boolean | undefined;
+  /** The first stream of a send opened: Max is one message only, so the page disarms it here. */
+  onTurnSent?(): void;
   // Retired ChatPage's one-message "Think longer" action.
   consumeThinking?(): boolean | undefined;
   /** Session-local model selected in /chat; read once so a reconnect
@@ -414,6 +416,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // conversation setting; the old ChatPage fallback consumes its
           // one-message action.
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
+          if (reconnectAttempts === 0 && !bare) deps.onTurnSent?.();
           const perRunModel = (runConfig as { custom?: { model?: unknown } } | undefined)?.custom?.model;
           const runModel = deps.getAgeBand?.() === "adult" && typeof perRunModel === "string" ? perRunModel : undefined;
           const currentLocation = reconnectAttempts === 0 && !bare ? await deps.getCurrentLocation?.() : undefined;

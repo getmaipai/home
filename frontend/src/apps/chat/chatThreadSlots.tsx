@@ -33,7 +33,6 @@ import { StoppedRun } from "@maipai/ui/src/elements/stopped-run";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { BackgroundInbox } from "@maipai/ui/src/elements/background-inbox";
 import { TaskCard } from "@maipai/ui/src/elements/task-card";
-import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -64,6 +63,9 @@ import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { useMaxChat } from "@/apps/chat/maxChat";
+import { MODE_CHOICES, MAX_DIALOG_BODY, MAX_DIALOG_TITLE, type ModeChoiceId } from "@/apps/chat/composerModeLines";
+import { AnswerStyleSelect } from "@maipai/ui/src/elements/answer-style-select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
 
@@ -216,25 +218,26 @@ export function ChatMessageQueue() {
 
 const ALWAYS_THINKS_REASON = "This model thinks before every reply, so there is no Instant switch.";
 
-export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
-
-/** ELT-MODE-01: the trailing composer slot contains the mode control only;
- * model names and model choice stay out of the chat surface. */
+/** The composer's one answer-style control (owner design, 2026-11-01): icon-only when closed, icon + word + one plain line per choice when open.
+ * Instant and Thinking are the conversation's mode (Thinking stays for the rest of the chat); Max is one message only and asks first. */
 export function ComposerTrailingWithThinkingMode() {
   const { mode, setMode } = useContext(ThinkingModeContext);
   const capability = useContext(ThinkingModeCapabilityContext);
-  // TIER-HOME-05: the Max chat chip beside the mode control. Only an adult who may hold Max sees it (the route says so; a teen's or
-  // child's page never asks). Tap to ask, Continue in the notice line to start, tap again to give it back.
-  const max = useMaxChat(useContext(ChatAgeBandContext) === "adult");
+  const adult = useContext(ChatAgeBandContext) === "adult";
+  const max = useMaxChat(adult);
   const engineDown = useEngineDownReason();
+  const icons = { instant: getIcon("zap"), thinking: getIcon("brain"), max: getIcon("brain") } as const;
+  const Sparkles = getIcon("sparkles");
+  const choices = (!adult ? [] : MODE_CHOICES.filter((choice) => (choice.id === "max" ? max.visible : choice.id === "instant" ? capability === "switchable" : capability !== "none"))).map((choice) => ({
+    id: choice.id, label: choice.word, description: choice.line, icon: icons[choice.id],
+    ...(choice.id === "max" ? { accent: Sparkles, disabled: max.disabled || engineDown !== undefined } : {}),
+  }));
+  const current: ModeChoiceId = max.picked ? "max" : mode;
+  // INSTANT-01: a model that reasons on every turn has no Instant, so with nothing else to choose the control is a plain "Thinking" chip.
+  const onlyThinking = adult && capability === "always" && !max.visible;
   return (
     <>
-      {capability === "always" ? (
-        // INSTANT-01: a model that reasons on every turn has no Instant, so
-        // nothing here is a control or claims a choice. The chip is the short
-        // word "Thinking" (it must fit unclipped); the reason is a tooltip and
-        // the accessible description. A model that never reasons (capability
-        // "none") shows nothing at all.
+      {onlyThinking ? (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -244,28 +247,29 @@ export function ComposerTrailingWithThinkingMode() {
           </Tooltip>
         </TooltipProvider>
       ) : null}
-      {capability === "switchable" ? (
-        <ModelSelectorRoot
-          models={[{ id: "mode", name: "", efforts: MODEL_EFFORTS }]}
-          value="mode"
-          onValueChange={() => {}}
-          effort={mode}
-          onEffortChange={(effort) => setMode(effort === "thinking" ? "thinking" : "instant")}
-        >
-          <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Thinking mode" />
-          <ModelSelectorContent side="top" align="start">
-            <ModelSelectorEffort label="Mode" />
-          </ModelSelectorContent>
-        </ModelSelectorRoot>
+      {!onlyThinking && choices.length > 0 ? (
+        <AnswerStyleSelect align="end"
+          choices={choices}
+          value={current}
+          onValueChange={(value) => {
+            if (value === "max") { max.ask(); return; }
+            if (max.picked) max.leave();
+            setMode(value === "thinking" ? "thinking" : "instant");
+          }}
+        />
       ) : null}
-      {max.visible ? (
-        <ElementsButton
-          type="button" variant={max.pressed ? "secondary" : "ghost"} size="sm" aria-pressed={max.pressed} disabled={max.disabled || (engineDown !== undefined && !max.pressed)} onClick={max.press}
-          title={max.pressed ? "Max is on. Tap to go back to the standard model." : "Max gives the best answers. Pictures, videos and songs wait while you use it, and Home goes back by itself when you stop."}
-        >
-          {max.label}
-        </ElementsButton>
-      ) : null}
+      <AlertDialog open={max.confirming} onOpenChange={(open) => { if (!open) max.cancel(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{MAX_DIALOG_TITLE}</AlertDialogTitle>
+            <AlertDialogDescription>{MAX_DIALOG_BODY}{max.startLine ? ` ${max.startLine}` : ""}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setMode("instant"); max.confirm(); }}>Use Max</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ComposerExtraControls />
     </>
   );

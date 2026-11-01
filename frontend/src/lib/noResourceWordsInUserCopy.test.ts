@@ -1,7 +1,9 @@
 // OWNER-RULING-2026-11-01: a person never reads about system resources or the system's state. The backend twin
 // (backend/tests/noResourceWordsInUserCopy.test.ts) scans the shared copy tables; this scans the client-side lines.
 import { describe, expect, test } from "bun:test";
-import { MAX_CONFIRM_LINE, MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, maxProgressLine } from "@/apps/chat/maxChat";
+import { MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, maxProgressLine } from "@/apps/chat/maxChat";
+import { MODE_LINES, MAX_DIALOG_TITLE, MAX_DIALOG_BODY, maxStartLine } from "@/apps/chat/composerModeLines";
+import { waitPhrase } from "@/apps/chat/maxChat";
 import { engineDownReason } from "@/apps/chat/useChatAvailability";
 import { fitAskActions } from "@/lib/fitAsk";
 
@@ -9,7 +11,7 @@ const BANNED = /\bmemory\b|\bRAM\b|\bGB\b|\broom\b|free(?:s|d)? up|putting away|
 
 describe("no resource or system-state words in client copy", () => {
   const lines: Array<[string, string | undefined]> = [
-    ["MAX_CONFIRM_LINE", MAX_CONFIRM_LINE], ["MAX_SELF_TEST_LINE", MAX_SELF_TEST_LINE], ["MAX_RUNNING_LONG_LINE", MAX_RUNNING_LONG_LINE],
+    ["MAX_DIALOG_TITLE", MAX_DIALOG_TITLE], ["MAX_DIALOG_BODY", MAX_DIALOG_BODY], ["max start line", maxStartLine(waitPhrase(60))], ["max start line seconds", maxStartLine(waitPhrase(30))], ...MODE_LINES.map((line, i): [string, string] => [`mode line ${i}`, line]), ["MAX_SELF_TEST_LINE", MAX_SELF_TEST_LINE], ["MAX_RUNNING_LONG_LINE", MAX_RUNNING_LONG_LINE],
     ["maxProgressLine loading", maxProgressLine("Loading", 60, 1000)], ["maxProgressLine testing", maxProgressLine("Testing", 35, 1000)],
     ["engineDownReason unavailable", engineDownReason("unavailable")], ["engineDownReason starting", engineDownReason("starting")],
   ];

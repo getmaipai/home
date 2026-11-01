@@ -7,12 +7,11 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { api, ApiError } from "@/lib/api";
 import { chatLeaseApi, type ChatLeaseView } from "@/lib/chatLeaseApi";
 import type { ChatComposerNoticeValue } from "@/apps/chat/chatThreadContexts";
+import { maxStartLine } from "@/apps/chat/composerModeLines";
 
-// CHAT-NOTICE-SHORT-01: every line is one short sentence pair (about 40 characters); the long explanation is the line's tooltip (`more`).
-export const MAX_CONFIRM_LINE = "Max takes over. Other jobs wait.";
+// CHAT-NOTICE-SHORT-01: every line is one short sentence pair (about 40 characters).
 export const MAX_SELF_TEST_LINE = "Max needs a quick test first.";
 export const MAX_RUNNING_LONG_LINE = "Taking longer than usual. Still working.";
-const MAX_CONFIRM_MORE = "Max gives the best answers. Pictures, videos and songs wait while you use it, and Home goes back by itself when you stop.";
 const DEFAULT_MAX_LOAD_S = 60;
 const DEFAULT_SELF_TEST_S = 35;
 /** The same rule as the Home side (chatTransitions.ts waitPhrase): rounded to 5 seconds, "a minute" past 50. */
@@ -35,6 +34,25 @@ type Flow =
   | { phase: "error"; line: string };
 const IDLE: Flow = { phase: "idle" };
 
+const PICK_KEY = ["max-chat", "picked"] as const;
+const setPicked = (qc: QueryClient, value: boolean) => qc.setQueryData<boolean>(PICK_KEY, value);
+const getPicked = (qc: QueryClient) => qc.getQueryData<boolean>(PICK_KEY) ?? false;
+/** Max is one message only: the send path calls this once the message left; the lease itself is handed back by the server after its grace. */
+export function consumeMaxPick(qc: QueryClient): void { if (getPicked(qc)) setPicked(qc, false); }
+/** Hand the lease back at once and drop the pick (a new chat, or Max left unused). */
+export function dropMaxPick(qc: QueryClient): void {
+  const wasPicked = getPicked(qc);
+  setPicked(qc, false);
+  if (getFlow(qc).phase === "confirm") setFlow(qc, IDLE);
+  if (wasPicked && qc.getQueryData<ChatLeaseView>(LEASE_KEY)?.held_by_you) void chatLeaseApi.release().then((next) => qc.setQueryData(LEASE_KEY, next)).catch(() => undefined);
+}
+/** Send waits while Max is picked and the lease is not yet ready (the composer notice says why). */
+export function useMaxSendHold(): boolean {
+  const picked = useQuery<boolean>({ queryKey: PICK_KEY, queryFn: () => false, initialData: false, staleTime: Infinity, enabled: false }).data;
+  const lease = useQuery<ChatLeaseView | undefined>({ queryKey: LEASE_KEY, queryFn: () => undefined, enabled: false }).data;
+  return picked && !(lease?.state === "held" && lease.held_by_you);
+}
+
 const setFlow = (qc: QueryClient, flow: Flow) => qc.setQueryData<Flow>(FLOW_KEY, flow);
 const getFlow = (qc: QueryClient) => qc.getQueryData<Flow>(FLOW_KEY) ?? IDLE;
 let selfTestPollMs = 3000;
@@ -50,7 +68,7 @@ async function take(qc: QueryClient): Promise<void> {
     setFlow(qc, IDLE);
   } catch (error) {
     if (error instanceof ApiError && error.code === "not_ready" && error.message === MAX_SELF_TEST_LINE) setFlow(qc, { phase: "self_test_needed", line: error.message });
-    else setFlow(qc, { phase: "error", line: error instanceof Error ? error.message : "Max did not start. Try again in a minute." });
+    else { setPicked(qc, false); setFlow(qc, { phase: "error", line: error instanceof Error ? error.message : "Max did not start. Try again in a minute." }); }
     void qc.invalidateQueries({ queryKey: LEASE_KEY });
   }
 }
@@ -72,41 +90,64 @@ async function runSelfTest(qc: QueryClient): Promise<void> {
 }
 
 export interface MaxChat {
-  /** Null until known, and for anyone who may not use Max chat (the control then draws nothing). */
+  /** Null until known, and for anyone who may not use Max chat (the control then offers no Max). */
   lease: ChatLeaseView | null;
   visible: boolean;
-  label: "Max" | "Starting Max" | "Max in use" | "Returning to standard";
-  pressed: boolean;
+  /** Max is picked for the next message. */
+  picked: boolean;
+  /** The Max confirm dialog is open. */
+  confirming: boolean;
+  /** Max cannot be picked now (a step is running, someone else holds it, or it is returning). */
   disabled: boolean;
-  /** The control was clicked: ask first, start after the confirm line, end when it is held. */
-  press: () => void;
+  /** The estimate line for the confirm ("It takes about a minute to start."), null when Max is already ready. */
+  startLine: string | null;
+  /** Max was chosen in the menu: ask first. */
+  ask: () => void;
+  /** "Use Max": arm it for the next message and request the lease. */
+  confirm: () => void;
+  /** "Cancel" or the dialog closed: the control stays on what it was. */
+  cancel: () => void;
+  /** Another choice was picked while Max was armed: drop it and hand the lease back, unused. */
+  leave: () => void;
 }
 
 /** `enabled` is false for every band but adult, so a teen's or child's page never asks the route at all. */
 export function useMaxChat(enabled: boolean): MaxChat {
   const qc = useQueryClient();
+  const picked = useQuery<boolean>({ queryKey: PICK_KEY, queryFn: () => false, initialData: false, staleTime: Infinity, enabled: false }).data;
   const leaseQuery = useQuery({
     queryKey: LEASE_KEY, queryFn: chatLeaseApi.get, enabled, retry: false,
-    // Watch a start or a return finish; a held lease is re-read each minute so an idle release shows up.
-    refetchInterval: (query) => (query.state.data?.state === "starting" || query.state.data?.state === "releasing" ? 3000 : query.state.data?.state === "held" ? 60_000 : false),
+    // Watch a start or a return finish; a held lease is re-read often while armed so a lapse shows up.
+    refetchInterval: (query) => (query.state.data?.state === "starting" || query.state.data?.state === "releasing" ? 3000 : query.state.data?.state === "held" ? (getPicked(qc) ? 15_000 : 60_000) : false),
   });
   const flow = useQuery<Flow>({ queryKey: FLOW_KEY, queryFn: () => IDLE, initialData: IDLE, staleTime: Infinity, enabled: false }).data;
   const lease = enabled && leaseQuery.data?.can_use ? leaseQuery.data : null;
   const busy = flow.phase === "starting" || flow.phase === "self_test_running";
-  const press = useCallback(() => {
-    const current = getFlow(qc);
+  // The lease lapsed (or never came) while Max stayed armed: Max is off and the control says so by going back to Instant.
+  useEffect(() => {
+    if (picked && flow.phase === "idle" && leaseQuery.data && leaseQuery.data.state === "off") setPicked(qc, false);
+  }, [picked, flow.phase, leaseQuery.data, qc]);
+  const ask = useCallback(() => { if (!busy) setFlow(qc, { phase: "confirm" }); }, [qc, busy]);
+  const confirm = useCallback(() => {
     const held = qc.getQueryData<ChatLeaseView>(LEASE_KEY);
-    if (current.phase === "starting" || current.phase === "self_test_running") return;
-    if (held?.held_by_you) {
-      setFlow(qc, IDLE);
-      void chatLeaseApi.release().then((next) => qc.setQueryData(LEASE_KEY, next)).catch((error) => setFlow(qc, { phase: "error", line: error instanceof Error ? error.message : "Max did not give back. Try again." }));
-      return;
-    }
-    setFlow(qc, current.phase === "confirm" ? IDLE : { phase: "confirm" });
+    setPicked(qc, true);
+    if (held?.held_by_you && held.state === "held") { setFlow(qc, IDLE); return; }
+    void take(qc);
   }, [qc]);
+  const cancel = useCallback(() => {
+    if (getFlow(qc).phase !== "confirm") return;
+    setFlow(qc, IDLE);
+  }, [qc]);
+  const leave = useCallback(() => dropMaxPick(qc), [qc]);
   const others = lease !== null && lease.state !== "off" && !lease.held_by_you;
-  const label: MaxChat["label"] = busy || lease?.state === "starting" ? "Starting Max" : lease?.state === "releasing" ? "Returning to standard" : others ? "Max in use" : "Max";
-  return { lease, visible: lease !== null, label, pressed: lease?.held_by_you === true, disabled: busy || others || lease?.state === "releasing", press };
+  const loadSeconds = lease?.estimates?.max_load_s ?? DEFAULT_MAX_LOAD_S;
+  const ready = lease?.state === "held" && lease.held_by_you;
+  return {
+    lease, visible: lease !== null, picked, confirming: flow.phase === "confirm" && lease !== null,
+    disabled: busy || others || lease?.state === "releasing",
+    startLine: ready ? null : maxStartLine(waitPhrase(loadSeconds)),
+    ask, confirm, cancel, leave,
+  };
 }
 
 /** The one notice line Max chat needs, in the composer's existing notice slot; null when there is nothing to say. */
@@ -124,7 +165,6 @@ export function useMaxChatNotice(isAdmin: boolean): ChatComposerNoticeValue | nu
   }, [timed]);
   const estimates = qc.getQueryData<ChatLeaseView>(LEASE_KEY)?.estimates;
   switch (flow.phase) {
-    case "confirm": return { text: MAX_CONFIRM_LINE, more: MAX_CONFIRM_MORE, repairsLink: null, actionLabel: "Continue", onAction: () => { void take(qc); } };
     case "starting": return { text: maxProgressLine("Loading", estimates?.max_load_s ?? DEFAULT_MAX_LOAD_S, Date.now() - flow.startedAt), repairsLink: null };
     case "self_test_running": return { text: maxProgressLine("Testing", estimates?.self_test_s ?? DEFAULT_SELF_TEST_S, Date.now() - flow.startedAt), repairsLink: null };
     case "self_test_needed": return isAdmin

@@ -1,3 +1,4 @@
+import { useMaxSendHold } from "@/apps/chat/maxChat";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
@@ -171,7 +172,9 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
     return () => clearTimeout(timer);
   }, [openingKey]);
   const opening = openingKey !== undefined && !openingTimedOut;
-  const sendHeld = opening;
+  // One answer style, Max: Send waits until the lease is ready (the composer notice says why).
+  const maxSendHold = useMaxSendHold();
+  const sendHeld = opening || maxSendHold;
   // Text typed while the placeholder stands in for the chat (even past the
   // cap) moves into the opened chat's composer, so nothing typed is lost in
   // the switch. Only what changed during the open moves: a draft that was

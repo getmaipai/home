@@ -26,7 +26,7 @@ export function getChatLease(): ChatLease {
   return lease;
 }
 
-/** Startup: the queue reads the lease, and a minute timer releases an idle one between requests. */
+/** Startup: the queue reads the lease, and a 15 second timer releases an idle one between requests. */
 export function startChatLease(): void {
   registerActiveChatLease(getChatLease());
   setChatLeaseSource(() => getChatLease().holdsGenerators());
@@ -35,5 +35,5 @@ export function startChatLease(): void {
     started: () => { if (getChatLease().snapshot().state === "held") getChatLease().requestStarted(); },
     ended: () => { if (getChatLease().snapshot().state === "held") getChatLease().requestEnded(); },
   });
-  setInterval(() => { void getChatLease().tick().catch(() => { /* the next tick retries */ }); }, 60_000).unref();
+  setInterval(() => { void getChatLease().tick().catch(() => { /* the next tick retries */ }); }, 15_000).unref();
 }

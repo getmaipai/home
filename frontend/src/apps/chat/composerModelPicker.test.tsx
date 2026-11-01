@@ -35,7 +35,7 @@ afterEach(() => {
 describe("composer mode control", () => {
   test("keeps the shipped Instant/Thinking mode control without model options", () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
-    expect(view.getByRole("combobox", { name: "Thinking mode" })).toBeTruthy();
+    expect(view.getByRole("combobox", { name: /^Answer style/ })).toBeTruthy();
     expect(view.queryByText("Private model alpha")).toBeNull();
     expect(view.queryByText("Private model beta")).toBeNull();
   });
@@ -44,7 +44,7 @@ describe("composer mode control", () => {
     const view = renderWithQueryClient(<Harness band="adult" capability="always" />);
     expect(view.getByText("Thinking")).toBeTruthy();
     expect(view.queryByText("Thinks before every reply")).toBeNull();
-    expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
+    expect(view.queryByRole("combobox", { name: /^Answer style/ })).toBeNull();
     expect(view.queryByRole("button")).toBeNull();
     expect(view.queryByText("Instant")).toBeNull();
   });
@@ -61,7 +61,7 @@ describe("composer mode control", () => {
 
   test("a model that never thinks shows no mode text at all (INSTANT-01)", () => {
     const view = renderWithQueryClient(<Harness band="adult" capability="none" />);
-    expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
+    expect(view.queryByRole("combobox", { name: /^Answer style/ })).toBeNull();
     expect(view.queryByText("Instant")).toBeNull();
     expect(view.queryByText("Thinking")).toBeNull();
     expect(view.queryByText("Thinks before every reply")).toBeNull();

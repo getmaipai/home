@@ -2,11 +2,14 @@
 // a teen, a child and an adult without a grant never see the control, a missing self-test shows the existing notice line with the action
 // that runs it, and the chip ends the session.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ComposerTrailingWithThinkingMode } from "@/apps/chat/chatThreadSlots";
 import { ChatAgeBandContext, ThinkingModeCapabilityContext, ThinkingModeContext } from "@/apps/chat/chatThreadContexts";
-import { MAX_CONFIRM_LINE, MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, __setSelfTestPollMsForTests, maxProgressLine, useMaxChatNotice } from "@/apps/chat/maxChat";
+import { MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, __setSelfTestPollMsForTests, consumeMaxPick, dropMaxPick, maxProgressLine, useMaxChatNotice, useMaxSendHold } from "@/apps/chat/maxChat";
+import { MAX_DIALOG_BODY, MAX_DIALOG_TITLE, MODE_CHOICES } from "@/apps/chat/composerModeLines";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
@@ -18,17 +21,21 @@ function NoticeProbe({ admin }: { admin: boolean }) {
   if (!notice) return null;
   return <div role="status"><span>{notice.text}</span>{notice.actionLabel ? <Button type="button" onClick={notice.onAction}>{notice.actionLabel}</Button> : null}</div>;
 }
-function Harness({ band, admin = false }: { band: "child" | "teen" | "adult"; admin?: boolean }) {
+let qcRef: ReturnType<typeof useQueryClient>;
+function SendProbe() { qcRef = useQueryClient(); return <span data-testid="send-hold">{useMaxSendHold() ? "held" : "open"}</span>; }
+function Harness({ band, admin = false, capability = "switchable" }: { band: "child" | "teen" | "adult"; admin?: boolean; capability?: "switchable" | "none" | "always" }) {
   const runtime = useLocalRuntime(NOOP, { initialMessages: [] });
+  const [mode, setMode] = useState<"instant" | "thinking">("instant");
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ChatAgeBandContext.Provider value={band}>
-        <ThinkingModeContext.Provider value={{ mode: "instant", setMode: () => {} }}>
-          <ThinkingModeCapabilityContext.Provider value="none">
+        <ThinkingModeContext.Provider value={{ mode, setMode }}>
+          <ThinkingModeCapabilityContext.Provider value={capability}>
             <ComposerTrailingWithThinkingMode />
           </ThinkingModeCapabilityContext.Provider>
         </ThinkingModeContext.Provider>
         <NoticeProbe admin={admin} />
+        <SendProbe />
       </ChatAgeBandContext.Provider>
     </AssistantRuntimeProvider>
   );
@@ -58,33 +65,136 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
 
-describe("Max chat control", () => {
-  test("a grant holder asks, confirms, holds the lease, and gives it back", async () => {
+const trigger = (view: ReturnType<typeof renderWithQueryClient>) => view.findByRole("combobox", { name: /^Answer style: /, hidden: true });
+const openMenu = async (view: ReturnType<typeof renderWithQueryClient>) => { fireEvent.keyDown(await trigger(view), { key: "ArrowDown" }); return view.findByRole("menu"); };
+const choose = async (view: ReturnType<typeof renderWithQueryClient>, word: string) => { const menu = await openMenu(view); fireEvent.click(within(menu).getByRole("menuitemradio", { name: new RegExp(`^${word}`) })); };
+const pickMax = async (view: ReturnType<typeof renderWithQueryClient>) => { await choose(view, "Max"); fireEvent.click(await view.findByRole("button", { name: "Use Max" })); };
+const held = () => screen_hold();
+function screen_hold() { return document.querySelector("[data-testid=send-hold]")?.textContent; }
+
+describe("one answer-style control", () => {
+  test("the closed control is icon-only with the word in its accessible name", async () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
-    const chip = await view.findByRole("button", { name: "Max" });
-    expect(chip.getAttribute("aria-pressed")).toBe("false");
-    fireEvent.click(chip);
-    expect(await view.findByText(MAX_CONFIRM_LINE)).toBeTruthy();
-    expect(calls).not.toContain("POST /api/ai/chat-lease");
-    fireEvent.click(view.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(view.getByRole("button", { name: "Max" }).getAttribute("aria-pressed")).toBe("true"));
-    expect(view.queryByText(MAX_CONFIRM_LINE)).toBeNull();
-    fireEvent.click(view.getByRole("button", { name: "Max" }));
-    await waitFor(() => expect(view.getByRole("button", { name: "Max" }).getAttribute("aria-pressed")).toBe("false"));
-    expect(calls).toContain("DELETE /api/ai/chat-lease");
+    const control = await trigger(view);
+    expect(control.getAttribute("aria-label")).toBe("Answer style: Instant");
+    expect(control.textContent).toBe("");
   });
 
-  test("the starting state shows while the big model loads", async () => {
+  test("the open menu shows icon, word and one plain line per choice", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    const menu = await openMenu(view);
+    for (const choice of MODE_CHOICES) {
+      const item = within(menu).getByRole("menuitemradio", { name: new RegExp(`^${choice.word}`) });
+      expect(item.textContent).toContain(choice.line);
+      expect(item.querySelector("svg")).toBeTruthy();
+    }
+  });
+
+  test("an adult with the grant picks Max, confirms in the dialog, and Send waits until the lease is ready", async () => {
     let finish!: () => void;
     takeAnswer = () => new Promise((resolve) => { finish = () => { current = lease({ state: "held", held_by_you: true }); resolve(Response.json(current)); }; });
     const view = renderWithQueryClient(<Harness band="adult" />);
-    fireEvent.click(await view.findByRole("button", { name: "Max" }));
-    fireEvent.click(await view.findByRole("button", { name: "Continue" }));
-    const starting = await view.findByRole("button", { name: "Starting Max" });
-    expect((starting as HTMLButtonElement).disabled).toBe(true);
-    expect(view.getByText("Loading Max. About a minute.")).toBeTruthy();
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await choose(view, "Max");
+    expect(await view.findByText(MAX_DIALOG_TITLE)).toBeTruthy();
+    expect(view.getByText(new RegExp(`${MAX_DIALOG_BODY} It takes about a minute to start\\.`))).toBeTruthy();
+    expect(calls).not.toContain("POST /api/ai/chat-lease");
+    expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Instant");
+    fireEvent.click(view.getByRole("button", { name: "Use Max" }));
+    expect(await view.findByText("Loading Max. About a minute.")).toBeTruthy();
+    expect(held()).toBe("held");
+    expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Max");
     finish();
-    await waitFor(() => expect(view.getByRole("button", { name: "Max" }).getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => expect(held()).toBe("open"));
+  });
+
+  test("Cancel leaves the control on what it was and asks nothing of the lease", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await choose(view, "Thinking");
+    await choose(view, "Max");
+    fireEvent.click(await view.findByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(view.queryByText(MAX_DIALOG_TITLE)).toBeNull());
+    expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Thinking");
+    expect(calls).not.toContain("POST /api/ai/chat-lease");
+  });
+
+  test("Max is one message: after the send it is Instant again and must be picked again, with a confirm each time", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await pickMax(view);
+    await waitFor(() => expect(held()).toBe("open"));
+    consumeMaxPick(qcRef);
+    await waitFor(() => expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy());
+    expect(calls).not.toContain("DELETE /api/ai/chat-lease");
+    await choose(view, "Max");
+    expect(await view.findByText(MAX_DIALOG_TITLE)).toBeTruthy();
+    const posts = calls.filter((call) => call === "POST /api/ai/chat-lease").length;
+    fireEvent.click(view.getByRole("button", { name: "Use Max" }));
+    await waitFor(() => expect(view.getByRole("combobox", { name: "Answer style: Max" })).toBeTruthy());
+    expect(calls.filter((call) => call === "POST /api/ai/chat-lease").length).toBe(posts);
+  });
+
+  test("leaving Max unused hands the lease back at once", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await pickMax(view);
+    await waitFor(() => expect(held()).toBe("open"));
+    await choose(view, "Instant");
+    await waitFor(() => expect(calls).toContain("DELETE /api/ai/chat-lease"));
+    expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy();
+  });
+
+  test("a new conversation drops an armed Max and hands the lease back", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await pickMax(view);
+    await waitFor(() => expect(held()).toBe("open"));
+    dropMaxPick(qcRef);
+    await waitFor(() => expect(calls).toContain("DELETE /api/ai/chat-lease"));
+    await waitFor(() => expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy());
+  });
+
+  test("Thinking stays selected across sends and Max is never the default", async () => {
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await choose(view, "Thinking");
+    consumeMaxPick(qcRef);
+    consumeMaxPick(qcRef);
+    expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Thinking");
+    cleanup();
+    const fresh = renderWithQueryClient(<Harness band="adult" />);
+    expect((await trigger(fresh)).getAttribute("aria-label")).toBe("Answer style: Instant");
+  });
+
+  test("an adult without the grant sees Instant and Thinking only", async () => {
+    current = lease({ can_use: false });
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    const menu = await openMenu(view);
+    expect(within(menu).getAllByRole("menuitemradio").map((item) => item.textContent?.slice(0, 7))).toEqual(["Instant", "Thinkin"]);
+  });
+
+  test("a teen and a child see no control at all and the page never asks the route", async () => {
+    for (const band of ["teen", "child"] as const) {
+      calls = [];
+      const view = renderWithQueryClient(<Harness band={band} />);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(view.queryByRole("combobox")).toBeNull();
+      expect(view.queryByRole("button", { name: /Max|Answer style/ })).toBeNull();
+      expect(calls).toEqual([]);
+      cleanup();
+    }
+  });
+
+  test("someone else holding the lease leaves Max in the menu but not selectable", async () => {
+    current = lease({ state: "held", held_by_you: false });
+    const view = renderWithQueryClient(<Harness band="adult" />);
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const menu = await openMenu(view);
+    expect(within(menu).getByRole("menuitemradio", { name: /^Max/ }).getAttribute("aria-disabled")).toBe("true");
   });
 
   test("the loading and testing lines carry the measured time, and give way to taking-longer past 1.5 times it", () => {
@@ -92,66 +202,41 @@ describe("Max chat control", () => {
     expect(maxProgressLine("Testing", 35, 0)).toBe("Testing Max. About 35 seconds.");
     expect(maxProgressLine("Testing", 35, 52_000)).toBe("Testing Max. About 35 seconds.");
     expect(maxProgressLine("Testing", 35, 53_000)).toBe(MAX_RUNNING_LONG_LINE);
-    for (const line of [maxProgressLine("Loading", 60, 0), MAX_CONFIRM_LINE, MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE]) { expect(line.length).toBeLessThanOrEqual(42); expect(line).not.toContain("\u2014"); }
-  });
-
-  test("a teen and a child see no control and the page never asks the route", async () => {
-    for (const band of ["teen", "child"] as const) {
-      calls = [];
-      const view = renderWithQueryClient(<Harness band={band} />);
-      await new Promise((resolve) => setTimeout(resolve, 30));
-      expect(view.queryByRole("button", { name: /Max/ })).toBeNull();
-      expect(calls).toEqual([]);
-      cleanup();
-    }
-  });
-
-  test("an adult without the grant sees no control", async () => {
-    current = lease({ can_use: false });
-    const view = renderWithQueryClient(<Harness band="adult" />);
-    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(view.queryByRole("button", { name: /Max/ })).toBeNull();
-  });
-
-  test("someone else holding the lease reads Max in use and cannot be pressed", async () => {
-    current = lease({ state: "held", held_by_you: false });
-    const view = renderWithQueryClient(<Harness band="adult" />);
-    const chip = await view.findByRole("button", { name: "Max in use" });
-    expect((chip as HTMLButtonElement).disabled).toBe(true);
+    for (const line of [maxProgressLine("Loading", 60, 0), MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE]) { expect(line.length).toBeLessThanOrEqual(42); expect(line).not.toContain("\u2014"); }
   });
 
   const needsSelfTest = async () => Response.json({ error: MAX_SELF_TEST_LINE, code: "not_ready", first_unmet: "self_test" }, { status: 409 });
 
-  test("a missing self-test shows the notice with Run self-test for an admin, runs it, and returns to the confirm line", async () => {
+  test("a missing self-test shows the notice with Run self-test for an admin, runs it, and returns to the confirm dialog", async () => {
     takeAnswer = needsSelfTest;
     const view = renderWithQueryClient(<Harness band="adult" admin />);
-    fireEvent.click(await view.findByRole("button", { name: "Max" }));
-    fireEvent.click(await view.findByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await pickMax(view);
     expect(await view.findByText(MAX_SELF_TEST_LINE)).toBeTruthy();
     takeAnswer = async () => { current = lease({ state: "held", held_by_you: true }); return Response.json(current); };
     fireEvent.click(view.getByRole("button", { name: "Run self-test" }));
-    expect(await view.findByText(MAX_CONFIRM_LINE)).toBeTruthy();
+    expect(await view.findByText(MAX_DIALOG_TITLE)).toBeTruthy();
     expect(calls).toContain("POST /api/coding/mode/self-test");
-    fireEvent.click(view.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(view.getByRole("button", { name: "Max" }).getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.click(view.getByRole("button", { name: "Use Max" }));
+    await waitFor(() => expect(held()).toBe("open"));
   });
 
   test("a non-admin with a missing self-test is told to ask an admin and gets no Run button", async () => {
     takeAnswer = needsSelfTest;
     const view = renderWithQueryClient(<Harness band="adult" />);
-    fireEvent.click(await view.findByRole("button", { name: "Max" }));
-    fireEvent.click(await view.findByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await pickMax(view);
     expect(await view.findByText(/Ask an admin/)).toBeTruthy();
     expect(view.queryByRole("button", { name: "Run self-test" })).toBeNull();
   });
 
-  test("another refusal shows its plain line and can be dismissed", async () => {
+  test("another refusal shows its plain line, can be dismissed, and Max is not armed", async () => {
     takeAnswer = async () => Response.json({ error: "A Max job is running. Try when it ends.", code: "max_window" }, { status: 409 });
     const view = renderWithQueryClient(<Harness band="adult" />);
-    fireEvent.click(await view.findByRole("button", { name: "Max" }));
-    fireEvent.click(await view.findByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
+    await pickMax(view);
     expect(await view.findByText(/A Max job is running/)).toBeTruthy();
+    expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Dismiss" }));
     await waitFor(() => expect(view.queryByText(/A Max job is running/)).toBeNull());
   });

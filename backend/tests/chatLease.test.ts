@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createChatLease, DEFAULT_LEASE } from "../src/lib/chatLease";
+import { createChatLease, DEFAULT_LEASE, LEASE_GRACE_MS } from "../src/lib/chatLease";
 import { setChatTurnObserver, trackChatLease, admit, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 
 const owner = { id: "owner", role: "owner" } as const;
@@ -90,7 +90,7 @@ describe("Max chat lease", () => {
     expect(await lease.acquire({ id: "other", role: "admin" })).toEqual({ ok: false, refusal: "stack_busy" });
   });
 
-  test("idle release after 30 minutes, counted from the last token", async () => {
+  test("idle release after the grace, counted from the last token", async () => {
     const { lease, calls, advance } = rig();
     await lease.acquire(owner);
     advance(DEFAULT_LEASE.idleMs - 1000);
@@ -103,6 +103,30 @@ describe("Max chat lease", () => {
     expect(calls).toEqual(["big", "standard"]);
     expect(lease.snapshot().state).toBe("off");
     expect(lease.holdsGenerators()).toBe(false);
+  });
+
+  test("the lease is handed back 3 minutes after the answer finishes (fake clock)", async () => {
+    const { lease, calls, advance } = rig();
+    expect(LEASE_GRACE_MS).toBe(3 * 60_000);
+    expect(DEFAULT_LEASE.idleMs).toBe(LEASE_GRACE_MS);
+    await lease.acquire(owner);
+    lease.requestStarted();
+    advance(10 * 60_000);
+    expect(await lease.tick()).toBe(false);
+    lease.requestEnded();
+    advance(LEASE_GRACE_MS - 1000);
+    expect(await lease.tick()).toBe(false);
+    advance(1000);
+    expect(await lease.tick()).toBe(true);
+    expect(calls).toEqual(["big", "standard"]);
+  });
+
+  test("a lease nobody uses ends after the same grace", async () => {
+    const { lease, calls, advance } = rig();
+    await lease.acquire(owner);
+    advance(LEASE_GRACE_MS);
+    expect(await lease.tick()).toBe(true);
+    expect(calls).toEqual(["big", "standard"]);
   });
 
   test("a request in flight keeps the lease however long the timer says", async () => {

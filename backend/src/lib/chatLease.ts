@@ -10,8 +10,11 @@ export type LeaseState = "off" | "starting" | "held" | "releasing";
 export type LeaseRefusal = "not_a_holder" | "not_ready" | "swap_failed" | "stack_busy" | "max_window";
 
 export interface LeaseConfig { idleMs: number; pinCapMs: number }
-/** Section 7 T7: 30 minutes idle, and a pinned lease still ends after 4 hours of quiet from the pinned person. */
-export const DEFAULT_LEASE: LeaseConfig = { idleMs: 30 * 60_000, pinCapMs: 4 * 60 * 60_000 };
+/** Max is one message at a time: the lease is handed back this long after the last answer finishes (owner, 2026-11-01), short enough that
+ * other jobs are not held, long enough that a quick second pick is fast. A lease nobody uses ends the same way. */
+export const LEASE_GRACE_MS = 3 * 60_000;
+/** Section 7 T7 (grace shortened from 30 minutes, 2026-11-01); a pinned lease still ends after 4 hours of quiet from the pinned person. */
+export const DEFAULT_LEASE: LeaseConfig = { idleMs: LEASE_GRACE_MS, pinCapMs: 4 * 60 * 60_000 };
 
 export interface LeaseDeps {
   now: () => number;

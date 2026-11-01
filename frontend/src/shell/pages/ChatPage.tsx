@@ -87,7 +87,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognit
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
-import { useMaxChatNotice } from "@/apps/chat/maxChat";
+import { consumeMaxPick, dropMaxPick, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
@@ -293,6 +293,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // PERSIST-CONV-01 / RESP-04: Thinking hydrates from the active
   // conversation settings and saves when changed. The model comes from
   // Stack and is not a chat-facing choice.
+  const maxQueryClient = useQueryClient();
   const [thinking, setThinkingState] = useState(false);
   const thinkingRef = useRef(false);
   thinkingRef.current = thinking;
@@ -517,6 +518,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // current value is hydrated from the conversation settings,
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
+          onTurnSent: () => consumeMaxPick(maxQueryClient),
           getAgeBand: () => person.age_band,
           getTryCompanionId: () => tryCompanionIdRef.current,
           consumeRetryWithCurrentCompanion: () => {
@@ -694,6 +696,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
       // Thinking and model are hydrated from each conversation's
       // persisted settings.
       if (isDeliberateSwitch) {
+        dropMaxPick(maxQueryClient);
         thinkingRef.current = false;
         setThinkingState(false);
         thinkingDirtyRef.current = false;

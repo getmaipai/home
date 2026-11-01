@@ -702,11 +702,11 @@ describe("ChatPage (SHELL-02's slice 2: the thread list)", () => {
       );
       await view.findByText("Archive me");
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
-      const thinkingTrigger = view.container.querySelector('[data-slot="model-selector-trigger"]') as HTMLButtonElement;
-      fireEvent.click(thinkingTrigger);
-      await view.findByRole("radio", { name: "Thinking" });
-      fireEvent.click(await view.findByRole("radio", { name: "Thinking" }));
-      expect(thinkingTrigger).toHaveTextContent("Thinking");
+      const thinkingTrigger = view.container.querySelector('[aria-label^="Answer style"]') as HTMLButtonElement;
+      fireEvent.keyDown(thinkingTrigger, { key: "ArrowDown" });
+      await view.findByRole("menuitemradio", { name: /^Thinking/ });
+      fireEvent.click(await view.findByRole("menuitemradio", { name: /^Thinking/ }));
+      expect(thinkingTrigger).toHaveAttribute("aria-label", "Answer style: Thinking");
 
       const archiveRow = view.getByText("Archive me").closest('[data-slot="aui_thread-list-item"]')!;
       const moreOptions = within(archiveRow as HTMLElement).getByRole("button", { name: "More options" });
@@ -715,13 +715,13 @@ describe("ChatPage (SHELL-02's slice 2: the thread list)", () => {
       fireEvent.click(archiveItem);
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
       expect(view.getByText("Archive me")).toBeVisible();
-      expect(thinkingTrigger).toHaveTextContent("Thinking");
+      expect(thinkingTrigger).toHaveAttribute("aria-label", "Answer style: Thinking");
       await turnsLoad;
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 
       fireEvent.click(view.getByText("Other conversation"));
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive456"));
-      await waitFor(() => expect(thinkingTrigger).toHaveTextContent("Instant"));
+      await waitFor(() => expect(thinkingTrigger).toHaveAttribute("aria-label", "Answer style: Instant"));
     } finally {
       globalThis.fetch = original;
     }
@@ -2849,7 +2849,7 @@ describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
     try {
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson({ role: age_band, age_band })} /></MemoryRouter>);
       await view.findByLabelText("Message input");
-      expect(view.queryByRole("button", { name: "Thinking mode" })).toBeNull();
+      expect(view.queryByRole("button", { name: /^Answer style/ })).toBeNull();
       expect(view.queryByText("Instant")).toBeNull();
     } finally { globalThis.fetch = original; }
   });
@@ -2870,7 +2870,7 @@ describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
       expect(view.container.querySelector('[data-slot="model-selector-value"]')).toBeNull();
       expect(view.queryByText("Instant")).toBeNull();
       expect(view.queryByText("Thinking")).toBeNull();
-      expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
+      expect(view.queryByRole("combobox", { name: /^Answer style/ })).toBeNull();
       expect(view.queryByText("Secret model name")).toBeNull();
     } finally { globalThis.fetch = original; }
   });
@@ -2886,13 +2886,13 @@ describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
-      const trigger = await view.findByRole("combobox", { name: "Thinking mode" });
-      expect(trigger).toHaveTextContent("Instant");
+      const trigger = await view.findByRole("combobox", { name: /^Answer style/ });
+      expect(trigger).toHaveAttribute("aria-label", "Answer style: Instant");
       expect(trigger).not.toHaveTextContent("Secret model name");
-      fireEvent.click(trigger);
-      expect(await view.findByRole("radio", { name: "Thinking" })).toBeTruthy();
-      fireEvent.click(view.getByRole("radio", { name: "Thinking" }));
-      expect(trigger).toHaveTextContent("Thinking");
+      fireEvent.keyDown(trigger, { key: "ArrowDown" });
+      expect(await view.findByRole("menuitemradio", { name: /^Thinking/ })).toBeTruthy();
+      fireEvent.click(view.getByRole("menuitemradio", { name: /^Thinking/ }));
+      expect(trigger).toHaveAttribute("aria-label", "Answer style: Thinking");
     } finally { globalThis.fetch = original; }
   });
 });
@@ -2913,7 +2913,7 @@ describe("ChatPage (ELT-MODE-01: model names stay out of chat)", () => {
       const person = band === "adult" ? makePerson() : makePerson({ role: band, age_band: band });
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={person} /></MemoryRouter>);
       await view.findByLabelText("Message input");
-      if (band === "adult") await view.findByRole("combobox", { name: "Thinking mode" });
+      if (band === "adult") await view.findByRole("combobox", { name: /^Answer style/ });
       for (const name of names) expect(view.queryByText(name)).toBeNull();
       expect(view.container.querySelector('[data-slot="composer-model-picker"]')).toBeNull();
       expect(view.container.querySelector('[aria-label^="Regenerate with a different model"]')).toBeNull();
@@ -2934,8 +2934,8 @@ describe("ChatPage (ELT-MODE-01: the mode label sits just left of the mic)", () 
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
-      const trigger = await view.findByRole("combobox", { name: "Thinking mode" });
-      expect(document.querySelectorAll('[data-slot="model-selector-trigger"]').length).toBe(1);
+      const trigger = await view.findByRole("combobox", { name: /^Answer style/ });
+      expect(document.querySelectorAll('[aria-label^="Answer style"]').length).toBe(1);
       const groups = document.querySelectorAll(".aui-composer-action-wrapper > div");
       expect(groups.length).toBe(2);
       expect(groups[0]!.contains(trigger)).toBe(false);
@@ -2954,9 +2954,9 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
     fireEvent.click(send);
   }
 
-  const trigger = () => document.querySelector('[data-slot="model-selector-trigger"]') as HTMLButtonElement;
-  const menu = () => document.querySelector('[data-slot="model-selector-content"]') as HTMLElement;
-  const menuItems = () => within(menu()).getAllByRole("radio");
+  const trigger = () => document.querySelector('[aria-label^="Answer style"]') as HTMLButtonElement;
+  const menu = () => document.querySelector('[role="menu"]') as HTMLElement;
+  const menuItems = () => within(menu()).getAllByRole("menuitemradio");
 
   function fetchWithPicker(): () => void {
     const original = globalThis.fetch;
@@ -2978,9 +2978,9 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(trigger()).toHaveTextContent("Instant");
-      fireEvent.click(trigger());
-      const items = within(menu()).getAllByRole("radio");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant");
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
+      const items = within(menu()).getAllByRole("menuitemradio");
       expect(items).toHaveLength(2);
       expect(items[0]).toHaveTextContent("Instant");
       expect(items[1]).toHaveTextContent("Thinking");
@@ -2999,10 +2999,10 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
       );
       await view.findByLabelText("Message input");
       expect(menu()).toBeNull();
-      fireEvent.click(trigger());
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
       await waitFor(() => expect(menu()).toBeTruthy());
       fireEvent.click(menuItems()[1]!);
-      expect(trigger()).toHaveTextContent("Thinking");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Thinking");
     } finally {
       restore();
     }
@@ -3073,8 +3073,8 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
       const first = page();
       await first.findByLabelText("Message input");
       await waitFor(() => expect(first.getAllByRole("button", { name: "Conversation actions" })[0]).toBeTruthy());
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
-      fireEvent.click(trigger());
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant"));
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
       fireEvent.click(menuItems()[1]!);
       await waitFor(() => expect(saved.settings).toEqual({ thinking: true }));
       const actions = first.getAllByRole("button", { name: "Conversation actions" })[0]!;
@@ -3089,7 +3089,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
       const reopened = page();
       await reopened.findByLabelText("Message input");
       await waitFor(() => expect(reopened.getAllByRole("button", { name: "Conversation actions" })[0]).toBeTruthy());
-      await waitFor(() => expect(trigger()).toHaveTextContent("Thinking"));
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-label", "Answer style: Thinking"));
       const reopenedActions = reopened.getAllByRole("button", { name: "Conversation actions" })[0]!;
       act(() => {
         fireEvent.pointerDown(reopenedActions, { button: 0, ctrlKey: false, pointerId: 1 });
@@ -3191,13 +3191,13 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(trigger());
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
       expect(menu()).toBeTruthy();
       const input = await view.findByLabelText("Message input");
       fireEvent.pointerDown(input, { bubbles: true, button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
       fireEvent.click(input, { bubbles: true, button: 0 });
       await waitFor(() => expect(trigger()).toHaveAttribute("aria-expanded", "false"));
-      expect(trigger()).toHaveTextContent("Instant");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant");
     } finally {
       restore();
     }
@@ -3212,11 +3212,11 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(trigger());
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
       expect(menu()).toBeTruthy();
       fireEvent.keyDown(document, { key: "Escape" });
       expect(menu()).toBeNull();
-      expect(trigger()).toHaveTextContent("Instant");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant");
     } finally {
       restore();
     }
@@ -3321,18 +3321,18 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(trigger());
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
       fireEvent.click(menuItems()[1]!);
-      expect(trigger()).toHaveTextContent("Thinking");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Thinking");
 
       await sendMessage(view, "explain it");
       await view.findByText("Reply 1.");
       // Still Thinking, and the second send in the same conversation
       // still carries thinking: true - the defect this test closes.
-      expect(trigger()).toHaveTextContent("Thinking");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Thinking");
       await sendMessage(view, "and then?");
       await view.findByText("Reply 2.");
-      expect(trigger()).toHaveTextContent("Thinking");
+      expect(trigger()).toHaveAttribute("aria-label", "Answer style: Thinking");
       const bodies = turnRequestBodies();
       expect(bodies).toHaveLength(2);
       expect(bodies[0]!.thinking).toBe(true);
@@ -3340,7 +3340,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
 
       // A new conversation keeps the active engine default.
       fireEvent.click(within(document.querySelector<HTMLElement>('[data-slot="section-sidebar-box"]')!).getByRole("button", { name: "New chat" }));
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant"));
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -3389,7 +3389,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
     try {
       const first = open("conv-model-a");
       await first.findByLabelText("Message input");
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant"));
       await sendMessage(first, "use fast");
       await first.findByText("Reply 1.");
       const sent = turnRequestBodies().at(-1)!;
@@ -3400,12 +3400,12 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
 
       const reopened = open("conv-model-a");
       await reopened.findByLabelText("Message input");
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant"));
       reopened.unmount();
 
       const other = open("conv-model-b");
       await other.findByLabelText("Message input");
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-label", "Answer style: Instant"));
       await sendMessage(other, "use family");
       await other.findByText("Reply 2.");
       expect(turnRequestBodies().at(-1)!.model).toBeUndefined();

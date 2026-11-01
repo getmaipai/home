@@ -11,6 +11,7 @@ import { transitionNotice } from "@/lib/chatTransitions";
 import { VOICE_FAILURE_COPY, voiceFailureLine } from "@/lib/failureCopy";
 import { COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { TAKE_RUN_TIMEOUT_LINE } from "@/lib/companionTakes";
+import { MODE_LINES, MAX_DIALOG_TITLE, MAX_DIALOG_BODY, maxStartLine } from "../../frontend/src/apps/chat/composerModeLines";
 import { plainEngineLine, plainMakingLine } from "@/lib/pictures/plainLine";
 
 export const BANNED = /\bmemory\b|\bRAM\b|\bGB\b|\bgigabytes?\b|\broom\b|free(?:s|d)? up|putting away|put away|using it|the computer is|\bengine\b|big model|big job|bigger job|\bpressure\b|\bload(?:ing)?\b the model|\bmodels?\b|lower level|\btier\b|\bbigger\b|\blarger\b|better version|\bbig\b|\bengines?\b|\bbusy\b|\brestart(?:s|ed|ing)?\b|\bpaused?\b|\boffline\b|\bunavailable\b|working on something else/i;
@@ -36,6 +37,8 @@ describe("no resource words in what a person reads", () => {
   lines.push(["fit ask line", askLine({ outcome: "ask", applied: {} as never, steps: [], lowered: [], leadTier: "boost", belowPick: true, needGb: 40, requestedNeedGb: 60, haveGb: 20, reason: "no_room_now", requested: { tier: "max" } as never } as never, "adult") ?? ""]);
   lines.push(["started with estimate", jobQueueCopy("started", "started", null, 30, "adult")]);
   lines.push(["making_room with estimate", jobQueueCopy("waiting_memory", "making_room", null, 30, "adult")]);
+  MODE_LINES.forEach((line, i) => lines.push([`composer mode line ${i}`, line]));
+  lines.push(["MAX_DIALOG_TITLE", MAX_DIALOG_TITLE], ["MAX_DIALOG_BODY", MAX_DIALOG_BODY], ["max start line", maxStartLine("a minute")], ["max start line seconds", maxStartLine("30 seconds")]);
   lines.push(["COMPANION_MODEL_MISMATCH_LINE", COMPANION_MODEL_MISMATCH_LINE], ["TAKE_RUN_TIMEOUT_LINE", TAKE_RUN_TIMEOUT_LINE]);
   for (const kind of Object.keys(VOICE_FAILURE_COPY) as Array<keyof typeof VOICE_FAILURE_COPY>) for (const [minor, repairs] of [[true, true], [false, true], [false, false]] as const) lines.push([`voice.${kind}.${minor}.${repairs}`, voiceFailureLine(kind, { minor, canOpenRepairs: repairs })]);
   lines.push(["plainEngineLine", plainEngineLine("Only 3.2 GB of memory available, reserve 4 GB")]);
