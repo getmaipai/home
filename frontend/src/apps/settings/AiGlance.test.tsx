@@ -72,6 +72,23 @@ describe("AiGlance Apply", () => {
     expect(posts[0]).toContain("stems.standard");
   });
 
+  test("a refused Apply shows the cause in a status row and keeps the change staged", async () => {
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (init?.method === "POST") return Promise.resolve(Response.json({ error: "Not enough room on the disk. Free some space, then try again.", code: "not_enough_space" }, { status: 409 }));
+      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json(overview));
+      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as typeof fetch;
+    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
+    fireEvent.click(await view.findByRole("switch", { name: /Wake Word/ }));
+    fireEvent.click(await view.findByRole("button", { name: "Apply changes" }));
+    expect(await view.findByText("That did not work")).toBeTruthy();
+    expect(view.getByText(/Not enough room on the disk/)).toBeTruthy();
+    expect(view.getByTestId("ai-staged")).toBeTruthy();
+  });
+
   test("a row whose model is downloading shows the progress, and a failed one says so", async () => {
     const serve = (choice: object) => {
       globalThis.fetch = ((input: RequestInfo | URL) => {
