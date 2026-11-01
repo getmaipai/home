@@ -111,6 +111,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         const single = row.options.length === 1 && row.options[0]!.kind === "switch" ? row.options[0]! : null;
         if (!row.shownEnabled) {
           if (single?.setting) await api.setSetting("household", single.setting.key, false, true);
+          else if (row.job === "stems") { /* Stems has no On/Off setting: the parts are installed or not, and nothing else to turn off. */ }
           else if (row.job === "wakeword") { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
           else await api.setSetting("household", `engines.${role}.choice`, "off", true);
         } else if (row.shown && (staged[row.job]?.choiceId || single)) {

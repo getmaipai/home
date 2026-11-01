@@ -7,7 +7,7 @@
 
 import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "voice" | "wakeword" | "vision" | "coding";
+export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "stems" | "voice" | "wakeword" | "vision" | "coding";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
 export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
@@ -51,7 +51,7 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper" | "vision.reader";
+type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper" | "vision.reader";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
@@ -60,6 +60,7 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "picturesdetailed", rows: ["pictures-zimage"] },
   { id: "videos", rows: ["video", "video-detailed"] },
   { id: "music", rows: ["music"] },
+  { id: "stems", rows: ["stems", "stems-ft", "stems-6s"] },
   { id: "voice", rows: ["voice", "voice-better"] },
   { id: "wakeword", rows: [] },
   { id: "vision", rows: ["vision"] },
@@ -221,6 +222,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
     case "vision":
     case "picturesdetailed":
     case "music":
+    case "stems":
     case "coding": {
       const toggle = choices.find((choice) => choice.kind === "switch");
       if (!toggle || !toggle.current) return "Off";
@@ -253,6 +255,8 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
     const words = copy.card(meta.id);
     // The picture reader's words arrive with the spec pin that carries them (AIMODELS-VISION-01); until then the card stays out of the page.
     if (meta.id === "vision" && !words.summary) continue;
+    // The Stems words arrive with the spec pin that carries them (TIER-STEMS-03); until then the card stays out of the page.
+    if (meta.id === "stems" && !words.summary) continue;
     if (!present) {
       cards.push({ id: meta.id, title: words.title, summary: words.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: `${words.title} is not on this computer. It needs more memory.` });
       continue;
@@ -297,6 +301,12 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       }
       case "music": {
         if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
+        break;
+      }
+      case "stems": {
+        if (has("stems")) specs.push({ id: "stems.standard", job: "stems", kind: "switch", row: rows.get("stems")!, current: rowIsInstalled(rows.get("stems")!, components), recommended: need("stems") === "recommended", setting: null });
+        if (has("stems-ft")) specs.push({ id: "stems.finer", job: "stems", kind: "switch", row: rows.get("stems-ft")!, current: rowIsInstalled(rows.get("stems-ft")!, components), recommended: false, setting: null });
+        if (has("stems-6s")) specs.push({ id: "stems.more", job: "stems", kind: "switch", row: rows.get("stems-6s")!, current: rowIsInstalled(rows.get("stems-6s")!, components), recommended: false, setting: null });
         break;
       }
       case "voice": {
