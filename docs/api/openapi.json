@@ -25511,7 +25511,7 @@
         },
         "responses": {
           "202": {
-            "description": "The downloads started in the background.",
+            "description": "The downloads started in the background. left_out names a job the request asked for that this computer can never run (the Stack's fits_ever), with the reason in plain words; nothing is downloaded for it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25525,6 +25525,24 @@
                     },
                     "models": {
                       "type": "number"
+                    },
+                    "left_out": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "job": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "job",
+                          "reason"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -25709,6 +25727,13 @@
                         "type": "string"
                       },
                       "description": "Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."
+                    },
+                    "cannot_run_why": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "For each job in cannot_run, the reason in plain words (how much memory it asks for)."
                     }
                   },
                   "required": [
