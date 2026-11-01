@@ -502,6 +502,26 @@ S6. **System status reaches the person through the existing mechanisms.**
     status. Rejected in review: a new status UI that duplicates an existing
     one.
 
+S7. **Whatever an app can make or change, chat can ask for, and a creative app is split into its two modes.**
+    Owner-approved 2026-11-01; his words are the record: "Anything made in Create can also be asked
+    for in chat ... we need this as a rule because when we create the video studio, image studio we are
+    going to have the same needs ... and we need the same Watch/Create in the videos app."
+    (a) Every thing a person can make or change in an app's Create mode (a song, lyrics, a sound, stems, a
+    band, an album, a picture edit, a video clip) has a chat tool and a chat card, and the card is the
+    same kit Element the Create page uses (rule 9: as it ships, never a chat-only copy). A slice that
+    adds a Create function is not done until its chat tool, its card and the tool's bench row exist.
+    Tools are conditional (rule 1) and gated in the tool, not the card. A job that takes time uses a
+    named tool-call card that polls the job; anything else is an answer block kind added once in
+    `commons` ([chat cards standard](chat-cards-2026-10-18.md)).
+    (b) An app that both plays and makes things is one app with two modes: **Listen** and **Create** in
+    Music, **Watch** and **Create** in Videos, **View** and **Create** in Pictures (the exact word is the
+    one the native app uses; Create is always the second mode). The switch sits at the top of the app so
+    Create is always visible. What Create makes appears in the first mode labelled "Made here". There is
+    no separate studio app for the same media.
+    A new creative app or a new Create function that skips (a) or (b) is rejected in review. Applies to
+    Music, Videos and Pictures from the next slice of each; existing pages move when their app is next
+    worked on, not before.
+
 ## Live video services
 
 Record: [live web video for everyone](live-video-2026-10-17.md), with its

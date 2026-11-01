@@ -68,7 +68,7 @@ New records, spec first in `commons/spec`, additive only:
 
 ## 3.3 Chat: every thing Create makes also has a chat tool and a card (owner, 2026-11-01)
 
-Rule for this whole note: no slice is done until its chat half exists. Anything a person can make or change in Create can be asked for
+Rule for this whole note, now a platform rule ([RULES.md](RULES.md) S7, owner-approved 2026-11-01, which also covers Videos' Watch and Create and Pictures): no slice is done until its chat half exists. Anything a person can make or change in Create can be asked for
 in chat, and the result is the same Element in both places (rule 9: the kit Element as it ships, never a chat-only copy). This follows the
 [chat cards standard](chat-cards-2026-10-18.md): a job that takes time uses a named tool-call card that polls the job (as the song card does
 today); everything else is an answer block, a new `kind` added once in `commons` and drawn by `AnswerBlockView`.
