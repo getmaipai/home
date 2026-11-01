@@ -16112,6 +16112,9 @@
                     "installed": {
                       "type": "boolean"
                     },
+                    "can_install": {
+                      "type": "boolean"
+                    },
                     "apps": {
                       "type": "array",
                       "items": {
@@ -16141,7 +16144,67 @@
                   },
                   "required": [
                     "installed",
+                    "can_install",
                     "apps"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/performance/apps/install": {
+      "post": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "Install the Mac app helper, for admins",
+        "responses": {
+          "200": {
+            "description": "Builds and loads the user-level helper for the person at this Mac. It does not turn Close apps on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "enum": [
+                        "installed",
+                        "no_toolchain",
+                        "nobody_logged_in",
+                        "not_mac",
+                        "failed"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "message"
                   ]
                 }
               }
@@ -24174,13 +24237,16 @@
         "summary": "Is the Mac app helper running, and which apps are open",
         "responses": {
           "200": {
-            "description": "Names are returned to the wizard and never stored.",
+            "description": "Names are returned to the wizard and never stored. can_install is true on a Mac that carries the helper installer, so the wizard can offer Install helper when installed is false.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "installed": {
+                      "type": "boolean"
+                    },
+                    "can_install": {
                       "type": "boolean"
                     },
                     "apps": {
@@ -24204,6 +24270,7 @@
                   },
                   "required": [
                     "installed",
+                    "can_install",
                     "apps"
                   ]
                 }
@@ -24292,6 +24359,99 @@
                   },
                   "required": [
                     "result"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Owner sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Setup is finished. The text says where to change this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/close-apps/install": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Install the Mac app helper for the person at this Mac",
+        "responses": {
+          "200": {
+            "description": "installed once the helper answers; any other result says in plain words what to do next. Close apps stays Off either way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "enum": [
+                        "installed",
+                        "no_toolchain",
+                        "nobody_logged_in",
+                        "not_mac",
+                        "failed"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "message"
                   ]
                 }
               }
