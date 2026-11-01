@@ -38,7 +38,7 @@
       "kind": "audio",
       "details": false,
       "layout": "audio",
-      "empty_state": { "type": "empty_state", "icon": "headphones", "text": "This station is no longer available. Go back to Radio and find it again." }
+      "empty_state": { "type": "empty_state", "icon": "headphones", "text": "This station is not available right now. Open Radio to find it again.", "action": { "navigate": { "to": "/apps/music/radio" } }, "action_label": "Open Radio" }
     },
     {
       "type": "media_shelf",
