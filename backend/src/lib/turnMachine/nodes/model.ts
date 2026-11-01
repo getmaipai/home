@@ -795,9 +795,14 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
     markResearch(state, "gap check start");
     const proposed = await writeQueriesChecked(queryWriterOverride ?? chatQueryWriter(signal), researchQuestion(state.messages, input.utterance), researchProgress(state.outcomes), resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
-    markResearch(state, `gap check end (${proposed === null ? "writer down" : `${proposed.length} searches`})`);
-    if (proposed !== null) state.nextQueries = proposed;
-    if (proposed !== null && proposed.length === 0) effective = { ...input, toolsAllowed: false };
+    markResearch(state, `gap check end (${proposed === null ? "writer down" : `${proposed.queries.length} searches, ${proposed.proposed} written`})`);
+    if (proposed !== null) state.nextQueries = proposed.queries;
+    // Done only when the writer itself sees nothing more to search; a list the filters emptied (repeats, names from memory) leaves the model to search.
+    if (proposed !== null && proposed.proposed === 0) effective = { ...input, toolsAllowed: false };
+    else if (proposed !== null && proposed.queries.length > 0) {
+      markResearch(state, `model skipped: the plan issues ${Math.min(proposed.queries.length, PLANNED_SEARCHES_PER_ROUND)} searches`);
+      return { outcome: { ok: true }, output: { kind: "tool_calls", calls: plannedSearchCalls(proposed.queries, state.outcomes.length) } };
+    }
   }
   const result = await modelRound(state, effective, signal);
   if (timed) markResearch(state, `model end (${result.output.kind})`);
@@ -807,6 +812,13 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if (calls.length === 0) return modelRound(state, { ...input, toolsAllowed: false, retry: false }, signal);
   return { ...result, output: { ...result.output, calls } };
 };
+
+/** RESEARCH-CLOCK-01: the searches a plan or a gap check wrote, issued by the code as the round's tool calls (up to this many at a time),
+ * so the big model does not spend 5 to 20 seconds writing calls the plan already holds. The policy and the tool node treat them as any call. */
+const PLANNED_SEARCHES_PER_ROUND = 3;
+function plannedSearchCalls(queries: readonly string[], round: number): ToolCall[] {
+  return queries.slice(0, PLANNED_SEARCHES_PER_ROUND).map((expression, index) => ({ tool: "websearch", args: { expression }, id: `plan-${round}-${index}` }));
+}
 
 /** The last few turns of the conversation as plain text for stage 1 (what the person already said settles what they mean). */
 function recentConversation(messages: LlmMessage[]): string {
@@ -1099,6 +1111,13 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     state.researchPlan = plan;
     firstRoundQueries = plan.queries;
     briefNote = brief ? ` ${briefBlock(brief)}` : "";
+    // The plan's own searches are the first round's calls: no big-model generation is spent writing them.
+    if (plan.queries.length > 0 && tools.some((t) => t.id === "websearch")) {
+      state.messages = messages;
+      state.lastTools = tools;
+      markResearch(state, `model skipped: the plan issues ${Math.min(plan.queries.length, PLANNED_SEARCHES_PER_ROUND)} searches`);
+      return { outcome: { ok: true }, output: { kind: "tool_calls", calls: plannedSearchCalls(plan.queries, 0) } };
+    }
   }
   const firstRoundMessages = firstRoundWanted ? withResearchNote(messages, `${firstRoundNote(state.answerStyle!, state.budget.rounds)}${briefNote}${suggestedSearchesNote(firstRoundQueries)}`) : null;
   state.messages = continuing ? state.messages : messages;

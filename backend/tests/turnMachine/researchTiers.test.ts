@@ -203,17 +203,26 @@ describe("research rounds follow the answer style", () => {
     expect(result.value.reply.text).not.toContain("not confirmed");
   });
 
-  test("the query writer's searches reach the first round and each later round, and a writer that is down changes nothing", async () => {
+  test("the plan's searches are the first round's calls, the gap check's are each later round's, and a writer that is down leaves the model to choose", async () => {
     await holdMax();
     const prompts: string[] = [];
-    __setQueryWriterForTests(async (prompt) => { prompts.push(prompt); return JSON.stringify({ queries: [prompts.length === 1 ? "first planned search about the series ending" : "second planned search using found names", "V series reboot"] }); });
-    const { requests } = await turn("owner", 2, { max: true });
-    const first = requests.find((r) => toolMessages(r).length === 0 && r.tool_choice !== "none")!;
-    expect(first.messages.filter((m) => m.role === "user").at(-1)!.content!.toString()).toContain("first planned search about the series ending");
-    const second = requests.find((r) => toolMessages(r).length === 1 && r.tool_choice !== "none")!;
-    expect(second.messages.at(-1)!.content!.toString()).toContain("second planned search using found names");
-    expect(prompts[1]).toContain("V series reboot".split(" ")[0]!); // the later prompt lists the searches already run
+    __setQueryWriterForTests(async (prompt) => {
+      prompts.push(prompt);
+      if (prompts.length === 1) return JSON.stringify({ queries: ["V series ending first planned angle", "V series cancelled why"] });
+      if (prompts.length === 2) return JSON.stringify({ queries: ["V series season cancelled found sites"] });
+      return JSON.stringify({ queries: [] });
+    });
+    await turn("owner", 5, { max: true });
+    expect(searxQueries).toEqual(["V series ending first planned angle", "V series cancelled why", "V series season cancelled found sites"]);
     expect(prompts[1]).toContain("Searches already run");
+    expect(prompts[1]).toContain("V series ending first planned angle");
+  });
+
+  test("a writer that is down leaves the searches to the model, as before", async () => {
+    await holdMax();
+    __setQueryWriterForTests(async () => null);
+    await turn("owner", 2, { max: true });
+    expect(searxQueries.length).toBe(2);
   });
 
   test("a research search built on a name or year from memory runs without it, and the next round is told", async () => {
@@ -374,7 +383,8 @@ describe("research is bounded by the clock, and the round counts are only ceilin
     searxDelayMs = 500;
     const { result } = await turn("owner", 4, { thinking: true });
     expect(searxQueries.length).toBe(1);
-    expect(result.value.reply.text.length).toBeGreaterThan(0);
+    // the model wrote the answer (a phrasing round), not a dump of the search results
+    expect(result.value.reply.text).toContain("It ended after one season");
   });
 
   test("the same turn with time to spare still uses its rounds", async () => {
@@ -402,13 +412,13 @@ const TOPICS = [
   { name: "a tax question", queries: ["employee deduct home office federal taxes", "home office deduction employee federal taxes"], utterance: "can an employee deduct a home office on their federal taxes", fact: "Deep fact: employees cannot claim the home office deduction for tax years 2018 through 2025." },
   { name: "a science question", queries: ["sea level rising faster some places", "sea level rising regional differences places others"], utterance: "why is sea level rising faster in some places than in others", fact: "Deep fact: the western Pacific has risen about three times the global average since 1993." },
 ];
-/** A query writer that plans the first round, then proposes `gaps` more rounds of searches, then finds nothing new to search. */
-const writerWithGaps = (gaps: number) => {
+/** A query writer that plans the first round with `plan`, then proposes each entry of `gaps` as a later round, then finds nothing new to search. */
+const writerWithGaps = (plan: string[], gaps: string[][]) => {
   let calls = 0;
   return async () => {
     calls += 1;
-    if (calls === 1) return JSON.stringify({ sub_questions: ["the key part"], queries: ["first angle on the question", "second angle on the question"] });
-    return JSON.stringify({ queries: calls - 1 <= gaps ? [`another angle number ${calls}`] : [] });
+    if (calls === 1) return JSON.stringify({ sub_questions: ["the key part"], queries: plan });
+    return JSON.stringify({ queries: gaps[calls - 2] ?? [] });
   };
 };
 const longPage = (fact: string): string => `${"Opening material that says nothing useful about the question. ".repeat(170)}\n${fact}\n${"Closing material of no use either. ".repeat(60)}`;
@@ -426,8 +436,8 @@ describe("deep facts reach the answer through the notes, on four kinds of questi
         brief: async () => JSON.stringify({ subject: topic.name, answer_type: "an explanation", must_contain: ["the key fact"], ambiguous: false, options: [], assumption: "" }),
         analysis: async () => JSON.stringify({ claims: [{ claim: "The page states the key fact.", status: "established", sources: [1] }], conflicts: [], gaps: [], guesses: [{ guess: "Things would have continued the same way.", because: ["the key fact"], confidence: "low", sources: [1] }] }),
       });
-      __setQueryWriterForTests(writerWithGaps(1));
-      const { requests, result } = await turn("owner", 2, { max: true, thinking: true, utterance: topic.utterance, queries: topic.queries });
+      __setQueryWriterForTests(writerWithGaps(topic.queries, [[topic.queries[0]! + " details"]]));
+      const { requests, result } = await turn("owner", 2, { max: true, thinking: true, utterance: topic.utterance });
       const answering = lastRequest(requests);
       const instruction = answering.messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
       expect(instruction).toContain("Notes from the pages that were read");
@@ -456,7 +466,7 @@ describe("deep facts reach the answer through the notes, on four kinds of questi
     });
     const judged: string[] = [];
     __setClaimJudgeForTests(async (prompt) => { judged.push(prompt); return '{"supported": true}'; });
-    __setQueryWriterForTests(writerWithGaps(0));
+    __setQueryWriterForTests(writerWithGaps(topic.queries, []));
     await turn("owner", 1, { max: true, thinking: true, utterance: topic.utterance });
     expect(judged.some((p) => p.includes(topic.fact))).toBe(true);
   });
@@ -484,10 +494,28 @@ describe("a question that could mean two things", () => {
 
   test("Thinking never asks: it researches and states its reading in the first line of the answer", async () => {
     __setStageWritersForTests({ brief: async () => ambiguous });
-    __setQueryWriterForTests(writerWithGaps(1));
+    __setQueryWriterForTests(writerWithGaps(["Harbor Lights television series end", "Harbor Lights series ratings"], [["Harbor Lights television series finale"]]));
     const { requests } = await turn("owner", 2, { thinking: true, utterance: "why did the television series Harbor Lights end" });
-    expect(searxQueries.length).toBe(2);
+    expect(searxQueries.length).toBe(3);
     const instruction = lastRequest(requests).messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
     expect(instruction).toContain('Begin with one plain sentence saying what you took the question to mean: "I took this to mean the 1984 series."');
+  });
+});
+
+describe("the gap check ends the searching only when the writer itself finds nothing more to search", () => {
+  test("a proposal list the filters emptied (a name from memory) leaves the model free to search again", async () => {
+    await holdMax();
+    let calls = 0;
+    __setQueryWriterForTests(async () => { calls += 1; return calls === 1 ? JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: ["Jane Smith interview about the question"] }); });
+    await turn("owner", 1, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
+    expect(searxQueries).toEqual(["Harbor Lights television series cancelled", "Harbor Lights series ratings one season"]);
+  });
+
+  test("a writer that proposes nothing at all ends the searching and the answer is written from the notes", async () => {
+    await holdMax();
+    __setQueryWriterForTests(writerWithGaps(["Harbor Lights television series cancelled"], []));
+    const { result } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
+    expect(searxQueries).toEqual(["Harbor Lights television series cancelled"]);
+    expect(result.value.reply.text).toContain("It ended after one season");
   });
 });

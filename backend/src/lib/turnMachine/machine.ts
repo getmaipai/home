@@ -233,7 +233,7 @@ export const turnMachine = setup({
       const entries = (event as unknown as { output: PolicyOutput }).output.entries;
       return entries.length > 0 && entries.every((e) => !e.decision.allow && e.decision.reason === "ungrounded_args" && isDecorativeTool(e.proposal.request.tool));
     },
-    moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds && !researchNoNewRound(context.turnState),
+    moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
     // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
     // here: it sent a round whose every outcome failed straight to
     // `answer` with a deterministic outage line. A failed tool never fails
@@ -552,7 +552,8 @@ export const turnMachine = setup({
             actions: [
               assign(({ event }) => ({ step: event.output })),
               // RESEARCH-TIER-01: a research round that found nothing new ends the searching; the next model call is the answering round.
-              assign({ roundsUsed: ({ context, event }) => (isResearchStyle(context.turnState.answerStyle, context.turnState.budget) && roundAddedNothing(context.turnState.outcomes, (event as unknown as { output: ToolOutput }).output.outcomes) ? context.turnState.budget.rounds : context.roundsUsed + 1) }),
+              // RESEARCH-CLOCK-01: so does a round that ends after 70% of the style's cap.
+              assign({ roundsUsed: ({ context, event }) => (isResearchStyle(context.turnState.answerStyle, context.turnState.budget) && (researchNoNewRound(context.turnState) || roundAddedNothing(context.turnState.outcomes, (event as unknown as { output: ToolOutput }).output.outcomes)) ? context.turnState.budget.rounds : context.roundsUsed + 1) }),
               "recordOutcomes",
               "derivePlanFromEvidence",
             ],

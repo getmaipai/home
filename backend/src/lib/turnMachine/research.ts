@@ -354,18 +354,21 @@ export function parsePlannedQueries(text: string): string[] {
 
 /** The searches the writer proposes, minus any that repeats an earlier search of the turn or an earlier proposal. Empty when the writer is unavailable. */
 export async function writeQueries(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<string[]> {
-  return (await writeQueriesChecked(writer, utterance, progress, digest, count)) ?? [];
+  return (await writeQueriesChecked(writer, utterance, progress, digest, count))?.queries ?? [];
 }
 
-/** The same, but null when the writer is unavailable (so a caller can tell "nothing new to search" from "no answer"). */
-export async function writeQueriesChecked(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<string[] | null> {
+/** The same, but with the writer's own count: `proposed` is how many searches it wrote before any were filtered out, so a caller can tell
+ * "the writer sees nothing more to search" (0) from "everything it wrote was a repeat or built on a name from memory" (more than 0 but
+ * `queries` empty). Null when the writer is unavailable. */
+export async function writeQueriesChecked(writer: QueryWriter, utterance: string, progress: ResearchProgress, digest: string, count: number): Promise<{ queries: string[]; proposed: number } | null> {
   let reply: string | null = null;
   try { reply = await writer(queryWriterPrompt(utterance, progress, digest, count)); } catch { reply = null; }
   if (reply === null) return null;
+  const planned = parsePlannedQueries(reply);
   const kept: string[] = [];
   const allowed = `${utterance}\n${digest}`;
-  for (const query of parsePlannedQueries(reply)) if (!isRepeatQuery([...progress.queries, ...kept], query) && memoryDetailsIn(query, allowed).length === 0) kept.push(query);
-  return kept.slice(0, count);
+  for (const query of planned) if (!isRepeatQuery([...progress.queries, ...kept], query) && memoryDetailsIn(query, allowed).length === 0) kept.push(query);
+  return { queries: kept.slice(0, count), proposed: planned.length };
 }
 
 /** Added to a research round's note when the query writer proposed searches. The model still chooses what to search. */
