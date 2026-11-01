@@ -77,6 +77,9 @@ export function toArticleViewData(article: ReferenceArticleView, options: Articl
     ...(kicker && options.onCategory ? { onKicker: () => options.onCategory!(kicker) } : {}),
     // The same header row as a News story: source line with the snapshot date and reading time, Save and Listen in one place.
     // A book that reports no snapshot date keeps the plain source line instead.
+    // The provider row carries the article's own name and its picture (when the book has one) instead of the book's name.
+    providerLabel: article.title,
+    ...(infoboxPicture?.src || article.lead_image?.src || figureHero?.hero.src ? { sourceIconUrl: (infoboxPicture?.src ?? article.lead_image?.src ?? figureHero?.hero.src)! } : {}),
     ...(article.snapshot_date
       ? { byline: { publisher: article.source_label, site: article.source_label, published_at: article.snapshot_date, outlets: 1, reading_s: Math.max(1, article.reading_minutes ?? 1) * 60 } }
       : {}),

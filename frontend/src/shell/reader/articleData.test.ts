@@ -16,6 +16,12 @@ const base: ReferenceArticleView = {
 const opts = { appName: "Wikipedia", onAppHome: () => {} };
 
 describe("toArticleViewData", () => {
+  test("the provider row shows the article's title, with its picture when the book has one", () => {
+    expect(toArticleViewData(base, opts).providerLabel).toBe("Zendaya");
+    expect(toArticleViewData(base, opts).sourceIconUrl).toBeUndefined();
+    expect(toArticleViewData({ ...base, lead_image: { src: "/img/z.jpg", alt: "Zendaya" } }, opts).sourceIconUrl).toBe("/img/z.jpg");
+  });
+
   test("a bare article keeps title, blocks and the News header line (source, snapshot date, reading time), and draws nothing extra", () => {
     const data = toArticleViewData({ ...base, reading_minutes: 12 }, opts);
     expect(data.title).toBe("Zendaya");
