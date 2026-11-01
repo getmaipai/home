@@ -11,7 +11,35 @@ import { sourceForBook } from "@/lib/retrieval/referenceSources";
 import { installed, libraryRequest } from "@/lib/kiwixClient";
 import type { PersonRow } from "@/types";
 
-export async function loadArticleFor(person: PersonRow, book: string, path: string) {
+type LoadedArticle = Awaited<ReturnType<typeof loadArticleUncached>>;
+
+// A page is 0.5 to 1.3 MB of HTML and parsing it costs 100 to 350 ms, and one open asks for the same article several times (the page, its
+// related cards, Key points, a preview). Kept for a few minutes per reader's age band and picture setting, the second ask is free.
+// Only a found article is kept (a library that is down or a missing page stays retryable), and equal asks in flight share one load.
+const ARTICLE_KEEP_MS = 5 * 60 * 1000;
+const ARTICLE_KEEP_MAX = 40;
+const kept = new Map<string, { at: number; article: NonNullable<LoadedArticle> }>();
+const inflight = new Map<string, Promise<LoadedArticle>>();
+export function __resetReferenceArticleCacheForTests(): void { kept.clear(); inflight.clear(); }
+
+export async function loadArticleFor(person: PersonRow, book: string, path: string): Promise<LoadedArticle> {
+  const key = `${speakerAgeBand(person, new Date())}|${getPersonSettingValue(person, "reference.images") === true}|${book}|${path}`;
+  const hit = kept.get(key);
+  if (hit && Date.now() - hit.at < ARTICLE_KEEP_MS) return hit.article;
+  const running = inflight.get(key);
+  if (running) return running;
+  const load = loadArticleUncached(person, book, path).then((article) => {
+    if (article) {
+      if (kept.size >= ARTICLE_KEEP_MAX) kept.delete(kept.keys().next().value!);
+      kept.set(key, { at: Date.now(), article });
+    }
+    return article;
+  }).finally(() => inflight.delete(key));
+  inflight.set(key, load);
+  return load;
+}
+
+async function loadArticleUncached(person: PersonRow, book: string, path: string) {
   const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
   if (!base || path.split("/").includes("..")) return null;
   try {
@@ -53,17 +81,23 @@ export async function loadArticleFor(person: PersonRow, book: string, path: stri
   } catch { return null; }
 }
 
+const RELATED_LOOKED_AT = 12;
+const RELATED_BUDGET_MS = 600;
+
 export async function articlePayloadFor(person: PersonRow, result: NonNullable<Awaited<ReturnType<typeof loadArticleFor>>>) {
   if ("redirect" in result) return null;
   const base = kiwixBaseUrl()!;
   let related: Array<{ book: string; path: string; title: string; thumbnail?: { src: string; alt: string } }> | undefined;
   if (result.relatedTargets.length) {
-    related = [];
-    for (let i = 0; i < result.relatedTargets.length && related.length < 5; i += 4) {
-      const batch = result.relatedTargets.slice(i, i + 4);
-      const loaded = await Promise.all(batch.map(async (target: { book: string; path: string }) => { const article = await loadArticleFor(person, target.book, target.path); return !article || "redirect" in article ? null : { book: target.book, path: target.path, title: article.title, ...(article.lead_image ? { thumbnail: article.lead_image } : {}) }; }));
-      related.push(...loaded.filter((x): x is NonNullable<typeof x> => x !== null).slice(0, 5 - related.length));
-    }
+    // Related cards must not hold the page back: look at the first dozen links at once, wait at most RELATED_BUDGET_MS, and show what is
+    // ready. The rest keep loading into the article cache, so the next open of this page has them at once.
+    const found: Array<{ book: string; path: string; title: string; thumbnail?: { src: string; alt: string } } | null> = [];
+    const looks = result.relatedTargets.slice(0, RELATED_LOOKED_AT).map(async (target: { book: string; path: string }, index: number) => {
+      const article = await loadArticleFor(person, target.book, target.path);
+      found[index] = !article || "redirect" in article ? null : { book: target.book, path: target.path, title: article.title, ...(article.lead_image ? { thumbnail: article.lead_image } : {}) };
+    });
+    await Promise.race([Promise.allSettled(looks), new Promise((resolve) => setTimeout(resolve, RELATED_BUDGET_MS))]);
+    related = found.filter((card): card is NonNullable<typeof card> => !!card).slice(0, 5);
   }
   return { title: result.title, book: result.book, path: result.path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, result.book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: { ...result.full.infobox, ...(result.infoboxImage ? { image: result.infoboxImage } : {}) } } : {}), ...((result.full.description ?? (result.lead ? deriveDescription(result.lead) : undefined)) ? { description: result.full.description ?? deriveDescription(result.lead!) } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}), ...(result.lead ? { lead: result.lead } : {}), reading_minutes: result.reading_minutes, ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.quick_fact ? { quick_fact: result.quick_fact } : {}), ...(result.badge ? { badge: result.badge } : {}), ...(related ? { related } : {}) };
 }

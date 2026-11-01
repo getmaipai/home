@@ -4,6 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetSidecarsForTests, registerSidecar } from "@/lib/sidecars";
 import { KIWIX_SIDECAR_ID } from "@/lib/kiwixSidecar";
 import { __resetReferenceReaderCachesForTests } from "@/lib/retrieval/referenceReader";
+import { __resetReferenceArticleCacheForTests } from "@/lib/reference/article";
 import { startFakeKiwix, type FakeBook, type FakeKiwix } from "./support/fakeKiwix";
 
 const WIKI = "wikipedia_en_all_mini_2026-09";
@@ -13,7 +14,7 @@ const article = (title: string, body: string) => `<!doctype html><html><head><ti
 const book = (id: string, articles: FakeBook["articles"]): FakeBook => ({ id, date: "2026-09-01", articles });
 let kiwix: FakeKiwix | null = null;
 function start(books: FakeBook[]) { kiwix = startFakeKiwix(books); registerSidecar({ id: KIWIX_SIDECAR_ID, command: ["true"], port: Number(new URL(kiwix.baseUrl).port) }); return kiwix; }
-beforeEach(() => { resetDb(); __resetSidecarsForTests(); __resetReferenceReaderCachesForTests(); });
+beforeEach(() => { resetDb(); __resetSidecarsForTests(); __resetReferenceReaderCachesForTests(); __resetReferenceArticleCacheForTests(); });
 afterEach(() => { kiwix?.stop(); kiwix = null; __resetSidecarsForTests(); });
 async function owner() { const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" }); return c; }
 async function child(adult: TestClient) { const res = await adult.post("/api/people", { displayName: "Robin", role: "child", secret: "child-secret" }); const { id } = await res.json() as { id: string }; const c = new TestClient(); await c.post("/api/auth/verify-secret", { personId: id, secret: "child-secret" }); return c; }
@@ -27,6 +28,15 @@ describe("reference reader routes", () => {
     expect(res.status).toBe(200); expect(data.blocks.some((b: any) => b.type === "heading" && b.text === "History")).toBe(true);
     expect(data.toc.map((x: any) => x.title)).toContain("Details"); expect(data.blocks.some((b: any) => b.type === "list" && b.ordered)).toBe(true);
     expect(data.blocks.some((b: any) => b.type === "table" && b.headers[0] === "Year")).toBe(true); expect(data.infobox.rows[0].label).toBe("Color");
+  });
+  test("opening the same article again is answered from memory, not read and parsed from the library a second time", async () => {
+    const fake = start([book(SIMPLE, { Earth: { title: "Earth", html: article("Earth", "") } })]);
+    const c = await owner();
+    expect((await c.get(articleUrl(SIMPLE, "Earth"))).status).toBe(200);
+    const pageReads = () => fake.requests.filter((request) => request.startsWith(`/content/${SIMPLE}/Earth`)).length;
+    expect(pageReads()).toBe(1);
+    expect((await c.get(articleUrl(SIMPLE, "Earth"))).status).toBe(200);
+    expect(pageReads()).toBe(1);
   });
   test("disambiguation note appears and redirect markup is dropped", async () => {
     start([book(SIMPLE, { Choice: { title: "Choice", html: `<div class="mw-parser-output"><h1>Choice</h1><div class="disambig">May refer to</div><p>Choice may refer to several places.</p><ul><li><a href="/content/${SIMPLE}/Other">Other</a></li></ul></div>` }, Redirect: { title: "Redirect", html: `<div class="mw-parser-output"><h1>Redirect</h1><div class="redirectMsg">Redirected from <a href="/content/${SIMPLE}/Choice">Choice</a></div><p>Destination article.</p></div>` } })]);
