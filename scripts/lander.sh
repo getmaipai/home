@@ -393,7 +393,7 @@ outbox_flush() {
     outbox_log "pushed ${p:0:7} to GitHub"
     outbox_delete_branches
     # Worktrees whose branch just reached GitHub's main can go now (the sweep needs the branch tip on origin/main).
-    if [[ "${serving:-0}" == 1 ]]; then sweep_worktrees; fi
+    if [[ "${serving:-0}" == 1 ]]; then : >"$outbox_dir/want-sweep"; fi
     return 0
   fi
   reason="$(grep -v '^[[:space:]]*$' "$errfile" | tail -n 1 | cut -c1-200)"
@@ -421,6 +421,8 @@ outbox_flush_locked() {
   echo "$$" >"$lock/pid"
   outbox_flush "$@" || rc=$?
   rm -rf "$lock"
+  # The sweep runs after the lock is gone, so a slow sweep never holds up the next push.
+  if [[ -e "$outbox_dir/want-sweep" ]]; then rm -f "$outbox_dir/want-sweep"; sweep_worktrees; fi
   return "$rc"
 }
 
