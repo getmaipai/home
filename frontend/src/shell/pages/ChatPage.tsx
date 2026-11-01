@@ -87,6 +87,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognit
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
+import { selectedSpeakerFromCache } from "@/apps/chat/selectedSpeaker";
 import { composerNoticeFor, consumeMaxPick, dropMaxPick, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
@@ -521,6 +522,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           onTurnSent: () => consumeMaxPick(maxQueryClient),
           getAgeBand: () => person.age_band,
           getTryCompanionId: () => tryCompanionIdRef.current,
+          getSelectedSpeaker: () => selectedSpeakerFromCache(maxQueryClient, person.id, visibleConversationIdRef.current, tryCompanionIdRef.current),
           consumeRetryWithCurrentCompanion: () => {
             const value = retryWithCurrentCompanionRef.current;
             retryWithCurrentCompanionRef.current = false;

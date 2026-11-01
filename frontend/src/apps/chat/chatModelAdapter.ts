@@ -107,6 +107,9 @@ export interface ChatModelAdapterDeps {
   getAgeBand?(): "adult" | "teen" | "child" | undefined;
   /** Draft companion pinned to this temporary test chat. */
   getTryCompanionId?(): string | undefined;
+  /** The conversation's selected companion, put on the reply from its first yield so no activity (waiting, thinking words, tool
+   * steps) ever draws without the companion's face. The server's own `turn_meta` speaker replaces it. */
+  getSelectedSpeaker?(): import("@maipai/home-backend/src/wire").AnsweredBy | undefined;
   /** PLACE-WEATHER-01: this request's coordinates when the person's weather
    * default is Current location and the browser already allowed it. Read once
    * per send, never on a reconnect, and never stored. */
@@ -253,6 +256,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
       if (!text && !imageAttached && documentPayloads.length === 0) return;
       deps.onReplyState?.("waiting");
+      const provisionalSpeaker = deps.getSelectedSpeaker?.();
+      if (provisionalSpeaker) yield { metadata: { custom: { answered_by: provisionalSpeaker } } };
 
       // Stop whatever an earlier live reply was still speaking - never two
       // voices at once. A manual "Listen" replay (chatListen.ts) stops

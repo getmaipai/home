@@ -501,6 +501,34 @@ describe("createChatModelAdapter streaming", () => {
       expect(yields[0]?.content).toBeUndefined();
     } finally { env.restore(); }
   });
+  test("the conversation's selected companion is on the reply from the first yield, before the server says who answers", async () => {
+    const selected = { companion_id: "rivet", name: "Rivet", look: null, via: "conversation" as const, portrait: "rivet/look1" };
+    // A stream that never starts: nothing from the server yet, as during an engine swap or a slow first token.
+    const env = stubEnvironment(() => new Promise<never>(() => {}));
+    try {
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, getSelectedSpeaker: () => selected });
+      const messages = [fakeUserMessage("Hi")];
+      const abort = new AbortController();
+      const options = { messages, runConfig: {}, abortSignal: abort.signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions;
+      const first = await runAdapter(adapter, options).next();
+      abort.abort();
+      expect(first.value?.metadata?.custom?.answered_by).toEqual(selected);
+    } finally { env.restore(); }
+  });
+  test("the server's turn_meta speaker replaces the provisional one", async () => {
+    const selected = { companion_id: "rivet", name: "Rivet", look: null, via: "conversation" as const };
+    const answering = { companion_id: "bruno", name: "Bruno", look: null, via: "mention" as const };
+    const env = stubEnvironment(ndjsonStream([
+      { type: "turn_meta", conversation_id: "c1", turn_id: "t1", answered_by: answering },
+      { type: "delta", text: "Hello" },
+      { type: "done", value: { reply: { text: "Hello" }, source: "model", safety: SAFETY, answered_by: answering, turn_id: "t1" } },
+    ]));
+    try {
+      const { yields } = await collect([fakeUserMessage("Hi")], undefined, undefined, undefined, undefined, undefined, { getSelectedSpeaker: () => selected });
+      expect(yields[0]?.metadata?.custom?.answered_by).toEqual(selected);
+      expect(yields.find((y) => (y.metadata?.custom?.answered_by as { companion_id?: string } | undefined)?.companion_id === "bruno")).toBeTruthy();
+    } finally { env.restore(); }
+  });
   test("a failed done reply carries the admin-details marker into message metadata", async () => {
     const env = stubEnvironment(ndjsonStream([
       { type: "done", value: { turn_id: "turn-failed-live", reply: { text: "That was too much text for me to read in one go. Try a shorter question." }, source: "plugin", failed_generation: true, safety: SAFETY } },

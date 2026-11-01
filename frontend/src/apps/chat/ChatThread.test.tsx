@@ -43,6 +43,31 @@ test("history reply faces use the retained portrait and finished replies contain
   portrait.mockRestore();
 });
 
+// COMPANION-FACE-01: a response activity never shows without the companion's face. Each state below is one way the assistant side
+// can be "doing something" before or beside a finished reply; every one must draw the same reply-face row a finished reply draws.
+test("every assistant activity state draws the companion face row", async () => {
+  const speaker = { companion_id: "rivet", name: "Rivet", look: null, portrait: null, via: "conversation" };
+  const running = { type: "running" } as const;
+  const states: Array<[string, ThreadMessageLike["content"], ThreadMessageLike["status"]]> = [
+    ["waiting, nothing yet", [], running],
+    ["thinking words (reasoning running)", [{ type: "reasoning", text: "Weighing it." }], running],
+    ["a tool step running", [{ type: "tool-call", toolCallId: "w1", toolName: "weather", args: {} }], running],
+    ["text streaming", [{ type: "text", text: "Part of an answer" }], running],
+    ["a finished reply", [{ type: "text", text: "Done." }], { type: "complete", reason: "stop" }],
+  ];
+  for (const [name, content, status] of states) {
+    const messages: ThreadMessageLike[] = [
+      { role: "user", content: [{ type: "text", text: "Q" }] },
+      { role: "assistant", content, ...(status ? { status } : {}), metadata: { custom: { answered_by: speaker } } },
+    ];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band="adult" messages={messages} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelectorAll('[data-slot="aui_assistant-message-root"]').length).toBe(1), { timeout: 3000 });
+    expect(view.container.querySelectorAll('[data-slot="aui_reply-face-row"]').length, name).toBe(1);
+    expect(view.container.querySelector('[data-slot="aui_reply-face-row"]')?.textContent, name).toContain("Rivet");
+    view.unmount();
+  }
+});
+
 function Harness({ admin, band = "child", connection = { phase: "online" }, adapter = NOOP, messages = MESSAGES }: { admin: boolean; band?: "child" | "teen" | "adult"; connection?: ConnectionState; adapter?: ChatModelAdapter; messages?: ThreadMessageLike[] }) {
   const runtime = useLocalRuntime(adapter, { initialMessages: messages });
   return (
