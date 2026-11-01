@@ -1,7 +1,7 @@
 // NAT-07a: the runner seams the opening rows use (a dated person-scope record archived by the hub's own
 // maintenance, a backdated earlier conversation, a temporary conversation, the child as speaker), proven
 // against the stub so the bench's own logic is checked before a model is involved.
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, setDefaultTimeout } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
@@ -13,6 +13,9 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy } from "../scripts/bench/conversationRunner";
 import type { RegisterRow } from "../scripts/bench/registerScore";
+
+// Each row runs a real two-turn conversation through the turn machine against the stub model (about 10 s on a loaded Studio).
+setDefaultTimeout(60_000);
 
 const rows = JSON.parse(readFileSync(join(import.meta.dir, "../scripts/bench/datasets/register-corpus.json"), "utf8")) as RegisterRow[];
 
