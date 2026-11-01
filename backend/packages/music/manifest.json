@@ -75,8 +75,41 @@
   "background": false,
   "contributes": {
     "sidebar": {
+      "search": {
+        "type": "search",
+        "state": "q",
+        "label": "Search Music",
+        "placeholder": "Search Music",
+        "submit": {
+          "navigate": {
+            "to": "/apps/music/search",
+            "state": {
+              "q": "{q}"
+            }
+          }
+        }
+      },
       "groups": [
-        { "id": "play", "pages": ["index", "radio", "songs", "albums", "artists", "playlists", "liked"] }
+        {
+          "id": "play",
+          "mode": "play",
+          "pages": [
+            "index",
+            "radio",
+            "songs",
+            "albums",
+            "artists",
+            "playlists",
+            "liked"
+          ]
+        },
+        {
+          "id": "create",
+          "mode": "create",
+          "pages": [
+            "create"
+          ]
+        }
       ]
     },
     "pages": [
@@ -185,6 +218,22 @@
         "nav": false,
         "kind": "schema",
         "module": "station"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "icon": "search",
+        "nav": false,
+        "kind": "schema",
+        "module": "search"
+      },
+      {
+        "id": "create",
+        "label": "Create",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "create"
       }
     ],
     "data": [
@@ -276,6 +325,25 @@
           "kind": "link",
           "href": "/settings/home/storage",
           "min_role": "admin"
+        }
+      ]
+    },
+    "header": {
+      "search": {
+        "label": "Search Music"
+      },
+      "modes": [
+        {
+          "id": "play",
+          "label": "Browse",
+          "icon": "headphones",
+          "page": "index"
+        },
+        {
+          "id": "create",
+          "label": "Create",
+          "icon": "sparkles",
+          "page": "create"
         }
       ]
     }

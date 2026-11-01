@@ -34,8 +34,38 @@
   "background": false,
   "contributes": {
     "sidebar": {
+      "search": {
+        "type": "search",
+        "state": "q",
+        "label": "Search Videos",
+        "placeholder": "Search Videos",
+        "submit": {
+          "navigate": {
+            "to": "/apps/videos/search",
+            "state": {
+              "q": "{q}"
+            }
+          }
+        }
+      },
       "groups": [
-        { "id": "play", "pages": ["index", "library", "history", "watch-later"] }
+        {
+          "id": "play",
+          "mode": "play",
+          "pages": [
+            "index",
+            "library",
+            "history",
+            "watch-later"
+          ]
+        },
+        {
+          "id": "create",
+          "mode": "create",
+          "pages": [
+            "create"
+          ]
+        }
       ]
     },
     "pages": [
@@ -86,6 +116,22 @@
         "nav": true,
         "kind": "schema",
         "module": "history"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "icon": "search",
+        "nav": false,
+        "kind": "schema",
+        "module": "search"
+      },
+      {
+        "id": "create",
+        "label": "Create",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "create"
       }
     ],
     "data": [
@@ -197,6 +243,25 @@
             "saved copies",
             "trash"
           ]
+        }
+      ]
+    },
+    "header": {
+      "search": {
+        "label": "Search Videos"
+      },
+      "modes": [
+        {
+          "id": "play",
+          "label": "Browse",
+          "icon": "play",
+          "page": "index"
+        },
+        {
+          "id": "create",
+          "label": "Create",
+          "icon": "sparkles",
+          "page": "create"
         }
       ]
     }

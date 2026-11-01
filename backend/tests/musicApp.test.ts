@@ -203,3 +203,12 @@ test("a guest reads Music like a child: no explicit song, no radio, no private s
   expect(startMusicQueue(guest, { mode: "radio", seed_kind: "genre", id: "Folk" }).ok).toBe(true);
   expect(resolveCollection(guest.id, "queue")!.items.map((entry) => entry.media_id).every((value) => [id(1), id(2), id(3), id(5)].includes(value))).toBe(true);
 });
+// MEDIA-HEADER-01: the title-bar search asks `songs` with a `query`; it matches the title, needs two letters, and stays inside what the person may open.
+const found = (person: PersonRow, query: string) => (mediaAppData(person, "music", "songs", { query }) as Array<{ id: string }>).map((row) => row.id);
+test("a songs query finds matching titles, needs two letters and keeps a child's limits", () => {
+  expect(found(atlas, "Song 3")).toEqual([id(3)]);
+  expect(found(atlas, "S")).toEqual([]);
+  expect(found(atlas, "nothing like it")).toEqual([]);
+  expect(found(sprout, "Song 4")).toEqual([]);
+  expect(found(sprout, "Song 6")).toEqual([]);
+});

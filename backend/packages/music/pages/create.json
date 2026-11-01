@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-create",
+  "title": "Create",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "music",
+      "text": "Creating music comes here soon."
+    }
+  ]
+}

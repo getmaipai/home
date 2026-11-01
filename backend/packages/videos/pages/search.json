@@ -1,0 +1,45 @@
+{
+  "type": "page",
+  "id": "videos-search",
+  "title": "Search",
+  "body": [
+    {
+      "type": "search",
+      "state": "q",
+      "label": "Search Videos",
+      "placeholder": "Search Videos"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Results",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "query": "$state.q"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No videos match. Try other words."
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/watch",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      }
+    }
+  ]
+}

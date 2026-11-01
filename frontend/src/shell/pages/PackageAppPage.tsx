@@ -323,8 +323,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
       {content}
     </div>
   ) : content;
-  // MEDIA-HEADER-01: an app with its own column (Music, Videos) draws that column, not the hub's app list beside it.
-  return media && hubActive && !sidebarProps ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
+  return media && hubActive ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
 }
 
 /** Where an app's search sends the typed words: the search node's `submit` navigate target. */

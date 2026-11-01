@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "videos-create",
+  "title": "Create",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "film",
+      "text": "Creating videos comes here soon."
+    }
+  ]
+}

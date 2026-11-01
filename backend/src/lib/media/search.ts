@@ -1,5 +1,4 @@
-import { or, sql, type SQL } from "drizzle-orm";
-import { mediaItems } from "@/db/schema";
+import { titleMatch } from "./textMatch";
 import type { PersonRow } from "@/types";
 import { MEDIA_APP_IDS, madeFiles, queryItems, type MediaAppId } from "@/lib/media/appHost";
 
@@ -28,18 +27,6 @@ const HEADINGS: Record<MediaAppId, string> = {
   podcasts: "Podcasts",
   books: "Books",
 };
-
-const FIELDS = [mediaItems.title, mediaItems.subtitle, mediaItems.artist, mediaItems.album, mediaItems.albumArtist,
-  mediaItems.series, mediaItems.author, mediaItems.narrator, mediaItems.genre];
-
-function escapedLike(query: string): string {
-  return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
-}
-
-function titleMatch(query: string): SQL {
-  const pattern = escapedLike(query);
-  return or(...FIELDS.map((field) => sql`lower(${field}) LIKE lower(${pattern}) ESCAPE '\\'`))!;
-}
 
 /** Search the same readable catalog the media apps use, plus Library-made songs and clips. */
 export function searchMedia(person: PersonRow, query: string, perApp = 8): MediaSearchGroup[] {

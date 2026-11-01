@@ -12,6 +12,7 @@ import type { PersonRow } from "@/types";
 import { MediaProgress as MediaProgressSchema } from "@maipai/spec/gen/ts/media-progress.js";
 import { z } from "zod";
 import { itemDetail } from "./items";
+import { titleMatch } from "./textMatch";
 import type { MediaBudget } from "./watchTime";
 import { listLibrary } from "@/lib/library";
 import { stationItemView, previewStationItemView } from "./radio";
@@ -535,6 +536,11 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
         return row;
       });
     }
+  }
+  // MEDIA-HEADER-01: Music's songs and Videos' library, asked with a `query`, are the app's search results.
+  if (params.query !== undefined && ((appId === "music" && dataId === "songs") || (appId === "videos" && dataId === "library"))) {
+    const q = params.query.trim();
+    return q.length < 2 ? [] : rowsOf(person, queryItems(person, appId, { where: titleMatch(q), limit }));
   }
   if (appId === "music") {
     const music = musicData(person, dataId, params);
