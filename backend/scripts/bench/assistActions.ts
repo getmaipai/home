@@ -1,7 +1,7 @@
 // ASSIST-BENCH-01: the action names the bench expects, per tool. One definition: the list actions come from
 // lib/listActions.ts; the reminder and alarm actions that exist today (alarmCalls.ts) are listed with the ones the
 // design note adds (section 2), and a test checks the two groups against alarmFoldFor.
-import { LIST_ACTIONS } from "@/lib/listActions";
+import { LIST_ACTIONS } from "@/lib/listActionNames";
 
 /** Reminder actions. `cancel_reminder` and `list_reminders` exist in alarmCalls.ts; the rest are ASSIST-REMIND-01. */
 export const REMINDER_ACTIONS = ["create_reminder", "edit_reminder", "snooze_reminder", "complete_reminder", "cancel_reminder", "list_reminders"] as const;
