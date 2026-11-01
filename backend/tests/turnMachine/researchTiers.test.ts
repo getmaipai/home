@@ -85,7 +85,7 @@ afterEach(() => {
 });
 
 /** Runs one turn against a model that wants to search `wantedRounds` times (a different query each round), then answers. */
-async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[] } = {}) {
+async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number } = {}) {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const requests: ChatCompletionRequest[] = [];
   let made = 0; // searches the scripted model has asked for so far (a skipped or empty search leaves no tool message to count)
@@ -100,8 +100,10 @@ async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts:
       __resetRateLimiterForTests(); // Home's own search pace (a burst of three) would make this scripted run wait seconds per round
       const done = made;
       if (done >= wantedRounds) return undefined;
-      made += 1;
-      return [{ id: `call-${done + 1}`, type: "function" as const, function: { name: "websearch", arguments: JSON.stringify({ expression: (opts.queries ?? QUERIES)[done], scope: opts.scope ?? "web" }) } }];
+      const count = Math.min(opts.perRound ?? 1, wantedRounds - done);
+      const calls = Array.from({ length: count }, (_, i) => ({ id: `call-${done + i + 1}`, type: "function" as const, function: { name: "websearch", arguments: JSON.stringify({ expression: (opts.queries ?? QUERIES)[done + i], scope: opts.scope ?? "web" }) } }));
+      made += count;
+      return calls;
     },
   });
   const proxy = startRecordingProxy(stub.url);
@@ -282,5 +284,13 @@ describe("repeat queries, the web scope, and credits no source names", () => {
     expect(checked.text).toContain("Pat Quill");
     expect(checked.text).not.toContain("Jane Roe");
     expect(checked.text).toContain("ended after one season");
+  });
+});
+
+describe("one question runs at most twelve searches", () => {
+  test("a Max round that asks for several searches at once still stops at twelve in all", async () => {
+    await holdMax();
+    await turn("owner", 13, { max: true, perRound: 3 });
+    expect(searxQueries.length).toBe(12);
   });
 });

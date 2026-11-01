@@ -5,7 +5,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // stop at cancellation; the race still records a timeout if a package
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
-import { newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
+import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
 import { isRepeatQuery } from "../research";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
@@ -288,6 +288,12 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     // SEARCH-DDGS-TEEN-01: the host's `spoken` (a minor's ddgs lock) is true for every surface that is not a plain written one, so the
     // shared glance screen is held to SearXNG only too, and an unplanned turn counts as spoken.
+    // RESEARCH-TIER-01 (owner ruling 2026-11-01): one question runs at most 12 searches, however many a round asks for.
+    if (tool === "websearch" && researchRun && researchRun.searches >= RESEARCH_SEARCHES_MAX) {
+      outcomes.push(outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "search_budget", durationMs: 0, failureKind: "found_nothing" }));
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
+      continue;
+    }
     // RESEARCH-TIER-01: a search that repeats an earlier one of this turn is not issued; the round records it as found nothing new.
     const priorQueries = tool === "websearch" && researchRun ? [...state.outcomes, ...outcomes].filter((o) => o.packageId === "websearch").map((o) => String((o.args as { expression?: unknown } | undefined)?.expression ?? "")) : [];
     if (tool === "websearch" && researchRun && isRepeatQuery(priorQueries, String((args as { expression?: unknown }).expression ?? ""))) {
