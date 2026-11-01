@@ -216,7 +216,8 @@ export function evidenceBySource(outcomes: readonly ToolExecutionOutcome[], note
   for (const note of notes) quotes.set(note.url, [...(quotes.get(note.url) ?? []), note.quote]);
   return outcomes.flatMap((o) => o.sources ?? []).map((source) => {
     const deep = quotes.get(source.url);
-    return `${byUrl.get(source.url) ?? ""}${deep ? `\n${deep.join("\n")}` : ""}`.trim();
+    // The checked quotes come first: a page is kept up to 8,000 characters and the judge reads only the start of the passages.
+    return `${deep ? `${deep.join("\n")}\n` : ""}${byUrl.get(source.url) ?? ""}`.trim();
   });
 }
 

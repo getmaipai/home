@@ -52,7 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
-import { currentResearchBudget, noteDeclined, notePageRead, researchPageAllowed, waitForHostPace } from "@/lib/researchBudget";
+import { RESEARCH_PAGES_PER_SEARCH, RESEARCH_PAGE_STEP_MS, RESEARCH_PAGE_TEXT_CHARS, currentResearchBudget, isUnreadableHost, noteDeclined, notePageRead, researchPageAllowed, waitForHostPace } from "@/lib/researchBudget";
 import { runAsBlockViewer } from "@/lib/blocklists/blockViewer";
 import { siteBlockSignature, siteBlocksActive, urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { isPrivacyFlaggedSearchEngine } from "@/lib/searchEngines";
@@ -228,6 +228,8 @@ const SEARXNG_PAGE_TIMEOUT_MS = 10_000;
 // seconds, not dozens a second."
 const SEARXNG_PAGE_RATE_LIMIT_KEY = "searxng-page";
 const SEARXNG_PAGE_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
+/** RESEARCH-PAGES-01: the pace of a research run's pages, in addition to its own per-run and per-site limits. */
+const RESEARCH_PAGE_RATE_LIMIT = { capacity: 12, refillPerSecond: 1 };
 
 // SEARCH-FALLBACK-01 (docs/plans/search-resilience-2026-09-24.md): "when
 // SearXNG is down or returns nothing, the websearch tool asks Wikipedia
@@ -1516,9 +1518,6 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
  * (each also goes through the per-host pace, robots check and SSRF guard
  * in searxngPageRead). The reasoning is in docs/dev.md. */
 export const SEARCH_PAGES_MAX = 3;
-/** RESEARCH-CLOCK-01: the first searches of a research run read this many pages each. */
-const RESEARCH_FIRST_SEARCHES = 3;
-const RESEARCH_FIRST_SEARCH_PAGES = 2;
 /** Characters of page text kept per page for the model (three pages stay
  * well inside the tool message's budget). */
 const SEARCH_PAGE_TEXT_CHARS = 2_500;
@@ -1569,8 +1568,10 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
   // RESEARCH-CLOCK-01: a research run's first searches read only their top two pages (cheap first); later searches read three.
   const researchStart = currentResearchBudget();
-  const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : researchStart && researchStart.searches <= RESEARCH_FIRST_SEARCHES ? RESEARCH_FIRST_SEARCH_PAGES : SEARCH_PAGES_MAX;
-  const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : SEARCH_PAGE_TEXT_CHARS;
+  // RESEARCH-PAGES-01 (senior review, 2026-11-01): a research search reads up to four pages at once, each kept up to 8,000 characters
+  // (the writer gets the chosen sections and the notes, not raw pages, so the length costs reading time only).
+  const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : researchStart ? RESEARCH_PAGES_PER_SEARCH : SEARCH_PAGES_MAX;
+  const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : researchStart ? RESEARCH_PAGE_TEXT_CHARS : SEARCH_PAGE_TEXT_CHARS;
   const deduped = { ...found, rows: dedupeRows(found.rows) };
   const result = minorBand ? floorSearchResult(deduped, minorBand) : dropBlockedSites(deduped);
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
@@ -1587,8 +1588,9 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
       continue;
     }
     if (hosts.has(host)) continue;
-    // RESEARCH-TIER-01: a research run shares one page budget across its searches (40 pages, 4 per site, stop at a refusal).
-    if (runBudget && !researchPageAllowed(runBudget, host)) continue;
+    // RESEARCH-TIER-01: a research run shares one page budget across its searches (40 pages, 4 per site, a refusing site skipped).
+    // Social and video hosts are never candidates of a research run (they refuse bots and hold no article).
+    if (runBudget && (isUnreadableHost(host) || !researchPageAllowed(runBudget, host))) continue;
     hosts.add(host);
     candidates.push(row);
   }
@@ -1597,7 +1599,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   // its pages at the same moment instead: they are all on different sites, so no site is asked twice at once, and the run's cut-off
   // time ends the reading wherever it is. A page already in flight at the budget is abandoned (it keeps its own 10 second timeout)
   // and that row keeps its snippet.
-  const deadline = Math.min(Date.now() + searchPagesBudgetMs, runBudget?.deadlineAt ?? Infinity);
+  const deadline = Math.min(Date.now() + (runBudget ? Math.max(searchPagesBudgetMs, RESEARCH_PAGE_STEP_MS) : searchPagesBudgetMs), runBudget?.deadlineAt ?? Infinity);
   const pages: SearxngPage[] = [];
   let first: PageReadResult | undefined;
   const readOne = async (row: SearxngRow): Promise<{ page: SearxngPage; doc: PageReadResult } | "stop" | null> => {
@@ -1607,7 +1609,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     let timer: ReturnType<typeof setTimeout> | undefined;
     const rowHost = runBudget ? new URL(row.url!).hostname : "";
     if (runBudget) {
-      if (runBudget.declined) return "stop";
+      if (runBudget.declinedHosts.has(rowHost)) return null;
       await waitForHostPace(runBudget, rowHost);
       notePageRead(runBudget, rowHost);
     }
@@ -1626,8 +1628,8 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
       return { page: { url: row.url!, title: doc.title || row.title, text }, doc };
     } catch (err) {
       if (err instanceof PageDeclinedError) {
-        // A site refused: a research run reads no more pages at all (owner ruling 2026-11-01).
-        if (runBudget) noteDeclined(runBudget);
+        // A site refused: a research run reads no more pages from THAT site and goes on with the others (owner ruling 2026-11-01).
+        if (runBudget) { noteDeclined(runBudget, new URL(row.url!).hostname); return null; }
         return "stop";
       }
       if (err instanceof HostError && err.code === "rate_limited") return "stop"; // Home's own page pace ran out: this search stops reading, the run goes on
@@ -1815,7 +1817,11 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
   // The pace counts pages, not the robots.txt check that goes with each
   // one (THIN-4A: with both counted, a three-page search spent six
   // tokens of a three-token burst and read one page).
-  if (countsAgainstPace && !tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
+  // RESEARCH-PAGES-01: a research run (40 pages, 4 per site, 3 seconds between one site's pages: researchBudget.ts) reads its pages from a
+  // roomier bucket of its own, so a round that reads ten pages at once is not cut to the household's burst of three.
+  const research = currentResearchBudget();
+  const paceOk = research ? tryConsume(`${SEARXNG_PAGE_RATE_LIMIT_KEY}-research`, RESEARCH_PAGE_RATE_LIMIT) : tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT);
+  if (countsAgainstPace && !paceOk) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
   await validatePublicPageUrl(url);
   try {
     const fetchOptions = { method: "GET", headers: PAGE_REQUEST_HEADERS, signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS) };

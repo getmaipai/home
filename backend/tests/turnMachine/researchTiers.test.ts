@@ -13,7 +13,7 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { __setChatWindowContextForTests } from "@/lib/roleHealth";
-import { __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
+import { PageDeclinedError, __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
 import { __setResearchCapForTests, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
@@ -32,6 +32,7 @@ let searx: ReturnType<typeof Bun.serve>;
 let searxQueries: string[] = [];
 let sameResults = false;
 let searxDelayMs = 0;
+let extraRows: { title: string; url: string; content: string }[] = [];
 
 const UTTERANCE = "the 1980s TV series V only had one season, tell me why the series was cancelled and what happened after";
 const QUERIES = [
@@ -65,6 +66,7 @@ beforeEach(() => {
   searxQueries = [];
   sameResults = false;
   searxDelayMs = 0;
+  extraRows = [];
   __setClaimJudgeForTests(async () => '{"supported": true}');
   __setQueryWriterForTests(async () => null);
   __setNoteWriterForTests(async () => null);
@@ -79,7 +81,7 @@ beforeEach(() => {
       searxQueries.push(q);
       if (searxDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, searxDelayMs));
       const n = sameResults ? 1 : searxQueries.length;
-      return Response.json({ results: [1, 2, 3].map((i) => ({ title: `Page ${n}.${i} about ${q}`, url: `https://site${n}x${i}.example/page`, content: `Snippet ${n}.${i} for ${q}` })) });
+      return Response.json({ results: [...extraRows, ...[1, 2, 3].map((i) => ({ title: `Page ${n}.${i} about ${q}`, url: `https://site${n}x${i}.example/page`, content: `Snippet ${n}.${i} for ${q}` }))] });
     },
   });
   setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searx.port}`);
@@ -294,15 +296,16 @@ describe("the stop rule, the citation check, the page budget and the stored step
     expect(roundAddedNothing([outcome([])], [outcome([])])).toBe(true);
   });
 
-  test("a research run reads at most 40 pages, 4 from one site, and none after a site refuses", () => {
+  test("a research run reads at most 40 pages, 4 from one site, and none more from a site that refuses (the other sites are still read)", () => {
     const budget = newResearchBudget(false);
     for (let i = 0; i < RESEARCH_HOST_PAGES_MAX; i++) { expect(researchPageAllowed(budget, "one.example")).toBe(true); notePageRead(budget, "one.example"); }
     expect(researchPageAllowed(budget, "one.example")).toBe(false);
     for (let i = 0; i < RESEARCH_PAGES_MAX - RESEARCH_HOST_PAGES_MAX; i++) notePageRead(budget, `site${i}.example`);
     expect(researchPageAllowed(budget, "fresh.example")).toBe(false);
     const refused = newResearchBudget(false);
-    noteDeclined(refused);
-    expect(researchPageAllowed(refused, "any.example")).toBe(false);
+    noteDeclined(refused, "refuses.example");
+    expect(researchPageAllowed(refused, "refuses.example")).toBe(false);
+    expect(researchPageAllowed(refused, "other.example")).toBe(true);
   });
 
   test("the searches of a research turn come back as steps for an adult's reload, and for no one else", () => {
@@ -511,9 +514,13 @@ describe("the gap check ends the searching only when the writer itself finds not
     await holdMax();
     let calls = 0;
     __setQueryWriterForTests(async () => { calls += 1; return calls === 1 ? JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: ["Harbor Lights television series cancelled"] }); });
-    const { result } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
+    const { result, requests } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
     expect(searxQueries).toEqual(["Harbor Lights television series cancelled"]);
     expect(result.value.reply.text).toContain("It ended after one season");
+    // RESEARCH-ROUND-01: after the gap check wrote nothing, no round is spent on a tool-offering generation (the live V run lost 31 s there).
+    const afterSearch = requests.filter((r) => toolMessages(r).length > 0);
+    expect(afterSearch.length).toBeGreaterThan(0);
+    expect(afterSearch.every((r) => !r.tools || r.tools.length === 0 || r.tool_choice === "none")).toBe(true);
   });
 
   test("a writer that proposes nothing at all ends the searching and the answer is written from the notes", async () => {
@@ -601,5 +608,42 @@ describe("the pinned article is read whole by section and cited as a source (RES
     const { requests, result } = await turn("owner", 1, { max: true });
     expect(JSON.stringify(lastRequest(requests).messages)).not.toContain("Backbone article");
     expect(result.value.sources!.length).toBe(3);
+  });
+});
+
+describe("page reading skips a refusing site and the junk hosts, and goes on (RESEARCH-PAGES-01)", () => {
+  const page = (url: string) => ({ type: "document" as const, file_id: "f", url, title: "A page", text: `Text of ${url}.`, chunks: [], links: [], sections: [] });
+
+  test("a social or video host is never asked for a page; the real sites after it are", async () => {
+    await holdMax();
+    extraRows = [{ title: "A reel", url: "https://www.instagram.com/p/abc", content: "reel" }, { title: "A clip", url: "https://www.youtube.com/watch?v=abc", content: "clip" }];
+    const asked: string[] = [];
+    __setPageReaderForTests(async (url) => { asked.push(url); return page(url); });
+    await turn("owner", 1, { max: true });
+    expect(asked.some((u) => u.includes("instagram.com") || u.includes("youtube.com"))).toBe(false);
+    expect(asked.length).toBe(3);
+  });
+
+  test("a site that refuses a page is skipped for the rest of the run, and the other sites are still read", async () => {
+    await holdMax();
+    const asked: string[] = [];
+    __setPageReaderForTests(async (url) => {
+      asked.push(url);
+      if (url.includes("site1x1.")) throw new PageDeclinedError("The site declined the page request.");
+      return page(url);
+    });
+    const { result } = await turn("owner", 2, { max: true });
+    expect(asked.filter((u) => u.includes("site1x")).length).toBe(3);
+    expect(asked.filter((u) => u.includes("site2x")).length).toBe(3);
+    expect(result.value.sources!.length).toBeGreaterThanOrEqual(6);
+  });
+
+  test("a research search reads up to four pages at once from different sites", async () => {
+    await holdMax();
+    extraRows = [{ title: "A fourth page", url: "https://four.example/page", content: "four" }];
+    const asked: string[] = [];
+    __setPageReaderForTests(async (url) => { asked.push(url); return page(url); });
+    await turn("owner", 1, { max: true });
+    expect(asked.length).toBe(4);
   });
 });

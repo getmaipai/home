@@ -14,8 +14,8 @@ export const RESEARCH_SEARCHES_MAX = 12;
 export interface ResearchRunBudget {
   pages: number;
   perHost: Map<string, { pages: number; lastAt: number }>;
-  /** A site refused a page: no more pages this run, the answer goes on with what it has. */
-  declined: boolean;
+  /** Sites that refused a page this run: no more pages from them, the other sites are still read. */
+  declinedHosts: Set<string>;
   /** The admin turned Max web research off (research.max_web): rounds after the first search the offline library only. */
   libraryOnly: boolean;
   /** Counts only, for the run's trace (rule 6a: no queries, URLs or titles in logs). */
@@ -32,14 +32,14 @@ export interface ResearchRunBudget {
 const store = new AsyncLocalStorage<ResearchRunBudget>();
 
 export function newResearchBudget(libraryOnly: boolean): ResearchRunBudget {
-  return { pages: 0, perHost: new Map(), declined: false, libraryOnly, searches: 0, notes: new Map() };
+  return { pages: 0, perHost: new Map(), declinedHosts: new Set(), libraryOnly, searches: 0, notes: new Map() };
 }
 export const runWithResearchBudget = <T>(budget: ResearchRunBudget, fn: () => T): T => store.run(budget, fn);
 export const currentResearchBudget = (): ResearchRunBudget | undefined => store.getStore();
 
 /** Whether one more page from this host may be read now (the pace is waited out by `waitForHostPace`). */
 export function researchPageAllowed(budget: ResearchRunBudget, host: string): boolean {
-  if (budget.declined || budget.pages >= RESEARCH_PAGES_MAX) return false;
+  if (budget.declinedHosts.has(host) || budget.pages >= RESEARCH_PAGES_MAX) return false;
   return (budget.perHost.get(host)?.pages ?? 0) < RESEARCH_HOST_PAGES_MAX;
 }
 /** Waits until this host's last page of the run is 3 seconds old (never longer than 3 seconds). */
@@ -54,4 +54,16 @@ export function notePageRead(budget: ResearchRunBudget, host: string, now: () =>
   const entry = budget.perHost.get(host) ?? { pages: 0, lastAt: 0 };
   budget.perHost.set(host, { pages: entry.pages + 1, lastAt: now() });
 }
-export function noteDeclined(budget: ResearchRunBudget): void { budget.declined = true; }
+/** A site refused a page: no more pages from that site this run. */
+export function noteDeclined(budget: ResearchRunBudget, host: string): void { budget.declinedHosts.add(host); }
+
+/** Sites no research run asks for pages: social, video and short-post hosts refuse bots, hold no article text, and (before this rule) one
+ * refusal from them ended all page reading for the run (the live V runs: 8 searches, 29 sites listed, 2 pages read). */
+const UNREADABLE_HOSTS = /(^|\.)(instagram|facebook|fb|youtube|youtu|tiktok|twitter|x|pinterest|linkedin|snapchat|threads|vimeo|dailymotion|twitch)\.(com|be|me|tv)$/i;
+export const isUnreadableHost = (host: string): boolean => UNREADABLE_HOSTS.test(host.replace(/^www\./i, ""));
+/** Characters of a page a research run keeps for the notes and the writer (the default search keeps 2,500). */
+export const RESEARCH_PAGE_TEXT_CHARS = 8_000;
+/** Pages one research search reads at once (all on different sites), within the run's 40. */
+export const RESEARCH_PAGES_PER_SEARCH = 4;
+/** The whole page-reading step of one research search gives up after this long and keeps what arrived. */
+export const RESEARCH_PAGE_STEP_MS = 10_000;
