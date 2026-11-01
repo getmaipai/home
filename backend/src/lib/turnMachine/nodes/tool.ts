@@ -6,7 +6,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
 import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
-import { isRepeatQuery } from "../research";
+import { isRepeatQuery, memoryDetailsIn, researchEvidence } from "../research";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
 import type { TurnAskField } from "@/wire";
@@ -299,6 +299,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if (tool === "websearch" && researchRun && isRepeatQuery(priorQueries, String((args as { expression?: unknown }).expression ?? ""))) {
       const repeat = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "repeat_query", durationMs: 0, failureKind: "found_nothing" });
       outcomes.push(repeat);
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
+      continue;
+    }
+    // RESEARCH-QUERY-01: a research search built on a name or year from the model's memory (nothing shown it yet) is skipped, so the
+    // next round searches to find the subject first and builds on what the sources show.
+    if (tool === "websearch" && researchRun && memoryDetailsIn(String((args as { expression?: unknown }).expression ?? ""), `${state.utterance}\n${researchEvidence([...state.outcomes, ...outcomes])}`).length > 0) {
+      outcomes.push(outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "memory_query", durationMs: 0, failureKind: "found_nothing" }));
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: "found_nothing" });
       continue;
     }

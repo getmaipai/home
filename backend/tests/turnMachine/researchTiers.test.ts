@@ -34,7 +34,7 @@ const QUERIES = [
   "V series cancelled why",
   "V series creator interview plans",
   "V series novel sequel",
-  "V series 2009 reboot",
+  "V series reboot",
   "V series final episode threads",
   "V series cast interview ending",
   "V series ratings network",
@@ -197,14 +197,22 @@ describe("research rounds follow the answer style", () => {
   test("the query writer's searches reach the first round and each later round, and a writer that is down changes nothing", async () => {
     await holdMax();
     const prompts: string[] = [];
-    __setQueryWriterForTests(async (prompt) => { prompts.push(prompt); return JSON.stringify({ queries: [prompts.length === 1 ? "first planned search about the series ending" : "second planned search using found names", "V series 2009 reboot"] }); });
+    __setQueryWriterForTests(async (prompt) => { prompts.push(prompt); return JSON.stringify({ queries: [prompts.length === 1 ? "first planned search about the series ending" : "second planned search using found names", "V series reboot"] }); });
     const { requests } = await turn("owner", 2, { max: true });
     const first = requests.find((r) => toolMessages(r).length === 0 && r.tool_choice !== "none")!;
     expect(first.messages.filter((m) => m.role === "user").at(-1)!.content!.toString()).toContain("first planned search about the series ending");
     const second = requests.find((r) => toolMessages(r).length === 1 && r.tool_choice !== "none")!;
     expect(second.messages.at(-1)!.content!.toString()).toContain("second planned search using found names");
-    expect(prompts[1]).toContain("V series 2009 reboot".split(" ")[0]!); // the later prompt lists the searches already run
+    expect(prompts[1]).toContain("V series reboot".split(" ")[0]!); // the later prompt lists the searches already run
     expect(prompts[1]).toContain("Searches already run");
+  });
+
+  test("a research search built on a name or year from memory is skipped, and the next round is told to find it from the sources", async () => {
+    await holdMax();
+    const { requests } = await turn("owner", 3, { max: true, queries: ["V series Ted White season two plans", "V series 1983 miniseries ending", "V series ending interview"] });
+    expect(searxQueries).toEqual(["V series ending interview"]);
+    const later = requests.filter((r) => r.tool_choice !== "none" && toolMessages(r).length === 0).at(-1)!;
+    expect(JSON.stringify(later.messages)).toContain("not yet shown by the question or any source");
   });
 
   test("Max stops at twelve rounds", async () => {
@@ -295,7 +303,7 @@ describe("the reasoning room grows with the style so a long research answer is n
 
 describe("repeat queries, the web scope, and credits no source names", () => {
   test("a search that repeats an earlier one is not issued", async () => {
-    await turn("owner", 4, { thinking: true, queries: ["V series cancelled why", "why V series cancelled", "V series novel sequel", "V series 2009 reboot"] });
+    await turn("owner", 4, { thinking: true, queries: ["V series cancelled why", "why V series cancelled", "V series novel sequel", "V series reboot"] });
     // the second is the first reworded (same words), so only three reach the search backend
     expect(searxQueries.length).toBe(3);
   });

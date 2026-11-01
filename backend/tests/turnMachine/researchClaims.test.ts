@@ -92,3 +92,19 @@ describe("the query writer", () => {
     for (const writer of [async () => null, async () => { throw new Error("down"); }, async () => "not json"]) expect(await writeQueries(writer, "q", { queries: [], sites: [] }, "", 4)).toEqual([]);
   });
 });
+
+describe("details from memory", () => {
+  test("a name or year the question and the results have not shown is flagged; one they showed is not", async () => {
+    const { memoryDetailsIn } = await import("@/lib/turnMachine/research");
+    expect(memoryDetailsIn("show Pat Quill interview 1991", "tell me about the show")).toEqual(["Pat Quill", "1991"]);
+    expect(memoryDetailsIn("show Pat Quill interview 1991", "tell me about the show\nPat Quill ran it from 1991")).toEqual([]);
+    expect(memoryDetailsIn("show ending why cancelled 1980s", "the 1980s show")).toEqual([]);
+  });
+  test("the writer's discovery-first prompt carries no names and its proposals with unshown names are dropped", async () => {
+    const { queryWriterPrompt, writeQueries } = await import("@/lib/turnMachine/research");
+    expect(queryWriterPrompt("q", { queries: [], sites: [] }, "", 4)).toContain("write only searches that identify the subject");
+    expect(queryWriterPrompt("q", { queries: [], sites: [] }, "- a.example: A title", 4)).not.toContain("write only searches that identify the subject");
+    const writer = async () => JSON.stringify({ queries: ["show creator Pat Quill interview", "who made the show and how it ended"] });
+    expect(await writeQueries(writer, "tell me about the show", { queries: [], sites: [] }, "", 4)).toEqual(["who made the show and how it ended"]);
+  });
+});

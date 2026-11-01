@@ -1,4 +1,4 @@
-import { NO_WEB_RESULTS_CLAUSE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, type QueryWriter } from "../research";
+import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -994,7 +994,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const roundsLeft = Math.max(1, state.budget.rounds - (input.roundsUsed ?? 0));
     const progressSoFar = researchProgress(state.outcomes);
     const proposed = await writeQueries(queryWriterOverride ?? chatQueryWriter(signal), input.utterance, progressSoFar, resultDigest(state.outcomes), Math.min(WRITER_QUERIES_LATER, roundsLeft));
-    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}` };
+    const nudge: LlmMessage = { role: "user", content: `${continuationInstruction(state.answerStyle!, input.utterance, progressSoFar, roundsLeft)}${suggestedSearchesNote(proposed)}${state.outcomes.some((o) => o.errorCode === "repeat_query") ? ` ${REPEAT_SKIPPED_NOTE}` : ""}${state.outcomes.some((o) => o.errorCode === "memory_query") ? ` ${MEMORY_QUERY_SKIPPED_NOTE}` : ""}` };
     messages = phrasedOutcomes.length === 0
       ? [...history, nudge]
       : [...history, toolCallAssistantMessage(phrasedOutcomes), ...toolResultMessages(phrasedOutcomes, evidenceChars, promptSurfaceClass !== "written", certaintyGate, sourceNumberOffsets(state.outcomes)), nudge];

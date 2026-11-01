@@ -83,14 +83,14 @@ export function continuationInstruction(style: AnswerStyle, utterance: string, p
  * new to add, so the turn goes to its answer instead of searching on. Counts and URLs only, no wording is read. */
 export function roundAddedNothing(previous: readonly ToolExecutionOutcome[], round: readonly ToolExecutionOutcome[]): boolean {
   // A skipped repeat is not a result: the next round tells the model and lets it search another angle.
-  const searches = round.filter((o) => o.packageId === "websearch" && o.errorCode !== "repeat_query");
+  const searches = round.filter((o) => o.packageId === "websearch" && o.errorCode !== "repeat_query" && o.errorCode !== "memory_query");
   if (searches.length === 0) return false;
   const sourcesIn = (list: readonly ToolExecutionOutcome[]) => list.filter((o) => o.packageId === "websearch").flatMap((o) => o.sources ?? []);
   const seen = new Set(sourcesIn(previous).map((source) => source.url));
   const found = searches.flatMap((o) => o.sources ?? []);
   if (found.length === 0) {
     // An empty round is a thin query, not the end: the model gets one more try to rewrite it, and a second empty round in a row ends the searching.
-    const earlierSearches = previous.filter((o) => o.packageId === "websearch" && o.errorCode !== "repeat_query");
+    const earlierSearches = previous.filter((o) => o.packageId === "websearch" && o.errorCode !== "repeat_query" && o.errorCode !== "memory_query");
     return earlierSearches.length > 0 && seen.size === 0;
   }
   return !found.some((source) => !seen.has(source.url));
@@ -234,6 +234,21 @@ export async function checkClaims(text: string, evidence: readonly string[], jud
   return { text: out.join(""), checked, unsupported: unsupportedAt.size, skipped: noText + (jobs.length - checked) };
 }
 
+const QUERY_NAME = /\b[A-Z][a-z]+(?:\s+(?:[A-Z]\.|[A-Z][a-z]+)){1,2}\b/g;
+const QUERY_YEAR = /\b(?:19|20)\d{2}\b/g;
+
+/** Names and years a search query carries that neither the person's question nor anything the searches returned has shown: details
+ * the model supplied from its own memory. A research query built on one can aim at the wrong subject (the live V run searched a
+ * miniseries' year and a producer's name for a different, later show), so such a search waits until a source has shown the detail. */
+export function memoryDetailsIn(query: string, allowedText: string): string[] {
+  const allowed = allowedText.toLowerCase();
+  const found = [...(query.match(QUERY_NAME) ?? []), ...(query.match(QUERY_YEAR) ?? [])];
+  return [...new Set(found.filter((detail) => !allowed.includes(detail.toLowerCase())))];
+}
+
+/** Said to the model in the next round when a search of this turn was skipped for carrying details from memory. */
+export const MEMORY_QUERY_SKIPPED_NOTE = "A search that used a name or year not yet shown by the question or any source was skipped; first search to find out from the sources who made it and when, then use what they show.";
+
 /** One model call that writes searches: a prompt in, text out, or null when the model is unavailable. */
 export type QueryWriter = (prompt: string) => Promise<string | null>;
 
@@ -266,7 +281,7 @@ ${searched}
 What the results showed so far (site: title, snippet):
 ${found}
 
-Write up to ${count} new web searches. Rules:
+${digest.trim() === "" ? "Nothing has been read yet, so write only searches that identify the subject and how it turned out: what it is, when it was made or aired, who made it, how it ended. Include no person's name and no year unless the question gave it.\n" : ""}Write up to ${count} new web searches. Rules:
 - Each search is specific: the exact name of the subject, the year or version when known, and ONE angle. A search with only a bare name is too vague.
 - Choose the angles that matter for this particular question and vary them (what happened and why; what the people involved said in interviews or official statements; what came after; how it was received; the original documents). Split a question that has several parts into one search per part.
 - Take names only from the question or from the results shown above. Never add a name from your own memory. If the results do not yet say who made or ran the subject, write a search that finds that first.
@@ -290,7 +305,8 @@ export async function writeQueries(writer: QueryWriter, utterance: string, progr
   try { reply = await writer(queryWriterPrompt(utterance, progress, digest, count)); } catch { reply = null; }
   if (reply === null) return [];
   const kept: string[] = [];
-  for (const query of parsePlannedQueries(reply)) if (!isRepeatQuery([...progress.queries, ...kept], query)) kept.push(query);
+  const allowed = `${utterance}\n${digest}`;
+  for (const query of parsePlannedQueries(reply)) if (!isRepeatQuery([...progress.queries, ...kept], query) && memoryDetailsIn(query, allowed).length === 0) kept.push(query);
   return kept.slice(0, count);
 }
 
