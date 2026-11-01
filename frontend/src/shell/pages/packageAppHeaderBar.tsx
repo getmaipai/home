@@ -64,7 +64,7 @@ function PackageAppHeaderCenter() {
   const { header } = state;
   const modes = header?.modes ?? [];
   return (
-    <div className="absolute left-1/2 top-1/2 flex w-max max-w-[calc(100%-26rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-3" data-testid="app-header-center">
+    <div className="absolute left-1/2 top-1/2 flex w-max max-w-lg -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-3" data-testid="app-header-center">
       {header?.search && state.searchTo ? <AppSearch label={state.label} searchTo={state.searchTo} /> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
