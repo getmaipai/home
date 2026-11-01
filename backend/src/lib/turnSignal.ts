@@ -620,7 +620,7 @@ export function isEligibleClause(clause: SignalClause): boolean {
  * like tea" are the shortest statements people make about themselves,
  * and a four-word floor dropped every one of them. */
 export const JUDGE_MIN_WORDS = 3;
-const SOCIAL_ACTS: ReadonlySet<Act> = new Set(["greeting", "closing", "backchannel"]);
+const SOCIAL_ACTS: ReadonlySet<Act> = new Set(["greeting", "closing", "backchannel"]); // rule: signal.rule (docs/BACKLOG.md, "MEM-AUDIT-02")
 
 /** The turn gate (MEM-AUDIT-02, decision 4; replaces MEM-06's
  * clause-only rule for the queue): a turn is the judge's when its text
@@ -632,7 +632,7 @@ const SOCIAL_ACTS: ReadonlySet<Act> = new Set(["greeting", "closing", "backchann
  * instructions. The clause rule above still decides which clause a fact
  * cites inside the judge. */
 export function hasEligibleClause(signal: TurnSignal, userText: string): boolean {
-  const words = userText.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  const words = userText.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length; // rule: signal.rule (docs/BACKLOG.md, "MEM-AUDIT-02")
   if (words < JUDGE_MIN_WORDS) return false;
   if (signal.clauses.length === 0) return false;
   return !signal.clauses.every((c) => SOCIAL_ACTS.has(c.act));
