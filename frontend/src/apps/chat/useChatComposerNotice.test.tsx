@@ -26,7 +26,7 @@ describe("useChatComposerNotice for a degraded Chat app", () => {
       : Response.json({ engines: { chat: { kind: "starting", pid: null, alive: false, availability: "unavailable", reason: "ai_installing", notice: { adult: "The AI is still downloading.", teen: "The AI is still downloading.", child: "I'm still installing.", repairs_link: null } } } }))) as unknown as typeof fetch;
     const client = createQueryClient();
     const v = renderHook(() => useChatComposerNotice({ role: "adult", age_band: "adult" } as never), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
-    await waitFor(() => expect(v.result.current).toEqual({ text: "The AI is still installing. Chat will work when the install finishes.", repairsLink: null }));
+    await waitFor(() => expect(v.result.current).toEqual({ text: "The AI is installing. Chat works after.", repairsLink: null }));
   });
 
   test("owner sees the reason and the Repairs link", async () => {
@@ -35,7 +35,7 @@ describe("useChatComposerNotice for a degraded Chat app", () => {
   });
   test("a non-admin gets a plain line with no part names and no link", async () => {
     const v = view(chat("Chat is working, but Memory isn't running."), { role: "adult", age_band: "adult" });
-    await waitFor(() => expect(v.result.current).toEqual({ text: "Some chat features may be limited right now.", repairsLink: null }));
+    await waitFor(() => expect(v.result.current).toEqual({ text: "Some chat features are limited.", repairsLink: null }));
   });
   test("search-limited keeps its own text", async () => {
     const v = view(chat("Household web search isn't reachable."), { role: "owner", age_band: "adult" });
@@ -49,7 +49,7 @@ describe("useChatComposerNotice for a degraded Chat app", () => {
 });
 
 describe("useChatComposerNotice while chat is Reduced (TIER-HOME-03)", () => {
-  const reduced = { chat: { kind: "url", pid: null, alive: true, availability: "ready", cause: "tier_reduced", notice: { adult: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused.", teen: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused.", child: "Chat is a little simpler for a few minutes.", repairs_link: null } } };
+  const reduced = { chat: { kind: "url", pid: null, alive: true, availability: "ready", cause: "tier_reduced", notice: { adult: "Chat is simpler for a few minutes.", teen: "Chat is simpler for a few minutes.", child: "Chat is a bit simpler for now.", repairs_link: null, more: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused." } } };
   function reducedView(person: { role: string; age_band: string }) {
     globalThis.fetch = mock((url: string | URL | Request) => Promise.resolve(Response.json(String(url).includes("/api/status/apps") ? [] : { engines: reduced }))) as unknown as typeof fetch;
     const client = createQueryClient();
@@ -57,11 +57,12 @@ describe("useChatComposerNotice while chat is Reduced (TIER-HOME-03)", () => {
   }
   test("an adult reads the simpler-chat line, with no Repairs link", async () => {
     const v = reducedView({ role: "adult", age_band: "adult" });
-    await waitFor(() => expect(v.result.current?.text).toContain("Chat is simpler while a big job runs"));
+    await waitFor(() => expect(v.result.current?.text).toBe("Chat is simpler for a few minutes."));
+    expect(v.result.current?.more).toContain("about 12 minutes");
     expect(v.result.current?.repairsLink).toBeNull();
   });
   test("a child reads the child line", async () => {
     const v = reducedView({ role: "child", age_band: "child" });
-    await waitFor(() => expect(v.result.current).toEqual({ text: "Chat is a little simpler for a few minutes.", repairsLink: null }));
+    await waitFor(() => expect(v.result.current).toEqual({ text: "Chat is a bit simpler for now.", more: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused.", repairsLink: null }));
   });
 });

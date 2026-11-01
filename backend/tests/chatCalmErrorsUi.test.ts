@@ -70,18 +70,18 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 describe("the composer line comes from one table, per band (design section 7)", () => {
   test("a paused engine: one line per band, and the Repairs link words for an admin", () => {
     expect(composerNotice("unavailable")).toEqual({
-      adult: "Chat is paused. Your message stays here; press Send once it is back.",
-      teen: "Chat is paused right now. Your message stays here; press Send once it is back.",
-      child: "I'm taking a break. Ask a grown-up, or try again soon.",
+      adult: "Chat is paused. Your message waits here.",
+      teen: "Chat is paused. Your message waits here.",
+      child: "I'm taking a break. Ask a grown-up.",
       repairs_link: "Open Repairs",
     });
   });
 
   test("a starting engine: the short starting line, and no Repairs link for anyone", () => {
     expect(composerNotice("starting")).toEqual({
-      adult: "Starting up. You can send in a moment.",
-      teen: "Starting up. You can send in a moment.",
-      child: "I'm waking up. Send that in a moment.",
+      adult: "Starting up. Send in a moment.",
+      teen: "Starting up. Send in a moment.",
+      child: "I'm waking up. Send in a moment.",
       repairs_link: null,
     });
   });

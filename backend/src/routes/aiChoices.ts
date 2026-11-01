@@ -6,6 +6,7 @@
 // anything. Free up space re-runs the unused test per id at removal time (lib/aiUnused.ts) and reports each
 // id separately, so one failure never stops the rest. Owner and admin only; the Stack's own refusals pass
 // through as its sentences, like routes/components.ts does.
+import { maxEstimates } from "@/lib/chatTransitions";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
@@ -239,11 +240,11 @@ aiChoicesRoutes.openapi(jobAskRoute, (c) => {
   return c.json({ answered: ask ? answerFitAsk(id, c.req.valid("json").answer) : false }, 200);
 });
 
-const leaseShape = z.object({ state: z.enum(["off", "starting", "held", "releasing"]), held_by_you: z.boolean(), pinned: z.boolean(), can_use: z.boolean(), releases_in_seconds: z.number().int().nullable() });
+const leaseShape = z.object({ state: z.enum(["off", "starting", "held", "releasing"]), held_by_you: z.boolean(), pinned: z.boolean(), can_use: z.boolean(), releases_in_seconds: z.number().int().nullable(), estimates: z.object({ max_load_s: z.number().int(), self_test_s: z.number().int() }) });
 const leaseView = (person: { id: string; role: string }) => {
   const snap = getChatLease().snapshot();
   const mine = snap.holderId === person.id;
-  return { state: snap.state, held_by_you: mine, pinned: mine && snap.pinned, can_use: person.role !== "teen" && holdsMax(person as never, "chat"), releases_in_seconds: mine ? snap.releasesInSeconds : null };
+  return { state: snap.state, held_by_you: mine, pinned: mine && snap.pinned, can_use: person.role !== "teen" && holdsMax(person as never, "chat"), releases_in_seconds: mine ? snap.releasesInSeconds : null, estimates: maxEstimates() };
 };
 const leaseGetRoute = createRoute({
   method: "get", path: "/chat-lease", tags: ["AI"], summary: "Whether the big chat model is leased, whether you hold it and whether you may (TIER-HOME-05)",
@@ -258,11 +259,11 @@ const leaseTakeRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: leaseShape } }, description: "The lease is yours." }, ...refusals },
 });
 const LEASE_REFUSAL: Record<string, { status: 403 | 409 | 503; line: string }> = {
-  not_a_holder: { status: 403, line: "Max chat is not turned on for you. Ask an admin to give you Max." },
-  not_ready: { status: 409, line: "Max chat is not set up on this computer yet. Finish the coding setup first." },
-  swap_failed: { status: 503, line: "Home could not load the big chat model, so chat stays as it was. Try again in a minute." },
-  stack_busy: { status: 409, line: "Someone else is using Max chat right now. It ends by itself when they stop." },
-  max_window: { status: 409, line: "A Max job is running. Max chat can start when it ends." },
+  not_a_holder: { status: 403, line: "Max is not on for you. Ask an admin." },
+  not_ready: { status: 409, line: "Max is not set up. Finish Coding setup." },
+  swap_failed: { status: 503, line: "Max did not load. Try again in a minute." },
+  stack_busy: { status: 409, line: "Someone else is using Max. Try later." },
+  max_window: { status: 409, line: "A Max job is running. Try when it ends." },
 };
 aiChoicesRoutes.openapi(leaseTakeRoute, async (c) => {
   const person = c.get("person");
@@ -272,7 +273,7 @@ aiChoicesRoutes.openapi(leaseTakeRoute, async (c) => {
     const refusal = LEASE_REFUSAL[result.refusal]!;
     // not_ready names the step that is missing so the composer can offer it (a stale self-test is the common one, and an admin can run it).
     const firstUnmet = result.refusal === "not_ready" ? (await codingModeReadiness().catch(() => null))?.first_unmet ?? null : null;
-    const line = firstUnmet === "self_test" ? "Max needs a self-test first." : refusal.line;
+    const line = firstUnmet === "self_test" ? "Max needs a quick test first." : refusal.line;
     return c.json({ error: line, code: result.refusal, ...(result.refusal === "not_ready" ? { first_unmet: firstUnmet } : {}) }, refusal.status) as never;
   }
   return c.json(leaseView(person), 200);

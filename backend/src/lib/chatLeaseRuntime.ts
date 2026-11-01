@@ -1,5 +1,6 @@
 // TIER-HOME-05: the one running Max chat lease. The swap is the Stack's coding-mode transaction (unload residents, load the big model,
 // post-load check, return on failure); the readiness record gates whether Max chat is offered at all.
+import { recordTransition } from "@/lib/chatTransitions";
 import { createChatLease, registerActiveChatLease, type ChatLease } from "@/lib/chatLease";
 import { codingModeReadiness } from "@/lib/codingMode";
 import { getStackClient } from "@/lib/stackEngine";
@@ -14,7 +15,11 @@ export function getChatLease(): ChatLease {
     now: () => clock(),
     windowOpen: () => openMaxWindow() !== null,
     ready: async () => (await codingModeReadiness()).ready,
-    swapToBig: () => getStackClient().setCodingMode("coding"),
+    swapToBig: async () => {
+      const started = Date.now();
+      await getStackClient().setCodingMode("coding");
+      recordTransition("max_load", Date.now() - started);
+    },
     swapToStandard: () => getStackClient().setCodingMode("normal"),
   });
   registerActiveChatLease(lease);

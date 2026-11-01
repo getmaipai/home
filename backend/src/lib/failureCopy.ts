@@ -109,19 +109,21 @@ export interface ComposerNotice {
   teen: string;
   child: string;
   repairs_link: string | null;
+  /** The longer explanation, for the line's tooltip. Never drawn under the input. */
+  more?: string;
 }
 
 const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
   paused: {
-    adult: "Chat is paused. Your message stays here; press Send once it is back.",
-    teen: "Chat is paused right now. Your message stays here; press Send once it is back.",
-    child: "I'm taking a break. Ask a grown-up, or try again soon.",
+    adult: "Chat is paused. Your message waits here.",
+    teen: "Chat is paused. Your message waits here.",
+    child: "I'm taking a break. Ask a grown-up.",
     repairs_link: "Open Repairs",
   },
   starting: {
-    adult: "Starting up. You can send in a moment.",
-    teen: "Starting up. You can send in a moment.",
-    child: "I'm waking up. Send that in a moment.",
+    adult: "Starting up. Send in a moment.",
+    teen: "Starting up. Send in a moment.",
+    child: "I'm waking up. Send in a moment.",
     repairs_link: null,
   },
 };
@@ -129,36 +131,37 @@ const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
 /** CHAT-PAUSE-01: the same composer line, worded for the cause when Home
  * knows it. Every cause reuses the one notice shape (and so the one
  * composer line, Welcome state and Send hold); only the words differ. */
-const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "paused_by_admin" | "offline" | "gpu", ComposerNotice> = {
+const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "paused_by_admin" | "offline" | "gpu", ComposerNotice> = {
   restarting: {
-    adult: "The AI is restarting. Chat will start again by itself in a minute.",
-    teen: "The AI is restarting. Chat will start again by itself in a minute.",
-    child: "I'm waking up. Try again in a minute.",
+    adult: "Chat is restarting. Back soon.",
+    teen: "Chat is restarting. Back soon.",
+    child: "I'm waking up. Back soon.",
     repairs_link: null,
   },
   memory: {
-    adult: "The computer is low on memory. Chat is paused until it recovers.",
-    teen: "The computer is low on memory. Chat is paused until it recovers.",
+    adult: "Low on memory. Chat is paused.",
+    teen: "Low on memory. Chat is paused.",
     child: "I need a rest. Try again soon.",
     repairs_link: "Open Repairs",
   },
   not_installed: {
-    adult: "The AI isn't installed yet. An owner can finish setup.",
-    teen: "The AI isn't installed yet. An owner can finish setup.",
+    adult: "The AI isn't installed. Ask an owner.",
+    teen: "The AI isn't installed. Ask an owner.",
     child: "I'm not ready yet. Ask a grown-up.",
     repairs_link: "Open Repairs",
   },
-  mode_change: { adult: "Home is getting ready for a big job. Chat will be back in about a minute.", teen: "Home is getting ready for a big job. Chat will be back in about a minute.", child: "I am getting ready for a big job. Try again in a minute.", repairs_link: null },
-  gpu: { adult: "Chat is paused because this Mac's graphics compiler is not responding. An owner can restart the Mac when nobody is using it.", teen: "Chat is paused because this Mac's graphics compiler is not responding. Ask a grown-up to restart the Mac.", child: "I need a rest. Ask a grown-up.", repairs_link: "Open Repairs" },
+  mode_change: { adult: "Getting ready. Back in about a minute.", teen: "Getting ready. Back in about a minute.", child: "Getting ready. Back in about a minute.", repairs_link: null, more: "Home is getting ready for a big job. Chat is paused until it finishes." },
+  reduced_swap: { adult: "Switching chat. Back in about 15 seconds.", teen: "Switching chat. Back in about 15 seconds.", child: "Switching chat. Back in about 15 seconds.", repairs_link: null, more: "Chat is changing to a different model so a big job has room. It comes back by itself." },
+  gpu: { adult: "Chat is paused. Restart the Mac.", teen: "Chat is paused. Ask a grown-up.", more: "This Mac's graphics compiler is not responding. An owner can restart the Mac when nobody is using it.", child: "I need a rest. Ask a grown-up.", repairs_link: "Open Repairs" },
   paused_by_admin: {
-    adult: "Chat is paused by an admin until it is turned back on.",
-    teen: "Chat is paused by an admin until it is turned back on.",
+    adult: "An admin paused chat.",
+    teen: "An admin paused chat.",
     child: "Chat is resting. Ask a grown-up.",
     repairs_link: null,
   },
   offline: {
     adult: "The AI isn't answering.",
-    teen: "The AI isn't answering. Ask a grown-up to check Repairs.",
+    teen: "The AI isn't answering. Ask a grown-up.",
     child: "I'm taking a break. Ask a grown-up.",
     repairs_link: "Check Repairs",
   },

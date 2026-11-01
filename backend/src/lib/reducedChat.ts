@@ -2,7 +2,7 @@
 // when the Stack reports the swap and clears it when the window ends; the chat health row reads it so the line under the input shows for
 // everyone and never holds Send (RULES.md S6: the one existing composer line, no banner). Counts and minutes only, never an app or person.
 import type { ComposerNotice } from "@/lib/failureCopy";
-import { JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
+import { beginTransition, recordTransition } from "@/lib/chatTransitions";
 
 let reduced: { minutesLeft: number | null } | null = null;
 
@@ -11,8 +11,8 @@ export function reducedChatState(): { minutesLeft: number | null } | null { retu
 
 /** TIER-HOME-03 (resource-tiers section 8): the line under the chat input while a Max window runs chat on its simpler model. Chat still answers, so this is shown beside a ready composer and never holds Send. */
 export function reducedChatNotice(minutesLeft: number | null): ComposerNotice {
-  const adult = minutesLeft === null ? JOB_QUEUE_COPY.reduced_chat.adult.replace(" (about N minutes)", "") : JOB_QUEUE_COPY.reduced_chat.adult.replace("N", String(Math.max(1, Math.round(minutesLeft))));
-  return { adult, teen: adult, child: JOB_QUEUE_COPY.reduced_chat.child, repairs_link: null };
+  const when = minutesLeft === null ? "" : ` (about ${Math.max(1, Math.round(minutesLeft))} minutes)`;
+  return { adult: "Chat is simpler for a few minutes.", teen: "Chat is simpler for a few minutes.", child: "Chat is a bit simpler for now.", repairs_link: null, more: `Chat is simpler while a big job runs${when}. Answers are shorter and some extras may be paused.` };
 }
 
 /** TIER-WIRE-02: how a request to the Stack's Reduced chat model came out. `waiting`: a chat turn is in flight, ask again at the next turn boundary. `unsupported`: an older Stack without the route. `failed`: refused, unreachable or an unreadable answer. */
@@ -27,7 +27,12 @@ async function switchReduced(on: boolean): Promise<ReducedSwitchResult> {
     const { getStackClient } = await import("@/lib/stackEngine");
     const client = getStackClient();
     if (!client.setReducedChat) return "unsupported";
-    const answer = await client.setReducedChat(on);
+    const end = beginTransition(on ? "enter_reduced" : "leave_reduced");
+    const started = Date.now();
+    let answer: Awaited<ReturnType<NonNullable<typeof client.setReducedChat>>>;
+    try { answer = await client.setReducedChat(on); } finally { end(); }
+    // The Stack's own swap time when it says one, else what Home waited. A 202 (waiting) or a refusal swapped nothing, so nothing is recorded.
+    if (answer.state === "ok" && answer.reduced === on) recordTransition(on ? "enter_reduced" : "leave_reduced", answer.swapMs ?? Date.now() - started);
     if (answer.state === "unsupported") return "unsupported";
     if (answer.state === "waiting") { truth = null; return "waiting"; }
     if (answer.state === "refused") { truth = null; return "failed"; }

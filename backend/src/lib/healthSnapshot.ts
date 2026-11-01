@@ -3,6 +3,7 @@ import { getEngineStatus } from "@/lib/llmSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 import { roleHealth, roleHealthEntry, localRoleHealthEntry } from "@/lib/roleHealth";
 import { composerNotice, makingNotice, type ChatPauseCause, type MakingCause } from "@/lib/failureCopy";
+import { activeTransition, observeModeChange, transitionNotice } from "@/lib/chatTransitions";
 import { reducedChatNotice, reducedChatState } from "@/lib/reducedChat";
 import { chatPausedByAdmin, chatPauseMessage } from "@/lib/chatPause";
 
@@ -36,7 +37,10 @@ export async function collectHealth() {
     chat.cause = "paused_by_admin";
     cause = "paused_by_admin";
   }
-  const notice = composerNotice(chat.availability ?? "ready", cause, chatPauseMessage());
+  let notice = composerNotice(chat.availability ?? "ready", cause, chatPauseMessage());
+  // The two switching lines carry a time measured on this computer, and "taking longer" once it passes 1.5 times that.
+  if (chat.cause === "reduced_swap") { const t = activeTransition(); notice = transitionNotice(t?.kind ?? "enter_reduced", t ? Date.now() - t.startedAt : 0); }
+  else if (chat.cause === "mode_change" && chat.availability === "starting") notice = transitionNotice("mode_change", observeModeChange(true) ?? 0);
   if (notice) chat.notice = notice;
   else if (chat.cause === "tier_reduced" && chat.availability === "ready") chat.notice = reducedChatNotice(reducedChatState()?.minutesLeft ?? null);
   const embed = roleHealthEntry("embed", locals[1]!, states[1]!);
@@ -47,7 +51,7 @@ export async function collectHealth() {
   // that cannot make videos is not an outage.
   const [image, video] = (["image", "video"] as const).map((role, index) => {
     const entry = roleHealthEntry(role, locals[4 + index]!, states[4 + index]!);
-    let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" && entry.cause !== "tier_reduced" ? entry.cause : null;
+    let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" && entry.cause !== "tier_reduced" && entry.cause !== "reduced_swap" ? entry.cause : null;
     if (makingCause === "restarting" && cause === "offline") { entry.availability = "unavailable"; entry.kind = "failed"; entry.alive = false; entry.cause = "offline"; makingCause = "offline"; }
     const line = makingNotice(role, entry.availability ?? "ready", makingCause);
     if (line) entry.notice = line;

@@ -6,7 +6,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ComposerTrailingWithThinkingMode } from "@/apps/chat/chatThreadSlots";
 import { ChatAgeBandContext, ThinkingModeCapabilityContext, ThinkingModeContext } from "@/apps/chat/chatThreadContexts";
-import { MAX_CONFIRM_LINE, MAX_SELF_TEST_LINE, MAX_STARTING_LINE, __setSelfTestPollMsForTests, useMaxChatNotice } from "@/apps/chat/maxChat";
+import { MAX_CONFIRM_LINE, MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, __setSelfTestPollMsForTests, maxProgressLine, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { Button } from "@maipai/ui/src/ui/button";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
@@ -82,9 +82,17 @@ describe("Max chat control", () => {
     fireEvent.click(await view.findByRole("button", { name: "Continue" }));
     const starting = await view.findByRole("button", { name: "Starting Max" });
     expect((starting as HTMLButtonElement).disabled).toBe(true);
-    expect(view.getByText(MAX_STARTING_LINE)).toBeTruthy();
+    expect(view.getByText("Loading Max. About a minute.")).toBeTruthy();
     finish();
     await waitFor(() => expect(view.getByRole("button", { name: "Max" }).getAttribute("aria-pressed")).toBe("true"));
+  });
+
+  test("the loading and testing lines carry the measured time, and give way to taking-longer past 1.5 times it", () => {
+    expect(maxProgressLine("Loading", 60, 0)).toBe("Loading Max. About a minute.");
+    expect(maxProgressLine("Testing", 35, 0)).toBe("Testing Max. About 35 seconds.");
+    expect(maxProgressLine("Testing", 35, 52_000)).toBe("Testing Max. About 35 seconds.");
+    expect(maxProgressLine("Testing", 35, 53_000)).toBe(MAX_RUNNING_LONG_LINE);
+    for (const line of [maxProgressLine("Loading", 60, 0), MAX_CONFIRM_LINE, MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE]) { expect(line.length).toBeLessThanOrEqual(42); expect(line).not.toContain("\u2014"); }
   });
 
   test("a teen and a child see no control and the page never asks the route", async () => {
@@ -139,7 +147,7 @@ describe("Max chat control", () => {
   });
 
   test("another refusal shows its plain line and can be dismissed", async () => {
-    takeAnswer = async () => Response.json({ error: "A Max job is running. Max chat can start when it ends.", code: "max_window" }, { status: 409 });
+    takeAnswer = async () => Response.json({ error: "A Max job is running. Try when it ends.", code: "max_window" }, { status: 409 });
     const view = renderWithQueryClient(<Harness band="adult" />);
     fireEvent.click(await view.findByRole("button", { name: "Max" }));
     fireEvent.click(await view.findByRole("button", { name: "Continue" }));

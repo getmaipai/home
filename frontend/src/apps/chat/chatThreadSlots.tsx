@@ -118,7 +118,7 @@ export function ChatComposerNotice() {
     // header status pill, on the kit's attention and destructive tokens,
     // chosen by the status-board state the rail's Chat icon reads; every notice, for
     // every age band, goes through this one presentation.
-    <span data-chat-notice data-level={level} role="status" aria-live="polite" title={notice.text}>
+    <span data-chat-notice data-level={level} role="status" aria-live="polite" title={notice.more ?? notice.text}>
       <StatusIndicator data-slot="chat-notice-dot" status={level === "red" ? "offline" : "degraded"} ping={false} inline />
       {" "}
       <span data-chat-notice-text>{notice.text}</span>

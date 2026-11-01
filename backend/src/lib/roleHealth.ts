@@ -1,4 +1,5 @@
 
+import { activeTransition, observeModeChange, transitionNotice } from "@/lib/chatTransitions";
 import * as canaryResults from "@/lib/canary/results";
 import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
@@ -14,7 +15,7 @@ export const MAKING_ROLES: readonly MakingRole[] = ["image", "video"];
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "tier_reduced" | "gpu"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); }
 
@@ -58,6 +59,9 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (role === "chat" && chatBlockedByGpu()) return GPU_HEALTH;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   if (role === "image" || role === "video") return makingHealth(role);
+  // The Reduced swap is running (a no-op renewal answers in milliseconds, so only a swap that lasts shows): chat cannot answer until it ends.
+  const swap = role === "chat" ? activeTransition() : null;
+  if (swap && Date.now() - swap.startedAt > 1500) return { availability: "starting", reason: null, cause: "reduced_swap" };
   if (role === "chat" && await stackReducedChat()) {
     // TIER-WIRE-03: the Stack's own `reduced_chat` decides, not Home's flag. TIER-HOME-03: simpler, not unavailable. Chat answers, so this stays "ready" and never holds Send.
     return { availability: "ready", reason: null, cause: "tier_reduced" };
@@ -65,7 +69,8 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (role === "chat") {
     try {
       const mode = await getStackClient().getCodingMode();
-      if (mode.state === "switching") return { availability: "starting", reason: null, cause: "mode_change", detail: "Home is getting ready for a big job. Chat will be back in about a minute." };
+      const sinceMs = observeModeChange(mode.state === "switching");
+      if (sinceMs !== null) return { availability: "starting", reason: null, cause: "mode_change", detail: transitionNotice("mode_change", sinceMs).adult };
     } catch { /* Older or unreachable Stack; role health below remains authoritative. */ }
   }
   // THIN-1C: the Stack's own recent refusal of this role outranks what

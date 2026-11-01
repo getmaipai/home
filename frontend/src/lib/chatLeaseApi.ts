@@ -8,6 +8,8 @@ export interface ChatLeaseView {
   /** False for a teen, a child, a guest and an adult without a Max grant: the composer shows no control. */
   can_use: boolean;
   releases_in_seconds: number | null;
+  /** Measured on this computer (median of recent runs), in seconds: how long Max takes to load and to self-test. */
+  estimates?: { max_load_s: number; self_test_s: number };
 }
 
 export const chatLeaseApi = {

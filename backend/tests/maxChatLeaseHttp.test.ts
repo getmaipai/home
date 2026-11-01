@@ -111,12 +111,17 @@ describe("Max chat lease over HTTP (TIER-HOME-05)", () => {
     }
   });
 
+  test("the lease view carries the measured Max load and self-test seconds for the composer line", async () => {
+    const { client } = await owner();
+    expect(await (await client.get("/api/ai/chat-lease")).json()).toMatchObject({ estimates: { max_load_s: 60, self_test_s: 35 } });
+  });
+
   test("a stale self-test answers not_ready and says the self-test is the missing step", async () => {
     const { client } = await owner();
     stale = true;
     const res = await client.post("/api/ai/chat-lease", {});
     expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "not_ready", first_unmet: "self_test", error: "Max needs a self-test first." });
+    expect(await res.json()).toMatchObject({ code: "not_ready", first_unmet: "self_test", error: "Max needs a quick test first." });
     expect(mode).toBe("normal");
   });
 

@@ -113,14 +113,14 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
   const apps = useStatusApps().data;
   if (readiness.hubDown) {
     const text = person.age_band === "child"
-      ? (readiness.hubDown === "offline" ? "I'm taking a break. Ask a grown-up." : "I'm waking up. Try again in a minute.")
-      : (readiness.hubDown === "offline" ? "The AI isn't answering." : "The AI is restarting. Chat will start again by itself in a minute.");
+      ? (readiness.hubDown === "offline" ? "I'm taking a break. Ask a grown-up." : "I'm waking up. Back soon.")
+      : (readiness.hubDown === "offline" ? "The AI isn't answering." : "Chat is restarting. Back soon.");
     return { text, repairsLink: readiness.hubDown === "offline" && isOwnerOrAdminRole(person.role) ? "Check Repairs" : null };
   }
   // TIER-HOME-03: chat is on its simpler model while a Max job runs. It still answers, so this is a line, never a hold on Send.
   if (chatAvailability(health) === "ready" && (health?.cause as string | undefined) === "tier_reduced" && notice) {
     const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : notice.adult;
-    return { text, repairsLink: null };
+    return { text, ...(notice.more ? { more: notice.more } : {}), repairsLink: null };
   }
   if (chatAvailability(health) === "ready" && Array.isArray(apps)) {
     if (apps.some(isSearchLimitedChat)) return { text: "Searches may be limited right now.", repairsLink: null };
@@ -130,18 +130,18 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
     const degraded = apps.find((app) => app.state === "degraded" && (app.id === "chat" || app.name.toLocaleLowerCase() === "chat"));
     if (degraded) {
       return isOwnerOrAdminRole(person.role)
-        ? { text: degraded.reason ?? "Chat is working, but some parts aren't fully running.", repairsLink: "Open Repairs" }
-        : { text: "Some chat features may be limited right now.", repairsLink: null };
+        ? { text: degraded.reason ?? "Chat works, but a part is down.", repairsLink: "Open Repairs" }
+        : { text: "Some chat features are limited.", repairsLink: null };
     }
   }
   if (chatAvailability(health) === "ready") return null;
   if (health?.kind === "starting" && (health.reason as string | undefined) === "ai_installing") {
     const text = person.age_band === "child"
-      ? "The AI is still installing. Ask a grown-up; chat will work when it finishes."
-      : "The AI is still installing. Chat will work when the install finishes.";
+      ? "Still installing. Ask a grown-up."
+      : "The AI is installing. Chat works after.";
     return { text, repairsLink: null };
   }
   if (!notice) return null;
   const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : person.age_band === "adult" ? notice.adult : null;
-  return text === null ? null : { text, repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
+  return text === null ? null : { text, ...(notice.more ? { more: notice.more } : {}), repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
 }

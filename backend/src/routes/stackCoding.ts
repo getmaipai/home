@@ -57,6 +57,7 @@ stackCodingRoutes.openapi(removeRoute, async (c) => {
   catch (error) { return failure(c, error) as never; }
 });
 
+import { selfTestAborted, selfTestFinished, selfTestStarted } from "@/lib/chatTransitions";
 import { codingModeReadiness } from "@/lib/codingMode";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { getStackClient } from "@/lib/stackEngine";
@@ -64,6 +65,7 @@ const modeRoute = createRoute({ method:"get", path:"/mode", tags:["Coding"], sum
   responses:{ 200:{ content:{"application/json":{schema:z.object({readiness:z.unknown(),mode:z.enum(["normal","coding"]).nullable(),state:z.enum(["stable","waiting","switching","failed"]).nullable(),reason:z.string().nullable()})}},description:"Readiness and mode state."}, ...refusals } });
 stackCodingRoutes.openapi(modeRoute, async c => {
   const readiness = await codingModeReadiness();
+  if (readiness.items.find((item) => item.id === "self_test")?.state === "done") selfTestFinished();
   try { const mode = await getStackClient().getCodingMode(); return c.json({ readiness, mode:mode.mode, state:mode.state, reason:mode.reason },200); }
   catch { return c.json({ readiness, mode:null, state:null, reason:"Home could not reach the AI engine." },200); }
 });
@@ -72,9 +74,11 @@ const selfTestRoute = createRoute({ method:"post", path:"/mode/self-test", tags:
   responses:{ 202:{ content:{"application/json":{schema:z.object({accepted:z.literal(true)})}},description:"The Stack accepted the test."}, 409:{content:{"application/json":{schema:z.object({error:z.string()})}},description:"The Stack refused the test in plain words."}, 503:{content:{"application/json":{schema:z.object({error:z.string()})}},description:"The AI engine is not answering."}, ...errorResponses({401:"Not signed in",403:"Admins only"}) } });
 stackCodingRoutes.openapi(selfTestRoute, async c => {
   try {
+    selfTestStarted();
     await getStackClient().runCodingModeSelfTest();
     return c.json({ accepted:true as const },202);
   } catch (error) {
+    selfTestAborted();
     if (error instanceof Error && "status" in error && (error as {status?:number}).status === 409) return c.json({ error:error.message },409);
     return c.json({ error:"Home could not reach the AI engine." },503);
   }
