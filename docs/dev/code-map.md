@@ -930,6 +930,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/deadline.ts` | nodeSignal, replyIsUncapped, modelNodeDeadlineMs, turnTotalWaitMs, streamWatchdog, retryDeadlineMs |
 | `backend/src/lib/turnMachine/documents.ts` | attachDocuments |
 | `backend/src/lib/turnMachine/entityPin.ts` | __setEntityPinForTests, articleFromBlocks, articleFromExtract, defaultCandidateFinder, pickPrompt, parsePick |
+| `backend/src/lib/turnMachine/fabrication.ts` | NOT_IN_SOURCES, namesIn, hasFactCue, markUnsourcedNames |
 | `backend/src/lib/turnMachine/machine.ts` | turnMachine |
 | `backend/src/lib/turnMachine/messages.ts` | contextToMessages, bareMessages, continuationMessages |
 | `backend/src/lib/turnMachine/nodes/answer.ts` | PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine, __setClaimJudgeForTests |
