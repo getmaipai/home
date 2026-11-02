@@ -8,20 +8,21 @@ import { TestClient } from "./client";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { getVideoJobFor } from "@/lib/videos/jobs";
-import { VIDEO_RECIPES, videoRecipeFor, withVideoRecipe } from "@/lib/videos/recipes";
+import { VIDEO_LOOKS, VIDEO_VOICES, VIDEO_RECIPES, videoLookFor, videoRecipeFor, withVideoLook, withVideoRecipe, withVideoVoices, videoVoicesFor } from "@/lib/videos/recipes";
 import { MAX_NEEDS_ADMIN_LINE, allowedQuality, maxOffered } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
 import { videoTierSegment } from "@/lib/media/videoCreateApp";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { until } from "./pictureFixture";
 import type { PersonRow } from "@/types";
 import { people as peopleTable } from "@/db/schema";
 
 let fake: FakeVideoStack;
 beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); fake = installFakeVideoStack(); });
-afterEach(() => { fake.restore(); });
+afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); });
 
 async function household() {
   const owner = new TestClient();
@@ -154,7 +155,7 @@ describe("the Make a video page and action", () => {
     expect(bar.submit.call.target).toBe("/api/plugins/videos/actions/make");
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("orientation").options.map((o: { value: string }) => o.value)).toEqual(["landscape", "portrait"]);
-    expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([3, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS]);
+    expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS]);
     expect(chip("recipe").options.map((o: { value: string }) => o.value)).toEqual(["none", ...VIDEO_RECIPES.map((r) => r.id)]);
     // Levels: Standard first; Max only when the person is offered it, Boost only when they may use it; one level alone shows no segment.
     const adultRow = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
@@ -165,7 +166,7 @@ describe("the Make a video page and action", () => {
     expect(videoTierSegment({ ...adultRow, role: "adult" })).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
-    expect(again.body.find((node) => node.type === "prompt_bar")!.chips).toHaveLength(3);
+    expect(again.body.find((node) => node.type === "prompt_bar")!.chips).toHaveLength(5);
   });
 
   test("the prompt bar's submit args fill from the item and the action takes them", async () => {
@@ -210,5 +211,102 @@ describe("Create is adult-only; Browse is unchanged", () => {
       expect((await other.client.get("/api/plugins/videos/pages/index")).status).toBe(200);
     }
     for (const page of ["create", "make-video", "creations"]) expect((await adult.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(200);
+  });
+});
+
+describe("V1b: look, length, voices, hint and Another take", () => {
+  test("the chips come from the single lists", async () => {
+    const { adult } = await household();
+    const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const bar = page.body.find((node) => node.type === "prompt_bar")!;
+    const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
+    expect(chip("look").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_LOOKS.map((l) => l.id));
+    expect(chip("look").default).toBe("natural");
+    expect(chip("voices").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_VOICES.map((v) => v.id));
+    expect(chip("voices").default).toBe("clean");
+    expect(bar.submit.call.args.look).toBe("{look}");
+    expect(JSON.stringify(page.body)).toContain("let one person talk at a time");
+    expect(videoLookFor("Classic cartoon")?.id).toBe("classic-cartoon");
+    expect(withVideoLook("a dog", videoLookFor("natural"))).toBe("a dog");
+    expect(withVideoLook("a dog", videoLookFor("anime"))).toStartWith("2D anime style");
+    expect(withVideoVoices("a dog", videoVoicesFor("full"))).toBe("a dog");
+    expect(withVideoVoices("a dog.", videoVoicesFor("clean"))).toBe("a dog. no laugh track, no music, only one character speaks at a time.");
+  });
+
+  test("a look goes before the words and clean voices after, on a Boost clip; the card keeps only what was typed", async () => {
+    const { owner } = await household();
+    fake.detailed = "installed";
+    __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" }));
+    const res = await owner.post("/api/videos/make", { prompt: BOAT, tier: "boost", seconds: 10, look: "classic-cartoon", voices: "clean", recipe: "dolly-in" });
+    expect(res.status).toBe(200);
+    const card = await res.json() as { items: Array<{ prompt: string }>; notice: string | null };
+    expect(card.items[0]!.prompt).toBe(BOAT);
+    expect(card.notice).toBeNull();
+    const sent = String(fake.submitted[0]!.prompt);
+    expect(sent).toStartWith(videoLookFor("classic-cartoon")!.wording);
+    expect(sent).toContain(BOAT);
+    expect(sent.indexOf(BOAT)).toBeLessThan(sent.indexOf(videoRecipeFor("dolly-in")!.wording));
+    expect(sent).toEndWith("no laugh track, no music, only one character speaks at a time.");
+    expect(fake.submitted[0]!.seconds).toBe(10);
+    expect(typeof fake.submitted[0]!.seed).toBe("number");
+  });
+
+  test("Standard cannot make 10 seconds: it makes 5 and says so in one plain line, also on the making list", async () => {
+    const { adult } = await household();
+    fake.pollsToFinish = 1000;
+    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, tier: "standard", seconds: 10 });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { notice: string };
+    expect(body.notice).toContain("5 seconds");
+    expect(body.notice).not.toContain("\u2014");
+    expect(fake.submitted[0]!.seconds).toBe(5);
+    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" })).json() as Array<{ status: string }>;
+    expect(rows[0]!.status).toContain("5 seconds");
+  });
+
+  test("an unknown look or voices choice is a plain 422", async () => {
+    const { adult } = await household();
+    expect((await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, look: "neon" })).status).toBe(422);
+    expect((await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, voices: "loud" })).status).toBe(422);
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("Another take on a conversation-less clip repeats the words and choices with a new job and seed; the route and the action both work", async () => {
+    const { adult, teen } = await household();
+    const actor = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
+    const first = await (await adult.client.post("/api/videos/make", { prompt: BOAT, orientation: "portrait", look: "anime", recipe: "handheld" })).json() as { id: string };
+    // Not while it is still being made.
+    expect((await adult.client.post(`/api/videos/jobs/${first.id}/another`, {})).status).toBe(404);
+    await until(() => getVideoJobFor(actor, first.id)?.state === "done");
+    const last = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "last" })).json() as Array<{ id: string; title: string }>;
+    expect(last[0]).toMatchObject({ id: first.id, title: BOAT });
+    const res = await adult.client.post(`/api/videos/jobs/${first.id}/another`, {});
+    expect(res.status).toBe(200);
+    const card = await res.json() as { id: string; conversation_id: string | null };
+    expect(card.id).not.toBe(first.id);
+    expect(card.conversation_id).toBeNull();
+    expect(fake.submitted).toHaveLength(2);
+    const [a, b] = fake.submitted as Array<Record<string, unknown>>;
+    expect(b!.prompt).toBe(a!.prompt);
+    expect(b!.size).toBe("480x832");
+    expect(String(b!.prompt)).toStartWith(videoLookFor("anime")!.wording);
+    await until(() => getVideoJobFor(actor, card.id)?.state === "done");
+    const viaAction = await adult.client.post("/api/plugins/videos/actions/another", { id: card.id });
+    expect(viaAction.status).toBe(200);
+    expect(fake.submitted).toHaveLength(3);
+    // Someone else's clip, a missing one and a teen are all refused; nothing more reaches the Stack.
+    expect((await teen.client.post(`/api/videos/jobs/${first.id}/another`, {})).status).toBe(404);
+    expect((await teen.client.post("/api/plugins/videos/actions/another", { id: first.id })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/videos/actions/another", { id: "nope" })).status).toBe(404);
+    expect(fake.submitted).toHaveLength(3);
+  });
+
+  test("adult-only refusals still hold: a child gets no look or voices wording and the make is refused", async () => {
+    const { child, teen } = await household();
+    for (const who of [child, teen]) {
+      const res = await who.client.post("/api/videos/make", { prompt: BOAT, look: "film", voices: "clean" });
+      expect(res.status).toBe(403);
+    }
+    expect(fake.submitted).toHaveLength(0);
   });
 });

@@ -21,9 +21,9 @@ import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
-import { chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
+import { DETAILED_MAX_SECONDS, chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
 import { StackVideoError } from "./stack";
-import { videoRecipeFor, withVideoRecipe } from "./recipes";
+import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 
@@ -174,6 +174,13 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
 
   // VIDEO-CREATE-01: a recipe's wording goes to the Stack after the person's words; the card keeps only what they typed. A child gets none.
   const recipe = kid ? null : videoRecipeFor(args.recipe);
+  // V1b: a look goes first, clean-dialogue wording last (only on a clip that has sound); neither is shown on the card. A child gets none.
+  const look = kid ? null : videoLookFor(args.look);
+  const voicesChosen = kid ? null : videoVoicesFor(args.voices);
+  const voices = choice.quality === "detailed" ? voicesChosen : null;
+  const detailedOffered = allowedQuality(actor, "video", "detailed", audience.band) === "detailed" && detailedVideoReady(engine);
+  const note = choice.shortened ? `${choice.quality === "quick" ? "Standard" : "This level"} makes ${seconds} seconds at most, so this video is ${seconds} seconds.${choice.quality === "quick" && detailedOffered ? ` Choose Boost for up to ${DETAILED_MAX_SECONDS}.` : ""}` : undefined;
+  const create = !kid && (recipe || look || voicesChosen || note) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(note ? { note } : {}) } : undefined;
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
   if (kid && !slot) return refused(callId, args, { kind: "child", why: "daily_limit", line: CHILD_VIDEO_LIMIT_LINE });
   try {
@@ -187,8 +194,11 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       prompt,
       sourceFileId,
       tier: jobTier("video", tierAsked.tier, choice.quality),
+      ...(create ? { create } : {}),
       body: {
-        prompt: kid ? forceCartoon(prompt) : withVideoRecipe(withVideoTriggerWords(prompt, adapter), recipe),
+        prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(withVideoTriggerWords(prompt, adapter), look), recipe), voices),
+        // A new seed for every clip (stored on the job); Another take rolls a different one.
+        seed: Math.floor(Math.random() * 2_147_483_647),
         size,
         seconds,
         ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}),

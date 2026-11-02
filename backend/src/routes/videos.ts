@@ -21,7 +21,7 @@ import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
-import { makeVideoFor } from "@/lib/videos/make";
+import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
@@ -260,6 +260,12 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   const actor = c.get("person");
   const source = getVideoJobFor(actor, c.req.valid("param").id);
   if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
+  // A clip made on the Create page has no chat behind it: Another take runs the same make again with a new seed.
+  if (!source.conversationId) {
+    const again = await anotherTakeFor(actor, source);
+    if (!again.ok) return c.json({ error: again.error, code: again.code }, again.status) as never;
+    return c.json(videoCardView(actor, again.job, true, await readyFlags(actor)), 200);
+  }
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; tier?: unknown; prompt?: unknown };
   const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
   const blocked = await gateRoute(actor, words);
@@ -311,14 +317,16 @@ const makeRoute = createRoute({
     seconds: z.number().int().min(1).max(30).optional().describe("Length in seconds; the most this level makes is used when it is longer."),
     tier: z.enum(["standard", "boost", "max"]).optional().describe("The level to make it at. Max needs an admin's OK; without it the request is refused."),
     recipe: z.string().trim().min(1).max(40).optional().describe("A recipe id from the package's `recipes` data (a camera move or style); its wording goes to the model after the prompt."),
+    look: z.string().trim().min(1).max(40).optional().describe("A look id (natural, classic-cartoon, anime, 3d-animated, film); its wording goes to the model before the prompt."),
+    voices: z.string().trim().min(1).max(40).optional().describe("clean (the default: no laugh track, no music, one speaker at a time) or full (music and effects)."),
   }) } } } },
-  responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card for the new clip." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardSchema.extend({ notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") }) } }, description: "The card for the new clip." }, ...refusals },
 });
 videosRoutes.openapi(makeRoute, async (c) => {
   const actor = c.get("person");
   const result = await makeVideoFor(actor, c.req.valid("json"));
   if (!result.ok) return c.json({ error: result.error, code: result.code }, result.status) as never;
-  return c.json(videoCardView(actor, result.job, true, await readyFlags(actor)), 200);
+  return c.json({ ...videoCardView(actor, result.job, true, await readyFlags(actor)), notice: result.notice }, 200);
 });
 
 const animateRoute = createRoute({

@@ -33,3 +33,47 @@ export const VIDEO_STARTERS: readonly { id: string; title: string; prompt: strin
   { id: "sunrise-valley", title: "Sunrise over a valley", prompt: "Sunrise over a misty green valley, birds crossing the sky" },
   { id: "cozy-cabin", title: "A cozy cabin in the snow", prompt: "A small cabin in falling snow, warm light glowing in the windows" },
 ];
+
+// VIDEO-CREATE-01 (V1b): the Look and Voices lists, one place each. Measured on LTX-2.5 (docs/design/video-create-2026-11-01.md): a classic
+// cartoon came back only when its era and animation style were said outright, and people looked right only with "natural colour grading"
+// wording. A look goes BEFORE the person's words (style first); the card keeps only what they typed.
+export interface VideoLook { id: string; label: string; wording: string }
+
+export const VIDEO_LOOKS: readonly VideoLook[] = [
+  { id: "natural", label: "Natural", wording: "" },
+  { id: "classic-cartoon", label: "Classic cartoon", wording: "1980s Saturday-morning hand-drawn cartoon, cel animation, flat colours, thick black outlines, Hanna-Barbera style" },
+  { id: "anime", label: "Anime", wording: "2D anime style, painted backdrop, limited animation" },
+  { id: "3d-animated", label: "3D animated", wording: "modern 3D animated film look" },
+  { id: "film", label: "Film", wording: "cinematic live-action film still, natural colour grading, muted realistic colours, soft contrast, true-to-life skin tones" },
+];
+
+/** A look by its id or label (any letter case), or null. */
+export function videoLookFor(value: unknown): VideoLook | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim().toLowerCase();
+  return key ? VIDEO_LOOKS.find((look) => look.id === key || look.label.toLowerCase() === key) ?? null : null;
+}
+
+/** The words the Stack gets with a look: its wording first, then the person's words. Natural adds nothing. */
+export function withVideoLook(prompt: string, look: VideoLook | null): string {
+  return look && look.wording ? `${look.wording}. ${prompt}` : prompt;
+}
+
+export interface VideoVoices { id: string; label: string; wording: string }
+
+/** Clean dialogue is the default. The wording only forbids things; it never gives the model a line to say aloud. */
+export const VIDEO_VOICES: readonly VideoVoices[] = [
+  { id: "clean", label: "Keep it clean", wording: "no laugh track, no music, only one character speaks at a time" },
+  { id: "full", label: "With music and effects", wording: "" },
+];
+export const DEFAULT_VIDEO_VOICES = "clean";
+
+export function videoVoicesFor(value: unknown): VideoVoices | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim().toLowerCase();
+  return key ? VIDEO_VOICES.find((voices) => voices.id === key || voices.label.toLowerCase() === key) ?? null : null;
+}
+
+export function withVideoVoices(prompt: string, voices: VideoVoices | null): string {
+  return voices && voices.wording ? `${prompt.replace(/[\s.]+$/, "")}. ${voices.wording}.` : prompt;
+}

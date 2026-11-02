@@ -4,7 +4,7 @@
 import type { PersonRow } from "@/types";
 import { runGenerateVideo } from "./tool";
 import { getVideoJobFor, type VideoJob } from "./jobs";
-import { videoRecipeFor } from "./recipes";
+import { videoLookFor, videoRecipeFor, videoVoicesFor } from "./recipes";
 import { MAX_NEEDS_ADMIN_LINE, tierArgument } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { laneOf } from "@/lib/pictures/lane";
@@ -12,8 +12,8 @@ import { videoDenial, VIDEO_DENIAL_LINE, type VideoAudience } from "./policy";
 
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string }
-export type MakeVideoResult = { ok: true; job: VideoJob } | { ok: false; status: 403 | 422 | 502 | 503; error: string; code: string };
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string }
+export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 422 | 502 | 503; error: string; code: string };
 
 /** The audience of the Create page: the signed-in person on their own written screen. */
 export function makeAudienceOf(actor: PersonRow): VideoAudience {
@@ -49,6 +49,16 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     if (!videoRecipeFor(recipe)) return { ok: false, error: "That camera move is not in the list. Use a name from the list on this page, or leave it empty." };
     body.recipe = recipe;
   }
+  const look = typeof raw.look === "string" ? raw.look.trim() : "";
+  if (look) {
+    if (!videoLookFor(look)) return { ok: false, error: "That look is not in the list. Use a name from the list on this page, or leave it empty." };
+    body.look = look;
+  }
+  const voices = typeof raw.voices === "string" ? raw.voices.trim() : "";
+  if (voices) {
+    if (!videoVoicesFor(voices)) return { ok: false, error: "That voices choice is not in the list. Use a name from the list on this page, or leave it empty." };
+    body.voices = voices;
+  }
   return { ok: true, body };
 }
 
@@ -64,13 +74,13 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody): Promi
   }
   const outcome = await runGenerateVideo({
     state: { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.prompt, ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}) },
+    args: { prompt: body.prompt, ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}) },
     callId: "make", spoken: false, audience,
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
   if (outcome.status === "succeeded" && data?.videoJobId) {
     const job = getVideoJobFor(actor, data.videoJobId);
-    if (job) return { ok: true, job };
+    if (job) return { ok: true, job, notice: job.request.create?.note ?? null };
   }
   if (outcome.status === "succeeded") {
     // A refusal keeps its own line in the reply, after the instruction to the model; the person reads the line alone.
@@ -79,4 +89,24 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody): Promi
   }
   if (outcome.failureKind === "bad_arguments") return { ok: false, status: 422, error: "Describe the video in 3 to 1200 characters, then try again.", code: "bad_arguments" };
   return { ok: false, status: outcome.failureKind === "unavailable" ? 503 : 502, error: outcome.detail ?? "The video could not be made. Try again in a minute.", code: outcome.errorCode ?? "failed" };
+}
+
+/**
+ * VIDEO-CREATE-01 (V1b): Another take on a clip made on the Create page (no chat behind it). The same words and the same choices
+ * (shape, length, level, camera move, look, voices) go through `makeVideoFor`, so the age and surface gate, the level rules and the
+ * one-clip-at-a-time rule are the ones every other make uses; the new job gets a new random seed.
+ */
+export async function anotherTakeFor(actor: PersonRow, source: VideoJob): Promise<MakeVideoResult> {
+  const [w, h] = source.request.size.split("x").map(Number);
+  const tier = source.request.tier ?? (source.request.quality === "detailed" ? "boost" : "standard");
+  const kept = source.request.create ?? {};
+  return makeVideoFor(actor, {
+    prompt: source.prompt,
+    orientation: w && h && h > w ? "portrait" : "landscape",
+    seconds: source.request.seconds,
+    tier,
+    ...(kept.recipe ? { recipe: kept.recipe } : {}),
+    ...(kept.look ? { look: kept.look } : {}),
+    ...(kept.voices ? { voices: kept.voices } : {}),
+  });
 }

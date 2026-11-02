@@ -6,7 +6,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { videoJobs } from "@/db/schema";
 import { getVideoJobFor } from "@/lib/videos/jobs";
-import { VIDEO_RECIPES, VIDEO_STARTERS } from "@/lib/videos/recipes";
+import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_STARTERS, VIDEO_VOICES } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
@@ -15,10 +15,9 @@ import type { PersonRow } from "@/types";
 import { registerMediaAppData } from "./appHost";
 
 /** One plain line for what a Create job is doing now. */
-function statusLine(state: string, percent: number, error: string | null): string {
-  if (state === "queued") return "Waiting for its turn";
-  if (state === "running") return percent > 0 ? `Making your video, ${percent}% done` : "Making your video";
-  return error ?? "It did not finish. Try again.";
+function statusLine(state: string, percent: number, error: string | null, note?: string): string {
+  const line = state === "queued" ? "Waiting for its turn" : state === "running" ? (percent > 0 ? `Making your video, ${percent}% done` : "Making your video") : state === "done" ? "Ready" : error ?? "It did not finish. Try again.";
+  return note ? `${line} ${note}` : line;
 }
 
 /** The levels this person may use (Boost needs the Boost model and their say; Max needs the Max slot and their say). Standard alone is no choice, so no segment. */
@@ -40,8 +39,10 @@ registerAppPageFill("videos", "make-video", (person, page) => {
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   bar.chips = [
     ...chips,
-    { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: [3, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS].map((value) => ({ value, label: `${value} seconds` })) },
+    { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: [QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS].map((value) => ({ value, label: `${value} seconds` })) },
     { state: "recipe", label: "Camera move", default: "none", options: [{ value: "none", label: "No camera move" }, ...VIDEO_RECIPES.map(({ id, label }) => ({ value: id, label }))] },
+    { state: "look", label: "Look", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label }) => ({ value: id, label })) },
+    { state: "voices", label: "Voices", default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
   ];
   const tier = videoTierSegment(person);
   if (tier) bar.tier = tier;
@@ -56,7 +57,14 @@ registerMediaAppData("videos", (person, dataId, params) => {
       const newest = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), isNull(videoJobs.conversationId))).orderBy(desc(videoJobs.createdAt)).get();
       const job = newest ? getVideoJobFor(person, newest.id) : null;
       if (!job || job.state === "done" || job.state === "cancelled") return [];
-      return [{ id: job.id, title: job.prompt, status: statusLine(job.state, job.percent, job.error), state: job.state, percent: job.percent }];
+      return [{ id: job.id, title: job.prompt, status: statusLine(job.state, job.percent, job.error, job.request.create?.note), state: job.state, percent: job.percent }];
+    }
+    // The newest Create clip once it has finished or stopped, so the person can ask for Another take (same words, new seed).
+    case "last": {
+      const newest = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), isNull(videoJobs.conversationId))).orderBy(desc(videoJobs.createdAt)).get();
+      const job = newest ? getVideoJobFor(person, newest.id) : null;
+      if (!job || job.state === "queued" || job.state === "running") return [];
+      return [{ id: job.id, title: job.prompt, status: statusLine(job.state, job.percent, job.error, job.request.create?.note), state: job.state }];
     }
     default: return null;
   }

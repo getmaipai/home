@@ -19,7 +19,8 @@ import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { makeVideoFor, readMakeBody } from "@/lib/videos/make";
+import { anotherTakeFor, makeVideoFor, readMakeBody } from "@/lib/videos/make";
+import { getVideoJobFor } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -146,7 +147,19 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const read = readMakeBody(await bodyOf(c.req.raw));
     if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
     const made = await makeVideoFor(person, read.body);
-    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
+
+  // VIDEO-CREATE-01 (V1b): Another take on the newest Create clip: the same words and choices, a new seed.
+  routes.post("/actions/another", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "another")) return next();
+    const body = await bodyOf(c.req.raw);
+    const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) : null;
+    if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
+    const made = await anotherTakeFor(person, source);
+    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
   });
 
   routes.post("/actions/lyrics", requireAuth, async (c, next) => {

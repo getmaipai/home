@@ -36,10 +36,17 @@
             "orientation": "{orientation}",
             "seconds": "{seconds}",
             "tier": "{tier}",
-            "recipe": "{recipe}"
+            "recipe": "{recipe}",
+            "look": "{look}",
+            "voices": "{voices}"
           }
         }
       }
+    },
+    {
+      "type": "empty_state",
+      "icon": "info",
+      "text": "Write what you want to see. For speech put each person's line in quotes and let one person talk at a time."
     },
     {
       "type": "section",
@@ -62,6 +69,44 @@
             "type": "empty_state",
             "icon": "film",
             "text": "Nothing is being made right now."
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "heading": "Last one",
+      "children": [
+        {
+          "type": "list",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "last"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{status}",
+          "item_media_field": "film",
+          "row_action": {
+            "icon": "refresh-cw",
+            "label": "Another take",
+            "action": {
+              "call": {
+                "target": "/api/plugins/videos/actions/another",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "film",
+            "text": "Your last video will show here with an Another take button."
           }
         }
       ]

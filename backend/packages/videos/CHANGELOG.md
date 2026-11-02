@@ -4,6 +4,10 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-02
+
+- VIDEO-CREATE-01 (V1b): Make a video shows what the video tests found. Length offers 5 and 10 seconds (a level that cannot make the length says so in one line), a Look chip (Natural, Classic cartoon, Anime, 3D animated, Film), a Voices chip (Keep it clean is the default), a one-line hint on writing speech, and an Another take button on the last video (same words, new seed).
+
 ## [0.1.3] - 2026-11-01
 
 - VIDEO-CREATE-01 (V1a): Make a video and the Create home use the kit prompt bar (words, Shape, Length, Camera move and the Standard, Boost and Max segment for the levels you may use) instead of the placeholder form.
