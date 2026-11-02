@@ -10,13 +10,18 @@ export function durationWords(minutes: number): string {
   return `${rest} min`;
 }
 
+/** One decimal, rounded down: 99.98% with an outage must not read as a perfect 100.0%. */
+function uptimeWords(uptimePercent: number): string {
+  return (Math.floor(Number((uptimePercent * 10).toFixed(6))) / 10).toFixed(1);
+}
+
 export function statusStripSummary(uptimePercent: number | null, incidents: readonly StatusHistoryIncident[]): string {
   if (uptimePercent === null) return "Last 90 days: no data yet.";
   const count = incidents.length;
-  if (count === 0) return `Last 90 days: ${uptimePercent.toFixed(1)}% uptime, no outages.`;
+  if (count === 0) return `Last 90 days: ${uptimeWords(uptimePercent)}% uptime, no outages.`;
   const outage = count === 1 ? "1 outage" : `${count} outages`;
   const down = durationWords(incidents.reduce((total, incident) => total + incident.minutes, 0));
-  return `Last 90 days: ${uptimePercent.toFixed(1)}% uptime, ${outage}, ${down} down.`;
+  return `Last 90 days: ${uptimeWords(uptimePercent)}% uptime, ${outage}, ${down} down.`;
 }
 
 export function daySummary(minutes: StatusHistoryMinutes): string {

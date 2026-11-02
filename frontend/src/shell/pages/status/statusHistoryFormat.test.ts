@@ -23,8 +23,14 @@ describe("status history words", () => {
 
   test("builds one plain sentence for the strip and its outage summary", () => {
     const incident = (minutes: number) => ({ component: "chat" as const, started_at: "2026-09-12T00:00:00.000Z", ended_at: null, minutes, ongoing: true });
-    expect(statusStripSummary(99.982, [incident(130)])).toBe("Last 90 days: 99.982% uptime, 1 outage, 2 h 10 min down.");
-    expect(statusStripSummary(98.765, [incident(35), incident(24)])).toBe("Last 90 days: 98.765% uptime, 2 outages, 59 min down.");
+    expect(statusStripSummary(99.982, [incident(130)])).toBe("Last 90 days: 99.9% uptime, 1 outage, 2 h 10 min down.");
+    expect(statusStripSummary(98.765, [incident(35), incident(24)])).toBe("Last 90 days: 98.7% uptime, 2 outages, 59 min down.");
     expect(statusStripSummary(null, [])).toBe("Last 90 days: no data yet.");
+  });
+
+  test("uptime with an outage never reads as a perfect 100.0%", () => {
+    expect(statusStripSummary(99.99, [])).toBe("Last 90 days: 99.9% uptime, no outages.");
+    expect(statusStripSummary(100, [])).toBe("Last 90 days: 100.0% uptime, no outages.");
+    expect(statusStripSummary(99.7, [])).toBe("Last 90 days: 99.7% uptime, no outages.");
   });
 });
