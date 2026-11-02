@@ -56,6 +56,8 @@ export interface EntityAnchor {
   text: string;
   /** Other candidate articles that share this one's base name (other editions, works or people of the same name), offered with it. */
   alternatives?: string[];
+  /** Set when the question's details did not decide between two candidates: the runner-up, with its opening, read beside the pick. */
+  unsettled?: { title: string; lead: string };
 }
 
 const MAX_QUERY_WORDS = 8;
@@ -179,8 +181,20 @@ Question: "${question.replace(/"/g, "'")}"
 Candidate articles:
 ${list}
 
-Answer with one JSON object and nothing else: {"pick": 1}
-"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, an overview of a broader topic or a different one with a similar name), or 0 when no candidate is clearly it or two fit equally well. Weigh every detail the question states (kinds, counts, periods, what it says the subject did or did not do). Use only what the question says.`;
+Answer with one JSON object and nothing else: {"pick": 1, "settled": true, "also": 0}
+"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, an overview of a broader topic or a different one with a similar name), or 0 when no candidate is clearly it. Compare each candidate's opening sentence with EVERY detail the question states (years, eras, formats, kinds, counts, what it says the subject did or did not do). "settled" is true when those details decide between the candidates that share a name, false when two or more of them fit and the question gives nothing that tells them apart. When "settled" is false, "also" is the number of the next-best candidate, otherwise 0. Use only what the question says.`;
+}
+
+/** What the pick said: the chosen candidate, whether the question's details decided it, and the runner-up when they did not. */
+export function parsePickDetail(text: string | null, count: number): { index: number; settled: boolean; also: number | null } | null {
+  const index = parsePick(text, count);
+  if (index === null) return null;
+  try {
+    const data = JSON.parse(text!.match(/\{[\s\S]*?\}/)?.[0] ?? "{}") as { settled?: unknown; also?: unknown };
+    const also = typeof data.also === "number" && Number.isInteger(data.also) && data.also >= 1 && data.also <= count && data.also - 1 !== index ? data.also - 1 : null;
+    const settled = data.settled === false && also !== null ? false : true;
+    return { index, settled, also: settled ? null : also };
+  } catch { return { index, settled: true, also: null }; }
 }
 
 export function parsePick(text: string | null, count: number): number | null {
@@ -192,7 +206,7 @@ export function parsePick(text: string | null, count: number): number | null {
 }
 
 const chatPinWriter = (signal?: AbortSignal): PinWriter => async (prompt) => {
-  const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 60, temperature: 0, thinking: false, ...(signal ? { signal } : {}) });
+  const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 80, temperature: 0, thinking: false, ...(signal ? { signal } : {}) });
   return result.ok ? result.value.text : null;
 };
 
@@ -241,8 +255,9 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
     let reply: string | null = null;
     try { reply = await (pinWriterOverride ?? chatPinWriter(signal))(pickPrompt(question, brief.subject, candidates)); } catch { reply = null; }
     debug = { titles: [...(debug?.titles ?? []), ...candidates.map((c) => c.title)], reply };
-    const index = parsePick(reply, candidates.length);
-    if (index === null) continue;
+    const detail = parsePickDetail(reply, candidates.length);
+    if (detail === null) continue;
+    const index = detail.index;
     const picked = candidates[index]!;
     let article: ArticleText | null = null;
     try { article = await picked.load(); } catch { article = null; }
@@ -251,6 +266,7 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
     const sameName = (title: string): boolean => anchorFor(title, null).baseName.toLowerCase() === anchor.baseName.toLowerCase();
     const alternatives = [...seen].filter((title) => title !== picked.title && title !== anchor.title && sameName(title));
     if (alternatives.length > 0) anchor.alternatives = alternatives.slice(0, 4);
+    if (detail.also !== null) anchor.unsettled = { title: candidates[detail.also]!.title, lead: candidates[detail.also]!.snippet.replace(/\s+/g, " ").trim().slice(0, 300) };
     return { anchor, candidates: total, debug };
   }
   return { anchor: null, candidates: total, ...(debug ? { debug } : {}) };

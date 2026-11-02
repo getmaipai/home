@@ -11,7 +11,7 @@ import { useDefaultScriptedStack } from "../stackFixture";
 import { addBenchTeen, createBenchPeople, startRecordingProxy, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { runTurnNext } from "@/lib/turnMachine/turnNext";
+import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { PageDeclinedError, __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
@@ -176,6 +176,31 @@ describe("research rounds follow the answer style", () => {
     expect(searxQueries.length).toBe(1);
     expect(result.value.reply.text).toContain("It ended after one season");
     expect(result.value.reply.text).not.toContain("so I won't guess");
+  });
+
+  test("RESEARCH-PLAN-CARD-01: a grown-up's Thinking turn announces its planned sub-questions on the status channel before the searches, a teen's does not", async () => {
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const plan = JSON.stringify({ sub_questions: ["why the series ended", "what its makers planned next"], queries: ["V series cancelled why", "V series planned second season"] });
+    for (const who of ["owner", "teen"] as const) {
+      __setQueryWriterForTests(async () => plan);
+      __setStageWritersForTests({ brief: async () => JSON.stringify({ subject: "the series", answer_type: "an explanation", must_contain: [], ambiguous: false, options: [], question: "", assumption: "" }), analysis: async () => null });
+      const stub = startStubLlmServer(0, { scriptedChatReply: () => "It ended after one season [1].", scriptedToolCalls: () => undefined });
+      const proxy = startRecordingProxy(stub.url);
+      process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
+      __resetLlmSupervisorForTests();
+      try {
+        const started = await runTurnNextStream(people[who]!, "chat", UTTERANCE, { thinking: true });
+        if (!started.ok || started.kind !== "stream") throw new Error("expected a stream");
+        for await (const _ of started.tokens) { /* run the turn to its end */ }
+        const events = started.status.drain();
+        const planned = events.find((e) => e.type === "research_plan");
+        if (who === "owner") expect(planned && planned.type === "research_plan" ? planned.steps : []).toEqual(["why the series ended", "what its makers planned next"]);
+        else expect(planned).toBeUndefined();
+      } finally {
+        proxy.stop();
+        await stub.stop();
+      }
+    }
   });
 
   test("Max with its lease takes more than two rounds, numbers sources across them and cites more than one site", async () => {

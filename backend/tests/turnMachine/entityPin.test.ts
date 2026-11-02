@@ -95,7 +95,7 @@ describe("pinning", () => {
   test("the pick is made on the question alone: the stage-1 paraphrase of the subject is not in the prompt", () => {
     const prompt = pickPrompt("why did it end", "a paraphrase with an invented 1983 detail", [{ title: "A", snippet: "x" }]);
     expect(prompt).not.toContain("invented 1983");
-    expect(prompt).toContain("Weigh every detail the question states");
+    expect(prompt).toContain("EVERY detail the question states");
   });
 
   test("the pick prompt lists the candidates and the question and names no subject of its own", () => {

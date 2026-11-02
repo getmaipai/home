@@ -84,6 +84,33 @@ afterEach(() => {
 const ask = (query: string, adapters: BackendAdapter[], extra: Partial<Parameters<typeof rotateSearch>[0]> = {}) => rotateSearch({ query, adapters, scope: "adult", ...extra });
 
 describe("rotation across backends", () => {
+  test("RESEARCH-THROTTLE-01: a fall-through backend answers only when the picked one is benched, empty or thin, never beside a healthy one", async () => {
+    const picked = fake("searxng", "ok");
+    const spare = fake("ddgs", "ok");
+    const spareAdapter: BackendAdapter = { ...spare.adapter, fallbackOnly: true };
+    // Healthy picked backend: the spare is never asked.
+    const healthy = await ask("healthy topic", [picked.adapter, spareAdapter]);
+    expect(healthy.via).toEqual(["searxng"]);
+    expect(spare.hits.length).toBe(0);
+    // The picked backend gives nothing (benched upstream), then 429: each query still gets rows from the spare.
+    picked.behaviour = "empty";
+    const empty = await ask("empty topic", [picked.adapter, spareAdapter]);
+    expect(empty.via).toEqual(["ddgs"]);
+    expect(empty.rows.length).toBe(4);
+    picked.behaviour = "429";
+    __resetSearchBackendsForTests({ now: () => now, file: join(dir, "search-backends.json") });
+    for (const id of ["searxng", "ddgs"] as const) __setBackendPaceForTests(id, { minGapMs: 0, burst: 1 });
+    const refused = await ask("refused topic", [picked.adapter, spareAdapter]);
+    expect(refused.via).toEqual(["ddgs"]);
+    // A thin answer (one row) is topped up from the spare, and a spare that is itself empty leaves the thin row standing.
+    picked.behaviour = "thin";
+    __resetSearchBackendsForTests({ now: () => now, file: join(dir, "search-backends.json") });
+    for (const id of ["searxng", "ddgs"] as const) __setBackendPaceForTests(id, { minGapMs: 0, burst: 1 });
+    const thin = await ask("thin topic", [picked.adapter, spareAdapter]);
+    expect(thin.via).toEqual(["searxng", "ddgs"]);
+    expect(thin.rows.length).toBeGreaterThan(1);
+  });
+
   test("a backend that answers 429 does not fail the round: the others answer and the refuser cools down", async () => {
     const a = fake("searxng", "429");
     const b = fake("ddgs", "ok");

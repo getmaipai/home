@@ -306,6 +306,19 @@ export async function analyse(brief: Brief | null, question: string, findings: F
 
 // ---------------------------------------------------------------- stage 5: the reply
 
+/** RESEARCH-OPENING-01: a Thinking or Max answer's first lines name what the question is about. When the pinned subject's base name is
+ * missing from the opening (a chatty lead-in, a heading), one plain sentence naming it goes first: the model's own reading of the question
+ * (stage 1's assumption) when there is one, else the pinned article's title. Nothing is added when the name is already there. */
+export function repairOpening(text: string, anchor: { title: string; baseName: string } | null | undefined, brief: Brief | null | undefined): string {
+  if (!anchor || text.trim() === "") return text;
+  const flat = (t: string): string => t.toLowerCase().replace(/[*_`#]/g, "").replace(/\s+/g, " ");
+  const opening = flat(text.trim().split(/\n\s*\n/)[0]!.slice(0, 600));
+  if (opening.includes(flat(anchor.baseName))) return text;
+  const reading = brief?.assumption?.trim();
+  const sentence = reading && flat(reading).includes(flat(anchor.baseName)) ? (/[.!?]$/.test(reading) ? reading : `${reading}.`) : `This answers your question about ${anchor.title}.`;
+  return `${sentence}\n\n${text.trimStart()}`;
+}
+
 const cites = (sources: readonly number[]): string => sources.map((n) => `[${n}]`).join("");
 
 /** Words in the answer the writing round aims for, by style (a target in the prompt, never a cap: an adult's written answer has none). */
@@ -319,7 +332,7 @@ export interface ReplyCoverage {
   /** The style's word target. */
   words?: number;
   /** The pinned article's title and the other articles of the same name that were passed over. */
-  pinned?: { title: string; alternatives: readonly string[] };
+  pinned?: { title: string; alternatives: readonly string[]; /** The runner-up and its opening when the question's details did not decide between two. */ unsettled?: { title: string; lead: string } };
 }
 
 /** What the writing round is handed: the analysis first (what to say, how sure), then the notes behind it. */
@@ -337,7 +350,8 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (analysis.guesses.length > 0) lines.push(`Guesses to present as guesses, each with its reasons:\n${analysis.guesses.map((g) => `- (${g.confidence}) ${g.guess} because ${g.because.join("; ")} ${cites(g.sources)}`.trim()).join("\n")}`);
     if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article; if it does not speak to a part, write that the part was not found in the sources):\n${coverage.read}`);
     if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
-    if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
+    if (coverage.pinned?.unsettled) lines.push(`The question's details do not tell "${coverage.pinned.title.replace(/"/g, "'")}" from "${coverage.pinned.unsettled.title.replace(/"/g, "'")}". The notes and the article are about the first. The second opens: ${coverage.pinned.unsettled.lead.replace(/"/g, "'")} In the first sentence say which one you read and that the question fits both, then cover the other one briefly from that opening (marked as read from its opening only), or say which one you chose and why.`);
+    else     if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
     lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found. Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
   }
   if (ledger) lines.push(ledger);

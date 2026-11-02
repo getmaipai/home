@@ -985,7 +985,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // RESEARCH-COVERAGE-01: after the analysis, every part the answer must cover is either backed by the notes or the article, or read for
     // once more by heading from the sections not yet read (no new search), or the writer is told to say it was not found in the sources.
     const coverageFor = async (): Promise<ReplyCoverage> => {
-      const coverage: ReplyCoverage = { words: wordTarget, ...(state.entityAnchor?.alternatives?.length ? { pinned: { title: state.entityAnchor.title, alternatives: state.entityAnchor.alternatives } } : {}) };
+      const coverage: ReplyCoverage = { words: wordTarget, ...(state.entityAnchor?.alternatives?.length || state.entityAnchor?.unsettled ? { pinned: { title: state.entityAnchor.title, alternatives: state.entityAnchor.alternatives ?? [], ...(state.entityAnchor.unsettled ? { unsettled: state.entityAnchor.unsettled } : {}) } } : {}) };
       const uncovered = state.researchAnalysis?.uncovered ?? [];
       if (uncovered.length === 0) return coverage;
       let read = "";
@@ -1168,6 +1168,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor));
     markResearch(state, `stage 2 plan end (sub-questions: ${plan.subQuestions.join(" | ")})`);
     state.researchPlan = plan;
+    // RESEARCH-PLAN-CARD-01: a grown-up sees the plan (the sub-questions) as steps of the existing activity row before the searches run.
+    if (state.planBasis.band === "adult" && plan.subQuestions.length > 0) state.status?.emit({ type: "research_plan", steps: plan.subQuestions.slice(0, 6) });
     // RESEARCH-BACKBONE-01: choose the pinned article's sections while the searches run; the writing round waits for it only briefly.
     state.backbone = undefined;
     state.backbonePromise = pinned.anchor?.article

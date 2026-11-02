@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
-  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ledgerForAnalysis, partsFor, repairJson, type Brief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ledgerForAnalysis, partsFor, repairJson, repairOpening, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
@@ -358,5 +358,22 @@ describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angl
     await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, { subject: "s", answerType: "", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" }, "what would have happened", 3);
     expect(seen).toContain("why it stopped, changed or came about");
     expect(seen).toContain("what was planned or announced");
+  });
+});
+
+describe("RESEARCH-OPENING-01: the first lines name the subject", () => {
+  const anchor = { title: "Alpha (1984 television series)", baseName: "Alpha" };
+  const brief = { subject: "s", answerType: "", mustContain: [], ambiguous: false, options: [], question: "", assumption: "You are asking what would have happened if the 1984 series Alpha had continued." };
+  test("an opening that never names the subject gets the model's own reading first; one that names it is left alone", () => {
+    const fixed = repairOpening("This is a fun one, so here is my read.\n\nMore text.", anchor, brief);
+    expect(fixed.startsWith("You are asking what would have happened if the 1984 series Alpha had continued.")).toBe(true);
+    expect(fixed).toContain("This is a fun one");
+    const named = "**Alpha** was cancelled after one season.";
+    expect(repairOpening(named, anchor, brief)).toBe(named);
+  });
+  test("without a usable reading the pinned title is named; without an anchor nothing changes", () => {
+    expect(repairOpening("Chatty start.", anchor, null).startsWith("This answers your question about Alpha (1984 television series).")).toBe(true);
+    expect(repairOpening("Chatty start.", null, brief)).toBe("Chatty start.");
+    expect(repairOpening("", anchor, brief)).toBe("");
   });
 });

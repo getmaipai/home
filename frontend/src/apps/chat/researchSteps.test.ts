@@ -10,6 +10,11 @@ describe("research step rows", () => {
     expect(timelineVerb({ packageId: "weather", state: "ok" })).toBe("Ran");
   });
 
+  test("RESEARCH-PLAN-CARD-01: a plan step reads Planned, whatever its state", () => {
+    expect(timelineVerb({ packageId: "research_plan", state: "ok" })).toBe("Planned");
+    expect(timelineVerb({ packageId: "research_plan", state: "running" })).toBe("Planned");
+  });
+
   test("the resting line adds the site count only when sites were read", () => {
     expect(toolTimelineRestingLabel(5, { total_time_ms: 42_000 } as never, 12)).toBe("Worked for 42 seconds, 5 steps, 12 sites");
     expect(toolTimelineRestingLabel(1, { total_time_ms: 9_000 } as never)).toBe("Worked for 9 seconds, 1 step");

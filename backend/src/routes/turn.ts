@@ -687,6 +687,13 @@ export async function* streamTurnEvents(
           const cue = pickThinkingCue(actorId, result.bannedPhrases);
           if (cue) { earlyCueSent = true; yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; }
         }
+      } else if (event.type === "research_plan") {
+        // The existing step row: one finished step per sub-question (the spec's tool_call and tool_result lines), ahead of the searches.
+        for (const [index, step] of event.steps.entries()) {
+          const call_id = `plan-${result.turnId}-${index + 1}`;
+          yield { t: "tool_call", package_id: "research_plan", call_id, args: {}, label: step.trim().slice(0, 160) } as unknown as TurnStreamEvent;
+          yield { t: "tool_result", package_id: "research_plan", call_id, outcome: { text: "" } } as unknown as TurnStreamEvent;
+        }
       } else if (!(dropReasoning && event.type === "reasoning")) yield event;
     }
   }

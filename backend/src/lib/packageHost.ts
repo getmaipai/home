@@ -79,7 +79,7 @@ import { waybackCopy } from "@/lib/retrieval/wayback";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { ddgsSetupNote } from "@/lib/retrieval/ddgsConfig";
 import { stricterBand } from "@/lib/robotCompanion";
-import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
+import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceBuilt, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
@@ -1754,6 +1754,16 @@ export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; 
   if (rotate && (wikimediaMode === "live" || wikimediaMode === "mix")) extras.push({ id: "wikimedia", search: (query) => wikimediaSearchRows(query, p.signal, p.deadlineAt) });
   if (rotate && hostedOn) {
     extras.push({ id: "hosted", search: async (query) => { const found = await hostedSearch(query, "adult", p.searxOpts.safeSearchLevel ?? "off", asked?.category, p.role, p.signal); return found ? { text: found.text, rows: found.rows } : { text: "", rows: [] }; } });
+  }
+  // RESEARCH-THROTTLE-01: a grown-up's research run whose picked sources leave out ddgs may still reach it as a fall-through when the picked
+  // source is benched, empty or thin (one throttled upstream engine used to leave a Max turn with a single site). Never beside a healthy
+  // source, never for a guest or a minor, never when ddgs is closed or offline for adults.
+  if (rotate && currentResearchBudget() !== undefined && p.band === "adult" && p.role !== "guest" && !sources.includes("ddgs") && webSourceBuilt("ddgs") && !["closed", "offline"].includes(effectiveMode("ddgs", "adult", p.temporary))) {
+    extras.push({ id: "ddgs", fallbackOnly: true, blockedCodes: ["search_unavailable"], search: (query) => {
+      const search = webSourceSearch("ddgs");
+      if (!search) return Promise.reject(new Error("web source ddgs is not available"));
+      return search({ args: { ...rowsOnly, query }, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
+    } });
   }
   if (!rotate) {
     if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(p.args, p.searxOpts);

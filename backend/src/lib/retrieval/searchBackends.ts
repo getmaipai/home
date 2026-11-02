@@ -26,6 +26,8 @@ export interface BackendAdapter {
   search: (query: string) => Promise<WebRows>;
   /** HostError codes that mean "this backend asked Home to slow down or is walled off" (a longer cooldown than a plain failure). */
   blockedCodes?: string[];
+  /** RESEARCH-THROTTLE-01: asked only after the other backends of this query gave fewer rows than wanted (failed, benched, empty or thin), never beside a healthy one. */
+  fallbackOnly?: boolean;
 }
 
 /** Pace per backend: `minGapMs` between requests, `burst` requests allowed back to back. */
@@ -323,8 +325,13 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
   // Rows that looked unrelated to the query: kept as a last resort so a wrong guess about relevance never leaves a person with nothing.
   let unrelated: { rows: WebRow[]; id: BackendId } | undefined;
   let lastError: unknown;
-  for (const id of orderFor(candidates)) {
-    if (via.length >= maxBackends) break;
+  // Fall-through backends come after every ordinary one, and only while the rows found so far are fewer than wanted.
+  const ordinary = candidates.filter((id) => byId.get(id)!.fallbackOnly !== true);
+  const fallbacks = candidates.filter((id) => byId.get(id)!.fallbackOnly === true);
+  for (const id of [...orderFor(ordinary), ...orderFor(fallbacks)]) {
+    const fallback = byId.get(id)!.fallbackOnly === true;
+    if (fallback && lists.reduce((n, l) => n + l.length, 0) >= wantRows) break;
+    if (!fallback && via.length >= maxBackends) break;
     const adapter = byId.get(id)!;
     const wait = reserve(id, MAX_WAIT_MS);
     if (wait === null) {

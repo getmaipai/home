@@ -59,6 +59,9 @@ export interface WebSearchContext {
  * next to its tiers, cache and engine health). */
 const SEARCHERS: Partial<Record<WebSourceId, (ctx: WebSearchContext) => Promise<WebRows>>> = { ddgs: ddgsSearch };
 
+/** Whether a source can answer right now (ddgs: its sidecar is up or the household named one). */
+export const webSourceBuilt = (id: WebSourceId): boolean => isBuilt(id);
+
 export function webSourceSearch(id: WebSourceId): ((ctx: WebSearchContext) => Promise<WebRows>) | undefined {
   return SEARCHERS[id];
 }

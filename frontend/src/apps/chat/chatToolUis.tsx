@@ -439,7 +439,9 @@ export const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
 };
 /** RESEARCH-TIER-01: a search step reads as what it did ("Searched · why the series ended"), not as a tool run. */
 const SEARCH_VERB: Record<TimelineCall["state"], string> = { running: "Searching", ok: "Searched", error: "Failed" };
-export const timelineVerb = (call: Pick<TimelineCall, "packageId" | "state">): string => (call.packageId === "websearch" ? SEARCH_VERB[call.state] : TIMELINE_VERB[call.state]);
+/** RESEARCH-PLAN-CARD-01: the plan's sub-questions are steps of the same row, read as "Planned · why the series ended". */
+export const PLAN_STEP_PACKAGE = "research_plan";
+export const timelineVerb = (call: Pick<TimelineCall, "packageId" | "state">): string => (call.packageId === PLAN_STEP_PACKAGE ? "Planned" : call.packageId === "websearch" ? SEARCH_VERB[call.state] : TIMELINE_VERB[call.state]);
 export const ToolTimelineIcon = getIcon("wrench");
 
 export function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | undefined, siteCount = 0): string {
@@ -471,7 +473,7 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
       open={open}
       onOpenChange={setOpen}
       activeLabel="Working…"
-      restingLabel={toolTimelineRestingLabel(result.length, stats, new Set(result.flatMap((call) => call.sites?.map((site) => site.host) ?? [])).size)}
+      restingLabel={toolTimelineRestingLabel(result.filter((call) => call.packageId !== PLAN_STEP_PACKAGE).length || result.length, stats, new Set(result.flatMap((call) => call.sites?.map((site) => site.host) ?? [])).size)}
       // No producer for a per-file diff-stat summary anywhere in Home
       // today (the kit's own upstream use is a coding-agent timeline) -
       // a named gap, not invented data.
