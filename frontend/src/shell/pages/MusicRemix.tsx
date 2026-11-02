@@ -16,7 +16,7 @@ export function remixRequest({ style, lyrics, tempo, voice }: { style: string; l
   return parts.filter(Boolean).join(" ");
 }
 
-export function RemixSong({ card, onClose }: { card: MusicCard; onClose: () => void }) {
+export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose: () => void; onSent?: () => void }) {
   const { push } = useToast();
   const [style, setStyle] = useState(""); const [lyrics, setLyrics] = useState(""); const [tempo, setTempo] = useState(""); const [voice, setVoice] = useState("");
   const [reviewing, setReviewing] = useState(false); const [sending, setSending] = useState(false); const [problem, setProblem] = useState("");
@@ -24,7 +24,7 @@ export function RemixSong({ card, onClose }: { card: MusicCard; onClose: () => v
   const send = () => {
     setSending(true); setProblem("");
     musicApi.revise(card.id, change)
-      .then(() => { push("Making your remix. It appears on this song when it is done."); onClose(); })
+      .then(() => { push("Making your remix. It appears on this song when it is done."); onSent?.(); onClose(); })
       .catch((error: unknown) => setProblem(error instanceof Error && error.message ? error.message : "The remix could not start. Check your connection and try again."))
       .finally(() => setSending(false));
   };

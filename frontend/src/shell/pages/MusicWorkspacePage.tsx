@@ -99,7 +99,9 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   useEffect(() => { top.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }, [id]);
   const { push } = useToast();
   const queryClient = useQueryClient();
-  const card = useQuery({ queryKey: ["music-song", id], queryFn: ({ signal }) => musicApi.card(id, signal), staleTime: 0 });
+  const card = useQuery({ queryKey: ["music-song", id], queryFn: ({ signal }) => musicApi.card(id, signal), staleTime: 0,
+    // Keep looking while the song is being made, and for a short while after it is done until its cover arrives.
+    refetchInterval: (query) => { const now = query.state.data; return now && (active(now) || (now.state === "done" && !now.cover_url && query.state.dataUpdateCount < 40)) ? 3000 : false; } });
   const song = card.data;
   const ready = song?.state === "done" && song.versions.length > 0;
   const version = song ? (song.versions.find((one) => one.id === song.current_id) ?? song.versions.at(-1)) : undefined;
@@ -119,12 +121,12 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
         <Button asChild disabled={!ready}><Link to={studioAddress(id)} aria-disabled={!ready}>Open in Studio</Link></Button>
         <Button asChild variant="secondary" disabled={!ready}><Link to={stemsAddress(id)} aria-disabled={!ready}>Extract stems</Link></Button>
         <Button type="button" variant="secondary" disabled={!ready} onClick={() => setRemixing(true)}>Remix</Button>
-        <Button type="button" variant="secondary" disabled={!ready} onClick={() => again(song?.length === "full" ? "quick" : "full")}>{song?.length === "full" ? "Make it quick" : "Extend to full"}</Button>
+        {song?.length === "full" ? null : <Button type="button" variant="secondary" disabled={!ready} onClick={() => again("full")}>Extend to full</Button>}
         <Button type="button" variant="secondary" disabled={!ready} onClick={newCover}>New cover art</Button>
         {version ? <Button asChild variant="secondary"><a href={version.url} download>Download</a></Button> : <Button type="button" variant="secondary" disabled>Download</Button>}
         <Button type="button" variant="secondary" disabled>Cover with a new voice</Button>
       </div>
-      {remixing && song && ready ? <RemixSong card={song} onClose={() => setRemixing(false)} /> : null}
+      {remixing && song && ready ? <RemixSong card={song} onClose={() => setRemixing(false)} onSent={() => { void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); }} /> : null}
       <p className="text-muted-foreground text-xs">{reasonOff || `Stems: ${STEMS_LINE.replace("is not available", "may not be available")} ${COVER_SONG_LINE}`}</p>
     </div>
   </section>;
