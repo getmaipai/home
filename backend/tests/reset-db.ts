@@ -72,6 +72,8 @@ import {
   artifacts,
   conversations,
   chatFolders,
+  songStyles,
+  madeArtists,
   chatFolderShares,
   clonedVoices,
   feeds,
@@ -306,5 +308,7 @@ export function resetDb(): void {
   db.delete(personApiTokens).run();
   db.delete(codingTokenUsage).run();
   db.delete(personCredentials).run();
+  db.delete(songStyles).run(); // MUSIC-STUDIO-S2: owned by a person
+  db.delete(madeArtists).run(); // MUSIC-LISTEN-C5
   db.delete(people).run();
 }

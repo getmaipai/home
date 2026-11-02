@@ -15,8 +15,9 @@ probably means MusicBrainz matching of bands and songs". Extends slice C5 of [mu
   (MUSIC-WIKI-01). That replaces the two records below for that path too. Permissions become `net:musicbrainz.org` plus the
   Wikimedia hosts `backend/src/lib/answerImages/wikimedia.ts` already uses.
 - `media-apps-blend-2026-10-17.md` line 133: "Catalog browsing (MusicBrainz, Cover Art Archive), Deezer, lyrics from LRCLIB,
-  ListenBrainz scrobbling ... nothing in the app by default | drop from the app". Replaced for MusicBrainz only; Cover Art Archive,
-  Deezer and scrobbling stay dropped.
+  ListenBrainz scrobbling ... nothing in the app by default | drop from the app". Replaced for MusicBrainz, and for Cover Art Archive (on by
+  default under the 2026-11-01 ruling in [music-listen-build](music-listen-build-2026-11-01.md), MUSIC-DATA-01); Deezer, iTunes and
+  scrobbling stay dropped.
 - `media-detail-pages-2026-10-25.md` line 40: "This note reverses the LRCLIB part only ... MusicBrainz, Deezer and scrobbling stay
   dropped." Replaced for MusicBrainz only; Deezer and scrobbling stay dropped.
 - The 2026-10-06 owner decision (`docs/dev.md`, DOCS-01): "AcoustID and MusicBrainz are request-only, with only fingerprint and
@@ -53,7 +54,7 @@ stored). Library items carry free-text `artist` and `album` and no identity. Mat
   search this needs; AcoustID fingerprinting is allowed by the 2026-10-06 decision but is a separate item.
 - Reference, not a port: the pre-migration hub's `catalog.ts` (`pickArtistMbid`, one-per-1.1 s queue, name-equality across
   spelling quirks, artist photo through the MusicBrainz Wikimedia relation) holds the hard-won matching logic. Rule 8: review,
-  rebuild small, record the verdict first. Deezer, iTunes and Cover Art Archive are out. MusicBrainz is `net:musicbrainz.org`; the Wikimedia photo and bio path is section 1b.
+  rebuild small, record the verdict first. Deezer and iTunes are out. Cover Art Archive is on by default under the 2026-11-01 ruling (MUSIC-DATA-01). MusicBrainz is `net:musicbrainz.org`; the Wikimedia photo and bio path is section 1b.
 
 ## 1b. Artist photo and bio from Wikimedia (MUSIC-WIKI-01; after MUSIC-MB-01)
 

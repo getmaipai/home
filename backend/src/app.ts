@@ -1,6 +1,7 @@
 import "@/lib/addedModels";
 import { libraryRoutes } from "@/routes/library";
 import { musicRoutes } from "@/routes/music";
+import { madeArtistsRoutes, songStylesRoutes } from "@/routes/musicMade";
 import { serveStatic } from "hono/bun";
 import { apiReference } from "@scalar/hono-api-reference";
 import { existsSync } from "node:fs";
@@ -313,6 +314,8 @@ app.route("/api/offline", offlineRoutes);
 app.route("/api/media", mediaRoutes);
 app.route("/api/trash", trashRoutes);
 app.route("/api/continue", continueRoutes);
+app.route("/api/music/styles", songStylesRoutes);
+app.route("/api/music/bands", madeArtistsRoutes);
 app.route("/api/music", musicRoutes);
 app.route("/api/shares", sharesRoutes);
 app.route("/api/updates", updatesRoutes);

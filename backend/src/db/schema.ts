@@ -2001,6 +2001,32 @@ export const musicArtistProfiles = sqliteTable("music_artist_profiles", {
   provenance: text("provenance").notNull(),
 });
 
+// MUSIC-STUDIO-S2, MUSIC-LISTEN-C5: a saved song style and a band the household made. Both tables share one column set and one
+// store (lib/music/madeRecords.ts). `name` is the style's title or the band's name, kept as a column for listing and ordering;
+// `body` is the rest of the spec record (style, seed, shared_to and the band's own fields) as JSON. A person's own words live
+// here, so nothing logs a row (rule 6a). person_id is null for a starter style that ships with Music.
+function madeRecordTable(name: string) {
+  return sqliteTable(
+    name,
+    {
+      id: text("id").primaryKey(),
+      personId: text("person_id").references(() => people.id),
+      name: text("name").notNull(),
+      origin: text("origin").notNull(), // song_styles: starter|household. made_artists: made
+      body: text("body").notNull(),
+      source: text("source").notNull().default("hub"), // hub|local
+      provenance: text("provenance").notNull(),
+      hlc: text("hlc").notNull(),
+      createdAt: text("created_at").notNull(),
+      updatedAt: text("updated_at").notNull(),
+      deletedAt: text("deleted_at"),
+    },
+    (t) => [index(`${name}_person_idx`).on(t.personId)],
+  );
+}
+export const songStyles = madeRecordTable("song_styles");
+export const madeArtists = madeRecordTable("made_artists");
+
 // MUSIC-DATA-01: a local copy of an album's front cover from the Cover Art Archive, keyed by the MusicBrainz release group id.
 // A reconstructible cache, not a household record: the image file lives in the cache data class. status: found | none (no cover).
 export const musicAlbumCovers = sqliteTable("music_album_covers", {

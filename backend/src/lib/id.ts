@@ -52,6 +52,16 @@ export function newConversationId(): string {
   return `conv-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/song-style.schema.json's `^sstyle-[a-z0-9]{6,}$` (MUSIC-STUDIO-S2). */
+export function newSongStyleId(): string {
+  return `sstyle-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/made-artist.schema.json's `^mband-[a-z0-9]{6,}$` (MUSIC-LISTEN-C5). */
+export function newMadeArtistId(): string {
+  return `mband-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/chat-folder.schema.json's `^folder-[a-z0-9]{6,}$`
  * (PROJECTS-01a: a chat folder, shown as a Project). */
 export function newChatFolderId(): string {

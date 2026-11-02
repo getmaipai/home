@@ -240,3 +240,12 @@ file briefs with a failing test; commons work (S5) is its own worktree.
 4. **Second engine (engine choice behind a slot).** Spend a bench on HeartMuLa (Apache-2.0, Mac path unknown) to compare with ACE-Step, or stay on ACE-Step plus the XL profile?
 5. **Music video (order choice).** Is "Make a video for this song" (the Higgsfield pairing) worth a slice right after stems, or after the Sounds maker?
 6. **Chat Element on a non-chat surface (design-blocking).** May the shared chat Element `MusicTrack` be used on the Song page, a non-chat surface, under rule 9b? `frontend/src/shell/library/LibraryViewer.tsx` already renders `MusicTrack` outside chat (via `useMusicTrackProps`). Recommended: yes, as shipped, with the same props.
+
+## Foundation landed (MUSIC-STUDIO-S2, MUSIC-LISTEN-C5, 2026-11-02)
+
+Spec `song-style` and `made-artist` (spec-v0.1.297, one shared `style` and one `seed` that is a made file or a library item), the
+`band` answer block and the kit `Band` Element (ui-v0.5.459) are pinned. The chat draws a `band` block through the one
+`answer-block` binding, so no per-kind binding exists. Home stores both records in `song_styles` and `made_artists` (one store,
+`backend/src/lib/music/madeRecords.ts`) behind `/api/music/styles` and `/api/music/bands`: owner-only writes (a parent for a child),
+sharing by `shared_to`, the safety floor on save (always for shared text), file and library references checked as readable, soft
+delete, and no logging of titles, names or style words (rule 6a). The `make_band` and generate flows are not built yet.

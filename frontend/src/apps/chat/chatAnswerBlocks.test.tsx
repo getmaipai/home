@@ -2,6 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { AnswerBlockDataRender, drawableBlocks } from "@/apps/chat/chatAnswerBlocks";
 import * as api from "@/lib/api";
+import bandFixture from "@maipai/spec/fixtures/answer-block/valid-band.json";
 import newsFeedFixture from "@maipai/spec/fixtures/answer-block/valid-story_feed.json";
 
 afterEach(cleanup);
@@ -24,6 +25,15 @@ describe("the answer_block part draws the kit Element, not the alt sentence", ()
     const { container } = render(<Render data={{ ...block, after_paragraph: 0 }} />);
     expect(container.querySelector('[data-slot="spec-sheet"]')).not.toBeNull();
     expect(container.querySelector("[data-fallback]")).toBeNull();
+  });
+
+  test("a made band draws the kit Band card (MUSIC-LISTEN-C5), with no extra binding", () => {
+    const Render = AnswerBlockDataRender as unknown as (props: { data: unknown }) => React.ReactElement;
+    const { container, getByText } = render(<Render data={bandFixture} />);
+    expect(container.querySelector('[data-slot="band"]')).not.toBeNull();
+    expect(container.querySelector("[data-fallback]")).toBeNull();
+    expect(getByText("Lantern Hollow")).toBeTruthy();
+    expect(getByText("Salt on the Glass")).toBeTruthy();
   });
 
   test("Undo posts the block id to the undo route", async () => {

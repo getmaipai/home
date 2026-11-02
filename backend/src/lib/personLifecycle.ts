@@ -409,6 +409,9 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   sqlite.query("DELETE FROM notification_holds WHERE recipient_id = ?").run(personId);
   sqlite.query("DELETE FROM reply_constraints WHERE person = ?").run(personId);
   sqlite.query("DELETE FROM music_jobs WHERE person_id = ?").run(personId);
+  // MUSIC-STUDIO-S2, MUSIC-LISTEN-C5: their saved song styles and the bands they made. Starter styles have no owner and stay.
+  sqlite.query("DELETE FROM song_styles WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM made_artists WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM coding_token_usage WHERE person_id = ?").run(personId);
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id
