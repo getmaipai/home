@@ -80,12 +80,12 @@ adultLockRoutes.openapi(confirmRoute, async (c) => {
   const { secret, item } = c.req.valid("json");
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
-  if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  if (throttled.blocked) { countUnlock("locked_out"); return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429); }
   const record = db.select().from(personCredentials).where(eq(personCredentials.personId, actor.id)).get();
   if (!record || record.secretHash === null) return c.json({ error: NO_SECRET_LINE }, 400);
   const lockout = currentLockout(actor.id, "adult_unlock");
   const verified = await verifyAgainstRecord(ip, actor.id, { secretHash: record.secretHash, lockedUntil: lockout?.lockedUntil ?? null }, secret, "Invalid PIN or password", "adult_unlock");
-  if (!verified.ok) return c.json(verified.body, verified.status);
+  if (!verified.ok) { countUnlock(verified.status === 429 ? "locked_out" : "wrong"); return c.json(verified.body, verified.status); }
   clearFailedAttempts(actor.id, "adult_unlock");
   return c.json(issueTicket(actor.id, screen.sessionKey, item), 200);
 });

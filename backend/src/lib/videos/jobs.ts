@@ -419,7 +419,8 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const now = new Date().toISOString();
   // ADULT-LOCK-02: a clip made with an adult-only style is a locked item from the start, before the Stack is called, so a clip being made is already a lock tile.
   const styleIds = (input.body.loras ?? []).map((l) => l.id);
-  const adultStyle = styleIds.length > 0 && (await allVideoAdapters()).some((a) => styleIds.includes(a.id) && a.classification === "adult-only");
+  // A style that cannot be resolved (removed or renamed since it was chosen) counts as adult-only: the lock fails closed.
+  const adultStyle = styleIds.length > 0 && await (async () => { const known = new Map((await allVideoAdapters()).map((a) => [a.id, a.classification])); return styleIds.some((id) => !known.has(id) || known.get(id) === "adult-only"); })();
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,

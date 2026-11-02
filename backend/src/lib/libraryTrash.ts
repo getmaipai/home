@@ -83,6 +83,8 @@ export function trashFile(actor: PersonRow, id: string, now = new Date()): Trash
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
   // Not the owner's, or already gone: the same answer, so an id never confirms a file someone else holds.
   if (!row || (row.ownerPersonId !== actor.id && !canDeleteInherited(actor, row.ownerPersonId)) || row.deletedAt !== null) return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
+  // ADULT-LOCK-02: a locked item answers like a missing one, so a trash call never confirms it or moves it without an unlock.
+  if (lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
   if (row.origin === "fetched") return { ok: false, status: 403, error: "Saved media belongs to its app. Remove it there." };
   if (parentOf(row)) return { ok: false, status: 403, error: "This file belongs to another item. Delete that item instead." };
   const deletedAt = now.toISOString();

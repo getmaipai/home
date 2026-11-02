@@ -10,6 +10,10 @@ import { throttleFail, throttleReset } from "@/lib/secretThrottle";
 
 export type SecretCheckFailure = { ok: false; status: 401 | 429; body: { error: string; retryAfter?: number; attemptsLeft?: number } };
 
+/** Adult-lock guesses in flight, by person: the lockout counts a failure only after the slow hash check ends, so a burst of parallel guesses would all pass
+ * the lockout check first. One guess per person at a time closes that (a second one answers as locked out for a second). Sign-in is unchanged. */
+const unlockInFlight = new Set<string>();
+
 export async function verifyAgainstRecord(
   ip: string,
   personId: string,
@@ -23,7 +27,12 @@ export async function verifyAgainstRecord(
     return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter } };
   }
 
-  const valid = await verifySecret(providedSecret, record.secretHash);
+  if (purpose === "adult_unlock") {
+    if (unlockInFlight.has(personId)) return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter: 1 } };
+    unlockInFlight.add(personId);
+  }
+  let valid: boolean;
+  try { valid = await verifySecret(providedSecret, record.secretHash); } finally { unlockInFlight.delete(personId); }
   if (!valid) {
     throttleFail(ip);
     // Atomic re-read-and-increment (lib/credentialLockout.ts): concurrent requests for one profile must not undercount real attempts.

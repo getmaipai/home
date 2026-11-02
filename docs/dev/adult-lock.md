@@ -57,6 +57,8 @@ A clip made with an adult-only style is marked `request.adultOnly` at job start 
 
 ## Known gaps (follow-ups)
 
+- (Closed 2026-11-02, see "Verification") the history list's `video.id`, trash, the `/api/videos` cancel, the artwork picker, an unresolvable style at job start, parallel unlock guesses and `/confirm` counting.
+- Still open, found in review and judged out of this slice: (a) a failed or cancelled job made before this change from an adult-only source carries no `request.adultOnly` and no clip, so its prompt shows; no adult-only style could be chosen before VIDEO-LORA ships, so only the continue-from-adult-clip path is affected; (b) background callers (retention, export, a worker outside a request) have no proof and so see a locked file as missing, by design; (c) `videoRowIsLocked` re-reads per job in the companion loops (an N+1, small lists); (d) the SQL filter (`lockedFilterSql`) and the JS decision (`lockItemOfProvenance`) state the rule twice; (e) the unlock failures and sign-in failures share the per-IP throttle on purpose (a stranger guessing at an open page can slow that address's sign-in, never the person's own profile counter).
 - Passkey unlock (`passkey_assertion`) is not built; `/unlock` takes the secret only.
 - A clip that turns adult-only only at the finished-clip check (prompt word list, nude verdict) is locked from then on, but a tool part stored before that
   keeps its words. ADULT-LOCK-06 sets the lock at job start from every source and closes this.
@@ -130,3 +132,24 @@ The kit draws every lock tile, the dialog and the live region (`AdultLockProvide
 
 Tests: `frontend/src/lib/adultLock.test.ts`, `frontend/src/shell/AdultLockHost.test.tsx` (note tests 2 to 4: one tile and no title while locked, the proof in no storage,
 each relock cause), `adultPlaybackGuard.test.ts`, `mediaHostAdult.test.tsx`, `backend/tests/adultLockPlayback.test.ts`. Kit side: `commons/ui/src/schema/adultLockNodes.test.tsx`.
+
+- The Stack's job list and progress (ADULT-LOCK-04), LoRA listings (VIDEO-LORA slices), pictures and songs (ADULT-LOCK-07), playback guards (ADULT-LOCK-05) and the frontend `AdultLockProvider` (ADULT-LOCK-03b) are their own rows.
+- Pin: `lock` and `made_audience` become spec fields with VIDEO-LORA-02; bump the `@maipai/spec` pin with `scripts/pin.sh` then and read them from the record.
+
+## Verification (2026-11-02, ADULT-LOCK-02 verify pass)
+
+Review of commit 3dffe62c3 at medium, each finding checked against the code. Confirmed and fixed, each with a test in `backend/tests/adultLockHardening.test.ts` that fails without the fix:
+
+| Finding | Fix |
+|---|---|
+| The chat history list (`GET /api/conversations/:id/turns`) returned a locked clip's job id in `video.id` | `videoJobIdsByTurnRedacted` (lib/videos/lock.ts): a locked clip's turn carries `video: { locked: true }`, the id comes back after an unlock. The live `done` event never carried it (the stored outcome is already a placeholder). |
+| Parallel guesses all passed the lockout check before any failure was counted | one adult-unlock guess per person at a time in `verifyAgainstRecord`; a second answers 429 for a second. Sign-in is unchanged. |
+| `POST /api/videos/jobs/:id/cancel` acted on a locked job and returned its state | 404 like the media-app cancel |
+| `trashFile` moved a locked item to Trash by id | refuses with the missing-file 404 (the `DELETE /api/files/:id` route was already guarded by `getAttachment`) |
+| A locked clip's poster could be set as a media item's artwork | `editMediaItem` refuses it |
+| A style id the adapter list cannot resolve left the job unlocked at start | an unknown style counts as adult-only (fails closed) |
+| `/confirm` wrong codes were not counted | counted like `/unlock` |
+
+Surfaces audited with no gap (repo-wide grep of readers of `video_jobs` and `attachments`): notifications, push, search, media home, companion activity, Library, shares, Trash. Notifications have no video producer; the others are covered by `tests/adultLock.test.ts` and the new leak test for notifications, the companion list and media home.
+
+Real HTTP proof on a dev hub (`bun run dev` in a worktree, port 8844, no Stack; a seeded adult-only clip "Zebraquill velvet cabaret dancer under violet lamps" and an all-ages clip owned by the demo owner Sage). As Sage with no proof: the job card is `{"locked":true,"making":false}`; clip, poster and `/api/files/:id/content` answer 404 with `cache-control: private, no-store` (the file record 404); Library search and header search for the title return no items and no groups; cancel and delete answer 404; the all-ages clip's card is normal. A wrong code gives 401 with `attemptsLeft: 4`. After `POST /api/adult-lock/unlock` with the demo secret: the card, clip bytes (200, no-store), file content, Library search and header search all return the clip, title included. After `POST /api/adult-lock/lock` with the same proof: the card is the tile again and clip and search are gone. As the demo teen and the demo child: every one of those routes answers 404 or empty, and `/unlock` answers 403 "Unlock on your own screen" (these two own no clips, so this shows the minor ceiling on routes, not a minor's own adult-only item; that case is the unit tests with a teen and child viewer).

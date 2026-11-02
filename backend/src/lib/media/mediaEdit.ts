@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { attachments, mediaItems } from "@/db/schema";
 import { canReadFileAudience, isOwnerOrAdmin } from "@/lib/access";
 import { nextHlc } from "@/lib/hlc";
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
 import { readableIn, type MediaAppId } from "./appHost";
 import { mediaBandOf, trips } from "./band";
@@ -64,7 +65,7 @@ export function editMediaItem(person: PersonRow, appId: MediaAppId, body: Record
     } else {
       const fileId = typeof body.artwork === "string" ? body.artwork : "";
       const file = /^file-[a-z0-9]{6,}$/.test(fileId) ? db.select().from(attachments).where(eq(attachments.id, fileId)).get() : undefined;
-      if (!file || file.deletedAt !== null || !file.mediaType.startsWith("image/") || !canReadFileAudience(person, file)) return fail(400, "That picture is not available.");
+      if (!file || file.deletedAt !== null || !file.mediaType.startsWith("image/") || !canReadFileAudience(person, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), person) !== "open") return fail(400, "That picture is not available.");
       if (fileId !== current.artwork) set.artwork = fileId;
     }
   }

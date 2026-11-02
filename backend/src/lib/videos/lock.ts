@@ -6,7 +6,7 @@ import { db, sqlite } from "@/db";
 import { attachments, people, videoJobs } from "@/db/schema";
 import { libraryProvenanceSql } from "@/lib/libraryProvenance";
 import { lockItemOfProvenance, lockState, lockedFilterSql, lockedView, unlockedFor, type AdultProof, type LockItem, type LockResult } from "@/lib/adultLock";
-import { getVideoJobFor, type VideoJob } from "@/lib/videos/jobs";
+import { getVideoJobFor, videoJobIdsByTurn, type VideoJob } from "@/lib/videos/jobs";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 
@@ -59,6 +59,17 @@ export function redactLockedVideoOutcome(actor: PersonRow, outcome: ToolExecutio
 /** The tool answer when an adult-only style is asked for in chat without an unlock proof: nothing starts, and the card is the lock tile with the unlock prompt. */
 export function lockedStyleOutcome(callId: string, packageId: string, args: Record<string, unknown>): ToolExecutionOutcome {
   return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args: { locked: true }, durationMs: 0, result: { reply: { text: "No video was started because the style asked for is locked. Say that it is locked and the person can unlock it on this page with their passcode, then ask again. Do not name the style." }, data: { locked: true, refused: "locked" }, actions: [] } });
+}
+
+/** The history list's video ids by turn with a locked job's id withheld: the id of a locked clip is as unreadable as its words. A turn whose clip is locked
+ * maps to `null` (the page shows the lock tile by following the turn, never by this id). */
+export function videoJobIdsByTurnRedacted(actor: PersonRow, turnIds: readonly string[]): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  for (const [turnId, id] of videoJobIdsByTurn(actor, turnIds)) {
+    const job = getVideoJobFor(actor, id);
+    out.set(turnId, job && videoJobLockState(actor, job) === "open" ? id : null);
+  }
+  return out;
 }
 
 /** Whether a stored video job of this person is a locked item right now (for lists of activity that must not count or name it). */

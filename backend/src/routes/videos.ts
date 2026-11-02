@@ -254,6 +254,8 @@ videosRoutes.openapi(cancelRoute, async (c) => {
   const actor = c.get("person");
   const wanted = getVideoJobFor(actor, c.req.valid("param").id);
   if (!wanted) return c.json({ error: "That video isn't available any more." }, 404) as never;
+  // ADULT-LOCK-02: a locked clip is not stopped, and its state not read, without an unlock (the media-app cancel answers the same 404).
+  if (videoJobLockState(actor, wanted) !== "open") return c.json({ error: "That video isn't available any more." }, 404) as never;
   // The card's Stop is for the clip being made now, which may be a later one of the same turn.
   const live = (wanted.turnId ? videoJobsForTurn(actor, wanted.turnId) : [wanted]).filter((j) => j.state === "queued" || j.state === "running");
   for (const job of live) await cancelVideoJob(actor, job.id);
