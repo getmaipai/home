@@ -33,6 +33,15 @@ describe("marking", () => {
     const once = markUnsourcedNames("Victor Hale paid.", "", "");
     expect(markUnsourcedNames(once.text, "", "").marked).toBe(0);
   });
+
+  test("a name with connecting words is looked up as written, a quote's closing comma is not part of the title, and words the sources give separately are given", () => {
+    // Live run 2026-11-02: "Wedding of the Waters" was looked up as "Wedding Waters" and "Barge Canal," with its comma, so true sentences were marked.
+    expect(namesIn('The ceremony was the Wedding of the Waters.')).toContain("Wedding of the Waters");
+    expect(namesIn('The state built the "Barge Canal," widening it.')).toContain("Barge Canal");
+    expect(markUnsourcedNames("The ceremony was the Wedding of the Waters.", "a ceremony called the wedding of the waters", "").marked).toBe(0);
+    expect(markUnsourcedNames("She was known as Countess Lovelace.", "Ada, Countess of Lovelace, wrote notes", "").marked).toBe(0);
+    expect(markUnsourcedNames("She met Victor Hale.", "Ada, Countess of Lovelace, wrote notes", "").marked).toBe(1);
+  });
 });
 
 describe("uncited sentences", () => {

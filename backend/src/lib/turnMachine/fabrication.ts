@@ -10,7 +10,8 @@ export const NOT_IN_SOURCES = " (not in the sources)";
 
 const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of|the|de|von|van)){0,3}(?:\s+[A-Z][a-z]+)\b/g;
 // A quoted title: starts with a capital letter or digit and ends on a non-space, so the words BETWEEN two quoted phrases ("A" and "B") are not one.
-const QUOTED = /[“"]([A-Z0-9][^“”"\n]{1,58}[^“”"\s])[”"]/g;
+// A comma, full stop or similar closing a quote in American punctuation ("Title,") is not part of the title.
+const QUOTED = /[“"]([A-Z0-9][^“”"\n]{1,58}[^“”"\s,.;:!])[”"]/g;
 /** Section labels the writer adds are not names: heading lines, lines that are only bold, "Label:" lines, and a bold "Label:" opening a line. */
 export function withoutLabels(text: string): string {
   return text
@@ -32,16 +33,27 @@ export function namesIn(text: string): string[] {
   const found = new Set<string>();
   for (const sentence of withoutLabels(text).split(/(?<=[.!?])\s+/)) {
     for (const m of sentence.matchAll(NAME_RUN)) {
-      let words = m[0].split(/\s+/).filter((w) => /^[A-Z]/.test(w));
+      // The name is kept as written ("Wedding of the Waters"), so the connecting words it carries are still part of what is looked up.
+      let run = m[0];
       const atStart = sentence.slice(0, m.index).trim() === "";
-      if (atStart && words.length > 0 && OPENERS.has(words[0]!.toLowerCase())) words = words.slice(1);
-      if (words.length < 2) continue;
+      if (atStart && OPENERS.has(run.split(/\s+/)[0]!.toLowerCase())) run = run.replace(/^\S+\s+/, "");
+      const words = run.split(/\s+/).filter((w) => /^[A-Z]/.test(w));
+      if (words.length < 2 || !/^[A-Z]/.test(run)) continue;
       if (words.every((w) => CALENDAR.has(w.toLowerCase()))) continue;
-      found.add(words.join(" "));
+      found.add(run);
     }
     for (const m of sentence.matchAll(QUOTED)) found.add(m[1]!);
   }
   return [...found];
+}
+
+/** A name counts as given when the evidence holds it as written, or holds every capitalized word of it (a writer may join words the
+ * sources give separately, as a title and a surname, or "Atlantic Ocean" for "the Atlantic"); an invented name has a word no source has. */
+export function nameIsGiven(name: string, haystack: string): boolean {
+  if (haystack.includes(squashText(name))) return true;
+  const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
+  const hasWord = (w: string): boolean => new RegExp(`(?<![\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u").test(haystack);
+  return words.length > 0 && words.every(hasWord);
 }
 
 /** True when the sentence states something checkable: a figure or a name. Hedged and general sentences carry neither. */
@@ -58,7 +70,7 @@ export function markUnsourcedNames(text: string, evidence: string, question: str
   const parts = text.split(/(?<=[.!?])(\s+)/);
   const out = parts.map((part) => {
     if (part.trim() === "" || part.includes(NOT_IN_SOURCES)) return part;
-    const unknown = namesIn(part).filter((name) => !haystack.includes(squashText(name)));
+    const unknown = namesIn(part).filter((name) => !nameIsGiven(name, haystack));
     if (unknown.length === 0) return part;
     marked += 1;
     const bare = part.replace(/\s+$/, "");
