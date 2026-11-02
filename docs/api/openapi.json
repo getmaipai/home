@@ -61275,6 +61275,18 @@
                     "minLength": 1,
                     "maxLength": 40,
                     "description": "A recipe id from the package's `recipes` data (a camera move or style); its wording goes to the model after the prompt."
+                  },
+                  "look": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "A look id (natural, classic-cartoon, anime, 3d-animated, film); its wording goes to the model before the prompt."
+                  },
+                  "voices": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "clean (the default: no laugh track, no music, one speaker at a time) or full (music and effects)."
                   }
                 },
                 "required": [
@@ -61484,6 +61496,11 @@
                     },
                     "limits": {
                       "type": "string"
+                    },
+                    "notice": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "One plain line when the length was cut to fit the level, else null."
                     }
                   },
                   "required": [
@@ -61491,7 +61508,8 @@
                     "conversation_id",
                     "items",
                     "can_make_another",
-                    "limits"
+                    "limits",
+                    "notice"
                   ]
                 }
               }

@@ -967,12 +967,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, PENDING, allVideoAdapters, videoAdaptersFor, setVideoAdapterEnabled |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, plainVideoFailure, getVideoJobFor, videoJobsForTurn, videoJobIdsByTurn, readVideoFile |
-| `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor |
+| `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_ADULT_ADAPTERS_KEY, VIDEO_QUALITY_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, isVideoQuality, qualityOfBase |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, dropVideoStatusCache, videoStatusReady, videoEngineReady |
-| `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS |
+| `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
