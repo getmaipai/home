@@ -37,9 +37,42 @@ function chatAnalysisWriter(maxTokens: number, signal?: AbortSignal): StageWrite
   };
 }
 
+/** A reply cut off inside its JSON object, closed up: an open string is ended, a dangling comma or key dropped, and the open brackets closed in
+ * order. What was complete before the cut is kept; the one half-written item is closed where it stands. */
+export function repairJson(text: string): string {
+  const start = text.indexOf("{");
+  if (start < 0) return "";
+  const body = text.slice(start);
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (const ch of body) {
+    if (inString) { if (escaped) escaped = false; else if (ch === "\\") escaped = true; else if (ch === '"') inString = false; continue; }
+    if (ch === '"') inString = true;
+    else if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+  let out = body;
+  if (inString) out += '"';
+  // A key with no value, or a trailing comma or colon, cannot close; take it back to the last complete value.
+  if (!inString) {
+    // A bare word cut off partway ("tr" of true), or a number cut off at its point or sign, cannot be completed: its key goes with it.
+    out = out.replace(/,?\s*"[^"]*"\s*:\s*([A-Za-z]+)$/, (whole, word: string) => (["true", "false", "null"].includes(word) ? whole : ""));
+    out = out.replace(/([\d])[.eE+-]+$/, "$1").replace(/:\s*[-+.eE]+$/, ": 0");
+  }
+  out = out.replace(/,\s*$/, "").replace(/,?\s*"[^"]*"\s*:\s*$/, "").replace(/,\s*$/, "");
+  return out + stack.reverse().join("");
+}
+
 const jsonOf = (text: string | null): Record<string, unknown> | null => {
   if (text === null) return null;
-  try { const parsed: unknown = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? ""); return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null; } catch { return null; }
+  const whole = text.match(/\{[\s\S]*\}/)?.[0] ?? "";
+  for (const candidate of [whole, repairJson(text)]) {
+    if (!candidate) continue;
+    try { const parsed: unknown = JSON.parse(candidate); if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>; } catch { /* try the repaired form */ }
+  }
+  return null;
 };
 const strings = (value: unknown, max: number, each: number): string[] =>
   Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, max).map((v) => v.trim().slice(0, each)) : [];
@@ -213,7 +246,7 @@ export function partsFor(brief: Brief | null, plan: DataPlan | undefined): strin
 
 /** Output room for the analysis. The reply is a JSON object (claims, conflicts, gaps, guesses and, since RESEARCH-COVERAGE-01, one entry per
  * part of the question): a live Max run returned no analysis at all once that field was added, the reply cut off inside the object. */
-export const ANALYSIS_TOKENS = { thinking: 500, max: 900 } as const;
+export const ANALYSIS_TOKENS = { thinking: 700, max: 1200 } as const;
 
 export function analysisPrompt(brief: Brief | null, question: string, ledger: string, backbone = "", parts: readonly string[] = []): string {
   return `You analyse research notes before an answer is written. You write no answer here.
@@ -222,8 +255,8 @@ ${brief ? `${briefBlock(brief)}\n` : ""}
 ${backbone ? `${backbone}\n\n` : ""}${ledger}
 
 Work from these notes and the article only. Answer with one JSON object and nothing else:
-{"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}], "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]${parts.length > 0 ? ', "parts": [{"part": "the part, copied as written below", "covered": true}]' : ""}}
-"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). ${parts.length > 0 ? `\nThe parts a good answer must cover:\n${parts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nIn "parts" list every one; "covered" is true only when a claim above states something for that part from the notes or the article, false when nothing there speaks to it.\n` : ""}Use at most 8 claims and 4 guesses. Name no person, title, number or detail that the notes and the article do not contain.`;
+{"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}],${parts.length > 0 ? ' "parts": [{"part": "the part, copied as written below", "covered": true}],' : ""} "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]}
+"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). ${parts.length > 0 ? `\nThe parts a good answer must cover:\n${parts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nIn "parts" list every one; "covered" is true only when a claim above states something for that part from the notes or the article, false when nothing there speaks to it.\n` : ""}Use at most 8 claims and 4 guesses, each in one short sentence. Name no person, title, number or detail that the notes and the article do not contain.`;
 }
 
 export function parseAnalysis(text: string | null, valid: ReadonlySet<number>, asked: readonly string[] = []): Analysis | null {

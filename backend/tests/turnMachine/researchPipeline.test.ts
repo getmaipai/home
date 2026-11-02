@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
-  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ledgerForAnalysis, partsFor, type Brief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ledgerForAnalysis, partsFor, repairJson, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
@@ -315,5 +315,30 @@ describe("coverage of the parts a good answer must cover (RESEARCH-COVERAGE-01)"
     expect(all.text).toContain("first quote text here");
     expect(all.text).toContain("second quote text here");
     expect(ledgerForAnalysis([a, b], null, numbers, 4_000).notes).toBe(2);
+  });
+});
+
+describe("a reply cut off inside its JSON is repaired, not lost (RESEARCH-ANALYSIS-03)", () => {
+  test("repairJson closes an open string and the open brackets, and drops a dangling key or comma", () => {
+    expect(JSON.parse(repairJson('{"claims": [{"claim": "one", "sources": [1]}], "parts": [{"part": "a part", "covered": tr'))).toBeDefined();
+    expect(JSON.parse(repairJson('{"a": [1, 2, 3,'))).toEqual({ a: [1, 2, 3] });
+    expect(JSON.parse(repairJson('{"a": "text that was cut'))).toEqual({ a: "text that was cut" });
+    expect(JSON.parse(repairJson('{"a": 1, "b":'))).toEqual({ a: 1 });
+    expect(JSON.parse(repairJson('prefix {"x": {"y": "z\\"q'))).toEqual({ x: { y: 'z"q' } });
+    expect(repairJson("no object here")).toBe("");
+  });
+
+  test("an analysis reply that stops partway still yields the claims and the parts reported before the cut", () => {
+    const cut = '{"claims": [{"claim": "It ended in 1999.", "status": "established", "sources": [1]}], "parts": [{"part": "why it ended", "covered": true}, {"part": "what came next", "covered": false}], "conflicts": [], "gaps": ["a gap that was never fini';
+    const analysis = parseAnalysis(cut, new Set([1]), ["why it ended", "what came next"]);
+    expect(analysis).not.toBeNull();
+    expect(analysis!.claims.length).toBe(1);
+    expect(analysis!.uncovered).toEqual(["what came next"]);
+  });
+
+  test("the schema asks for the parts right after the claims, so a cut loses the less important tail", () => {
+    const prompt = analysisPrompt(null, "q", "ledger", "", ["a part"]);
+    expect(prompt.indexOf('"parts"')).toBeLessThan(prompt.indexOf('"conflicts"'));
+    expect(prompt).toContain("each in one short sentence");
   });
 });

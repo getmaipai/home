@@ -92,6 +92,12 @@ describe("pinning", () => {
     expect(parsePick(null, 3)).toBeNull();
   });
 
+  test("the pick is made on the question alone: the stage-1 paraphrase of the subject is not in the prompt", () => {
+    const prompt = pickPrompt("why did it end", "a paraphrase with an invented 1983 detail", [{ title: "A", snippet: "x" }]);
+    expect(prompt).not.toContain("invented 1983");
+    expect(prompt).toContain("Weigh every detail the question states");
+  });
+
   test("the pick prompt lists the candidates and the question and names no subject of its own", () => {
     const prompt = pickPrompt("why did it end", "a show", [{ title: "A (2001 series)", snippet: "x" }, { title: "A (franchise)", snippet: "y" }]);
     expect(prompt).toContain("1. A (2001 series)");

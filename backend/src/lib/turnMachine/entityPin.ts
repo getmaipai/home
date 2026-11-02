@@ -167,17 +167,18 @@ export const defaultCandidateFinder: CandidateFinder = async (query, person, sig
 
 // ---------------------------------------------------------------- picking
 
-export function pickPrompt(question: string, subject: string, candidates: readonly { title: string; snippet: string }[]): string {
+export function pickPrompt(question: string, _subject: string, candidates: readonly { title: string; snippet: string }[]): string {
   const list = candidates.map((c, i) => `${i + 1}. ${c.title}: ${c.snippet.replace(/\s+/g, " ").slice(0, 200)}`).join("\n");
+  // The question alone decides: the stage-1 paraphrase of the subject can carry a detail the model supplied from memory (a wrong year), and a
+  // pick checked against that detail would confirm the mistake instead of catching it.
   return `Pick the encyclopedia article that is exactly what this question is about.
 Question: "${question.replace(/"/g, "'")}"
-What it is about: ${subject}
 
 Candidate articles:
 ${list}
 
 Answer with one JSON object and nothing else: {"pick": 1}
-"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, an overview of a broader topic or a different one with a similar name), or 0 when no candidate is clearly it or two fit equally well. Use only what the question says.`;
+"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, an overview of a broader topic or a different one with a similar name), or 0 when no candidate is clearly it or two fit equally well. Weigh every detail the question states (kinds, counts, periods, what it says the subject did or did not do). Use only what the question says.`;
 }
 
 export function parsePick(text: string | null, count: number): number | null {
