@@ -60265,213 +60265,236 @@
         ],
         "responses": {
           "200": {
-            "description": "The card as its owner sees it.",
+            "description": "The card as its owner sees it, or the lock tile.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "queued",
-                              "running",
-                              "done",
-                              "failed",
-                              "cancelled"
-                            ]
-                          },
-                          "percent": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": "string",
-                            "description": "One plain line for the card: what is happening now."
-                          },
-                          "position": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "eta_seconds": {
-                            "type": "number",
-                            "nullable": true,
-                            "description": "While running: seconds left, from earlier clips of this size and length."
-                          },
-                          "step": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "preview_url": {
-                            "type": "string",
-                            "nullable": true,
-                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
-                          },
-                          "started_at": {
-                            "type": "number",
-                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "generate",
-                              "animate",
-                              "edit"
-                            ]
-                          },
-                          "error": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "quality": {
-                            "type": "string",
-                            "enum": [
-                              "quick",
-                              "detailed"
-                            ],
-                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
-                          },
-                          "switch_to": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "quick",
-                              "detailed",
-                              null
-                            ],
-                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                          },
-                          "fit_ask": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "conversation_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
                             "type": "object",
-                            "nullable": true,
                             "properties": {
-                              "job_id": {
+                              "id": {
                                 "type": "string"
                               },
-                              "picked": {
+                              "state": {
                                 "type": "string",
-                                "nullable": true
+                                "enum": [
+                                  "queued",
+                                  "running",
+                                  "done",
+                                  "failed",
+                                  "cancelled"
+                                ]
                               },
-                              "actual": {
-                                "type": "string",
-                                "nullable": true
-                              }
-                            },
-                            "required": [
-                              "job_id",
-                              "picked",
-                              "actual"
-                            ],
-                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
-                          },
-                          "max_offered": {
-                            "type": "boolean",
-                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                          },
-                          "clip": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "url": {
-                                "type": "string"
-                              },
-                              "poster_url": {
-                                "type": "string"
-                              },
-                              "width": {
+                              "percent": {
                                 "type": "number"
                               },
-                              "height": {
-                                "type": "number"
+                              "label": {
+                                "type": "string",
+                                "description": "One plain line for the card: what is happening now."
                               },
-                              "seconds": {
+                              "position": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "seed": {
+                              "eta_seconds": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "While running: seconds left, from earlier clips of this size and length."
+                              },
+                              "step": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "file_id": {
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "preview_url": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                              },
+                              "started_at": {
+                                "type": "number",
+                                "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                              },
+                              "prompt": {
                                 "type": "string"
                               },
-                              "poster_file_id": {
-                                "type": "string"
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "generate",
+                                  "animate",
+                                  "edit"
+                                ]
                               },
-                              "has_sound": {
+                              "error": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "quality": {
+                                "type": "string",
+                                "enum": [
+                                  "quick",
+                                  "detailed"
+                                ],
+                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                              },
+                              "switch_to": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "quick",
+                                  "detailed",
+                                  null
+                                ],
+                                "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                              },
+                              "fit_ask": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "job_id": {
+                                    "type": "string"
+                                  },
+                                  "picked": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "actual": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "job_id",
+                                  "picked",
+                                  "actual"
+                                ],
+                                "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                              },
+                              "max_offered": {
                                 "type": "boolean",
-                                "description": "The clip has a sound track the model made (speech included)."
+                                "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                              },
+                              "clip": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "poster_url": {
+                                    "type": "string"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  },
+                                  "seconds": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "seed": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "file_id": {
+                                    "type": "string"
+                                  },
+                                  "poster_file_id": {
+                                    "type": "string"
+                                  },
+                                  "has_sound": {
+                                    "type": "boolean",
+                                    "description": "The clip has a sound track the model made (speech included)."
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "poster_url",
+                                  "width",
+                                  "height",
+                                  "seconds",
+                                  "seed",
+                                  "file_id",
+                                  "poster_file_id",
+                                  "has_sound"
+                                ]
                               }
                             },
                             "required": [
-                              "url",
-                              "poster_url",
-                              "width",
-                              "height",
-                              "seconds",
-                              "seed",
-                              "file_id",
-                              "poster_file_id",
-                              "has_sound"
+                              "id",
+                              "state",
+                              "percent",
+                              "label",
+                              "position",
+                              "eta_seconds",
+                              "step",
+                              "steps",
+                              "preview_url",
+                              "started_at",
+                              "prompt",
+                              "kind",
+                              "error",
+                              "quality",
+                              "switch_to",
+                              "fit_ask",
+                              "max_offered",
+                              "clip"
                             ]
                           }
                         },
-                        "required": [
-                          "id",
-                          "state",
-                          "percent",
-                          "label",
-                          "position",
-                          "eta_seconds",
-                          "step",
-                          "steps",
-                          "preview_url",
-                          "started_at",
-                          "prompt",
-                          "kind",
-                          "error",
-                          "quality",
-                          "switch_to",
-                          "fit_ask",
-                          "max_offered",
-                          "clip"
-                        ]
-                      }
+                        "can_make_another": {
+                          "type": "boolean"
+                        },
+                        "limits": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "conversation_id",
+                        "items",
+                        "can_make_another",
+                        "limits"
+                      ]
                     },
-                    "can_make_another": {
-                      "type": "boolean"
-                    },
-                    "limits": {
-                      "type": "string"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ],
+                      "description": "An adult-only item that is locked: draw the lock tile; `making` adds its spinner."
                     }
-                  },
-                  "required": [
-                    "id",
-                    "conversation_id",
-                    "items",
-                    "can_make_another",
-                    "limits"
                   ]
                 }
               }
@@ -60740,209 +60763,232 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "queued",
-                              "running",
-                              "done",
-                              "failed",
-                              "cancelled"
-                            ]
-                          },
-                          "percent": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": "string",
-                            "description": "One plain line for the card: what is happening now."
-                          },
-                          "position": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "eta_seconds": {
-                            "type": "number",
-                            "nullable": true,
-                            "description": "While running: seconds left, from earlier clips of this size and length."
-                          },
-                          "step": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "preview_url": {
-                            "type": "string",
-                            "nullable": true,
-                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
-                          },
-                          "started_at": {
-                            "type": "number",
-                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "generate",
-                              "animate",
-                              "edit"
-                            ]
-                          },
-                          "error": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "quality": {
-                            "type": "string",
-                            "enum": [
-                              "quick",
-                              "detailed"
-                            ],
-                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
-                          },
-                          "switch_to": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "quick",
-                              "detailed",
-                              null
-                            ],
-                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                          },
-                          "fit_ask": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "conversation_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
                             "type": "object",
-                            "nullable": true,
                             "properties": {
-                              "job_id": {
+                              "id": {
                                 "type": "string"
                               },
-                              "picked": {
+                              "state": {
                                 "type": "string",
-                                "nullable": true
+                                "enum": [
+                                  "queued",
+                                  "running",
+                                  "done",
+                                  "failed",
+                                  "cancelled"
+                                ]
                               },
-                              "actual": {
-                                "type": "string",
-                                "nullable": true
-                              }
-                            },
-                            "required": [
-                              "job_id",
-                              "picked",
-                              "actual"
-                            ],
-                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
-                          },
-                          "max_offered": {
-                            "type": "boolean",
-                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                          },
-                          "clip": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "url": {
-                                "type": "string"
-                              },
-                              "poster_url": {
-                                "type": "string"
-                              },
-                              "width": {
+                              "percent": {
                                 "type": "number"
                               },
-                              "height": {
-                                "type": "number"
+                              "label": {
+                                "type": "string",
+                                "description": "One plain line for the card: what is happening now."
                               },
-                              "seconds": {
+                              "position": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "seed": {
+                              "eta_seconds": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "While running: seconds left, from earlier clips of this size and length."
+                              },
+                              "step": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "file_id": {
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "preview_url": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                              },
+                              "started_at": {
+                                "type": "number",
+                                "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                              },
+                              "prompt": {
                                 "type": "string"
                               },
-                              "poster_file_id": {
-                                "type": "string"
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "generate",
+                                  "animate",
+                                  "edit"
+                                ]
                               },
-                              "has_sound": {
+                              "error": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "quality": {
+                                "type": "string",
+                                "enum": [
+                                  "quick",
+                                  "detailed"
+                                ],
+                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                              },
+                              "switch_to": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "quick",
+                                  "detailed",
+                                  null
+                                ],
+                                "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                              },
+                              "fit_ask": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "job_id": {
+                                    "type": "string"
+                                  },
+                                  "picked": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "actual": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "job_id",
+                                  "picked",
+                                  "actual"
+                                ],
+                                "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                              },
+                              "max_offered": {
                                 "type": "boolean",
-                                "description": "The clip has a sound track the model made (speech included)."
+                                "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                              },
+                              "clip": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "poster_url": {
+                                    "type": "string"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  },
+                                  "seconds": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "seed": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "file_id": {
+                                    "type": "string"
+                                  },
+                                  "poster_file_id": {
+                                    "type": "string"
+                                  },
+                                  "has_sound": {
+                                    "type": "boolean",
+                                    "description": "The clip has a sound track the model made (speech included)."
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "poster_url",
+                                  "width",
+                                  "height",
+                                  "seconds",
+                                  "seed",
+                                  "file_id",
+                                  "poster_file_id",
+                                  "has_sound"
+                                ]
                               }
                             },
                             "required": [
-                              "url",
-                              "poster_url",
-                              "width",
-                              "height",
-                              "seconds",
-                              "seed",
-                              "file_id",
-                              "poster_file_id",
-                              "has_sound"
+                              "id",
+                              "state",
+                              "percent",
+                              "label",
+                              "position",
+                              "eta_seconds",
+                              "step",
+                              "steps",
+                              "preview_url",
+                              "started_at",
+                              "prompt",
+                              "kind",
+                              "error",
+                              "quality",
+                              "switch_to",
+                              "fit_ask",
+                              "max_offered",
+                              "clip"
                             ]
                           }
                         },
-                        "required": [
-                          "id",
-                          "state",
-                          "percent",
-                          "label",
-                          "position",
-                          "eta_seconds",
-                          "step",
-                          "steps",
-                          "preview_url",
-                          "started_at",
-                          "prompt",
-                          "kind",
-                          "error",
-                          "quality",
-                          "switch_to",
-                          "fit_ask",
-                          "max_offered",
-                          "clip"
-                        ]
-                      }
+                        "can_make_another": {
+                          "type": "boolean"
+                        },
+                        "limits": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "conversation_id",
+                        "items",
+                        "can_make_another",
+                        "limits"
+                      ]
                     },
-                    "can_make_another": {
-                      "type": "boolean"
-                    },
-                    "limits": {
-                      "type": "string"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ],
+                      "description": "An adult-only item that is locked: draw the lock tile; `making` adds its spinner."
                     }
-                  },
-                  "required": [
-                    "id",
-                    "conversation_id",
-                    "items",
-                    "can_make_another",
-                    "limits"
                   ]
                 }
               }
@@ -61066,213 +61112,236 @@
         },
         "responses": {
           "200": {
-            "description": "The card, with a new clip queued.",
+            "description": "The card, with a new clip queued (or the lock tile).",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "queued",
-                              "running",
-                              "done",
-                              "failed",
-                              "cancelled"
-                            ]
-                          },
-                          "percent": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": "string",
-                            "description": "One plain line for the card: what is happening now."
-                          },
-                          "position": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "eta_seconds": {
-                            "type": "number",
-                            "nullable": true,
-                            "description": "While running: seconds left, from earlier clips of this size and length."
-                          },
-                          "step": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "preview_url": {
-                            "type": "string",
-                            "nullable": true,
-                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
-                          },
-                          "started_at": {
-                            "type": "number",
-                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "generate",
-                              "animate",
-                              "edit"
-                            ]
-                          },
-                          "error": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "quality": {
-                            "type": "string",
-                            "enum": [
-                              "quick",
-                              "detailed"
-                            ],
-                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
-                          },
-                          "switch_to": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "quick",
-                              "detailed",
-                              null
-                            ],
-                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                          },
-                          "fit_ask": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "conversation_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
                             "type": "object",
-                            "nullable": true,
                             "properties": {
-                              "job_id": {
+                              "id": {
                                 "type": "string"
                               },
-                              "picked": {
+                              "state": {
                                 "type": "string",
-                                "nullable": true
+                                "enum": [
+                                  "queued",
+                                  "running",
+                                  "done",
+                                  "failed",
+                                  "cancelled"
+                                ]
                               },
-                              "actual": {
-                                "type": "string",
-                                "nullable": true
-                              }
-                            },
-                            "required": [
-                              "job_id",
-                              "picked",
-                              "actual"
-                            ],
-                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
-                          },
-                          "max_offered": {
-                            "type": "boolean",
-                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                          },
-                          "clip": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "url": {
-                                "type": "string"
-                              },
-                              "poster_url": {
-                                "type": "string"
-                              },
-                              "width": {
+                              "percent": {
                                 "type": "number"
                               },
-                              "height": {
-                                "type": "number"
+                              "label": {
+                                "type": "string",
+                                "description": "One plain line for the card: what is happening now."
                               },
-                              "seconds": {
+                              "position": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "seed": {
+                              "eta_seconds": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "While running: seconds left, from earlier clips of this size and length."
+                              },
+                              "step": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "file_id": {
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "preview_url": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                              },
+                              "started_at": {
+                                "type": "number",
+                                "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                              },
+                              "prompt": {
                                 "type": "string"
                               },
-                              "poster_file_id": {
-                                "type": "string"
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "generate",
+                                  "animate",
+                                  "edit"
+                                ]
                               },
-                              "has_sound": {
+                              "error": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "quality": {
+                                "type": "string",
+                                "enum": [
+                                  "quick",
+                                  "detailed"
+                                ],
+                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                              },
+                              "switch_to": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "quick",
+                                  "detailed",
+                                  null
+                                ],
+                                "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                              },
+                              "fit_ask": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "job_id": {
+                                    "type": "string"
+                                  },
+                                  "picked": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "actual": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "job_id",
+                                  "picked",
+                                  "actual"
+                                ],
+                                "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                              },
+                              "max_offered": {
                                 "type": "boolean",
-                                "description": "The clip has a sound track the model made (speech included)."
+                                "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                              },
+                              "clip": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "poster_url": {
+                                    "type": "string"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  },
+                                  "seconds": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "seed": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "file_id": {
+                                    "type": "string"
+                                  },
+                                  "poster_file_id": {
+                                    "type": "string"
+                                  },
+                                  "has_sound": {
+                                    "type": "boolean",
+                                    "description": "The clip has a sound track the model made (speech included)."
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "poster_url",
+                                  "width",
+                                  "height",
+                                  "seconds",
+                                  "seed",
+                                  "file_id",
+                                  "poster_file_id",
+                                  "has_sound"
+                                ]
                               }
                             },
                             "required": [
-                              "url",
-                              "poster_url",
-                              "width",
-                              "height",
-                              "seconds",
-                              "seed",
-                              "file_id",
-                              "poster_file_id",
-                              "has_sound"
+                              "id",
+                              "state",
+                              "percent",
+                              "label",
+                              "position",
+                              "eta_seconds",
+                              "step",
+                              "steps",
+                              "preview_url",
+                              "started_at",
+                              "prompt",
+                              "kind",
+                              "error",
+                              "quality",
+                              "switch_to",
+                              "fit_ask",
+                              "max_offered",
+                              "clip"
                             ]
                           }
                         },
-                        "required": [
-                          "id",
-                          "state",
-                          "percent",
-                          "label",
-                          "position",
-                          "eta_seconds",
-                          "step",
-                          "steps",
-                          "preview_url",
-                          "started_at",
-                          "prompt",
-                          "kind",
-                          "error",
-                          "quality",
-                          "switch_to",
-                          "fit_ask",
-                          "max_offered",
-                          "clip"
-                        ]
-                      }
+                        "can_make_another": {
+                          "type": "boolean"
+                        },
+                        "limits": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "conversation_id",
+                        "items",
+                        "can_make_another",
+                        "limits"
+                      ]
                     },
-                    "can_make_another": {
-                      "type": "boolean"
-                    },
-                    "limits": {
-                      "type": "string"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ],
+                      "description": "An adult-only item that is locked: draw the lock tile; `making` adds its spinner."
                     }
-                  },
-                  "required": [
-                    "id",
-                    "conversation_id",
-                    "items",
-                    "can_make_another",
-                    "limits"
                   ]
                 }
               }
@@ -61419,215 +61488,249 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "queued",
-                              "running",
-                              "done",
-                              "failed",
-                              "cancelled"
-                            ]
-                          },
-                          "percent": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": "string",
-                            "description": "One plain line for the card: what is happening now."
-                          },
-                          "position": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "eta_seconds": {
-                            "type": "number",
-                            "nullable": true,
-                            "description": "While running: seconds left, from earlier clips of this size and length."
-                          },
-                          "step": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "preview_url": {
-                            "type": "string",
-                            "nullable": true,
-                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
-                          },
-                          "started_at": {
-                            "type": "number",
-                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "generate",
-                              "animate",
-                              "edit"
-                            ]
-                          },
-                          "error": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "quality": {
-                            "type": "string",
-                            "enum": [
-                              "quick",
-                              "detailed"
-                            ],
-                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
-                          },
-                          "switch_to": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "quick",
-                              "detailed",
-                              null
-                            ],
-                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                          },
-                          "fit_ask": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "job_id": {
-                                "type": "string"
-                              },
-                              "picked": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "actual": {
-                                "type": "string",
-                                "nullable": true
+                  "allOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "conversation_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "queued",
+                                      "running",
+                                      "done",
+                                      "failed",
+                                      "cancelled"
+                                    ]
+                                  },
+                                  "percent": {
+                                    "type": "number"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "description": "One plain line for the card: what is happening now."
+                                  },
+                                  "position": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "eta_seconds": {
+                                    "type": "number",
+                                    "nullable": true,
+                                    "description": "While running: seconds left, from earlier clips of this size and length."
+                                  },
+                                  "step": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "steps": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "preview_url": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                                  },
+                                  "started_at": {
+                                    "type": "number",
+                                    "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                                  },
+                                  "prompt": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "generate",
+                                      "animate",
+                                      "edit"
+                                    ]
+                                  },
+                                  "error": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "quality": {
+                                    "type": "string",
+                                    "enum": [
+                                      "quick",
+                                      "detailed"
+                                    ],
+                                    "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                  },
+                                  "switch_to": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "quick",
+                                      "detailed",
+                                      null
+                                    ],
+                                    "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                                  },
+                                  "fit_ask": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "job_id": {
+                                        "type": "string"
+                                      },
+                                      "picked": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "actual": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "job_id",
+                                      "picked",
+                                      "actual"
+                                    ],
+                                    "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                                  },
+                                  "max_offered": {
+                                    "type": "boolean",
+                                    "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                                  },
+                                  "clip": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "url": {
+                                        "type": "string"
+                                      },
+                                      "poster_url": {
+                                        "type": "string"
+                                      },
+                                      "width": {
+                                        "type": "number"
+                                      },
+                                      "height": {
+                                        "type": "number"
+                                      },
+                                      "seconds": {
+                                        "type": "number",
+                                        "nullable": true
+                                      },
+                                      "seed": {
+                                        "type": "number",
+                                        "nullable": true
+                                      },
+                                      "file_id": {
+                                        "type": "string"
+                                      },
+                                      "poster_file_id": {
+                                        "type": "string"
+                                      },
+                                      "has_sound": {
+                                        "type": "boolean",
+                                        "description": "The clip has a sound track the model made (speech included)."
+                                      }
+                                    },
+                                    "required": [
+                                      "url",
+                                      "poster_url",
+                                      "width",
+                                      "height",
+                                      "seconds",
+                                      "seed",
+                                      "file_id",
+                                      "poster_file_id",
+                                      "has_sound"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "state",
+                                  "percent",
+                                  "label",
+                                  "position",
+                                  "eta_seconds",
+                                  "step",
+                                  "steps",
+                                  "preview_url",
+                                  "started_at",
+                                  "prompt",
+                                  "kind",
+                                  "error",
+                                  "quality",
+                                  "switch_to",
+                                  "fit_ask",
+                                  "max_offered",
+                                  "clip"
+                                ]
                               }
                             },
-                            "required": [
-                              "job_id",
-                              "picked",
-                              "actual"
-                            ],
-                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
-                          },
-                          "max_offered": {
-                            "type": "boolean",
-                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                          },
-                          "clip": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "url": {
-                                "type": "string"
-                              },
-                              "poster_url": {
-                                "type": "string"
-                              },
-                              "width": {
-                                "type": "number"
-                              },
-                              "height": {
-                                "type": "number"
-                              },
-                              "seconds": {
-                                "type": "number",
-                                "nullable": true
-                              },
-                              "seed": {
-                                "type": "number",
-                                "nullable": true
-                              },
-                              "file_id": {
-                                "type": "string"
-                              },
-                              "poster_file_id": {
-                                "type": "string"
-                              },
-                              "has_sound": {
-                                "type": "boolean",
-                                "description": "The clip has a sound track the model made (speech included)."
-                              }
+                            "can_make_another": {
+                              "type": "boolean"
                             },
-                            "required": [
-                              "url",
-                              "poster_url",
-                              "width",
-                              "height",
-                              "seconds",
-                              "seed",
-                              "file_id",
-                              "poster_file_id",
-                              "has_sound"
-                            ]
-                          }
+                            "limits": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "conversation_id",
+                            "items",
+                            "can_make_another",
+                            "limits"
+                          ]
                         },
-                        "required": [
-                          "id",
-                          "state",
-                          "percent",
-                          "label",
-                          "position",
-                          "eta_seconds",
-                          "step",
-                          "steps",
-                          "preview_url",
-                          "started_at",
-                          "prompt",
-                          "kind",
-                          "error",
-                          "quality",
-                          "switch_to",
-                          "fit_ask",
-                          "max_offered",
-                          "clip"
-                        ]
-                      }
+                        {
+                          "type": "object",
+                          "properties": {
+                            "locked": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "making": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "locked",
+                            "making"
+                          ],
+                          "description": "An adult-only item that is locked: draw the lock tile; `making` adds its spinner."
+                        }
+                      ]
                     },
-                    "can_make_another": {
-                      "type": "boolean"
-                    },
-                    "limits": {
-                      "type": "string"
-                    },
-                    "notice": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "One plain line when the length was cut to fit the level, else null."
+                    {
+                      "type": "object",
+                      "properties": {
+                        "notice": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "One plain line when the length was cut to fit the level, else null."
+                        }
+                      },
+                      "required": [
+                        "notice"
+                      ]
                     }
-                  },
-                  "required": [
-                    "id",
-                    "conversation_id",
-                    "items",
-                    "can_make_another",
-                    "limits",
-                    "notice"
                   ]
                 }
               }
@@ -61739,213 +61842,236 @@
         },
         "responses": {
           "200": {
-            "description": "The card for the new clip.",
+            "description": "The card for the new clip (or the lock tile).",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "queued",
-                              "running",
-                              "done",
-                              "failed",
-                              "cancelled"
-                            ]
-                          },
-                          "percent": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": "string",
-                            "description": "One plain line for the card: what is happening now."
-                          },
-                          "position": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "eta_seconds": {
-                            "type": "number",
-                            "nullable": true,
-                            "description": "While running: seconds left, from earlier clips of this size and length."
-                          },
-                          "step": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "preview_url": {
-                            "type": "string",
-                            "nullable": true,
-                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
-                          },
-                          "started_at": {
-                            "type": "number",
-                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "generate",
-                              "animate",
-                              "edit"
-                            ]
-                          },
-                          "error": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "quality": {
-                            "type": "string",
-                            "enum": [
-                              "quick",
-                              "detailed"
-                            ],
-                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
-                          },
-                          "switch_to": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "quick",
-                              "detailed",
-                              null
-                            ],
-                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                          },
-                          "fit_ask": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "conversation_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
                             "type": "object",
-                            "nullable": true,
                             "properties": {
-                              "job_id": {
+                              "id": {
                                 "type": "string"
                               },
-                              "picked": {
+                              "state": {
                                 "type": "string",
-                                "nullable": true
+                                "enum": [
+                                  "queued",
+                                  "running",
+                                  "done",
+                                  "failed",
+                                  "cancelled"
+                                ]
                               },
-                              "actual": {
-                                "type": "string",
-                                "nullable": true
-                              }
-                            },
-                            "required": [
-                              "job_id",
-                              "picked",
-                              "actual"
-                            ],
-                            "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
-                          },
-                          "max_offered": {
-                            "type": "boolean",
-                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                          },
-                          "clip": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "url": {
-                                "type": "string"
-                              },
-                              "poster_url": {
-                                "type": "string"
-                              },
-                              "width": {
+                              "percent": {
                                 "type": "number"
                               },
-                              "height": {
-                                "type": "number"
+                              "label": {
+                                "type": "string",
+                                "description": "One plain line for the card: what is happening now."
                               },
-                              "seconds": {
+                              "position": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "seed": {
+                              "eta_seconds": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "While running: seconds left, from earlier clips of this size and length."
+                              },
+                              "step": {
                                 "type": "number",
                                 "nullable": true
                               },
-                              "file_id": {
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "preview_url": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                              },
+                              "started_at": {
+                                "type": "number",
+                                "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                              },
+                              "prompt": {
                                 "type": "string"
                               },
-                              "poster_file_id": {
-                                "type": "string"
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "generate",
+                                  "animate",
+                                  "edit"
+                                ]
                               },
-                              "has_sound": {
+                              "error": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "quality": {
+                                "type": "string",
+                                "enum": [
+                                  "quick",
+                                  "detailed"
+                                ],
+                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                              },
+                              "switch_to": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "quick",
+                                  "detailed",
+                                  null
+                                ],
+                                "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                              },
+                              "fit_ask": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "job_id": {
+                                    "type": "string"
+                                  },
+                                  "picked": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "actual": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "job_id",
+                                  "picked",
+                                  "actual"
+                                ],
+                                "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                              },
+                              "max_offered": {
                                 "type": "boolean",
-                                "description": "The clip has a sound track the model made (speech included)."
+                                "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                              },
+                              "clip": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "poster_url": {
+                                    "type": "string"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  },
+                                  "seconds": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "seed": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "file_id": {
+                                    "type": "string"
+                                  },
+                                  "poster_file_id": {
+                                    "type": "string"
+                                  },
+                                  "has_sound": {
+                                    "type": "boolean",
+                                    "description": "The clip has a sound track the model made (speech included)."
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "poster_url",
+                                  "width",
+                                  "height",
+                                  "seconds",
+                                  "seed",
+                                  "file_id",
+                                  "poster_file_id",
+                                  "has_sound"
+                                ]
                               }
                             },
                             "required": [
-                              "url",
-                              "poster_url",
-                              "width",
-                              "height",
-                              "seconds",
-                              "seed",
-                              "file_id",
-                              "poster_file_id",
-                              "has_sound"
+                              "id",
+                              "state",
+                              "percent",
+                              "label",
+                              "position",
+                              "eta_seconds",
+                              "step",
+                              "steps",
+                              "preview_url",
+                              "started_at",
+                              "prompt",
+                              "kind",
+                              "error",
+                              "quality",
+                              "switch_to",
+                              "fit_ask",
+                              "max_offered",
+                              "clip"
                             ]
                           }
                         },
-                        "required": [
-                          "id",
-                          "state",
-                          "percent",
-                          "label",
-                          "position",
-                          "eta_seconds",
-                          "step",
-                          "steps",
-                          "preview_url",
-                          "started_at",
-                          "prompt",
-                          "kind",
-                          "error",
-                          "quality",
-                          "switch_to",
-                          "fit_ask",
-                          "max_offered",
-                          "clip"
-                        ]
-                      }
+                        "can_make_another": {
+                          "type": "boolean"
+                        },
+                        "limits": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "conversation_id",
+                        "items",
+                        "can_make_another",
+                        "limits"
+                      ]
                     },
-                    "can_make_another": {
-                      "type": "boolean"
-                    },
-                    "limits": {
-                      "type": "string"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ],
+                      "description": "An adult-only item that is locked: draw the lock tile; `making` adds its spinner."
                     }
-                  },
-                  "required": [
-                    "id",
-                    "conversation_id",
-                    "items",
-                    "can_make_another",
-                    "limits"
                   ]
                 }
               }
@@ -62661,6 +62787,237 @@
           },
           "503": {
             "description": "Videos are not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/adult-lock/unlock": {
+      "post": {
+        "tags": [
+          "Adult lock"
+        ],
+        "summary": "Unlock this page's adult-only items with your own passcode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "secret": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "visit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "secret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A short-lived proof. Keep it in memory, send it as X-Adult-Unlock, drop it when the page ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "proof": {
+                      "type": "string"
+                    },
+                    "idle_seconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "proof",
+                    "idle_seconds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No passcode is set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong passcode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an adult's own screen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/adult-lock/lock": {
+      "post": {
+        "tags": [
+          "Adult lock"
+        ],
+        "summary": "Lock now: end this page's unlock",
+        "responses": {
+          "200": {
+            "description": "The proof no longer works.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "locked": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "locked"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/adult-lock/confirm": {
+      "post": {
+        "tags": [
+          "Adult lock"
+        ],
+        "summary": "A fresh passcode for one action on one item (the creator removing the lock): a single-use ticket valid 30 seconds",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "secret": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "unmark"
+                    ]
+                  },
+                  "item": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "secret",
+                  "action",
+                  "item"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Single use, bound to this item and this session. A live unlock proof does not replace it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "expires_in": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ticket",
+                    "expires_in"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No passcode is set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong passcode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an adult's own screen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
             "content": {
               "application/json": {
                 "schema": {
