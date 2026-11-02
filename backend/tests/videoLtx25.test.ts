@@ -7,7 +7,7 @@ import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
-import { startVideoJob } from "@/lib/videos/jobs";
+import { getVideoJobFor, startVideoJob } from "@/lib/videos/jobs";
 import { LTX25_MODEL, chooseVideoQuality, etaWords, maxSecondsFor, videoSizeFor } from "@/lib/videos/quality";
 import { WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
 import { __setVideoStatusForTests, readyVideoStatusForTests, videoStatusReady } from "@/lib/videos/ready";
@@ -18,6 +18,7 @@ import { videoTiersStatus } from "@/routes/videos";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { until } from "./pictureFixture";
+import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
 let fake: FakeVideoStack;
@@ -96,7 +97,7 @@ describe("the choice (quality.ts)", () => {
     expect(adult.max.ready).toBe(false);
     expect(videoTiersStatus(READY(), false)).toMatchObject({ standard: { model: "wan", sound: false, max_seconds: 5 }, boost: { ready: false } });
     expect(videoTiersStatus(NOT_READY(), true)).toMatchObject({ standard: { model: "wan" }, boost: { model: "ltx23", max_seconds: 10 } });
-    expect(videoStatusReady(readyVideoStatusForTests({ quickMissing: true, ltx25: "ready" }))).toBe(true);
+    expect(videoStatusReady(readyVideoStatusForTests({ quickMissing: true, ltx25: "ready" }), true)).toBe(true);
   });
 });
 
@@ -211,5 +212,73 @@ describe("minors and Max", () => {
     expect(body.tiers.standard).toMatchObject({ max_seconds: 10, sound: true });
     expect(body.tiers.boost.max_seconds).toBe(5);
     expect(body.tiers.max.ready).toBe(false);
+  });
+});
+
+describe("readiness is per lane (a minor never counts LTX-2.5)", () => {
+  const ONLY_LTX25 = () => readyVideoStatusForTests({ quickMissing: true, ltx25: "ready" });
+  const setRole = (id: string, role: "teen" | "child" | "owner") => {
+    db.update(peopleTable).set({ role }).where(eq(peopleTable.id, id)).run();
+    invalidateSessionCacheForPerson(id);
+    return db.select().from(peopleTable).where(eq(peopleTable.id, id)).get()! as PersonRow;
+  };
+
+  test("videoStatusReady: adult yes, minor no, with Wan missing and only ltx25 ready", () => {
+    expect(videoStatusReady(ONLY_LTX25(), true)).toBe(true);
+    expect(videoStatusReady(ONLY_LTX25(), false)).toBe(false);
+    expect(videoStatusReady(ONLY_LTX25())).toBe(false);
+  });
+
+  test("the three gates: the adult can make; the same person as a teen and as a child gets the not-ready answer and nothing reaches the Stack", async () => {
+    fake.quickMissing = true; fake.ltx25 = "ready"; __setVideoStatusForTests(ONLY_LTX25());
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const owner = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Sage")).get()! as PersonRow;
+    // Adult: status says can_make, and a chat clip is made (a finished job gives the another route something to repeat).
+    expect(((await (await client.get("/api/videos/status")).json()) as { can_make: boolean }).can_make).toBe(true);
+    const conv = await import("@/lib/conversationHistory");
+    const resolved = conv.resolveOrCreateConversation(owner, "chat", undefined, {});
+    if (!resolved.ok) throw new Error("no conversation");
+    const job = await startVideoJob({ actor: owner, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: BOAT, body: { prompt: BOAT, size: "512x256", seconds: 5, audience: "adult", model: LTX25_MODEL } });
+    await until(() => getVideoJobFor(owner, job.id)?.state === "done");
+    const { runGenerateVideo } = await import("@/lib/videos/tool");
+    const { makeAudienceOf } = await import("@/lib/videos/make");
+    const adultRun = await runGenerateVideo({ state: { actor: owner, persona: null, conversationId: null, turnId: null, temporary: false }, args: { prompt: BOAT }, callId: "a", spoken: false, audience: makeAudienceOf(owner) });
+    expect(adultRun.status).toBe("succeeded");
+    await until(() => fake.submitted.length === 2);
+    const before = fake.submitted.length;
+    for (const role of ["teen", "child"] as const) {
+      const minor = setRole(owner.id, role);
+      // 1. the tool gate
+      const run = await runGenerateVideo({ state: { actor: minor, persona: null, conversationId: null, turnId: null, temporary: false }, args: { prompt: BOAT }, callId: "m", spoken: false, audience: makeAudienceOf(minor) });
+      expect(run.status).toBe("failed");
+      expect(run.errorCode).toBe("no_engine");
+      // 2. /api/videos/status
+      const status = await (await client.get("/api/videos/status")).json() as { can_make: boolean; engine_ready: boolean; reason: string | null };
+      expect(status).toMatchObject({ can_make: false, engine_ready: false });
+      expect(status.reason).toBeTruthy();
+      // 3. the Another route's gate
+      const another = await client.post(`/api/videos/jobs/${job.id}/another`, {});
+      expect(another.status).toBe(503);
+      expect(((await another.json()) as { code: string }).code).toBe("not_installed");
+    }
+    expect(fake.submitted.length).toBe(before);
+    setRole(owner.id, "owner");
+  });
+
+  test("slotBody replays at release time with the Stack's own profile: a Boost that only lists 640x320 and 4 seconds", () => {
+    const raw = readyVideoStatusForTests({ ltx25: "ready" });
+    const engine = { qualities: { ...raw.qualities!, ltx25: { ...raw.qualities!.ltx25!, profiles: [
+      { name: "standard" as const, size: "512x256", width: 512, height: 256, max_seconds: 8 },
+      { name: "boost" as const, size: "640x320", width: 640, height: 320, max_seconds: 4 },
+    ] } } };
+    const base = { prompt: BOAT, audience: "adult" as const, model: LTX25_MODEL, size: "768x448", seconds: 5 };
+    const boost = videoBodyForSlot(base, "boost", "adult", "adult", engine);
+    expect(boost.body).toMatchObject({ size: "640x320", seconds: 4 });
+    const standard = videoBodyForSlot({ ...base, size: "512x256", seconds: 10 }, "standard", "adult", "adult", engine);
+    expect(standard.body).toMatchObject({ size: "512x256", seconds: 8 });
+    // A queued size the Stack still lists is kept; without an engine read the table is used, as before.
+    expect(videoBodyForSlot({ ...base, size: "640x320", seconds: 4 }, "boost", "adult", "adult", engine).body.size).toBe("640x320");
+    expect(videoBodyForSlot(base, "boost", "adult", "adult").body).toMatchObject({ size: "768x448", seconds: 5 });
   });
 });

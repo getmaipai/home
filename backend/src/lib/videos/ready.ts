@@ -37,14 +37,15 @@ export function peekVideoEngineStatus(): StackVideoStatus | null {
 export function dropVideoStatusCache(): void { cached = null; }
 
 /** The engine is installed and able to take a job (setting up, idle or running all count: the job queues). Either kind counts: a computer with only Detailed installed can still make a video. */
-export function videoStatusReady(status: StackVideoStatus | null): boolean {
+/** `adult` (default false) says LTX-2.5 may count: it serves adults only, so a teen or a child is ready only when Wan Quick is (VIDEO-TIERS-01, rules 0, 8, 10). */
+export function videoStatusReady(status: StackVideoStatus | null, adult = false): boolean {
   if (!status) return false;
   if (status.available === false) return false;
-  return quickVideoReady(status) || detailedVideoReady(status) || ltx25VideoReady(status);
+  return quickVideoReady(status) || (adult && (detailedVideoReady(status) || ltx25VideoReady(status)));
 }
 
-export async function videoEngineReady(): Promise<boolean> {
-  return videoStatusReady(await videoEngineStatus());
+export async function videoEngineReady(adult = false): Promise<boolean> {
+  return videoStatusReady(await videoEngineStatus(), adult);
 }
 
 /** A ready status for tests. `detailed: "installed"` or `"missing"` adds the Stack's `qualities` (VIDEO-LTX-01); left out is an older Stack with Quick only. */

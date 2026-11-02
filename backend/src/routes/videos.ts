@@ -149,7 +149,7 @@ videosRoutes.openapi(statusRoute, async (c) => {
   const audience = videoRouteAudience(actor);
   const denial = videoDenial(audience);
   const engine = await videoEngineStatus();
-  const ready = videoStatusReady(engine);
+  const ready = videoStatusReady(engine, laneOf(audience) === "adult");
   const styles = denial ? [] : (await videoAdaptersFor(videoAdapterAudiencesFor(audience))).map((a) => ({ id: a.id, name: a.name }));
   return c.json({
     can_make: denial === null && ready,
@@ -262,7 +262,7 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
   const refused = refuseVideoPrompt(prompt, { lane: laneOf(audience) });
   if (refused) return { status: 422, body: { error: promptRefusalLineFor(refused, "video", actor, audience.band, prompt, VIDEO_REFUSAL_LINE[refused]), code: refused } };
   if (laneOf(audience) === "child" && videosMadeToday(actor) + 1 > kidsDailyVideos()) return { status: 422, body: { error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" } };
-  { const engine = await videoEngineStatus(); if (!videoStatusReady(engine)) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
+  { const engine = await videoEngineStatus(); if (!videoStatusReady(engine, laneOf(audience) === "adult")) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
   return null;
 }
 

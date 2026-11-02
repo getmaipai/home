@@ -109,7 +109,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
   if (prompt.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const engine = await videoEngineStatus();
-  if (!videoStatusReady(engine)) return failed(callId, args, "no_engine", "unavailable", "no video model is installed on the Stack");
+  if (!videoStatusReady(engine, laneOf(audience) === "adult")) return failed(callId, args, "no_engine", "unavailable", "no video model is installed on the Stack");
 
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;

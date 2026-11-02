@@ -7,8 +7,8 @@ import type { Lane } from "@/lib/pictures/lane";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import type { AgeBand } from "@/lib/ageBand";
 import { slotRun, type Tier } from "@/lib/tiers";
-import { LTX25_DEFAULTS, LTX25_MODEL, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
-import type { VideoBody } from "@/lib/videos/stack";
+import { LTX25_DEFAULTS, LTX25_MODEL, ltx25Profile, videoSizeFor, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
+import type { StackVideoStatus, VideoBody } from "@/lib/videos/stack";
 
 type Body = Omit<VideoBody, "timeout_ms">;
 
@@ -41,7 +41,7 @@ function scaledSize(quality: VideoQuality, portrait: boolean, resolution: number
 }
 
 /** The body to send for a job queued at `requested`: the slot's model, options and tier applied. */
-export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lane: Lane): { body: Body; tier: Tier; quality: VideoQuality } {
+export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lane: Lane, engine: Pick<StackVideoStatus, "qualities"> | null = null): { body: Body; tier: Tier; quality: VideoQuality } {
   const run = slotRun("video", requested, band);
   const body: Body = { ...base };
   delete body.tier;
@@ -53,8 +53,13 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
     const levelKey = level === "quick" ? "standard" : "boost";
     const portrait = shapeOf(base.size) === "default-portrait";
     // The queued size is the Stack's true size for the level it was queued at; a level lowered since (a switched-off Boost) gets the lower level's size.
-    if (run.lowered && shapeOf(base.size) !== "other") body.size = LTX25_DEFAULTS[levelKey][portrait ? "portrait" : "landscape"];
-    if (body.seconds !== undefined) body.seconds = Math.max(1, Math.min(body.seconds, maxSecondsFor(level, "ltx25")));
+    // The Stack's own reported profile for the level wins over the table, so a replayed job never sends a size the Stack lacks.
+    const profile = ltx25Profile(engine, levelKey);
+    const queuedSize = base.size ? base.size.split("x").map(Number) : [];
+    const [qw, qh] = portrait ? [queuedSize[1], queuedSize[0]] : queuedSize;
+    const listed = (engine?.qualities?.ltx25?.profiles ?? []).some((p) => p.name === levelKey && p.width === qw && p.height === qh);
+    if (shapeOf(base.size) !== "other" && (run.lowered || (profile && !listed))) body.size = videoSizeFor("ltx25", level, portrait, engine);
+    if (body.seconds !== undefined) body.seconds = Math.max(1, Math.min(body.seconds, maxSecondsFor(level, "ltx25", engine)));
     if (run.tier === "boost" || run.tier === "max") body.tier = run.tier;
     return { body, tier: run.tier, quality: level };
   }
