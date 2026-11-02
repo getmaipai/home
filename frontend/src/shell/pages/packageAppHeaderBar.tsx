@@ -64,7 +64,7 @@ function PackageAppHeaderCenter() {
   const { header } = state;
   const modes = header?.modes ?? [];
   return (
-    <div className="flex shrink-0 items-center gap-2 max-md:-ms-2 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3" data-testid="app-header-center">
+    <div className="flex shrink-0 items-center gap-2 max-md:-ms-4 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3" data-testid="app-header-center">
       {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} /></div> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>

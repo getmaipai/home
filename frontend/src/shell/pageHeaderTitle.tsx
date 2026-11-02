@@ -100,7 +100,7 @@ export function HeaderTitle({ entry, hideInTopRow = false, heading = false }: { 
   return (
     <div className={`flex min-w-0 flex-1 items-center gap-3 px-2${heading ? " max-sm:px-0" : ""}`} {...(hideInTopRow ? { "data-top-row-hide": "" } : {})}>
       <EntryIcon aria-hidden className={`text-muted-foreground size-6 shrink-0${heading ? " max-sm:hidden" : ""}`} />
-      <Name data-slot="header-title" className={`min-w-0 flex-1 truncate text-xl font-semibold${heading ? " max-sm:text-lg" : ""}`}>{entry.label}</Name>
+      <Name data-slot="header-title" className={`min-w-0 flex-1 truncate text-xl font-semibold${heading ? " max-sm:text-base" : ""}`}>{entry.label}</Name>
     </div>
   );
 }
