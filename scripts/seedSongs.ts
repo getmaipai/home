@@ -38,18 +38,21 @@ const dataDir = resolve(args[at + 1]!);
 if (!/\/data\/dev\/|\/dev\//.test(`${dataDir}/`) && process.env.MAIPAI_SEED_SONGS_FORCE !== "1") { console.error(`refusing: ${dataDir} does not look like a dev data directory`); process.exit(2); }
 process.env.MAIPAI_DATA_DIR = dataDir;
 
-const { db } = await import("../backend/src/db");
-const { people } = await import("../backend/src/db/schema");
-const { createAttachment } = await import("../backend/src/lib/attachments");
-const { resolveOrCreateConversation, logTurn } = await import("../backend/src/lib/conversationHistory");
-const { newConversationTurnId, newMusicJobId } = await import("../backend/src/lib/id");
-const { saveMusicJob, jobsForPerson } = await import("../backend/src/lib/music/store");
-const { MUSIC_NOTE } = await import("../backend/src/lib/music/types");
-const { modelStampFor } = await import("../backend/src/lib/music/models");
+// The backend imports use the "@/" alias, which this folder's tsconfig does not map, so they load by a computed path and stay untyped here.
+const load = (path: string): Promise<any> => import(path); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-const sage = db.select().from(people).all().find((person) => person.role === "owner");
+const { db } = await load("../backend/src/db");
+const { people } = await load("../backend/src/db/schema");
+const { createAttachment } = await load("../backend/src/lib/attachments");
+const { resolveOrCreateConversation, logTurn } = await load("../backend/src/lib/conversationHistory");
+const { newConversationTurnId, newMusicJobId } = await load("../backend/src/lib/id");
+const { saveMusicJob, jobsForPerson } = await load("../backend/src/lib/music/store");
+const { MUSIC_NOTE } = await load("../backend/src/lib/music/types");
+const { modelStampFor } = await load("../backend/src/lib/music/models");
+
+const sage = db.select().from(people).all().find((person: { role: string }) => person.role === "owner");
 if (!sage) throw new Error("no owner in the dev household to own the songs");
-if (jobsForPerson(sage, 40).some((job) => job.state === "done" && job.task === "text2music" && SONGS.some((s) => s.title === job.request.title))) { console.log("demo songs already present"); process.exit(0); }
+if (jobsForPerson(sage, 40).some((job: { state: string; task: string; request: { title: string } }) => job.state === "done" && job.task === "text2music" && SONGS.some((s) => s.title === job.request.title))) { console.log("demo songs already present"); process.exit(0); }
 
 let index = 0;
 for (const song of SONGS) {
