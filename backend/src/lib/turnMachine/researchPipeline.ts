@@ -9,6 +9,7 @@
 // No prompt here names a subject or a kind of question.
 import { complete } from "@/lib/llm";
 import { notesLedger, squash, type Ledger, type PageKind, type PageNote } from "./pageNotes";
+import { namesIn, nameIsGiven, squashText } from "./fabrication";
 import { isRepeatQuery, queryWriterPrompt, researchProgress, shortKeywordQuery, type AnswerStyle, type QueryWriter } from "./research";
 
 /** One model call: a prompt in, text out, or null when the model is unavailable. */
@@ -105,7 +106,7 @@ The person asked: "${utterance.replace(/"/g, "'")}"
 ${recent.trim() ? `\nThe conversation so far, most recent last:\n${recent.trim()}\n` : ""}
 Answer with one JSON object and nothing else:
 {"subject": "the thing itself, named as the person named it; never the kind of answer wanted and never a year or name the person did not say", "titles": ["one per work or version the person's words could mean when the name is shared, written as an encyclopedia titles it, with a bracketed qualifier"], "answer_type": "the shape of a good answer", "must_contain": ["up to 5 things a good answer must contain for this question"], "ambiguous": false, "options": [], "question": "", "assumption": "one plain sentence: what you took the question to mean"}
-Use only what the question and the conversation say; add no detail of your own to "subject" or "assumption". "titles" are guesses used only to look the article up, so give them in the form an encyclopedia would use; use [] when the question has no single subject to look up.
+Use only what the question and the conversation say; add no detail of your own to "subject", "assumption" or "must_contain": name there no person, work, place or year the question does not name; describe the part instead ("the main characters", "what it was based on"). "titles" are guesses used only to look the article up, so give them in the form an encyclopedia would use; use [] when the question has no single subject to look up.
 "ambiguous" is true ONLY when it is unclear WHAT is meant (which version, edition, person, product, event, or what subject at all) AND neither the question's own words nor the conversation so far settle it. If the words already point to one reading, "ambiguous" is false. When true, "options" holds two or three short labels naming the readings themselves (never a description of the person, never "missing context"), or is empty when the question names no subject at all, and "question" is the one short question to ask ("Do you mean the A or the B?" or "Which one do you mean?").`;
 }
 
@@ -171,10 +172,12 @@ export function briefBlock(brief: Brief): string {
 
 /** Stage 2's reminder that an answer depends on more than the literal ask. The model words each angle from the question's own subject; nothing here names a topic. */
 export const SUB_QUESTION_ANGLES = "A good answer depends on more than the literal ask. For a question about what would have happened, what comes next, or what something means, also plan the sub-questions its answer rests on, wherever they apply to this question: why it stopped, changed or came about; what was planned or announced; what came after; who said what; what is settled and what is only reported. Word each one from this question's own subject.";
+/** Stage 2's rule against invented names in the plan (the code guard in `unnamedParts` backs it up). */
+export const SUB_QUESTION_NAMES = "A sub-question names only what the question, the pinned subject or the person's words name; a part about people or works not named there is worded without names.";
 
-export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = ""): Promise<DataPlan> {
+export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = "", given = ""): Promise<DataPlan> {
   const base = queryWriterPrompt(utterance, researchProgress([]), "", count, anchorNote);
-  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "queries": ["..."]}.\n${SUB_QUESTION_ANGLES}` : base;
+  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "queries": ["..."]}.\n${SUB_QUESTION_ANGLES} ${SUB_QUESTION_NAMES}` : base;
   let reply: string | null = null;
   try { reply = await writer(prompt); } catch { reply = null; }
   const data = jsonOf(reply);
@@ -185,7 +188,8 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
     const query = shortKeywordQuery(raw);
     if (query.length > 3 && query.split(/\s+/).length >= 2 && !isRepeatQuery(kept, query)) kept.push(query);
   }
-  return { subQuestions: strings(data.sub_questions, 6, 160), queries: kept.slice(0, count) };
+  const haystack = `${utterance} ${brief?.subject ?? ""} ${given}`;
+  return { subQuestions: brief ? unnamedParts(strings(data.sub_questions, 6, 160), haystack) : strings(data.sub_questions, 6, 160), queries: kept.slice(0, count) };
 }
 
 // ---------------------------------------------------------------- stage 3: grab and filter
@@ -240,10 +244,22 @@ export interface AnalysisClaim { claim: string; status: ClaimStatus; sources: nu
 export interface AnalysisGuess { guess: string; because: string[]; confidence: "low" | "medium" | "high"; sources: number[] }
 export interface Analysis { claims: AnalysisClaim[]; conflicts: string[]; gaps: string[]; guesses: AnalysisGuess[]; /** Parts of the question the notes and the article did not cover (the analysis's own report). */ uncovered: string[] }
 
+const EXAMPLE_LIST = /\s*\((?:e\.g\.|such as|like)[^)]*\)/i;
+/** Parts that carry a name the question, the pinned subject or the article never gave are dropped (a name from the model's memory in a
+ * part is how an invented person reaches the answer). An example list in brackets is cut first. If every part would go, the parts are
+ * kept with that bracketed list removed. Parts with no name pass unchanged. */
+export function unnamedParts(parts: readonly string[], given: string): string[] {
+  const haystack = squashText(given);
+  const stripped = parts.map((p) => p.replace(EXAMPLE_LIST, "").trim()).filter(Boolean);
+  const kept = stripped.filter((p) => namesIn(p).every((name) => nameIsGiven(name, haystack)));
+  return kept.length > 0 || stripped.length === 0 ? kept : stripped;
+}
+
 /** The parts a good answer must cover: what the brief says it must contain, then the plan's sub-questions, without repeats, at most six. */
-export function partsFor(brief: Brief | null, plan: DataPlan | undefined): string[] {
+export function partsFor(brief: Brief | null, plan: DataPlan | undefined, given = ""): string[] {
   const out: string[] = [];
-  for (const p of [...(brief?.mustContain ?? []), ...(plan?.subQuestions ?? [])]) if (p.trim() && !out.some((o) => similar(o, p))) out.push(p.trim());
+  const mustContain = brief ? unnamedParts(brief.mustContain, `${given} ${brief.subject}`) : [];
+  for (const p of [...mustContain, ...unnamedParts(plan?.subQuestions ?? [], given)]) if (p.trim() && !out.some((o) => similar(o, p))) out.push(p.trim());
   return out.slice(0, 6);
 }
 

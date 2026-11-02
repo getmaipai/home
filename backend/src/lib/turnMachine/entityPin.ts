@@ -61,7 +61,7 @@ export interface EntityAnchor {
 }
 
 const MAX_QUERY_WORDS = 8;
-const CANDIDATES_MAX = 5;
+const CANDIDATES_MAX = 8;
 const LEAD_CHARS = 700;
 
 let finderOverride: CandidateFinder | undefined;

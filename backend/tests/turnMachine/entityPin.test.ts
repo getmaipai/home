@@ -214,6 +214,14 @@ describe("title-shaped lookups first", () => {
     expect(prompts[0]!.split("\n").filter((l) => /^\d+\. /.test(l))).toHaveLength(8);
   });
 
+  test("a lookup offers up to eight candidates: a fitting sibling at rank six is not cut", async () => {
+    const titles = ["Alder (1990 film)", "Alder (1995 film)", "Alder (2001 film)", "Alder (2003 film)", "Alder (2005 film)", "Alder (2009 miniseries)"];
+    __setEntityPinForTests({ finder: async () => titles.map((t) => candidate(t)), writer: async () => '{"pick": 6}' });
+    const { anchor, candidates } = await pinEntity(brief("Alder"), "q", person);
+    expect(candidates).toBe(6);
+    expect(anchor?.title).toBe("Alder (2009 miniseries)");
+  });
+
   test("a colon subtitle does not hide a sibling: it is reported in alternatives", async () => {
     __setEntityPinForTests({ finder: async () => [candidate("Alder: The Beginning"), candidate("Alder: The Return"), candidate("Beta: The Return")], writer: async () => '{"pick": 1}' });
     const { anchor } = await pinEntity(brief("x"), "q", person);

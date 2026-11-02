@@ -980,7 +980,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const noFindings = { notes: [], ledger: { text: "", notes: 0, dropped: 0 }, read: 0, dropped: 0 };
     // For the bench's fabrication check: everything the searches returned, page text included (the stored outcomes keep none of it).
     if (researching) noteResearchText(state, "search evidence", researchEvidence(state.outcomes));
-    const parts = partsFor(brief, state.researchPlan);
+    const parts = partsFor(brief, state.researchPlan, `${rq} ${state.entityAnchor?.text ?? ""}`);
     const wordTarget = state.answerStyle === "max" ? ANSWER_WORDS.max : ANSWER_WORDS.thinking;
     // RESEARCH-COVERAGE-01: after the analysis, every part the answer must cover is either backed by the notes or the article, or read for
     // once more by heading from the sections not yet read (no new search), or the writer is told to say it was not found in the sources.
@@ -1165,7 +1165,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     state.entityAnchor = pinned.anchor;
     markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates${pinned.debug ? `: [${pinned.debug.titles.join(" | ")}], pick reply ${JSON.stringify((pinned.debug.reply ?? "").slice(0, 80))}` : ""})`);
     markResearch(state, "stage 2 plan start");
-    const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor));
+    const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor), pinned.anchor?.text ?? "");
     markResearch(state, `stage 2 plan end (sub-questions: ${plan.subQuestions.join(" | ")})`);
     state.researchPlan = plan;
     // RESEARCH-PLAN-CARD-01: a grown-up sees the plan (the sub-questions) as steps of the existing activity row before the searches run.

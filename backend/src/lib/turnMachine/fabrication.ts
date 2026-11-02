@@ -22,7 +22,7 @@ export function withoutLabels(text: string): string {
 }
 const CALENDAR = new Set(["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 
-const squashText = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ");
+export const squashText = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ");
 
 /** Words that open sentences in ordinary English and are capitalized only for being first; they are never part of a name there. */
 const OPENERS = new Set(["the", "a", "an", "in", "on", "at", "it", "he", "she", "they", "we", "this", "that", "these", "those", "there", "then", "when", "while", "after", "before", "during", "but", "and", "so", "if", "as", "by", "for", "from", "with", "some", "many", "one", "two", "its", "his", "her", "their", "our", "my", "your", "no", "not", "also", "however", "since", "because", "although", "once", "today", "later", "earlier", "first", "second", "finally", "overall", "most", "all", "both", "each", "every", "such", "yes"]);

@@ -380,6 +380,21 @@ describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angl
     expect(text).toContain("Say in the first sentence which one you took the question to mean");
     expect(replyBrief(brief, analysis, "", null, { pinned: { title: "Alpha", alternatives: [] } })).not.toContain("name is shared");
   });
+  test("RESEARCH-NAMES-01: names the question never gave are kept out of the parts, the brief prompt and the plan prompt forbid them", async () => {
+    const parsed = parseBrief('{"subject":"a show","must_contain":["the main characters (e.g., Alpha Beta, Gamma)","why it ended"]}')!;
+    expect(partsFor(parsed, undefined, "what was the show about")).toEqual(["the main characters", "why it ended"]);
+    const plan = { subQuestions: ["what Delta Epsilon said", "who is Zeta Omega", "what came next"], queries: [] };
+    expect(partsFor(null, plan, "what happened Zeta Omega is a series")).toEqual(["who is Zeta Omega", "what came next"]);
+    // Every part named something unknown: the parts stay, with the bracketed example list removed.
+    const onlyNamed = parseBrief('{"subject":"a show","must_contain":["the cast (such as Alpha Beta)"]}')!;
+    expect(partsFor(onlyNamed, undefined, "q")).toEqual(["the cast"]);
+    const planned = await planData(async () => '{"sub_questions":["what Delta Epsilon said","who is Zeta Omega","what came next"],"queries":["the show ended why"]}', parsed, "why did the show end", 3, "", "Zeta Omega is a series");
+    expect(planned.subQuestions).toEqual(["who is Zeta Omega", "what came next"]);
+    expect(briefPrompt("q", "")).toContain('add no detail of your own to "subject", "assumption" or "must_contain": name there no person, work, place or year the question does not name');
+    let seen = "";
+    await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, parsed, "q", 3);
+    expect(seen).toContain("A sub-question names only what the question, the pinned subject or the person's words name; a part about people or works not named there is worded without names.");
+  });
   test("the plan prompt asks for the sub-questions an answer rests on, without naming a topic", async () => {
     let seen = "";
     await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, { subject: "s", answerType: "", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" }, "what would have happened", 3);
