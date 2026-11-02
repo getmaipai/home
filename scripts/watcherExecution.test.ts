@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -63,6 +63,28 @@ describe("main watcher", () => {
     expect(bad.status).toBe(0);
     expect(records(failed)[0].result).toBe("green");
     expect(readFileSync(join(failed.data, "watcher.log"), "utf8")).toContain("gate lock acquire failed; running watcher suite without it");
+  }, 60_000);
+
+  test("the suite finds deno under HOME/.local/bin even when the launchd PATH lacks it", () => {
+    // WATCH-PATH-01: the LaunchAgent PATH has no ~/.local/bin, so the music smoke test could not start deno, disabled the
+    // package and the seed test's radio station POST answered 404 on every watcher run.
+    const f = fixture();
+    const home = join(f.scratch, "home");
+    mkdirSync(join(home, ".local", "bin"), { recursive: true });
+    writeFileSync(join(home, ".local", "bin", "deno"), "#!/bin/sh\n");
+    chmodSync(join(home, ".local", "bin", "deno"), 0o755);
+    const seen = join(f.scratch, "deno.path");
+    commit(f, "deno path marker", {
+      "scripts/suite.sh": `#!/usr/bin/env bash\ncommand -v deno > '${seen}' || { echo 'deno missing'; exit 1; }\necho 'all green'\n`,
+    });
+    const env = { ...f.env, HOME: home, PATH: "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" };
+    const bunDir = join(f.scratch, "bundir");
+    mkdirSync(bunDir, { recursive: true });
+    for (const tool of ["git", "bun"]) { const found = Bun.which(tool); if (found) { symlinkSync(found, join(bunDir, tool)); } }
+    env.PATH = `${bunDir}:${env.PATH}`;
+    expect(run(f, "watcher.sh", ["run-once"], env).status).toBe(0);
+    expect(records(f)[0].result).toBe("green");
+    expect(readFileSync(seen, "utf8").trim()).toBe(join(home, ".local", "bin", "deno"));
   }, 60_000);
 
   test("waits for high work CPU until the cap and skips waiting for low or unknown CPU", () => {

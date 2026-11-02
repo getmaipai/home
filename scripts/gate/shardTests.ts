@@ -322,6 +322,8 @@ export function failedFiles(output: string): string[] {
   for (const line of output.split(/\r?\n/)) {
     const header = /^([^\s].*\.(?:test|spec|_test|_spec)\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts)):\s*$/.exec(line);
     if (header) current = header[1] as string;
+    // Bun ends a run with "N tests failed:" and re-lists every failure; those lines belong to earlier files, not the last header.
+    else if (/^\d+ tests? failed:\s*$/.test(line)) current = "";
     else if (line.startsWith("(fail)") && current) files.add(current);
   }
   return [...files];

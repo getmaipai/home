@@ -131,6 +131,11 @@ describe("parsing", () => {
     expect(failedFiles(output)).toEqual(["tests/first.test.ts", "tests/last.test.ts"]);
   });
 
+  test("failedFiles does not blame the last file for bun's end-of-run recap of earlier failures", () => {
+    const output = "tests/seed.test.ts:\n(fail) (unnamed) [3042.78ms]\n\ntests/triviaSource.test.ts:\n(pass) trivia > ok [1ms]\n\n 8 pass\n 1 fail\nRan 9 tests across 2 files.\n\n1 tests failed:\n(fail) (unnamed) [2437.83ms]\n";
+    expect(failedFiles(output)).toEqual(["tests/seed.test.ts"]);
+  });
+
   test("junitFileSeconds sums testcase times per file", () => {
     const xml = `<testcase name="a" classname="x" time="0.5" file="tests/a.test.ts" line="1" />
 <testcase name="b" classname="x" time="1.25" file="tests/a.test.ts" line="2" />

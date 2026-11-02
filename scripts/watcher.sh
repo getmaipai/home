@@ -8,6 +8,10 @@
 # MAIPAI_WATCH_FRONTEND_SHARDS=12, MAIPAI_WATCH_SCRIPTS_SHARDS=8.
 set -euo pipefail
 umask 077
+# WATCH-PATH-01: the LaunchAgent PATH lacks ~/.local/bin, where deno lives. Without it the music package's deno smoke test cannot
+# start at boot, the package is disabled, and backend/tests/seed.test.ts failed on every run with a 404 on the radio station POST.
+for extra in "$HOME/.local/bin" /usr/local/bin; do [[ -d "$extra" && ":$PATH:" != *":$extra:"* ]] && PATH="$PATH:$extra"; done || true
+export PATH
 
 error() { echo "watcher.sh: $1" >&2; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || { error "not inside a git checkout; run this from the main checkout."; exit 1; }
