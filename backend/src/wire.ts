@@ -840,6 +840,8 @@ export interface ComposerNotice {
 export interface HealthStatus {
   brain: string;
   voice: string;
+  /** True when both listening (stt) and speaking (tts) can take a call, so every person's chat may show the call button (additive). */
+  voice_call_ready?: boolean;
   /** False when any engine that should be up is not answering, or a
    * sidecar is unhealthy/crashed. */
   ok: boolean;

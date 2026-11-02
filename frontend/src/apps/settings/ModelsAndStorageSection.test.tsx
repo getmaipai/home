@@ -205,8 +205,8 @@ describe("Models and storage", () => {
 
   test("with the engine down it says so instead of an empty page", async () => {
     const v = mount(overview([], { stack: "unreachable", message: "The engine isn't answering. Check that the engine is running, then try again." }));
-    expect(await v.findByText("The AI engine isn't answering")).toBeTruthy();
-    expect(v.getByText("The engine isn't answering. Check that the engine is running, then try again.")).toBeTruthy();
+    expect(await v.findByText(/The AI is waiting for its helper to start/)).toBeTruthy();
+    expect(v.queryByRole("alert")).toBeNull();
     v.restore();
   });
 });

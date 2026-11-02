@@ -15,20 +15,16 @@
 // glyph, matching ChatGPT's own voice-entry affordance. Opens the real
 // live voice session (VOICE-LIVE-02, `liveVoiceSession.tsx`, already
 // landed) through `voiceSessionContext.tsx`'s `open`/`setOpen`.
-import { useContext } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { usableRole } from "@/apps/chat/engineRoles";
-import { AdminContext } from "@/apps/chat/chatThreadContexts";
+import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
-import { api, type EnginesOverview } from "@/lib/api";
 
 /** Shared readiness gate for the composer waveform and the chat header Call action. */
 export function useVoiceCallReady(disabled = false, engineDown?: string): boolean {
-  const isAdmin = useContext(AdminContext);
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isAdmin });
-  return !disabled && engineDown === undefined && usableRole(enginesQuery.data, "stt") && usableRole(enginesQuery.data, "tts");
+  // The health row every signed-in person can read (not the admin-only Engines overview): listening and speaking can both take a call.
+  const ready = useHealthQuery().data?.voice_call_ready === true;
+  return !disabled && engineDown === undefined && ready;
 }
 
 const AudioWaveformIcon = getIcon("audio-waveform");

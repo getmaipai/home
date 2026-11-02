@@ -57,14 +57,14 @@ function VideoQualitySection({ data, refresh }: { data: VideoSettings; refresh: 
     if (!detailed) return;
     setError(null);
     try { await componentsApi.install(detailed.component, accepted); void client.invalidateQueries({ queryKey: ["components"] }); refresh(); }
-    catch (e) { setError(messageOf(e, "The engine could not start getting Detailed videos. Check that the engine is running, then try again.")); }
+    catch (e) { setError(messageOf(e, "Getting Detailed videos could not start. Videos are not ready yet, so try again in a minute.")); }
   }
   const quickOn = data.available && data.model_installed;
   return (
     <section aria-label="Video quality" className="flex flex-col gap-3">
       <h2 className="text-sm font-medium">Quick and Detailed videos</h2>
       {!data.available ? (
-        <Alert><AlertTitle>This computer can't make videos</AlertTitle><AlertDescription>{data.reason ?? "Videos need a Mac with 128 GB of memory."}</AlertDescription></Alert>
+        <p className="text-sm text-muted-foreground">{data.reason ?? "This computer cannot make videos."}</p>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">Pick which one chat uses in the Video quality setting above. Anyone who can make videos can still ask chat for the other kind for one video.</p>
@@ -95,7 +95,7 @@ function VideoQualitySection({ data, refresh }: { data: VideoSettings; refresh: 
           </ItemGroup>
           {detailed && !detailed.installed && !installing && row && !row.can_install && row.install_block ? <p className="text-sm text-muted-foreground">{row.install_block}</p> : null}
           {data.quality === "detailed" && !detailed?.installed ? (
-            <Alert><AlertTitle>Detailed is chosen, but it is not ready</AlertTitle><AlertDescription>Chat makes Quick videos until Detailed videos are on this computer.</AlertDescription></Alert>
+            <p className="text-sm text-muted-foreground">Detailed is chosen, but it is not on this computer yet. Chat makes Quick videos until it is.</p>
           ) : null}
           <Collapsible>
             <CollapsibleTrigger asChild><Button type="button" variant="link">What is the difference?</Button></CollapsibleTrigger>

@@ -210,7 +210,7 @@ export function ModelsAndStorageSection() {
       ) : null}
       <LicencePrompt refresh={refresh} setError={setError} installing={!!data?.components?.some((row) => row.state === "installing")} />
       {query.isError ? <Alert variant="destructive"><AlertTitle>The list did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert> : null}
-      {data?.stack === "unreachable" ? <Alert><AlertTitle>The AI engine isn't answering</AlertTitle><AlertDescription>{data.message ?? "Check that the engine is running, then reload this page."}</AlertDescription></Alert> : null}
+      {data?.stack === "unreachable" ? <p className="text-sm text-muted-foreground">The AI is waiting for its helper to start. The Status page shows what is happening.</p> : null}
       {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       {data?.stack === "ok" ? GROUPS.map((group) => {
         const rows = (data.components ?? []).filter((row) => row.group === group.id);

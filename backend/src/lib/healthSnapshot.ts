@@ -1,7 +1,7 @@
 import { emptyLengthRetryCount } from "@/lib/reasoningReserve";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { listSidecars } from "@/lib/sidecars";
-import { roleHealth, roleHealthEntry, localRoleHealthEntry } from "@/lib/roleHealth";
+import { roleHealth, roleHealthEntry, localRoleHealthEntry, voiceCallReady } from "@/lib/roleHealth";
 import { composerNotice, makingNotice, type ChatPauseCause, type MakingCause } from "@/lib/failureCopy";
 import { activeTransition, observeModeChange, transitionNotice } from "@/lib/chatTransitions";
 import { reducedChatNotice, reducedChatState } from "@/lib/reducedChat";
@@ -18,9 +18,10 @@ export function __resetChatPauseTrackingForTests(): void { unreachableSince = nu
 // and backend statusHistory.componentStatesFrom, which mirror that rule.
 export async function collectHealth() {
   const roles = ["chat", "embed", "background", "voice", "image", "video"] as const;
-  const [locals, states] = await Promise.all([
+  const [locals, states, callReady] = await Promise.all([
     Promise.all(roles.map((role) => localRoleHealthEntry(role))),
     Promise.all(roles.map((role) => roleHealth(role))),
+    voiceCallReady(),
   ]);
   const chat = roleHealthEntry("chat", locals[0]!, states[0]!);
   if (chat.context_per_slot == null) chat.context_message = "I could not read how much the AI can hold, so I am using a safe small window";
@@ -61,7 +62,7 @@ export async function collectHealth() {
   const ok =
     [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting" && e.kind !== "blocked" && e.kind !== "stalled") &&
     sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
-  return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", ok, engines: { chat, embed, background, voice, image, video }, uptimeSeconds: process.uptime() };
+  return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", voice_call_ready: callReady, ok, engines: { chat, embed, background, voice, image, video }, uptimeSeconds: process.uptime() };
 }
 
 export type HealthSnapshot = Awaited<ReturnType<typeof collectHealth>>;

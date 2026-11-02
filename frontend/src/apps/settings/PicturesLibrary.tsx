@@ -63,13 +63,13 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
     setError(null);
     setFamily(which);
     try { setJob((await picturesAdminApi.installModel(which)).job); }
-    catch (e) { setFamily(undefined); setError(messageOf(e, "The picture engine could not start the install. Check that the engine is running, then try again.")); }
+    catch (e) { setFamily(undefined); setError(messageOf(e, "The install could not start. Pictures are not ready yet, so try again in a minute.")); }
   }
   return (
     <section aria-label="Picture quality" className="flex flex-col gap-3">
       <h2 className="text-sm font-medium">Quick and Detailed pictures</h2>
       {overview.stack === "unreachable" ? (
-        <Alert><AlertTitle>The picture engine isn't answering</AlertTitle><AlertDescription>Check that the engine is running, then reload this page.</AlertDescription></Alert>
+        <p className="text-sm text-muted-foreground">Pictures are waiting for their helper to start. The Status page shows what is happening.</p>
       ) : installed.length > 0 ? (
         <>
           <p className="text-sm text-muted-foreground">Pick which one chat uses in the Picture quality setting above. Anyone can still ask chat for the other kind for one picture.</p>
@@ -84,7 +84,7 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
             <Item>
               <ItemContent>
                 <ItemTitle>Detailed</ItemTitle>
-                <ItemDescription clamp={false}>Takes about 30 to 45 seconds. Finer detail, and many more styles to add.{detailed && !detailed.installed && !detailed.available ? " This computer does not have the memory for it." : ""}</ItemDescription>
+                <ItemDescription clamp={false}>Takes about 30 to 45 seconds. Finer detail, and many more styles to add.{detailed && !detailed.installed && !detailed.available ? " This computer cannot make Detailed pictures." : ""}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 {detailed?.installed ? <Badge variant="secondary">On this computer</Badge>
@@ -94,7 +94,7 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
             </Item>
           </ItemGroup>
           {overview.quality === "detailed" && !overview.detailed_ready ? (
-            <Alert><AlertTitle>Detailed is chosen, but it is not ready</AlertTitle><AlertDescription>Chat makes Quick pictures until Detailed pictures are on this computer.</AlertDescription></Alert>
+            <p className="text-sm text-muted-foreground">Detailed is chosen, but it is not on this computer yet. Chat makes Quick pictures until it is.</p>
           ) : null}
           <Collapsible>
             <CollapsibleTrigger asChild><Button type="button" variant="link">What is the difference?</Button></CollapsibleTrigger>
@@ -261,7 +261,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
       if ("job" in reply) setJob(reply.job);
       else { refresh(); }
       setName(""); setUrl(""); setFile(null); setPath(""); setLicence(""); setRead(false); setWords(""); setAllAges("unsure");
-    } catch (e) { setError(messageOf(e, "The style could not be added. Check that the engine is running, then try again.")); }
+    } catch (e) { setError(messageOf(e, "The style could not be added. Pictures are not ready yet, so try again in a minute.")); }
     finally { setBusy(false); }
   }
 
@@ -313,7 +313,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Label htmlFor="style-words">Words that switch the style on (optional, separated by commas)</Label>
           <Input id="style-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
-        <p className="text-sm text-muted-foreground">The picture engine checks that the file can be used. A style is never refused for an adult. A style that names a real person is adult-only, and children and teens never see it. Home keeps its CSAM and age protections.</p>
+        <p className="text-sm text-muted-foreground">Home checks that the file can be used. A style is never refused for an adult. A style that names a real person is adult-only, and children and teens never see it. Home keeps its CSAM and age protections.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {card}
         {progress?.state === "failed" ? <p role="alert" className="text-sm text-destructive">{progress.error}</p> : null}

@@ -158,6 +158,8 @@ const EngineHealthSchema = z.object({
 const HealthResponseSchema = z.object({
   brain: z.string(),
   voice: z.string(),
+  /** True when listening and speaking can both take a call; every signed-in person may read it (additive). */
+  voice_call_ready: z.boolean().optional(),
   /** False when any engine that should be up is not answering, or any
    * registered sidecar is unhealthy/crashed. The Health page's headline. */
   ok: z.boolean(),

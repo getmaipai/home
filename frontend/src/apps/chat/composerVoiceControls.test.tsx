@@ -11,6 +11,10 @@ function stubEngines(roles: { id: string; state: string }[]): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/health")) {
+      const usable = (id: string) => roles.some((r) => r.id === id && ["installed", "loaded", "ready"].includes(r.state));
+      return Promise.resolve(Response.json({ voice_call_ready: usable("stt") && usable("tts"), engines: {} }));
+    }
     if (url.includes("/api/engines")) {
       return Promise.resolve(
         Response.json({
@@ -193,12 +197,11 @@ describe("useVoiceCallReady (the Call gate)", () => {
     } finally { again(); }
   });
 
-  test("false for someone who is not an admin (the engines route is admin-only)", async () => {
+  test("true for someone who is not an admin too (the call gate reads the health row, not the admin-only engines route)", async () => {
     const restore = stubEngines(both);
     try {
       const view = renderWithQueryClient(<AdminContext.Provider value={false}><Probe /></AdminContext.Provider>);
-      await new Promise((r) => setTimeout(r, 50));
-      expect(view.getByTestId("ready").textContent).toBe("false");
+      await waitFor(() => expect(view.getByTestId("ready").textContent).toBe("true"));
     } finally { restore(); }
   });
 });

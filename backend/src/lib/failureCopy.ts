@@ -211,7 +211,7 @@ function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "un
     case "mode_change": return {
       adult: `${Thing} making starts again by itself when another job finishes.`,
       teen: `${Thing} making starts again by itself when another job finishes.`,
-      child: "${Things} are getting ready. Try again later.",
+      child: `${things} are getting ready. Try again later.`,
       repairs_link: null,
     };
     case "gpu": return {

@@ -158,9 +158,9 @@ export function AiGlance({ card }: SettingsViewProps) {
         <div>
           <p className="text-base text-muted-foreground">{copy.subtitle}</p>
         </div>
-        {missing.length > 0 ? <Button type="button" disabled={download.isPending} onClick={() => download.mutate(missing)}>{fill(copy.download_missing ?? "", { count: missing.length })}</Button> : null}
+        {missing.length > 0 ? <Button type="button" disabled={download.isPending || data.stack === "unreachable"} onClick={() => download.mutate(missing)}>{fill(copy.download_missing ?? "", { count: missing.length })}</Button> : null}
       </header>
-      {data.stack === "unreachable" ? <Alert variant="destructive"><AlertTitle>The AI engine isn't answering</AlertTitle><AlertDescription>{data.message ?? "Check that the engine is running, then try again."}</AlertDescription></Alert> : null}
+      {data.stack === "unreachable" ? <p className="text-sm text-muted-foreground">The AI is waiting for its helper to start. The Status page shows what is happening.</p> : null}
       {missing.length > 0 ? (
         <Alert variant="warning" data-testid="ai-missing">
           <AlertTitle>{fill(copy.missing_title ?? "", { count: missing.length })}</AlertTitle>

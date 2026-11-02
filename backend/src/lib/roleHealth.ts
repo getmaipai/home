@@ -4,6 +4,7 @@ import * as canaryResults from "@/lib/canary/results";
 import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
 import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
+import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import type { EngineHealthEntry } from "@/wire";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 
@@ -178,4 +179,17 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
   if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}), ...(state.cause ? { cause: state.cause } : {}) };
   if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null, ...(state.cause ? { cause: state.cause } : {}), ...(state.detail ? { detail: state.detail } : {}) };
   return { ...local, ...context, alive: true, availability: "ready", reason: null, ...(state.cause === "tier_reduced" ? { cause: "tier_reduced" as const } : {}) };
+}
+
+/** A live voice call needs listening (`stt`) and speaking (`tts`). The same test the admin Engines overview used on the client:
+ * each role is installed, loaded or ready. Served in the health snapshot so every person's chat can decide whether to show the call
+ * button, without the admin-only Engines routes. A Stack that does not answer reads false. */
+export async function voiceCallReady(): Promise<boolean> {
+  try {
+    const roles = isStackConfigured() ? (await getStackClient().roles()).roles : await getHomeSupervisorRoles();
+    const usable = (id: string) => roles.some((row) => row.id === id && ["installed", "loaded", "ready"].includes(row.state.state));
+    return usable("stt") && usable("tts");
+  } catch {
+    return false;
+  }
 }

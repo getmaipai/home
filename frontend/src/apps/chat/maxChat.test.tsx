@@ -222,7 +222,7 @@ describe("one answer-style control", () => {
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(view.queryByRole("combobox")).toBeNull();
       expect(view.queryByRole("button", { name: /Max|Answer style/ })).toBeNull();
-      expect(calls).toEqual([]);
+      expect(calls.filter((call) => !call.includes("/api/health"))).toEqual([]);
       cleanup();
     }
   });

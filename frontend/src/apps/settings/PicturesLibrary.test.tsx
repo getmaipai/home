@@ -62,7 +62,7 @@ describe("Pictures and videos settings view", () => {
     const v = mount(overview({ engine: { ...base.engine, models: [...base.engine.models, detailed] }, quality: "detailed", detailed_ready: false }));
     await waitFor(() => expect(v.getByText("Detailed")).toBeTruthy());
     expect(v.queryByText(/Z-Image/)).toBeNull();
-    expect(v.getByText("Detailed is chosen, but it is not ready")).toBeTruthy();
+    expect(v.getByText(/Detailed is chosen, but it is not on this computer yet/)).toBeTruthy();
     fireEvent.click(v.getByRole("button", { name: "What is the difference?" }));
     await waitFor(() => expect(v.getByRole("table", { name: "Quick compared with Detailed" })).toBeTruthy());
     expect(v.getByText("About 30 to 45 seconds")).toBeTruthy();
@@ -78,7 +78,7 @@ describe("Pictures and videos settings view", () => {
     const v = mount(overview({ engine: { ...base.engine, models: [...base.engine.models, { id: "z-image-turbo", label: "Z-Image-Turbo", installed: true, available: true, licence: "Apache-2.0", edit: false, peak_gb: 34, remaining_bytes: 0 }] }, detailed_ready: true }));
     await waitFor(() => expect(v.getByText("Detailed")).toBeTruthy());
     expect(v.queryByRole("button", { name: /Get Detailed pictures/ })).toBeNull();
-    expect(v.queryByText("Detailed is chosen, but it is not ready")).toBeNull();
+    expect(v.queryByText(/Detailed is chosen, but it is not on this computer yet/)).toBeNull();
     v.restore();
   });
 
@@ -119,7 +119,7 @@ describe("Pictures and videos settings view", () => {
 
   test("an engine that is not answering says so in plain words", async () => {
     const v = mount(overview({ stack: "unreachable", adapters: [] }));
-    await waitFor(() => expect(v.getByText("The picture engine isn't answering")).toBeTruthy());
+    await waitFor(() => expect(v.getByText(/Pictures are waiting for their helper to start/)).toBeTruthy());
     v.restore();
   });
 });

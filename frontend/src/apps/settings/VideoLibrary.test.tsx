@@ -122,7 +122,7 @@ describe("video settings view", () => {
 
   test("Detailed chosen but not installed says chat makes Quick until it is; a computer without the memory shows no Get button", async () => {
     const chosen = mount(settings({ ...withDetailed(), quality: "detailed" }));
-    await waitFor(() => expect(chosen.getByText("Detailed is chosen, but it is not ready")).toBeTruthy());
+    await waitFor(() => expect(chosen.getByText(/Detailed is chosen, but it is not on this computer yet/)).toBeTruthy());
     chosen.restore();
     cleanup();
     const small = mount(settings(withDetailed({ available: false, reason: "This computer does not have the memory for Detailed videos." })));

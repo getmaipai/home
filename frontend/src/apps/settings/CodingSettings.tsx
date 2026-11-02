@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -165,7 +164,7 @@ export function CodingAdminSettings() {
       <AlertDialog open={removePiece !== null} onOpenChange={(open) => { if (!open) setRemovePiece(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove {removePiece?.label}?</AlertDialogTitle><AlertDialogDescription>This removes the piece from this computer. You can install it again later.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep it</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removePiece; setRemovePiece(null); if (pending) void remove(pending); }}>Remove</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </CardContent></Card>
     {pieceError ? <p role="alert" className="text-sm text-destructive">{pieceError}</p> : null}
-    {pieces.data?.message ? <Alert><AlertTitle>{pieces.data.stack === "unreachable" ? "Coding engine is not answering" : "Coding setup"}</AlertTitle><AlertDescription>{pieces.data.message}</AlertDescription></Alert> : null}
+    {pieces.data?.message ? <p className="text-sm text-muted-foreground">{pieces.data.stack === "unreachable" ? "Coding is waiting for its helper to start. The Status page shows what is happening." : pieces.data.message}</p> : null}
     <p className="text-sm text-muted-foreground">Chat always comes first. Coding waits or slows down, never chat. See what is running on the <Link to="/status" className="text-primary underline">Status page</Link>.</p>
     <AlertDialog open={pauseOpen} onOpenChange={setPauseOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{paused ? "Resume coding?" : "Stop all coding now?"}</AlertDialogTitle><AlertDialogDescription>{paused ? "People with access can use Coding again." : "Coding requests stop until you resume. Keys stay in place and can be used again later."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant={paused ? "default" : "destructive"} onClick={() => { const next = !paused; setPauseOpen(false); void api.setSetting("household", "coding.paused", next).then(() => client.invalidateQueries({ queryKey: ["settings-values", "household"] })).catch((error: unknown) => setPieceError(messageOf(error, "Could not change the pause setting."))); }}>{paused ? "Resume coding" : "Stop all coding"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;
