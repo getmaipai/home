@@ -197,7 +197,8 @@ failing_files() {
       fi
     done < "$output"
   fi
-  printf '%s' "${files[*]}"
+  # bash 3.2 (macOS) treats an empty array as unset under set -u; the ${var+...} guard keeps "no failing files" a plain empty string.
+  printf '%s' "${files[*]+${files[*]}}"
 }
 
 rerun_file() {

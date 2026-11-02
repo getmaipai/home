@@ -56,6 +56,23 @@ describe("main watcher", () => {
     expect(note).toContain("(fail) backend thing > breaks");
   }, 60_000);
 
+  test("a red run with no failing-file lines still records red (bash 3.2 empty array)", () => {
+    const f = fixture();
+    writeFileSync(join(f.main, "scripts/suite.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then\n  echo 'bun install failed: link error'\n  exit 1\nfi\necho 'all green'\n");
+    git(f.main, "add", "-A");
+    git(f.main, "commit", "-m", "fixture suite without failing-file lines");
+    git(f.main, "push", "origin", "main");
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const sha = commit(f, "break the install", { RED: "red\n" });
+    const out = run(f, "watcher.sh", ["run-once"]);
+    expect(out.stderr).not.toContain("unbound variable");
+    expect(out.status).toBe(0);
+    const last = records(f).at(-1);
+    expect(last.result).toBe("red");
+    expect(last.sha).toBe(sha);
+    expect(last.failing).toEqual([]);
+  }, 60_000);
+
   test("bisects multiple landings to the commit that introduced RED", () => {
     const f = fixture();
     expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
