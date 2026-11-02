@@ -45,6 +45,8 @@ On the left:
 
 **Try this.** Each picture is a ready idea with a look and a camera move already chosen, for example "Paper boat". Press one and the words, the look and the camera fill in on the left. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, the pictures show above the line "Your clips show here. Pick a tile or describe a video on the left and press Generate."
 
+The page has the same look as Music Create: a dark pane in dark mode and a soft grey pane in light mode, with a big **MAKE ANY VIDEO** title and a bright green **Generate** button. Small grey headings such as TRY THIS and the filter names are in capital letters.
+
 On a phone, the left side is a bar at the bottom with your words and a round **Generate** button. Press the round button with the sliders on it to open the **Options**.
 
 On the right, the clips are under a **Your clips** heading. The **View** button holds the filters: Favorites only, Group by words and Type. The newest clip is big and the picture comes first. The tags sit on the picture and your words show once under it. On a wide screen the older clips sit two to a row. The buttons for a clip (Favorite, download, Remix and the rest) show when you point at it, and always show on a phone.

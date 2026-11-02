@@ -464,6 +464,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
+| `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
