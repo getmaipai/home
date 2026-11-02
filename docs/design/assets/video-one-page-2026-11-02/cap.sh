@@ -16,6 +16,8 @@ for t in light dark; do
   desk rendering-1440-$t "theme=$t&state=rendering"
   desk draft-1440-$t "theme=$t&state=draft"
   desk empty-1440-$t "theme=$t&state=empty"
+  desk clips-1440-$t "theme=$t&page=clips"
+  phone clips-390-$t "theme=$t&page=clips"
   phone done-390-$t "theme=$t&state=done"
   phone sheet-390-$t "theme=$t&state=done&open=sheet"
   phone rendering-390-$t "theme=$t&state=rendering"
