@@ -181,6 +181,9 @@
                     "voice": {
                       "type": "string"
                     },
+                    "voice_call_ready": {
+                      "type": "boolean"
+                    },
                     "ok": {
                       "type": "boolean"
                     },
