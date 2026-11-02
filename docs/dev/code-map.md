@@ -186,6 +186,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
 | `frontend/src/shell/InstallStrip.tsx` | installTitle, InstallStrip |
 | `frontend/src/shell/MediaHubFrame.tsx` | MediaHubFrame |
+| `frontend/src/shell/MediaPickerDialog.tsx` | thumbUrlFor, MediaPickerBody |
 | `frontend/src/shell/MediaPlayerRegistration.tsx` | chaptersWithEnds, audioKindOfApp, MediaPlayerRegistration |
 | `frontend/src/shell/MemoriesRedirect.tsx` | MemoriesRedirect, LegacyProfileMemoriesRedirect |
 | `frontend/src/shell/NotificationBell.tsx` | POLL_MS, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, useNotificationsQuery, usePendingNotificationCount, NotificationToaster |
@@ -678,6 +679,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
 | `backend/src/lib/otherApps.ts` | readOtherApps |
 | `backend/src/lib/outbound.ts` | HOME_USER_AGENT |
+| `backend/src/lib/packageAssets.ts` | ASSET_TYPES, MAX_ASSET_BYTES, cleanAssetPath, packageAssetFile, assetResponse |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |
 | `backend/src/lib/packageCache.ts` | LEGACY_ENTRY_GRACE_S, CACHE_NOT_MODIFIED, PACKAGE_CACHE_RESPONSE, packageCacheResponse, __setTestCacheBudgetBytes, OTHER_CACHE_SOURCE |
 | `backend/src/lib/packageHost.ts` | __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, resolveDataSourceProvenance, __setPackageFetchForTests |

@@ -61290,6 +61290,12 @@
                     "minLength": 1,
                     "maxLength": 40,
                     "description": "clean (the default: no laugh track, no music, one speaker at a time) or full (music and effects)."
+                  },
+                  "start_frame": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The id of a picture in your own Library; the video starts from it (404 when it is not yours)."
                   }
                 },
                 "required": [
