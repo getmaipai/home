@@ -42,7 +42,7 @@ describe("app status presentation", () => {
     const view = render(<TooltipProvider><StatusApps person={person("admin")} apps={[app(state)]} /></TooltipProvider>);
     expect(view.getByText("Chat")).toBeInTheDocument();
     expect(view.getAllByText(label).some((element) => element.getAttribute("data-status") === status)).toBe(true);
-    expect(view.getByRole("img", { name: /Last 90 days: 99.500% uptime/ })).toBeInTheDocument();
+    expect(view.getByRole("img", { name: /Last 90 days: 99\.5% uptime/ })).toBeInTheDocument();
   });
 
   test.each(["degraded", "down", "waiting_for_internet"] as const)("renders %s for the household without dependency names or controls", (state) => {

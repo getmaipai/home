@@ -84,7 +84,7 @@ describe("Coding admin settings", () => {
     } finally { globalThis.fetch = original; }
   });
 
-  test("disables Home mode with the first unmet reason and shows all checklist states and actions", async () => {
+  test("shows the first unmet reason and all Max chat checklist states and actions", async () => {
     const original = globalThis.fetch;
     const registry = settingsFile.filter((setting) => setting.key.startsWith("coding."));
     const values = registry.map((setting) => ({ key: setting.key, value: setting.default, source: "default", label: setting.label, level: setting.level, secret: false }));
@@ -115,15 +115,15 @@ describe("Coding admin settings", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<MemoryRouter><CodingAdminSettings /></MemoryRouter>);
-      expect((await view.findAllByText("Some model files are missing, so add them and check again.")).length).toBe(2);
+      expect((await view.findAllByText("Some model files are missing, so add them and check again.")).length).toBe(1);
       expect(view.getAllByText("Needs a step from you").length).toBe(4);
       expect(view.getAllByText("Needs setup")).toHaveLength(3);
       expect(view.getByText("Ready")).toBeTruthy();
       for (const label of ["Coding is on", "Coding engine", "Coding model files", "Computer hardware", "Free memory", "Coding test", "Coding app", "Speed check"]) expect(view.getByText(label)).toBeTruthy();
       expect(view.getAllByRole("link", { name: "How" }).length).toBe(4);
-      const modeRow = view.getByText("Home mode").closest("[data-setting-key]");
-      expect(modeRow?.querySelector("button[role=combobox]")).toBeDisabled();
-      fireEvent.click(within(view.getByLabelText("Home mode checklist")).getByRole("button", { name: "Install" }));
+      // TIER-HOME-05: Home mode is retired, so there is no Home mode row to lock; the checklist alone carries the reason.
+      expect(view.queryByText("Home mode")).toBeNull();
+      fireEvent.click(within(view.getByLabelText("Max chat checklist")).getByRole("button", { name: "Install" }));
       await waitFor(() => expect(calls.filter((call) => call.url.includes("/coding/pieces/") && call.method === "POST").length).toBe(2));
       fireEvent.click(view.getByRole("button", { name: "Run the test" }));
       await waitFor(() => expect(calls.some((call) => call.url.endsWith("/api/coding/mode/self-test") && call.method === "POST")).toBe(true));
@@ -202,7 +202,7 @@ describe("section headings", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<MemoryRouter><CodingAdminSettings /></MemoryRouter>);
-      await view.findByText("Coding and Home mode");
+      await view.findByRole("heading", { name: "Coding" });
       expect(view.queryByText("household.coding")).toBeNull();
     } finally { globalThis.fetch = original; }
   });

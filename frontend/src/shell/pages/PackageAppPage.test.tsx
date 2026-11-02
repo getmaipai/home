@@ -289,15 +289,17 @@ describe("media index empty states", () => {
       walk(page.body);
       if (paths.size === 0) throw new Error(`${packageId} index has no bound shelves`);
       const visiblePath = [...paths][0]!;
-      let releaseData!: (response: Response) => void;
-      const pendingData = new Promise<Response>((resolveData) => { releaseData = resolveData; });
+      // A Response body reads once, and two bound nodes may ask for the same path (Music binds History twice), so each
+      // request gets its own Response built from the one pending payload.
+      let releaseData!: (payload: unknown) => void;
+      const pendingPayload = new Promise<unknown>((resolveData) => { releaseData = resolveData; });
       globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === "string" ? input : input.toString();
         if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
         if (url.startsWith(`/api/plugins/${packageId}/pages/index`)) return Promise.resolve(Response.json(page));
         if (url.startsWith(`/api/plugins/${packageId}/data/`)) {
           const path = url.split("/data/")[1]?.split("?")[0] ?? "";
-          return path === visiblePath ? pendingData : Promise.resolve(Response.json([]));
+          return path === visiblePath ? pendingPayload.then((payload) => Response.json(payload)) : Promise.resolve(Response.json([]));
         }
         return baseFetch(input, init);
       }) as typeof fetch;
@@ -305,8 +307,9 @@ describe("media index empty states", () => {
       const populated = open(`/apps/${packageId}`);
       await waitFor(() => expect([...paths].every((path) => path === visiblePath || document.body.textContent?.includes("Loading") === false)).toBe(true));
       expect(document.body.textContent).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
-      await act(async () => { releaseData(Response.json([{ id: `${packageId}-item`, title: "Visible item", kind: "video", thumbnail: null }])); });
-      await populated.findByRole("button", { name: /Visible item/ });
+      await act(async () => { releaseData([{ id: `${packageId}-item`, title: "Visible item", kind: "video", thumbnail: null }]); });
+      // Music shows the same item in its quick tiles and its History shelf, so more than one button is right.
+      expect((await populated.findAllByRole("button", { name: /Visible item/ })).length).toBeGreaterThan(0);
       expect(document.body.textContent).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
       cleanup();
     }

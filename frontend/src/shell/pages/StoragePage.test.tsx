@@ -135,7 +135,7 @@ describe("StoragePage", () => {
       expect(document.body.textContent).toContain("video");
       // The cap controls: the generic settings renderer's own field for
       // the household.storage group, not a hand-built form.
-      await waitFor(() => expect(document.body.textContent).toContain("Household storage cap (bytes)"));
+      await waitFor(() => expect(document.body.textContent).toContain("Household storage cap"));
       expectHomeTablesWithoutDemoOrActions(1);
     } finally {
       restore();

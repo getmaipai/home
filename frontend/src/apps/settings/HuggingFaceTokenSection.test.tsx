@@ -87,6 +87,9 @@ describe("HuggingFaceTokenSection", () => {
     try {
       const { findByText } = render(<HuggingFaceTokenSection />);
       fireEvent.click(await findByText("Remove"));
+      // Removing asks first: nothing is sent until the person confirms.
+      expect(removed).toBe(false);
+      fireEvent.click(await findByText("Remove token"));
       await waitFor(() => expect(removed).toBe(true));
       await findByText("No token connected yet.");
     } finally {
@@ -104,6 +107,7 @@ describe("HuggingFaceTokenSection", () => {
       fireEvent.click(await findByText("Save"));
       await findByText("Saved.");
       fireEvent.click(await findByText("Remove"));
+      fireEvent.click(await findByText("Remove token"));
       await findByText("No token connected yet.");
       expect(queryByText("Saved.")).toBeNull();
     } finally {

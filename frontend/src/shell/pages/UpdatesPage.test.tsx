@@ -127,10 +127,9 @@ describe("UpdatesPage", () => {
         const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
         return url.endsWith("/api/updates");
       })).toHaveLength(1);
-      expect(view.getByRole("searchbox", { name: "Search table rows" })).toBeTruthy();
-      expect(view.getByRole("button", { name: "Download table as CSV" })).toBeTruthy();
-      expect(view.getByRole("button", { name: "Next" })).toBeTruthy();
-      expect(view.getByRole("combobox", { name: "Rows per page" })).toBeTruthy();
+      // AUDIT-FE-POLISH-01: the search, CSV and paging toolbar appears only from ten rows; this fixture has fewer.
+      expect(view.queryByRole("searchbox", { name: "Search table rows" })).toBeNull();
+      expect(view.queryByRole("button", { name: "Download table as CSV" })).toBeNull();
     } finally {
       restore();
     }
