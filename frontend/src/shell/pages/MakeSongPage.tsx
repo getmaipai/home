@@ -44,7 +44,7 @@ export function makeSongBody(form: { idea: string; lyrics: string; instrumental:
   };
 }
 
-export const songAddress = (id: string): string => `/apps/music/make-song?song=${encodeURIComponent(id)}`;
+export const songAddress = (id: string): string => `/apps/music/create?song=${encodeURIComponent(id)}`;
 
 const text = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 

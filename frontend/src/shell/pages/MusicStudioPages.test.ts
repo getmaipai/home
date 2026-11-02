@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { makeSongBody, songAddress } from "./MakeSongPage";
 import { createBody, editPath, isStudioPage } from "./MusicStudioPages";
+import { stemsAddress, studioAddress } from "./MusicWorkspacePage";
+import manifest from "../../../../backend/packages/music/manifest.json";
 
 describe("music studio pages", () => {
   test("only the music app's studio pages are ours", () => {
@@ -33,6 +35,17 @@ describe("music studio pages", () => {
     expect(body).toEqual({ idea: "calm piano", instrumental: true });
   });
   test("a made song has its own address", () => {
-    expect(songAddress("a b")).toBe("/apps/music/make-song?song=a%20b");
+    expect(songAddress("a b")).toBe("/apps/music/create?song=a%20b");
+  });
+  test("stems opens the studio and asks for the split", () => {
+    expect(stemsAddress("a b")).toContain("split=1");
+    expect(studioAddress("a b")).not.toContain("split=1");
+  });
+  test("the sidebar lists each destination once and no make-* page", () => {
+    const pages = manifest.contributes.pages as { id: string; nav?: boolean }[];
+    const shown = pages.filter((page) => page.nav !== false).map((page) => page.id);
+    expect(new Set(shown).size).toBe(shown.length);
+    expect(shown.filter((id) => id.startsWith("make-"))).toEqual([]);
+    for (const id of ["create", "studio", "stems", "remix", "creations"]) expect(shown).toContain(id);
   });
 });

@@ -132,10 +132,9 @@
           "mode": "create",
           "pages": [
             "create",
-            "make-song",
-            "make-band",
-            "make-album",
-            "make-style",
+            "studio",
+            "stems",
+            "remix",
             "creations"
           ]
         }
@@ -268,7 +267,7 @@
         "id": "make-song",
         "label": "Make a song",
         "icon": "music",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "make-song"
       },
@@ -276,7 +275,7 @@
         "id": "make-band",
         "label": "Make a band",
         "icon": "users",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "make-band"
       },
@@ -284,7 +283,7 @@
         "id": "make-album",
         "label": "Make an album",
         "icon": "disc-3",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "make-album"
       },
@@ -292,14 +291,14 @@
         "id": "make-style",
         "label": "Make a style",
         "icon": "sparkles",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "make-style"
       },
       {
         "id": "creations",
-        "label": "My creations",
-        "icon": "library",
+        "label": "Library",
+        "icon": "folder",
         "nav": true,
         "kind": "schema",
         "module": "creations"
@@ -315,10 +314,26 @@
       {
         "id": "studio",
         "label": "Studio",
-        "icon": "music",
-        "nav": false,
+        "icon": "audio-waveform",
+        "nav": true,
         "kind": "schema",
         "module": "studio"
+      },
+      {
+        "id": "stems",
+        "label": "Stems",
+        "icon": "sliders-horizontal",
+        "nav": true,
+        "kind": "schema",
+        "module": "stems"
+      },
+      {
+        "id": "remix",
+        "label": "Remix and edit",
+        "icon": "sparkles",
+        "nav": true,
+        "kind": "schema",
+        "module": "remix"
       }
     ],
     "data": [

@@ -86,6 +86,17 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     return () => window.clearInterval(tick);
   }, [playing, tracks]);
 
+  const autoSplit = params.get("split") === "1" && !stemsId && song.data?.state === "done";
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!autoSplit || asked.current || !songId) return;
+    asked.current = true;
+    setSplitting(true);
+    musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
+      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE))
+      .finally(() => setSplitting(false));
+  }, [autoSplit, songId, navigate]);
+
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
   if (!songId) return <EmptyState icon="music" text="Open a song from your list, then choose Studio." actionLabel="Open Create" onAction={() => navigate("/apps/music/create")} />;
   if (song.isError) return <EmptyState icon="music" text="That song is not here any more. It may have been removed from your Library." actionLabel="Open Create" onAction={() => navigate("/apps/music/create")} />;

@@ -33,9 +33,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/playlist.json` | music | Playlist |
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
 | `backend/packages/music/pages/radio.json` | music | Radio |
+| `backend/packages/music/pages/remix.json` | music | Remix and edit |
 | `backend/packages/music/pages/search.json` | music | Search |
 | `backend/packages/music/pages/songs.json` | music | Songs |
 | `backend/packages/music/pages/station.json` | music | Station |
+| `backend/packages/music/pages/stems.json` | music | Stems |
 | `backend/packages/music/pages/studio.json` | music | Studio |
 | `backend/packages/news/pages/channel.json` | news | Channel |
 | `backend/packages/news/pages/following.json` | news | Following |
@@ -243,7 +245,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
-| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | songLine, MusicWorkspace |
+| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress, editInChatAddress |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
