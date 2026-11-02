@@ -66,7 +66,7 @@ export function Shelf({ label, hint, picks, value, onChange, empty }: { label: s
 }
 
 /** The finished (or still-being-made) song: the kit song card plus Keep and Make another. */
-export function SongResult({ id, onAnother }: { id: string; onAnother?: () => void }) {
+export function SongResult({ id, onAnother, inWorkspace = false }: { id: string; onAnother?: () => void; inWorkspace?: boolean }) {
   const navigate = useNavigate();
   const { push } = useToast();
   const queryClient = useQueryClient();
@@ -92,9 +92,9 @@ export function SongResult({ id, onAnother }: { id: string; onAnother?: () => vo
     <MusicTrack {...props} />
     {ready ? <div className="flex flex-wrap items-center gap-2">
       <Button type="button" variant={kept ? "secondary" : "default"} disabled={kept} onClick={keep}>{kept ? "Kept in your Library" : "Keep in my Library"}</Button>
-      <Button asChild variant="outline"><Link to={`/apps/music/studio?song=${encodeURIComponent(id)}`}>Open in Studio</Link></Button>
+      {inWorkspace ? null : <Button asChild variant="outline"><Link to={`/apps/music/studio?song=${encodeURIComponent(id)}`}>Open in Studio</Link></Button>}
       {fileId ? <Button asChild variant="outline"><Link to={`/files?file=${encodeURIComponent(fileId)}`}>Open in Library</Link></Button> : null}
-      <Button type="button" variant="ghost" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>Make another</Button>
+      {inWorkspace ? null : <Button type="button" variant="ghost" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>Make another</Button>}
     </div> : null}
     {ready ? <p className="text-muted-foreground text-sm">Every song you make lands in your Library. Keep pins it so storage clean-up never removes it. Open Edit above to change the title, words or style; your earlier version stays.</p> : null}
     {shown.state === "failed" || shown.state === "cancelled" ? <Button type="button" variant="outline" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>Start over</Button> : null}

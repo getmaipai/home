@@ -108,7 +108,7 @@ function SongDetail({ id, onClose }: { id: string; onClose: () => void }) {
       <div className="flex flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Now open</p><h2 className="text-4xl leading-none font-black tracking-tight uppercase sm:text-6xl">{song?.title ?? "Your song"}</h2></div>
       <Button type="button" variant="secondary" size="sm" onClick={onClose}>Close</Button>
     </div>
-    <div className="bg-background/50 rounded-2xl p-4 backdrop-blur-xl"><SongResult key={id} id={id} onAnother={onClose} /></div>
+    <div className="bg-background/50 rounded-2xl p-4 backdrop-blur-xl"><SongResult key={id} id={id} onAnother={onClose} inWorkspace /></div>
     <div className="flex flex-col gap-2" data-testid="music-song-actions">
       <div className="flex flex-wrap gap-2">
         <Button asChild disabled={!ready}><Link to={studioAddress(id)} aria-disabled={!ready}>Open in Studio</Link></Button>
