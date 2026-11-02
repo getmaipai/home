@@ -110,6 +110,11 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         }
         if (["directory", "popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"].includes(scope)) return c.json(withLimit(body, await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag"), scope: scope as import("./radioApp").RadioScope })) as never, 200);
         if (scope === "saved") return c.json(radioSavedRows(person) as never, 200);
+        // MUSIC-LISTEN-05: Search matches stations already saved here by name, tag or country, from the local list only (never a radio-browser request per keystroke).
+        if (scope === "saved-match") {
+          const needle = field("q").trim().toLocaleLowerCase();
+          return c.json((needle.length < 2 ? [] : radioSavedRows(person).filter((row) => `${row.title} ${row.summary ?? ""}`.toLocaleLowerCase().includes(needle))) as never, 200);
+        }
         if (scope === "recordings") return c.json(radioRecordingRows(person) as never, 200);
         if (scope === "countries") return c.json({ as_of: new Date().toISOString(), rows: radioCountryRows() } as never, 200);
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);

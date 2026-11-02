@@ -2,6 +2,12 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.12] - 2026-11-01
+
+### Added
+
+- Listen now has quick tiles, per-person shelves (recently played, your artists, recently added) and radio from your music. Artist and Album pages show popular songs, discography tabs, similar artists and disc groups. Search shows a Top result and grouped Songs, Artists, Albums, Playlists and saved Stations; children see no play counts or popular lists.
+
 ## [0.3.11] - 2026-11-01
 
 ### Added

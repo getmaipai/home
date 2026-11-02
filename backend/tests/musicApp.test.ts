@@ -212,3 +212,21 @@ test("a songs query finds matching titles, needs two letters and keeps a child's
   expect(found(sprout, "Song 4")).toEqual([]);
   expect(found(sprout, "Song 6")).toEqual([]);
 });
+const call = (person: PersonRow, name: string, params: Record<string, unknown>) => mediaAppData(person, "music", name, params) as unknown as Array<Record<string, unknown>>;
+test("Search finds a top result and grouped rows, and a child never gets popular songs", () => {
+  const top = call(atlas, "songs", { scope: "top", query: "nova" });
+  expect(top).toHaveLength(1);
+  expect(top[0]!.title).toBe("nova");
+  expect(call(atlas, "artists", { query: "pip" }).map((row) => row.title)).toEqual(["pippa"]);
+  expect(call(atlas, "albums", { query: "gard" }).length).toBeGreaterThan(0);
+  expect(call(atlas, "songs", { query: "Song 2" }).map((row) => row.id)).toEqual([id(2)]);
+  saveProgress(atlas, "music", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
+  saveProgress(sprout, "music", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
+  expect(call(atlas, "artist", { scope: "popular", id: "nova" }).map((row) => row.id)).toEqual([id(3)]);
+  expect(call(sprout, "artist", { scope: "popular", id: "nova" })).toEqual([]);
+});
+test("Listen now data is per person: another person's play never shows in my recent list", () => {
+  saveProgress(atlas, "music", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
+  expect(call(atlas, "history", { scope: "quick" }).length).toBeGreaterThan(0);
+  expect(call(sprout, "history", { scope: "quick" }).map((row) => row.id)).not.toContain(id(3));
+});

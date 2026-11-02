@@ -61,8 +61,8 @@
       }
     },
     {
-      "type": "media_shelf",
-      "heading": "Tracks",
+      "type": "track_rows",
+      "label": "Tracks",
       "bind": {
         "source": "package",
         "path": "album",
@@ -73,25 +73,20 @@
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "orientation": "vertical",
-      "density": "compact",
+      "item_number_field": "track_number",
       "item_meta_field": "duration_s",
       "item_highlight_field": "playing",
-      "on_select": {
+      "hide_when_empty": true,
+      "on_play": {
         "play": {
           "media_id": "{id}"
         }
       },
-      "item_index_field": "track_number",
-      "hide_when_empty": true
+      "item_group_field": "disc_label"
     },
     {
       "type": "creation_header",
       "variant": "collection",
-      "part": "footer",
       "bind": {
         "source": "package",
         "path": "header",
@@ -127,11 +122,12 @@
             }
           }
         }
-      }
+      },
+      "part": "footer"
     },
     {
       "type": "media_shelf",
-      "heading": "More albums",
+      "heading": "More by this artist",
       "bind": {
         "source": "package",
         "path": "album-more",
@@ -145,7 +141,9 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
-      "layout": "grid",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
       "on_select": {
         "navigate": {
           "to": "/apps/music/album",
@@ -154,7 +152,12 @@
           }
         }
       },
-      "hide_when_empty": true
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
     }
   ]
 }

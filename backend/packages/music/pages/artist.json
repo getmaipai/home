@@ -62,17 +62,18 @@
     },
     {
       "type": "media_shelf",
-      "heading": "Songs",
+      "heading": "Popular",
       "bind": {
         "source": "package",
         "path": "artist",
         "params": {
-          "id": "$state.id"
+          "id": "$state.id",
+          "scope": "popular"
         }
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
+      "item_subtitle_field": "{popular_line}",
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
@@ -80,30 +81,29 @@
       "density": "compact",
       "item_meta_field": "duration_s",
       "item_highlight_field": "playing",
+      "item_index_field": "rank",
+      "hide_when_empty": true,
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
-      },
-      "hide_when_empty": true
+      }
     },
     {
-      "type": "media_shelf",
-      "heading": "Albums",
+      "type": "top_result",
       "bind": {
         "source": "package",
         "path": "artist-albums",
         "params": {
-          "id": "$state.id"
+          "id": "$state.id",
+          "scope": "latest"
         }
       },
-      "item_key_field": "id",
       "item_label_field": "title",
+      "item_eyebrow_field": "Latest release",
       "item_subtitle_field": "{channel}",
       "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "layout": "grid",
+      "hide_when_empty": true,
       "on_select": {
         "navigate": {
           "to": "/apps/music/album",
@@ -112,7 +112,273 @@
           }
         }
       },
-      "hide_when_empty": true
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "section",
+      "heading": "Discography",
+      "children": [
+        {
+          "type": "tabs",
+          "state": "discography",
+          "tabs": [
+            {
+              "id": "albums",
+              "label": "Albums",
+              "body": [
+                {
+                  "type": "media_shelf",
+                  "bind": {
+                    "source": "package",
+                    "path": "artist-albums",
+                    "params": {
+                      "id": "$state.id",
+                      "scope": "albums"
+                    }
+                  },
+                  "item_key_field": "id",
+                  "item_label_field": "title",
+                  "item_subtitle_field": "{channel}",
+                  "item_media_field": "thumbnail",
+                  "aspect": "square",
+                  "variant": "plain",
+                  "card_radius": "tight",
+                  "press_scale": true,
+                  "hide_when_empty": false,
+                  "on_select": {
+                    "navigate": {
+                      "to": "/apps/music/album",
+                      "state": {
+                        "id": "{id}"
+                      }
+                    }
+                  },
+                  "on_play": {
+                    "play": {
+                      "media_id": "{id}"
+                    }
+                  },
+                  "play_label": "Play {title}",
+                  "empty_state": {
+                    "type": "empty_state",
+                    "icon": "music",
+                    "text": "No albums by this artist in your library."
+                  },
+                  "layout": "grid"
+                }
+              ]
+            },
+            {
+              "id": "singles",
+              "label": "Singles and EPs",
+              "body": [
+                {
+                  "type": "media_shelf",
+                  "bind": {
+                    "source": "package",
+                    "path": "artist-albums",
+                    "params": {
+                      "id": "$state.id",
+                      "scope": "singles"
+                    }
+                  },
+                  "item_key_field": "id",
+                  "item_label_field": "title",
+                  "item_subtitle_field": "{channel}",
+                  "item_media_field": "thumbnail",
+                  "aspect": "square",
+                  "variant": "plain",
+                  "card_radius": "tight",
+                  "press_scale": true,
+                  "hide_when_empty": false,
+                  "on_select": {
+                    "navigate": {
+                      "to": "/apps/music/album",
+                      "state": {
+                        "id": "{id}"
+                      }
+                    }
+                  },
+                  "on_play": {
+                    "play": {
+                      "media_id": "{id}"
+                    }
+                  },
+                  "play_label": "Play {title}",
+                  "empty_state": {
+                    "type": "empty_state",
+                    "icon": "music",
+                    "text": "No singles or EPs by this artist in your library."
+                  },
+                  "layout": "grid"
+                }
+              ]
+            },
+            {
+              "id": "appears",
+              "label": "Appears on",
+              "body": [
+                {
+                  "type": "media_shelf",
+                  "bind": {
+                    "source": "package",
+                    "path": "artist-albums",
+                    "params": {
+                      "id": "$state.id",
+                      "scope": "appears"
+                    }
+                  },
+                  "item_key_field": "id",
+                  "item_label_field": "title",
+                  "item_subtitle_field": "{channel}",
+                  "item_media_field": "thumbnail",
+                  "aspect": "square",
+                  "variant": "plain",
+                  "card_radius": "tight",
+                  "press_scale": true,
+                  "hide_when_empty": false,
+                  "on_select": {
+                    "navigate": {
+                      "to": "/apps/music/album",
+                      "state": {
+                        "id": "{id}"
+                      }
+                    }
+                  },
+                  "on_play": {
+                    "play": {
+                      "media_id": "{id}"
+                    }
+                  },
+                  "play_label": "Play {title}",
+                  "empty_state": {
+                    "type": "empty_state",
+                    "icon": "music",
+                    "text": "This artist is not on anyone else's album in your library."
+                  },
+                  "layout": "grid"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "heading": "All songs",
+      "children": [
+        {
+          "type": "track_rows",
+          "label": "Songs",
+          "bind": {
+            "source": "package",
+            "path": "artist",
+            "params": {
+              "id": "$state.id"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_meta_field": "duration_s",
+          "item_highlight_field": "playing",
+          "hide_when_empty": true,
+          "on_play": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Similar artists",
+      "bind": {
+        "source": "package",
+        "path": "artists",
+        "params": {
+          "id": "$state.id",
+          "scope": "similar"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/artist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}",
+      "art_shape": "circle"
+    },
+    {
+      "type": "section",
+      "heading": "About",
+      "children": [
+        {
+          "type": "creation_header",
+          "variant": "collection",
+          "bind": {
+            "source": "package",
+            "path": "header",
+            "params": {
+              "id": "$state.id",
+              "scope": "artist"
+            }
+          },
+          "share_change": {
+            "add": {
+              "call": {
+                "target": "/api/plugins/music/actions/share-add",
+                "args": {
+                  "id": "{id}",
+                  "person_id": "{person_id}"
+                }
+              }
+            },
+            "remove": {
+              "call": {
+                "target": "/api/plugins/music/actions/share-remove",
+                "args": {
+                  "id": "{id}",
+                  "person_id": "{person_id}"
+                }
+              }
+            },
+            "make_private": {
+              "call": {
+                "target": "/api/plugins/music/actions/share-private",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            }
+          },
+          "part": "footer"
+        }
+      ]
     }
   ]
 }

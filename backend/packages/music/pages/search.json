@@ -10,33 +10,239 @@
       "placeholder": "Search Music"
     },
     {
-      "type": "media_shelf",
-      "heading": "Results",
-      "bind": {
-        "source": "package",
-        "path": "songs",
-        "params": {
-          "query": "$state.q"
+      "type": "section",
+      "condition": "!q",
+      "children": [
+        {
+          "type": "category_tiles",
+          "label": "Browse by genre",
+          "bind": {
+            "source": "package",
+            "path": "songs",
+            "params": {
+              "scope": "categories"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_color_field": "color",
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/music/search",
+              "state": {
+                "q": "{title}"
+              }
+            }
+          }
         }
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "orientation": "vertical",
-      "density": "compact",
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "music",
-        "text": "No songs match. Try other words."
-      },
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
+      ]
+    },
+    {
+      "type": "section",
+      "condition": "q",
+      "children": [
+        {
+          "type": "top_result",
+          "bind": {
+            "source": "package",
+            "path": "songs",
+            "params": {
+              "q": "$state.q",
+              "scope": "top"
+            }
+          },
+          "item_label_field": "title",
+          "item_eyebrow_field": "{kind_label}",
+          "item_subtitle_field": "{artist}",
+          "item_media_field": "thumbnail",
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/music/{route}",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          },
+          "on_play": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "play_label": "Play {title}"
+        },
+        {
+          "type": "media_shelf",
+          "heading": "Songs",
+          "bind": {
+            "source": "package",
+            "path": "songs",
+            "params": {
+              "q": "$state.q",
+              "limit": "4"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "density": "compact",
+          "item_meta_field": "duration_s",
+          "item_highlight_field": "playing",
+          "on_select": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "music",
+            "text": "Nothing matches. Try other words."
+          }
+        },
+        {
+          "type": "media_shelf",
+          "heading": "Artists",
+          "bind": {
+            "source": "package",
+            "path": "artists",
+            "params": {
+              "q": "$state.q"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "card_radius": "tight",
+          "press_scale": true,
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/music/artist",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          },
+          "on_play": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "play_label": "Play {title}",
+          "art_shape": "circle"
+        },
+        {
+          "type": "media_shelf",
+          "heading": "Albums",
+          "bind": {
+            "source": "package",
+            "path": "albums",
+            "params": {
+              "q": "$state.q"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "card_radius": "tight",
+          "press_scale": true,
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/music/album",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          },
+          "on_play": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "play_label": "Play {title}"
+        },
+        {
+          "type": "media_shelf",
+          "heading": "Playlists",
+          "bind": {
+            "source": "package",
+            "path": "playlists",
+            "params": {
+              "q": "$state.q"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "card_radius": "tight",
+          "press_scale": true,
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/music/playlist",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          },
+          "on_play": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "play_label": "Play {title}"
+        },
+        {
+          "type": "media_shelf",
+          "heading": "Stations",
+          "bind": {
+            "source": "package",
+            "path": "radio",
+            "params": {
+              "scope": "saved-match",
+              "q": "$state.q"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{summary}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "card_radius": "tight",
+          "press_scale": true,
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/music/station",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          },
+          "on_play": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "play_label": "Play {title}"
         }
-      }
+      ]
     }
   ]
 }

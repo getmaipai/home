@@ -27,7 +27,7 @@ test("a music element requests autoplay for queue transitions", async () => {
 type Node = Record<string, unknown> & { type?: string; body?: Node[]; main?: Node[]; aside?: Node[] };
 const nodesOf = (file: string): Node[] => {
   const out: Node[] = [];
-  const walk = (list: Node[] | undefined) => { for (const node of list ?? []) { out.push(node); walk(node.main); walk(node.aside); } };
+  const walk = (list: Node[] | undefined) => { for (const node of list ?? []) { out.push(node); walk(node.main); walk(node.aside); walk((node as Node & { children?: Node[] }).children); } };
   walk((JSON.parse(readFileSync(resolve(pages, file), "utf8")) as Node).body);
   return out;
 };
@@ -37,7 +37,8 @@ test("Music pages use the shipped media variants: grids, round artist art, compa
   expect(shelf("albums.json", "Albums")).toMatchObject({ layout: "grid", aspect: "square", variant: "plain" });
   expect(shelf("artists.json", "Artists")).toMatchObject({ layout: "grid", art_shape: "circle" });
   expect(shelf("index.json", "Radio from your music")).toMatchObject({ art_shape: "circle" });
-  expect(shelf("album.json", "Tracks")).toMatchObject({ orientation: "vertical", density: "compact", item_index_field: "track_number", item_meta_field: "duration_s", item_highlight_field: "playing" });
+  const tracks = nodesOf("album.json").find((node) => node.type === "track_rows")!;
+  expect(tracks).toMatchObject({ item_number_field: "track_number", item_meta_field: "duration_s", item_highlight_field: "playing", item_group_field: "disc_label" });
   expect(shelf("songs.json", "Songs")).toMatchObject({ orientation: "vertical", density: "compact", item_highlight_field: "playing" });
   expect(shelf("play.json", "Up next")).toMatchObject({ orientation: "vertical", density: "compact" });
   const remove = (shelf("playlist.json", "Songs").row_actions as Array<{ label: string }>) ?? [];
@@ -72,4 +73,19 @@ test("the shipped page schema accepts the music block nodes and shelf props", ()
   };
   walk(doc);
   for (const type of ["quick_tiles", "top_result", "category_tiles", "track_rows"]) expect(types.has(type)).toBe(true);
+});
+
+test("Listen now, Artist and Search pages carry the new blocks and bind only to existing data ids", () => {
+  const manifest = JSON.parse(readFileSync(resolve(pages, "../manifest.json"), "utf8")) as { contributes: { data: Array<{ id: string }> } };
+  const ids = new Set(manifest.contributes.data.map((entry) => entry.id));
+  const kinds = (file: string) => nodesOf(file).map((node) => node.type);
+  expect(kinds("index.json")).toContain("quick_tiles");
+  expect(kinds("search.json")).toEqual(expect.arrayContaining(["search", "top_result", "category_tiles", "media_shelf"]));
+  expect(kinds("artist.json")).toEqual(expect.arrayContaining(["creation_header", "tabs", "track_rows"]));
+  for (const file of ["index.json", "artist.json", "album.json", "playlist.json", "search.json"]) {
+    for (const node of nodesOf(file)) {
+      const path = (node.bind as { path?: string } | undefined)?.path;
+      if (path) expect({ file, path, known: ids.has(path) }).toEqual({ file, path, known: true });
+    }
+  }
 });

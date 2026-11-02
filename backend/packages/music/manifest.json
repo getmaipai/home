@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",

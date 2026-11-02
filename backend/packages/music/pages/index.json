@@ -4,6 +4,184 @@
   "title": "Listen now",
   "body": [
     {
+      "type": "quick_tiles",
+      "label": "Pick up where you left off",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "quick"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "max": 6,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently played",
+      "bind": {
+        "source": "package",
+        "path": "history"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{album_id}"
+          }
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your artists",
+      "bind": {
+        "source": "package",
+        "path": "artists",
+        "params": {
+          "scope": "recent"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "art_shape": "circle",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/artist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Made here",
+      "bind": {
+        "source": "package",
+        "path": "songs",
+        "params": {
+          "scope": "made"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "horizontal",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently added",
+      "bind": {
+        "source": "package",
+        "path": "albums",
+        "params": {
+          "scope": "recent"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Radio from your music",
+      "bind": {
+        "source": "package",
+        "path": "radio-seeds"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "art_shape": "circle",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true
+    },
+    {
       "type": "billboard",
       "bind": {
         "source": "package",
@@ -32,98 +210,6 @@
         }
       },
       "secondary": [],
-      "hide_when_empty": true
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Created by you",
-      "bind": {
-        "source": "package",
-        "path": "songs",
-        "params": {
-          "scope": "made"
-        }
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "orientation": "vertical",
-      "density": "compact",
-      "item_meta_field": "duration_s",
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      },
-      "hide_when_empty": true
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Recently played",
-      "bind": {
-        "source": "package",
-        "path": "history"
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      },
-      "hide_when_empty": true
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Recently added",
-      "bind": {
-        "source": "package",
-        "path": "albums",
-        "params": {
-          "scope": "recent"
-        }
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "on_select": {
-        "navigate": {
-          "to": "/apps/music/album",
-          "state": {
-            "id": "{id}"
-          }
-        }
-      },
-      "hide_when_empty": true
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Radio from your music",
-      "bind": {
-        "source": "package",
-        "path": "radio-seeds"
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "art_shape": "circle",
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      },
       "hide_when_empty": true
     },
     {
@@ -174,7 +260,9 @@
             "id": "{id}"
           }
         }
-      }
+      },
+      "card_radius": "tight",
+      "press_scale": true
     },
     {
       "type": "media_shelf",
@@ -200,7 +288,9 @@
             "id": "{id}"
           }
         }
-      }
+      },
+      "card_radius": "tight",
+      "press_scale": true
     }
   ]
 }
