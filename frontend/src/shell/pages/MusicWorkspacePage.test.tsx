@@ -58,9 +58,9 @@ describe("Create controls", () => {
     const view = open();
     const generate = await view.findByRole("button", { name: "Generate" }) as HTMLButtonElement;
     await waitFor(() => expect(view.getByTestId("music-hint").textContent).toContain("Say what the song is about"));
-    expect(generate.disabled).toBe(true);
+    expect(generate.getAttribute("aria-disabled")).toBe("true");
     fireEvent.change(view.getByLabelText("Describe your song"), { target: { value: "a slow song about rain" } });
-    await waitFor(() => expect((view.getByRole("button", { name: "Generate" }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect((view.getByRole("button", { name: "Generate" }) as HTMLButtonElement).getAttribute("aria-disabled")).toBe("false"));
     fireEvent.click(view.getByRole("button", { name: "Generate" }));
     await waitFor(() => expect(calls.some((call) => call.url === "/api/music/songs" && call.method === "POST")).toBe(true));
   });
@@ -70,7 +70,7 @@ describe("Create controls", () => {
     const view = open();
     fireEvent.change(await view.findByLabelText("Describe your song"), { target: { value: "a slow song about rain" } });
     expect(await view.findByTestId("music-no-engine")).toBeTruthy();
-    expect((view.getByRole("button", { name: "Generate" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(view.getByRole("button", { name: "Generate" }).getAttribute("aria-disabled")).toBe("true");
   });
 
   test("Your songs shows a tile with a Remix action that opens the panel, never chat", async () => {

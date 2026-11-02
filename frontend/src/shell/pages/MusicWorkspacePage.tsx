@@ -140,22 +140,27 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
   const engineMissing = status.data ? !status.data.can_make : false;
   const ready = idea.trim().length >= 3 && !making && !engineMissing && !status.isPending;
   const toggleStyle = (name: string) => onStyles(styles.includes(name) ? styles.filter((one) => one !== name) : styles.length < 8 ? [...styles, name] : styles);
+  const hint = engineMissing ? NO_MUSIC_ENGINE_LINE : problem || (idea.trim().length < 3 ? "Say what the song is about to turn Generate on." : "It takes about a minute. It shows up in your songs.");
   const create = () => {
-    if (!ready) return;
+    if (!ready) { if (!making) push(hint); return; }
     setMaking(true); setProblem("");
     musicApi.makeSong(makeSongBody({ idea: styles.length ? `${idea.trim()} Style: ${styles.join(", ")}.` : idea, lyrics: withLyrics && !instrumental ? lyrics : "", instrumental, title: "", length, bpm: "", key: "", styleId: null, bandId: null }))
       .then((card) => { setIdea(""); setLyrics(""); onStyles([]); onMade(card.id); })
       .catch((error: unknown) => { const line = text(error, "Home could not start the song. Check the request and try again."); setProblem(line); push(line); })
       .finally(() => setMaking(false));
   };
-  const hint = engineMissing ? NO_MUSIC_ENGINE_LINE : problem || (idea.trim().length < 3 ? "Say what the song is about to turn Generate on." : "It takes about a minute. It shows up in your songs.");
   return <div className="bg-card mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 sm:p-4" data-testid="music-docked-bar" id="music-bar">
-    {make !== "song" ? <div className="max-h-96 min-h-0 overflow-y-auto"><CreatePage kind={make} adult /></div> : <div className="flex flex-col gap-2">
+    <div className="h-80 min-h-0 overflow-y-auto" data-testid="music-bar-body">
+    {make !== "song" ? <CreatePage kind={make} adult /> : <div className="flex flex-col gap-2">
       <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
         className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
       {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."
         className="placeholder:text-muted-foreground bg-muted/40 w-full resize-none rounded-xl p-3 text-sm outline-none" /> : null}
+    {stylesOpen ? <div className="flex flex-wrap gap-2" role="group" aria-label="Styles" data-testid="music-styles-panel">
+      {STARTER_STYLES.map((name) => <Chip key={name} selected={styles.includes(name)} onClick={() => toggleStyle(name)}>{name}</Chip>)}
+    </div> : null}
     </div>}
+    </div>
     <div className="flex items-center gap-2 overflow-x-auto" role="group" aria-label="What to make">
       {MAKES.map((one) => <Chip key={one.id} selected={make === one.id} onClick={() => setMake(one.id)}>{one.label}</Chip>)}
       {make === "song" ? <>
@@ -166,14 +171,11 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
         <Chip selected={stylesOpen || styles.length > 0} onClick={() => onStylesOpen(!stylesOpen)}>{styles.length ? `Styles (${styles.length})` : "Styles"}</Chip>
       </> : null}
     </div>
-    {make === "song" && stylesOpen ? <div className="flex flex-wrap gap-2" role="group" aria-label="Styles" data-testid="music-styles-panel">
-      {STARTER_STYLES.map((name) => <Chip key={name} selected={styles.includes(name)} onClick={() => toggleStyle(name)}>{name}</Chip>)}
-    </div> : null}
-    {make === "song" ? <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className={make === "song" ? "flex flex-wrap items-center justify-between gap-3" : "invisible flex"} aria-hidden={make !== "song"}>
       <p role={problem || engineMissing ? "alert" : "status"} data-testid={engineMissing ? "music-no-engine" : "music-hint"} className="text-muted-foreground w-full text-xs sm:w-auto sm:min-w-0 sm:flex-1">{hint}</p>
       <span className="text-muted-foreground text-xs sm:ml-auto" data-testid="music-engine-chip">{status.data?.engine_ready ? "Music model: ready" : "Music model: not running"}</span>
-      <Button type="button" size="lg" disabled={!ready} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
-    </div> : null}
+      <Button type="button" size="lg" aria-disabled={!ready} className={ready ? "" : "opacity-50"} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
+    </div>
   </div>;
 }
 
