@@ -403,7 +403,7 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (analysis.gaps.length > 0) lines.push(`Not found:\n${analysis.gaps.map((g) => `- ${g}`).join("\n")}`);
     if (analysis.guesses.length > 0) lines.push(`Guesses to present as guesses, each with its reasons:\n${analysis.guesses.map((g) => `- (${g.confidence}) ${g.guess} because ${g.because.join("; ")} ${cites(g.sources)}`.trim()).join("\n")}`);
     if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article. A part that the analysis, the notes, the article or this text speaks to is answered from them and is never listed as not found; only a part none of them speaks to is written as not found in the sources):\n${coverage.read}`);
-    if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
+    if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it, and name no example, title or person it might have been (a name you cannot find in the sources is never written, not even as a thing that is missing).`);
   }
   // The answer's shape (what the first sentence names, the shared-name line, the parts to cover, no invented fact, the word target) holds with or
   // without an analysis: a missing analysis (the stage failed or timed out) must not leave the writer without it.

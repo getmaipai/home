@@ -1,6 +1,6 @@
 // RESEARCH-FABRICATION-01: names and quoted titles no source gives are marked; checkable uncited sentences are judged.
 import { describe, expect, test } from "bun:test";
-import { NOT_IN_SOURCES, hasFactCue, markUnsourcedNames, namesIn, withoutLabels } from "@/lib/turnMachine/fabrication";
+import { NOT_IN_SOURCES, SENTENCE_BREAK, hasFactCue, nameIsGiven, squashText, markUnsourcedNames, namesIn, withoutLabels } from "@/lib/turnMachine/fabrication";
 import { CLAIM_UNCONFIRMED, checkClaims } from "@/lib/turnMachine/research";
 
 describe("names", () => {
@@ -106,5 +106,26 @@ describe("a source's own name and invented guess names (bench 2026-11-02)", () =
     expect(out.text).not.toContain("explored Acme Holding Group");
     expect(out.text).toContain("I infer the lead would clash with the captain [3].");
     expect(out.text).toContain(`Acme Holding Group sponsored it [3]${NOT_IN_SOURCES}.`);
+  });
+});
+
+describe("matching survives the writer's wording (held-out Max run, 2026-11-02)", () => {
+  test("a name is given when the source holds its singular or plural form", () => {
+    expect(nameIsGiven("Small Flats", squashText("a robot suits a small flat best"))).toBe(true);
+    expect(nameIsGiven("Required Minimum Payouts", squashText("the required minimum payout starts later"))).toBe(true);
+    expect(nameIsGiven("Small Flats", squashText("small areas and flat roofs"))).toBe(false);
+  });
+
+  test("a full stop after an abbreviation or an initial does not end the sentence, so a name is not cut in two and the mark lands once at the end", () => {
+    const text = "Trade fell with the arrival of the St. Orwin Strait route, but the system stayed busy.";
+    expect(text.split(SENTENCE_BREAK).filter((p) => p.trim() !== "")).toEqual([text]);
+    const result = markUnsourcedNames(text, "the strait route opened", "");
+    expect(result.text).toBe(`Trade fell with the arrival of the St. Orwin Strait route, but the system stayed busy${NOT_IN_SOURCES}.`);
+    expect(result.marked).toBe(1);
+  });
+
+  test("a heading that holds an abbreviation and ends without a stop is not joined to the next sentence", () => {
+    const text = "### Robot vs. Stick: Suitability for Small Flats\nThe sources do not say which is better.";
+    expect(markUnsourcedNames(text, "robots and sticks", "").marked).toBe(0);
   });
 });

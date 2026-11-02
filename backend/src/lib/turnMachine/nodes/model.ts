@@ -993,6 +993,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
         markResearch(state, `coverage read start (${uncovered.length} parts uncovered)`);
         const more = await readMoreSections(backbone.unread, rq, uncovered, { signal });
         read = more.text;
+        // The sections read here reach the writer, so they are evidence for the name check and the claim judge too (the held-out run marked
+        // true names from a section read at this step because the check had never seen the text).
+        if (read) {
+          state.backbone = { ...backbone, text: `${backbone.text}\n\n${read}` };
+          noteResearchText(state, "coverage read", read);
+        }
         markResearch(state, `coverage read end (${more.headings.length} sections, ${more.text.length} chars)`);
       }
       if (read) coverage.read = read;

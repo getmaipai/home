@@ -27,6 +27,13 @@ export function withoutLabels(text: string): string {
 }
 const CALENDAR = new Set(["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 
+/** Short forms whose full stop does not end a sentence ("St. Anne", "Stick vs. Other", "Dr. Marsh", "U.S. policy"); a single capital letter before a stop is an initial. */
+const ABBREVIATIONS = "St|Mr|Mrs|Ms|Dr|Jr|Sr|vs|No|Mt|Ft|Prof|Gen|Gov|Sen|Rep|Lt|Col|Capt|Sgt|Inc|Ltd|Co|Corp|approx|est|fig";
+/** Splits after a sentence end (keeping the white space as its own piece when used with `String.split`), but not after an abbreviation or an initial. */
+export const SENTENCE_BREAK = new RegExp(`(?<=[.!?])(?<!\\b(?:${ABBREVIATIONS}|[A-Z])\\.)(\\s+)`);
+/** The same break, and also every line break: a heading or list line that ends without a stop is a sentence of its own, never the start of the next one. */
+export const SENTENCE_OR_LINE_BREAK = new RegExp(`(?<=[.!?])(?<!\\b(?:${ABBREVIATIONS}|[A-Z])\\.)(\\s+)|(\\s*\\n\\s*)`);
+
 export const squashText = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ");
 
 /** Words that open sentences in ordinary English and are capitalized only for being first; they are never part of a name there. */
@@ -36,7 +43,8 @@ const OPENERS = new Set(["the", "a", "an", "in", "on", "at", "it", "he", "she", 
  * not part of one) and short quoted titles. */
 export function namesIn(text: string): string[] {
   const found = new Set<string>();
-  for (const sentence of withoutLabels(text).split(/(?<=[.!?])\s+/)) {
+  for (const sentence of withoutLabels(text).split(SENTENCE_OR_LINE_BREAK)) {
+    if (!sentence) continue;
     for (const m of sentence.matchAll(QUOTED)) found.add(m[1]!);
     for (const clause of sentence.split(CLAUSE_SPLIT)) {
       const body = clause.replace(LIST_MARK, "");
@@ -73,11 +81,23 @@ function givenAsHost(name: string, haystack: string): boolean {
   return false;
 }
 
+/** The name with each word allowed a plural or singular ending, punctuation and spacing between words loose ("Small Apartments" is given by
+ * "a small apartment"; "Required Minimum Distributions" by "required minimum distribution"). */
+function pluralFormIsGiven(name: string, haystack: string): boolean {
+  const words = squashText(name).replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter(Boolean);
+  if (words.length < 2) return false;
+  const stem = (w: string): string => w.replace(/(?:ies|es|s)$/, (m) => (m === "ies" ? "y" : "")) || w;
+  const alt = (w: string): string => { const st = stem(w); return st === w ? `${escapeRe(w)}(?:e?s)?` : `(?:${escapeRe(w)}|${escapeRe(st)}(?:e?s)?|${escapeRe(st.replace(/y$/, ""))}ies)`; };
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])${words.map(alt).join("[^\\p{L}\\p{N}]{1,3}")}(?![\\p{L}\\p{N}])`, "u");
+  return re.test(haystack);
+}
+
 /** A name counts as given when the evidence holds it as written, or holds each pair of neighbouring words of it close together (a writer may
  * drop a connective or join a title to a surname). Words that each appear somewhere in the sources but never near one another do not make
  * a name given: an invented person assembled from known words is still marked. */
 export function nameIsGiven(name: string, haystack: string): boolean {
   if (haystack.includes(squashText(name))) return true;
+  if (pluralFormIsGiven(name, haystack)) return true;
   if (givenAsHost(name, haystack)) return true;
   const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
   if (words.length < 2) return words.length === 1 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(haystack);
@@ -104,7 +124,7 @@ export function markUnsourcedNames(text: string, evidence: string, question: str
   const haystack = squashText(`${evidence}\n${question}`);
   let marked = 0;
   let dropped = 0;
-  const parts = text.split(/(?<=[.!?])(\s+)/);
+  const parts = text.split(SENTENCE_OR_LINE_BREAK).filter((p): p is string => p !== undefined);
   const out = parts.map((part) => {
     if (part.trim() === "" || part.includes(NOT_IN_SOURCES)) return part;
     const unknown = namesIn(part).filter((name) => !nameIsGiven(name, haystack));

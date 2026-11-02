@@ -9,7 +9,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { TurnBudget } from "./contract";
 import { plainQuery } from "./entityPin";
-import { hasFactCue } from "./fabrication";
+import { SENTENCE_BREAK, hasFactCue } from "./fabrication";
 
 /** Appended to the final answering instruction of a research turn. */
 export const RESEARCH_ANSWER_CLAUSE = "Say where each claim comes from (the site, or who was interviewed) beside its [n]. Say plainly which parts are your own guess and which the sources state. If the sources disagree or are thin, say so. Name no person, title or figure that the sources do not give.";
@@ -186,7 +186,7 @@ const NAME = /\b[A-Z][a-z]+(?:\s+(?:[A-Z]\.|[A-Z][a-z]+)){1,2}\b/g;
 export function dropUnsupportedCredits(text: string, evidence: string, question: string): { text: string; dropped: number } {
   const haystack = `${evidence}\n${question}`.toLowerCase();
   let dropped = 0;
-  const parts = text.split(/(?<=[.!?])(\s+)/);
+  const parts = text.split(SENTENCE_BREAK);
   const kept = parts.filter((part) => {
     if (!CREDIT_CUE.test(part)) return true;
     const names = part.match(NAME) ?? [];
@@ -257,7 +257,7 @@ export interface ClaimCheckResult { text: string; checked: number; unsupported: 
 export async function checkClaims(text: string, evidence: readonly string[], judge: ClaimJudge, opts: { concurrency?: number; deadlineMs?: number; maxChecks?: number; now?: () => number; uncitedPassages?: string } = {}): Promise<ClaimCheckResult> {
   const now = opts.now ?? Date.now;
   const stopAt = now() + (opts.deadlineMs ?? 25_000);
-  const parts = text.split(/(?<=[.!?])(\s+)/);
+  const parts = text.split(SENTENCE_BREAK);
   const jobs: { index: number; sentence: string; passages: string }[] = [];
   let noText = 0;
   parts.forEach((part, index) => {
