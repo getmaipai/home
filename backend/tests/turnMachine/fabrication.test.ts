@@ -1,6 +1,6 @@
 // RESEARCH-FABRICATION-01: names and quoted titles no source gives are marked; checkable uncited sentences are judged.
 import { describe, expect, test } from "bun:test";
-import { NOT_IN_SOURCES, hasFactCue, markUnsourcedNames, namesIn } from "@/lib/turnMachine/fabrication";
+import { NOT_IN_SOURCES, hasFactCue, markUnsourcedNames, namesIn, withoutLabels } from "@/lib/turnMachine/fabrication";
 import { CLAIM_UNCONFIRMED, checkClaims } from "@/lib/turnMachine/research";
 
 describe("names", () => {
@@ -45,5 +45,28 @@ describe("uncited sentences", () => {
     expect(result.text).toContain("That is usually how it goes.");
     const none = await checkClaims("It cost 40 dollars in total.", ["x"], judge);
     expect(none.checked).toBe(0);
+  });
+});
+
+describe("section labels and the words between two quotes are not names (found on the held-out set)", () => {
+  const answer = "**Established Points**\n- Anna Marsh built the bridge in 1868.\n\n## My Guesses\nWhat Could Not Be Found:\n**What the sources say:** the county paid.\nThey called it “The Long Road” and “Marsh Bridge” in print.";
+  test("headings, bold-only lines, label lines and a bold label opening a line are dropped before names are read", () => {
+    const kept = withoutLabels(answer);
+    expect(kept).not.toContain("Established Points");
+    expect(kept).not.toContain("My Guesses");
+    expect(kept).not.toContain("What Could Not Be Found");
+    expect(kept).not.toContain("What the sources say");
+    expect(kept).toContain("Anna Marsh built the bridge in 1868.");
+    expect(kept).toContain("the county paid.");
+  });
+
+  test("only real names remain, and the text between two quoted titles is not a quoted title", () => {
+    expect(namesIn(answer).sort()).toEqual(["Anna Marsh", "Marsh Bridge", "The Long Road"].sort());
+    expect(namesIn('He read "Alpha" and "Beta" aloud.').sort()).toEqual(["Alpha", "Beta"]);
+    expect(namesIn('He read "alpha" and "beta" aloud.')).toEqual([]);
+  });
+
+  test("a bold name inside a sentence is still a name", () => {
+    expect(namesIn("Then **Anna Marsh** arrived and left.")).toEqual(["Anna Marsh"]);
   });
 });

@@ -9,7 +9,16 @@
 export const NOT_IN_SOURCES = " (not in the sources)";
 
 const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of|the|de|von|van)){0,3}(?:\s+[A-Z][a-z]+)\b/g;
-const QUOTED = /[“"]([^“”"\n]{3,60})[”"]/g;
+// A quoted title: starts with a capital letter or digit and ends on a non-space, so the words BETWEEN two quoted phrases ("A" and "B") are not one.
+const QUOTED = /[“"]([A-Z0-9][^“”"\n]{1,58}[^“”"\s])[”"]/g;
+/** Section labels the writer adds are not names: heading lines, lines that are only bold, "Label:" lines, and a bold "Label:" opening a line. */
+export function withoutLabels(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*#{1,6}\s/.test(line) && !/^\s*(?:[-*]\s+)?\*\*[^*\n]{1,80}\*\*:?\s*$/.test(line) && !/^\s*[A-Za-z][^.!?\n]{0,60}:\s*$/.test(line))
+    .map((line) => line.replace(/\*\*[^*\n]{1,60}:\*\*|\*\*[^*\n]{1,60}\*\*:/g, " "))
+    .join("\n");
+}
 const CALENDAR = new Set(["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 
 const squashText = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ");
@@ -21,7 +30,7 @@ const OPENERS = new Set(["the", "a", "an", "in", "on", "at", "it", "he", "she", 
  * not part of one) and short quoted titles. */
 export function namesIn(text: string): string[] {
   const found = new Set<string>();
-  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+  for (const sentence of withoutLabels(text).split(/(?<=[.!?])\s+/)) {
     for (const m of sentence.matchAll(NAME_RUN)) {
       let words = m[0].split(/\s+/).filter((w) => /^[A-Z]/.test(w));
       const atStart = sentence.slice(0, m.index).trim() === "";

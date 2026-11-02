@@ -79,8 +79,8 @@ try {
     const searches = outcomes.filter((o) => o.packageId === "websearch");
     const sources = (result.value.sources ?? []).map((s) => ({ site: s.site, title: s.title?.slice(0, 80) }));
     const evidence = researchEvidence(outcomes as unknown as Parameters<typeof researchEvidence>[0]);
-    // Pages read and the light model's seconds, from the turn's own time-line marks and outcomes (RESEARCH-EVAL-02).
-    const pagesRead = outcomes.reduce((n, o) => n + (((o.result?.data as { pages?: unknown[] } | undefined)?.pages?.length) ?? 0), 0);
+    // Pages read and the light model's seconds, from the turn's own time-line marks (the stored outcomes keep no page text, so counting them read 0).
+    const pagesRead = Number(marks.map((m) => m.match(/from (\d+) pages/)?.[1]).find(Boolean) ?? 0);
     const lightModelSeconds = Number(marks.map((m) => m.match(/\(([\d.]+) s of light-model time\)/)?.[1]).find(Boolean) ?? 0);
     // The notes the writer saw and the article it was given count as evidence for the fabrication check.
     const verdict = await judgeResearch(research, { answer: result.value.reply.text, sources: (result.value.sources ?? []).map((s) => ({ site: s.site, url: s.url })), queries: searches.map((o) => o.args?.expression ?? ""), evidence: `${evidence}\n${writerTexts.join("\n")}`, pagesRead, lightModelSeconds }, judge);
