@@ -7,7 +7,7 @@ import type { Lane } from "@/lib/pictures/lane";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import type { AgeBand } from "@/lib/ageBand";
 import { slotRun, type Tier } from "@/lib/tiers";
-import { LTX25_DEFAULTS, LTX25_MODEL, ltx25Profile, videoSizeFor, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
+import { LTX25_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL, ltx25Profile, videoSizeFor, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
 import type { StackVideoStatus, VideoBody } from "@/lib/videos/stack";
 
 type Body = Omit<VideoBody, "timeout_ms">;
@@ -48,6 +48,22 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
   // VIDEO-TIERS-01: an adult's LTX-2.5 clip keeps its model at whatever level the slot lowers it to; its size and ceiling follow that level. A
   // slot an admin pointed at another model overrides it below, as before. A minor is never here (the lane check below puts it on Wan).
   const slotModel = run.lowered ? null : run.model;
+  // LTX25-MAX-01: a Max clip keeps its model only while the job still runs at Max (an admin has not switched the Max slot off since it was queued) and
+  // the person is an adult. Its size and ceiling are the Stack's `max` profile (a profile can only lower the ceiling). A job lowered to Boost goes
+  // on as an LTX-2.5 Boost clip below; anything else is never sent the Max model.
+  if (base.model === LTX25_MAX_MODEL) {
+    const [bw, bh] = (base.size ?? "").split("x").map(Number);
+    const portrait = !!bw && !!bh && bh > bw;
+    if (lane === "adult" && run.tier === "max" && !run.lowered && (!slotModel || slotModel === LTX25_MAX_MODEL || slotModel.startsWith("ltx25"))) {
+      body.size = videoSizeFor("ltx25max", "detailed", portrait, engine);
+      if (body.seconds !== undefined) body.seconds = Math.max(1, Math.min(body.seconds, maxSecondsFor("detailed", "ltx25max", engine)));
+      body.tier = "max";
+      return { body, tier: "max", quality: "detailed" };
+    }
+    base = { ...base, model: LTX25_MODEL, size: portrait ? LTX25_DEFAULTS.standard.portrait : LTX25_DEFAULTS.standard.landscape };
+    body.model = base.model;
+    body.size = base.size;
+  }
   if (base.model === LTX25_MODEL && lane === "adult" && (!slotModel || !qualityOfSlotModel(slotModel) || slotModel.startsWith("ltx25"))) {
     const level: VideoQuality = run.tier === "standard" ? "quick" : "detailed";
     const levelKey = level === "quick" ? "standard" : "boost";

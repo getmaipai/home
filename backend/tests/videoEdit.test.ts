@@ -171,19 +171,21 @@ describe("C2: edit_video", () => {
     expect(fake.submitted).toHaveLength(submitted);
   });
 
-  test("make_it_max: the same clip at Max with the same seed for someone with the grant; nobody else gets one and nothing is made", async () => {
+  test("make_it_max: the same clip at Max (model ltx25-max, 1024x576) with the same seed for someone with the grant; nobody else gets one and nothing is made", async () => {
     const owner = person("owner");
-    // An admin pointed the Max slot at a model of its own, so Max exists on this computer.
-    setHouseholdSettingValue("engines.video.tier.max", { model: "detailed", options: {}, who: "admins" });
-    const { job, state } = await makeClip(owner, { prompt: BOAT, tier: "boost", seconds: 6 });
+    // The Stack reports the Max pack ready, so Max exists on this computer (LTX25-MAX-01).
+    fake.ltx25 = "ready"; fake.ltx25max = "ready";
+    __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed", ltx25: "ready", ltx25max: "ready" }));
+    const { job, state } = await makeClip(owner, { prompt: BOAT, tier: "standard", seconds: 8 });
     const made = await edit(state, { clip: job.id, change: "make_it_max" });
     expect(made.status).toBe("succeeded");
+    expect(made.result?.reply?.text).toContain("at Max");
     const next = jobOf(owner, made);
     expect(next.prompt).toBe(BOAT);
     expect(next.request.seed).toBe(job.request.seed);
     expect(next.request.tier).toBe("max");
     await until(() => fake.submitted.length >= 2);
-    expect(fake.submitted.at(-1)).toMatchObject({ tier: "max", seed: job.request.seed });
+    expect(fake.submitted.at(-1)).toMatchObject({ model: "ltx25-max", size: "1024x576", tier: "max", seed: job.request.seed, seconds: 8 });
 
     const adult = person("adult", "marlow");
     const theirs = await makeClip(adult, { prompt: BOAT, tier: "boost" });
@@ -192,6 +194,22 @@ describe("C2: edit_video", () => {
     expect(refused.result?.reply?.text).toContain(MAX_NEEDS_ADMIN_LINE);
     expect(refused.result?.data).toEqual({ refused: "max_needs_admin" });
     expect(fake.submitted).toHaveLength(before);
+  });
+
+  test("make_it_max when Max is not ready: one plain status line, nothing is made, no model or memory words", async () => {
+    const owner = person("owner");
+    const { job, state } = await makeClip(owner, { prompt: BOAT, tier: "boost", seconds: 6 });
+    for (const status of [undefined, "not-installed", "missing"] as const) {
+      __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed", ...(status ? { ltx25max: status } : {}) }));
+      const before = fake.submitted.length;
+      const refused = await edit(state, { clip: job.id, change: "make_it_max" });
+      expect(refused.status).toBe("succeeded");
+      expect(refused.result?.data).toEqual({ refused: "max_not_ready" });
+      const line = refused.result?.reply?.text ?? "";
+      expect(line).toContain("Settings, Models and storage");
+      expect(line).not.toMatch(/\b(GB|RAM|memory|ltx|LTX)\b/);
+      expect(fake.submitted).toHaveLength(before);
+    }
   });
 
   test("a teen is refused with the Create line, a child and a stranger's clip find nothing, and nothing reaches the Stack", async () => {

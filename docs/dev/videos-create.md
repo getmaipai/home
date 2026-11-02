@@ -6,7 +6,8 @@ Dev tier. Design and measurements are in [video-create](../design/video-create-2
 
 - Verified: the LTX-2.5 engine and the edits (trim, join, mix) ran with real clips and real ffmpeg on a scratch Stack. Home's tests run against a scripted Stack.
 - Not verified: the live hub does not have this yet. It has not been shipped. Read this page as the behavior once installed.
-- Not built: `continue` and `retake` (the Stack's LTX-2.5 refuses a picture start), Max (no slot passes the 64 GB cap yet), Characters, Places and Storyboard.
+- Verified for Max (LTX25-MAX-01): the Stack's own run (205 s for a 10 s clip, 48.6 GB OS footprint, speech correct, Stack main cc1198f3f) and Home's tests against a scripted Stack. The Create level segment was opened on a dev hub in the browser at desktop and phone width, with the Stack's status answered by a small proxy that forwarded to the live Stack and added `qualities.ltx25max` (ready, then installed false). **Not verified:** a real Create to Max clip through Home. No scratch Stack had the `ltx25-max-gen` runtime built (it downloads its Python environment and a 71 GB pack), so Home has never sent `ltx25-max` to a real Stack, and the clip that comes back (1024x576, quality `ltx25max`) is read only from the scripted fixture.
+- Not built: `continue` and `retake` (the Stack's LTX-2.5 refuses a picture start), Characters, Places and Storyboard. VIDEO-TIERS-01 stays open for the parts below Max (the Stack pin and one memory-measurement method are the Stack's).
 
 ## Stack requirements
 
@@ -24,12 +25,16 @@ One definition: `backend/src/lib/videos/quality.ts`. Every length in Home reads 
 |---|---|---|---|---|
 | Standard (adult) | LTX-2.5 q8 distilled | yes | 10 s | 512x256 (asked as 512x288) |
 | Boost (adult) | LTX-2.5 q8 distilled | yes | 5 s | 768x448 (640x320 is the smaller size) |
-| Max | none | | | stays empty until a run passes the 64 GB per-clip cap and beats Boost |
+| Max (adult, holds Max) | LTX-2.5 bf16 distilled, `ltx25-max` | yes | 10 s | 1024x576 (576x1024 portrait), words only |
 | Standard (child, teen) | Wan Quick | no | 5 s | 832x480 |
 
 The engine rounds the height so heights are multiples of 64, so the 288 and 352 in the design note come out as 256 and 320. The Stack's own profile wins over `LTX25_DEFAULTS`, and a profile's `max_seconds` can only lower a ceiling. Measured on a 128 GB Mac: Standard 10 s about 43 s (39.4 GB), Boost 5 s 42 to 74 s.
 
 Rule 8: a child or teen has no level choice. `chooseVideoQuality` sends `quickOnly` for them and `videoModelForLane` (`lib/pictures/lane.ts`) picks Wan Quick again at the job starter. Max needs the `tier.max:video` grant (`lib/tiers.ts`); owners and admins hold it by role.
+
+**Max (LTX25-MAX-01).** Max is offered only when `qualities.ltx25max.ready` is exactly `true` (`ltx25MaxReady`) and the person holds `tier.max:video` (owners and admins by role) and is an adult. It no longer depends on the saved Max slot having its own model: `maxOffered(person, "video", band, available)` takes the Stack's answer for `available`. The Stack's `max` profile gives the size and a ceiling that can only lower 10 s (`videoSizeFor`, `maxSecondsFor` with maker `ltx25max`). `chooseVideoQuality` takes `max: true` (the caller read the grant) and returns maker `ltx25max`; a picture start or a style never gets Max (the tool tells the model it was not made at Max). `makeVideoFor` sends model `ltx25-max`, tier `max`; the job request is quality `detailed`, tier `max`, and `videoBodyForSlot` keeps the model while the level is still Max, otherwise sends an LTX-2.5 Boost clip (a Max level switched off since) or Wan (a minor, never Max). Admission (51 GB) and the one-video-at-a-time rule are the Stack's and the household queue's; Home says "about four minutes" and never a memory figure to a person.
+
+The Create level segment shows Max ready with its hint. A person who holds Max, on a Stack that reports the Max engine but not a ready pack, sees Max greyed with `disabled_reason` from `videoMaxNotReadyReason` (not installed, or not ready): the existing way a kit segment says why. The install, the 71 GB and the licence prompt stay in Settings, Models and storage: the Stack lists the pack as a `video` component with its licence, and `ModelsAndStorageSection` already asks the admin to accept it. `make_it_max` refuses with that same line (`max_not_ready`) and makes nothing, and refuses a clip that started from a picture or used a style (`max_words_only`).
 
 The older words Quick and Detailed remain in `quality.ts` as the internal model families. `generate_video` still accepts `quality`: detailed means Boost, quick means Standard.
 
@@ -75,4 +80,4 @@ An edit is never lower in audience than its sources. `clipAdultOnly` marks a sou
 
 ## Tests
 
-In `backend/tests/`: `videoCreate.test.ts` (lists, wording, page data, refusals, one clip at a time), `videoEdit.test.ts` (declared arguments, `quality` still accepted, another take, remix), `videoChatEdit.test.ts` (trim, join, mix, refusals, staging cleanup, audience floor), `videoLtx25.test.ts` (the tier choice with and without the engine), `videoQuality.test.ts`, `videoTool.test.ts`, `videoSafety.test.ts`. The Stack side is scripted by `videoEditStackFixture.ts` and `videoFixture.ts`. Run one with `cd backend && bun test tests/videoChatEdit.test.ts`.
+In `backend/tests/`: `videoCreate.test.ts` (lists, wording, page data, refusals, one clip at a time), `videoEdit.test.ts` (declared arguments, `quality` still accepted, another take, remix), `videoChatEdit.test.ts` (trim, join, mix, refusals, staging cleanup, audience floor), `videoLtx25.test.ts` (the tier choice with and without the engine, and the LTX-2.5 Max cases: offered iff ready and held, hidden for a teen, a child and an adult without the grant, the model id and size on the wire, a Stack profile lowering the ceiling, the not-ready segment and line), `videoQuality.test.ts`, `videoTool.test.ts`, `videoSafety.test.ts`. The Stack side is scripted by `videoEditStackFixture.ts` and `videoFixture.ts`. Run one with `cd backend && bun test tests/videoChatEdit.test.ts`.

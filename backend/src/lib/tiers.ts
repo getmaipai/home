@@ -133,8 +133,8 @@ export function maxAvailable(category: TierCategory): boolean {
 }
 
 /** Whether this person is shown a Max control on a card: they hold Max, their band reaches it, the slot is on and a Max model exists. */
-export function maxOffered(person: PersonRow, category: TierCategory, band?: AgeBand): boolean {
-  return maxAvailable(category) && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
+export function maxOffered(person: PersonRow, category: TierCategory, band?: AgeBand, available: boolean = maxAvailable(category)): boolean {
+  return available && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
 }
 
 /**

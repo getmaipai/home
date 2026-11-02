@@ -23,7 +23,7 @@ There are three levels: **Standard**, **Boost** and **Max**.
 
 - **Standard** makes a small picture with sound, up to 10 seconds long. It takes about 43 seconds.
 - **Boost** makes a bigger picture with better sound. It takes about a minute.
-- **Max** is for the best picture. It is not offered yet. Home turns it on only after it has been measured to fit in the memory one clip may use (64 GB). Until then you will not see it.
+- **Max** is for the sharpest picture, up to 10 seconds, with sound. An admin has to get it first: it is a big download (about 71 GB) that comes with its maker's licence, and you find it in Settings, Models and storage. Max also needs an admin's OK for you. Until both are done you will not see it, or you will see it greyed out with a line that says what to do. Max makes one video at a time and takes about 4 minutes. It starts from words only, so a picture or a style cannot be used with it.
 
 These times come from tests on a Mac with 128 GB. Your computer may be a little slower or faster, and the first clip after a restart takes longer.
 
@@ -36,7 +36,7 @@ Open **Videos**, then **Create**. The page has these parts.
 - **Prompt bar.** Write what you want to see. Put each person's line in quotes.
 - **Look.** Pick one: natural, classic cartoon, anime, 3D animated or film.
 - **Camera.** Pick one: dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still.
-- **Level.** Standard or Boost. Max shows only when it is offered to you.
+- **Level.** Standard or Boost. Max shows only when it is installed and an admin has allowed it for you.
 - **Start frame.** Pick a picture to start from. A picture you pick is the first frame.
 - **Player.** Your clip plays here when it is done.
 - **Making now.** A list of clips being made, with their progress. Press **Stop** to cancel one.
@@ -69,7 +69,7 @@ Ask chat to change a video you made. Home keeps the old video and makes a new on
 
 - **Another take.** "Do another one." Same words, a new result.
 - **Remix.** "Make it anime" or "same but at night." Same video with the change you name. You can change the words, look, camera, sound, length or level.
-- **Make it Max.** "Make it Max." Only when Max is offered to you. Otherwise Home says so.
+- **Make it Max.** "Make it Max." It keeps the same words and the same result, and makes the video again at Max. It works only when Max is installed and allowed for you, and only for a video made from words. Otherwise Home says what is missing and makes nothing.
 - **Trim.** "Cut the first two seconds." Say where it starts and ends, in seconds.
 - **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order.
 - **Mix.** "Put my voice over it" or "add my song." Home lays a spoken line, one of your songs or a sound over the video. You can ask for it quieter or louder.

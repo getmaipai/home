@@ -22,7 +22,7 @@ export interface StackClip {
   mode?: string;
   lora_ids?: string[];
   /** VIDEO-LTX-01: which model made it, and whether it has a sound track the model made (absent on an older Stack: Quick, silent). */
-  quality?: "quick" | "detailed" | "ltx25";
+  quality?: "quick" | "detailed" | "ltx25" | "ltx25max";
   audio?: boolean;
   ms?: number;
   bytes?: number;
@@ -58,13 +58,15 @@ export interface StackVideoQuality {
 
 /** VIDEO-TIERS-01: one size LTX-2.5 runs at, as `qualities.ltx25.profiles[]` reports it (true output size, memory in GB). */
 export interface StackLtx25Profile {
-  name: "standard" | "boost";
+  name: "standard" | "boost" | "max";
   size: string;
   width: number;
   height: number;
   max_seconds: number;
   max_frames?: number;
   peak_gb?: number;
+  /** What the Stack reserves to admit a clip (Max only). */
+  admit_gb?: number;
   short_peak_gb?: number;
 }
 
@@ -77,6 +79,9 @@ export interface StackLtx25Quality {
   environment?: unknown;
   limits?: Record<string, number | string>;
   profiles?: StackLtx25Profile[];
+  /** The pieces to download (LTX25-MAX-01 reports them; `download_bytes` is the whole pack). */
+  install?: { download_bytes?: number; remaining_bytes?: number };
+  licence?: { id: string; name: string; url: string } | null;
 }
 
 export interface StackVideoStatus {
@@ -94,7 +99,7 @@ export interface StackVideoStatus {
   audio: boolean;
   reference_images?: { generated: boolean; uploaded: boolean; reason: string };
   /** VIDEO-LTX-01: the two models. An older Stack has none: Quick only, from the fields above. */
-  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality };
+  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality; /** LTX25-MAX-01: the Max profile, the same shape as `ltx25` with one `max` profile; absent on a Stack that lacks it. */ ltx25max?: StackLtx25Quality };
 }
 
 export interface StackVideoLora {
@@ -244,15 +249,24 @@ export async function cancelOrDeleteVideo(job: string): Promise<void> {
 
 /** VIDEO-TIERS-01: `qualities.ltx25` is read defensively. `ready` counts only when it is exactly `true`, and a profile with an unusable size or length is dropped, so a half-written reply never offers a tier the Stack cannot run. */
 export function withCheckedLtx25(status: StackVideoStatus): StackVideoStatus {
-  const raw = status.qualities?.ltx25 as (Partial<StackLtx25Quality> & { profiles?: unknown }) | undefined;
-  if (!status.qualities || !raw || typeof raw !== "object") return status;
-  const profiles = (Array.isArray(raw.profiles) ? raw.profiles : []).flatMap((p): StackLtx25Profile[] => {
-    const x = p as Partial<StackLtx25Profile> | null;
-    if (!x || (x.name !== "standard" && x.name !== "boost") || typeof x.width !== "number" || typeof x.height !== "number" || typeof x.max_seconds !== "number") return [];
-    if (!(x.width > 0) || !(x.height > 0) || !(x.max_seconds > 0)) return [];
-    return [{ ...x, name: x.name, width: x.width, height: x.height, size: `${x.width}x${x.height}`, max_seconds: x.max_seconds } as StackLtx25Profile];
-  });
-  return { ...status, qualities: { ...status.qualities, ltx25: { ...raw, ready: raw.ready === true, profiles } } };
+  if (!status.qualities) return status;
+  const qualities = { ...status.qualities };
+  const checked = (raw: unknown, names: ReadonlyArray<StackLtx25Profile["name"]>): StackLtx25Quality | undefined => {
+    if (!raw || typeof raw !== "object") return undefined;
+    const quality = raw as Partial<StackLtx25Quality> & { profiles?: unknown };
+    const profiles = (Array.isArray(quality.profiles) ? quality.profiles : []).flatMap((p): StackLtx25Profile[] => {
+      const x = p as Partial<StackLtx25Profile> | null;
+      if (!x || !names.includes(x.name as StackLtx25Profile["name"]) || typeof x.width !== "number" || typeof x.height !== "number" || typeof x.max_seconds !== "number") return [];
+      if (!(x.width > 0) || !(x.height > 0) || !(x.max_seconds > 0)) return [];
+      return [{ ...x, name: x.name as StackLtx25Profile["name"], width: x.width, height: x.height, size: `${x.width}x${x.height}`, max_seconds: x.max_seconds } as StackLtx25Profile];
+    });
+    return { ...quality, ready: quality.ready === true, profiles };
+  };
+  const ltx25 = checked(qualities.ltx25, ["standard", "boost"]);
+  const ltx25max = checked(qualities.ltx25max, ["max"]);
+  if (ltx25) qualities.ltx25 = ltx25; else delete qualities.ltx25;
+  if (ltx25max) qualities.ltx25max = ltx25max; else delete qualities.ltx25max;
+  return { ...status, qualities };
 }
 
 export async function videoStatus(): Promise<StackVideoStatus | null> {

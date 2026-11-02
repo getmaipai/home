@@ -8,7 +8,7 @@ import { TestClient } from "./client";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
 import { getVideoJobFor, startVideoJob } from "@/lib/videos/jobs";
-import { LTX25_MODEL, chooseVideoQuality, etaWords, maxSecondsFor, videoSizeFor } from "@/lib/videos/quality";
+import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, etaWords, maxSecondsFor, videoSizeFor } from "@/lib/videos/quality";
 import { WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
 import { __setVideoStatusForTests, readyVideoStatusForTests, videoStatusReady } from "@/lib/videos/ready";
 import { videoStatus, withCheckedLtx25, type StackVideoStatus } from "@/lib/videos/stack";
@@ -19,6 +19,7 @@ import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { until } from "./pictureFixture";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 
 let fake: FakeVideoStack;
@@ -280,5 +281,186 @@ describe("readiness is per lane (a minor never counts LTX-2.5)", () => {
     // A queued size the Stack still lists is kept; without an engine read the table is used, as before.
     expect(videoBodyForSlot({ ...base, size: "640x320", seconds: 4 }, "boost", "adult", "adult", engine).body.size).toBe("640x320");
     expect(videoBodyForSlot(base, "boost", "adult", "adult").body).toMatchObject({ size: "768x448", seconds: 5 });
+  });
+});
+
+// ---------------------------------------------------------------- LTX25-MAX-01 (VIDEO-TIERS-01): the Max level
+
+describe("LTX-2.5 Max: the choice", () => {
+  const MAX_READY = (seconds?: number) => readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed", ...(seconds ? { ltx25maxSeconds: seconds } : {}) });
+
+  test("Max asked, held and ready: ltx25max at 1024x576 (576x1024 portrait), ten seconds, a longer ask is cut and says so", () => {
+    const engine = MAX_READY();
+    const choice = chooseVideoQuality({ requested: "detailed", seconds: 15, engine, adultLane: true, max: true });
+    expect(choice).toMatchObject({ quality: "detailed", maker: "ltx25max", seconds: 10, shortened: true, note: null, announce: true });
+    expect(videoSizeFor(choice.maker, choice.quality, false, engine)).toBe("1024x576");
+    expect(videoSizeFor(choice.maker, choice.quality, true, engine)).toBe("576x1024");
+    expect(etaWords("detailed", 10, "ltx25max")).toBe("about four minutes");
+  });
+
+  test("the Stack's own profile can only lower the ceiling", () => {
+    expect(maxSecondsFor("detailed", "ltx25max", MAX_READY(6))).toBe(6);
+    expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine: MAX_READY(6), adultLane: true, max: true })).toMatchObject({ maker: "ltx25max", seconds: 6, shortened: true });
+    // A profile that claims more than ten seconds is held to ten.
+    expect(maxSecondsFor("detailed", "ltx25max", MAX_READY(20))).toBe(10);
+    // No profile listed: the table's 1024x576 and ten seconds.
+    const bare = MAX_READY();
+    bare.qualities!.ltx25max!.profiles = [];
+    expect(maxSecondsFor("detailed", "ltx25max", bare)).toBe(10);
+    expect(videoSizeFor("ltx25max", "detailed", false, bare)).toBe("1024x576");
+  });
+
+  test("Max is used only when it was asked for, is held, and the Stack says ready", () => {
+    const engine = MAX_READY();
+    expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine, adultLane: true })).toMatchObject({ maker: "ltx25" });
+    expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine, adultLane: true, max: false }).maker).toBe("ltx25");
+    for (const status of ["not-installed", "missing"] as const) {
+      const notReady = readyVideoStatusForTests({ ltx25: "ready", ltx25max: status });
+      expect(ltx25MaxReady(notReady)).toBe(false);
+      expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine: notReady, adultLane: true, max: true }).maker).toBe("ltx25");
+    }
+    expect(ltx25MaxReady(readyVideoStatusForTests({ ltx25: "ready" }))).toBe(false);
+  });
+
+  test("a minor never gets Max, a picture start and a style go the old way", () => {
+    const engine = MAX_READY();
+    expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, quickOnly: true, adultLane: false, max: true })).toMatchObject({ maker: "wan", seconds: 5 });
+    expect(chooseVideoQuality({ requested: "detailed", engine, adultLane: true, max: true, hasPicture: true }).maker).not.toBe("ltx25max");
+    expect(chooseVideoQuality({ engine, adultLane: true, max: true, style: { base_model: "ltx-2.3" } }).maker).toBe("ltx23");
+  });
+
+  test("readiness: Max alone makes an adult ready, never a minor", () => {
+    const only = readyVideoStatusForTests({ quickMissing: true, ltx25max: "ready" });
+    expect(videoStatusReady(only, true)).toBe(true);
+    expect(videoStatusReady(only, false)).toBe(false);
+  });
+
+  test("the Stack's reply is read defensively: a bad profile or ready value is never ready", () => {
+    const raw = readyVideoStatusForTests({ ltx25max: "ready" });
+    const broken = withCheckedLtx25({ ...raw, qualities: { ...raw.qualities!, ltx25max: { ready: "yes" as unknown as boolean, profiles: [{ name: "boost" as unknown as "max", width: 1024, height: 576, max_seconds: 10, size: "x" }, { name: "max", width: -1, height: 576, max_seconds: 10, size: "x" }] } } } as StackVideoStatus);
+    expect(broken.qualities!.ltx25max!.ready).toBe(false);
+    expect(broken.qualities!.ltx25max!.profiles).toEqual([]);
+  });
+
+  test("the status route reports Max ready, with its ceiling, for an adult only", () => {
+    expect(videoTiersStatus(MAX_READY(), true).max).toEqual({ ready: true, max_seconds: 10, sound: true, model: "ltx25max" });
+    expect(videoTiersStatus(MAX_READY(6), true).max.max_seconds).toBe(6);
+    expect(videoTiersStatus(MAX_READY(), false).max.ready).toBe(false);
+    expect(videoTiersStatus(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "not-installed" }), true).max.ready).toBe(false);
+  });
+});
+
+describe("LTX-2.5 Max: who is offered it, and the request on the wire", () => {
+  async function people() {
+    const { owner, ownerRow, teen, child } = await household();
+    const made = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const id = ((await made.json()) as { id: string }).id;
+    const adult = new TestClient();
+    await adult.post("/api/auth/verify-secret", { personId: id, secret: "0000" });
+    const adultRow = db.select().from(peopleTable).where(eq(peopleTable.id, id)).get()! as PersonRow;
+    return { owner, ownerRow, adult, adultRow, teen, child };
+  }
+  const ids = (segment: unknown) => ((segment as { tiers: Array<{ id: string }> } | null)?.tiers ?? []).map((t) => t.id);
+
+  test("Max is offered iff the Stack says ready AND the person holds Max (owner by role, an adult only with the grant); never a teen or a child", async () => {
+    const { ownerRow, adultRow, teen, child } = await people();
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
+    const segment = videoTierSegment(ownerRow) as { tiers: Array<{ id: string; label?: string; hint?: string; disabled_reason?: string }> };
+    expect(ids(segment)).toEqual(["standard", "boost", "max"]);
+    expect(segment.tiers[2]).toEqual({ id: "max", label: "Max", hint: "Up to 10 seconds, sharpest picture, with sound" });
+    expect(JSON.stringify(segment)).not.toMatch(/\b(GB|RAM|memory|LTX|ltx)\b/);
+    expect(ids(videoTierSegment(adultRow))).not.toContain("max");
+    expect(ids(videoTierSegment(teen))).not.toContain("max");
+    expect(ids(videoTierSegment(child))).not.toContain("max");
+    // An adult with the grant for video is offered it too.
+    const { createGrant, personIsGranted } = await import("@/lib/grants");
+    expect(personIsGranted(adultRow.id, "tier.max:video")).toBe(false);
+    const granted = createGrant({ id: ownerRow.id, role: "owner" }, { person: adultRow.id, action: "tier.max:video", effect: "allow", acknowledged_at: new Date().toISOString(), acknowledged_by_person_id: ownerRow.id });
+    expect(granted.ok).toBe(true);
+    expect(ids(videoTierSegment(adultRow))).toContain("max");
+  });
+
+  test("Max is hidden when the Stack lacks the engine; with the engine but not the pack it is shown disabled with one plain status line (an owner only)", async () => {
+    const { ownerRow, adultRow } = await people();
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
+    expect(ids(videoTierSegment(ownerRow))).toEqual(["standard", "boost"]);
+    for (const status of ["not-installed", "missing"] as const) {
+      __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: status }));
+      const max = (videoTierSegment(ownerRow) as { tiers: Array<{ id: string; hint?: string; disabled_reason?: string }> }).tiers.find((t) => t.id === "max")!;
+      expect(max.hint).toBeUndefined();
+      expect(max.disabled_reason).toContain("Settings, Models and storage");
+      expect(max.disabled_reason!.length).toBeLessThanOrEqual(120);
+      expect(max.disabled_reason).not.toMatch(/\b(GB|RAM|memory|LTX|ltx)\b/);
+      expect(ids(videoTierSegment(adultRow))).not.toContain("max");
+    }
+  });
+
+  test("Create at Max sends model ltx25-max, 1024x576, up to ten seconds; the job is stored at Max; the clip comes back at 1024x576", async () => {
+    fake.ltx25 = "ready"; fake.ltx25max = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
+    const { owner } = await people();
+    const res = await owner.post("/api/videos/make", { prompt: BOAT, tier: "max", seconds: 10 });
+    expect(res.status).toBe(200);
+    const card = await res.json() as { id: string; notice: string | null };
+    await until(() => fake.submitted.length > 0);
+    expect(fake.submitted[0]).toMatchObject({ model: LTX25_MAX_MODEL, size: "1024x576", seconds: 10, tier: "max" });
+    expect(card.notice).toBeNull();
+    const row = db.select().from((await import("@/db/schema")).videoJobs).all()[0]!;
+    expect(row.id).toBe(card.id);
+    expect(JSON.stringify(row)).toContain("ltx25-max");
+  });
+
+  test("the Stack's profile lowering the ceiling is honoured on the wire and said in one line", async () => {
+    fake.ltx25 = "ready"; fake.ltx25max = "ready"; fake.ltx25maxSeconds = 6; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", ltx25maxSeconds: 6 }));
+    const { owner } = await people();
+    const res = await owner.post("/api/videos/make", { prompt: BOAT, tier: "max", seconds: 10 });
+    expect(res.status).toBe(200);
+    await until(() => fake.submitted.length > 0);
+    expect(fake.submitted[0]).toMatchObject({ model: LTX25_MAX_MODEL, seconds: 6 });
+    expect(((await res.json()) as { notice: string | null }).notice).toContain("6 seconds");
+  });
+
+  test("an adult without the grant is refused with one plain line and nothing is sent", async () => {
+    fake.ltx25 = "ready"; fake.ltx25max = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
+    const { adult } = await people();
+    const refused = await adult.post("/api/videos/make", { prompt: BOAT, tier: "max" });
+    expect(refused.status).toBe(422);
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("Max asked while the pack is not ready: made at Boost, and the plain line says so (the Create page never offers it)", async () => {
+    fake.ltx25 = "ready"; fake.ltx25max = "not-installed"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "not-installed" }));
+    const { owner } = await people();
+    const res = await owner.post("/api/videos/make", { prompt: BOAT, tier: "max", seconds: 10 });
+    expect(res.status).toBe(200);
+    await until(() => fake.submitted.length > 0);
+    expect(fake.submitted[0]).toMatchObject({ model: LTX25_MODEL, size: "768x448", seconds: 5 });
+    expect(fake.submitted[0]!.model).not.toBe(LTX25_MAX_MODEL);
+  });
+
+  test("a teen or a child sent the Max model by any route is put on silent Wan", async () => {
+    fake.ltx25 = "ready"; fake.ltx25max = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
+    const { teen, child } = await people();
+    for (const actor of [teen, child]) {
+      const job = await startVideoJob({ actor, conversationId: null, turnId: null, temporary: false, kind: "generate", prompt: BOAT, body: { prompt: BOAT, seconds: 10, size: "1024x576", audience: "all-ages", model: LTX25_MAX_MODEL }, tier: "max" });
+      expect((job.request as { stackBody?: { model?: string } }).stackBody?.model).toBe(WAN_QUICK_VIDEO_MODEL);
+      await (await import("@/lib/videos/jobs")).cancelVideoJob(actor, job.id).catch(() => undefined);
+    }
+    const base = { prompt: BOAT, audience: "all-ages" as const, model: LTX25_MAX_MODEL, size: "1024x576", seconds: 10 };
+    const body = videoBodyForSlot(base, "max", "teen", "teen");
+    expect(body.body.model).toBe(WAN_QUICK_VIDEO_MODEL);
+    expect(body.body.size).toBe("832x480");
+    expect(body.body.seconds).toBe(5);
+    expect(body.quality).toBe("quick");
+  });
+
+  test("the slot body keeps the Max model at Max (size and ceiling from the Stack's profile); a Max level switched off is sent as an LTX-2.5 Boost clip", () => {
+    const engine = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", ltx25maxSeconds: 8 });
+    const base = { prompt: BOAT, audience: "adult" as const, model: LTX25_MAX_MODEL, size: "1024x576", seconds: 10 };
+    const atMax = videoBodyForSlot(base, "max", "adult", "adult", engine);
+    expect(atMax).toMatchObject({ tier: "max", quality: "detailed", body: { model: LTX25_MAX_MODEL, size: "1024x576", seconds: 8, tier: "max" } });
+    expect(videoBodyForSlot({ ...base, size: "576x1024" }, "max", "adult", "adult", engine).body.size).toBe("576x1024");
+    setHouseholdSettingValue("engines.video.tier.max", { model: "off", options: {}, who: "admins" });
+    const lowered = videoBodyForSlot(base, "max", "adult", "adult", engine);
+    expect(lowered).toMatchObject({ tier: "boost", quality: "detailed", body: { model: LTX25_MODEL, size: "768x448", seconds: 5, tier: "boost" } });
   });
 });

@@ -984,7 +984,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_ADULT_ADAPTERS_KEY, VIDEO_QUALITY_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo |
-| `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_DEFAULTS |
+| `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |

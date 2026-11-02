@@ -9,8 +9,8 @@ import { getVideoJobFor } from "@/lib/videos/jobs";
 import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_STARTERS, VIDEO_VOICES } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
-import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
-import { peekVideoEngineStatus } from "@/lib/videos/ready";
+import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
+import { peekVideoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
 import { registerAppPageFill } from "@/lib/apps";
 import { packageAssetFile } from "@/lib/packageAssets";
 import type { PersonRow } from "@/types";
@@ -20,6 +20,16 @@ import { madeFileFor, madeFileItemView, registerMediaAppData } from "./appHost";
 function statusLine(state: string, percent: number, error: string | null, note?: string): string {
   const line = state === "queued" ? "Waiting for its turn" : state === "running" ? (percent > 0 ? `Making your video, ${percent}% done` : "Making your video") : state === "done" ? "Ready" : error ?? "It did not finish. Try again.";
   return note ? `${line} ${note}` : line;
+}
+
+/** LTX25-MAX-01: the Max entry of the level segment. Offered only when the Stack reports the Max model ready AND this person holds Max (an adult, by grant or role). A person who holds Max, on a Stack that has the Max engine but not its pack ready, sees it
+ * disabled with the one status line (`videoMaxNotReadyReason`; the pack installs from Settings, Models and storage, which carries the size and the licence prompt). A Stack without the engine, or a person who does not hold Max, sees nothing. */
+function maxTierEntry(person: PersonRow, band: ReturnType<typeof speakerAgeBand>, engine: ReturnType<typeof peekVideoEngineStatus>): Array<Record<string, unknown>> {
+  const holds = band === "adult" && maxOffered(person, "video", band, true);
+  if (!holds) return [];
+  if (ltx25MaxReady(engine)) return [{ id: "max", label: "Max", hint: `Up to ${maxSecondsFor("detailed", "ltx25max", engine)} seconds, sharpest picture, with sound` }];
+  if (engine?.qualities?.ltx25max) return [{ id: "max", label: "Max", disabled_reason: videoMaxNotReadyReason(engine) }];
+  return [];
 }
 
 /** The levels this person may use (Boost needs the Boost model and their say; Max needs the Max slot and their say). Standard alone is no choice, so no segment. */
@@ -33,7 +43,7 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
   const tiers = [
     { id: "standard", label: "Standard", hint: ltx25 ? `Up to ${maxSecondsFor("quick", "ltx25", engine)} seconds, with sound` : `Up to ${QUICK_MAX_SECONDS} seconds` },
     ...(boostOffered ? [{ id: "boost", label: "Boost", hint: `Up to ${ltx25 ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS} seconds, with sound` }] : []),
-    ...(maxOffered(person, "video", band) ? [{ id: "max", label: "Max", hint: "The best the home can make" }] : []),
+    ...maxTierEntry(person, band, engine),
   ];
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
 }

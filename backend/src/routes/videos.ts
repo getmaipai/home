@@ -23,7 +23,7 @@ import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
-import { LTX25_MODEL, chooseVideoQuality, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
+import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -82,7 +82,7 @@ export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
 }
 
 /** VIDEO-LTX-01: the card's kind and the other kind it can be made again as. A video made with a style is bound to the style's model, so it offers no switch. */
-function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean }): { quality: "quick" | "detailed"; switch_to: "quick" | "detailed" | null } {
+function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean; max?: boolean }): { quality: "quick" | "detailed"; switch_to: "quick" | "detailed" | null } {
   const quality = job.request.quality ?? "quick";
   // A video made with a style is bound to the style's model; one that started from a picture can only be Quick (Detailed starts from words).
   if (job.request.loras.length > 0 || job.request.source_file_id) return { quality, switch_to: null };
@@ -90,7 +90,7 @@ function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean
   return { quality, switch_to: ready.detailed ? "detailed" : null };
 }
 
-function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; detailed: boolean }) {
+function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; detailed: boolean; max?: boolean }) {
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
@@ -100,13 +100,13 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     error: job.state === "failed" ? job.error : null,
     ...qualityFields(job, ready),
     fit_ask: job.state === "queued" && laneOfPerson(actor) === "adult" ? answerableFitAsk(actor, job.id) : null,
-    max_offered: job.state === "done" && laneOfPerson(actor) === "adult" && maxOffered(actor, "video"),
+    max_offered: job.state === "done" && laneOfPerson(actor) === "adult" && maxOffered(actor, "video", undefined, ready.max === true),
     clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id, has_sound: file.audio === true } : null,
   };
 }
 
 /** The card for a job: every clip made in the same turn (the first and each Make another), oldest first. */
-export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean, ready: { quick: boolean; detailed: boolean } = { quick: false, detailed: false }) {
+export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean, ready: { quick: boolean; detailed: boolean; max?: boolean } = { quick: false, detailed: false }) {
   const group = root.turnId ? videoJobsForTurn(actor, root.turnId) : [root];
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
@@ -117,32 +117,32 @@ export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean
 }
 
 /** Which kinds can run now (read from the Stack's status, cached for a few seconds). */
-async function readyFlags(actor: PersonRow): Promise<{ quick: boolean; detailed: boolean }> {
+async function readyFlags(actor: PersonRow): Promise<{ quick: boolean; detailed: boolean; max: boolean }> {
   const engine = await videoEngineStatus();
   // A teen or a child is only ever on Quick (lane review): the card never offers them Detailed, and the job starter would override it anyway.
   // VIDEO-TIERS-01: an adult's LTX-2.5 serves both levels, so either switch is ready when the Stack says it is.
   const adult = laneOfPerson(actor) === "adult";
-  return { quick: quickVideoReady(engine) || (adult && ltx25VideoReady(engine)), detailed: adult && (detailedVideoReady(engine) || ltx25VideoReady(engine)) };
+  return { quick: quickVideoReady(engine) || (adult && ltx25VideoReady(engine)), detailed: adult && (detailedVideoReady(engine) || ltx25VideoReady(engine)), max: adult && ltx25MaxReady(engine) };
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const refusals = errorResponses({ 401: "Not signed in", 403: "Videos are off for this profile", 404: "No such video job", 422: "That request is not allowed", 502: "Videos could not be made", 503: "Videos are not ready" });
 
-const TierStatusSchema = z.object({ ready: z.boolean(), max_seconds: z.number(), sound: z.boolean(), model: z.enum(["wan", "ltx23", "ltx25"]).nullable() });
-/** VIDEO-TIERS-01: what each level makes on this computer now (the one answer the Create page, the tools and the settings read). A teen or a child: Standard on Wan, silent. Max has no model yet. */
+const TierStatusSchema = z.object({ ready: z.boolean(), max_seconds: z.number(), sound: z.boolean(), model: z.enum(["wan", "ltx23", "ltx25", "ltx25max"]).nullable() });
+/** VIDEO-TIERS-01: what each level makes on this computer now (the one answer the Create page, the tools and the settings read). A teen or a child: Standard on Wan, silent. Max is the LTX-2.5 Max model when the Stack reports it ready. */
 export function videoTiersStatus(engine: Awaited<ReturnType<typeof videoEngineStatus>>, adult: boolean) {
   const ltx25 = adult && ltx25VideoReady(engine);
   const boost23 = adult && detailedVideoReady(engine);
   return {
     standard: ltx25 ? { ready: true, max_seconds: maxSecondsFor("quick", "ltx25", engine), sound: true, model: "ltx25" as const } : { ready: quickVideoReady(engine), max_seconds: maxSecondsFor("quick", "wan"), sound: false, model: quickVideoReady(engine) ? "wan" as const : null },
     boost: ltx25 ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx25", engine), sound: true, model: "ltx25" as const } : boost23 ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx23"), sound: true, model: "ltx23" as const } : { ready: false, max_seconds: 0, sound: false, model: null },
-    max: { ready: false, max_seconds: 0, sound: false, model: null },
+    max: adult && ltx25MaxReady(engine) ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx25max", engine), sound: true, model: "ltx25max" as const } : { ready: false, max_seconds: 0, sound: false, model: null },
   };
 }
 
 const statusRoute = createRoute({
   method: "get", path: "/status", tags: ["Videos"], summary: "Whether this person can make videos now, and why not", middleware: [requireAuth] as const,
-  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), reason: z.string().nullable(), engine_ready: z.boolean(), tiers: z.object({ standard: TierStatusSchema, boost: TierStatusSchema, max: TierStatusSchema }).describe("Which levels this person can use now and how long a clip each makes (Max is not offered yet)."), adult_styles: z.boolean(), limits: z.string(), styles: z.array(z.object({ id: z.string(), name: z.string() })) }) } }, description: "Additive." }, ...errorResponses({ 401: "Not signed in" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), reason: z.string().nullable(), engine_ready: z.boolean(), tiers: z.object({ standard: TierStatusSchema, boost: TierStatusSchema, max: TierStatusSchema }).describe("Which levels this person can use now and how long a clip each makes (Max is ready only when the Stack has its model installed; the person must also hold Max)."), adult_styles: z.boolean(), limits: z.string(), styles: z.array(z.object({ id: z.string(), name: z.string() })) }) } }, description: "Additive." }, ...errorResponses({ 401: "Not signed in" }) },
 });
 videosRoutes.openapi(statusRoute, async (c) => {
   const actor = c.get("person");
@@ -292,7 +292,8 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   // VIDEO-LTX-01: Quick or Detailed again. Left out, the video keeps its own kind; a style made for one model decides.
   const engine = await videoEngineStatus();
   const used = source.request.loras.flatMap((id) => { const found = adapters.find((a) => a.id === id); return found ? [found] : []; });
-  const choice = chooseVideoQuality({ requested: allowedQuality(actor, "video", isVideoQuality(asked.quality) ? asked.quality : tierArgument({ person: actor, category: "video", arg: asked.tier, band: audience.band }).quality ?? source.request.quality ?? "quick", audience.band), style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: laneOf(audience) === "adult" });
+  const tierAsked = tierArgument({ person: actor, category: "video", arg: asked.tier, band: audience.band, maxAvailable: laneOf(audience) === "adult" && ltx25MaxReady(engine) });
+  const choice = chooseVideoQuality({ requested: allowedQuality(actor, "video", isVideoQuality(asked.quality) ? asked.quality : tierAsked.quality ?? source.request.quality ?? "quick", audience.band), style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: laneOf(audience) === "adult", max: tierAsked.tier === "max" && laneOf(audience) === "adult" && ltx25MaxReady(engine) });
   const portrait = (() => { const [w, h] = source.request.size.split("x").map(Number); return Boolean(w && h && h > w); })();
   const size = videoSizeFor(choice.maker, choice.quality, portrait, engine);
   // Only LoRAs this person may still use ride along; one turned off since is dropped.
@@ -306,9 +307,9 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   try {
     const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: words, sourceFileId: source.request.source_file_id,
-      tier: jobTier("video", tierArgument({ person: actor, category: "video", arg: asked.tier, band: audience.band }).tier, choice.quality),
+      tier: choice.maker === "ltx25max" ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(words) : words, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.maker === "ltx25" ? { model: LTX25_MODEL } : choice.maker === "ltx23" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
+        prompt: laneOf(audience) === "child" ? forceCartoon(words) : words, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.maker === "ltx25max" ? { model: LTX25_MAX_MODEL } : choice.maker === "ltx25" ? { model: LTX25_MODEL } : choice.maker === "ltx23" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated" } : {}),

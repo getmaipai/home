@@ -11,7 +11,8 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { MAX_NEEDS_ADMIN_LINE, jobTier, tierArgument } from "@/lib/tiers";
-import { etaWords, makerOfModel } from "./quality";
+import { etaWords, ltx25MaxReady, makerOfModel } from "./quality";
+import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
 import { MINOR_MAKE_LINE, bodyOfVideoJob, makeVideoFor, type MakeVideoBody } from "./make";
 import { laneOf } from "@/lib/pictures/lane";
 import { and, eq } from "drizzle-orm";
@@ -62,6 +63,7 @@ export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open
 export const WHAT_TO_CHANGE_LINE = "Tell me what to change: the words, the look, the camera move, the sound, the length or the level.";
 export const NO_PICTURE_LINE = "The picture that video started from is not available any more, so I can't make it again. Ask for a new video.";
 export const ALREADY_MAX_LINE = "That video is already made at Max.";
+export const MAX_WORDS_ONLY_LINE = "Max makes videos from words only, so a video that started from a picture or a style cannot be made again at Max. I can make a new one from words at Max.";
 export const NO_CLIPS_LINE = "I can't find one of those videos. Tell me which videos to join, from the ones you made here.";
 export const JOIN_CLIPS_LINE = `Tell me ${MIN_JOIN_CLIPS} to ${MAX_JOIN_CLIPS} of your videos to join, in the order you want them.`;
 export const MIX_SOUND_LINE = "Tell me what to put over the video: a line to say in a voice, or one of your songs.";
@@ -129,6 +131,10 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     if (body.tier === "max") return refused(callId, args, ALREADY_MAX_LINE, "already_max");
     // The same grant check the tool and the Create page use; without it nothing is made.
     if (tierArgument({ person: actor, category: "video", arg: "max", band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) return refused(callId, args, MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
+    // Max runs only when the Stack says its model is ready; otherwise one plain status line, never a silent Boost copy and never a raw error.
+    const engine = await videoEngineStatus();
+    if (!ltx25MaxReady(engine)) return refused(callId, args, videoMaxNotReadyReason(engine), "max_not_ready");
+    if (source.request.source_file_id || source.request.loras.length > 0) return refused(callId, args, MAX_WORDS_ONLY_LINE, "max_words_only");
     body.tier = "max";
     // The same clip, made better: the same picture of the idea, so the seed stays.
     if (source.request.seed) body.seed = source.request.seed;
@@ -142,7 +148,8 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   }
   const job = made.job;
   const quality = job.request.quality ?? "quick";
-  const level = jobTier("video", job.request.tier, quality);
+  const madeAtMax = makerOfModel((job.request as { stackBody?: { model?: string } }).stackBody?.model, quality) === "ltx25max";
+  const level = madeAtMax ? "max" : jobTier("video", job.request.tier, quality);
   const note = made.notice ? ` ${made.notice}` : "";
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
