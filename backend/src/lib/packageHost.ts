@@ -992,7 +992,7 @@ interface SearxngEngine {
 const SEARXNG_ENGINES_CACHE_TTL_MS = 60 * 60 * 1000;
 let searxngEnginesCache: { baseUrl: string; fetchedAt: number; engines: SearxngEngine[] } | null = null;
 const searxngBenchedUntil = new Map<string, number>();
-const SEARXNG_ENGINE_BENCH_MS = 30 * 60 * 1000;
+const SEARXNG_ENGINE_BENCH_MS = 5 * 60 * 1000;
 
 /** Test-only reset, the same shape every other module-level cache here
  * gets (__resetRateLimiterForTests, __resetPackageCacheForTests): a
@@ -1001,6 +1001,10 @@ const SEARXNG_ENGINE_BENCH_MS = 30 * 60 * 1000;
 export function __resetSearxngEnginesCacheForTests(): void {
   searxngEnginesCache = null;
 }
+
+export const __searxngEngineBenchMsForTests = SEARXNG_ENGINE_BENCH_MS;
+export const __pickSearchEnginesForTests = (pool: string[], exclude: readonly string[] = []): string[] => pickSearchEngines(pool, exclude);
+export function __benchEngineForTests(name: string, until: number): void { searxngBenchedUntil.set(name, until); }
 
 export function __resetSearchRotationForTests(): void {
   searxngBenchedUntil.clear();
@@ -1064,6 +1068,16 @@ function availableRotationPool(pool: string[]): string[] {
   return pool.filter((name) => (searxngBenchedUntil.get(name) ?? 0) <= now);
 }
 
+/** When fewer than 2 engines are available, one benched engine (the one whose bench ends first) joins as a probe, so a pool
+ * emptied by benching still tests whether an engine answers again. */
+const MIN_ENGINE_POOL = 2;
+function poolWithProbe(pool: string[]): string[] {
+  const available = availableRotationPool(pool);
+  if (available.filter((name) => name !== "wikipedia").length >= MIN_ENGINE_POOL) return available;
+  const probe = pool.filter((name) => !available.includes(name) && name !== "wikipedia").sort((a, b) => (searxngBenchedUntil.get(a) ?? 0) - (searxngBenchedUntil.get(b) ?? 0))[0];
+  return probe ? [...available, probe] : available;
+}
+
 /** THIN-GROUND-01 part 2: one search names this many engines. It is still ONE
  * request to SearXNG, which fans out, so Home's request count and page-read
  * budget are unchanged. */
@@ -1089,7 +1103,7 @@ function engineScore(name: string): number {
  * the pool's own stable order. wikipedia is never one of the three: the caller
  * appends it when configured. */
 function pickSearchEngines(pool: string[], exclude: readonly string[] = [], count = SEARCH_ENGINE_COUNT): string[] {
-  return availableRotationPool(pool)
+  return poolWithProbe(pool)
     .filter((name) => name !== "wikipedia" && !exclude.includes(name))
     .map((name, order) => ({ name, order, score: engineScore(name) }))
     .sort((a, b) => b.score - a.score || a.order - b.order)
@@ -1783,7 +1797,7 @@ export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; 
       return search({ args: { ...rowsOnly, query }, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
     } };
   });
-  const found = await rotateSearch({ query: (asked!.query as string), adapters: [...adapters, ...extras], scope: `${p.band}${p.temporary ? ":temporary" : ""}`, signal: p.signal });
+  const found = await rotateSearch({ query: (asked!.query as string), adapters: [...adapters, ...extras], scope: `${p.band}${p.temporary ? ":temporary" : ""}`, signal: p.signal, ...(currentResearchBudget() !== undefined ? { wantHosts: 2 } : {}) });
   return attachSearchPages({ text: found.text, rows: found.rows }, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
 }
 

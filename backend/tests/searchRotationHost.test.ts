@@ -44,7 +44,7 @@ async function setup(searxBehaviour: "walled" | "ok") {
       counts.searx += 1;
       if (searxBehaviour === "walled") return Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"], ["google", "Suspended: too many requests"]] });
       const q = url.searchParams.get("q") ?? "";
-      return Response.json({ results: [1, 2, 3].map((i) => ({ title: `${q} result ${i}`, url: `https://searx.example.com/${i}`, content: `about ${q}` })), infoboxes: [] });
+      return Response.json({ results: [1, 2, 3].map((i) => ({ title: `${q} result ${i}`, url: `https://site${i}.example.com/${i}`, content: `about ${q}` })), infoboxes: [] });
     },
   });
   const wiki = Bun.serve({

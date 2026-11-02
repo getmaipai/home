@@ -295,6 +295,9 @@ export interface RotateOptions {
   scope: string;
   /** Rows wanted before the first backend's answer counts as enough. */
   wantRows?: number;
+  /** Distinct hosts wanted among the rows before the answer counts as enough (default 1: rows alone decide). A backend whose
+   * rows all share one host does not count toward `maxBackends` while this is above 1. */
+  wantHosts?: number;
   /** The most backends whose answers are fused for one query. */
   maxBackends?: number;
   signal?: AbortSignal;
@@ -305,10 +308,16 @@ function textOf(rows: WebRow[]): string {
   return rows.map((row, i) => `${i + 1}. ${row.title}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n");
 }
 
+function hostOf(row: WebRow): string | null {
+  if (!row.url) return null;
+  try { return new URL(row.url).hostname.toLowerCase().replace(/^www\./, ""); } catch { return null; }
+}
+
 async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
   const { query, adapters, signal } = opts;
   const wantRows = opts.wantRows ?? 3;
   const maxBackends = opts.maxBackends ?? 2;
+  const wantHosts = opts.wantHosts ?? 1;
   const byId = new Map(adapters.map((adapter) => [adapter.id, adapter] as const));
   let candidates = adapters.map((adapter) => adapter.id).filter(backendAvailable);
   const tried: RotateResult["tried"] = [];
@@ -325,13 +334,17 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
   // Rows that looked unrelated to the query: kept as a last resort so a wrong guess about relevance never leaves a person with nothing.
   let unrelated: { rows: WebRow[]; id: BackendId } | undefined;
   let lastError: unknown;
+  const hosts = new Set<string>();
+  // Backends whose answer counts toward maxBackends: with wantHosts above 1, one whose rows all share a single host does not.
+  let counted = 0;
+  const enough = (): boolean => lists.reduce((n, l) => n + l.length, 0) >= wantRows && hosts.size >= wantHosts;
   // Fall-through backends come after every ordinary one, and only while the rows found so far are fewer than wanted.
   const ordinary = candidates.filter((id) => byId.get(id)!.fallbackOnly !== true);
   const fallbacks = candidates.filter((id) => byId.get(id)!.fallbackOnly === true);
   for (const id of [...orderFor(ordinary), ...orderFor(fallbacks)]) {
     const fallback = byId.get(id)!.fallbackOnly === true;
-    if (fallback && lists.reduce((n, l) => n + l.length, 0) >= wantRows) break;
-    if (!fallback && via.length >= maxBackends) break;
+    if (fallback && enough()) break;
+    if (!fallback && counted >= maxBackends) break;
     const adapter = byId.get(id)!;
     const wait = reserve(id, MAX_WAIT_MS);
     if (wait === null) {
@@ -365,7 +378,10 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
       tried.push({ id, outcome: "ok", ms });
       lists.push(answer.rows);
       via.push(id);
-      if (answer.rows.length >= wantRows) break;
+      const own = new Set<string>();
+      for (const row of answer.rows) { const host = hostOf(row); if (host) { own.add(host); hosts.add(host); } }
+      if (wantHosts <= 1 || own.size > 1) counted += 1;
+      if (answer.rows.length >= wantRows && hosts.size >= wantHosts) break;
     } catch (err) {
       if (signal?.aborted) {
         backend(id).probing = false;

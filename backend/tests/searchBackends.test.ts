@@ -193,6 +193,42 @@ describe("rotation across backends", () => {
   });
 });
 
+describe("RESEARCH-HOSTS-01: distinct hosts", () => {
+  const rowsOn = (q: string, hosts: string[]): WebRow[] => hosts.map((h, i) => ({ title: `${q} guide ${i + 1} from ${h}`, url: `https://${h}/${i + 1}`, snippet: `About ${q}, part ${i + 1}` }));
+  const stub = (id: BackendId, rows: WebRow[], fallbackOnly = false): { adapter: BackendAdapter; calls: () => number } => {
+    let n = 0;
+    return { calls: () => n, adapter: { id, ...(fallbackOnly ? { fallbackOnly: true } : {}), async search() { n += 1; return { text: "", rows }; } } };
+  };
+  const setup = (q: string) => ({
+    searx: stub("searxng", []),
+    wiki: stub("wikimedia", rowsOn(q, Array(5).fill("en.wikipedia.org"))),
+    ddgs: stub("ddgs", rowsOn(q, ["a.example.com", "b.example.com", "a.example.com"]), true),
+  });
+
+  test("wantHosts 2: five rows on one host do not end the round; the fall-through backend adds hosts", async () => {
+    const f = setup("host topic");
+    const res = await ask("host topic", [f.searx.adapter, f.wiki.adapter, f.ddgs.adapter], { wantHosts: 2 });
+    expect(res.via).toContain("ddgs");
+    expect(new Set(res.rows.map((r) => new URL(r.url!).hostname)).size).toBe(3);
+  });
+
+  test("default wantHosts 1 keeps today's behaviour: enough rows on one host end the round", async () => {
+    const f = setup("host topic");
+    const res = await ask("host topic", [f.searx.adapter, f.wiki.adapter, f.ddgs.adapter]);
+    expect(res.via).toEqual(["wikimedia"]);
+    expect(f.ddgs.calls()).toBe(0);
+  });
+
+  test("a one-host backend does not use up maxBackends when hosts are wanted", async () => {
+    const a = stub("searxng", rowsOn("cap topic", ["en.wikipedia.org", "en.wikipedia.org"]));
+    const b = stub("wikimedia", rowsOn("cap topic", ["en.wikipedia.org", "en.wikipedia.org"]));
+    const c = stub("hosted", rowsOn("cap topic", ["x.example.com", "y.example.com"]));
+    const res = await ask("cap topic", [a.adapter, b.adapter, c.adapter], { wantHosts: 2, maxBackends: 2, wantRows: 6 });
+    expect(c.calls()).toBe(1);
+    expect(res.via).toContain("hosted");
+  });
+});
+
 describe("pace and cooldown", () => {
   test("no backend is asked faster than its pace: a burst of two, then one gap apart", async () => {
     const a = fake("searxng", "ok");
