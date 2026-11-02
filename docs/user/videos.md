@@ -127,6 +127,27 @@ After chat has made you a picture, say "animate this picture" or open the **More
 
 Home can animate a picture you made or a photo you attach. Describe the motion you want. The model decides whether to fulfill adult requests; Home blocks output only when its CSAM check finds a candidate.
 
+## Adults-only videos and the lock
+
+A video made with an adults-only style is marked NSFW and locked the moment it starts. You do not have to do anything. While it is locked, it shows as one lock tile, with no title or picture, and it opens only when you enter your passcode on your own screen.
+
+People under 18 never see an adults-only video, locked or not. The TV and other shared screens do not show it either.
+
+**Change your mind about a video you made.** You can take the lock off.
+
+1. Open the video and press **Unmark as NSFW**.
+2. Read what will change. The video will show with its title and picture in your feeds and lists, to anyone looking at your screen.
+3. Enter your passcode again, even if you just unlocked. Home asks every time.
+4. Press **Remove lock**.
+
+After that, the video says "Marked NSFW, lock removed." Anyone under 18 still cannot see it. Only the person who made the video can take the lock off. An admin cannot take it off another person's video.
+
+**Lock it again.** Press **Mark as NSFW** on any of your videos. It locks at once, and you do not need your passcode. An admin can also mark more videos NSFW.
+
+**Changing a video.** A trimmed, joined or mixed video follows the videos it came from. If the video you changed had its lock removed, the new one has no lock. If any video you used is still locked, the new one is locked. A new take that uses an adults-only style again is locked.
+
+Home keeps a short record of each change: who, when and which video. It never holds the words or the picture. Only you can see the record for your own videos.
+
 ## Who can make videos
 
 Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual and only the everyday styles. Children can make short cartoon videos of safe things, up to 5 a day, switched on for every child unless you turn it off, with the same limits as pictures. An owner or admin can turn this off. Teens and children get Standard only, as short clips with no sound. They never see a half-drawn frame. Spoken answers, the TV and other shared screens never make videos. A guest cannot.

@@ -53,19 +53,42 @@ join it in ADULT-LOCK-07.
 | Companion activity and counts | `routes/companions.ts` | locked jobs left out |
 | Chat tool part | `lib/turnMachine/nodes/tool.ts`, `redactLockedVideoOutcome` | placeholder, no prompt, styles or ids; an adult-only style without a proof starts nothing |
 
-A clip made with an adult-only style is marked `request.adultOnly` at job start (`startVideoJob`), so a running clip is already a tile.
+A clip made with an adult-only style is marked `request.adultOnly` and `request.adultLock` at job start (`startVideoJob`), so a running clip is already a tile.
+
+## Auto-mark, unmark and re-mark (ADULT-LOCK-06)
+
+The two fields live in the Library file's provenance note, beside `audience` (the key the Library's minor gate has always read; `made_audience` is written with the same value): `made_audience` (`all-ages` or `adult-only`, the machine fact, never lowered) and `lock` (`on` or `off`, what the creator can clear). One store, no second copy of the flag: the clip and its poster carry both, and `lockItemOfProvenance` and `lockedFilterSql` read them as before. A note with no `lock` key (a clip stored before this slice) is locked on. The audit table is `adult_mark_log` (migration 0160, indexed by item and by actor); the design's `adult_marks` table is not built because the note is the store.
+
+| Piece | File | What it does |
+|---|---|---|
+| The table of the design note | `lib/adultLock.ts` `newItemMark(sources, addsAdultStyle)` | The one function for every new item: audience never below a source's, lock on while a source is locked on or an adult-only style is added, cleared sources are followed. `markFields`, `withMark` write the note keys. |
+| The adult-style predicate | `lib/videos/adultStyle.ts` `usesAdultOnlyStyle(styleIds)` | The ONE "uses an adult-only style" function: today the adult-only video adapters; the LoRA slices extend this file only. |
+| Job start | `lib/videos/jobs.ts` `startVideoJob`, `startVideoEditJob`; `lib/videos/editTool.ts` `clipMark` | Sets `request.adultOnly` and `request.adultLock` before the Stack is called. An edit reads each source's CURRENT flags from its file (a lock the creator cleared stays cleared). |
+| Finished clip | `settleClip` | Writes `made_audience`, `audience` and `lock` into the clip and poster notes. The prompt word check raises the audience only; the check's own nude or sexual verdict turns the lock on (not for an edit, which follows its sources). A lock on at storage writes an `auto` audit row. |
+| Marks and audit | `lib/adultMarks.ts` | `setItemLock` (clear and mark, the rules below), `adultStateOf` (the card's `adult` field), `markHistory` (the creator's own rows). |
+| Route | `POST /api/videos/jobs/{id}/adult-mark { action: "clear" \| "mark", ticket? }` | Answers `{ made_audience, lock }` and nothing else. |
+
+Who may do what:
+
+- **Clear.** The creator only, on their own written screen (a browser session of an adult), with a ticket from `POST /api/adult-lock/confirm { secret, action: "unmark", item: <job id> }`: a fresh passcode, single use, 30 seconds, bound to the person, the browser session and the job. A live unlock proof is refused in its place; the ticket is spent only by a request that could succeed. Anyone else, an admin included, gets the same 404 a missing clip gets.
+- **Mark.** The creator or an admin, no passcode. It raises `made_audience` to adult-only if it was lower, turns the lock on, and only ever raises. An admin marks by job id without seeing the item, and the answer holds no content.
+- **Audit.** `adult_mark_log` rows hold the file id, action (`clear` or `mark`), actor, `via` (`creator_passcode`, `creator`, `admin`, `auto`) and time. No prompt, title or file name. No route, admin page or Status page lists them; the creator gets their own rows in the card's `adult.history`.
+- **Minors.** Nothing here lowers `made_audience`, so a teen or child never sees the item locked, cleared or marked again (`lockState` is `hidden` for them in every state).
+- **Chat.** `redactLockedVideoOutcome` turns the stored tool part of a locked clip into the placeholder; once the creator clears the lock the part is an ordinary result, because the clip is no longer a locked item.
+
+The card (`GET /api/videos/jobs/{id}`, shown only when open) carries `adult: { made_audience, lock, can_clear, can_mark, line, history }` for the creator. The chat video card shows `line` as its notice, "Unmark as NSFW" when `can_clear` (the kit `AdultLockDialog` with the confirm's own title, words and button, from ui-v0.5.481) and "Mark as NSFW" when `can_mark`. A card that turns locked is the one lock tile. Tests: `tests/adultMark06.test.ts`, `tests/adultMark06Edit.test.ts` (the table row by row, then real trims and joins), `src/apps/chat/videoAdultMark.test.tsx`.
 
 ## Known gaps (follow-ups)
 
 - (Closed 2026-11-02, see "Verification") the history list's `video.id`, trash, the `/api/videos` cancel, the artwork picker, an unresolvable style at job start, parallel unlock guesses and `/confirm` counting.
 - Still open, found in review and judged out of this slice: (a) a failed or cancelled job made before this change from an adult-only source carries no `request.adultOnly` and no clip, so its prompt shows; no adult-only style could be chosen before VIDEO-LORA ships, so only the continue-from-adult-clip path is affected; (b) background callers (retention, export, a worker outside a request) have no proof and so see a locked file as missing, by design; (c) `videoRowIsLocked` re-reads per job in the companion loops (an N+1, small lists); (d) the SQL filter (`lockedFilterSql`) and the JS decision (`lockItemOfProvenance`) state the rule twice; (e) the unlock failures and sign-in failures share the per-IP throttle on purpose (a stranger guessing at an open page can slow that address's sign-in, never the person's own profile counter).
 - Passkey unlock (`passkey_assertion`) is not built; `/unlock` takes the secret only.
-- A clip that turns adult-only only at the finished-clip check (prompt word list, nude verdict) is locked from then on, but a tool part stored before that
-  keeps its words. ADULT-LOCK-06 sets the lock at job start from every source and closes this.
+- A tool part stored before a clip turned adult-only at the finished-clip check keeps its words. The lock now starts at job start for every adult style and source (below); the prompt word check raises the minor ceiling only, so a word-only clip is not locked and its part is an ordinary result.
+- The Videos Create page (a catalog package, schema driven) and the Library viewer have no Unmark or Mark action yet: they need a kit action and a package action each (follow-up). Chat's video card has both. A person who signs in with a password rather than digits cannot use the confirm dialog (the kit passcode boxes are digits only).
 - The Stack's job list and progress (ADULT-LOCK-04), LoRA listings (VIDEO-LORA slices) and pictures and songs (ADULT-LOCK-07) are their own rows.
 - The kit's unlock dialog takes a digit passcode. A person whose sign-in secret is a password (no digit count) sees "Set a passcode in Account to open these" until they set a digit passcode.
 - A flag that flips on while an item plays is caught only when the page reads the item again as an `adult_only` row it had seen open (the poll the page already makes); a person who never unlocked gets the tile, which has no id to match.
-- `lock` and `made_audience` are spec fields since spec-v0.1.309 (pinned with ADULT-LOCK-03b); the backend still reads them from the provenance note until ADULT-LOCK-06 moves it to the record.
+- `lock` and `made_audience` are spec fields since spec-v0.1.309; the backend reads and writes them in the provenance note (ADULT-LOCK-06 keeps them there, one store), and moving them onto the record is VIDEO-LORA-02's change.
 
 ## The Stack's full view (ADULT-LOCK-03)
 
