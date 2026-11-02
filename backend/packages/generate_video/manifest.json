@@ -87,14 +87,14 @@
           "full"
         ],
         "grounded": false,
-        "description": "Optional sound for a clip made at Boost or Max. clean (the default) means no laugh track and no music, and one person speaks at a time. full means music and sound effects too; use it only when the person asks for music or effects. A person's spoken line goes in the prompt inside quotes, and only one person speaks at a time."
+        "description": "Optional sound for any clip that has sound (Standard or Boost on a computer with the newest video model, else Boost or Max). clean (the default) means no laugh track and no music, and one person speaks at a time. full means music and sound effects too; use it only when the person asks for music or effects. A person's spoken line goes in the prompt inside quotes, and only one person speaks at a time."
       },
       "seconds": {
         "type": "integer",
         "minimum": 1,
         "maximum": 10,
         "grounded": false,
-        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. A video longer than 5 seconds is made at Boost automatically (Standard makes 5 seconds at most). Spoken words are clearest in a clip of 5 seconds or less, so for a spoken line keep it at 5 unless the person asks for longer."
+        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. On a computer with the newest video model, Standard makes up to 10 seconds with sound and Boost makes up to 5 seconds with sound; otherwise Standard makes 5 seconds at most and a longer video is made at Boost automatically. When a length is cut to fit, the tool says so and you tell the person. A video that starts from a picture is 5 seconds at most and has no sound."
       },
       "tier": {
         "type": "string",
@@ -104,7 +104,7 @@
           "max"
         ],
         "grounded": false,
-        "description": "Optional level: standard, boost or max. Leave it out for almost every request; Home then uses the household's setting. Use boost when the person wants people to speak, wants sound or music, wants more than 5 seconds, or a better one. Use max only when they ask for max quality or the biggest model; it is for people an admin allowed, and if it is not allowed the tool says so and you tell the person in your own words. Use standard for \"just a quick one\", or when they want it to start from a picture. Do not use it for age or content reasons."
+        "description": "Optional level: standard, boost or max. Leave it out for almost every request; Home then uses the household's setting. Use boost when the person wants a better one, or, on a computer where Standard has no sound, wants people to speak, wants sound or music, or wants more than 5 seconds. Use max only when they ask for max quality or the biggest model; it is for people an admin allowed, and if it is not allowed the tool says so and you tell the person in your own words. Use standard for \"just a quick one\", for a longer clip with sound when the tool allows it, or when they want it to start from a picture. Do not use it for age or content reasons."
       },
       "style": {
         "type": "string",

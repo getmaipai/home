@@ -106,7 +106,7 @@
         "minimum": 1,
         "maximum": 10,
         "grounded": false,
-        "description": "For remix only: a new length in seconds, 1 to 10. More than 5 seconds is made at Boost."
+        "description": "For remix only: a new length in seconds, 1 to 10. A length a level cannot make is cut to fit, and the tool says so."
       },
       "keep_seed": {
         "type": "boolean",

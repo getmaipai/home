@@ -9,7 +9,8 @@ import { getVideoJobFor } from "@/lib/videos/jobs";
 import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_STARTERS, VIDEO_VOICES } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
-import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
+import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
+import { peekVideoEngineStatus } from "@/lib/videos/ready";
 import { registerAppPageFill } from "@/lib/apps";
 import { packageAssetFile } from "@/lib/packageAssets";
 import type { PersonRow } from "@/types";
@@ -24,12 +25,27 @@ function statusLine(state: string, percent: number, error: string | null, note?:
 /** The levels this person may use (Boost needs the Boost model and their say; Max needs the Max slot and their say). Standard alone is no choice, so no segment. */
 export function videoTierSegment(person: PersonRow): Record<string, unknown> | null {
   const band = speakerAgeBand(person, new Date());
+  // VIDEO-TIERS-01: with LTX-2.5 serving an adult (the page is adult-only), Standard is up to 10 seconds with sound and Boost up to 5 seconds with sound;
+  // otherwise today's words. The ceilings come from `maxSecondsFor` (quality.ts), the one definition.
+  const engine = peekVideoEngineStatus();
+  const ltx25 = ltx25VideoReady(engine);
+  const boostOffered = allowedQuality(person, "video", "detailed", band) === "detailed";
   const tiers = [
-    { id: "standard", label: "Standard", hint: `Up to ${QUICK_MAX_SECONDS} seconds` },
-    ...(allowedQuality(person, "video", "detailed", band) === "detailed" ? [{ id: "boost", label: "Boost", hint: `Up to ${DETAILED_MAX_SECONDS} seconds, with sound` }] : []),
+    { id: "standard", label: "Standard", hint: ltx25 ? `Up to ${maxSecondsFor("quick", "ltx25", engine)} seconds, with sound` : `Up to ${QUICK_MAX_SECONDS} seconds` },
+    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: `Up to ${ltx25 ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS} seconds, with sound` }] : []),
     ...(maxOffered(person, "video", band) ? [{ id: "max", label: "Max", hint: "The best the home can make" }] : []),
   ];
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
+}
+
+/** The lengths the Length chip offers: five seconds and the longest any level makes here now (10 s: Standard on LTX-2.5, or Boost on LTX-2.3). A level that makes less is cut to fit and says so. */
+function lengthOptions(): number[] {
+  const engine = peekVideoEngineStatus();
+  const longest = Math.max(
+    ltx25VideoReady(engine) ? maxSecondsFor("quick", "ltx25", engine) : QUICK_MAX_SECONDS,
+    ltx25VideoReady(engine) ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS,
+  );
+  return [...new Set([QUICK_MAX_SECONDS, longest])];
 }
 
 /** The first node of one type anywhere in a page's body (the prompt bar sits inside the page's split view). */
@@ -55,7 +71,7 @@ registerAppPageFill("videos", "make-video", (person, page) => {
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   bar.chips = [
     ...chips,
-    { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: [QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS].map((value) => ({ value, label: `${value} seconds` })) },
+    { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: lengthOptions().map((value) => ({ value, label: `${value} seconds` })) },
     { state: "look", label: "Look", variant: "cards", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) })) },
     // No camera move is the start: "none" is not a card, so no card is chosen until the person picks one (the route reads "none" as not given).
     { state: "camera", label: "Camera", variant: "cards", default: "none", options: VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) })) },

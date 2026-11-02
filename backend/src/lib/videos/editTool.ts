@@ -9,7 +9,7 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { MAX_NEEDS_ADMIN_LINE, jobTier, tierArgument } from "@/lib/tiers";
-import { etaWords } from "./quality";
+import { etaWords, makerOfModel } from "./quality";
 import { bodyOfVideoJob, makeVideoFor, type MakeVideoBody } from "./make";
 import { sourceVideoJob } from "./jobs";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
@@ -107,7 +107,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: `A new ${job.request.seconds} second version of the video is being made at ${level === "max" ? "Max" : level === "boost" ? "Boost" : "Standard"}; the first one is kept. It takes ${etaWords(quality, job.request.seconds)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${note}` },
+      reply: { text: `A new ${job.request.seconds} second version of the video is being made at ${level === "max" ? "Max" : level === "boost" ? "Boost" : "Standard"}; the first one is kept. It takes ${etaWords(quality, job.request.seconds, makerOfModel((job.request as { stackBody?: { model?: string } }).stackBody?.model, quality))} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${note}` },
       data: { videoJobId: job.id },
       actions: [],
     },

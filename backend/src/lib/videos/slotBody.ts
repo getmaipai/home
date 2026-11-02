@@ -7,7 +7,7 @@ import type { Lane } from "@/lib/pictures/lane";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import type { AgeBand } from "@/lib/ageBand";
 import { slotRun, type Tier } from "@/lib/tiers";
-import { QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
+import { LTX25_DEFAULTS, LTX25_MODEL, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
 import type { VideoBody } from "@/lib/videos/stack";
 
 type Body = Omit<VideoBody, "timeout_ms">;
@@ -15,6 +15,7 @@ type Body = Omit<VideoBody, "timeout_ms">;
 /** The quality a slot's model id names: the LTX pin is Detailed, the Wan pin is Quick; any other id names neither. */
 export function qualityOfSlotModel(id: string | null | undefined): VideoQuality | null {
   if (!id) return null;
+  // LTX-2.5 serves both Standard and Boost (VIDEO-TIERS-01): its level is the job's tier, not its id (see `videoBodyForSlot`).
   if (id === "detailed" || id.startsWith("ltx")) return "detailed";
   if (id === "quick" || id.startsWith("fastwan") || id.startsWith("wan")) return "quick";
   return null;
@@ -23,7 +24,11 @@ export function qualityOfSlotModel(id: string | null | undefined): VideoQuality 
 const STEP = 64;
 const shapeOf = (size: string | undefined): "default-landscape" | "default-portrait" | "other" => {
   if (size === undefined) return "default-landscape";
-  for (const sizes of Object.values(VIDEO_SIZES_BY_QUALITY)) { if (size === sizes.landscape) return "default-landscape"; if (size === sizes.portrait) return "default-portrait"; }
+  const known = [...Object.values(VIDEO_SIZES_BY_QUALITY), ...Object.values(LTX25_DEFAULTS)];
+  for (const sizes of known) { if (size === sizes.landscape) return "default-landscape"; if (size === sizes.portrait) return "default-portrait"; }
+  // The Stack's own true LTX-2.5 sizes (a Boost profile of 640x320 is also a default shape).
+  if (size === "640x320") return "default-landscape";
+  if (size === "320x640") return "default-portrait";
   return "other";
 };
 /** The size at `resolution` (the short side) in the maker's own shape; null when that is not smaller than the maker's default. */
@@ -40,8 +45,24 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
   const run = slotRun("video", requested, band);
   const body: Body = { ...base };
   delete body.tier;
+  // VIDEO-TIERS-01: an adult's LTX-2.5 clip keeps its model at whatever level the slot lowers it to; its size and ceiling follow that level. A
+  // slot an admin pointed at another model overrides it below, as before. A minor is never here (the lane check below puts it on Wan).
+  const slotModel = run.lowered ? null : run.model;
+  if (base.model === LTX25_MODEL && lane === "adult" && (!slotModel || !qualityOfSlotModel(slotModel) || slotModel.startsWith("ltx25"))) {
+    const level: VideoQuality = run.tier === "standard" ? "quick" : "detailed";
+    const levelKey = level === "quick" ? "standard" : "boost";
+    const portrait = shapeOf(base.size) === "default-portrait";
+    // The queued size is the Stack's true size for the level it was queued at; a level lowered since (a switched-off Boost) gets the lower level's size.
+    if (run.lowered && shapeOf(base.size) !== "other") body.size = LTX25_DEFAULTS[levelKey][portrait ? "portrait" : "landscape"];
+    if (body.seconds !== undefined) body.seconds = Math.max(1, Math.min(body.seconds, maxSecondsFor(level, "ltx25")));
+    if (run.tier === "boost" || run.tier === "max") body.tier = run.tier;
+    return { body, tier: run.tier, quality: level };
+  }
   const shape = shapeOf(base.size);
-  let quality: VideoQuality = qualityOfSlotModel(base.model) ?? "quick";
+  // A minor is never sent LTX-2.5 (rules 0, 8, 10): the model goes back to the lane's own and the size and ceiling follow Wan.
+  if (base.model === LTX25_MODEL && lane !== "adult") body.model = videoModelForLane(lane, base.model);
+  let quality: VideoQuality = body.model === LTX25_MODEL ? "detailed" : qualityOfSlotModel(body.model) ?? "quick";
+  if (base.model === LTX25_MODEL && lane !== "adult") quality = "quick";
   if (run.lowered) {
     delete body.model;
     quality = "quick";

@@ -18,6 +18,7 @@ import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { videoBodyForSlot } from "./slotBody";
+import { LTX25_DEFAULTS, LTX25_MODEL } from "./quality";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
@@ -398,7 +399,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || (model === LTX25_MODEL && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -518,7 +519,8 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     if (!conversationId && job.temporary) throw new Error("no conversation");
     const width = clip.width ?? 832;
     const height = clip.height ?? 480;
-    const quality = clip.quality === "detailed" ? "detailed" as const : "quick" as const;
+    // VIDEO-TIERS-01: an LTX-2.5 clip is Standard ("quick") or Boost ("detailed") by the level the job ran at; it has sound either way (`audio`).
+    const quality = clip.quality === "detailed" || (clip.quality === "ltx25" && job.request.quality === "detailed") ? "detailed" as const : "quick" as const;
     const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height, quality, audio: clip.audio === true };
     let file: VideoFile;
     if (job.temporary) {

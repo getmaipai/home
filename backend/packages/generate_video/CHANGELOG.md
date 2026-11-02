@@ -2,6 +2,12 @@
 
 All notable changes to the Make a Video package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [Unreleased]
+
+### Changed
+
+- VIDEO-TIERS-01: on a computer whose Stack serves LTX-2.5, an adult's Standard video is up to 10 seconds with sound and Boost is up to 5 seconds with sound (made from words; a clip that starts from a picture is still the silent 5 second kind). The `seconds`, `tier` and `voices` descriptions say so. A teen or a child is unchanged.
+
 ## [0.3.0] - 2026-11-02
 
 ### Added

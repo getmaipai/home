@@ -22,7 +22,7 @@ export interface StackClip {
   mode?: string;
   lora_ids?: string[];
   /** VIDEO-LTX-01: which model made it, and whether it has a sound track the model made (absent on an older Stack: Quick, silent). */
-  quality?: "quick" | "detailed";
+  quality?: "quick" | "detailed" | "ltx25";
   audio?: boolean;
   ms?: number;
   bytes?: number;
@@ -56,6 +56,29 @@ export interface StackVideoQuality {
   image_to_video?: boolean;
 }
 
+/** VIDEO-TIERS-01: one size LTX-2.5 runs at, as `qualities.ltx25.profiles[]` reports it (true output size, memory in GB). */
+export interface StackLtx25Profile {
+  name: "standard" | "boost";
+  size: string;
+  width: number;
+  height: number;
+  max_seconds: number;
+  max_frames?: number;
+  peak_gb?: number;
+  short_peak_gb?: number;
+}
+
+/** VIDEO-TIERS-01: LTX-2.5 (sound, adults only), as `GET /stack/v1/video` reports it. Absent on a Stack that does not serve it. */
+export interface StackLtx25Quality {
+  /** The Stack can take an LTX-2.5 job now (installed, available and its runtime environment in place). */
+  ready: boolean;
+  installed?: boolean;
+  available?: boolean;
+  environment?: unknown;
+  limits?: Record<string, number | string>;
+  profiles?: StackLtx25Profile[];
+}
+
 export interface StackVideoStatus {
   state: "unsupported" | "off" | "not-installed" | "needs-setup" | "building" | "idle" | "running";
   phase: string | null;
@@ -71,7 +94,7 @@ export interface StackVideoStatus {
   audio: boolean;
   reference_images?: { generated: boolean; uploaded: boolean; reason: string };
   /** VIDEO-LTX-01: the two models. An older Stack has none: Quick only, from the fields above. */
-  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality };
+  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality };
 }
 
 export interface StackVideoLora {
@@ -103,7 +126,7 @@ export interface VideoBody {
   image_source?: "generated" | "uploaded";
   loras?: Array<{ id: string; strength: number }>;
   audience: "all-ages" | "adult";
-  /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
+  /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), "ltx25-q8" is LTX-2.5 with sound (VIDEO-TIERS-01, adults only, words only: the Stack answers 422 to a picture or a LoRA), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;
   /** TIER-HOME-04: the level the job runs at, from the slot (`lib/videos/slotBody.ts`); left out at Standard. */
   tier?: "boost" | "max";
@@ -219,12 +242,25 @@ export async function cancelOrDeleteVideo(job: string): Promise<void> {
   } catch { /* the Stack removes its own files after a day */ }
 }
 
+/** VIDEO-TIERS-01: `qualities.ltx25` is read defensively. `ready` counts only when it is exactly `true`, and a profile with an unusable size or length is dropped, so a half-written reply never offers a tier the Stack cannot run. */
+export function withCheckedLtx25(status: StackVideoStatus): StackVideoStatus {
+  const raw = status.qualities?.ltx25 as (Partial<StackLtx25Quality> & { profiles?: unknown }) | undefined;
+  if (!status.qualities || !raw || typeof raw !== "object") return status;
+  const profiles = (Array.isArray(raw.profiles) ? raw.profiles : []).flatMap((p): StackLtx25Profile[] => {
+    const x = p as Partial<StackLtx25Profile> | null;
+    if (!x || (x.name !== "standard" && x.name !== "boost") || typeof x.width !== "number" || typeof x.height !== "number" || typeof x.max_seconds !== "number") return [];
+    if (!(x.width > 0) || !(x.height > 0) || !(x.max_seconds > 0)) return [];
+    return [{ ...x, name: x.name, width: x.width, height: x.height, size: `${x.width}x${x.height}`, max_seconds: x.max_seconds } as StackLtx25Profile];
+  });
+  return { ...status, qualities: { ...status.qualities, ltx25: { ...raw, ready: raw.ready === true, profiles } } };
+}
+
 export async function videoStatus(): Promise<StackVideoStatus | null> {
   try {
     const res = await request("/stack/v1/video", { method: "GET", timeoutMs: 5_000 });
     if (!res.ok) return null;
     const body = await res.json() as { video?: StackVideoStatus };
-    return body.video ?? null;
+    return body.video ? withCheckedLtx25(body.video) : null;
   } catch {
     return null;
   }

@@ -6,7 +6,7 @@
 // to the Stack. Rule 0 is untouched: the age and surface gates ran before anything here, and the finished-clip age check runs on
 // every clip of either kind.
 import { householdVideoQuality } from "./policy";
-import type { StackVideoStatus } from "./stack";
+import type { StackLtx25Profile, StackVideoStatus } from "./stack";
 
 export type VideoQuality = "quick" | "detailed";
 /** The base model a Stack LoRA record names for each kind. */
@@ -14,16 +14,51 @@ export const QUICK_BASE = "wan2.2-ti2v-5b";
 export const DETAILED_BASE = "ltx-2.3";
 export const QUICK_MAX_SECONDS = 5;
 export const DETAILED_MAX_SECONDS = 10;
+/** VIDEO-TIERS-01: LTX-2.5 with sound. Adults only; words only (the Stack answers 422 to a picture or a LoRA for it). */
+export const LTX25_MODEL = "ltx25-q8";
+/** Which model makes a clip: Wan (silent), LTX-2.3 (sound) or LTX-2.5 (sound). */
+export type VideoMaker = "wan" | "ltx23" | "ltx25";
+/** The true LTX-2.5 sizes (the engine rounds heights to a multiple of 64; docs/design/video-tiers-2026-11-02.md section 3) and ceilings, used when the Stack's own `profiles` are missing. Standard is 512x256 for 10 s; Boost 768x448 for 5 s (640x320 is the smaller Boost size). */
+export const LTX25_DEFAULTS: Record<"standard" | "boost", { landscape: string; portrait: string; max_seconds: number }> = {
+  standard: { landscape: "512x256", portrait: "256x512", max_seconds: 10 },
+  boost: { landscape: "768x448", portrait: "448x768", max_seconds: 5 },
+};
 
 export const isVideoQuality = (value: unknown): value is VideoQuality => value === "quick" || value === "detailed";
 export const qualityOfBase = (base: string | null | undefined): VideoQuality | null => (base === DETAILED_BASE ? "detailed" : base === QUICK_BASE ? "quick" : null);
-export const maxSecondsFor = (quality: VideoQuality): number => (quality === "detailed" ? DETAILED_MAX_SECONDS : QUICK_MAX_SECONDS);
+/** The ceiling of each level. Wan: 5 s. LTX-2.3 (Boost): 10 s. LTX-2.5: Standard 10 s, Boost 5 s for now. The one definition; every length in Home reads it. A Stack profile's own `max_seconds` lowers it. */
+export function maxSecondsFor(quality: VideoQuality, maker: VideoMaker = quality === "detailed" ? "ltx23" : "wan", engine?: Pick<StackVideoStatus, "qualities"> | null): number {
+  if (maker === "wan") return QUICK_MAX_SECONDS;
+  if (maker === "ltx23") return DETAILED_MAX_SECONDS;
+  const level = quality === "detailed" ? "boost" : "standard";
+  return Math.min(LTX25_DEFAULTS[level].max_seconds, ltx25Profile(engine ?? null, level)?.max_seconds ?? Infinity);
+}
 
 /** The sizes of each kind (the Stack's defaults for landscape and its tall shape). */
 export const VIDEO_SIZES_BY_QUALITY: Record<VideoQuality, { landscape: string; portrait: string }> = {
   quick: { landscape: "832x480", portrait: "480x832" },
   detailed: { landscape: "768x448", portrait: "448x768" },
 };
+
+/** Whether LTX-2.5 can run here now: the Stack reports `qualities.ltx25.ready`. */
+export function ltx25VideoReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
+  return engine?.qualities?.ltx25?.ready === true;
+}
+/** The Stack's profile for a level (the larger Boost size when it lists two), or null when it lists none. */
+export function ltx25Profile(engine: Pick<StackVideoStatus, "qualities"> | null, level: "standard" | "boost"): StackLtx25Profile | null {
+  const fits = (engine?.qualities?.ltx25?.profiles ?? []).filter((p) => p.name === level);
+  return fits.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? null;
+}
+/** The size to ask for: LTX-2.5's true size from the Stack's profile (else the table above); the older makers keep their own. */
+export function videoSizeFor(maker: VideoMaker, quality: VideoQuality, portrait: boolean, engine?: Pick<StackVideoStatus, "qualities"> | null): string {
+  if (maker !== "ltx25") return VIDEO_SIZES_BY_QUALITY[quality][portrait ? "portrait" : "landscape"];
+  const level = quality === "detailed" ? "boost" : "standard";
+  const profile = ltx25Profile(engine ?? null, level);
+  if (profile) return portrait ? `${profile.height}x${profile.width}` : `${profile.width}x${profile.height}`;
+  return LTX25_DEFAULTS[level][portrait ? "portrait" : "landscape"];
+}
+/** The maker of an adult's clip by the model id the request carries. */
+export const makerOfModel = (model: string | null | undefined, quality: VideoQuality): VideoMaker => (model === LTX25_MODEL ? "ltx25" : quality === "detailed" ? "ltx23" : "wan");
 
 /** Whether Detailed can run here now: the Stack lists it as installed and this computer's tier can run it. */
 export function detailedVideoReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
@@ -42,6 +77,8 @@ export type VideoQualityNote = "detailed_not_installed" | "quick_not_installed" 
 
 export interface VideoQualityChoice {
   quality: VideoQuality;
+  /** Which model makes it (VIDEO-TIERS-01): LTX-2.5 only for an adult, from words, when the Stack says it is ready. */
+  maker: VideoMaker;
   /** The seconds to ask for, held to the kind's ceiling. */
   seconds: number;
   note: VideoQualityNote;
@@ -56,24 +93,35 @@ export interface VideoQualityChoice {
  * Detailed (a fact of the models, not a reading of words), else the request's own choice, else the household's setting. Detailed
  * that is not installed falls back to Quick with a note and the five second ceiling.
  */
-export function chooseVideoQuality(input: { requested?: VideoQuality | undefined; style?: { base_model: string } | null; seconds?: number | undefined; engine: StackVideoStatus | null; household?: VideoQuality; /** The clip starts from a picture: Detailed can take it only when the Stack says so (`qualities.detailed.image_to_video`). */ hasPicture?: boolean; /** A teen or a child: Quick and nothing else, whatever was asked (the job starter enforces it again). */ quickOnly?: boolean }): VideoQualityChoice {
+export function chooseVideoQuality(input: { requested?: VideoQuality | undefined; style?: { base_model: string } | null; seconds?: number | undefined; engine: StackVideoStatus | null; household?: VideoQuality; /** The clip starts from a picture: Detailed can take it only when the Stack says so (`qualities.detailed.image_to_video`). */ hasPicture?: boolean; /** A teen or a child: Quick and nothing else, whatever was asked (the job starter enforces it again). */ quickOnly?: boolean; /** An adult: the only lane LTX-2.5 serves (a teen or a child never gets it, rules 0, 8 and 10). */ adultLane?: boolean }): VideoQualityChoice {
   const asked = typeof input.seconds === "number" && Number.isFinite(input.seconds) ? Math.round(input.seconds) : undefined;
   const base = qualityOfBase(input.style?.base_model);
   const quickOk = quickVideoReady(input.engine);
   const detailedOk = detailedVideoReady(input.engine);
-  const fit = (quality: VideoQuality, note: VideoQualityNote, announce: boolean): VideoQualityChoice => {
-    const ceiling = maxSecondsFor(quality);
+  // VIDEO-TIERS-01: LTX-2.5 serves an adult's clip made from words (no picture, no style) when the Stack says it is ready. Standard is then
+  // 10 s with sound and Boost 5 s with sound; anything else keeps today's models exactly.
+  const ltx25Ok = input.adultLane === true && !input.hasPicture && !input.style && ltx25VideoReady(input.engine);
+  const fit = (quality: VideoQuality, note: VideoQualityNote, announce: boolean, maker: VideoMaker = quality === "detailed" ? "ltx23" : "wan"): VideoQualityChoice => {
+    const ceiling = maxSecondsFor(quality, maker, input.engine);
     const seconds = Math.max(1, Math.min(ceiling, asked ?? 5));
-    return { quality, seconds, note, announce, shortened: asked !== undefined && asked > ceiling };
+    return { quality, maker, seconds, note, announce, shortened: asked !== undefined && asked > ceiling };
   };
-  if (input.quickOnly) return fit("quick", null, false);
+  if (input.quickOnly && !ltx25Ok) return fit("quick", null, false);
   if (input.style && base) {
     if (base === "detailed") return fit("detailed", input.requested === "quick" ? "style_needs_detailed" : null, true);
     return fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);
   }
+  if (ltx25Ok) {
+    // A length past Boost's five seconds is a Standard clip (10 s) unless Boost was asked for outright.
+    const level: VideoQuality = input.quickOnly ? "quick" : input.requested ?? (asked !== undefined && asked > maxSecondsFor("detailed", "ltx25", input.engine) ? "quick" : input.household ?? householdVideoQuality());
+    return fit(level, null, input.requested === "detailed", "ltx25");
+  }
   const wanted = input.requested ?? (asked !== undefined && asked > QUICK_MAX_SECONDS ? "detailed" : input.household ?? householdVideoQuality());
   // A picture starts a Quick clip only on a Stack that does not say Detailed can start from one (VIDEO-LTX-02); the household's own default stays quiet, a request for Detailed is told why not.
-  if (input.hasPicture && wanted === "detailed" && input.engine?.qualities?.detailed.image_to_video !== true) return fit("quick", input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS) ? "picture_needs_quick" : null, false);
+  // VIDEO-TIERS-01: with LTX-2.5 ready, an adult's picture clip says why it is silent, since the Standard level now has sound from words.
+  const pictureLtx25 = input.hasPicture && input.adultLane === true && ltx25VideoReady(input.engine);
+  if (input.hasPicture && wanted === "detailed" && input.engine?.qualities?.detailed.image_to_video !== true) return fit("quick", input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS) || pictureLtx25 ? "picture_needs_quick" : null, false);
+  if (pictureLtx25 && wanted === "quick") return fit("quick", "picture_needs_quick", false);
   if (wanted === "detailed") {
     if (detailedOk) return fit("detailed", null, input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS));
     return fit("quick", "detailed_not_installed", false);
@@ -92,7 +140,9 @@ export const VIDEO_QUALITY_NOTE_LINE: Record<Exclude<VideoQualityNote, null>, st
 };
 
 /** How long a video takes, in the person's words, by kind and length (measured on the Studio: Quick about two minutes; Detailed 42 to 49 s for 5 s, 65 to 81 s for 8 to 10 s, a little more the first time a worker loads the model). */
-export function etaWords(quality: VideoQuality, seconds: number): string {
+export function etaWords(quality: VideoQuality, seconds: number, maker: VideoMaker = quality === "detailed" ? "ltx23" : "wan"): string {
+  // LTX-2.5 (measured: Standard 10 s about 43 s, Boost 5 s 42 to 74 s).
+  if (maker === "ltx25") return "about a minute";
   if (quality === "quick") return "about two minutes";
   return seconds <= 5 ? "about a minute" : "about two minutes";
 }

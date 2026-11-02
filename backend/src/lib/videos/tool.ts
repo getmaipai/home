@@ -21,7 +21,7 @@ import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
-import { DETAILED_MAX_SECONDS, chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
+import { DETAILED_MAX_SECONDS, LTX25_MODEL, chooseVideoQuality, ltx25VideoReady, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
 import { StackVideoError } from "./stack";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
 
@@ -162,7 +162,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const styleNote = named && !adapter ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
   // VIDEO-LTX-01: Quick or Detailed. A style made for one model decides; a length past five seconds needs Detailed; else what was asked for, else the household's setting.
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "video", arg: args.tier, band: audience.band });
-  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick" });
+  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult" });
   // A style made for Detailed cannot be used without Detailed: say so rather than start a clip the Stack would refuse.
   if (adapter && qualityOfBase(adapter.base_model) === "detailed" && !detailedVideoReady(engine)) {
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, which are not on this computer yet. An admin can get them in Settings, Models and storage, or I can make the video without the style." }, data: { refused: "style_needs_detailed" }, actions: [] } });
@@ -171,11 +171,12 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, and a Detailed video cannot start from a picture yet. I can animate the picture without the style, or make a Detailed video in that style from words." }, data: { refused: "style_needs_detailed" }, actions: [] } });
   }
   const seconds = kid ? Math.min(choice.seconds, KID_MAX_SECONDS) : choice.seconds;
-  const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
-  const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed video, with sound and speech; say so in one short sentence." : "";
+  const size = videoSizeFor(choice.maker, choice.quality, portrait, engine);
+  const ltx25 = choice.maker === "ltx25";
+  const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? (ltx25 ? " This one has sound and speech; say so in one short sentence." : " This one is a Detailed video, with sound and speech; say so in one short sentence.") : "";
   const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
-  const longSpeechNote = choice.quality === "detailed" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
-  const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
+  const longSpeechNote = choice.maker === "ltx23" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
+  const soundNote = choice.maker === "wan" ? (lane === "adult" && ltx25VideoReady(engine) ? " This video has no sound; if they wanted sound or spoken words, offer to make one from words only, which has sound." : " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one.") : "";
 
   // VIDEO-CREATE-01: a recipe's wording goes to the Stack after the person's words; the card keeps only what they typed. A child gets none.
   // VIDEO-CHAT-01: `camera` is the declared name; `recipe` is what older calls and the Create page send. `camera` wins.
@@ -183,8 +184,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   // V1b: a look goes first, clean-dialogue wording last (only on a clip that has sound); neither is shown on the card. A child gets none.
   const look = kid ? null : videoLookFor(args.look);
   const voicesChosen = kid ? null : videoVoicesFor(args.voices);
-  const voices = choice.quality === "detailed" ? voicesChosen : null;
-  const detailedOffered = allowedQuality(actor, "video", "detailed", audience.band) === "detailed" && detailedVideoReady(engine);
+  const voices = choice.maker !== "wan" ? voicesChosen : null;
+  const detailedOffered = !ltx25 && allowedQuality(actor, "video", "detailed", audience.band) === "detailed" && detailedVideoReady(engine);
   const note = choice.shortened ? `${choice.quality === "quick" ? "Standard" : "This level"} makes ${seconds} seconds at most, so this video is ${seconds} seconds.${choice.quality === "quick" && detailedOffered ? ` Choose Boost for up to ${DETAILED_MAX_SECONDS}.` : ""}` : undefined;
   const create = !kid && (recipe || look || voicesChosen || note) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(note ? { note } : {}) } : undefined;
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
@@ -207,7 +208,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         seed: typeof args.seed === "number" && Number.isInteger(args.seed) && args.seed > 0 && args.seed < 2_147_483_647 ? args.seed : Math.floor(Math.random() * 2_147_483_647),
         size,
         seconds,
-        ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}),
+        ...(ltx25 ? { model: LTX25_MODEL } : choice.maker === "ltx23" ? { model: "detailed" as const } : {}),
         audience: stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
@@ -218,7 +219,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `A ${seconds} second ${choice.quality === "detailed" ? "Detailed " : ""}video is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${qualityNote}${lengthNote}${soundNote}${longSpeechNote}` },
+        reply: { text: `A ${seconds} second ${ltx25 ? "" : choice.quality === "detailed" ? "Detailed " : ""}video${ltx25 ? ", with sound," : ""} is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds, choice.maker)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${qualityNote}${lengthNote}${soundNote}${longSpeechNote}` },
         data: { videoJobId: job.id },
         actions: [],
       },
