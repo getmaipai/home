@@ -71,10 +71,11 @@ Ask chat to change a video you made. Home keeps the old video and makes a new on
 - **Remix.** "Make it anime" or "same but at night." Same video with the change you name. You can change the words, look, camera, sound, length or level.
 - **Make it Max.** "Make it Max." It keeps the same words and the same result, and makes the video again at Max. It works only when Max is installed and allowed for you, and only for a video made from words. Otherwise Home says what is missing and makes nothing.
 - **Trim.** "Cut the first two seconds." Say where it starts and ends, in seconds.
-- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order.
+- **Continue.** "Keep going from where it ended." Home takes the last picture of the video and makes a new video that starts from it. Say what happens next, or leave it out and Home uses your first words. It keeps the same level and look unless you change them. It needs a computer that can start a video from a picture. If yours cannot yet, Home says so and makes nothing. Only one video is made at a time.
+- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order. Home puts them one after another with a straight cut. A smooth blend from one video into the next (a crossfade) is not ready yet. If you ask for one, Home says so and offers the straight cut.
 - **Mix.** "Put my voice over it" or "add my song." Home lays a spoken line, one of your songs or a sound over the video. You can ask for it quieter or louder.
 
-Only videos you made can be changed. Changing, joining and mixing are for adults. A changed video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
+Only videos you made can be changed. Changing, continuing, joining and mixing are for adults. A video in Trash cannot be continued: put it back first. A changed video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
 
 Trim, join and mix need the video editor on the AI engine. If your engine does not have it, Home says it cannot change the video.
 
@@ -90,7 +91,7 @@ To choose who in your home can watch a saved video, open it in the Library and u
 
 ## Make a picture move
 
-After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. Home makes a 5 second video with no sound that starts from that picture.
+After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. On a computer that can start a video from a picture, Home makes a video with sound at your level that starts from it. On other computers it makes a 5 second video with no sound.
 
 Home can animate a picture you made or a photo you attach. Describe the motion you want. The model decides whether to fulfill adult requests; Home blocks output only when its CSAM check finds a candidate.
 
@@ -126,7 +127,7 @@ The video engine checks the file and refuses any style that puts a child in an a
 
 - **No video option.** Why: your Mac has less than 128 GB, your account cannot make videos, or videos are off. Fix: ask an owner or admin to check Settings.
 - **"No video model is installed".** Why: the video model is not downloaded. Fix: an owner or admin installs it in Settings.
-- **Chat made a clip with no sound when I asked for sound.** Why: the sound models are not on this computer yet, or you started from a picture, which makes a clip with no sound. Fix: an owner or admin gets the sound models in **Settings**, **Pictures, videos and music**, and accepts the licence. Or ask for a video from words only.
+- **Chat made a clip with no sound when I asked for sound.** Why: the sound models are not on this computer yet, or you started from a picture on a computer that cannot yet start a video with sound from one. Fix: an owner or admin gets the sound models in **Settings**, **Pictures, videos and music**, and accepts the licence. Or ask for a video from words only.
 - **A video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. Boost takes about a minute, and the first one after a restart a little more.
 - **Your video is waiting.** Why: picture, video and song jobs share a household queue. Fix: wait. Its card shows its place in line and it starts when its turn comes.
 - **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.

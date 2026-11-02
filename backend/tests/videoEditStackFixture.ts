@@ -5,6 +5,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { __setStackClientForTests, getStackClient } from "@/lib/stackEngine";
 import { __setStackEditTimingForTests } from "@/lib/videos/stackEdit";
+import sharp from "sharp";
 import { testMp4 } from "./videoFixture";
 
 export interface FakeEditJob { id: string; input: { inputs: string[]; ops: Array<Record<string, unknown>>; output: { dir: string; name: string } }; staged: Array<{ name: string; bytes: number }>; dirMode: number; polls: number; state: string; cancelled: boolean }
@@ -54,6 +55,12 @@ export function installFakeEditStack(): FakeEditStack {
       else {
         job.state = "done";
         const path = join(job.input.output.dir, job.input.output.name);
+        // A `frame` job ends in a picture (.png), as the real Stack's does; every other job ends in a clip.
+        if (/\.png$/i.test(job.input.output.name)) {
+          const png = await sharp({ create: { width: 128, height: 72, channels: 3, background: { r: 40, g: 90, b: 160 } } }).png().toBuffer();
+          writeFileSync(path, png);
+          return { ...stamp(job), result: { path, size_bytes: png.byteLength, container: "png", width: 128, height: 72, elapsed_ms: 80 } };
+        }
         writeFileSync(path, testMp4());
         return { ...stamp(job), result: { path, size_bytes: 4096, container: "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: "h264", audio_codec: "aac", elapsed_ms: 1200 } };
       }

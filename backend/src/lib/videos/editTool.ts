@@ -2,8 +2,9 @@
 // words and choices, new seed), remix (the same recipe plus the fields the person changed) and make it max (the same clip at Max). Each one calls
 // `makeVideoFor`, the one function the Create page's buttons call, so the gates, the level rules and the one-clip-at-a-time rule are the
 // same in chat and on the page. Three more edit the finished clips themselves through the Stack's `media.edit` job: trim (cut a clip), join
-// (put the person's own clips in order into one film) and mix (lay a spoken line or a song over a clip and set the balance). `continue` and
-// `retake` are not here: the Stack's LTX-2.5 cannot start from a picture yet. The model decides when a person wants one of these (rule 1); nothing here reads wording. The result is
+// (put the person's own clips in order into one film, with a straight cut or a crossfade) and mix (lay a spoken line or a song over a clip and set
+// the balance). `continue` takes the last frame of a finished clip through the Stack's `frame` op and starts a new clip from it with LTX-2.5's picture
+// start (VIDEO-INPUTS-01); `retake` is not here. The model decides when a person wants one of these (rule 1); nothing here reads wording. The result is
 // `data: { videoJobId }` like `generate_video`, so the same card follows the job. A failed tool tells the model only the failure kind
 // (rule 6); a refusal keeps its own plain line.
 import { z } from "zod";
@@ -11,7 +12,9 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { MAX_NEEDS_ADMIN_LINE, jobTier, tierArgument } from "@/lib/tiers";
-import { etaWords, ltx25MaxReady, makerOfModel } from "./quality";
+import { etaWords, ltx25MaxPictureReady, ltx25MaxReady, ltx25PictureReady, makerOfModel } from "./quality";
+import sharp from "sharp";
+import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
 import { MINOR_MAKE_LINE, bodyOfVideoJob, makeVideoFor, type MakeVideoBody } from "./make";
 import { laneOf } from "@/lib/pictures/lane";
@@ -24,8 +27,8 @@ import { synthesizeSpeech } from "@/lib/tts";
 import { listClonedVoices } from "@/lib/clonedVoices";
 import { getOfferedVoices } from "@/lib/voiceResolve";
 import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
-import { readVideoFile, sourceVideoJob, startVideoEditJob, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
-import { DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, MAX_JOIN_CLIPS, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, joinOps, mixOps, trimOps, trimRange } from "./editPlan";
+import { activeVideoJobsFor, readVideoFile, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
+import { CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, crossfadeProblem, frameOps, joinOps, lastFrameAt, mixOps, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, type EditFile } from "./stackEdit";
 import { isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { fileAudience } from "@/lib/access";
@@ -40,7 +43,7 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "continue"]),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.enum(ids(VIDEO_LOOKS)).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
@@ -51,6 +54,8 @@ export const editVideoArgs = z.object({
   from_s: z.number().min(0).max(600).optional(),
   to_s: z.number().gt(0).max(600).optional(),
   clips: z.array(z.string().trim().min(1).max(80)).min(MIN_JOIN_CLIPS).max(MAX_JOIN_CLIPS).optional(),
+  transition: z.enum(JOIN_TRANSITIONS).optional(),
+  transition_s: z.number().min(MIN_CROSSFADE_S).max(MAX_CROSSFADE_S).optional(),
   sound: z.enum(["voice", "music"]).optional(),
   line: z.string().trim().min(1).max(600).optional(),
   voice: z.string().trim().min(1).max(80).optional(),
@@ -63,13 +68,19 @@ export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open
 export const WHAT_TO_CHANGE_LINE = "Tell me what to change: the words, the look, the camera move, the sound, the length or the level.";
 export const NO_PICTURE_LINE = "The picture that video started from is not available any more, so I can't make it again. Ask for a new video.";
 export const ALREADY_MAX_LINE = "That video is already made at Max.";
-export const MAX_WORDS_ONLY_LINE = "Max makes videos from words only, so a video that started from a picture or a style cannot be made again at Max. I can make a new one from words at Max.";
+export const MAX_WORDS_ONLY_LINE = "Max cannot use a style, and a video that started from a picture cannot be made again at Max on this computer yet. I can make a new one from words at Max.";
 export const NO_CLIPS_LINE = "I can't find one of those videos. Tell me which videos to join, from the ones you made here.";
 export const JOIN_CLIPS_LINE = `Tell me ${MIN_JOIN_CLIPS} to ${MAX_JOIN_CLIPS} of your videos to join, in the order you want them.`;
 export const MIX_SOUND_LINE = "Tell me what to put over the video: a line to say in a voice, or one of your songs.";
 export const NO_TRACK_LINE = "I can't find that song. Pick one of your own songs or sound files, or ask for a voice line instead.";
 export const NO_VOICE_LINE = "I don't know that voice. Pick one from your home's voices, or leave the voice out to use yours.";
 export const SPEECH_FAILED_LINE = "I couldn't change that video. Home can't speak right now, so the line was not added. Try again in a minute.";
+export const CROSSFADE_NOT_SUPPORTED_LINE = "Crossfades are not available yet. I can join the videos with a straight cut now. Ask me to do that if you like.";
+export const CONTINUE_CHAT_LINE = "A video can only be continued from a chat. Open a chat, then ask again.";
+export const CONTINUE_NOT_READY_LINE = "Continuing a video from its last picture is not ready on this computer yet. An admin can check Settings, Models and storage.";
+export const CONTINUE_TRASH_LINE = "That video is in Trash. Restore it from Trash, then ask me to continue it.";
+export const CONTINUE_BUSY_LINE = "You already have a video being made. Wait for it to finish, or stop it first.";
+export const CONTINUE_FRAME_LINE = "I couldn't continue that video. The last picture could not be read from it. Try again.";
 export const START_PAST_END_LINE = "That is after the video ends. Pick a start time inside it.";
 
 export interface RunEditVideoInput { state: GenerateVideoState; args: Record<string, unknown>; callId: string; spoken: boolean }
@@ -93,23 +104,40 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
   // The surface and age gate, then the same screening any typed prompt gets (a remix's new words are screened like a first request).
   // A typed voice line is screened like a prompt, before any speech is made.
-  const typed = value.change === "remix" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : "";
+  const typed = value.change === "remix" || value.change === "continue" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : "";
   const refusal = videoRefusalFor(audience, { prompt: typed });
   if (refusal) return refused(callId, args, refusal.line, refusal.why);
 
   const temporary = state.temporary === true || state.ephemeral === true;
+  if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
   if (value.change === "trim" || value.change === "join" || value.change === "mix") {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
+    // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
+    if (value.change === "join" && value.transition === "crossfade" && !CROSSFADE_IN_STACK) return refused(callId, args, CROSSFADE_NOT_SUPPORTED_LINE, "not_supported");
     return editFinishedClips(input, value, actor, temporary);
   }
-  const source = sourceVideoJob(actor, state.conversationId, value.clip, temporary);
+  const continuing = value.change === "continue";
+  const source = continuing ? ownClip(actor, state, value.clip, temporary) : sourceVideoJob(actor, state.conversationId, value.clip, temporary);
   if (!source) return refused(callId, args, NO_CLIP_LINE, "no_clip");
 
   const body: MakeVideoBody = bodyOfVideoJob(source);
   // A clip that started from a picture (made here or an attached photo) starts from it again, through the same loader and input screening a Make another uses.
   let prepared: RunGenerateVideoInput["prepared"];
-  if (source.request.source_file_id) {
+  let adultOnly = false;
+  if (continuing) {
+    // The new clip starts from the last frame of this one, with the person's new words (else the old ones); level, look, camera and voices stay unless changed.
+    if (value.prompt !== undefined) body.prompt = value.prompt;
+    if (value.look !== undefined) body.look = value.look;
+    if (value.camera !== undefined) body.recipe = value.camera;
+    if (value.voices !== undefined) body.voices = value.voices;
+    if (value.tier !== undefined) body.tier = value.tier;
+    if (value.seconds !== undefined) body.seconds = value.seconds;
+    const started = await continueFrom({ state, args, callId, actor, audience, source, body, temporary });
+    if ("outcome" in started) return started.outcome;
+    prepared = started.prepared;
+    adultOnly = started.adultOnly;
+  } else if (source.request.source_file_id) {
     const prep = source.conversationId
       ? await prepareVideoRerun({ actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: value.change === "remix" ? value.prompt ?? source.prompt : source.prompt, sourceFileId: source.request.source_file_id, adapters: [], styleIds: [] })
       : null;
@@ -134,13 +162,13 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     // Max runs only when the Stack says its model is ready; otherwise one plain status line, never a silent Boost copy and never a raw error.
     const engine = await videoEngineStatus();
     if (!ltx25MaxReady(engine)) return refused(callId, args, videoMaxNotReadyReason(engine), "max_not_ready");
-    if (source.request.source_file_id || source.request.loras.length > 0) return refused(callId, args, MAX_WORDS_ONLY_LINE, "max_words_only");
+    if ((source.request.source_file_id && !ltx25MaxPictureReady(engine)) || source.request.loras.length > 0) return refused(callId, args, MAX_WORDS_ONLY_LINE, "max_words_only");
     body.tier = "max";
     // The same clip, made better: the same picture of the idea, so the seed stays.
     if (source.request.seed) body.seed = source.request.seed;
   }
 
-  const made = await makeVideoFor(actor, body, { audience, state, callId, ...(prepared ? { prepared } : {}) });
+  const made = await makeVideoFor(actor, body, { audience, state, callId, ...(prepared ? { prepared } : {}), ...(adultOnly ? { adultOnly: true } : {}) });
   if (!made.ok) {
     if (made.status === 503) return failed(callId, args, made.code, "unavailable");
     if (made.status === 502) return failed(callId, args, made.code, "errored");
@@ -154,11 +182,58 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: `A new ${job.request.seconds} second version of the video is being made at ${level === "max" ? "Max" : level === "boost" ? "Boost" : "Standard"}; the first one is kept. It takes ${etaWords(quality, job.request.seconds, makerOfModel((job.request as { stackBody?: { model?: string } }).stackBody?.model, quality))} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${note}` },
+      reply: { text: `A new ${job.request.seconds} second ${continuing ? "video that starts where the first one ended" : "version of the video"} is being made at ${level === "max" ? "Max" : level === "boost" ? "Boost" : "Standard"}; the first one is kept. It takes ${etaWords(quality, job.request.seconds, makerOfModel((job.request as { stackBody?: { model?: string } }).stackBody?.model, quality))} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${note}` },
       data: { videoJobId: job.id },
       actions: [],
     },
   });
+}
+
+// ---------------------------------------------------------------- continue (the last frame, then a new clip from it)
+
+type ContinueStart = { prepared: NonNullable<RunGenerateVideoInput["prepared"]>; adultOnly: boolean } | { outcome: ToolExecutionOutcome };
+
+/**
+ * The picture a continued clip starts from: the last frame of the source, taken by the Stack's `frame` op, screened like any picture an adult hands
+ * the tool, and kept as this chat's own picture so Make another can start from it again. Every refusal is one plain line: a clip in Trash, a Stack
+ * that cannot start LTX-2.5 from a picture, another clip already being made. Nothing is sent to the Stack's video engine here; `makeVideoFor` does that
+ * with the same gates every other make runs.
+ */
+async function continueFrom(input: { state: GenerateVideoState; args: Record<string, unknown>; callId: string; actor: PersonRow; audience: ReturnType<typeof videoAudienceOf>; source: VideoJob; body: MakeVideoBody; temporary: boolean }): Promise<ContinueStart> {
+  const { state, args, callId, actor, audience, source, body, temporary } = input;
+  const no = (line: string, why: string): ContinueStart => ({ outcome: refused(callId, args, line, why) });
+  if (!state.conversationId) return no(CONTINUE_CHAT_LINE, "no_chat");
+  const file = source.files[0];
+  if (file && !source.temporary) {
+    const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
+    if (row && row.deletedAt !== null) return no(CONTINUE_TRASH_LINE, "in_trash");
+  }
+  // Max starts from a picture only where the Stack says it can; a Max clip lowered to Boost or Standard still needs that level's own picture start.
+  const engine = await videoEngineStatus();
+  const ready = body.tier === "max" ? ltx25MaxPictureReady(engine) || ltx25PictureReady(engine) : ltx25PictureReady(engine);
+  if (!ready) return no(CONTINUE_NOT_READY_LINE, "picture_start_not_ready");
+  if (activeVideoJobsFor(actor) > 0) return no(CONTINUE_BUSY_LINE, "already_making");
+  const clip = clipFile(actor, source);
+  if (!clip) return no(NO_CLIP_LINE, "no_clip");
+  const framed = await runStackEdit({ inputs: [clip], ops: frameOps(lastFrameAt(file?.seconds ?? source.request.seconds)), name: "frame.png" });
+  if (!framed.ok) return no(framed.line, framed.code);
+  let jpeg: Uint8Array;
+  let width: number; let height: number;
+  try {
+    const decoded = sharp(Buffer.from(framed.bytes));
+    const meta = await decoded.metadata();
+    width = meta.width ?? framed.width ?? 0; height = meta.height ?? framed.height ?? 0;
+    if (!width || !height) return no(CONTINUE_FRAME_LINE, "frame_unreadable");
+    jpeg = new Uint8Array(await decoded.jpeg({ quality: 92 }).toBuffer());
+  } catch { return no(CONTINUE_FRAME_LINE, "frame_unreadable"); }
+  // The same input-side floor a photo gets (CSAM candidates, the viewer's lane); the source clip passed the finished-clip check, this is the picture itself.
+  const screened = await screenInputImage(jpeg, body.prompt, viewerOf(actor, audience.band));
+  if (!screened.ok) return no(screened.line, screened.code);
+  // Never lower than the source: an adult-only clip makes an adult-only continuation.
+  const adultOnly = await clipAdultOnly(source);
+  const stored = storeContinueFrame(actor, { conversationId: state.conversationId, turnId: state.turnId, temporary, jpeg, width, height, adultOnly, sourceJobId: source.id });
+  if (!stored.ok) return no(stored.line, "frame_not_saved");
+  return { prepared: { image: Buffer.from(jpeg).toString("base64"), imageSource: "generated", sourceFileId: stored.id, width, height }, adultOnly };
 }
 
 // ---------------------------------------------------------------- trim, join and mix (the Stack's media.edit)
@@ -265,8 +340,14 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     inputs = clipFiles; ops = trimOps(range.from, range.to);
     describe = `cut to ${range.from} to ${range.to} seconds`;
   } else if (value.change === "join") {
-    inputs = clipFiles; ops = joinOps();
-    describe = `${sources.length} videos joined in the order you named`;
+    const crossfade = value.transition === "crossfade";
+    const duration = value.transition_s ?? DEFAULT_CROSSFADE_S;
+    if (crossfade) {
+      const tooShort = crossfadeProblem(sources.map((job) => job.files[0]?.seconds ?? null), duration);
+      if (tooShort) return refused(callId, args, tooShort, "crossfade_too_short");
+    }
+    inputs = clipFiles; ops = joinOps(crossfade ? "crossfade" : "cut", duration);
+    describe = `${sources.length} videos joined in the order you named${crossfade ? `, with a ${duration} second crossfade between them` : ""}`;
   } else {
     const start = value.start_s ?? 0;
     if (seconds !== null && start >= seconds) return refused(callId, args, START_PAST_END_LINE, "start_past_end");

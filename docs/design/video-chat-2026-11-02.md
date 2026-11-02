@@ -99,7 +99,7 @@ ready" row (S6); no new status surface.
 **Built on the Home side (2026-11-02, C3 and C4):** `edit_video` takes `trim` (`from_s`, `to_s`), `join` (`clips`, 2 to 6 of the person's own videos) and `mix`
 (`sound` voice with `line` and an optional household `voice`, or music with `track`; `level` quiet to very_loud; `start_s`) through the Stack's
 `media.edit` job (`lib/videos/stackEdit.ts`, `editPlan.ts`). The result is a new video job of kind `edit` (Library note `video-edit:`, linked to the first
-clip); the old clip stays. `continue` and `retake` are not built: the Stack's LTX-2.5 refuses a picture start.
+clip); the old clip stays. `retake` is not built. `continue` (2026-11-02, EDITOR-15) takes the last frame through `media.edit` `frame` and starts a new clip from it with LTX-2.5's picture start (Stack ede7c3a); `join` takes `transition` (`cut` or `crossfade`, 0.3 to 1 s), and a crossfade waits for a Stack `crossfade` step (see `docs/dev/videos-create.md`).
 
 ## 7. Open points
 

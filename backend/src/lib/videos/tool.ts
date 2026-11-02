@@ -84,6 +84,8 @@ export interface RunGenerateVideoInput {
   audience?: VideoAudience;
   /** A picture already loaded and screened by the caller (an edit of a clip that started from one, via `prepareVideoRerun`). */
   prepared?: { image: string; imageSource: "generated" | "uploaded"; sourceFileId: string; width: number | null; height: number | null };
+  /** The new clip is adult-only whatever its words say (a continued clip's source is). */
+  adultOnly?: boolean;
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -176,8 +178,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const size = videoSizeFor(choice.maker, choice.quality, portrait, engine);
   const ltx25 = choice.maker === "ltx25" || choice.maker === "ltx25max";
   const maxMade = choice.maker === "ltx25max";
-  // Max asked for and ready, but this clip starts from a picture or a style: Max makes words only, so say it was not made at Max.
-  const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || adapter !== null) ? " Max makes videos from words only, with no picture start and no style, so this one was not made at Max; say so in one short sentence." : "";
+  // Max asked for and ready, but this clip uses a style, or starts from a picture this Stack cannot start a Max clip from (VIDEO-INPUTS-01): say it was not made at Max.
+  const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || adapter !== null) ? " Max cannot use a style, and cannot start from a picture on this computer yet, so this one was not made at Max; say so in one short sentence." : "";
   const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? (ltx25 ? " This one has sound and speech; say so in one short sentence." : " This one is a Detailed video, with sound and speech; say so in one short sentence.") : "";
   const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
   const longSpeechNote = choice.maker === "ltx23" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
@@ -207,6 +209,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       sourceFileId,
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       ...(create ? { create } : {}),
+      ...(input.adultOnly ? { adultOnly: true } : {}),
       body: {
         prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(withVideoTriggerWords(prompt, adapter), look), recipe), voices),
         // A new seed for every clip (stored on the job); Another take rolls a different one.

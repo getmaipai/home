@@ -14,9 +14,9 @@ export const QUICK_BASE = "wan2.2-ti2v-5b";
 export const DETAILED_BASE = "ltx-2.3";
 export const QUICK_MAX_SECONDS = 5;
 export const DETAILED_MAX_SECONDS = 10;
-/** VIDEO-TIERS-01: LTX-2.5 with sound. Adults only; words only (the Stack answers 422 to a picture or a LoRA for it). */
+/** VIDEO-TIERS-01: LTX-2.5 with sound. Adults only; no LoRA (the Stack answers 422 to one). A picture start needs the Stack's `image_to_video` flag (VIDEO-INPUTS-01), read by `ltx25PictureReady`. */
 export const LTX25_MODEL = "ltx25-q8";
-/** LTX25-MAX-01: the Max level of LTX-2.5 (bf16, 1024x576, up to 10 s, sound). Adults who hold Max only; words only. */
+/** LTX25-MAX-01: the Max level of LTX-2.5 (bf16, 1024x576, up to 10 s, sound). Adults who hold Max only; no LoRA; a picture start needs `ltx25MaxPictureReady`. */
 export const LTX25_MAX_MODEL = "ltx25-max";
 /** The Max size and ceiling used until the Stack's own `max` profile says otherwise (a profile can only lower the ceiling). */
 export const LTX25_MAX_DEFAULTS = { landscape: "1024x576", portrait: "576x1024", max_seconds: 10 };
@@ -52,6 +52,18 @@ export function ltx25VideoReady(engine: Pick<StackVideoStatus, "qualities"> | nu
 /** Whether LTX-2.5 Max can run here now: the Stack reports `qualities.ltx25max.ready` exactly `true` (pack installed, runtime in place). */
 export function ltx25MaxReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
   return engine?.qualities?.ltx25max?.ready === true;
+}
+/** VIDEO-INPUTS-01: the Stack says an LTX-2.5 Standard or Boost clip can start from a picture (`qualities.ltx25.image_to_video` exactly `true`). Read from the Stack, never assumed. */
+export function ltx25PictureReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
+  return ltx25VideoReady(engine) && engine?.qualities?.ltx25?.image_to_video === true;
+}
+/** The same for Max (`qualities.ltx25max.image_to_video` exactly `true`). */
+export function ltx25MaxPictureReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
+  return ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.image_to_video === true;
+}
+/** A second picture can end a clip of this maker (`end_image` exactly `true` on its quality). Used only after the End frame bench passes (VIDEO-INPUTS-03). */
+export function ltx25EndPictureReady(engine: Pick<StackVideoStatus, "qualities"> | null, max = false): boolean {
+  return (max ? ltx25MaxPictureReady(engine) && engine?.qualities?.ltx25max?.end_image === true : ltx25PictureReady(engine) && engine?.qualities?.ltx25?.end_image === true);
 }
 /** The Stack's `max` profile, or null when it lists none. */
 export function ltx25MaxProfile(engine: Pick<StackVideoStatus, "qualities"> | null): StackLtx25Profile | null {
@@ -116,10 +128,11 @@ export function chooseVideoQuality(input: { requested?: VideoQuality | undefined
   const base = qualityOfBase(input.style?.base_model);
   const quickOk = quickVideoReady(input.engine);
   const detailedOk = detailedVideoReady(input.engine);
-  // VIDEO-TIERS-01: LTX-2.5 serves an adult's clip made from words (no picture, no style) when the Stack says it is ready. Standard is then
+  // VIDEO-TIERS-01: LTX-2.5 serves an adult's clip made from words (no style; no picture unless the Stack says it can start from one) when the Stack says it is ready. Standard is then
   // 10 s with sound and Boost 5 s with sound; anything else keeps today's models exactly.
-  const ltx25Ok = input.adultLane === true && !input.hasPicture && !input.style && ltx25VideoReady(input.engine);
-  const ltx25MaxOk = input.max === true && input.adultLane === true && !input.hasPicture && !input.style && ltx25MaxReady(input.engine);
+  // VIDEO-INPUTS-01: a picture start rides the same models once the Stack reports `image_to_video` for them; an older Stack keeps pictures on the old makers.
+  const ltx25Ok = input.adultLane === true && (!input.hasPicture || ltx25PictureReady(input.engine)) && !input.style && ltx25VideoReady(input.engine);
+  const ltx25MaxOk = input.max === true && input.adultLane === true && (!input.hasPicture || ltx25MaxPictureReady(input.engine)) && !input.style && ltx25MaxReady(input.engine);
   const fit = (quality: VideoQuality, note: VideoQualityNote, announce: boolean, maker: VideoMaker = quality === "detailed" ? "ltx23" : "wan"): VideoQualityChoice => {
     const ceiling = maxSecondsFor(quality, maker, input.engine);
     const seconds = Math.max(1, Math.min(ceiling, asked ?? 5));
