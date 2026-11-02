@@ -249,7 +249,10 @@ export function partsFor(brief: Brief | null, plan: DataPlan | undefined): strin
 
 /** Output room for the analysis. The reply is a JSON object (claims, conflicts, gaps, guesses and, since RESEARCH-COVERAGE-01, one entry per
  * part of the question): a live Max run returned no analysis at all once that field was added, the reply cut off inside the object. */
-export const ANALYSIS_TOKENS = { thinking: 700, max: 1200 } as const;
+/** Claims the analysis may carry: eight, or four more than the parts asked for, so every part can have its own claim first. */
+export const claimCap = (parts: number): number => Math.max(8, parts + 4);
+
+export const ANALYSIS_TOKENS = { thinking: 700, max: 1400 } as const;
 
 export function analysisPrompt(brief: Brief | null, question: string, ledger: string, backbone = "", parts: readonly string[] = []): string {
   return `You analyse research notes before an answer is written. You write no answer here.
@@ -259,7 +262,7 @@ ${backbone ? `${backbone}\n\n` : ""}${ledger}
 
 Work from these notes and the article only. Answer with one JSON object and nothing else:
 {"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}],${parts.length > 0 ? ' "parts": [{"part": "the part, copied as written below", "covered": true}],' : ""} "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]}
-"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). ${parts.length > 0 ? `\nThe parts a good answer must cover:\n${parts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nIn "parts" list every one; "covered" is true only when a claim above states something for that part from the notes or the article, false when nothing there speaks to it.\n` : ""}Use at most 8 claims and 4 guesses, each in one short sentence. Name no person, title, number or detail that the notes and the article do not contain.`;
+"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). ${parts.length > 0 ? `\nThe parts a good answer must cover:\n${parts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nIn "parts" list every one; "covered" is true only when a claim above states something for that part from the notes or the article, false when nothing there speaks to it.\n` : ""}Write the claims part by part: for every part listed above that the notes or the article speak to, first one claim stating what they say for it, in the part's own words; only then add further claims. Read the article to its end, later sections included, before marking a part not covered. Use at most ${claimCap(parts.length)} claims and 4 guesses, each in one short sentence. Name no person, title, number or detail that the notes and the article do not contain.`;
 }
 
 export function parseAnalysis(text: string | null, valid: ReadonlySet<number>, asked: readonly string[] = []): Analysis | null {
@@ -268,7 +271,7 @@ export function parseAnalysis(text: string | null, valid: ReadonlySet<number>, a
   const nums = (value: unknown): number[] => (Array.isArray(value) ? value.filter((v): v is number => typeof v === "number" && valid.has(v)) : []);
   const statuses: ClaimStatus[] = ["established", "reported", "inferred", "contested"];
   const claims: AnalysisClaim[] = [];
-  for (const raw of Array.isArray(data.claims) ? data.claims.slice(0, 8) : []) {
+  for (const raw of Array.isArray(data.claims) ? data.claims.slice(0, claimCap(asked.length)) : []) {
     const r = (raw ?? {}) as { claim?: unknown; status?: unknown; sources?: unknown };
     const claim = typeof r.claim === "string" ? r.claim.trim().slice(0, 260) : "";
     const status = statuses.find((s) => s === r.status) ?? "reported";
@@ -335,11 +338,11 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (analysis.conflicts.length > 0) lines.push(`Where the notes disagree:\n${analysis.conflicts.map((c) => `- ${c}`).join("\n")}`);
     if (analysis.gaps.length > 0) lines.push(`Not found:\n${analysis.gaps.map((g) => `- ${g}`).join("\n")}`);
     if (analysis.guesses.length > 0) lines.push(`Guesses to present as guesses, each with its reasons:\n${analysis.guesses.map((g) => `- (${g.confidence}) ${g.guess} because ${g.because.join("; ")} ${cites(g.sources)}`.trim()).join("\n")}`);
-    if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article; if it does not speak to a part, write that the part was not found in the sources):\n${coverage.read}`);
+    if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article. A part that the analysis, the notes, the article or this text speaks to is answered from them and is never listed as not found; only a part none of them speaks to is written as not found in the sources):\n${coverage.read}`);
     if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
     if (coverage.pinned?.unsettled) lines.push(`The question's details do not tell "${coverage.pinned.title.replace(/"/g, "'")}" from "${coverage.pinned.unsettled.title.replace(/"/g, "'")}". The notes and the article are about the first. The second opens: ${coverage.pinned.unsettled.lead.replace(/"/g, "'")} In the first sentence say which one you read and that the question fits both, then cover the other one briefly from that opening (marked as read from its opening only), or say which one you chose and why.`);
     else     if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
-    lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found. Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
+    lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
   }
   if (ledger) lines.push(ledger);
   return lines.join("\n\n");

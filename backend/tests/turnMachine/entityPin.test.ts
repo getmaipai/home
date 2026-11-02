@@ -71,13 +71,13 @@ describe("articles read whole", () => {
       { type: "list", ordered: false, items: [[{ type: "text", text: "36th" }]] },
     ], "library");
     expect(fromBlocks.lead).toBe("Opening.");
-    expect(fromBlocks.sections.map((s) => s.heading)).toEqual(["Reception"]);
+    expect(fromBlocks.sections.map((s) => s.heading)).toEqual(["Reception", "Reception: Ratings"]);
     expect(fromBlocks.sections[0]!.text).toContain("It rated badly.");
-    expect(fromBlocks.sections[0]!.text).toContain("- 36th");
+    expect(fromBlocks.sections[1]!.text).toContain("- 36th");
     const fromExtract = articleFromExtract("T", "Opening line.\n\n== Production ==\nMade in 1984.\n\n=== Budget ===\nHalf.\n== Legacy ==\nLater.", "wikimedia");
     expect(fromExtract.lead).toBe("Opening line.");
-    expect(fromExtract.sections.map((s) => s.heading)).toEqual(["Production", "Legacy"]);
-    expect(fromExtract.sections[0]!.text).toContain("Budget:");
+    expect(fromExtract.sections.map((s) => s.heading)).toEqual(["Production", "Production: Budget", "Legacy"]);
+    expect(fromExtract.sections[1]!.text).toContain("Half.");
   });
 });
 

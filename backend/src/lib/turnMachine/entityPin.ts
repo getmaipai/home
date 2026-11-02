@@ -88,14 +88,16 @@ function blockText(block: ArticleBlock): string {
   }
 }
 
-/** An extracted article's blocks as a lead and sections: a level 2 heading starts a section, smaller headings stay inside it. */
+/** An extracted article's blocks as a lead and sections: a level 2 heading starts a section, a level 3 heading starts its own section named "Parent: Child" (so a section picker can see it), deeper headings stay inside. */
 export function articleFromBlocks(title: string, blocks: readonly ArticleBlock[], source: ArticleText["source"]): ArticleText {
   let lead = "";
   const sections: ArticleSection[] = [];
   let current: ArticleSection | null = null;
+  let parent = "";
   for (const block of blocks) {
     if (block.type === "heading") {
-      if (block.level === 2) { current = { heading: block.text.trim(), text: "" }; sections.push(current); }
+      if (block.level === 2) { parent = block.text.trim(); current = { heading: parent, text: "" }; sections.push(current); }
+      else if (block.level === 3 && parent) { current = { heading: `${parent}: ${block.text.trim()}`, text: "" }; sections.push(current); }
       else if (current) current.text += `${current.text ? "\n" : ""}${block.text.trim()}:`;
       continue;
     }
@@ -112,9 +114,12 @@ export function articleFromExtract(title: string, extract: string, source: Artic
   let lead = "";
   const sections: ArticleSection[] = [];
   let current: ArticleSection | null = null;
+  let parent = "";
   for (const line of extract.split(/\r?\n/)) {
     const head = /^\s*==\s*([^=].*?)\s*==\s*$/.exec(line);
-    if (head) { current = { heading: head[1]!.trim(), text: "" }; sections.push(current); continue; }
+    if (head) { parent = head[1]!.trim(); current = { heading: parent, text: "" }; sections.push(current); continue; }
+    const sub3 = /^\s*===\s*([^=].*?)\s*===\s*$/.exec(line);
+    if (sub3 && parent) { current = { heading: `${parent}: ${sub3[1]!.trim()}`, text: "" }; sections.push(current); continue; }
     if (/^\s*={3,}\s*.*?\s*={3,}\s*$/.test(line)) { if (current) current.text += `${current.text ? "\n" : ""}${line.replace(/=/g, "").trim()}:`; continue; }
     if (!line.trim()) continue;
     if (current) current.text += `${current.text ? "\n" : ""}${line.trim()}`;

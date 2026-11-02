@@ -290,6 +290,27 @@ describe("coverage of the parts a good answer must cover (RESEARCH-COVERAGE-01)"
     expect(analysisPrompt(brief, "q", "ledger")).not.toContain("parts a good answer must cover");
   });
 
+  test("the analysis asks for a claim per part first and scales the claim cap with the parts", () => {
+    const many = ["a one", "b two", "c three", "d four", "e five", "f six"];
+    const prompt = analysisPrompt(brief, "q", "ledger", "", many);
+    expect(prompt).toContain("Write the claims part by part");
+    expect(prompt).toContain("Read the article to its end");
+    expect(prompt).toContain("at most 10 claims");
+    expect(analysisPrompt(brief, "q", "ledger", "", ["x y"])).toContain("at most 8 claims");
+    const claims = Array.from({ length: 12 }, (_, i) => ({ claim: `Claim ${i}.`, status: "established", sources: [1] }));
+    const reply = JSON.stringify({ claims, conflicts: [], gaps: [], guesses: [] });
+    expect(parseAnalysis(reply, new Set([1]), many)!.claims).toHaveLength(10);
+    expect(parseAnalysis(reply, new Set([1]))!.claims).toHaveLength(8);
+  });
+
+  test("the writer brief never lists a part with text behind it as not found", () => {
+    const analysis = { claims: [{ claim: "It ended in 1999.", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: ["what came next"] };
+    const withRead = replyBrief(brief, analysis, "", null, { read: "## Aftermath\nA corrected edition followed." });
+    expect(withRead).toContain("is never listed as not found");
+    expect(withRead).not.toContain("if it does not speak to a part, write that the part was not found");
+    expect(withRead).toContain("a fact you stated above is never listed there");
+  });
+
   test("the writing round reads the section read for an uncovered part, or is told the part was not found in the sources, and aims at the style's word count", () => {
     const analysis = { claims: [{ claim: "It ended in 1999.", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: ["what came next"] };
     const withRead = replyBrief(brief, analysis, "", null, { read: "## Aftermath\nA corrected edition followed.", words: ANSWER_WORDS.max });
