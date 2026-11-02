@@ -47,13 +47,23 @@ export function namesIn(text: string): string[] {
   return [...found];
 }
 
-/** A name counts as given when the evidence holds it as written, or holds every capitalized word of it (a writer may join words the
- * sources give separately, as a title and a surname, or "Atlantic Ocean" for "the Atlantic"); an invented name has a word no source has. */
+/** How far apart (characters) two neighbouring words of a name may sit in the evidence and still count as the same mention: room for a
+ * connective or a given name between them ("Countess of Lovelace", "Coach Herb Brooks"), not for two separate passages. */
+const NAME_GAP_CHARS = 24;
+const escapeRe = (w: string): string => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** A name counts as given when the evidence holds it as written, or holds each pair of neighbouring words of it close together (a writer may
+ * drop a connective or join a title to a surname). Words that each appear somewhere in the sources but never near one another do not make
+ * a name given: an invented person assembled from known words is still marked. */
 export function nameIsGiven(name: string, haystack: string): boolean {
   if (haystack.includes(squashText(name))) return true;
   const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
-  const hasWord = (w: string): boolean => new RegExp(`(?<![\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u").test(haystack);
-  return words.length > 0 && words.every(hasWord);
+  if (words.length < 2) return words.length === 1 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(haystack);
+  const near = (a: string, b: string): boolean => {
+    const w = (x: string): string => `(?<![\\p{L}\\p{N}])${escapeRe(x)}(?![\\p{L}\\p{N}])`;
+    return new RegExp(`${w(a)}[^\\n]{0,${NAME_GAP_CHARS}}?${w(b)}|${w(b)}[^\\n]{0,${NAME_GAP_CHARS}}?${w(a)}`, "u").test(haystack);
+  };
+  return words.slice(1).every((w, i) => near(words[i]!, w));
 }
 
 /** True when the sentence states something checkable: a figure or a name. Hedged and general sentences carry neither. */

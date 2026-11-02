@@ -104,6 +104,8 @@ interface MachineContext {
   // GROUND-02: set once when a refused decorative call was dropped and the model is asked again
   // without tools; a second refusal takes the ordinary path, so this can never loop.
   decorativeDropped?: boolean;
+  /** A research turn's refused later-round call was dropped once and the answer written from the notes already gathered. */
+  researchCallDropped?: boolean;
   // CF-SEARCH-02: set once when the model's search query was refused as ungrounded and the person's own
   // words were searched instead; a second refusal takes the ordinary path, so this can never loop.
   rawSearchTried?: boolean;
@@ -233,6 +235,18 @@ export const turnMachine = setup({
       if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
       const entries = (event as unknown as { output: PolicyOutput }).output.entries;
       return entries.length > 0 && entries.every((e) => !e.decision.allow && e.decision.reason === "ungrounded_args" && isDecorativeTool(e.proposal.request.tool));
+    },
+    // RESEARCH-RETRY-01 (live run 2026-11-02): a Thinking or Max turn that had already gathered pages made a later search call policy found
+    // ungrounded (a garbled query), and the person got the refusal line instead of the answer the notes could support. A failed tool never
+    // fails the answer: the refused call is dropped once and the answer is written from what was gathered.
+    researchCallDropped: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      const style = context.turnState.answerStyle;
+      if (toRun.length > 0 || parkedAsk !== null || context.researchCallDropped || retryRound(context)) return false;
+      if (style === undefined || style === "instant" || !context.turnState.outcomes.some((o) => o.status === "succeeded" && o.packageId === "websearch")) return false;
+      if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
+      const entries = (event as unknown as { output: PolicyOutput }).output.entries;
+      return entries.length > 0 && entries.every((e) => !e.decision.allow && (e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool"));
     },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
     // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
@@ -485,6 +499,7 @@ export const turnMachine = setup({
           // (roundsUsed 1 is what makes the next model call the phrasing one).
           { guard: "retryRefused", actions: assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), target: "model" },
           { guard: "decorativeCallDropped", actions: assign(({ context }) => ({ decorativeDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
+          { guard: "researchCallDropped", actions: assign(({ context }) => ({ researchCallDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "policyAllRefused", actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
           { actions: assign(({ event }) => ({ step: event.output })), target: "tool" },
         ],

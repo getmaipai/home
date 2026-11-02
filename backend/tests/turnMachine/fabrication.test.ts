@@ -41,6 +41,12 @@ describe("marking", () => {
     expect(markUnsourcedNames("The ceremony was the Wedding of the Waters.", "a ceremony called the wedding of the waters", "").marked).toBe(0);
     expect(markUnsourcedNames("She was known as Countess Lovelace.", "Ada, Countess of Lovelace, wrote notes", "").marked).toBe(0);
     expect(markUnsourcedNames("She met Victor Hale.", "Ada, Countess of Lovelace, wrote notes", "").marked).toBe(1);
+    // Both sides of the loosened rule: words that sit together in a source (a title and a surname, a given name between) are given; a name
+    // assembled from words that each appear, but far apart in different passages, is still marked.
+    expect(markUnsourcedNames("He was Coach Brooks.", "the head coach Herb Brooks led the team", "").marked).toBe(0);
+    const apart = `Victor was the cook on the ship. ${"The crew sailed on through the long cold night. ".repeat(6)} Later the harbour master Hale signed the log.`;
+    expect(markUnsourcedNames("She met Victor Hale.", apart, "").marked).toBe(1);
+    expect(markUnsourcedNames("She met Victor Hale.", "Victor Hale signed the log", "").marked).toBe(0);
   });
 });
 

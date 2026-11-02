@@ -54,6 +54,8 @@ export interface EntityAnchor {
   article: ArticleText | null;
   /** Title and lead as one string: the words a search built on this anchor may carry. */
   text: string;
+  /** Other candidate articles that share this one's base name (other editions, works or people of the same name), offered with it. */
+  alternatives?: string[];
 }
 
 const MAX_QUERY_WORDS = 8;
@@ -244,7 +246,12 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
     const picked = candidates[index]!;
     let article: ArticleText | null = null;
     try { article = await picked.load(); } catch { article = null; }
-    return { anchor: anchorFor(article?.title || picked.title, article, picked.snippet), candidates: total, debug };
+    const anchor = anchorFor(article?.title || picked.title, article, picked.snippet);
+    // Candidates of the same base name that were passed over: the answer says which one it read.
+    const sameName = (title: string): boolean => anchorFor(title, null).baseName.toLowerCase() === anchor.baseName.toLowerCase();
+    const alternatives = [...seen].filter((title) => title !== picked.title && title !== anchor.title && sameName(title));
+    if (alternatives.length > 0) anchor.alternatives = alternatives.slice(0, 4);
+    return { anchor, candidates: total, debug };
   }
   return { anchor: null, candidates: total, ...(debug ? { debug } : {}) };
 }

@@ -114,6 +114,15 @@ describe("pinning", () => {
     expect(anchor?.article?.lead).toContain("opening");
   });
 
+  test("RESEARCH-PIN-05: candidates that share the picked one's base name are kept as alternatives, other names are not", async () => {
+    __setEntityPinForTests({ finder: async () => [candidate("Alpha (1983 miniseries)"), candidate("Alpha (1984 television series)"), candidate("Alpha (franchise)"), candidate("Beta (1984 television series)")], writer: async () => '{"pick": 2}' });
+    const { anchor } = await pinEntity(brief("the series"), "why did the 1980s series end", person);
+    expect(anchor?.title).toBe("Alpha (1984 television series)");
+    expect(anchor?.alternatives).toEqual(["Alpha (1983 miniseries)", "Alpha (franchise)"]);
+    __setEntityPinForTests({ finder: async () => [candidate("Alpha (1984 television series)"), candidate("Beta (franchise)")], writer: async () => '{"pick": 1}' });
+    expect((await pinEntity(brief("x"), "q", person)).anchor?.alternatives).toBeUndefined();
+  });
+
   test("no clear candidate, no candidates, a model that is down, or no brief all give no anchor", async () => {
     __setEntityPinForTests({ finder: async () => [candidate("A"), candidate("B")], writer: async () => '{"pick": 0}' });
     expect((await pinEntity(brief("x"), "q", person)).anchor).toBeNull();

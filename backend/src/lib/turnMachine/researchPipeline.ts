@@ -169,9 +169,12 @@ export function briefBlock(brief: Brief): string {
   return `What the person is asking: ${brief.subject}. A good answer is: ${brief.answerType || "a complete answer"}. It must contain: ${brief.mustContain.length > 0 ? brief.mustContain.join("; ") : "what the question asks"}.`;
 }
 
+/** Stage 2's reminder that an answer depends on more than the literal ask. The model words each angle from the question's own subject; nothing here names a topic. */
+export const SUB_QUESTION_ANGLES = "A good answer depends on more than the literal ask. For a question about what would have happened, what comes next, or what something means, also plan the sub-questions its answer rests on, wherever they apply to this question: why it stopped, changed or came about; what was planned or announced; what came after; who said what; what is settled and what is only reported. Word each one from this question's own subject.";
+
 export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = ""): Promise<DataPlan> {
   const base = queryWriterPrompt(utterance, researchProgress([]), "", count, anchorNote);
-  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "queries": ["..."]}.` : base;
+  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "queries": ["..."]}.\n${SUB_QUESTION_ANGLES}` : base;
   let reply: string | null = null;
   try { reply = await writer(prompt); } catch { reply = null; }
   const data = jsonOf(reply);
@@ -315,6 +318,8 @@ export interface ReplyCoverage {
   missing?: readonly string[];
   /** The style's word target. */
   words?: number;
+  /** The pinned article's title and the other articles of the same name that were passed over. */
+  pinned?: { title: string; alternatives: readonly string[] };
 }
 
 /** What the writing round is handed: the analysis first (what to say, how sure), then the notes behind it. */
@@ -332,6 +337,7 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (analysis.guesses.length > 0) lines.push(`Guesses to present as guesses, each with its reasons:\n${analysis.guesses.map((g) => `- (${g.confidence}) ${g.guess} because ${g.because.join("; ")} ${cites(g.sources)}`.trim()).join("\n")}`);
     if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article; if it does not speak to a part, write that the part was not found in the sources):\n${coverage.read}`);
     if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
+    if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
     lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found. Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
   }
   if (ledger) lines.push(ledger);

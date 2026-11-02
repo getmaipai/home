@@ -342,3 +342,21 @@ describe("a reply cut off inside its JSON is repaired, not lost (RESEARCH-ANALYS
     expect(prompt).toContain("each in one short sentence");
   });
 });
+
+describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angles an answer rests on", () => {
+  const brief = null;
+  const analysis = { claims: [{ claim: "It ended in 1999.", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: [] };
+  test("a shared name makes the writer say in its first sentence which one it read, and name the others", () => {
+    const text = replyBrief(brief, analysis, "", null, { pinned: { title: "Alpha (1984 television series)", alternatives: ["Alpha (1983 miniseries)"] } });
+    expect(text).toContain('"Alpha (1984 television series)"');
+    expect(text).toContain('"Alpha (1983 miniseries)"');
+    expect(text).toContain("Say in the first sentence which one you took the question to mean");
+    expect(replyBrief(brief, analysis, "", null, { pinned: { title: "Alpha", alternatives: [] } })).not.toContain("name is shared");
+  });
+  test("the plan prompt asks for the sub-questions an answer rests on, without naming a topic", async () => {
+    let seen = "";
+    await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, { subject: "s", answerType: "", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" }, "what would have happened", 3);
+    expect(seen).toContain("why it stopped, changed or came about");
+    expect(seen).toContain("what was planned or announced");
+  });
+});

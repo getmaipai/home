@@ -106,9 +106,10 @@ afterEach(() => {
 });
 
 /** Runs one turn against a model that wants to search `wantedRounds` times (a different query each round), then answers. */
-async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number; utterance?: string; reply?: string } = {}) {
+async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts: { thinking?: boolean; max?: boolean; scope?: "reference" | "web"; queries?: string[]; perRound?: number; utterance?: string; reply?: string; badSecondCall?: boolean } = {}) {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const requests: ChatCompletionRequest[] = [];
+  let badCallMade = false;
   let made = 0; // searches the scripted model has asked for so far (a skipped or empty search leaves no tool message to count)
   const stub = startStubLlmServer(0, {
     scriptedChatReply: (request: ChatCompletionRequest) => {
@@ -120,6 +121,8 @@ async function turn(who: "owner" | "teen" | "child", wantedRounds: number, opts:
       requests.push(request);
       __resetRateLimiterForTests(); // Home's own search pace (a burst of three) would make this scripted run wait seconds per round
       const done = made;
+      // A later round whose only call policy refuses (a tool that does not exist), with no text beside it.
+      if (opts.badSecondCall && done === 1 && !badCallMade) { badCallMade = true; return [{ id: "call-bad", type: "function" as const, function: { name: "no_such_tool", arguments: "{}" } }]; }
       if (done >= wantedRounds) return undefined;
       const count = Math.min(opts.perRound ?? 1, wantedRounds - done);
       const calls = Array.from({ length: count }, (_, i) => ({ id: `call-${done + i + 1}`, type: "function" as const, function: { name: "websearch", arguments: JSON.stringify({ expression: (opts.queries ?? QUERIES)[done + i], scope: opts.scope ?? "web" }) } }));
@@ -166,6 +169,13 @@ describe("research rounds follow the answer style", () => {
     expect(nudge).toContain("V 1980s series season");
     expect(nudge).toContain("Sites read so far");
     expect(nudge).toContain("3 more searches");
+  });
+
+  test("RESEARCH-RETRY-01: a later round whose only call is refused still ends in an answer written from the pages already read, never the refusal line", async () => {
+    const { result } = await turn("owner", 3, { thinking: true, badSecondCall: true });
+    expect(searxQueries.length).toBe(1);
+    expect(result.value.reply.text).toContain("It ended after one season");
+    expect(result.value.reply.text).not.toContain("so I won't guess");
   });
 
   test("Max with its lease takes more than two rounds, numbers sources across them and cites more than one site", async () => {

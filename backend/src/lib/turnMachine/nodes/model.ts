@@ -985,7 +985,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // RESEARCH-COVERAGE-01: after the analysis, every part the answer must cover is either backed by the notes or the article, or read for
     // once more by heading from the sections not yet read (no new search), or the writer is told to say it was not found in the sources.
     const coverageFor = async (): Promise<ReplyCoverage> => {
-      const coverage: ReplyCoverage = { words: wordTarget };
+      const coverage: ReplyCoverage = { words: wordTarget, ...(state.entityAnchor?.alternatives?.length ? { pinned: { title: state.entityAnchor.title, alternatives: state.entityAnchor.alternatives } } : {}) };
       const uncovered = state.researchAnalysis?.uncovered ?? [];
       if (uncovered.length === 0) return coverage;
       let read = "";
@@ -1166,7 +1166,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates${pinned.debug ? `: [${pinned.debug.titles.join(" | ")}], pick reply ${JSON.stringify((pinned.debug.reply ?? "").slice(0, 80))}` : ""})`);
     markResearch(state, "stage 2 plan start");
     const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor));
-    markResearch(state, "stage 2 plan end");
+    markResearch(state, `stage 2 plan end (sub-questions: ${plan.subQuestions.join(" | ")})`);
     state.researchPlan = plan;
     // RESEARCH-BACKBONE-01: choose the pinned article's sections while the searches run; the writing round waits for it only briefly.
     state.backbone = undefined;
