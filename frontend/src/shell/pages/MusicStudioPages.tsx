@@ -160,6 +160,7 @@ function CreateChooser({ adult }: { adult: boolean }) {
 /** The kit card for a saved record, opened in edit mode. Edits, remakes and discards go to the same routes the chat card uses. */
 function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const card = useQuery({ queryKey: ["music-card", kind, id], queryFn: () => request<{ block: { props: Record<string, unknown> } }>(`/api/music/${COLLECTION[kind]}/${encodeURIComponent(id)}/card`), staleTime: 0 });
   const block = useMemo(() => ({ kind, provenance: `${PRODUCER[kind]}:${id}:-:-`, props: card.data?.block.props ?? {} }), [kind, id, card.data]);
   const band = useBandCard(block);
@@ -175,7 +176,7 @@ function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const act = (action: string, detail?: Record<string, unknown>) => {
     const ask = PICTURE_ASK[action];
     if (ask) navigate(`/chat?ask=${encodeURIComponent(`${ask}\n\nmaipai://music/${kind === "song_style" ? "style" : kind}/${id}`)}`);
-    else onAction("", action, detail);
+    else { onAction("", action, detail); void queryClient.invalidateQueries({ queryKey: ["music-made"] }); }
   };
   const actions = kind === "band" ? ["make_album", "discard"] : kind === "album" ? ["play_all", "remake_cover", "discard"] : ["make_song", "discard"];
   const shared = { editable: props.editable !== false, defaultEditing: props.editable !== false };

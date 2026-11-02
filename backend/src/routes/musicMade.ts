@@ -87,7 +87,7 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
     const where = { conversationId: q.conversation_id ?? null, turnId: q.turn_id ?? null };
     const rec = r.value as unknown as { owner_person_id: string | null };
     const block = (kind === "made_artist" ? bandBlockFromRecord(r.value as never, where) : kind === "made_album" ? albumBlock(actor, r.value as never, where) : styleBlock(r.value as never, where)) as { props: Record<string, unknown> };
-    if (kind !== "song_style" && rec.owner_person_id !== actor.id) block.props = { ...block.props, editable: false, actions: kind === "made_album" ? ["play_all"] : [] };
+    if ((kind !== "song_style" || rec.owner_person_id !== null) && rec.owner_person_id !== actor.id) block.props = { ...block.props, editable: false, actions: kind === "made_album" ? ["play_all"] : kind === "song_style" ? ["make_song"] : [] };
     return c.json({ block: block as Record<string, unknown> }, 200);
   });
   router.openapi(patch, (c) => {

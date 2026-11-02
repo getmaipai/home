@@ -90,6 +90,8 @@ export function finishAlbumPicture(picture: PictureJob): void {
   if (!match) return;
   const owner = db.select().from(people).where(and(eq(people.id, picture.personId))).get();
   if (!owner) return;
+  const album = getMade("made_album", owner as unknown as PersonRow, match[1]!);
+  if (album.ok && (album.value as unknown as { cover_file_id?: string | null }).cover_file_id === picture.files[0].id) return;
   updateMade("made_album", owner as unknown as PersonRow, match[1]!, { cover_file_id: picture.files[0].id });
 }
 
@@ -146,8 +148,10 @@ export function syncAlbumTracks(actor: PersonRow, albumId: string): void {
   if (album.owner_person_id !== actor.id) return;
   const added: string[] = [];
   for (const job of albumJobs(actor.id, albumId)) {
-    if (db.select().from(mediaItems).where(eq(mediaItems.locFileId, job.fileId)).get()) continue;
-    const item = promoteMadeMusicFile(actor, job.fileId);
+    // A song saved or played before the album read it has an item already; it joins while it names no album, and one the person removed keeps its album name and stays out.
+    const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, job.fileId)).get();
+    if (existing && existing.album) continue;
+    const item = existing ?? promoteMadeMusicFile(actor, job.fileId);
     if (!item) continue;
     db.update(mediaItems).set({ album: album.title, trackNo: (album.track_media_ids?.length ?? 0) + added.length + 1, hlc: nextHlc() }).where(eq(mediaItems.id, item.id)).run();
     added.push(item.id);

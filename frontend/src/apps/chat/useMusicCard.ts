@@ -41,7 +41,7 @@ export function studioAsk(action: "make_album" | "make_song", kind: MusicCardKin
 const EDIT_ACTION = { album: "edit_album", song_style: "edit_song_style", band: "edit_band" } as const;
 
 const POLL_MS = 3000;
-const POLL_MAX = 100;
+const POLL_MAX = 40;
 
 /** The props that mean "a picture or a song is still coming", so the card is watched until it arrives. */
 function stillMaking(kind: MusicCardKind, props: Record<string, unknown> | null): boolean {
