@@ -8,6 +8,7 @@ import { BAND_ACTION_NAMES, runBandAction } from "@/lib/music/bandActions";
 import { ALBUM_ACTION_NAMES, runAlbumAction, syncAlbumTracks } from "@/lib/music/album";
 import { STYLE_ACTION_NAMES, runStyleAction, styleBlock } from "@/lib/music/styleCard";
 import { bandBlockFromRecord } from "@/lib/music/band";
+import { pictureEngineReady } from "@/lib/pictures/ready";
 import { albumBlock } from "@/lib/music/album";
 import { createMade, deleteMade, getMade, listMade, listRevisions, restoreRevision, updateMade, type MadeKind, type StoreResult } from "@/lib/music/madeRecords";
 
@@ -58,7 +59,7 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
   const card = createRoute({
     method: "get", path: "/{id}/card", tags: [tag], summary: `The ${noun}'s card as it is now`, middleware: [requireAuth] as const,
     request: { params: idParamSchema("id", idExample), query: z.object({ conversation_id: z.string().optional(), turn_id: z.string().optional() }) },
-    responses: { 200: { content: { "application/json": { schema: z.object({ block: z.record(z.string(), z.unknown()).describe("The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in.") }) } }, description: `The ${noun}'s card. Someone who is not its owner gets it read-only.` }, ...errorResponses({ 401: "Sign in first", 404: `${noun} not found` }) },
+    responses: { 200: { content: { "application/json": { schema: z.object({ block: z.record(z.string(), z.unknown()).describe("The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."), cover_state: z.enum(["ready", "pending", "no_engine"]).optional().describe("Albums only. ready: the cover is on the card. pending: a cover may still arrive. no_engine: none will, because no picture engine is set up.") }) } }, description: `The ${noun}'s card. Someone who is not its owner gets it read-only. An album with no cover also says whether one can still come: cover_state is no_engine when no picture engine is set up.` }, ...errorResponses({ 401: "Sign in first", 404: `${noun} not found` }) },
   });
 
   const fail = <T,>(r: Extract<StoreResult<T>, { ok: false }>) => ({ error: r.error });
@@ -78,7 +79,7 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
     const r = getMade(kind, c.get("person"), c.req.valid("param").id);
     return r.ok ? c.json(r.value as never, 200) : c.json(fail(r), 404);
   });
-  router.openapi(card, (c) => {
+  router.openapi(card, async (c) => {
     const actor = c.get("person");
     if (kind === "made_album") syncAlbumTracks(actor, c.req.valid("param").id);
     const r = getMade(kind, actor, c.req.valid("param").id);
@@ -88,7 +89,8 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
     const rec = r.value as unknown as { owner_person_id: string | null };
     const block = (kind === "made_artist" ? bandBlockFromRecord(r.value as never, where) : kind === "made_album" ? albumBlock(actor, r.value as never, where) : styleBlock(r.value as never, where)) as { props: Record<string, unknown> };
     if ((kind !== "song_style" || rec.owner_person_id !== null) && rec.owner_person_id !== actor.id) block.props = { ...block.props, editable: false, actions: kind === "made_album" ? ["play_all"] : kind === "song_style" ? ["make_song"] : [] };
-    return c.json({ block: block as Record<string, unknown> }, 200);
+    const coverState: "ready" | "pending" | "no_engine" | undefined = kind === "made_album" ? (block.props.cover ? "ready" : (await pictureEngineReady()) ? "pending" : "no_engine") : undefined;
+    return c.json({ block: block as Record<string, unknown>, ...(coverState ? { cover_state: coverState } : {}) }, 200);
   });
   router.openapi(patch, (c) => {
     const r = updateMade(kind, c.get("person"), c.req.valid("param").id, c.req.valid("json"));
@@ -156,7 +158,7 @@ const AlbumAction = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: z.object({ action: z.enum(ALBUM_ACTION_NAMES), done: z.string().describe("One plain sentence for the person."), media_id: z.string().nullable().optional(), album: z.record(z.string(), z.unknown()).optional().describe("The album's card as it is now.") }) } }, description: "Done." },
-    ...errorResponses({ 400: "That action cannot run for this album", 401: "Sign in first", 403: "Only the album's owner can do that", 404: "Album not found" }),
+    ...errorResponses({ 400: "That action cannot run for this album", 401: "Sign in first", 403: "Only the album's owner can do that", 404: "Album not found", 503: "A new cover needs a picture engine and none is set up" }),
   },
 });
 madeAlbumsRoutes.openapi(AlbumAction, async (c) => {

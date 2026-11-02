@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cardPath, musicRefOf, studioAsk } from "./useMusicCard";
+import { cardPath, musicRefOf, studioAsk, stillMaking } from "./useMusicCard";
 
 // MUSIC-STUDIO-HOME: the pieces around the album, song style and band edit cards. The id and turn ride in `provenance`.
 
@@ -27,5 +27,15 @@ describe("studioAsk", () => {
   test("carries one object link for the turn", () => {
     expect(studioAsk("make_album", "band", "mband-abc123")).toContain("maipai://music/band/mband-abc123");
     expect(studioAsk("make_song", "song_style", "sstyle-abc123")).toContain("maipai://music/style/sstyle-abc123");
+  });
+});
+
+describe("stillMaking", () => {
+  test("an album with no picture engine waits only for its songs", () => {
+    expect(stillMaking("album", { tracks: [{ media_id: "m" }] }, "pending")).toBe(true);
+    expect(stillMaking("album", { tracks: [{ media_id: "m" }] }, "no_engine")).toBe(false);
+    expect(stillMaking("album", { tracks: [] }, "no_engine")).toBe(true);
+    expect(stillMaking("album", { cover: { src: "x" }, tracks: [{ media_id: "m" }] }, "ready")).toBe(false);
+    expect(stillMaking("song_style", { title: "x" }, undefined)).toBe(false);
   });
 });

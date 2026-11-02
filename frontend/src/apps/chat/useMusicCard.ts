@@ -3,7 +3,7 @@
 // ids ride in the block's `provenance` (`make_album:<album>:<conversation>:<turn>`, likewise `make_song_style`); a button never
 // names a route. A saved edit comes back as a new card, so the chat card, the Music app and the edit tools always show one record.
 // What a button did is said in a toast (the kit's one transient notice).
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
@@ -44,11 +44,14 @@ const POLL_MS = 3000;
 const POLL_MAX = 40;
 
 /** The props that mean "a picture or a song is still coming", so the card is watched until it arrives. */
-function stillMaking(kind: MusicCardKind, props: Record<string, unknown> | null): boolean {
+export type CoverState = "ready" | "pending" | "no_engine";
+/** With no picture engine a cover never comes, so only the songs are waited for. */
+export function stillMaking(kind: MusicCardKind, props: Record<string, unknown> | null, cover: CoverState | undefined = undefined): boolean {
   if (!props) return true;
-  if (kind === "album") return !props.cover || !Array.isArray(props.tracks) || props.tracks.length === 0;
+  if (kind === "album") return (!props.cover && cover !== "no_engine") || !Array.isArray(props.tracks) || props.tracks.length === 0;
   return false;
 }
+export const NO_ENGINE_NOTE = "There is no picture engine set up, so this album has no cover. Add one in Settings under AI and models.";
 
 /**
  * For an `album` or `song_style` block (and the edit button of a `band` block): its live props, the button handler and whether the
@@ -65,6 +68,7 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
   const [gone, setGone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [watch, setWatch] = useState(0);
+  const told = useRef(false);
 
   useEffect(() => {
     // A band's pictures come from useBandCard; the band card is read here only after an edit.
@@ -72,10 +76,12 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
     let alive = true; let polls = 0; let timer: ReturnType<typeof setTimeout> | undefined;
     const look = async () => {
       try {
-        const got = await request<{ block: { props: Record<string, unknown> } }>(cardPath(kind, id, conversationId, turnId));
+        const got = await request<{ block: { props: Record<string, unknown> }; cover_state?: CoverState }>(cardPath(kind, id, conversationId, turnId));
         if (!alive) return;
         setLive(got.block.props);
-        if (!stillMaking(kind, got.block.props)) return;
+        // Said once, and only while the album is new (its songs are still coming), so an old album does not announce it on every visit.
+        if (got.cover_state === "no_engine" && !told.current && !(Array.isArray(got.block.props.tracks) && got.block.props.tracks.length > 0)) { told.current = true; push(NO_ENGINE_NOTE); }
+        if (!stillMaking(kind, got.block.props, got.cover_state)) return;
       } catch (error) {
         if (!alive) return;
         if ((error as { status?: number }).status === 404) { setGone(true); return; }
@@ -85,7 +91,7 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
     };
     void look();
     return () => { alive = false; if (timer) clearTimeout(timer); };
-  }, [id, kind, conversationId, turnId, watch]);
+  }, [id, kind, conversationId, turnId, watch, push]);
 
   const play = useCallback((mediaId: string) => {
     if (host) void Promise.resolve(host.onPlay(mediaId, {})).catch((error: unknown) => push(error instanceof Error && error.message ? error.message : "That song could not play. Try again."));
