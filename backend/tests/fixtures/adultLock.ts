@@ -5,6 +5,7 @@ import { TestClient } from "../client";
 import { db } from "@/db";
 import { attachments, people as peopleTable } from "@/db/schema";
 import { getVideoJobFor } from "@/lib/videos/jobs";
+import { withMark } from "@/lib/adultLock";
 import { until } from "../pictureFixture";
 import type { PersonRow } from "@/types";
 
@@ -43,7 +44,8 @@ export async function makeClip(client: TestClient, actor: PersonRow, prompt: str
 /** Mark a finished clip and its poster adult-only (the lock on), the way the pipeline stores an adult-only clip. */
 export function markAdultOnly(jobId: string): void {
   for (const row of db.select().from(attachments).where(like(attachments.provenance, `%"job":"${jobId}"%`)).all()) {
-    db.update(attachments).set({ provenance: row.provenance.replace('"audience":"all-ages"', '"audience":"adult-only"') }).where(eq(attachments.id, row.id)).run();
+    const next = withMark(row.provenance, { lock: "on", raiseToAdult: true });
+    if (next) db.update(attachments).set({ provenance: next }).where(eq(attachments.id, row.id)).run();
   }
 }
 

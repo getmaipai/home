@@ -26,11 +26,14 @@ import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { videoJobLockItem, videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
-import { lockedView } from "@/lib/adultLock";
+import { lockedView, sessionKeyOf } from "@/lib/adultLock";
+import { adultStateOf, setItemLock, NOT_READY_LINE } from "@/lib/adultMarks";
+import { getCookie } from "hono/cookie";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { conversationTurns } from "@/db/schema";
+import { conversationTurns, videoJobs } from "@/db/schema";
+import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
 
 export const videosRoutes = apiRouter();
@@ -66,6 +69,14 @@ const ItemSchema = z.object({
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
   clip: z.object({ url: z.string(), poster_url: z.string(), width: z.number(), height: z.number(), seconds: z.number().nullable(), seed: z.number().nullable(), file_id: z.string(), poster_file_id: z.string(), has_sound: z.boolean().describe("The clip has a sound track the model made (speech included).") }).nullable(),
+  adult: z.object({
+    made_audience: z.enum(["all-ages", "adult-only"]).describe("The machine fact and the minor ceiling; never lowered."),
+    lock: z.enum(["on", "off"]).describe("Whether the Adult lock applies; the creator can clear it."),
+    can_clear: z.boolean().describe("Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."),
+    can_mark: z.boolean().describe("Show 'Mark as NSFW': the creator, the item is not locked."),
+    line: z.string().nullable().describe("The state in plain words, for an adult-only item."),
+    history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })).describe("The creator's own audit rows for this item (no content)."),
+  }).nullable().describe("ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."),
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 /** ADULT-LOCK-02: a card with an adult-only clip in it, while the person holds no unlock proof: the one tile and nothing else (no id, words, picture or count). */
@@ -94,6 +105,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     ...qualityFields(job, ready),
     fit_ask: job.state === "queued" && laneOfPerson(actor) === "adult" ? answerableFitAsk(actor, job.id) : null,
     max_offered: job.state === "done" && laneOfPerson(actor) === "adult" && maxOffered(actor, "video", undefined, ready.max === true),
+    adult: file && !job.temporary ? adultStateOf(actor, file.id) : null,
     clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id, has_sound: file.audio === true } : null,
   };
 }
@@ -261,6 +273,36 @@ videosRoutes.openapi(cancelRoute, async (c) => {
   for (const job of live) await cancelVideoJob(actor, job.id);
   const fresh = getVideoJobFor(actor, wanted.id) ?? wanted;
   return c.json(videoCardOrLocked(actor, fresh, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
+});
+
+// ADULT-LOCK-06 (design 3.10): the creator clears the Adult lock after the confirm dialog and a FRESH passcode (the single-use ticket of
+// POST /api/adult-lock/confirm, named for this job); the creator or an admin marks it again with no passcode. Nothing of the item is in an answer.
+const adultMarkRoute = createRoute({
+  method: "post", path: "/jobs/{id}/adult-mark", tags: ["Videos"], summary: "Mark a clip NSFW again, or (the creator only, with a fresh passcode ticket) remove its Adult lock", middleware: [requireAuth] as const,
+  request: { params: idParams, body: { content: { "application/json": { schema: z.object({ action: z.enum(["clear", "mark"]), ticket: z.string().min(1).max(200).optional() }) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]) }) } }, description: "The state now." },
+    ...errorResponses({ 403: "Not an adult's own screen, or the passcode ticket is missing, spent or for another item", 404: "No such clip", 409: "Not ready, or nothing to change" }),
+  },
+});
+videosRoutes.openapi(adultMarkRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const { action, ticket } = c.req.valid("json");
+  const own = getVideoJobFor(actor, id);
+  let fileId: string | undefined;
+  if (own) {
+    if (own.state !== "done" || own.temporary || !own.files[0]) return c.json({ error: NOT_READY_LINE }, 409) as never;
+    fileId = own.files[0].id;
+  } else if (action === "mark" && isOwnerOrAdmin(actor)) {
+    // An admin may mark more of the household's items adult-only without seeing them; nothing of the item is answered.
+    const row = db.select({ files: videoJobs.files, state: videoJobs.state }).from(videoJobs).where(eq(videoJobs.id, id)).get();
+    try { fileId = row?.state === "done" ? (JSON.parse(row.files) as Array<{ id?: string }>)[0]?.id : undefined; } catch { fileId = undefined; }
+  }
+  if (!fileId) return c.json({ error: "That video isn't available any more." }, 404) as never;
+  const done = setItemLock({ actor, fileId, action, ticket: ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
+  if (!done.ok) return c.json({ error: done.error }, done.status) as never;
+  return c.json({ made_audience: done.made_audience, lock: done.lock }, 200);
 });
 
 async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 403 | 422 | 503; body: { error: string; code: string } } | null> {

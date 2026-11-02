@@ -290,3 +290,7 @@ export function newMediaCollectionId(): string {
 export function newVideoFavoriteId(): string {
   return `vfav-${randomSuffix(10)}`;
 }
+
+export function newAdultMarkLogId(): string {
+  return `amark-${randomSuffix(10)}`;
+}

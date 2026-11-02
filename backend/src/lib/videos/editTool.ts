@@ -33,6 +33,7 @@ import { CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_V
 import { runStackEdit, type EditFile } from "./stackEdit";
 import { isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { fileAudience } from "@/lib/access";
+import { lockItemOfProvenance, newItemMark, type MarkSource } from "@/lib/adultLock";
 import { allVideoAdapters } from "./adapters";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
@@ -144,6 +145,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   // A clip that started from a picture (made here or an attached photo) starts from it again, through the same loader and input screening a Make another uses.
   let prepared: RunGenerateVideoInput["prepared"];
   let adultOnly = false;
+  let adultLock: "on" | "off" = "off";
   if (continuing) {
     // The new clip starts from the last frame of this one, with the person's new words (else the old ones); level, look, camera and voices stay unless changed.
     if (value.prompt !== undefined) body.prompt = value.prompt;
@@ -156,6 +158,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     if ("outcome" in started) return started.outcome;
     prepared = started.prepared;
     adultOnly = started.adultOnly;
+    adultLock = started.adultLock;
   } else if (source.request.source_file_id) {
     const prep = source.conversationId
       ? await prepareVideoRerun({ actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: value.change === "remix" ? value.prompt ?? source.prompt : source.prompt, sourceFileId: source.request.source_file_id, adapters: [], styleIds: [] })
@@ -179,7 +182,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     if (!max.ok) return refused(callId, args, max.line, max.why);
   }
 
-  const made = await makeVideoFor(actor, body, { audience, state, callId, ...(prepared ? { prepared } : {}), ...(adultOnly ? { adultOnly: true } : {}) });
+  const made = await makeVideoFor(actor, body, { audience, state, callId, ...(prepared ? { prepared } : {}), ...(adultOnly ? { adultOnly: true, adultLock } : {}) });
   if (!made.ok) {
     if (made.status === 503) return failed(callId, args, made.code, "unavailable");
     if (made.status === 502) return failed(callId, args, made.code, "errored");
@@ -202,7 +205,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
 // ---------------------------------------------------------------- continue (the last frame, then a new clip from it)
 
-type ContinueStart = { prepared: NonNullable<RunGenerateVideoInput["prepared"]>; adultOnly: boolean } | { outcome: ToolExecutionOutcome };
+type ContinueStart = { prepared: NonNullable<RunGenerateVideoInput["prepared"]>; adultOnly: boolean; adultLock: "on" | "off" } | { outcome: ToolExecutionOutcome };
 
 /**
  * The picture a continued clip starts from: the last frame of the source, taken by the Stack's `frame` op, screened like any picture an adult hands
@@ -241,10 +244,11 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
   const screened = await screenInputImage(jpeg, body.prompt, viewerOf(actor, audience.band));
   if (!screened.ok) return no(screened.line, screened.code);
   // Never lower than the source: an adult-only clip makes an adult-only continuation.
-  const adultOnly = await clipAdultOnly(source);
-  const stored = storeContinueFrame(actor, { conversationId: state.conversationId, turnId: state.turnId, temporary, jpeg, width, height, adultOnly, sourceJobId: source.id });
+  const mark = newItemMark([await clipMark(source)], false);
+  const adultOnly = mark.madeAudience === "adult-only";
+  const stored = storeContinueFrame(actor, { conversationId: state.conversationId, turnId: state.turnId, temporary, jpeg, width, height, adultOnly, lock: mark.lock, sourceJobId: source.id });
   if (!stored.ok) return no(stored.line, "frame_not_saved");
-  return { prepared: { image: Buffer.from(jpeg).toString("base64"), imageSource: "generated", sourceFileId: stored.id, width, height }, adultOnly };
+  return { prepared: { image: Buffer.from(jpeg).toString("base64"), imageSource: "generated", sourceFileId: stored.id, width, height }, adultOnly, adultLock: mark.lock };
 }
 
 // ---------------------------------------------------------------- trim, join and mix (the Stack's media.edit)
@@ -269,16 +273,20 @@ function clipFile(actor: PersonRow, job: VideoJob): EditFile | null {
   return read ? { bytes: read.bytes, ext: "mp4" } : null;
 }
 
-/** Whether a source clip is adult-only: flagged when it was stored, else by its Library note; a saved clip whose note does not say all-ages counts as adult-only. */
-async function clipAdultOnly(job: VideoJob): Promise<boolean> {
-  if (job.request.adultOnly === true) return true;
+/** ADULT-LOCK-06: the flags a source clip carries right now (design 3.10): from its Library file when it has one (so a lock the creator cleared since the job
+ * ran counts as cleared), else from what the job was marked at its start. A saved clip whose note does not say all-ages counts as adult-only with the lock on. */
+async function clipMark(job: VideoJob): Promise<MarkSource> {
   const file = job.files[0];
-  if (job.request.adultOnly === undefined && !job.temporary && file) {
+  if (file && !job.temporary) {
     const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
-    return !row || fileAudience(row.provenance) !== "all-ages";
+    const item = row ? lockItemOfProvenance(row.ownerPersonId, row.provenance) : null;
+    if (item) return { madeAudience: item.madeAudience, lock: item.lock };
+    if (!row || fileAudience(row.provenance) !== "all-ages") return { madeAudience: "adult-only", lock: "on" };
+    return { madeAudience: "all-ages", lock: "off" };
   }
-  if (job.request.adultOnly === undefined) return isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
-  return false;
+  if (job.request.adultOnly === true) return { madeAudience: "adult-only", lock: job.request.adultLock ?? "on" };
+  if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification)) return { madeAudience: "adult-only", lock: "off" };
+  return { madeAudience: "all-ages", lock: "off" };
 }
 
 /** A song or sound file of this person for a mix: their own music job (a temporary chat's only in that chat) or a file in their own Library. */
@@ -344,7 +352,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   let ops;
   let spoken: { line: string; voice: string } | null = null;
   // Never lower than the sources: any adult-only clip, an adult-only track or an adult line makes the edit adult-only.
-  let adultOnly = (await Promise.all(sources.map(clipAdultOnly))).some(Boolean);
+  const marks: MarkSource[] = await Promise.all(sources.map(clipMark));
   let describe: string;
   if (value.change === "trim") {
     const range = trimRange({ from_s: value.from_s, to_s: value.to_s }, seconds);
@@ -368,7 +376,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       const voice = await voiceChoice(actor, value.voice);
       if (!voice.ok) return refused(callId, args, NO_VOICE_LINE, "no_voice");
       spoken = { line: value.line, voice: voice.voice };
-      if (await isAdultOnlyJob(value.line, [], async () => undefined)) adultOnly = true;
+      if (await isAdultOnlyJob(value.line, [], async () => undefined)) marks.push({ madeAudience: "adult-only", lock: "off" });
       inputs = [clipFiles[0]!]; // the spoken line joins in the run, so the answer does not wait for the speech
       ops = mixOps(value.level ?? DEFAULT_VOICE_LEVEL, start, true);
       describe = "your line laid over it";
@@ -377,7 +385,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       const track = ownTrack(actor, state, value.track, temporary);
       if (!track) return refused(callId, args, NO_TRACK_LINE, "no_track");
       const trackRow = db.select().from(attachments).where(eq(attachments.id, value.track)).get();
-      if (trackRow && fileAudience(trackRow.provenance) === "adult-only") adultOnly = true;
+      if (trackRow && fileAudience(trackRow.provenance) === "adult-only") marks.push({ madeAudience: "adult-only", lock: lockItemOfProvenance(trackRow.ownerPersonId, trackRow.provenance)?.lock ?? "off" });
       inputs = [clipFiles[0]!, track];
       ops = mixOps(value.level ?? DEFAULT_MUSIC_LEVEL, start, false);
       describe = "your song laid under it";
@@ -395,7 +403,8 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const made = await runStackEdit({ inputs: files, ops: ops!, name: "edited.mp4", signal });
     return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
   };
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly });
+  const mark = newItemMark(marks, false);
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,

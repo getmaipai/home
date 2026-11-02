@@ -13,6 +13,9 @@ import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouse
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
+import { usesAdultOnlyStyle } from "./adultStyle";
+import { markFields, newItemMark } from "@/lib/adultLock";
+import { logAutoMark } from "@/lib/adultMarks";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
@@ -63,6 +66,8 @@ export interface VideoRequest {
   /** VIDEO-CHAT-01 (C3, C4): set on a clip made by editing others (trim, join, mix): the job it came from (the first clip of a join) and what was done. The old clips stay. */
   /** Set when the clip is stored: it is adult-only (its words, style or sources), so an edit of it never goes lower. */
   adultOnly?: boolean;
+  /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
+  adultLock?: "on" | "off";
   edit?: { from: string; change: "trim" | "join" | "mix"; with?: string[] };
 }
 
@@ -369,14 +374,14 @@ export function loadLibraryPicture(actor: PersonRow, fileId: string): PhotoResul
 }
 
 /** VIDEO-CHAT-01 (continue): keeps the last frame of a clip as this chat's own picture (the same kind of file a clip's poster is), so the new clip starts from a stored file that Make another can load again. Memory only in a temporary chat. */
-export function storeContinueFrame(actor: PersonRow, input: { conversationId: string; turnId: string | null; temporary: boolean; jpeg: Uint8Array; width: number; height: number; adultOnly: boolean; sourceJobId: string }): { ok: true; id: string } | { ok: false; line: string } {
+export function storeContinueFrame(actor: PersonRow, input: { conversationId: string; turnId: string | null; temporary: boolean; jpeg: Uint8Array; width: number; height: number; adultOnly: boolean; lock?: "on" | "off"; sourceJobId: string }): { ok: true; id: string } | { ok: false; line: string } {
   if (input.temporary) {
     const id = newFileId();
     storeTemporaryClip({ id, conversationId: input.conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: input.jpeg });
     return { ok: true, id };
   }
   if (!input.turnId) return { ok: false, line: "A video can only be continued from a chat message. Ask again in a chat." };
-  const provenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: input.adultOnly ? "adult-only" : "all-ages", job: input.sourceJobId, width: input.width, height: input.height, frame: "last" })}`;
+  const provenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markFields({ madeAudience: input.adultOnly ? "adult-only" : "all-ages", lock: input.lock ?? (input.adultOnly ? "on" : "off") }), job: input.sourceJobId, width: input.width, height: input.height, frame: "last" })}`;
   const made = createAttachment(actor, { conversationId: input.conversationId, turnId: input.turnId, mediaType: "image/jpeg", bytes: input.jpeg, provenance, deduplicate: false, retention: "conversation" });
   return made.ok ? { ok: true, id: made.value.id } : { ok: false, line: saveFailureLine(made.status) };
 }
@@ -408,6 +413,8 @@ export interface StartVideoInput {
   create?: VideoRequest["create"];
   /** VIDEO-CHAT-01 (continue): the clip is adult-only whatever its words say (it starts from an adult-only clip's frame), so the finished-clip check never judges it lower. */
   adultOnly?: boolean;
+  /** ADULT-LOCK-06: the source's Adult lock (`on` or `off`) when `adultOnly` comes from a source clip; absent means on. */
+  adultLock?: "on" | "off";
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -418,13 +425,13 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const model = videoModelForLane(laneOfPerson(input.actor), input.body.model);
   const now = new Date().toISOString();
   // ADULT-LOCK-02: a clip made with an adult-only style is a locked item from the start, before the Stack is called, so a clip being made is already a lock tile.
-  const styleIds = (input.body.loras ?? []).map((l) => l.id);
-  // A style that cannot be resolved (removed or renamed since it was chosen) counts as adult-only: the lock fails closed.
-  const adultStyle = styleIds.length > 0 && await (async () => { const known = new Map((await allVideoAdapters()).map((a) => [a.id, a.classification])); return styleIds.some((id) => !known.has(id) || known.get(id) === "adult-only"); })();
+  // ADULT-LOCK-06: the mark is decided here, from the one table (newItemMark): an adult-only style locks it on; a source's flags (`input.adultOnly`, `input.adultLock`) carry over.
+  const adultStyle = await usesAdultOnlyStyle((input.body.loras ?? []).map((l) => l.id));
+  const mark = newItemMark(input.adultOnly ? [{ madeAudience: "adult-only", lock: input.adultLock ?? "on" }] : [], adultStyle);
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.adultOnly || adultStyle ? { adultOnly: true } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -528,8 +535,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
   // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
   // An edit is adult-only when any clip it is made from is (`request.adultOnly`, set when the edit starts), never lower than its sources.
-  const adult = job.request.adultOnly === true || await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
-  job.request.adultOnly = adult;
+  const startedAdult = job.request.adultOnly === true;
+  const adult = startedAdult || await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
   const keyframes = await extractKeyframes(video, clip.seconds ?? job.request.seconds);
   // An edit has no poster from the Stack: frame 0 of the new clip is its poster, and a clip no frame can be taken from is not stored.
   const poster = posterIn ?? keyframes?.[0] ?? null;
@@ -540,6 +547,14 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   if (signal.aborted) return;
   const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
   if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
+  // ADULT-LOCK-06: the lock is on from the start (an adult-only style or source: `request.adultLock`), or now, when the finished-clip check's own verdict is nude or
+  // sexual. The prompt word check above raised the audience only. An edit follows its sources (the table), so a verdict never relocks a clip the creator cleared.
+  const verdictNude = !job.request.edit && checks.some((check) => check.ok && check.verdict.is_nude_or_sexual);
+  const lock: "on" | "off" = (startedAdult && job.request.adultLock !== "off") || verdictNude ? "on" : "off";
+  job.request.adultLock = lock;
+  const madeAdult = adult || verdictNude;
+  job.request.adultOnly = madeAdult;
+  const markNote = markFields({ madeAudience: madeAdult ? "adult-only" : "all-ages", lock });
   const conversationId = job.conversationId;
   // VIDEO-CREATE-01: no conversation means the Create page made it; the clip and poster are kept Library files, not chat attachments.
   if (!conversationId && job.temporary) throw new Error("no conversation");
@@ -559,8 +574,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
     const own = conversationId === null;
     if (!own && (!job.turnId || !(await waitForTurnRow(job.turnId)))) throw new Error("turn row never appeared");
     if (signal.aborted) return;
-    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta, ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
-    const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height,  })}`;
+    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
+    const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markNote, job: job.id, width, height,  })}`;
     const made = own
       ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept" })
       : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation" });
@@ -569,6 +584,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
       ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "kept" })
       : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "conversation" });
     if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
+    if (lock === "on") logAutoMark(made.value.id, actor.id);
     file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
   }
   job.files = [file];
@@ -606,7 +622,7 @@ export type EditRun = (signal: AbortSignal) => Promise<{ ok: true; clip: EditedC
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
+export interface StartEditInput { adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -617,7 +633,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
     percent: 5, phase: "editing", position: null, prompt: input.source.prompt,
-    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true } : {}) },
+    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

@@ -1951,6 +1951,24 @@ export const videoFavorites = sqliteTable(
   (table) => [uniqueIndex("video_favorites_person_file_idx").on(table.personId, table.fileId)],
 );
 
+// ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the record of every change to an item's Adult lock: who, when, which item, and how. It holds no
+// content (no title, prompt, words or file name). It is a record, not a log: no admin page or Status page shows it, and only the creator sees their own
+// rows, in the item's menu. `item_id` is the Library file (attachments.id). `action` is `clear` or `mark`; `via` is `creator_passcode`, `creator`, `admin` or `auto`.
+export const adultMarkLog = sqliteTable(
+  "adult_mark_log",
+  {
+    id: text("id").primaryKey(),
+    itemId: text("item_id").notNull(),
+    action: text("action", { enum: ["clear", "mark"] }).notNull(),
+    actorId: text("actor_id").notNull(),
+    via: text("via", { enum: ["creator_passcode", "creator", "admin", "auto"] }).notNull(),
+    at: text("at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [index("adult_mark_log_item_idx").on(table.itemId, table.at), index("adult_mark_log_actor_idx").on(table.actorId, table.at)],
+);
+
 // VIDEO-GEN-04: the household's switch on one video LoRA in the Stack's library. The Stack owns the file and its
 // metadata; Home owns whether the household lets chat use it. A missing row reads as enabled.
 export const videoAdapterPrefs = sqliteTable("video_adapter_prefs", {

@@ -17,7 +17,7 @@ export function videoJobLockItem(job: VideoJob): LockItem | null {
     const item = row ? lockItemOfProvenance(row.owner, row.provenance) : null;
     if (item) return item;
   }
-  return job.request.adultOnly === true ? { ownerPersonId: job.personId, madeAudience: "adult-only", lock: "on" } : null;
+  return job.request.adultOnly === true ? { ownerPersonId: job.personId, madeAudience: "adult-only", lock: job.request.adultLock === "off" ? "off" : "on" } : null;
 }
 
 export function videoJobLockState(actor: PersonRow, job: VideoJob, proof?: AdultProof): LockResult {
@@ -39,7 +39,7 @@ export function lockedVideoTile(person: PersonRow): { locked: true; making: bool
   const meta = libraryProvenanceSql("a.provenance");
   const stored = sqlite.query(`SELECT 1 AS n FROM attachments a WHERE a.owner_person_id = ? AND a.deleted_at IS NULL AND json_extract(${meta},'$.writer') != 'video-poster' AND ${lockedFilterSql(person, meta)} LIMIT 1`).get(person.id);
   const active = db.select({ request: videoJobs.request }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), inArray(videoJobs.state, ["queued", "running"]))).all()
-    .some((row) => { try { return (JSON.parse(row.request) as { adultOnly?: boolean }).adultOnly === true; } catch { return false; } });
+    .some((row) => { try { return (() => { const request = JSON.parse(row.request) as { adultOnly?: boolean; adultLock?: string }; return request.adultOnly === true && request.adultLock !== "off"; })(); } catch { return false; } });
   return stored || active ? lockedView(active) : null;
 }
 
@@ -52,7 +52,9 @@ export function redactLockedVideoOutcome(actor: PersonRow, outcome: ToolExecutio
   const id = (outcome.result?.data as { videoJobId?: unknown } | undefined)?.videoJobId;
   if (typeof id !== "string") return outcome;
   const job = getVideoJobFor(actor, id);
-  if (!job || videoJobLockItem(job)?.madeAudience !== "adult-only") return outcome;
+  // ADULT-LOCK-06: only a locked item is a placeholder; an adult-only clip whose lock the creator cleared (or never had) is an ordinary result.
+  const item = job ? videoJobLockItem(job) : null;
+  if (!job || item?.madeAudience !== "adult-only" || item.lock === "off") return outcome;
   return outcomeOf({ callId: outcome.callId, packageId: outcome.packageId, status: outcome.status, via: outcome.via, args: { locked: true }, at: outcome.at, durationMs: outcome.durationMs, result: { reply: { text: LOCKED_RESULT_TEXT }, data: { locked: true }, actions: [] } });
 }
 

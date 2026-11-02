@@ -185,6 +185,39 @@ export function lockState(item: LockItem | null, actor: PersonRow, proof: AdultP
   return unlockedFor(actor, proof) ? "open" : "locked";
 }
 
+/** One source of a new item (an edited, joined or mixed clip, a continued frame): the flags it carries right now. A source with no flags counts as adult-only
+ * with the lock off only when the caller says so; callers pass what `lockItemOfProvenance` or the job's request says. */
+export interface MarkSource { madeAudience: "all-ages" | "adult-only" | null; lock: "on" | "off" }
+export interface ItemMark { madeAudience: "all-ages" | "adult-only"; lock: "on" | "off" }
+
+/**
+ * ADULT-LOCK-06: the audience table of the design note (3.10), one function for every new item (job start, edit, join, mix, continue; pictures and songs
+ * call it in ADULT-LOCK-07). `madeAudience` is never lower than any source's and rises when the new item adds an adult-only style. `lock` is on when a
+ * source is still locked on or the item adds an adult-only style; an item whose adult sources the creator all cleared follows them (off), and an
+ * all-ages item with no adult style starts off.
+ */
+export function newItemMark(sources: readonly MarkSource[], addsAdultStyle: boolean): ItemMark {
+  const adult = addsAdultStyle || sources.some((s) => s.madeAudience !== "all-ages");
+  const locked = addsAdultStyle || sources.some((s) => s.madeAudience !== "all-ages" && s.lock === "on");
+  return { madeAudience: adult ? "adult-only" : "all-ages", lock: locked ? "on" : "off" };
+}
+
+/** The provenance note keys of a mark. `audience` is the minor ceiling the Library already reads; `made_audience` says the same in the spec's word. */
+export function markFields(mark: ItemMark): { audience: ItemMark["madeAudience"]; made_audience: ItemMark["madeAudience"]; lock: ItemMark["lock"] } {
+  return { audience: mark.madeAudience, made_audience: mark.madeAudience, lock: mark.lock };
+}
+
+/** A provenance note with `lock` (and, when raising, the audience keys) rewritten. `raise` only ever raises the audience, never lowers it. */
+export function withMark(provenance: string, change: { lock: "on" | "off"; raiseToAdult?: boolean }): string | null {
+  const meta = libraryProvenance(provenance);
+  const writer = meta.writer;
+  if (!writer) return null;
+  const { writer: _w, ...rest } = meta;
+  const next: Record<string, unknown> = { ...rest, lock: change.lock };
+  if (change.raiseToAdult) { next.audience = "adult-only"; next.made_audience = "adult-only"; }
+  return `${writer}:${JSON.stringify(next)}`;
+}
+
 /** What a locked item is drawn as: one flag the tile needs, never a title, description, picture, tag, count, date, id or owner. */
 export function lockedView(making = false): { locked: true; making: boolean } { return { locked: true, making }; }
 

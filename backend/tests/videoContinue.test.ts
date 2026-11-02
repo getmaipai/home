@@ -1,7 +1,7 @@
 // VIDEO-INPUTS-01 (Home side): (A) a start picture goes to LTX-2.5 Standard, Boost and Max when the Stack reports `image_to_video`; (B) `edit_video`
 // `continue` starts a new clip from the last frame of a finished one (the Stack's `frame` op, then the picture start); (C) `join` takes a
 // `transition` and says plainly that a crossfade is not available until the Stack has the step. Fake Stacks only; no network.
-import { __unlockRestOfTest } from "@/lib/adultLock";
+import { withMark, __unlockRestOfTest } from "@/lib/adultLock";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -195,11 +195,14 @@ describe("B: edit_video continue", () => {
     const owner = person("owner");
     __unlockRestOfTest(owner.id); // ADULT-LOCK-02: a locked source is read on an unlocked page only
     const { job, state } = await makeClip(owner);
-    const row = db.select().from(videoJobs).where(eq(videoJobs.id, job.id)).get()!;
-    db.update(videoJobs).set({ request: JSON.stringify({ ...JSON.parse(row.request), adultOnly: true }) }).where(eq(videoJobs.id, job.id)).run();
+    // ADULT-LOCK-06: the source's current flags are those of its Library file (the creator may have cleared them since), so the clip is marked there.
+    for (const id of [job.files[0]!.id, job.files[0]!.poster_id]) {
+      const stored = db.select().from(attachments).where(eq(attachments.id, id)).get()!;
+      db.update(attachments).set({ provenance: withMark(stored.provenance, { lock: "on", raiseToAdult: true })! }).where(eq(attachments.id, id)).run();
+    }
     const outcome = await edit(state, { clip: job.id, change: "continue" });
     const next = jobOf(owner, outcome);
-    expect(next.request.adultOnly).toBe(true);
+    expect(next.request).toMatchObject({ adultOnly: true, adultLock: "on" });
     await finished(owner, outcome);
     const again = await edit(chatState(owner, job.conversationId!), { clip: next.id, change: "another_take" });
     expect(again.status).toBe("succeeded");

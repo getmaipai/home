@@ -88,6 +88,8 @@ export interface RunGenerateVideoInput {
   prepared?: { image: string; imageSource: "generated" | "uploaded"; sourceFileId: string; width: number | null; height: number | null };
   /** The new clip is adult-only whatever its words say (a continued clip's source is). */
   adultOnly?: boolean;
+  /** The source clip's Adult lock (design 3.10); absent means on. */
+  adultLock?: "on" | "off";
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -213,7 +215,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       sourceFileId,
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       ...(create ? { create } : {}),
-      ...(input.adultOnly ? { adultOnly: true } : {}),
+      ...(input.adultOnly ? { adultOnly: true, ...(input.adultLock ? { adultLock: input.adultLock } : {}) } : {}),
       body: {
         prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(withVideoTriggerWords(prompt, adapter), look), recipe), voices),
         // A new seed for every clip (stored on the job); Another take rolls a different one.

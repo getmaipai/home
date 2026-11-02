@@ -56,6 +56,7 @@ import {
   pictureAdapterPrefs,
   videoJobs,
   videoFavorites,
+  adultMarkLog,
   mediaCollections,
   mediaProgress,
   mediaWatchDays,
@@ -223,6 +224,7 @@ export function resetDb(): void {
   __resetMusicJobsForTests();
   db.delete(musicJobs).run();
   db.delete(videoFavorites).run(); // VIDEO-UI-06: references people
+  db.delete(adultMarkLog).run(); // ADULT-LOCK-06
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(videoAdapterPrefs).run();
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
