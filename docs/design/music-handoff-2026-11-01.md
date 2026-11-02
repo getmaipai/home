@@ -56,7 +56,7 @@ story and members, so made bands are a differentiator. Items marked (unv) there 
 
 **Sound effects by tier** (agent research, model cards read): Standard uses ACE-Step trims (MIT, already running); Boost and Max add
 Stable Audio 3 Small SFX as an optional download (Community Licence, outputs `personal_only`), after a bench; no separate Max engine.
-Rejected: MMAudio and TangoFlux (non-commercial weights). Bench before shipping the optional engine: offline load of a Mac conversion
+Not in the first cut, on merit: MMAudio is built for video-to-audio and is weak on unfamiliar sounds, and TangoFlux has no verified Mac path. Both ship non-commercial weights; that is only a line in the catalog entry for the owner's acceptance (LICENCE-ACK-01) and never a reason to drop a model. Bench before shipping the optional engine: offline load of a Mac conversion
 (official code is CUDA or CPU; MLX conversions are community and unchecked), memory and seconds per 10 s clip, loop seam clicks on ten
 prompts, a foley set against ACE-Step trims.
 

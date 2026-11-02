@@ -122,7 +122,7 @@ Evidence: research pass 2026-11-01 (model cards read; any figure not read from a
 | Boost | Stable Audio 3 Small SFX (optional download) for foley: door, footstep, glass, whoosh, UI beep; more steps or a longer clip. |
 | Max | same engines as Boost; long beds use the ACE-Step XL profile. No separate sound engine is invented for Max. |
 
-The Boost and Max engine choice never reaches a minor (rule 8: a minor never gets model choice). Rejected: MMAudio and TangoFlux (non-commercial weights). Benches before the optional engine ships: offline load from a pinned
+The Boost and Max engine choice never reaches a minor (rule 8: a minor never gets model choice). Not in the first cut, on merit: MMAudio is built for video-to-audio and is weak on unfamiliar sounds, and TangoFlux has no verified Mac path. Both ship non-commercial weights; that is only a line in the catalog entry for the owner's acceptance (LICENCE-ACK-01) and never a reason to drop a model. Benches before the optional engine ships: offline load from a pinned
 Mac conversion, memory and seconds per 10 s clip on the Studio and a p32 host, loop seam clicks on ten prompts, and a foley set
 scored against ACE-Step trims. The bench decides whether the optional engine is worth shipping; it does not wait on any licence.
 
