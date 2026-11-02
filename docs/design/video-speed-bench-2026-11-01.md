@@ -507,6 +507,28 @@ Footprint (the OS charge) is far above the MLX counter and the resident set at l
 - Clips: `ltx25-max-new-<bf16|bf16-lowram|q8>-768x448-f<241|361|481>-smurfs10.mp4` and `ltx25-max-new-bf16[-lowram]-1024x576-f241-smurfs10.mp4` in `~/video-bench/clips/`.
 
 
+## The ungated mirror `mlx-community/ltx-2.5-mlx` as a pinnable Max pack (2026-11-02)
+
+The official dgrauet packs are gated on Hugging Face, so the Stack cannot pin them for households. The mirror `huggingface.co/mlx-community/ltx-2.5-mlx` is not gated. Downloaded on the owner's yes (distilled set only, 66 GB on disk) into `~/video-bench/models-25/mlxc-bf16`: `transformer-distilled.safetensors` 38.0 GB, `gemma4-12b-ltx-v1/model.safetensors` 23.8 GB with its tokenizer and config files, `connector.safetensors` 6.3 GB, `spatial_upscaler_x2_v1_1.safetensors` 1.0 GB, `temporal_upscaler_x2_v1_0.safetensors`, `vae_decoder`, `vae_encoder`, `vocoder`, `audio_vae`, `duration_head`, `LICENSE.md` and `ltx-acceptable-use-policy-snapshot-2026-08-12.pdf`. Left out: `transformer-dev.safetensors` (38 GB), `vae_decoder_pruna` and `vae_diffusion_decoder` (my first download command briefly fetched the last two, 1.5 GB, because the exclude flags were given in a form the tool read as file names; they were deleted).
+
+**It needs `--gemma <pack>/gemma4-12b-ltx-v1`.** Without that flag the runtime (`dgrauet/ltx-2-mlx` 0.18.0, the `ltx25-new` venv) loads without an error but ignores the prompt: at 768x448 and 1024x576 the Smurfs prompt produced an unrelated drama scene with garbled speech ("Holy suar, it's smar..."), loudness -25 to -28 LUFS, and a 512x288 Marie test gave a man in a hat and "And all the song is owned." With the flag the pack matches the dgrauet pack:
+
+| Run (Smurfs four lines, 10 s, seed 7, official runtime) | Time | MLX peak | Footprint | rss max | Loudness | Whisper | Picture |
+|---|---:|---:|---:|---:|---:|---|---|
+| dgrauet bf16, 768x448 | 114.9 s | 62.9 GB | 45.2 GB | 31.3 GB | -11.5 LUFS | all four lines | clean Smurfs |
+| mirror, no `--gemma`, 768x448 | 114.0 s | 62.9 GB | 45.2 GB | 11.3 GB | -24.6 | garbled | prompt ignored |
+| **mirror with `--gemma`, 768x448** | 104.3 s | 62.9 GB | 45.3 GB | 30.9 GB | -13.0 | all four lines | clean Smurfs |
+| dgrauet bf16, 1024x576 | 272.0 s | 37.2 GB | 48.6 GB | 20.6 GB | -14.1 | all four lines | clean |
+| mirror, no `--gemma`, 1024x576 | 187.0 s | 37.2 GB | 48.6 GB | 35.6 GB | -27.7 | garbled | prompt ignored |
+| **mirror with `--gemma`, 1024x576** | 191.5 s | 37.2 GB | 48.6 GB | 28.2 GB | -14.0 | all four lines | clean Smurfs |
+| Marie line 512x288, 5 s: dgrauet / mirror with `--gemma` | 26.5 s / 27.3 s | | 41.8 GB / 41.8 GB | | | both exact | both the sitcom kitchen |
+
+Footprint and MLX peak are identical between the packs; the time differences (104 against 115 s, 191 against 272 s) are load noise from the shared machine, not the pack. Output is not bit-identical (different conversions), but the same prompt gives the same kind of result and the same speech.
+**What the Stack must pin:** runtime `dgrauet/ltx-2-mlx` 0.18.0 plus this pack, and always pass `--gemma <pack>/gemma4-12b-ltx-v1`, because the failure without it is silent. A startup self-check is advisable: one short clip whose transcript must contain a known line.
+**Licence:** `LICENSE.md` is the LTX-2.x Community License Agreement dated August 11, 2026; its text matches Lightricks' `LICENSE-2_x` on GitHub to 99.7 percent after stripping formatting (the rest is markdown, not terms). The acceptable-use PDF (snapshot 2026-08-12) is shipped with it; I did not compare its text with an official copy. The licence's derivative-build clause applies to this conversion, so the licence files travel with the pack.
+Clips: `ltx25-max-new-mlxcg-768x448-f241-smurfs10.mp4`, `ltx25-max-new-mlxcg-1024x576-f241-smurfs10.mp4` (with the flag) and `ltx25-max-new-mlxc-*` (without it, the failure case), in `~/video-bench/clips/`.
+
+
 ## Not run, and why
 
 Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
