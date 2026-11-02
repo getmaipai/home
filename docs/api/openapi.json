@@ -87626,6 +87626,32 @@
                       "started_at": {
                         "type": "number"
                       },
+                      "making_version": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "stage_label": {
+                            "type": "string"
+                          },
+                          "progress": {
+                            "type": "number"
+                          },
+                          "eta_seconds": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "position": {
+                            "type": "number",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "stage_label",
+                          "progress",
+                          "eta_seconds",
+                          "position"
+                        ]
+                      },
                       "cover_pending": {
                         "type": "boolean"
                       },
@@ -87751,6 +87777,7 @@
                       "stages",
                       "stage_index",
                       "started_at",
+                      "making_version",
                       "cover_pending",
                       "cover_url",
                       "cover_versions",
@@ -87945,6 +87972,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -88070,6 +88123,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -88261,6 +88315,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -88386,6 +88466,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -88595,6 +88676,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -88720,6 +88827,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -88937,6 +89045,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -89062,6 +89196,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -89303,6 +89438,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -89428,6 +89589,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -89674,6 +89836,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -89799,6 +89987,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -90011,6 +90200,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -90136,6 +90351,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -90352,6 +90568,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -90477,6 +90719,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -90705,6 +90948,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -90830,6 +91099,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -91049,6 +91319,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -91174,6 +91470,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -91396,6 +91693,32 @@
                     "started_at": {
                       "type": "number"
                     },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -91521,6 +91844,7 @@
                     "stages",
                     "stage_index",
                     "started_at",
+                    "making_version",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
