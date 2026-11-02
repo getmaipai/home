@@ -901,7 +901,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/tailscale.ts` | isTailscaleRequest, interpretTailscaleStatusJson, getTailscaleStatus, getTailscaleLeafForServer, ensureTailscaleCert, setTailscaleRenewalActive |
 | `backend/src/lib/tailscaleTls.ts` | onTsLeafRenewed, notifyTsLeafRenewed |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
-| `backend/src/lib/text.ts` | wordsOf, ownWordsQuery, tokenize, isBarePronoun |
+| `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
 | `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, mirrorLegacyIntoSlot, migrateTierSlots |
 | `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, slotIsOff |

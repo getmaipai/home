@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T03:08:55.016Z",
+  "generatedAt": "2026-11-02T03:17:06.395Z",
   "kitTag": "ui-v0.5.457",
   "items": [
     {
@@ -234,8 +234,8 @@
       "file": "answer-style-select.tsx",
       "name": "answer-style-select",
       "group": "answer",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Drawn in the chat composer as the answer-style control; Home passes the choices and the picked id as props only.",
       "implemented": true
     },
     {
@@ -1070,8 +1070,8 @@
       "file": "pending-actions.tsx",
       "name": "pending-actions",
       "group": "pending",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Drawn under a held job's status line; Home passes the labels and what each answer does as props only.",
       "implemented": true
     },
     {
@@ -1118,8 +1118,8 @@
       "file": "prompt-bar.tsx",
       "name": "prompt-bar",
       "group": "prompt",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "later",
+      "verdictReason": "Added to the kit for generation prompts; no Home screen draws it yet. Wire it when a generation screen takes a prompt with options.",
       "implemented": false
     },
     {
