@@ -3,7 +3,7 @@ import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
 import { ANSWER_WORDS, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planData, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
-import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
+import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchEvidence, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -978,6 +978,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const backboneCited = backbone?.source ? backboneNumber : null;
     const backboneText = backbone ? backboneBlock(backbone, backboneCited) : "";
     const noFindings = { notes: [], ledger: { text: "", notes: 0, dropped: 0 }, read: 0, dropped: 0 };
+    // For the bench's fabrication check: everything the searches returned, page text included (the stored outcomes keep none of it).
+    if (researching) noteResearchText(state, "search evidence", researchEvidence(state.outcomes));
     const parts = partsFor(brief, state.researchPlan);
     const wordTarget = state.answerStyle === "max" ? ANSWER_WORDS.max : ANSWER_WORDS.thinking;
     // RESEARCH-COVERAGE-01: after the analysis, every part the answer must cover is either backed by the notes or the article, or read for
