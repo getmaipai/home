@@ -115,7 +115,7 @@ function fakeClient(answer: (query: string) => MbRecording[] | Error): { client:
   const queries: string[] = [];
   return {
     queries,
-    client: { lookupArtistWikidata: async () => null, searchRecordings: async (query) => { queries.push(query); const out = answer(query); if (out instanceof Error) throw out; return out; } },
+    client: { lookupArtistGenres: async () => [], lookupArtistWikidata: async () => null, searchRecordings: async (query) => { queries.push(query); const out = answer(query); if (out instanceof Error) throw out; return out; } },
   };
 }
 

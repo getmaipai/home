@@ -233,6 +233,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
+| `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
@@ -617,6 +618,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | sweepStaleDownloads, sha256OfFile, downloadUrl |
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
+| `backend/src/lib/music/band.ts` | MAKE_BAND_TOOL_ID, BAND_NOT_HERE_LINE, BAND_MODEL_LINE, briefFor, bandPrompt, parseDraft |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, prepareOwnedStemsJob |
@@ -629,6 +631,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic, getMusicJob |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/tool.ts` | GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs, musicRefusalFor |
+| `backend/src/lib/music/trackItem.ts` | readMusicTrack |
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |
 | `backend/src/lib/nasMounts.ts` | listNasMounts, createNasMount, deleteNasMount |
 | `backend/src/lib/nativeFolderDialog.ts` | runCommand, chooseNativeFolder |

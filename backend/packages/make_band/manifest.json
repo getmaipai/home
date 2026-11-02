@@ -1,0 +1,64 @@
+{
+  "id": "make_band",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make a Band",
+  "description": "Make a new fictional band, with a portrait, a logo and a first single, in the style of a song the person is playing.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicBandAllowed",
+    "bench_row": "band-tool",
+    "reason": "adult on their own written screen with music enabled and a maipai://music/track reference in the message"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "Create a band like this song maipai://music/track/media-a1b2c3d4e5",
+      "make a band like the song I am playing maipai://music/track/media-f6g7h8i9j0",
+      "invent a new band that sounds like this track",
+      "I love this song, make me a band with the same feel",
+      "create an artist like this one with a first single"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "ref"
+    ],
+    "properties": {
+      "ref": {
+        "type": "string",
+        "grounded": false,
+        "description": "The maipai://music/track/... reference the person sent. Pass it exactly. The band is new: it only borrows the song's feel, never its name, words or members.",
+        "maxLength": 200
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

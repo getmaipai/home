@@ -1,0 +1,17 @@
+{
+  "description": "Recipe fallback; the native tool and its gates are covered in backend/tests/makeBand.test.ts.",
+  "inputs": {
+    "ref": "maipai://music/track/media-a1b2c3d4e5"
+  },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "A band can only be made through chat on your own screen. Press Create a band like this in the Music player.",
+      "speech": "A band can only be made through chat on your own screen. Press Create a band like this in the Music player."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

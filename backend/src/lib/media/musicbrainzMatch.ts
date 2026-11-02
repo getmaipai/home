@@ -84,6 +84,8 @@ export interface MusicBrainzClient {
   searchRecordings(query: string, limit: number): Promise<MbRecording[]>;
   /** MUSIC-WIKI-01: the artist's Wikidata id from its MusicBrainz url relations, or null when it has none. Only the artist's MusicBrainz id is sent. */
   lookupArtistWikidata(artistId: string): Promise<string | null>;
+  /** MUSIC-LIKE-01: the artist's public genre names, for a band made "like" a playing song. Only the artist's MusicBrainz id is sent. */
+  lookupArtistGenres(artistId: string): Promise<string[]>;
 }
 
 /** One client holds the one queue: every request to MusicBrainz from this process goes through it, so the spacing is global. */
@@ -148,6 +150,14 @@ export function createMusicBrainzClient(deps: ClientDeps = {}): MusicBrainzClien
         if (found) return found[1]!;
       }
       return null;
+    },
+    async lookupArtistGenres(artistId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(artistId)) return [];
+      const url = new URL(`${baseUrl()}/ws/2/artist/${artistId}`);
+      url.searchParams.set("inc", "genres");
+      url.searchParams.set("fmt", "json");
+      const body = (await getJson(url)) as { genres?: Array<{ name?: string; count?: number }> } | null;
+      return (body?.genres ?? []).filter((g) => typeof g.name === "string" && g.name !== "").sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).slice(0, 6).map((g) => g.name!);
     },
   };
 }

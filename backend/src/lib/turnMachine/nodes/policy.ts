@@ -1,3 +1,4 @@
+import { MAKE_BAND_TOOL_ID } from "@/lib/music/band";
 import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
 // U2c, the `policy` node (turn-machine-state-record-2026-09-22.md's
 // state table): each ActionProposal against the manifest's min_role,
@@ -392,6 +393,24 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         continue;
       }
       entries.push({ proposal: itemProposal, decision: { allow: true } });
+      continue;
+    }
+
+    // MUSIC-LIKE-01: `make_band` reads only a music reference the person sent in this message, on a turn offered it.
+    if (call.tool === MAKE_BAND_TOOL_ID) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const bandProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const typed = itemRefsIn(state.utterance).filter((item) => item.app === "music" && item.kind === "track");
+      const given = typeof callArgs.ref === "string" ? callArgs.ref.trim() : "";
+      const asked = given ? (typed.find((item) => item.ref === (itemRefsIn(given)[0]?.ref ?? given)) ?? typed.find((item) => item.id === trimItemQuoting(given))) : typed[0];
+      if (asked) callArgs.ref = asked.ref;
+      const reason = !state.musicBandAllowed ? "music_not_here" as const : !asked ? "item_not_here" as const : musicRefusalFor(musicAudienceOf(state, false), {}) ? "music_not_here" as const : null;
+      if (reason) {
+        noteRefusal(reason);
+        entries.push({ proposal: bandProposal, decision: { allow: false, reason } });
+        continue;
+      }
+      entries.push({ proposal: bandProposal, decision: { allow: true } });
       continue;
     }
 

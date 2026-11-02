@@ -3,6 +3,9 @@
 // No import of lib/attachments here: attachments.ts calls the delete helpers below when a turn, a chat or a person is
 // forgotten, so only jobs without kept output go with a deleted chat.
 import { isGeneratedFile } from "@/lib/libraryProvenance";
+
+/** MUSIC-LIKE-01: a picture made for something else than a chat card: a song cover, or a made band's portrait or logo (`band:<id>:portrait`). Hidden from the card. */
+export type PicturePurpose = "cover" | `band:${string}`;
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, pictureJobs } from "@/db/schema";
@@ -46,7 +49,7 @@ export interface PictureJob {
   conversationId: string | null;
   turnId: string | null;
   companionId?: string | null;
-  purpose?: "cover" | null;
+  purpose?: PicturePurpose | null;
   kind: PictureJobKind;
   state: PictureJobState;
   stackJob: string | null;
@@ -98,7 +101,7 @@ const TEMP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 type Row = typeof pictureJobs.$inferSelect;
 function fromRow(row: Row): PictureJob {
   return {
-    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, companionId: row.companionId, purpose: row.purpose as "cover" | null, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
+    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, companionId: row.companionId, purpose: row.purpose as PicturePurpose | null, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
     stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request: JSON.parse(row.request) as PictureRequest,
     error: row.error, files: JSON.parse(row.files) as PictureFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
@@ -150,7 +153,7 @@ export function pictureJobsForTurn(actor: PersonRow, turnId: string): PictureJob
   const jobs = new Map<string, PictureJob>();
   for (const job of [...memory.values(), ...live.values()]) if (job.turnId === turnId && job.personId === actor.id) jobs.set(job.id, job);
   for (const row of db.select().from(pictureJobs).where(and(eq(pictureJobs.turnId, turnId), eq(pictureJobs.personId, actor.id))).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
-  return [...jobs.values()].filter((job) => job.purpose !== "cover").sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return [...jobs.values()].filter((job) => !job.purpose).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /** The first job id of each of these turns, for the history list (one query). */
@@ -159,9 +162,9 @@ export function pictureJobIdsByTurn(actor: PersonRow, turnIds: readonly string[]
   if (turnIds.length === 0) return out;
   const firstAt = new Map<string, string>();
   const note = (turnId: string, id: string, at: string) => { const seen = firstAt.get(turnId); if (seen === undefined || at < seen) { firstAt.set(turnId, at); out.set(turnId, id); } };
-  for (const job of memory.values()) if (job.purpose !== "cover" && job.turnId && turnIds.includes(job.turnId) && job.personId === actor.id) note(job.turnId, job.id, job.createdAt);
+  for (const job of memory.values()) if (!job.purpose && job.turnId && turnIds.includes(job.turnId) && job.personId === actor.id) note(job.turnId, job.id, job.createdAt);
   const rows = db.select({ purpose: pictureJobs.purpose, id: pictureJobs.id, turnId: pictureJobs.turnId, createdAt: pictureJobs.createdAt }).from(pictureJobs).where(and(eq(pictureJobs.personId, actor.id), inArray(pictureJobs.turnId, [...turnIds]))).all();
-  for (const row of rows) if (row.purpose !== "cover" && row.turnId) note(row.turnId, row.id, row.createdAt);
+  for (const row of rows) if (!row.purpose && row.turnId) note(row.turnId, row.id, row.createdAt);
   return out;
 }
 

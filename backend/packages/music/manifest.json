@@ -50,8 +50,8 @@
     {
       "id": "musicbrainz",
       "destination": "MusicBrainz's own public search API",
-      "when": "someone asks about a music artist, and in the background after a library scan, about one song a second, to match your songs to MusicBrainz. Turn the background match off under Music settings.",
-      "what": "for an artist question, the artist's name as typed; for the background match, each song's title, artist, album and track number from its file, plus your home's internet address. Nothing anyone in the house said or saved goes with it: no name, account, cookie or listening history.",
+      "when": "someone asks about a music artist, in the background after a library scan, about one song a second, to match your songs to MusicBrainz, and when you press Create a band like this on a matched song, once, to read its artist's genre tags. Turn the background match off under Music settings.",
+      "what": "for an artist question, the artist's name as typed; for the genre tags, the artist's public MusicBrainz id; for the background match, each song's title, artist, album and track number from its file, plus your home's internet address. Nothing anyone in the house said or saved goes with it: no name, account, cookie or listening history.",
       "who": "the MetaBrainz Foundation",
       "opt_in": false,
       "retention": "unknown, see MusicBrainz's own policy"

@@ -46,7 +46,7 @@ function fixture(wd: unknown, page: unknown, files: unknown = commons()) {
 }
 const mb = (qid: string | null | Error): MusicBrainzClient => ({
   searchRecordings: async () => [],
-  lookupArtistWikidata: async () => { if (qid instanceof Error) throw qid; return qid; },
+  lookupArtistGenres: async () => [], lookupArtistWikidata: async () => { if (qid instanceof Error) throw qid; return qid; },
 });
 const BIO = "Quill is a folk band from Example Town. They formed in 1999. Their first album came out in 2001.";
 
@@ -173,7 +173,7 @@ test("the owner's off switch stops the pass before any request", async () => {
   setHouseholdSettingValue("music.artist_wikimedia", false);
   const f = fixture(wikidata("Q42"), extract(BIO));
   let asked = 0;
-  const client: MusicBrainzClient = { searchRecordings: async () => [], lookupArtistWikidata: async () => { asked++; return "Q42"; } };
+  const client: MusicBrainzClient = { searchRecordings: async () => [], lookupArtistGenres: async () => [], lookupArtistWikidata: async () => { asked++; return "Q42"; } };
   const result = await runArtistProfilePass({ client, fetchJson: f.fetchJson, fetchPhoto: f.fetchPhoto });
   expect(result.considered).toBe(0);
   expect(asked).toBe(0);
@@ -184,7 +184,7 @@ test("a none answer is kept, not asked again, until it is old", async () => {
   const [first] = await artistIds() as [string];
   db.update(mediaItems).set({ musicbrainzArtistId: ART }).where(eq(mediaItems.id, first)).run();
   let asked = 0;
-  const client: MusicBrainzClient = { searchRecordings: async () => [], lookupArtistWikidata: async () => { asked++; return null; } };
+  const client: MusicBrainzClient = { searchRecordings: async () => [], lookupArtistGenres: async () => [], lookupArtistWikidata: async () => { asked++; return null; } };
   expect((await runArtistProfilePass({ client })).none).toBe(1);
   await runArtistProfilePass({ client });
   expect(asked).toBe(1);

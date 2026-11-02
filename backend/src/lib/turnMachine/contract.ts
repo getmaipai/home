@@ -249,6 +249,8 @@ export interface TurnState {
   musicEditAllowed?: boolean;
   /** NEWS-DISCUSS-TOOL-2026-10-27: the person's own message holds a maipai:// reference they may read; `read_item` is offered only then. */
   itemReferenceAllowed?: boolean;
+  /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
+  musicBandAllowed?: boolean;
   modelId?: string;
   /** MINOR-CEILING-01: the chat model the Stack runs this turn (the person's pick when they made
    * one), so a node can read the running model's record; never sent to a client. */

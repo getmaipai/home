@@ -35,6 +35,26 @@
               }
             },
             {
+              "label": "Band like this",
+              "icon": "users",
+              "action": {
+                "navigate": {
+                  "to": "/apps/music/like-this",
+                  "state": { "id": "{id}", "op": "band" }
+                }
+              }
+            },
+            {
+              "label": "Song like this",
+              "icon": "music",
+              "action": {
+                "navigate": {
+                  "to": "/apps/music/like-this",
+                  "state": { "id": "{id}", "op": "song" }
+                }
+              }
+            },
+            {
               "label": "Add to playlist",
               "icon": "plus",
               "action": {

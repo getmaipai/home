@@ -1,0 +1,16 @@
+{
+  "id": "make_band",
+  "inputs": [
+    {
+      "name": "ref",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "A band can only be made through chat on your own screen. Press Create a band like this in the Music player."
+    }
+  ]
+}

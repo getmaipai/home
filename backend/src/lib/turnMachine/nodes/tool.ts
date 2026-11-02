@@ -1,3 +1,4 @@
+import { MAKE_BAND_TOOL_ID, runMakeBand } from "@/lib/music/band";
 import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMusic } from "@/lib/music/tool";
 // U2c, the `tool` node (turn-machine-state-record-2026-09-22.md's state
 // table): "runPlugin under the tool deadline; the outcome recorded in
@@ -270,6 +271,16 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const outcome = await runReadItemTool({ actor: state.actor, args: args as Record<string, unknown>, callId });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    // MUSIC-LIKE-01: make_band writes the band, then starts its picture and song jobs; the policy node checked the offer and the reference.
+    if (tool === MAKE_BAND_TOOL_ID) {
+      const outcome = await runMakeBand({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+      outcomes.push(outcome);
+      const data = outcome.result?.data as { musicJobId?: string } | undefined;
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       continue;
     }

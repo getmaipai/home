@@ -1,0 +1,28 @@
+package: make_band
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: backend/tests/makeBand.test.ts covers the gate, the policy and the band record
+  routing_examples:
+    met: true
+    note: two examples in manifest.json
+  privacy_row_per_data_source:
+    met: true
+    note: no data sources of its own; the optional MusicBrainz genre read is the Music package data source
+  offline_behavior_stated:
+    met: true
+  smoke_test:
+    met: true
+    note: tests/smoke.json
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+gold:
+  real_service_verified:
+    met: false
+    note: live verification belongs to MUSIC-LIKE-01

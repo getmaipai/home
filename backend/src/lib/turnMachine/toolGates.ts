@@ -34,6 +34,7 @@ interface LatchedToolGates {
   musicEngineReady: boolean;
   musicEditOk: boolean;
   itemRefOk: boolean;
+  musicBandOk: boolean;
 }
 
 const MAX_LATCHED_CONVERSATIONS = 500;
@@ -51,6 +52,7 @@ export interface TurnToolGateResult {
   musicOk: boolean;
   musicEditOk: boolean;
   itemRefOk: boolean;
+  musicBandOk: boolean;
 }
 
 /** Calculates the conditional offers for a real turn and for its cache warm-up. */
@@ -90,17 +92,25 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const musicEditOk = musicEditPermission && (musicEditAvailable || latch?.musicEditOk === true);
 
   const itemRefPermission = !input.bare && input.actor.role !== "guest" && input.band !== "child" && input.surfaceClass === "written";
-  const itemRefInMessage = itemRefPermission && safeGate(() => itemRefsIn(input.text).length > 0);
-  if (latch && itemRefInMessage) latch.itemRefOk = true;
-  const itemRefOk = itemRefPermission && (itemRefInMessage || latch?.itemRefOk === true);
+  // MUSIC-LIKE-01: a song reference (maipai://music/track/...) offers `make_band` and nothing else; every other reference offers
+  // `read_item`. The two never share a turn, so the sixteen-tool worst case holds (a message with both kinds offers read_item only).
+  const refsInMessage = itemRefPermission ? (() => { try { return itemRefsIn(input.text); } catch { return []; } })() : [];
+  const isTrack = (ref: { app: string; kind: string }) => ref.app === "music" && ref.kind === "track";
+  const otherRefInMessage = refsInMessage.some((ref) => !isTrack(ref));
+  const trackRefInMessage = !otherRefInMessage && refsInMessage.length > 0;
+  if (latch && otherRefInMessage) latch.itemRefOk = true;
+  const itemRefOk = itemRefPermission && (otherRefInMessage || latch?.itemRefOk === true);
+  if (latch && trackRefInMessage && musicOk) latch.musicBandOk = true;
+  const musicBandOk = itemRefPermission && musicOk && !itemRefOk && (trackRefInMessage || latch?.musicBandOk === true);
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk),
     answerImagesOk,
     picturesOk,
     videosOk,
     musicOk,
     musicEditOk,
     itemRefOk,
+    musicBandOk,
   };
 }
 
@@ -112,7 +122,7 @@ function getConversationLatch(conversationId: string): LatchedToolGates {
     conversationToolGateLatches.set(conversationId, latch);
     return latch;
   }
-  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, itemRefOk: false };
+  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, itemRefOk: false, musicBandOk: false };
   conversationToolGateLatches.set(conversationId, latch);
   if (conversationToolGateLatches.size > MAX_LATCHED_CONVERSATIONS) {
     const oldest = conversationToolGateLatches.keys().next().value;

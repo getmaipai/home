@@ -91,6 +91,7 @@ const UsersPage = lazyNamed(() => import("@/shell/pages/UsersPage"), "UsersPage"
 const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage");
 const ReferencePage = lazyNamed(() => import("@/shell/pages/ReferencePage"), "ReferencePage");
 const WikipediaPage = lazyNamed(() => import("@/shell/pages/WikipediaPage"), "WikipediaPage");
+const MusicLikeThisPage = lazyNamed(() => import("@/shell/pages/MusicLikeThisPage"), "MusicLikeThisPage");
 const NewsDiscussPage = lazyNamed(() => import("@/shell/pages/NewsDiscussPage"), "NewsDiscussPage");
 const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
 const MediaHomePage = lazyNamed(() => import("@/shell/pages/MediaHomePage"), "MediaHomePage");
@@ -438,6 +439,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           {/* APP-KIND-04: every installed package app, with no rebuild. Static routes win over this splat.
               MEDIA-POLISH-01 (RULES S2): an app draws its own header, so app pages sit outside PageHeaderLayout, whose
               title bar had no entry for them and drew an empty 52 px strip above every app. */}
+          <Route path="apps/music/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
           <Route element={<PageHeaderLayout />}>

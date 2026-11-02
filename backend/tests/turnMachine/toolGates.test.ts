@@ -152,3 +152,44 @@ describe("conversation tool gate latch", () => {
     expect(itemWithoutLink).not.toContain("read_item");
   });
 });
+
+describe("MUSIC-LIKE-01: make_band follows a song reference, never the wording", () => {
+  const track = "maipai://music/track/media-a1b2c3d4e5";
+  test("a song reference on a music turn offers make_band and not read_item; wording alone offers neither", async () => {
+    const adult = makePerson("owner");
+    setReady(true);
+    const withRef = await offered(adult, { text: `Create a band like this: ${track}` });
+    const wordsOnly = await offered(adult, { text: "make me a band like the song I am playing" });
+    expect(withRef).toContain("make_band");
+    expect(withRef).not.toContain("read_item");
+    expect(wordsOnly).not.toContain("make_band");
+  });
+  test("without music, a child or a guest, or with a news link too, make_band is not offered", async () => {
+    const adult = makePerson("owner");
+    expect(await offered(adult, { text: track })).not.toContain("make_band");
+    setReady(true);
+    const mixed = await offered(adult, { text: `${track} and ${link}` });
+    expect(mixed).toContain("read_item");
+    expect(mixed).not.toContain("make_band");
+    const child = makePerson("child", "person-child");
+    expect(await offered(child, { text: track, band: "child" })).not.toContain("make_band");
+    const guest = makePerson("guest", "person-guest");
+    expect(await offered(guest, { text: track })).not.toContain("make_band");
+  });
+  test("every other gate on at once still fits the sixteen-tool cap", async () => {
+    const adult = makePerson("owner");
+    setReady(true);
+    const all = await offered(adult, { text: track, musicEditAvailable: () => true });
+    expect(all).toContain("make_band");
+    expect(all.length).toBeLessThanOrEqual(16);
+  });
+  test("the offer latches for the chat and still needs the live music gate", async () => {
+    const adult = makePerson("owner");
+    setReady(true);
+    expect(await offered(adult, { conversationId: "band-chat", text: track })).toContain("make_band");
+    expect(await offered(adult, { conversationId: "band-chat", text: "make it darker" })).toContain("make_band");
+    const spoken = await offered(adult, { conversationId: "band-chat", text: "make it darker", surfaceClass: "spoken", spoken: true });
+    expect(spoken).not.toContain("make_band");
+  });
+});
+

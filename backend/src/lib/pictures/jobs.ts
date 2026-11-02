@@ -17,6 +17,7 @@ import { gateFinished } from "./laneGate";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
+import type { PicturePurpose } from "./jobStore";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
@@ -80,7 +81,7 @@ export interface StartPictureInput {
   turnId: string | null;
   companionId?: string | null;
   temporary: boolean;
-  purpose?: "cover";
+  purpose?: PicturePurpose;
   kind: PictureJobKind;
   prompt: string;
   body: Omit<GenerationBody, "timeout_ms">;
@@ -309,6 +310,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   savePictureJob(job);
   // A stored cover may update its song, but never changes this picture's outcome.
   try { const { finishSongCover } = await import("@/lib/music/cover"); finishSongCover(job); } catch { /* optional cover linkage */ }
+  try { const { finishBandPicture } = await import("@/lib/music/band"); finishBandPicture(job); } catch { /* optional band linkage */ }
   if (stackJob) void cancelOrDelete(stackJob);
 }
 
