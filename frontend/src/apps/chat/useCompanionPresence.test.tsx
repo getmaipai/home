@@ -1,5 +1,6 @@
 import { afterEach, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -17,7 +18,8 @@ const person = { id: "p1", role: "owner" } as Roster;
 const adapter: ChatModelAdapter = { run: async function* () {} };
 function Harness() {
   const runtime = useLocalRuntime(adapter, { initialMessages: [] });
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // One client for the Harness's life: a new client per render refetched the avatar and reset its failed flag mid-test.
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return <QueryClientProvider client={client}><MemoryRouter><AssistantRuntimeProvider runtime={runtime}><WakeWordPersonContext.Provider value={person}><CompanionSpeechContext.Provider value={{ isSpeaking: false, liveVoiceListening: false }}><Presence /></CompanionSpeechContext.Provider></WakeWordPersonContext.Provider></AssistantRuntimeProvider></MemoryRouter></QueryClientProvider>;
 }
 
@@ -71,8 +73,14 @@ test("an avatar failure hides the video character", async () => {
   const video = view.container.querySelector("video");
   expect(video).toBeTruthy();
   await waitFor(() => expect(video?.getAttribute("src")).toBe("/idle.mp4"), { timeout: 5000 });
+  // The avatar may be playing its greeting clip when the first error lands; that error only drops the clip and falls back to idle.
+  // Idle failing is what hides the character, so keep failing whichever video is showing until it is gone.
   fireEvent.error(video!);
-  await waitFor(() => expect(view.queryByRole("img", { name: "Mimi" })).toBeNull(), { timeout: 5000 });
+  await waitFor(() => {
+    const showing = view.container.querySelector("video");
+    if (showing) fireEvent.error(showing);
+    expect(view.queryByRole("img", { name: "Mimi" })).toBeNull();
+  }, { timeout: 4000 });
   globalThis.IntersectionObserver = priorObserver;
   HTMLCanvasElement.prototype.getContext = priorContext;
   HTMLMediaElement.prototype.play = priorPlay;
