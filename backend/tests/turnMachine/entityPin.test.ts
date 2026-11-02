@@ -238,3 +238,31 @@ describe("title-shaped lookups first", () => {
     expect(prompt).toContain('{"pick": 1, "settled": true, "also": 0}');
   });
 });
+
+describe("the pick is asked again when the reply is not the JSON object (RESEARCH-ANGLES-01)", () => {
+  const candidate = (title: string): EntityCandidate => ({ title, snippet: "", load: async () => ({ title, lead: `${title} opening.`, sections: [], source: "library" }) });
+  test("a prose reply is followed by one more call on the same candidates; the second reply decides and both are kept", async () => {
+    const prompts: string[] = [];
+    const replies = ["I think the second one fits best.", '{"pick":2,"settled":true,"also":0}'];
+    __setEntityPinForTests({
+      finder: async () => [candidate("Alpha (franchise)"), candidate("Alpha (1984 television series)")],
+      writer: async (prompt) => { prompts.push(prompt); return replies[prompts.length - 1] ?? null; },
+    });
+    const { anchor, debug } = await pinEntity(brief("the series"), "why did the 1980s series end", person);
+    expect(anchor?.title).toBe("Alpha (1984 television series)");
+    expect(prompts.length).toBe(2);
+    expect(prompts[1]).toBe(`${prompts[0]}\nYour reply must be only the JSON object.`);
+    expect(debug?.replies).toEqual(replies);
+  });
+
+  test("two unparsable replies pin nothing and a down model is not asked twice", async () => {
+    let calls = 0;
+    __setEntityPinForTests({ finder: async () => [candidate("A"), candidate("B")], writer: async () => { calls++; return "no idea"; } });
+    expect((await pinEntity(brief("x"), "q", person)).anchor).toBeNull();
+    calls = 0;
+    __setEntityPinForTests({ finder: async () => [candidate("A"), candidate("B")], writer: async () => { calls++; return null; } });
+    expect((await pinEntity(brief("x"), "q", person)).anchor).toBeNull();
+    expect(calls).toBe(1);
+  });
+});
+

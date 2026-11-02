@@ -278,10 +278,11 @@ describe("planned searches are short plain keywords (RESEARCH-QUERY-04)", () => 
 describe("coverage of the parts a good answer must cover (RESEARCH-COVERAGE-01)", () => {
   const brief: Brief = { subject: "s", answerType: "an explanation", mustContain: ["why it ended", "what came next"], ambiguous: false, options: [], question: "", assumption: "" };
 
-  test("the parts are the brief's must-contain items then the plan's sub-questions, without repeats, at most six", () => {
+  test("the parts are the brief's must-contain items then the plan's sub-questions, without repeats, at most eight", () => {
     expect(partsFor(brief, { subQuestions: ["why it ended", "who ran it", "what came next in later years"], queries: [] })).toEqual(["why it ended", "what came next", "who ran it"]);
     expect(partsFor(null, undefined)).toEqual([]);
-    expect(partsFor({ ...brief, mustContain: ["a1 aa", "b1 bb", "c1 cc", "d1 dd", "e1 ee", "f1 ff", "g1 gg"] }, undefined).length).toBe(6);
+    expect(partsFor({ ...brief, mustContain: ["a1 aa", "b1 bb", "c1 cc", "d1 dd", "e1 ee", "f1 ff", "g1 gg", "h1 hh", "i1 ii"] }, undefined).length).toBe(8);
+    expect(partsFor({ ...brief, mustContain: ["a1 aa", "b1 bb", "c1 cc", "d1 dd"] }, { subQuestions: ["e1 ee", "f1 ff", "g1 gg", "h1 hh"], queries: [] }).length).toBe(8);
   });
 
   test("the analysis prompt lists the parts and asks which are covered; a part reported uncovered comes back in the question's own words", () => {
@@ -398,7 +399,33 @@ describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angl
   test("the plan prompt asks for the sub-questions an answer rests on, without naming a topic", async () => {
     let seen = "";
     await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, { subject: "s", answerType: "", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" }, "what would have happened", 3);
-    expect(seen).toContain("why it stopped, changed or came about");
-    expect(seen).toContain("what was planned or announced");
+    expect(seen).toContain("why_it_stopped_or_changed");
+    expect(seen).toContain("what_was_planned_or_announced");
+  });
+});
+
+describe("plan angles and the pick-retry (RESEARCH-ANGLES-01)", () => {
+  const brief: Brief = { subject: "the show", answerType: "an explanation", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" };
+
+  test("the plan prompt asks for the angles as keys, each a sub-question or empty", async () => {
+    let seen = "";
+    await planData(async (prompt) => { seen = prompt; return "{}"; }, brief, "q", 3);
+    expect(seen).toContain('"angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": ""}');
+    expect(seen).not.toContain("wherever they apply");
+  });
+
+  test("a non-empty angle joins the sub-questions after the model's own list; a repeat, an empty one and one naming an unknown name do not", async () => {
+    const reply = JSON.stringify({ sub_questions: ["x"], angles: { what_came_after: "what came after it", why_it_stopped_or_changed: "", who_said_what: "what Delta Epsilon said", what_planned: "what came after it" }, queries: ["the show ended why"] });
+    const plan = await planData(async () => reply, brief, "why did the show end", 3);
+    expect(plan.subQuestions).toEqual(["x", "what came after it"]);
+    expect((await planData(async () => '{"sub_questions":["x"],"queries":[]}', brief, "q", 3)).subQuestions).toEqual(["x"]);
+    expect((await planData(async () => '{"sub_questions":["x"],"angles":"none","queries":[]}', brief, "q", 3)).subQuestions).toEqual(["x"]);
+  });
+
+  test("the reply brief tells the writer to cover every part when parts are given, and the brief's items otherwise", () => {
+    const analysis = { claims: [{ claim: "c", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: [] };
+    const withItems: Brief = { ...brief, mustContain: ["m1"] };
+    expect(replyBrief(withItems, analysis, "", null, { parts: ["p1", "p2"] })).toContain("covering p1; p2");
+    expect(replyBrief(withItems, analysis, "", null)).toContain("covering m1");
   });
 });

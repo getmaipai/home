@@ -985,7 +985,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // RESEARCH-COVERAGE-01: after the analysis, every part the answer must cover is either backed by the notes or the article, or read for
     // once more by heading from the sections not yet read (no new search), or the writer is told to say it was not found in the sources.
     const coverageFor = async (): Promise<ReplyCoverage> => {
-      const coverage: ReplyCoverage = { words: wordTarget, ...(state.entityAnchor?.alternatives?.length || state.entityAnchor?.unsettled ? { pinned: { title: state.entityAnchor.title, alternatives: state.entityAnchor.alternatives ?? [], ...(state.entityAnchor.unsettled ? { unsettled: state.entityAnchor.unsettled } : {}) } } : {}) };
+      const coverage: ReplyCoverage = { words: wordTarget, ...(parts.length > 0 ? { parts } : {}), ...(state.entityAnchor?.alternatives?.length || state.entityAnchor?.unsettled ? { pinned: { title: state.entityAnchor.title, alternatives: state.entityAnchor.alternatives ?? [], ...(state.entityAnchor.unsettled ? { unsettled: state.entityAnchor.unsettled } : {}) } } : {}) };
       const uncovered = state.researchAnalysis?.uncovered ?? [];
       if (uncovered.length === 0) return coverage;
       let read = "";

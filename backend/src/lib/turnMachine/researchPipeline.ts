@@ -171,13 +171,13 @@ export function briefBlock(brief: Brief): string {
 }
 
 /** Stage 2's reminder that an answer depends on more than the literal ask. The model words each angle from the question's own subject; nothing here names a topic. */
-export const SUB_QUESTION_ANGLES = "A good answer depends on more than the literal ask. For a question about what would have happened, what comes next, or what something means, also plan the sub-questions its answer rests on, wherever they apply to this question: why it stopped, changed or came about; what was planned or announced; what came after; who said what; what is settled and what is only reported. Word each one from this question's own subject.";
+export const SUB_QUESTION_ANGLES = 'A good answer depends on more than the literal ask. Also fill "angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": ""}: for each key a sub-question worded from this question\'s subject when the question\'s answer rests on it, or "" when it does not.';
 /** Stage 2's rule against invented names in the plan (the code guard in `unnamedParts` backs it up). */
 export const SUB_QUESTION_NAMES = "A sub-question names only what the question, the pinned subject or the person's words name; a part about people or works not named there is worded without names.";
 
 export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = "", given = ""): Promise<DataPlan> {
   const base = queryWriterPrompt(utterance, researchProgress([]), "", count, anchorNote);
-  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "queries": ["..."]}.\n${SUB_QUESTION_ANGLES} ${SUB_QUESTION_NAMES}` : base;
+  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "angles": {...}, "queries": ["..."]}.\n${SUB_QUESTION_ANGLES} ${SUB_QUESTION_NAMES}` : base;
   let reply: string | null = null;
   try { reply = await writer(prompt); } catch { reply = null; }
   const data = jsonOf(reply);
@@ -189,7 +189,18 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
     if (query.length > 3 && query.split(/\s+/).length >= 2 && !isRepeatQuery(kept, query)) kept.push(query);
   }
   const haystack = `${utterance} ${brief?.subject ?? ""} ${given}`;
-  return { subQuestions: brief ? unnamedParts(strings(data.sub_questions, 6, 160), haystack) : strings(data.sub_questions, 6, 160), queries: kept.slice(0, count) };
+  if (!brief) return { subQuestions: strings(data.sub_questions, 6, 160), queries: kept.slice(0, count) };
+  const subQuestions = unnamedParts(strings(data.sub_questions, 6, 160), haystack);
+  // The angles the answer may rest on: each non-empty one joins the list after the model's own, through the same name guard, without repeats.
+  const angles = data.angles && typeof data.angles === "object" && !Array.isArray(data.angles) ? Object.values(data.angles as Record<string, unknown>) : [];
+  for (const raw of angles) {
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    // An angle is optional, so one that names what was never given is dropped outright (no fallback to the bracket-stripped text).
+    const part = raw.replace(EXAMPLE_LIST, "").trim().slice(0, 160);
+    const given = squashText(haystack);
+    if (part && namesIn(part).every((name) => nameIsGiven(name, given)) && !subQuestions.some((o) => samePart(o, part))) subQuestions.push(part);
+  }
+  return { subQuestions, queries: kept.slice(0, count) };
 }
 
 // ---------------------------------------------------------------- stage 3: grab and filter
@@ -255,12 +266,12 @@ export function unnamedParts(parts: readonly string[], given: string): string[] 
   return kept.length > 0 || stripped.length === 0 ? kept : stripped;
 }
 
-/** The parts a good answer must cover: what the brief says it must contain, then the plan's sub-questions, without repeats, at most six. */
+/** The parts a good answer must cover: what the brief says it must contain, then the plan's sub-questions, without repeats, at most eight. */
 export function partsFor(brief: Brief | null, plan: DataPlan | undefined, given = ""): string[] {
   const out: string[] = [];
   const mustContain = brief ? unnamedParts(brief.mustContain, `${given} ${brief.subject}`) : [];
   for (const p of [...mustContain, ...unnamedParts(plan?.subQuestions ?? [], given)]) if (p.trim() && !out.some((o) => similar(o, p))) out.push(p.trim());
-  return out.slice(0, 6);
+  return out.slice(0, 8);
 }
 
 /** Output room for the analysis. The reply is a JSON object (claims, conflicts, gaps, guesses and, since RESEARCH-COVERAGE-01, one entry per
@@ -337,6 +348,8 @@ export interface ReplyCoverage {
   missing?: readonly string[];
   /** The style's word target. */
   words?: number;
+  /** The parts a good answer must cover (`partsFor`); the writing round is told to cover all of them. Absent: the brief's must-contain items. */
+  parts?: readonly string[];
   /** The pinned article's title and the other articles of the same name that were passed over. */
   pinned?: { title: string; alternatives: readonly string[]; /** The runner-up and its opening when the question's details did not decide between two. */ unsettled?: { title: string; lead: string } };
 }
@@ -358,7 +371,7 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
     if (coverage.pinned?.unsettled) lines.push(`The question's details do not tell "${coverage.pinned.title.replace(/"/g, "'")}" from "${coverage.pinned.unsettled.title.replace(/"/g, "'")}". The notes and the article are about the first. The second opens: ${coverage.pinned.unsettled.lead.replace(/"/g, "'")} In the first sentence say which one you read and that the question fits both, then cover the other one briefly from that opening (marked as read from its opening only), or say which one you chose and why.`);
     else     if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
-    lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
+    lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${(coverage.parts?.length ? coverage.parts : brief?.mustContain ?? []).length ? `, covering ${(coverage.parts?.length ? coverage.parts : brief?.mustContain ?? []).join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
   }
   if (ledger) lines.push(ledger);
   return lines.join("\n\n");

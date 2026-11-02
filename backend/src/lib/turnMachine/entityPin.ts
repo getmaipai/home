@@ -210,9 +210,25 @@ export function parsePick(text: string | null, count: number): number | null {
   } catch { return null; }
 }
 
+/** The pick reply's shape, so the engine's grammar forces a JSON object instead of a prose answer. */
+export const PICK_SCHEMA = {
+  name: "pick",
+  schema: {
+    type: "object",
+    properties: { pick: { type: "integer" }, settled: { type: "boolean" }, also: { type: "integer" } },
+    required: ["pick", "settled", "also"],
+  },
+} as const;
+
 const chatPinWriter = (signal?: AbortSignal): PinWriter => async (prompt) => {
-  const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 80, temperature: 0, thinking: false, ...(signal ? { signal } : {}) });
-  return result.ok ? result.value.text : null;
+  const base = { max_tokens: 80, temperature: 0, thinking: false, ...(signal ? { signal } : {}) };
+  const messages = [{ role: "user" as const, content: prompt }];
+  // If the engine refuses the grammar, the plain call still runs.
+  const constrained = await complete("chat", messages, { ...base, response_format: { type: "json_schema", json_schema: PICK_SCHEMA } });
+  if (constrained.ok) return constrained.value.text;
+  if (signal?.aborted) return null;
+  const plain = await complete("chat", messages, base);
+  return plain.ok ? plain.value.text : null;
 };
 
 // ---------------------------------------------------------------- the anchor
@@ -230,7 +246,7 @@ export function anchorFor(title: string, article: ArticleText | null, snippet = 
   return { title: title.trim(), baseName, years, phrase, lead, article, text: `${title}. ${lead}` };
 }
 
-export interface PinResult { anchor: EntityAnchor | null; candidates: number; /** For the bench: the candidate titles and the model's pick reply. */ debug?: { titles: string[]; reply: string | null } }
+export interface PinResult { anchor: EntityAnchor | null; candidates: number; /** For the bench: the candidate titles and the model's pick reply. */ debug?: { titles: string[]; reply: string | null; /** Every pass's reply, the retry after an unparsable one included. */ replies: (string | null)[] } }
 
 /** Pins the subject of a research question to one article, or to none when no candidate is clearly it. The candidate set is widened until a
  * pick is made: the subject as the brief words it, then the question itself, then the live search (when allowed). About a second per pass
@@ -267,10 +283,20 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
     if (candidates.length === 0 || candidates.every((c) => seen.has(c.title))) continue;
     candidates.forEach((c) => seen.add(c.title));
     total = seen.size;
-    let reply: string | null = null;
-    try { reply = await (pinWriterOverride ?? chatPinWriter(signal))(pickPrompt(question, brief.subject, candidates)); } catch { reply = null; }
-    debug = { titles: [...(debug?.titles ?? []), ...candidates.map((c) => c.title)], reply };
-    const detail = parsePickDetail(reply, candidates.length);
+    const write = pinWriterOverride ?? chatPinWriter(signal);
+    const prompt = pickPrompt(question, brief.subject, candidates);
+    const ask = async (text: string): Promise<string | null> => { try { return await write(text); } catch { return null; } };
+    const replies = [...(debug?.replies ?? [])];
+    let reply = await ask(prompt);
+    replies.push(reply);
+    let detail = parsePickDetail(reply, candidates.length);
+    // A reply that is not the JSON object is asked for once more on the same candidates; nothing is guessed.
+    if (detail === null && reply !== null && !/"pick"\s*:\s*-?\d/.test(reply)) {
+      reply = await ask(`${prompt}\nYour reply must be only the JSON object.`);
+      replies.push(reply);
+      detail = parsePickDetail(reply, candidates.length);
+    }
+    debug = { titles: [...(debug?.titles ?? []), ...candidates.map((c) => c.title)], reply, replies };
     if (detail === null) continue;
     const index = detail.index;
     const picked = candidates[index]!;
