@@ -161,7 +161,7 @@ describe("the band card", () => {
     expect(block.provenance).toBe(bandProvenance("mband-test0000001", where));
     const actions = block.props.actions as string[];
     expect(new Set(actions).size).toBe(actions.length);
-    expect(actions).toEqual(["make_album", "keep", "remake", "remake_portrait", "remake_logo", "discard"]);
+    expect(actions).toEqual(["make_album", "keep", "remake", "discard"]);
     expect(block.props.logo).toBeUndefined();
     expect(fileIdOfHubImage((block.props.portrait as { src: string }).src)).toBe("file-portrait1");
     expect(block.props.inspiredBy).toBe("Paper Boats by Rivet Row");
