@@ -61,3 +61,17 @@ Four short turns through a dev Home against the live chat model, with a stand-in
 "make it slower" called `edit_music` for a remake, not stems; "what does a stem mean in music production?" called no tool. The budget row (16 tools, `edit_music`
 offered only once a song exists) is pinned by `toolOffers.test.ts` and `toolOfferInventory.test.ts`; the age, surface, minor-line and voice-line rows by `musicSafety.test.ts`
 and `musicTool.test.ts`. Four turns is a smoke measurement, not a rate: the wider tool-calling corpus lives in `commons`.
+
+## Music Studio: made bands, albums and song styles
+
+Three records, one editor each, shared by chat and the Music app.
+
+- **Records:** `made-artist` (`mband-`), `made-album` (`malbum-`), `song-style` (`sstyle-`), and `mrev-` revisions that keep every earlier version with its provenance
+  (`make_band|make_album|make_song_style:<id>:<conversation|->:<turn|->`). Code: `backend/src/lib/music/*`, routes in `backend/src/routes/musicMade.ts`.
+- **Tools:** `make_album`, `make_song_style` and the edit tools `edit_band`, `edit_album`, `edit_song_style`. Offered by object context (a `maipai://music/<band|album|style|track>/<id>`
+  link), never by wording; adults only, like `make_band`. `generate_music` accepts a `song_style` and a `band` or `album`.
+- **Routes:** `/api/music/{bands,albums,styles}` list, create, get, patch, delete; `/:id/revisions` and `/:id/revisions/:revision/restore`; `/:id/card` returns the answer block;
+  `/:id/action` takes `{action, patch, conversation_id, turn_id}`.
+- **Chat cards:** `useMusicCard` (`frontend/src/apps/chat/useMusicCard.ts`) refreshes an album or style card from `/card` and sends edits and buttons to `/action`. It polls while an album has no cover or songs.
+- **Music app:** `frontend/src/shell/pages/MusicStudioPages.tsx` draws Create, Make a band, Make an album, Make a style, My creations and the edit page. The kit Elements are rendered as shipped (rule 9); the kit schema has no card-editor node, so `PackageAppPage` renders these pages in React.
+- **Rule 6a:** logs never carry names, titles, lyrics or ids.

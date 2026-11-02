@@ -1,0 +1,31 @@
+import { describe, expect, test } from "bun:test";
+import { cardPath, musicRefOf, studioAsk } from "./useMusicCard";
+
+// MUSIC-STUDIO-HOME: the pieces around the album, song style and band edit cards. The id and turn ride in `provenance`.
+
+describe("musicRefOf", () => {
+  test("reads the record, conversation and turn from the provenance", () => {
+    expect(musicRefOf("album", "make_album:malbum-abc123:conv-1:turn-2")).toEqual({ id: "malbum-abc123", conversationId: "conv-1", turnId: "turn-2" });
+    expect(musicRefOf("song_style", "make_song_style:sstyle-abc123:-:-")).toEqual({ id: "sstyle-abc123", conversationId: null, turnId: null });
+    expect(musicRefOf("band", "make_band:mband-abc123:c:t")?.id).toBe("mband-abc123");
+  });
+  test("another producer, another kind or a bad id is not ours", () => {
+    expect(musicRefOf("album", "make_band:malbum-abc123:-:-")).toBeNull();
+    expect(musicRefOf("album", "make_album:../x:-:-")).toBeNull();
+    expect(musicRefOf("track", "make_album:malbum-abc123:-:-")).toBeNull();
+  });
+});
+
+describe("cardPath", () => {
+  test("names the card route and where the card was made", () => {
+    expect(cardPath("album", "malbum-abc123", "conv-1", "turn-2")).toBe("/api/music/albums/malbum-abc123/card?conversation_id=conv-1&turn_id=turn-2");
+    expect(cardPath("song_style", "sstyle-abc123", null, null)).toBe("/api/music/styles/sstyle-abc123/card");
+  });
+});
+
+describe("studioAsk", () => {
+  test("carries one object link for the turn", () => {
+    expect(studioAsk("make_album", "band", "mband-abc123")).toContain("maipai://music/band/mband-abc123");
+    expect(studioAsk("make_song", "song_style", "sstyle-abc123")).toContain("maipai://music/style/sstyle-abc123");
+  });
+});

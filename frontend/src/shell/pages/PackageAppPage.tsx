@@ -25,6 +25,7 @@ import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
 import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
+import { MusicStudioPage, isStudioPage } from "@/shell/pages/MusicStudioPages";
 import "./packageAppNews.css";
 
 
@@ -276,7 +277,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         loadingLabel="Opening the app"
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
-          {packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
+          {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
           {media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <div className="flex"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}

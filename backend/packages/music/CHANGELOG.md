@@ -2,6 +2,12 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.13] - 2026-11-02
+
+### Added
+
+- Create pages for Make a band, Make an album and Make a song style, and My creations: a shelf of the bands, albums and styles you made. A tile opens the same editor card the chat shows, and every change keeps the earlier version. Pictures and new songs are still made in chat, and the pages link there.
+
 ## [0.3.12] - 2026-11-01
 
 ### Added

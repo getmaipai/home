@@ -18,6 +18,7 @@ import { splitAfterParagraph } from "@maipai/spec/interpreters/ts/paragraphs.js"
 import { useState } from "react";
 import { request } from "@/lib/api";
 import { bandImageSrc, useBandCard } from "./useBandCard";
+import { joinBandAndStudio, useMusicCard } from "./useMusicCard";
 
 /** The data part's `name`. */
 export const ANSWER_BLOCK_PART = "answer_block";
@@ -87,7 +88,10 @@ export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ d
   delete block.after_paragraph;
   // MUSIC-LIKE-01: a made band's card gets its live pictures and its buttons from the band route (useBandCard); other blocks are inert here.
   const band = useBandCard(data as { kind: string; provenance?: string; props: unknown });
+  // MUSIC-STUDIO-HOME: an album's and a song style's card, and a band card's edit, go through the same kind of hook.
+  const studio = useMusicCard(data as { kind: string; provenance?: string; props: unknown });
   if (band.props) block.props = band.props;
+  if (studio.props) block.props = studio.props;
   // IMGTOOLS-05: a picture gallery shows the kit's Edit button only when every picture in it is one the person
   // may edit (a stored attachment or a saved edit); a web picture an answer shows carries its own licence and is
   // not theirs to alter, so such a gallery gets no handler at all.
@@ -96,7 +100,8 @@ export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ d
   const targets = images.map((image) => ({ id: String(image.id ?? ""), name: String(image.alt ?? "picture"), src: String(image.src ?? "") }));
   const editable = edit !== null && targets.length > 0 && targets.every((target) => target.id !== "" && (edit.canEdit ? edit.canEdit(target) : true));
   const onImageEdit = editable ? (_blockId: string, imageId: string) => { const target = targets.find((candidate) => candidate.id === imageId); if (target) edit.onEdit(target); } : undefined;
-  const onAction = band.onAction ?? (data.kind === "confirmation" && undoAvailable
+  const bandOrStudio = joinBandAndStudio(band.onAction, studio.onAction);
+  const onAction = bandOrStudio ?? (data.kind === "confirmation" && undoAvailable
     ? async (id: string, action: string) => {
         if (action !== "undo") return;
         await request(`/api/tool-undo/${encodeURIComponent(id)}`, { method: "POST" });
@@ -109,11 +114,11 @@ export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ d
     delete props.undo;
     renderedBlock = { ...block, props };
   }
-  if (band.gone) return null;
+  if (band.gone || studio.gone) return null;
   return (
     <AnswerBlockView
       block={renderedBlock}
-      {...(band.props ? { resolveImageSrc: bandImageSrc } : {})}
+      {...(band.props || studio.props ? { resolveImageSrc: bandImageSrc } : {})}
       {...(onImageEdit ? { onImageEdit } : {})}
       {...(onAction ? { onAction } : {})}
     />

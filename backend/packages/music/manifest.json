@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -134,6 +134,8 @@
             "create",
             "make-song",
             "make-band",
+            "make-album",
+            "make-style",
             "creations"
           ]
         }
@@ -279,12 +281,36 @@
         "module": "make-band"
       },
       {
+        "id": "make-album",
+        "label": "Make an album",
+        "icon": "disc-3",
+        "nav": true,
+        "kind": "schema",
+        "module": "make-album"
+      },
+      {
+        "id": "make-style",
+        "label": "Make a style",
+        "icon": "sparkles",
+        "nav": true,
+        "kind": "schema",
+        "module": "make-style"
+      },
+      {
         "id": "creations",
         "label": "My creations",
         "icon": "library",
         "nav": true,
         "kind": "schema",
         "module": "creations"
+      },
+      {
+        "id": "edit",
+        "label": "Edit",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "edit"
       }
     ],
     "data": [

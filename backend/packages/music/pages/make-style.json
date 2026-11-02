@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-make-style",
+  "title": "Make a song style",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "sparkles",
+      "text": "Making a song style comes here soon."
+    }
+  ]
+}

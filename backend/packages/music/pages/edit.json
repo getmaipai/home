@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-edit",
+  "title": "Edit",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "music",
+      "text": "Open something from My creations to edit it."
+    }
+  ]
+}

@@ -18,3 +18,16 @@ on your newest playlist. Only you can change your lists.
 
 The small player keeps your music playing while you browse. Tap it to return to Now playing. Your browser may ask you to
 press Play first. The next song plays from your Up next list.
+
+## Make your own bands, albums and song styles
+
+Adults can make three things in the Music app. Open **Create** to pick one.
+
+- **A band**: a name, a look and a sound. Home draws the pictures in chat.
+- **An album**: a title, a look for the cover and a sound. Home adds the cover and the songs in chat.
+- **A song style**: a sound you can reuse for many songs. It uses words only, never lyrics.
+
+You can fill the form yourself, or ask in chat, for example "Make an album called Porch Light". Open **My creations** to see everything you made. Choose one to change it.
+You can also change one right in chat. Open its card and choose Edit, or ask Home to change it.
+
+Every change keeps the earlier version, so nothing is lost. Children and teens do not see these pages.

@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-make-album",
+  "title": "Make an album",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "disc-3",
+      "text": "Making an album comes here soon."
+    }
+  ]
+}
