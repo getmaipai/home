@@ -427,7 +427,7 @@ describe("review fixes", () => {
     expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
   });
 
-  test("a leftover Bot app of ours is stopped at start; an unrelated process with a recorded pid is not touched", async () => {
+  test("a leftover Bot app of ours is stopped at start (found by its port); an unrelated process with a recorded pid is not touched", async () => {
     const { id } = await owner();
     const { deviceId, ports } = await createRobotHost({ label: "Rivet", personId: id });
     await stopRobotHosts();
@@ -438,17 +438,13 @@ describe("review fixes", () => {
     const orphan = Bun.spawn([join(releases[0]!, "bot/bin/maipai-bot-host"), "run", "--data-dir", join(roots, deviceId), "--hub-url", "http://127.0.0.1:1", "--voice-port", String(ports.voice)]);
     await waitUntil(() => stranger.exitCode === null && orphan.exitCode === null);
     await sleep(500);
-    // The stranger is recorded first: it must survive; the orphan is not recorded, so it still holds the port and is reported, not killed.
+    // The stranger is the recorded pid: it must survive. The orphan is not recorded, but it holds this host's voice port and its
+    // command line is our Bot app, so it is found by the port and stopped, and the host starts.
     await startRobotHosts();
-    expect(stranger.exitCode).toBeNull();
-    expect(orphan.exitCode).toBeNull();
-    expect(robotIssues().filter((i) => !i.resolved_at)).toHaveLength(1);
-    // Now record the orphan: it is ours, so it is stopped and the host starts.
-    writeFileSync(join(roots, deviceId, "host.pid"), String(orphan.pid));
-    expect((await fixIssue(robotIssues().find((i) => !i.resolved_at)!.id)).ok).toBe(true);
     await orphan.exited;
     expect(stranger.exitCode).toBeNull();
     expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
+    expect(robotIssues().filter((i) => !i.resolved_at)).toHaveLength(0);
     stranger.kill();
   });
 
@@ -466,6 +462,24 @@ describe("review fixes", () => {
     await orphan.exited;
     expect(orphan.signalCode).toBe("SIGTERM");
     expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
+  });
+
+  test("a Bot app that already exec'd into maipai_body.app (no data dir in its command, no pid file) is found by its port and stopped", async () => {
+    const { id } = await owner();
+    const { deviceId, ports } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    __resetSidecarsForTests();
+    __resetRobotHostsForTests();
+    rmSync(join(roots, deviceId, "host.pid"), { force: true });
+    // What the live hub showed: python3 -m maipai_body.app from the robots/releases folder, parent 1, holding the voice port.
+    const python = join(roots, "releases", "0.0.0-test-arm64", "bot", "python", "bin", "python3");
+    const orphan = Bun.spawn([process.execPath, "-e", `Bun.listen({hostname:'127.0.0.1',port:${ports.voice},socket:{data(){}}});setInterval(()=>{},1000)`, "--", python, "-m", "maipai_body.app"]);
+    await waitUntil(() => connects(ports.voice), 8000, "the stand-in to listen");
+    await startRobotHosts();
+    await orphan.exited;
+    expect(orphan.signalCode).toBe("SIGTERM");
+    expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
+    expect(robotIssues().filter((i) => !i.resolved_at)).toHaveLength(0);
   });
 
   test("turning Robots off stops every robot brain at once", async () => {

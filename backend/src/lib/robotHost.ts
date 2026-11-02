@@ -117,22 +117,43 @@ const pidFile = (deviceId: string): string => join(roots, deviceId, "host.pid");
 function commandOf(pid: number): string {
   try { return Bun.spawnSync(["ps", "-o", "command=", "-p", String(pid)]).stdout.toString(); } catch { return ""; }
 }
-/** A Bot app left over from a previous Home run is stopped, but only when its recorded pid is alive and its command line is
- * our Bot app with this host's data directory. Anything else is left strictly alone. */
-async function reapStaleBotApp(host: HostRecord): Promise<void> {
-  let pid: number;
-  try { pid = Number(readFileSync(pidFile(host.deviceId), "utf8").trim()); } catch { return; }
-  if (!Number.isInteger(pid) || pid <= 1) return;
-  try { process.kill(pid, 0); } catch { rmSync(pidFile(host.deviceId), { force: true }); return; }
-  const command = commandOf(pid);
-  // The shipped launcher execs `python3 -m maipai_body.hub_host`, so either name marks our Bot app.
-  const ours = command.includes("maipai-bot-host") || command.includes("maipai_body.hub_host");
-  if (!ours || !command.includes(join(roots, host.deviceId))) return;
+/** True when the command line is a Bot app of ours. The shipped launcher (`maipai-bot-host`, then `python3 -m maipai_body.hub_host`)
+ * ends in `os.execv(python3 -m maipai_body.app)`, so a running Bot app shows neither the launcher name nor the data directory (they
+ * live in its environment). It is ours when it names the Bot app module and either this host's data directory or a Bot app release
+ * under this Home's robots/releases folder. */
+function isOurBotApp(command: string, host: HostRecord): boolean {
+  const module = command.includes("maipai-bot-host") || command.includes("maipai_body.hub_host") || command.includes("maipai_body.app");
+  return module && (command.includes(join(roots, host.deviceId)) || command.includes(join(roots, "releases") + "/"));
+}
+/** Pids listening on a TCP port (read-only lookup; nothing is signalled here). */
+function listenersOn(port: number): number[] {
+  try {
+    const out = Bun.spawnSync(["lsof", "-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"]).stdout.toString();
+    return out.split(/\s+/).map(Number).filter((n) => Number.isInteger(n) && n > 1);
+  } catch { return []; }
+}
+function alive(pid: number): boolean { try { process.kill(pid, 0); return true; } catch { return false; } }
+async function stopPid(pid: number): Promise<void> {
   for (const signal of ["SIGTERM", "SIGKILL"] as const) {
-    try { process.kill(pid, signal); } catch { break; }
+    try { process.kill(pid, signal); } catch { return; }
     const end = Date.now() + 4000;
-    while (Date.now() < end) { try { process.kill(pid, 0); } catch { rmSync(pidFile(host.deviceId), { force: true }); return; } await new Promise((r) => setTimeout(r, 100)); }
+    while (Date.now() < end) { if (!alive(pid)) return; await new Promise((r) => setTimeout(r, 100)); }
   }
+}
+/** A Bot app left over from a previous Home run is stopped. Candidates are the recorded pid and whatever listens on this host's
+ * own ports (ports are leased per host, so a holder of one is this host's brain or a stranger); each is stopped only when its
+ * command line is our Bot app (isOurBotApp). Anything else is left strictly alone. */
+async function reapStaleBotApp(host: HostRecord): Promise<void> {
+  let recorded = NaN;
+  try { recorded = Number(readFileSync(pidFile(host.deviceId), "utf8").trim()); } catch { /* none recorded */ }
+  const candidates = new Set<number>();
+  if (Number.isInteger(recorded) && recorded > 1) candidates.add(recorded);
+  for (const port of Object.values(host.ports)) for (const pid of listenersOn(port)) candidates.add(pid);
+  for (const pid of candidates) {
+    if (pid === process.pid || !alive(pid)) continue;
+    if (isOurBotApp(commandOf(pid), host)) await stopPid(pid);
+  }
+  if (!Number.isInteger(recorded) || !alive(recorded)) rmSync(pidFile(host.deviceId), { force: true });
 }
 
 function register(host: HostRecord, releaseDir: string): void {
