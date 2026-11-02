@@ -393,7 +393,7 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   test("the served Create page puts the rail above the feed: a plain poster shelf whose press only navigates with prompt, look and camera; the empty feed keeps its one line", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
-    const main = page.body[0]!.main as Row[];
+    const main = page.body.find((node) => node.type === "split_view")!.main as Row[];
     expect(main.map((node) => node.type)).toEqual(["media_shelf", "section"]);
     const shelf = main[0]!;
     expect(shelf).toMatchObject({ heading: "Try this", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase" } } });
