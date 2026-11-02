@@ -210,7 +210,51 @@ So a reference picture gives sameness at the price of controlling the scene; tex
 
 Wan Quick is silent by design; no audio stream is written.
 
+## Audio transcripts and the audio verdict (2026-11-02)
+
+Whisper large-v3 turbo (MLX, offline; tokenizer files fetched on the owner's yes, about 3 MB) transcribed every clip with sound; transcripts sit beside each clip as `<name>.txt` in `~/video-bench/capability/`.
+Whisper only reads words. On laughter, music, rain, traffic and ambience it prints filler ("Thank you.", "You", "."), so those lines are **not** evidence about the sound; they are listed only where words were asked for.
+
+| Clip | Asked | Heard (Whisper) | Verdict |
+|---|---|---|---|
+| `speech-a1` (bf16, seed 7) | "We leave at dawn, and we do not look back." | "We leave at dawn and we do not look back." | exact |
+| `speech-a2` (bf16, seed 8) | same | "We leave at dawn and we do not look back." | exact; voice identity across the two runs not judged (no ear) |
+| `ltx-marie-sarkis` (bf16) | "Poor naive Sarkis. I kinda feel bad for him." | "Poor naive Snarkers. I'm a little mad friend." | right rhythm, words partly wrong |
+| `ltx-marie-sarkis-q8` | same | "Poor naive Sarkis. I kind of feel bad for him." | right |
+| `ltx-marie-sarkis-q4` | same | "Poor Naive Sarkis. I kind of feel bad for him." | right |
+| `ltx-bmo-finn` (bf16, 8 s) | BMO "DEAN!", Finn "DAISY!", alternating | "game you" | wrong |
+| `ltx-spongebob-patrick`, `-2`, `-3` (bf16, made by the videos session) | Dean and Daisy shouted | "Oh, Daisy! Daisy! Daisy! Daisy! Daisy!"; "Daisy Daisy Daisy"; "Dean. Dean. Daisy. Dean. Daisy." | the third has the alternation; the first two only Daisy |
+| `ltx-bmo-jake` | made by the videos session | "Pain a little bad, through that now! The end." | not scored (prompt not in my files) |
+| `ltx25-calico` (LTX 2.5, separate runtime, videos session) | made by the videos session | "Trade in your Mac Studio for two Collico Critters!" | clear words; spelling of the brand is Whisper's |
+| `ltx-goldengirls` (bf16), `-q4`, `-q8` | laughter, no words asked | "Thank you." / "Golden girl." / n/a | filler; no evidence |
+| `ltx-spongebob` (bf16), `-q4`, `-q8` | no dialogue asked | "Oh, oh, oh, ..." / "Please don't leave you with Hey" / "And it's a good sign." | q4 and q8 invented words; bf16 made laughter, matching what the owner heard |
+
+### Owner-judged audio (2026-11-01 and 2026-11-02)
+
+- Golden Girls, same prompt and seed: bf16 laugh track "perfect", q4 laugh track "sounds awful"; the bf16 Marie clip "sounded fine".
+- SpongeBob, no dialogue in the prompt: bf16 had Patrick laughing, background music and effects (good); q8 had gibberish words.
+- Vader: bf16 live-action daytime, q8 animated night; q4 also changed the picture style. The earlier picture-only reading above ("q4 looks better") did not weigh sound or style fidelity and is withdrawn.
+
+### Measured sound, bf16 against q8 against q4 (48 kHz mono, no clipping in any clip)
+
+| Clip | build | mean level | quiet-floor level | brightest 50 ms | share above 8 kHz |
+|---|---|---:|---:|---:|---:|
+| Golden Girls | bf16 / q8 / q4 | -27.0 / -26.1 / -25.8 dB | -42.3 / -42.1 / -40.5 dB | -23.0 / -18.6 / -19.3 dB | 0 |
+| Marie | bf16 / q8 / q4 | -31.8 / -30.7 / -30.7 dB | -44.6 / -50.5 / -50.9 dB | -24.1 / -21.5 / -22.8 dB | 0.1 percent |
+| Rain on a window | bf16 / q8 / q4 | -47.9 / -47.5 / -45.6 dB | -50.7 / -49.6 / -47.5 dB | -44.6 / -44.8 / -43.4 dB | 0.02 to 0.04 percent |
+| SpongeBob | bf16 / q8 / q4 | -25.8 / -15.7 / -17.7 dB | -30.5 / -18.7 / -24.5 dB | -19.4 / -12.2 / -13.1 dB | 0.4 / 0.3 / 0.2 percent |
+
+What the numbers show: on Golden Girls the three spectrograms (`gg-audio-spectrograms-bf16-q8-q4.png`) match in structure, but q8 and q4 carry much stronger low-frequency energy and wider bursts in the first quarter of the clip, and q4's quiet floor is 1.8 dB higher; there is no hiss
+(nothing above 8 kHz) and no clipping, so the "awful" laughter is not explained by noise or distortion in these numbers. On SpongeBob the quantised builds are 8 to 10 dB louder with a quiet floor 6 to 12 dB higher: they added sound the bf16 clip did not have, which fits the owner hearing invented words. Rain is near silent on all three (peak -45 dB), no build makes a convincing rain bed.
+I cannot hear, so the owner's ears outrank this table. The q8 Golden Girls clip (`ltx-goldengirls-q8.mp4`) and the q8 and q4 Marie and rain clips are in the folder for listening; the owner has not yet heard q8.
+
+### Verdict for sound (replaces the pick-per-slot list above for any clip with audio)
+
+- **bf16 for anything with sound.** Two owner reports (q4 laughter awful, q8 invented words) and the louder, higher-floor quantised tracks all point one way. bf16 stays Boost unless the owner listens to q8 and finds it equal.
+- **Not for sound: q4** (owner heard bad laughter), and q8 until heard (owner heard gibberish on SpongeBob).
+- **Quantised builds only where silent or low-audio use is accepted.** In that use q4 stays the cheaper pick (33.8 GB, about 49 s). Note the one result in q4's favour: the Marie line came out right on both quantised builds and wrong on bf16 in this seed; one seed does not outweigh the owner's listening.
+
 ## Not run, and why
 
-A transcript of any speech (no tokenizer for the local whisper; owner to listen); Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
+Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
 seed per setting; 1440p and the refiner (no MLX path); `taew2_1` (does not fit the 5B VAE).
