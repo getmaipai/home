@@ -60607,6 +60607,83 @@
                                   "poster_file_id",
                                   "has_sound"
                                 ]
+                              },
+                              "adult": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "made_audience": {
+                                    "type": "string",
+                                    "enum": [
+                                      "all-ages",
+                                      "adult-only"
+                                    ],
+                                    "description": "The machine fact and the minor ceiling; never lowered."
+                                  },
+                                  "lock": {
+                                    "type": "string",
+                                    "enum": [
+                                      "on",
+                                      "off"
+                                    ],
+                                    "description": "Whether the Adult lock applies; the creator can clear it."
+                                  },
+                                  "can_clear": {
+                                    "type": "boolean",
+                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                  },
+                                  "can_mark": {
+                                    "type": "boolean",
+                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                  },
+                                  "line": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The state in plain words, for an adult-only item."
+                                  },
+                                  "history": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "action": {
+                                          "type": "string",
+                                          "enum": [
+                                            "clear",
+                                            "mark"
+                                          ]
+                                        },
+                                        "via": {
+                                          "type": "string",
+                                          "enum": [
+                                            "creator_passcode",
+                                            "creator",
+                                            "admin",
+                                            "auto"
+                                          ]
+                                        },
+                                        "at": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "action",
+                                        "via",
+                                        "at"
+                                      ]
+                                    },
+                                    "description": "The creator's own audit rows for this item (no content)."
+                                  }
+                                },
+                                "required": [
+                                  "made_audience",
+                                  "lock",
+                                  "can_clear",
+                                  "can_mark",
+                                  "line",
+                                  "history"
+                                ],
+                                "description": "ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."
                               }
                             },
                             "required": [
@@ -60627,7 +60704,8 @@
                               "switch_to",
                               "fit_ask",
                               "max_offered",
-                              "clip"
+                              "clip",
+                              "adult"
                             ]
                           }
                         },
@@ -61101,6 +61179,83 @@
                                   "poster_file_id",
                                   "has_sound"
                                 ]
+                              },
+                              "adult": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "made_audience": {
+                                    "type": "string",
+                                    "enum": [
+                                      "all-ages",
+                                      "adult-only"
+                                    ],
+                                    "description": "The machine fact and the minor ceiling; never lowered."
+                                  },
+                                  "lock": {
+                                    "type": "string",
+                                    "enum": [
+                                      "on",
+                                      "off"
+                                    ],
+                                    "description": "Whether the Adult lock applies; the creator can clear it."
+                                  },
+                                  "can_clear": {
+                                    "type": "boolean",
+                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                  },
+                                  "can_mark": {
+                                    "type": "boolean",
+                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                  },
+                                  "line": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The state in plain words, for an adult-only item."
+                                  },
+                                  "history": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "action": {
+                                          "type": "string",
+                                          "enum": [
+                                            "clear",
+                                            "mark"
+                                          ]
+                                        },
+                                        "via": {
+                                          "type": "string",
+                                          "enum": [
+                                            "creator_passcode",
+                                            "creator",
+                                            "admin",
+                                            "auto"
+                                          ]
+                                        },
+                                        "at": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "action",
+                                        "via",
+                                        "at"
+                                      ]
+                                    },
+                                    "description": "The creator's own audit rows for this item (no content)."
+                                  }
+                                },
+                                "required": [
+                                  "made_audience",
+                                  "lock",
+                                  "can_clear",
+                                  "can_mark",
+                                  "line",
+                                  "history"
+                                ],
+                                "description": "ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."
                               }
                             },
                             "required": [
@@ -61121,7 +61276,8 @@
                               "switch_to",
                               "fit_ask",
                               "max_offered",
-                              "clip"
+                              "clip",
+                              "adult"
                             ]
                           }
                         },
@@ -61216,6 +61372,114 @@
           },
           "503": {
             "description": "Videos are not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/adult-mark": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Mark a clip NSFW again, or (the creator only, with a fresh passcode ticket) remove its Adult lock",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "clear",
+                      "mark"
+                    ]
+                  },
+                  "ticket": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The state now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "made_audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "lock": {
+                      "type": "string",
+                      "enum": [
+                        "on",
+                        "off"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "made_audience",
+                    "lock"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an adult's own screen, or the passcode ticket is missing, spent or for another item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such clip",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not ready, or nothing to change",
             "content": {
               "application/json": {
                 "schema": {
@@ -61454,6 +61718,83 @@
                                   "poster_file_id",
                                   "has_sound"
                                 ]
+                              },
+                              "adult": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "made_audience": {
+                                    "type": "string",
+                                    "enum": [
+                                      "all-ages",
+                                      "adult-only"
+                                    ],
+                                    "description": "The machine fact and the minor ceiling; never lowered."
+                                  },
+                                  "lock": {
+                                    "type": "string",
+                                    "enum": [
+                                      "on",
+                                      "off"
+                                    ],
+                                    "description": "Whether the Adult lock applies; the creator can clear it."
+                                  },
+                                  "can_clear": {
+                                    "type": "boolean",
+                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                  },
+                                  "can_mark": {
+                                    "type": "boolean",
+                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                  },
+                                  "line": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The state in plain words, for an adult-only item."
+                                  },
+                                  "history": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "action": {
+                                          "type": "string",
+                                          "enum": [
+                                            "clear",
+                                            "mark"
+                                          ]
+                                        },
+                                        "via": {
+                                          "type": "string",
+                                          "enum": [
+                                            "creator_passcode",
+                                            "creator",
+                                            "admin",
+                                            "auto"
+                                          ]
+                                        },
+                                        "at": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "action",
+                                        "via",
+                                        "at"
+                                      ]
+                                    },
+                                    "description": "The creator's own audit rows for this item (no content)."
+                                  }
+                                },
+                                "required": [
+                                  "made_audience",
+                                  "lock",
+                                  "can_clear",
+                                  "can_mark",
+                                  "line",
+                                  "history"
+                                ],
+                                "description": "ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."
                               }
                             },
                             "required": [
@@ -61474,7 +61815,8 @@
                               "switch_to",
                               "fit_ask",
                               "max_offered",
-                              "clip"
+                              "clip",
+                              "adult"
                             ]
                           }
                         },
@@ -61828,6 +62170,83 @@
                                       "poster_file_id",
                                       "has_sound"
                                     ]
+                                  },
+                                  "adult": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "made_audience": {
+                                        "type": "string",
+                                        "enum": [
+                                          "all-ages",
+                                          "adult-only"
+                                        ],
+                                        "description": "The machine fact and the minor ceiling; never lowered."
+                                      },
+                                      "lock": {
+                                        "type": "string",
+                                        "enum": [
+                                          "on",
+                                          "off"
+                                        ],
+                                        "description": "Whether the Adult lock applies; the creator can clear it."
+                                      },
+                                      "can_clear": {
+                                        "type": "boolean",
+                                        "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                      },
+                                      "can_mark": {
+                                        "type": "boolean",
+                                        "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                      },
+                                      "line": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The state in plain words, for an adult-only item."
+                                      },
+                                      "history": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "action": {
+                                              "type": "string",
+                                              "enum": [
+                                                "clear",
+                                                "mark"
+                                              ]
+                                            },
+                                            "via": {
+                                              "type": "string",
+                                              "enum": [
+                                                "creator_passcode",
+                                                "creator",
+                                                "admin",
+                                                "auto"
+                                              ]
+                                            },
+                                            "at": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "action",
+                                            "via",
+                                            "at"
+                                          ]
+                                        },
+                                        "description": "The creator's own audit rows for this item (no content)."
+                                      }
+                                    },
+                                    "required": [
+                                      "made_audience",
+                                      "lock",
+                                      "can_clear",
+                                      "can_mark",
+                                      "line",
+                                      "history"
+                                    ],
+                                    "description": "ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."
                                   }
                                 },
                                 "required": [
@@ -61848,7 +62267,8 @@
                                   "switch_to",
                                   "fit_ask",
                                   "max_offered",
-                                  "clip"
+                                  "clip",
+                                  "adult"
                                 ]
                               }
                             },
@@ -62184,6 +62604,83 @@
                                   "poster_file_id",
                                   "has_sound"
                                 ]
+                              },
+                              "adult": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "made_audience": {
+                                    "type": "string",
+                                    "enum": [
+                                      "all-ages",
+                                      "adult-only"
+                                    ],
+                                    "description": "The machine fact and the minor ceiling; never lowered."
+                                  },
+                                  "lock": {
+                                    "type": "string",
+                                    "enum": [
+                                      "on",
+                                      "off"
+                                    ],
+                                    "description": "Whether the Adult lock applies; the creator can clear it."
+                                  },
+                                  "can_clear": {
+                                    "type": "boolean",
+                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                  },
+                                  "can_mark": {
+                                    "type": "boolean",
+                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                  },
+                                  "line": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The state in plain words, for an adult-only item."
+                                  },
+                                  "history": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "action": {
+                                          "type": "string",
+                                          "enum": [
+                                            "clear",
+                                            "mark"
+                                          ]
+                                        },
+                                        "via": {
+                                          "type": "string",
+                                          "enum": [
+                                            "creator_passcode",
+                                            "creator",
+                                            "admin",
+                                            "auto"
+                                          ]
+                                        },
+                                        "at": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "action",
+                                        "via",
+                                        "at"
+                                      ]
+                                    },
+                                    "description": "The creator's own audit rows for this item (no content)."
+                                  }
+                                },
+                                "required": [
+                                  "made_audience",
+                                  "lock",
+                                  "can_clear",
+                                  "can_mark",
+                                  "line",
+                                  "history"
+                                ],
+                                "description": "ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."
                               }
                             },
                             "required": [
@@ -62204,7 +62701,8 @@
                               "switch_to",
                               "fit_ask",
                               "max_offered",
-                              "clip"
+                              "clip",
+                              "adult"
                             ]
                           }
                         },
