@@ -101,7 +101,7 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const queryClient = useQueryClient();
   const card = useQuery({ queryKey: ["music-song", id], queryFn: ({ signal }) => musicApi.card(id, signal), staleTime: 0,
     // Keep looking while the song is being made, and for a short while after it is done until its cover arrives.
-    refetchInterval: (query) => { const now = query.state.data; return now && (active(now) || (now.state === "done" && !now.cover_url && query.state.dataUpdateCount < 40)) ? 3000 : false; } });
+    refetchInterval: (query) => { const now = query.state.data; return now && (active(now) || !!now.making_version || (now.state === "done" && !now.cover_url && query.state.dataUpdateCount < 40)) ? 3000 : false; } });
   const song = card.data;
   const ready = song?.state === "done" && song.versions.length > 0;
   const version = song ? (song.versions.find((one) => one.id === song.current_id) ?? song.versions.at(-1)) : undefined;
@@ -116,6 +116,11 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
       <Button type="button" variant="secondary" size="sm" onClick={onClose}>Close</Button>
     </div>
     <div className="bg-background/50 rounded-2xl p-4 backdrop-blur-xl"><SongResult key={id} id={id} onAnother={onClose} inWorkspace /></div>
+    {song?.making_version ? <div className="bg-background/50 flex flex-col gap-2 rounded-2xl p-4 backdrop-blur-xl" role="status" data-testid="music-making-version">
+      <p className="text-sm font-semibold">{song.making_version.position ? `Your new version is waiting, number ${song.making_version.position} in line` : `Making your new version: ${song.making_version.stage_label || "starting"}${song.making_version.progress > 0 ? ` ${Math.round(song.making_version.progress * 100)}%` : ""}`}</p>
+      <progress className="w-full" max={1} value={song.making_version.progress > 0 ? song.making_version.progress : undefined} aria-label="New version progress" />
+      <p className="text-muted-foreground text-xs">It appears on this song when it is done. The earlier version stays.</p>
+    </div> : null}
     <div className="flex flex-col gap-2" data-testid="music-song-actions">
       <div className="flex flex-wrap gap-2">
         <Button asChild disabled={!ready}><Link to={studioAddress(id)} aria-disabled={!ready}>Open in Studio</Link></Button>

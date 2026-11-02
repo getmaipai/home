@@ -60,6 +60,7 @@ const cardSchema = z.object({
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),
+  making_version: z.object({ stage_label: z.string(), progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable() }).nullable(),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed"]), boost_offered: z.boolean(), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
@@ -140,6 +141,11 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
       ? picture?.state === "queued" || picture?.state === "running"
       : Date.now() - Date.parse(shown.updatedAt) < 30_000;
   }
+  // A remix, extension or new length that is still being made is a job without a file yet, so it is in no version list: say so on the card.
+  const familyFiles = new Set(versions.map((job) => job.fileId).filter((id): id is string => !!id));
+  const pending = root.task === "stems" || !root.conversationId ? null
+    : jobsForConversation(actor, root.conversationId, root.temporary).find((job) => (job.state === "queued" || job.state === "running") && job.task !== "stems" && job.id !== root.id && !!job.parentFileId && familyFiles.has(job.parentFileId));
+  const makingVersion = pending ? { stage_label: musicStageLabel(pending, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: pending.progress, eta_seconds: pending.etaSeconds, position: pending.position } : null;
   // TIER-HOME-03: the song card offers Boost when the engine has a Detailed maker and this person may use Boost (music has no Max maker yet).
   const engine = await musicEngineStatus();
   const boostOffered = !!engine?.quality.includes("detailed") && authorizeTier({ person: actor, category: "music", requested: "boost" }).tier === "boost";
@@ -147,6 +153,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     stages: stages.map((label, index) => ({ id: ["queued", "model", "planning", "making", "mixing", "finishing"][index]!, label })),
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
     cover_pending: coverPending,
+    making_version: makingVersion,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     conversation_id: root.temporary ? null : root.conversationId, made_from_file: root.request.ownedFile === true,
     id: root.id, task: root.task, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,

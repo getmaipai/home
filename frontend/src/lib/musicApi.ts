@@ -23,6 +23,8 @@ export interface MusicCard {
   error_line: string | null;
   cover_url: string | null;
   cover_versions: { id: string; url: string }[];
+  /** A remix, extension or new length still being made on this song; null when none is. */
+  making_version?: { stage_label: string; progress: number; eta_seconds: number | null; position: number | null } | null;
   cover_pending: boolean;
   /** Oldest first. Each url is the owner's own audio, with Range support. */
   versions: MusicVersion[];
