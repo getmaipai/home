@@ -216,5 +216,11 @@ afterEach(async () => {
   __setDefaultStackClientForTests(defaultScriptedStack.client);
 });
 
+// ADULT-LOCK-03: every test starts with a Home view key (see fixtures/viewToken.ts); the tests about the key set and restore their own.
+const { __setHomeViewTokenForTests } = await import("@/lib/stack/homeViewToken");
+const { DEFAULT_TEST_VIEW_TOKEN } = await import("./fixtures/viewToken");
+__setHomeViewTokenForTests(DEFAULT_TEST_VIEW_TOKEN);
+afterEach(() => __setHomeViewTokenForTests(DEFAULT_TEST_VIEW_TOKEN));
+
 const { __resetLearnedCeilingsForTests } = await import("@/lib/reasoningReserve");
 afterEach(__resetLearnedCeilingsForTests);

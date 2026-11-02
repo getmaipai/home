@@ -5,6 +5,7 @@
 import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
 import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
 import type { StackLiveFields } from "@/lib/genLive";
+import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "@/lib/stack/fullView";
 
 export type StackPicState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -106,14 +107,16 @@ function baseUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
+/** `view` (ADULT-LOCK-03) is the full-view grant of an adult job; without it the call is the plain one and carries no extra header. */
+async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}, view?: FullView): Promise<Response> {
   const doFetch = fetchForTests ?? globalThis.fetch;
   const { timeoutMs = 15_000, ...rest } = init;
   const signal = rest.signal ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
   try {
-    return await doFetch(baseUrl() + path, { ...rest, signal });
+    return await sendWithView(doFetch, baseUrl(), path, { ...rest, signal }, view);
   } catch (error) {
     if (error instanceof StackPicturesError) throw error;
+    if (error instanceof StackViewError) throw new StackPicturesError(503, error.code, VIEW_KEY_LINE);
     throw new StackPicturesError(503, "unreachable", "Pictures are not ready yet. Try again in a few minutes.");
   }
 }
@@ -153,8 +156,8 @@ export async function submitEdit(form: FormData): Promise<{ job: string }> {
   return failure(res);
 }
 
-export async function getGenerationJob(job: string): Promise<StackPicJob> {
-  const res = await request(`/v1/images/generations/${encodeURIComponent(job)}`, { method: "GET" });
+export async function getGenerationJob(job: string, view?: FullView): Promise<StackPicJob> {
+  const res = await request(`/v1/images/generations/${encodeURIComponent(job)}`, { method: "GET" }, view);
   if (!res.ok) return failure(res);
   const body = await res.json() as Partial<StackPicJob>;
   return {
@@ -173,15 +176,15 @@ export async function getGenerationJob(job: string): Promise<StackPicJob> {
 }
 
 /** The latest preview JPEG of a running picture (GENPREVIEW-01). */
-export async function fetchPicturePreview(job: string): Promise<Uint8Array> {
-  const res = await request(`/v1/images/generations/${encodeURIComponent(job)}/preview.jpg`, { method: "GET" });
+export async function fetchPicturePreview(job: string, view?: FullView): Promise<Uint8Array> {
+  const res = await request(`/v1/images/generations/${encodeURIComponent(job)}/preview.jpg`, { method: "GET" }, view);
   if (!res.ok) return failure(res);
   return new Uint8Array(await res.arrayBuffer());
 }
 
 /** One finished picture's PNG bytes. */
-export async function fetchPicture(job: string, index: number): Promise<Uint8Array> {
-  const res = await request(`/v1/images/generations/${encodeURIComponent(job)}/${index}.png`, { method: "GET", timeoutMs: 60_000 });
+export async function fetchPicture(job: string, index: number, view?: FullView): Promise<Uint8Array> {
+  const res = await request(`/v1/images/generations/${encodeURIComponent(job)}/${index}.png`, { method: "GET", timeoutMs: 60_000 }, view);
   if (!res.ok) return failure(res);
   return new Uint8Array(await res.arrayBuffer());
 }

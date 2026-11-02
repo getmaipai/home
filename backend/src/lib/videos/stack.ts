@@ -5,6 +5,7 @@
 import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
 import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
 import type { StackLiveFields } from "@/lib/genLive";
+import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "@/lib/stack/fullView";
 
 export type StackVideoState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -162,14 +163,16 @@ function baseUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
+/** `view` (ADULT-LOCK-03) is the full-view grant of an adult job; without it the call is the plain one and carries no extra header. */
+async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}, view?: FullView): Promise<Response> {
   const doFetch = fetchForTests ?? globalThis.fetch;
   const { timeoutMs = 15_000, ...rest } = init;
   const signal = rest.signal ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
   try {
-    return await doFetch(baseUrl() + path, { ...rest, signal });
+    return await sendWithView(doFetch, baseUrl(), path, { ...rest, signal }, view);
   } catch (error) {
     if (error instanceof StackVideoError) throw error;
+    if (error instanceof StackViewError) throw new StackVideoError(503, error.code, VIEW_KEY_LINE);
     throw new StackVideoError(503, "unreachable", "Videos are not ready yet. Try again in a few minutes.");
   }
 }
@@ -204,8 +207,8 @@ export async function convertForMessages(bytes: Uint8Array, title: string): Prom
   return new Uint8Array(await res.arrayBuffer());
 }
 
-export async function getVideoJob(job: string): Promise<StackVideoJob> {
-  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}`, { method: "GET" });
+export async function getVideoJob(job: string, view?: FullView): Promise<StackVideoJob> {
+  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}`, { method: "GET" }, view);
   if (!res.ok) return failure(res);
   const body = await res.json() as Partial<StackVideoJob>;
   return {
@@ -224,22 +227,22 @@ export async function getVideoJob(job: string): Promise<StackVideoJob> {
 }
 
 /** The first-frame preview JPEG of a running clip (GENPREVIEW-01). */
-export async function fetchVideoPreview(job: string): Promise<Uint8Array> {
-  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/preview.jpg`, { method: "GET" });
+export async function fetchVideoPreview(job: string, view?: FullView): Promise<Uint8Array> {
+  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/preview.jpg`, { method: "GET" }, view);
   if (!res.ok) return failure(res);
   return new Uint8Array(await res.arrayBuffer());
 }
 
 /** The finished clip's mp4 bytes. */
-export async function fetchClip(job: string): Promise<Uint8Array> {
-  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/video.mp4`, { method: "GET", timeoutMs: 120_000 });
+export async function fetchClip(job: string, view?: FullView): Promise<Uint8Array> {
+  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/video.mp4`, { method: "GET", timeoutMs: 120_000 }, view);
   if (!res.ok) return failure(res);
   return new Uint8Array(await res.arrayBuffer());
 }
 
 /** The finished clip's JPEG poster (frame 0). */
-export async function fetchPoster(job: string): Promise<Uint8Array> {
-  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/poster.jpg`, { method: "GET", timeoutMs: 30_000 });
+export async function fetchPoster(job: string, view?: FullView): Promise<Uint8Array> {
+  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/poster.jpg`, { method: "GET", timeoutMs: 30_000 }, view);
   if (!res.ok) return failure(res);
   return new Uint8Array(await res.arrayBuffer());
 }

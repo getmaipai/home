@@ -23,6 +23,7 @@ import { videoEngineStatus } from "./ready";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
+import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 
 export type VideoJobKind = "generate" | "animate" | "edit";
 export type VideoJobState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -446,8 +447,12 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** ADULT-LOCK-03: an adult job is read from the Stack with the full view (Home is its trusted caller; what it reads reaches a response only through the lock). Any other job is read the plain way. */
+const viewOfJob = (job: VideoJob, actor: PersonRow): FullView | undefined => fullViewForJob((job.request as { audience?: unknown }).audience, actor);
+
 async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
+  const view = viewOfJob(job, actor);
   const controller = new AbortController();
   watching.set(job.id, controller);
   const deadline = Date.now() + MAX_WATCH_MS;
@@ -459,7 +464,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
     while (!controller.signal.aborted && Date.now() < deadline) {
       let status;
       try {
-        status = await getVideoJob(job.stackJob);
+        status = await getVideoJob(job.stackJob, view);
       } catch (error) {
         if (error instanceof StackVideoError && error.status === 404) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It did not finish. Try again.`; saveVideoJob(job); return; }
         // A single missed poll is not a failure; the next one decides.
@@ -480,7 +485,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
       job.phase = status.phase;
       saveVideoJob(job);
-      await updateLive(job.id, status, () => fetchVideoPreview(job.stackJob!));
+      await updateLive(job.id, status, () => fetchVideoPreview(job.stackJob!, view));
       await sleep(POLL_MS, controller.signal);
     }
     if (!controller.signal.aborted) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; saveVideoJob(job); void cancelOrDeleteVideo(job.stackJob); }
@@ -579,8 +584,9 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     const clip = clips[0];
     if (!clip) { job.state = "failed"; job.error = plainVideoFailure(null); saveVideoJob(job); return; }
     // The Stack's bytes are stored unchanged: a poster that is re-encoded could never start a later clip.
-    const video = await fetchClip(stackJob);
-    const poster = await fetchPoster(stackJob);
+    const view = viewOfJob(job, actor);
+    const video = await fetchClip(stackJob, view);
+    const poster = await fetchPoster(stackJob, view);
     if (signal.aborted) return;
     if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video didn't come out right. Try again.`; saveVideoJob(job); return; }
     await settleClip(job, actor, video, poster, clip, signal, "video-gen");

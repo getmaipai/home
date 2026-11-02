@@ -34,6 +34,8 @@ export interface FakeVideoStack {
   /** VIDEO-INPUTS-01: the Stack reports `image_to_video` (and `end_image`) true on LTX-2.5 Standard and Boost / on Max. */
   ltx25Picture: boolean;
   ltx25maxPicture: boolean;
+  /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
+  handler: typeof fetch;
   restore(): void;
 }
 
@@ -67,12 +69,13 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
     jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
+    handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
   __resetVideoAdapterCacheForTests();
   __setVideoPollMsForTests(20);
-  __setVideosFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
+  const handler = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
@@ -117,6 +120,8 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       return json(added);
     }
     return json({ error: `The fake video engine has no route ${method} ${path}.`, code: "not_found" }, 404);
-  }) as typeof fetch);
+  }) as typeof fetch;
+  fake.handler = handler;
+  __setVideosFetchForTests(handler);
   return fake;
 }

@@ -19,6 +19,7 @@ import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouse
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PicturePurpose } from "./jobStore";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
+import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
@@ -140,8 +141,13 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 const stopped = (job: PictureJob) => job.state === "cancelled";
 
+/** ADULT-LOCK-03: a generated adult picture is read from the Stack with the full view (Home is its trusted caller; what it reads reaches a response only through the lock).
+ * An edit is the exception: its form never tells the Stack the audience (ADULT-LOCK-07 decides that), so the Stack serves it the plain way and Home asks that way. */
+const viewOfJob = (job: PictureJob, actor: PersonRow): FullView | undefined => (job.kind === "edit" ? undefined : fullViewForJob(job.request.audience, actor));
+
 async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
+  const view = viewOfJob(job, actor);
   const controller = new AbortController();
   watching.set(job.id, controller);
   markLive(job);
@@ -154,7 +160,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
     while (!controller.signal.aborted && !stopped(job) && Date.now() < deadline) {
       let status;
       try {
-        status = await getGenerationJob(job.stackJob);
+        status = await getGenerationJob(job.stackJob, view);
       } catch (error) {
         if (stopped(job) || controller.signal.aborted) return;
         if (error instanceof StackPicturesError && error.status === 404) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It did not finish. Try again.`; savePictureJob(job); return; }
@@ -177,7 +183,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
       job.phase = status.phase;
       savePictureJob(job);
-      await updateLive(job.id, status, () => fetchPicturePreview(job.stackJob!));
+      await updateLive(job.id, status, () => fetchPicturePreview(job.stackJob!, view));
       await sleep(POLL_MS, controller.signal);
     }
     if (!controller.signal.aborted && !stopped(job)) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; savePictureJob(job); void cancelOrDelete(job.stackJob); }
@@ -246,6 +252,7 @@ async function adultOnly(job: PictureJob): Promise<boolean> {
 
 async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Promise<void> {
   const stackJob = job.stackJob;
+  const view = viewOfJob(job, actor);
   const files: PictureFile[] = [];
   const storedIds: string[] = [];
   const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; savePictureJob(job); if (stackJob) void cancelOrDelete(stackJob); };
@@ -255,7 +262,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
     for (let index = 0; index < pics.length; index += 1) {
       if (stopped(job)) return;
       const pic = pics[index]!;
-      const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob!, index);
+      const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob!, index, view);
       // The bytes are stored exactly as the Stack made them: image-to-video checks their digest against what the engine
       // returned, so nothing may re-encode them. They are decoded here only to prove they are a picture and read the size.
       const info = await sharp(raw, { failOn: "error", limitInputPixels: 64_000_000 }).metadata();

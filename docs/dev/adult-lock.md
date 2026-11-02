@@ -60,5 +60,50 @@ A clip made with an adult-only style is marked `request.adultOnly` at job start 
 - Passkey unlock (`passkey_assertion`) is not built; `/unlock` takes the secret only.
 - A clip that turns adult-only only at the finished-clip check (prompt word list, nude verdict) is locked from then on, but a tool part stored before that
   keeps its words. ADULT-LOCK-06 sets the lock at job start from every source and closes this.
-- The Stack's job list and progress (ADULT-LOCK-04), LoRA listings (VIDEO-LORA slices), pictures and songs (ADULT-LOCK-07), playback guards (ADULT-LOCK-05) and the frontend `AdultLockProvider` (ADULT-LOCK-03b) are their own rows.
+- LoRA listings (VIDEO-LORA slices), pictures and songs (ADULT-LOCK-07), playback guards (ADULT-LOCK-05) and the frontend `AdultLockProvider` (ADULT-LOCK-03b) are their own rows.
 - Pin: `lock` and `made_audience` become spec fields with VIDEO-LORA-02; bump the `@maipai/spec` pin with `scripts/pin.sh` then and read them from the record.
+
+## The Stack's full view (ADULT-LOCK-03)
+
+Built 2026-11-02. Since Stack `cbd93b3` (ADULT-LOCK-04) the Stack reports a job made with `audience: "adult"` as state and progress only, and answers 404 for
+its preview, clip, poster, messages copy, picture and thumbnail, to every caller that does not ask for the full view. Home asks for it, and only Home can.
+
+**What Home sends.** `x-maipai-view: full` and `x-maipai-home-token: <key>` on a read of an adult job, nothing else and nowhere else. A full-view ask with a
+wrong or missing key gets 403 `full_view_forbidden` on every route of the Stack, adult job or not, so Home never sends the headers it does not need.
+
+| Piece | File | What it does |
+|---|---|---|
+| The grant | `backend/src/lib/stack/fullView.ts` | `fullViewForJob(audience, owner, basis)` returns a `FullView` or `undefined`. `undefined` unless the job's audience is `adult` and the owner is an adult. `basis` is `"background"` (Home reading its own job: progress, the finished-clip check, settle; Home is the Stack's trusted caller) or `{ proof, surface }` (a person present: needs their own live proof, a human browser session and `surface: "own"`, never `"shared"` or `"spoken"`; `lockState` must say open). |
+| The call | same file, `sendWithView` | Adds the two headers only when it is handed a grant. On a 403 `full_view_forbidden` it forgets the cached key, reads it again and asks once more; a second refusal, or no key at all, throws `StackViewError`, which the video and picture modules turn into a `StackVideoError` or `StackPicturesError` with one plain line and no key in it. |
+| The key | `backend/src/lib/stack/homeViewToken.ts` | Where the key comes from, the one cached copy, the Repairs row. Never logged, never in an error, never returned from a route, never sent to a browser. |
+| Video and picture client | `lib/videos/stack.ts`, `lib/pictures/stack.ts` | `getVideoJob`, `fetchVideoPreview`, `fetchClip`, `fetchPoster`, `getGenerationJob`, `fetchPicturePreview`, `fetchPicture` take an optional `view`. |
+| Callers | `lib/videos/jobs.ts` (`watch`, `finish`), `lib/pictures/jobs.ts` (`watch`, `finish`) | Each builds the grant from the job's own `request.audience` and the owner. |
+
+**Which calls carry the headers.** Only the reads of an adult job: status, preview, clip, poster, picture. Not the submit (the maker's own call, answered as before), not
+the DELETE of the Stack's copy (its reply is unused), not the stateless `POST /v1/videos/messages` (Home sends its own bytes; no job), not `media.edit` (Home's edit jobs
+carry no `audience`, the Stack does not redact them, and Home reads the result by path), not the companion takes and looks (`all-ages`). A picture **edit** is not sent as
+adult to the Stack today (its form has no `audience`), so Home reads it the plain way; ADULT-LOCK-07 decides that with the picture lock. Home's routes serve Home's own stored copy of a
+clip, so no person-facing route reads the Stack at request time; what a background read fetches reaches a response only through the lock above (the tile, the 404, the proof).
+
+**The key.** First match wins:
+
+1. `STACK_HOME_VIEW_TOKEN` in Home's environment (at least 16 characters): the value the Stack's unit was given.
+2. The Stack is on another computer (`engines.stack.where` = another computer): the key an admin stored with `PUT /api/engine-link/view-token` (owner or admin; `DELETE` forgets it).
+   It is encrypted at rest in `data/keys/stack-link/home-view-token.enc` with the same key store as the pairing passphrase and is never shown again. **The pairing has no channel for a
+   secret the engine computer made** (it carries Home's SSH key and the engine's public host key), so this is the one thing an admin copies across, from `keys/home-view-token` in the
+   engine computer's data folder. There is no screen for it yet (a follow-up); until it is stored, Repairs shows "Adult items cannot be opened until Home has the engine's key" and a clip being made keeps waiting.
+3. The Stack is on this computer: `<Stack data folder>/keys/home-view-token` (`stackDataDir()` in `lib/localStackService.ts`: `MAIPAI_STACK_DATA_DIR`, else `<install root>/stack/data`).
+   The Stack makes the file at first use, and only when a full-view ask presents some token, so a Home that finds no file asks once (at most every 30 s) with a placeholder on
+   `GET /stack/v1/health` (403, and the Stack writes its key) and reads the file again. `/healthz` is not used: it answers before the Stack's check. The file is mode 600 and
+   owned by the user that runs the Stack; a Home that cannot read it (a Stack run as another user) reads it as missing, so use rule 1 or 2 there.
+
+**When the key is missing, wrong or rotated.** A refused key is forgotten and read again once per call, so a rotated key in the file heals itself. A key Home still cannot use raises one Repairs row
+(`stack` / `adult.view_key`, fixed words, no host, path or key) and the clip or picture keeps asking every poll until the key works or the watch deadline passes; the row closes at the next
+successful full-view read. A failure at the very end (the clip is done, the key goes bad before Home fetches it) fails the clip with the plain line and the Stack's copy goes; the window is a few milliseconds.
+
+**What to pin, in order.** Home must not pin a Stack at or after `cbd93b3` before this change is on `main`: without the headers every adult job there reads as `done` with no clip. Land this change first,
+prove it against the real Stack, then `bash scripts/pin.sh stack <sha>` as its own commit. A Stack older than `cbd93b3` ignores the headers (no redaction, no check of the key), so this change is safe on it.
+
+**Tests.** `backend/tests/adultFullView.test.ts` runs Home's real job code against a Stack that enforces the Stack's rules (`tests/fixtures/adultStack.ts`: redacted by default, 404 on files, 403 on a bad key
+on every route): an adult clip and picture finish, Home's own lock answers the tile and 404 before an unlock, a job that is not adult, a minor and a shared or spoken surface never send the headers, a
+missing, wrong, rotated, environment and remote-stored key. `tests/preload.ts` gives every other test a default key so an adult job in an unrelated test never waits on one.

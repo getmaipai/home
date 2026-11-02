@@ -27,6 +27,8 @@ export interface FakeImageStack {
   loraAdds: Array<Record<string, unknown>>;
   /** When set, a LoRA file add is refused with this code and sentence. */
   loraRefusal: { code: string; error: string } | null;
+  /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
+  handler: typeof fetch;
   restore(): void;
 }
 
@@ -49,12 +51,13 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export function installFakeImageStack(options: { pollsToFinish?: number } = {}): FakeImageStack {
   const fake: FakeImageStack = {
     jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_LORAS.map((l) => ({ ...l, trigger_words: [...l.trigger_words] })), loraAdds: [], loraRefusal: null,
+    handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
   };
   __setPictureStatusForTests(readyStatusForTests());
   __resetAdapterCacheForTests();
   __setPicturePollMsForTests(20);
-  __setPicturesFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
+  const handler = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
@@ -132,7 +135,9 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
     }
     if (method === "POST" && path === "/stack/v1/image/install") return json({ job: "install-job-1", family: "flux2-klein-4b", joined: false }, 202);
     return json({ error: `The fake picture engine has no route ${method} ${path}.`, code: "not_found" }, 404);
-  }) as typeof fetch);
+  }) as typeof fetch;
+  fake.handler = handler;
+  __setPicturesFetchForTests(handler);
   return fake;
 }
 

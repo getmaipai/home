@@ -563,7 +563,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |
 | `backend/src/lib/llmSampling.ts` | chatSamplingOf |
 | `backend/src/lib/llmSupervisor.ts` | __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, setWarmupPrompt, sweepOrphanEngineProcesses, reportChatBackendUnreachable |
-| `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
+| `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
@@ -885,6 +885,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/client.ts` | identityFromHeaders, createStackClient |
 | `backend/src/lib/stack/contract.ts` | STACK_CONTRACT_MIN, STACK_CONTRACT_MAX, StackCodingModeSchema |
 | `backend/src/lib/stack/errors.ts` | StackError |
+| `backend/src/lib/stack/fullView.ts` | fullViewForJob, StackViewError, VIEW_KEY_LINE, sendWithView |
+| `backend/src/lib/stack/homeViewToken.ts` | MIN_TOKEN_CHARS, VIEW_HEADER, HOME_TOKEN_HEADER, __setHomeViewTokenForTests, readRemoteViewToken, storeRemoteViewToken |
 | `backend/src/lib/stack/httpErrors.ts` | StackFailureSchema, classifyStackError, STACK_ERROR_RESPONSES |
 | `backend/src/lib/stack/link.ts` | LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_CONNECT_WINDOW_MS, LINK_CONNECT_RETRY_MS, LINK_BACKOFF_BASE_MS, LINK_BACKOFF_CAP_MS |
 | `backend/src/lib/stack/linkKeys.ts` | normalizePairingCode, derivePairingLookup, issuePairingCode, getPairingPublicKey, verifyPairingPayload, knownHostsName |

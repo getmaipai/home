@@ -45,11 +45,16 @@ function runStackServiceCommand(binary: string, command: StackServiceCommand, en
 
 let runner: StackServiceRunner = runStackServiceCommand;
 
+/** The local Stack's data folder (its `keys/` folder holds the Home view key, ADULT-LOCK-03). */
+export function stackDataDir(): string {
+  return process.env.MAIPAI_STACK_DATA_DIR ?? join(installRoot(), "stack", "data");
+}
+
 function serviceEnv(): NodeJS.ProcessEnv {
   const root = installRoot();
   return {
     ...process.env,
-    STACK_DATA_DIR: process.env.MAIPAI_STACK_DATA_DIR ?? join(root, "stack", "data"),
+    STACK_DATA_DIR: stackDataDir(),
     PORT: String(stackPort()),
     STACK_BUN_BIN: process.env.MAIPAI_STACK_BUN_BIN ?? join(root, ".bun", "bin", "bun"),
   };

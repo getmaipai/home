@@ -12,6 +12,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { getConnInfo } from "hono/bun";
 import { rebuildEngineLinkAfterPairing } from "@/lib/remoteStackSettings";
+import { MIN_TOKEN_CHARS, removeRemoteViewToken, storeRemoteViewToken } from "@/lib/stack/homeViewToken";
 
 export const engineLinkRoutes = apiRouter();
 const ErrorResponses = errorResponses({ 400: "Invalid request or pairing code", 401: "Not signed in", 403: "Admin access required" });
@@ -124,4 +125,28 @@ const revokeRoute = createRoute({
   middleware: [requireRole("owner", "admin")] as const,
   responses: { 200: { content: { "application/json": { schema: z.object({ paired: z.literal(false) }) } }, description: "Link credentials deleted" }, ...ErrorResponses },
 });
-engineLinkRoutes.openapi(revokeRoute, (c) => { stopEngineLink(); revokeLinkKey(); setHouseholdSettingValue("engines.stack.where", "this_computer"); return c.json({ paired: false as const }, 200); });
+engineLinkRoutes.openapi(revokeRoute, (c) => { stopEngineLink(); revokeLinkKey(); removeRemoteViewToken(); setHouseholdSettingValue("engines.stack.where", "this_computer"); return c.json({ paired: false as const }, 200); });
+
+// ADULT-LOCK-03: the engine computer's Home key. The pairing carries no secret from the engine computer, so an admin copies the key the engine
+// keeps (the file keys/home-view-token in its data folder) here once. It is stored encrypted, never read back and never returned.
+const viewKeyRoute = createRoute({
+  method: "put", path: "/view-token", tags: ["Engine link"], summary: "Store the engine computer's Home key (the key that lets Home open adult items on it)",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ token: z.string().min(MIN_TOKEN_CHARS).max(200) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ stored: z.literal(true) }) } }, description: "The key is stored. It is never shown again." }, ...ErrorResponses },
+});
+engineLinkRoutes.openapi(viewKeyRoute, (c) => {
+  try {
+    if (!storeRemoteViewToken(c.req.valid("json").token)) return c.json({ error: `That is too short to be the engine's Home key. It is at least ${MIN_TOKEN_CHARS} characters.` }, 400);
+  } catch {
+    return c.json({ error: "Home could not save the key. Check that Home's data folder can be written to, then try again." }, 400);
+  }
+  return c.json({ stored: true as const }, 200);
+});
+
+const viewKeyDeleteRoute = createRoute({
+  method: "delete", path: "/view-token", tags: ["Engine link"], summary: "Forget the stored engine computer Home key",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ stored: z.literal(false) }) } }, description: "The key is gone." }, ...ErrorResponses },
+});
+engineLinkRoutes.openapi(viewKeyDeleteRoute, (c) => { removeRemoteViewToken(); return c.json({ stored: false as const }, 200); });
