@@ -60112,6 +60112,7 @@
                                 "wan",
                                 "ltx23",
                                 "ltx25",
+                                "ltx25max",
                                 null
                               ]
                             }
@@ -60142,6 +60143,7 @@
                                 "wan",
                                 "ltx23",
                                 "ltx25",
+                                "ltx25max",
                                 null
                               ]
                             }
@@ -60172,6 +60174,7 @@
                                 "wan",
                                 "ltx23",
                                 "ltx25",
+                                "ltx25max",
                                 null
                               ]
                             }
@@ -60189,7 +60192,7 @@
                         "boost",
                         "max"
                       ],
-                      "description": "Which levels this person can use now and how long a clip each makes (Max is not offered yet)."
+                      "description": "Which levels this person can use now and how long a clip each makes (Max is ready only when the Stack has its model installed; the person must also hold Max)."
                     },
                     "adult_styles": {
                       "type": "boolean"
