@@ -79,6 +79,9 @@ describe("WorldClocksTab", () => {
   });
 
   test("updates local time on a minute interval", async () => {
+    // The previous test's failed save leaves a real-timer flush pending (react-query batches notifications with setTimeout); under fake
+    // timers that macrotask never runs and the first query result is never delivered. Let it run before the clock is faked.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     jest.useFakeTimers();
     const api = mockApi([{ id: "london", name: "London", country: "United Kingdom", zone: "Europe/London", position: 0 }]);
     const now = new Date("2026-10-30T12:00:00.000Z").valueOf();
