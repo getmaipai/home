@@ -374,7 +374,7 @@ function ownsMusicAttachment(actor: PersonRow, job: MusicJob): boolean {
     return !!song && song.personId === actor.id && song.conversationId === job.conversationId;
   }
   const row = db.select({ provenance: attachments.provenance, mediaType: attachments.mediaType }).from(attachments)
-    .where(and(eq(attachments.id, job.fileId), eq(attachments.ownerPersonId, actor.id), eq(attachments.conversationId, job.conversationId))).get();
+    .where(and(eq(attachments.id, job.fileId), eq(attachments.ownerPersonId, actor.id), eq(attachments.conversationId, job.conversationId), isNull(attachments.deletedAt))).get();
   return row?.mediaType === "audio/mp4" && generationOf(row.provenance) !== null;
 }
 export function sourceMusicJob(actor: PersonRow, conversationId: string, track: string, temporary: boolean): MusicJob | null {

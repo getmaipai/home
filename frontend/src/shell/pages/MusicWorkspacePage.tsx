@@ -94,6 +94,7 @@ const TOOLS = [
 /** The song opened above the rows: its cover blurred into the background, the kit player, and every action as a button, each off with its reason. */
 function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; remix: boolean }) {
   const [remixing, setRemixing] = useState(remix);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const top = useRef<HTMLElement>(null);
   // The song opens above the tiles; bring it into view so a click on a tile's Remix or Stems is seen to do something.
   useEffect(() => { top.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }, [id]);
@@ -106,6 +107,7 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const ready = song?.state === "done" && song.versions.length > 0;
   const version = song ? (song.versions.find((one) => one.id === song.current_id) ?? song.versions.at(-1)) : undefined;
   const again = (length: "quick" | "full") => { void musicApi.setLength(id, length).then(() => { push(length === "full" ? "Making the full version. It appears on this song." : "Making the quick version. It appears on this song."); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, "That could not start. Try again."))); };
+  const removeSong = () => { void musicApi.remove(id).then(() => { push("Moved to Trash. You can bring it back from the Library until the keep time ends."); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); onClose(); }).catch((error: unknown) => { setConfirmingDelete(false); push(text(error, "That song could not be deleted. Try again.")); }); };
   const newCover = () => { void musicApi.newCover(id, `Album cover art for the song "${song?.title ?? "Untitled song"}"`).then(() => { push("Making a new cover."); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, "A new cover could not start. Try again."))); };
   const reasonOff = ready ? "" : "Available once the song is finished.";
   return <section ref={top} className="relative isolate flex shrink-0 flex-col gap-5 overflow-hidden rounded-3xl p-5 sm:p-8" data-testid="music-song-result" aria-label="Open song">
@@ -130,6 +132,11 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
         <Button type="button" variant="secondary" disabled={!ready} onClick={newCover}>New cover art</Button>
         {version ? <Button asChild variant="secondary"><a href={version.url} download>Download</a></Button> : <Button type="button" variant="secondary" disabled>Download</Button>}
         <Button type="button" variant="secondary" disabled>Cover with a new voice</Button>
+        {confirmingDelete ? <span className="flex items-center gap-2" role="group" aria-label="Confirm delete">
+          <span className="text-sm">Move this song and its versions to Trash?</span>
+          <Button type="button" variant="destructive" onClick={removeSong}>Delete</Button>
+          <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>Keep</Button>
+        </span> : <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(true)}>Delete song</Button>}
       </div>
       {remixing && song && ready ? <RemixSong card={song} onClose={() => setRemixing(false)} onSent={() => { void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); }} /> : null}
       <p className="text-muted-foreground text-xs">{reasonOff || `Stems: ${STEMS_LINE.replace("is not available", "may not be available")} ${COVER_SONG_LINE}`}</p>

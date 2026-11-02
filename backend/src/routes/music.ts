@@ -4,10 +4,11 @@ import { pictureEngineReady } from "@/lib/pictures/ready";
 import { pictureDenial } from "@/lib/pictures/policy";
 import { startSongCover } from "@/lib/music/cover";
 import { listVersions } from "@/lib/imageEdit";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { musicJobs } from "@/db/schema";
-import { memory, pruneMusicJobs } from "@/lib/music/store";
+import { attachments, musicJobs } from "@/db/schema";
+import { trashFile } from "@/lib/libraryTrash";
+import { dropMusicJob, memory, pruneMusicJobs } from "@/lib/music/store";
 // MUSIC-GEN-03: private chat cards and exports, every entrance behind the same age and surface gate.
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
@@ -178,7 +179,8 @@ const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], s
   responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "Up to 40 song cards." }, ...refusals } });
 musicRoutes.openapi(listRoute, async (c) => {
   const actor = c.get("person");
-  return c.json(await Promise.all(jobsForPerson(actor, 40).map((job) => musicCardView(actor, job))), 200);
+  const trashed = new Set(db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNotNull(attachments.deletedAt))).all().map((r) => r.id));
+  return c.json(await Promise.all(jobsForPerson(actor, 40).filter((job) => !job.fileId || !trashed.has(job.fileId)).map((job) => musicCardView(actor, job))), 200);
 });
 const getRoute = createRoute({ method: "get", path: "/jobs/{id}", tags: ["Music"], summary: "The owner's song card", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "Progress and versions." }, ...refusals } });
@@ -326,6 +328,24 @@ musicRoutes.openapi(cancelRoute, async (c) => {
   const actor = c.get("person"); const job = await cancelMusicJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   return c.json(await musicCardView(actor, job), 200);
+});
+// Delete a song (owner, 2026-11-02): the song, its versions and covers go to Trash together and come back from there until the keep window ends.
+const deleteSongRoute = createRoute({ method: "post", path: "/jobs/{id}/delete", tags: ["Music"], summary: "Move a song and all its versions to Trash", middleware,
+  request: { params },
+  responses: { 200: { content: { "application/json": { schema: z.object({ deleted: z.number(), trash_until: z.string().nullable() }) } }, description: "How many versions moved to Trash." }, ...refusals } });
+musicRoutes.openapi(deleteSongRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
+  if (!root) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  if (root.state === "queued" || root.state === "running") await cancelMusicJob(actor, root.id);
+  let deleted = 0; let trashUntil: string | null = null;
+  for (const version of musicVersions(actor, root)) {
+    if (!version.fileId) continue;
+    if (version.temporary) { dropMusicJob(version); deleted += 1; continue; }
+    const result = trashFile(actor, version.fileId);
+    if (result.ok) { deleted += 1; trashUntil = result.value.trash_until; }
+  }
+  if (deleted === 0) dropMusicJob(root);
+  return c.json({ deleted, trash_until: trashUntil }, 200);
 });
 const useRoute = createRoute({ method: "post", path: "/jobs/{id}/use", tags: ["Music"], summary: "Use a version for the next edit", middleware: viewMiddleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80) }) } } } },

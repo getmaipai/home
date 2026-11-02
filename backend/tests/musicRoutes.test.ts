@@ -56,6 +56,17 @@ describe("music routes", () => {
     const other = new TestClient();
     expect((await other.get("/api/music/jobs")).status).toBe(401);
   });
+  test("deleting a song moves it to Trash, drops it from the list, and another person cannot", async () => {
+    const { actor, client } = await owner(); const { job } = await song(actor);
+    const stranger = new TestClient();
+    expect((await stranger.post(`/api/music/jobs/${job.id}/delete`, {})).status).toBe(401);
+    const response = await client.post(`/api/music/jobs/${job.id}/delete`, {});
+    expect(response.status).toBe(200);
+    expect((await response.json() as { deleted: number }).deleted).toBeGreaterThan(0);
+    expect(await (await client.get("/api/music/jobs")).json()).toEqual([]);
+    const row = db.select().from(attachments).where(eq(attachments.id, job.fileId!)).get()!;
+    expect(row.deletedAt).not.toBeNull();
+  });
   test("splits the shown song and shows its stems as one card that steps through them in order", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor);
     fake.stems = true;

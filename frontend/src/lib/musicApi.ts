@@ -60,6 +60,8 @@ export const musicApi = {
   setLength: (id: string, length: "quick" | "full", fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/length`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ length, ...(fileId ? { file_id: fileId } : {}) }) }),
   /** Make it Boost / Make it Standard: the same song made again with the other maker, as a new version on this card. */
   setTier: (id: string, tier: "standard" | "boost", fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/quality`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { tier, file_id: fileId } : { tier }) }),
+  /** Delete a song: it, its versions and its covers move to Trash together. */
+  remove: (id: string) => requestJson<{ deleted: number; trash_until: string | null }>(`/api/music/jobs/${encodeURIComponent(id)}/delete`, { method: "POST" }),
   revise: (id: string, change: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/revise`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ change, ...(fileId ? { file_id: fileId } : {}) }) }),
   /** Make a song from the Make a song page: the same path the generate_music tool runs. Answers with the card, still being made. */
   makeSong: (body: MakeSongBody) => requestJson<MusicCard>("/api/music/songs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
