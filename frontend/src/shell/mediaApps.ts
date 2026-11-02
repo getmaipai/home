@@ -34,6 +34,12 @@ export function playRoute(kind: string, id: string): string | null {
   return target ? `/apps/${target.app}/${target.page}?id=${encodeURIComponent(id)}` : null;
 }
 
+/** Whether pressing Play on `mediaId` would only reopen what is already open: the host holds this item and the person is on its play page.
+ * Then Play resumes (if paused) and never navigates again, so a second click cannot stack history entries or restart a station that is still connecting. */
+export function playIsAlreadyOpen(heldId: string | null, pathname: string, to: string, mediaId: string): boolean {
+  return heldId !== null && heldId === mediaId && to.split("?")[0] === pathname;
+}
+
 /** The media app whose area this path is in (`/apps/videos/watch` is `videos`), or null. */
 export function mediaAppOfPath(pathname: string): string | null {
   const match = /^\/apps\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(pathname);

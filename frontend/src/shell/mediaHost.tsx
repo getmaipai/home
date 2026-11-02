@@ -9,7 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
 import { api, request } from "@/lib/api";
-import { mediaAppOfPath, playRoute } from "@/shell/mediaApps";
+import { mediaAppOfPath, playIsAlreadyOpen, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
@@ -143,6 +143,12 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
         }
         const to = playRoute(kind, mediaId);
         if (!to) throw new Error("This item cannot be played from here. Open it from its app.");
+        // A second press on what is already open resumes it; it never navigates again (that stacked history and re-ran the page).
+        const held = store.get();
+        if (held && playIsAlreadyOpen(held.id, pathRef.current, to, mediaId)) {
+          if (held.el.paused) void held.el.play().catch(() => undefined);
+          return;
+        }
         navigate(to, { state: { pageState: { id: mediaId } } });
       },
       // Only a media app's player plays in the host's element; anywhere else the Player keeps its own.
