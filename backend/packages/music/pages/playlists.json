@@ -19,6 +19,7 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
+      "density": "compact",
       "on_select": {
         "call": {
           "target": "/api/plugins/music/playlist",
