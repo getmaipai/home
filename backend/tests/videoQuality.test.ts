@@ -115,7 +115,8 @@ describe("the choice", () => {
     const only = readyVideoStatusForTests({ detailed: "installed", quickMissing: true });
     expect(quickVideoReady(only)).toBe(false);
     expect(detailedVideoReady(only)).toBe(true);
-    expect(videoStatusReady(only)).toBe(true);
+    expect(videoStatusReady(only, true)).toBe(true);
+    expect(videoStatusReady(only, false)).toBe(false);
     expect(chooseVideoQuality({ engine: only, household: "quick" })).toMatchObject({ quality: "detailed", note: "quick_not_installed" });
     expect(videoStatusReady(readyVideoStatusForTests({ detailed: "missing", quickMissing: true }))).toBe(false);
   });
