@@ -50,6 +50,8 @@ if [[ -f "$deps_lib" ]]; then source "$deps_lib"
 else
   DEPS_ERROR=""; DEPS_LAST_RC=0
   install_deps() { local dir="$1"; shift; bounded_run "${DEPS_INSTALL_SECONDS:-600}" "${DEPS_INSTALL_LABEL:-bun install}" bash -c 'cd "$1" && shift && bun install --frozen-lockfile "$@"' _ "$dir" "$@"; }
+  deps_current() { return 1; }
+  deps_ensure() { install_deps "$1" --force; }
 fi
 
 refresh_snapshot() {
@@ -78,7 +80,8 @@ checkout_warm() {
     local d
     for d in backend frontend; do
       [[ -d "$checkout/$d" ]] || continue
-      DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d (warm checkout)" install_deps "$checkout/$d" || { error "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies in $checkout and retry."; return 1; }
+      # INSTALL-STAMP-01: install only when node_modules was not installed from this tree's package.json and bun.lock (lib/deps.sh).
+      DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d (warm checkout)" deps_ensure "$checkout/$d" || { error "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies in $checkout and retry."; return 1; }
     done
   fi
 }
@@ -196,14 +199,14 @@ sweep_worktrees() {
   return 0
 }
 
-# After the fast-forward, reinstall in backend and frontend when their package files moved, so scripts in the main checkout keep working across a pin bump. Never fails the landing: it is already on main.
+# After the fast-forward, reinstall in backend and frontend when node_modules was not installed from the package files now on main (INSTALL-STAMP-01, lib/deps.sh), so
+# scripts in the main checkout keep working across a pin bump even after an earlier failed install. Never fails the landing: it is already on main.
 reinstall_main_dependencies() {
-  local before="$1" changed d done_dirs=()
-  [[ -z "${MAIPAI_LAND_SKIP_INSTALL:-}" && -n "$before" ]] || return 0
-  changed="$(git -C "$main" diff --name-only "$before" HEAD -- backend/package.json backend/bun.lock frontend/package.json frontend/bun.lock 2>/dev/null || true)"
-  [[ -n "$changed" ]] || return 0
+  local d done_dirs=()
+  [[ -z "${MAIPAI_LAND_SKIP_INSTALL:-}" ]] || return 0
   for d in backend frontend; do
-    printf '%s\n' "$changed" | grep -Eq "^$d/" || continue
+    [[ -d "$main/$d" ]] || continue
+    deps_current "$main/$d" && continue
     # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md).
     if DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d (main checkout)" install_deps "$main/$d" --force >/dev/null 2>&1; then done_dirs+=("$d")
     else echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout install failed in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; run bun install there" >> "$data/lander.log"; fi
@@ -228,7 +231,7 @@ update_main_checkout() {
       if [[ -z "$branch" ]] && { [[ -z "$head" || -z "$origin_main" ]] || ! git -C "$main" merge-base --is-ancestor "$head" "$origin_main"; }; then reason="diverged (detached HEAD is not an ancestor of the landed main)"
       elif [[ -n "$origin_main" ]] && git -C "$main" merge --ff-only "$origin_main" >/dev/null 2>&1; then
         echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout fast-forwarded to $(git -C "$main" rev-parse --short HEAD)" >> "$data/lander.log"
-        reinstall_main_dependencies "$head"
+        reinstall_main_dependencies
         return 0
       else reason="fast-forward failed"; fi
     fi
@@ -500,7 +503,7 @@ outbox_summary() {
 }
 
 run_one() {
-  local request="$1" base base_state ref_before local_branch branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
+  local request="$1" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
   local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
@@ -559,7 +562,6 @@ PY
   local_branch="$(git -C "$checkout" rev-parse --verify -q "refs/heads/$branch" 2>/dev/null || true)"
   origin_branch="$(git -C "$checkout" rev-parse --verify -q "origin/$branch" 2>/dev/null || true)"
   if [[ "$local_branch" != "$sha" && "$origin_branch" != "$sha" ]]; then bounce "$request" "$branch" "$sha" "branch $branch is no longer at $sha; run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
-  prev_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo "$base")"
   # A failed earlier entry can leave a half-rebased or dirty tree (and HEAD on its unlanded commit); tracked files go back to HEAD first. Ignored files (node_modules) stay.
   git -C "$checkout" rebase --abort >/dev/null 2>&1 || true
   git -C "$checkout" reset --hard -q HEAD >/dev/null 2>&1 || true
@@ -571,19 +573,19 @@ PY
     reason="rebase conflict in: ${conflict:-unknown files}; rebase onto origin/main in your worktree (fetch first), then land.sh again"
     bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
   fi
-  local rebased_sha package_changed
-  rebased_sha="$(git -C "$checkout" rev-parse HEAD)"
-  package_changed="$(git -C "$checkout" diff --name-only "$prev_sha" "$rebased_sha" 2>/dev/null | grep -E '^(backend|frontend)/(package\.json|bun\.lock)$' || true)"
-  if [[ -n "$package_changed" && -z "${MAIPAI_LAND_SKIP_INSTALL:-}" ]]; then
+  # INSTALL-STAMP-01 (2026-11-02): install when node_modules was not installed from the package.json and bun.lock now in the tree (a stamp inside
+  # node_modules, lib/deps.sh), never by diffing HEAD history: a bounced landing leaves HEAD on the failed branch, so the retry's diff was empty and
+  # the old packages stayed. --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin
+  # path changed (docs/PINNING.md), which made the generated adoption file name the old kit and turned main red.
+  if [[ -z "${MAIPAI_LAND_SKIP_INSTALL:-}" ]]; then
     local d
     for d in backend frontend; do
-      if printf '%s\n' "$package_changed" | grep -Eq "^$d/"; then
-        # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md), which made the generated adoption file name the old kit and turned main red.
-        phase "installing dependencies"
-        install_rc=0
-        DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d" install_deps "$checkout/$d" --force >"$output" 2>&1 || install_rc=$?
-        if (( install_rc != 0 )); then bounce "$request" "$branch" "$sha" "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
-      fi
+      [[ -d "$checkout/$d" ]] || continue
+      deps_current "$checkout/$d" && continue
+      phase "installing dependencies"
+      install_rc=0
+      DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d" install_deps "$checkout/$d" --force >"$output" 2>&1 || install_rc=$?
+      if (( install_rc != 0 )); then bounce "$request" "$branch" "$sha" "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
     done
   fi
   export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github"

@@ -72,6 +72,7 @@ const setup = () => {
   for (const name of scriptNames) copyFileSync(join(import.meta.dir, "..", name), join(main, "scripts", name));
   mkdirSync(join(main, "scripts", "lib"), { recursive: true });
   copyFileSync(join(import.meta.dir, "..", "lib", "gitnet.sh"), join(main, "scripts", "lib", "gitnet.sh"));
+  copyFileSync(join(import.meta.dir, "..", "lib", "deps.sh"), join(main, "scripts", "lib", "deps.sh"));
   writeFileSync(join(main, "scripts", "check.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then echo 'fake check: RED found'; exit 1; fi\necho 'fake check: clean'\n");
   writeFileSync(join(main, "scripts", "generate.sh"), "#!/usr/bin/env bash\nif [[ -f GEN ]]; then mkdir -p docs/api; git rev-parse HEAD > docs/api/openapi.json; fi\n");
   mkdirSync(join(main, "docs"), { recursive: true });

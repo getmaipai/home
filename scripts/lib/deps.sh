@@ -13,6 +13,14 @@
 #                                or one that leaves a dangling node_modules/@maipai/* link, deletes <dir>/node_modules (that one folder)
 #                                and tries once more. Knobs: DEPS_INSTALL_SECONDS (600), DEPS_INSTALL_LABEL. On failure DEPS_ERROR holds
 #                                the cause; DEPS_LAST_RC is 124 after a timeout.
+#   deps_stamp_value <dir>       sha256 of <dir>/package.json and <dir>/bun.lock (what an install would read).
+#   deps_current <dir>           true when the stamp matches (or <dir> has no package.json).
+#   deps_ensure <dir>            INSTALL-STAMP-01 (2026-11-02): install_deps <dir> --force unless <dir>/node_modules/.maipai-install-stamp
+#                                equals deps_stamp_value (missing, stale or unreadable stamp means install). install_deps writes the
+#                                stamp after a successful install and deletes it before starting one, so a failed or interrupted install
+#                                is never trusted. The decision rests on what node_modules was installed from, never on git history:
+#                                a bounced landing leaves the warm checkout's HEAD on the failed branch, so a HEAD diff saw "no change"
+#                                on the retry and left the old packages in place. Returns 0 when nothing was needed.
 
 DEPS_ERROR=""
 DEPS_LAST_RC=0
@@ -69,11 +77,38 @@ _deps_dangling_links() {
   return 1
 }
 
+DEPS_STAMP_NAME=".maipai-install-stamp"
+
+deps_stamp_value() {
+  local dir="$1" f
+  for f in package.json bun.lock; do
+    printf '%s:' "$f"
+    if [[ -f "$dir/$f" ]]; then shasum -a 256 < "$dir/$f" | cut -d' ' -f1; else echo none; fi
+  done | shasum -a 256 | cut -d' ' -f1
+}
+
+# deps_current <dir>: true when <dir> has no package.json, or its node_modules stamp matches the files now in the tree.
+deps_current() {
+  local dir="$1" want have
+  [[ -f "$dir/package.json" ]] || return 0
+  want="$(deps_stamp_value "$dir")"
+  have="$(cat "$dir/node_modules/$DEPS_STAMP_NAME" 2>/dev/null || true)"
+  [[ -n "$want" && "$have" == "$want" ]]
+}
+
+deps_ensure() {
+  local dir="$1"
+  if deps_current "$dir"; then DEPS_ERROR=""; DEPS_LAST_RC=0; return 0; fi
+  install_deps "$dir" --force
+}
+
 install_deps() {
-  local dir="$1" force="" attempt rc=0 bad label secs
+  local dir="$1" force="" attempt rc=0 bad label secs input
   [[ "${2:-}" == --force ]] && force="--force"
   secs="${DEPS_INSTALL_SECONDS:-600}"; label="${DEPS_INSTALL_LABEL:-bun install $(basename "$dir")}"
   DEPS_ERROR=""; DEPS_LAST_RC=0
+  rm -f "$dir/node_modules/$DEPS_STAMP_NAME"
+  input="$(deps_stamp_value "$dir")" # hashed before the install starts: the stamp names what the install read, even if a file moves meanwhile
   ensure_pinned_tags "$dir" || { DEPS_LAST_RC=1; return 1; }
   for attempt in 1 2; do
     rc=0
@@ -82,7 +117,11 @@ install_deps() {
       echo "deps.sh: $dir/$bad is a dangling link after install" >&2
       rc=1
     fi
-    if (( rc == 0 )); then DEPS_LAST_RC=0; return 0; fi
+    if (( rc == 0 )); then
+      DEPS_LAST_RC=0
+      mkdir -p "$dir/node_modules" && printf '%s\n' "$input" > "$dir/node_modules/$DEPS_STAMP_NAME" 2>/dev/null
+      return 0
+    fi
     DEPS_LAST_RC="$rc"
     if (( attempt == 1 )); then
       echo "deps.sh: install in $dir failed (exit $rc); deleting its node_modules and trying once more" >&2

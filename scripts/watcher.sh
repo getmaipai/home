@@ -56,6 +56,7 @@ if [[ -f "$deps_lib" ]]; then source "$deps_lib"
 else
   DEPS_ERROR=""; DEPS_LAST_RC=0
   install_deps() { local dir="$1"; shift; bounded_run "${DEPS_INSTALL_SECONDS:-600}" "${DEPS_INSTALL_LABEL:-bun install}" bash -c 'cd "$1" && shift && bun install --frozen-lockfile "$@"' _ "$dir" "$@"; }
+  deps_current() { return 1; }
 fi
 
 refresh_snapshot() {
@@ -89,15 +90,15 @@ checkout_warm() {
   fi
 }
 
+# INSTALL-STAMP-01 (2026-11-02): install when node_modules was not installed from the package.json and bun.lock now in the checkout (a stamp inside
+# node_modules, lib/deps.sh), not when HEAD history shows a package file moved: a failed install or a pin that landed while the watcher was busy
+# left the old packages in place and every later run failed the same way.
 install_if_needed() {
   [[ -z "${MAIPAI_WATCH_SKIP_INSTALL:-}" ]] || return 0
-  local previous="${1:-}" changed=0 d
-  if [[ -z "$previous" ]] || ! git -C "$checkout" cat-file -e "$previous^{commit}" 2>/dev/null; then changed=1
-  elif [[ -n "$(git -C "$checkout" diff --name-only "$previous" HEAD -- backend/package.json backend/bun.lock frontend/package.json frontend/bun.lock 2>/dev/null || true)" ]]; then changed=1
-  fi
-  [[ "$changed" -eq 1 ]] || return 0
+  local d
   for d in backend frontend; do
     [[ -d "$checkout/$d" ]] || continue
+    deps_current "$checkout/$d" && continue
     # --force for the same reason as the lander: a changed commons pin is a file: dependency and a plain install keeps the old snapshot.
     DEPS_INSTALL_SECONDS="${MAIPAI_WATCH_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d" install_deps "$checkout/$d" --force || { error "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies in $checkout and retry."; return 1; }
   done
@@ -452,7 +453,7 @@ file_issue() {
 }
 
 run_once() {
-  local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
+  local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
   local bisect_started bisect_budget bisect_spent
   # OUTBOX-01: the watcher tests the pipeline's main, which is a landing ahead of GitHub's while the outbox is still pushing, so a slow
   # or failed fetch only gets a log line; the landed commits are tested all the same.
@@ -467,9 +468,8 @@ run_once() {
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
-  previous="$last_run"
   git -C "$checkout" checkout --detach "$head" >/dev/null 2>&1
-  install_if_needed "$previous"
+  install_if_needed
   started="$(date +%s)"; output="$(mktemp "$data/.suite.XXXXXX")"
   if [[ "${MAIPAI_WATCH_NO_LOCK:-}" == 1 ]]; then :
   elif [[ ! -f "$gate_lock" ]]; then

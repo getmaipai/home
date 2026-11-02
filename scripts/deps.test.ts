@@ -106,6 +106,52 @@ describe("ensure_pinned_tags and install_deps", () => {
   });
 });
 
+describe("INSTALL-STAMP-01: node_modules records what it was installed from", () => {
+  const stampFile = (l: { backend: string }) => join(l.backend, "node_modules", ".maipai-install-stamp");
+  const env = (l: { base: string; tagDir: string }) => ({ FAKE_BUN_MODE: "", FAKE_BUN_LOG: join(l.base, "bun.log"), FAKE_BUN_TAGDIR: l.tagDir });
+  const installs = (l: { base: string }) => (existsSync(join(l.base, "bun.log")) ? readFileSync(join(l.base, "bun.log"), "utf8").trim().split("\n").length : 0);
+
+  test("deps_ensure installs with --force when there is no stamp, writes one, and skips while it matches", () => {
+    const l = layout("stamp-skip");
+    mkdirSync(l.tagDir, { recursive: true });
+    mkdirSync(join(l.backend, "node_modules"), { recursive: true });
+    expect(sh(`deps_ensure ${l.backend}`, env(l)).status).toBe(0);
+    expect(installs(l)).toBe(1);
+    expect(readFileSync(join(l.base, "bun.log"), "utf8")).toContain("--frozen-lockfile --force");
+    expect(readFileSync(stampFile(l), "utf8").trim()).toMatch(/^[0-9a-f]{64}$/);
+    expect(sh(`deps_ensure ${l.backend}`, env(l)).status).toBe(0);
+    expect(installs(l)).toBe(1);
+  });
+
+  test("a changed package.json or bun.lock, a corrupted stamp and a deleted node_modules each install again", () => {
+    const l = layout("stamp-redo");
+    mkdirSync(l.tagDir, { recursive: true });
+    mkdirSync(join(l.backend, "node_modules"), { recursive: true });
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(1);
+    writeFileSync(join(l.backend, "bun.lock"), "lock v2\n");
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(2);
+    writeFileSync(stampFile(l), "corrupted\n");
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(3);
+    rmSync(join(l.backend, "node_modules"), { recursive: true });
+    mkdirSync(join(l.backend, "node_modules"), { recursive: true });
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(4);
+  });
+
+  test("a failed install leaves no stamp, so the next call installs again", () => {
+    const l = layout("stamp-fail", { tag: false });
+    mkdirSync(join(l.backend, "node_modules"), { recursive: true });
+    writeFileSync(stampFile(l), "stale\n");
+    const r = sh(`deps_current ${l.backend}; echo "current=$?"; install_deps ${l.backend} --force; echo "rc=$?"; [[ -e ${stampFile(l)} ]] && echo stamped || echo unstamped`, { ...env(l), FAKE_BUN_MODE: "needs-tag" });
+    expect(r.out).toContain("current=1");
+    expect(r.out).toContain("rc=1");
+    expect(r.out).toContain("unstamped");
+  });
+});
+
 describe("the settings generator never writes the shared commons checkout", () => {
   test("with MAIPAI_COMMONS_DIR unset it writes to a private temp directory", () => {
     const tmp = join(root, "gen-tmp");

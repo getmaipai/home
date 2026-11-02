@@ -213,11 +213,11 @@ describe("lander pipeline", () => {
     expect(queueFiles()).toHaveLength(0);
   }, 60_000);
 
-  test("main checkout reinstalls dependencies only when a package file moved", () => {
+  test("main checkout reinstalls dependencies only when node_modules was not installed from the package files", () => {
     const bin = join(scratch, "stub-bin");
     const calls = join(scratch, "bun-calls");
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, "bun"), `#!/bin/bash\necho "$PWD: $*" >> "${calls}"\n`, { mode: 0o755 });
+    writeFileSync(join(bin, "bun"), `#!/bin/bash\necho "$PWD: $*" >> "${calls}"\nmkdir -p node_modules\n`, { mode: 0o755 });
     const prior = { path: env.PATH, skip: env.MAIPAI_LAND_SKIP_INSTALL, update: env.MAIPAI_LAND_UPDATE_MAIN };
     env.PATH = `${bin}:${process.env.PATH}`;
     delete env.MAIPAI_LAND_SKIP_INSTALL;
