@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Videos in the Music Studio look (mockup, VIDEO-STUDIO-01)</title>
+<!--
+  Mockup of docs/design/video-studio-2026-11-02.md. Query: ?page=studio|create  &theme=light|dark  &phone=1  &sel=music|video
+  Every colour is a stand-in for the kit's `studio` token scope (data-surface="studio", K1): the dark values are the Music app's
+  `music-surface` values (frontend/src/shell/tokens.css), the light values are a proposal that the contrast tests fix at build.
+  Colour drawn over a picture (scrim, white text on the poster) stands in for --art-scrim and --art-foreground.
+  Thumbnails are the Videos package's own loop posters (backend/packages/videos/assets/loops/*.jpg); waveforms are drawn from a seed.
+-->
+<style>
+:root{--bg:oklch(.965 .004 285);--fg:oklch(.2 .01 285);--card:#fff;--muted:oklch(.93 .004 285);--mfg:oklch(.5 .01 285);--border:oklch(.88 .004 285);--primary:oklch(.86 .2 125);--pfg:oklch(.17 .003 285);--shell:#f4f4f5;--hue-a:oklch(.62 .2 350);--hue-b:oklch(.62 .15 250);--hue-c:oklch(.72 .16 70);--scrim:linear-gradient(transparent,rgba(0,0,0,.55))}
+:root[data-theme=dark]{--bg:oklch(.17 .003 285);--fg:oklch(.97 0 0);--card:oklch(.21 .003 285);--muted:oklch(.26 .003 285);--mfg:oklch(.72 .01 285);--border:oklch(.3 .003 285);--primary:oklch(.9 .2 125);--pfg:oklch(.17 .003 285);--shell:#0b0b0c;--hue-a:oklch(.55 .2 350);--hue-b:oklch(.55 .15 250);--hue-c:oklch(.68 .16 70)}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--shell);color:var(--fg);overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+.app{display:grid;grid-template-columns:56px 220px 1fr;height:100vh}
+.rail{border-right:1px solid var(--border);display:flex;flex-direction:column;gap:10px;align-items:center;padding:14px 0}
+.rail i{width:28px;height:28px;border-radius:8px;background:var(--muted)}
+.side{border-right:1px solid var(--border);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.side b{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;font-weight:500;color:var(--mfg)}
+.side b.on{background:var(--muted);color:var(--fg)}
+.col{display:flex;flex-direction:column;min-width:0;height:100vh}
+.head{display:flex;align-items:center;gap:12px;padding:10px 20px;height:56px;flex:none}
+.head h1{font-size:17px;margin:0;font-weight:600}
+.pill{border:1px solid var(--border);border-radius:999px;padding:6px 14px;background:var(--card);color:var(--mfg)}
+.pill.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.search{flex:0 1 320px;margin:0 auto}
+.av{width:34px;height:34px;border-radius:50%;background:var(--muted);border:2px dashed var(--border);margin-left:6px}
+/* the studio surface (K1) */
+.pane{flex:1;min-height:0;margin:0 16px 16px;border-radius:24px;background:var(--bg);color:var(--fg);padding:20px 24px;display:flex;flex-direction:column;gap:16px;overflow:hidden;border:1px solid var(--border)}
+.btn{border:0;border-radius:999px;height:48px;padding:0 22px;font-size:16px;font-weight:500;background:var(--muted);color:var(--fg);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn.p{background:var(--primary);color:var(--pfg)}
+.btn.o{background:transparent;border:1px solid var(--border)}
+.btn.sm{height:36px;padding:0 14px;font-size:14px}
+.btn.lg{height:56px;padding:0 26px;font-size:18px}
+.btn[disabled],.btn.off{opacity:.45}
+.btn small{font-size:11px;opacity:.8;border:1px solid currentColor;border-radius:999px;padding:0 6px;margin-left:2px}
+.hd{display:flex;align-items:center;gap:16px;flex:none}
+.art{width:72px;height:72px;border-radius:14px;overflow:hidden;flex:none;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.art img{width:100%;height:100%;object-fit:cover;display:block}
+.hd .tt{flex:1;min-width:0}
+.eye{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mfg)}
+.hd h2{margin:2px 0 0;font-size:38px;line-height:1;font-weight:900;letter-spacing:-.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd .acts{display:flex;gap:10px}
+.body{display:grid;grid-template-columns:1fr 320px;gap:16px;flex:1;min-height:0}
+.left{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
+.card{background:var(--card);border-radius:18px}
+.top{display:grid;grid-template-columns:340px 1fr;gap:12px}
+.mon{border-radius:18px;overflow:hidden;position:relative;aspect-ratio:16/9;background:#000}
+.mon img{width:100%;height:100%;object-fit:cover}
+.mon .tc{position:absolute;left:10px;bottom:8px;color:#fff;font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.5);border-radius:999px;padding:2px 8px}
+.mon .badge{position:absolute;right:10px;top:8px;color:#fff;font-size:11px;background:rgba(0,0,0,.5);border-radius:999px;padding:2px 8px}
+.tools{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.tools h3,.panel h3{margin:0;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.tgrid{display:flex;flex-wrap:wrap;gap:8px}
+.tools p{margin:0;font-size:12.5px;color:var(--mfg)}
+.tl{display:grid;grid-template-columns:176px 1fr;overflow:hidden;border-radius:18px}
+.tl .corner{display:flex;align-items:center;justify-content:space-between;padding:8px 10px}
+.eyes{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mfg)}
+.ruler{position:relative;height:40px}
+.ruler span{position:absolute;bottom:2px;border-left:1px solid color-mix(in oklch,var(--fg) 25%,transparent);padding-left:4px;font-size:11px;color:var(--mfg);height:18px;line-height:18px}
+.lab{border-top:2px solid var(--bg);position:relative;padding:6px 8px 6px 14px;display:flex;flex-direction:column;justify-content:center;gap:6px;height:62px;background:var(--card)}
+.lab::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--h)}
+.lab .r{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.lab .r span{flex:1;min-width:0;line-height:1.15}.lab .r span.ic{flex:none}
+.ic{width:24px;height:24px;border-radius:7px;background:var(--muted);display:grid;place-items:center;font-size:11px;font-weight:700}
+.ic.on{background:var(--primary);color:var(--pfg)}
+.sl{height:4px;border-radius:2px;background:var(--muted);position:relative}
+.sl i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--primary)}
+.sl b{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--card);border:2px solid var(--primary)}
+.lane{border-top:2px solid var(--bg);height:62px;position:relative;background:color-mix(in oklch,var(--h) 10%,var(--card));overflow:hidden}
+.grid i{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in oklch,var(--fg) 10%,transparent)}
+.seg{position:absolute;top:8px;bottom:8px;border-radius:8px;overflow:hidden;border:1px solid color-mix(in oklch,var(--h) 70%,transparent)}
+.seg.sel{outline:2px solid var(--primary);outline-offset:1px}
+.seg .th{display:flex;height:100%}
+.seg .th img{height:100%;width:auto;aspect-ratio:16/9;object-fit:cover;flex:none}
+.seg .nm{position:absolute;left:6px;top:3px;font-size:11px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.hdl{position:absolute;top:0;bottom:0;width:8px;background:var(--primary);z-index:3}
+.hdl.l{left:0;border-radius:8px 0 0 8px}.hdl.r{right:0;border-radius:0 8px 8px 0}
+.hdl::after{content:"";position:absolute;left:3px;right:3px;top:calc(50% - 8px);height:16px;border-left:1px solid var(--pfg);border-right:1px solid var(--pfg)}
+.xf{position:absolute;top:8px;bottom:8px;z-index:4;background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 3px,transparent 3px 6px);border-radius:4px;border:1px solid var(--primary)}
+.cut{position:absolute;top:2px;bottom:2px;width:2px;background:var(--primary);z-index:5}
+.wave{display:flex;align-items:center;gap:1px;height:100%;padding:6px 0}
+.wave s{flex:1;min-width:1px;border-radius:1px;background:var(--h)}
+.fade{position:absolute;top:0;bottom:0;background:linear-gradient(var(--dir),color-mix(in oklch,var(--card) 85%,transparent),transparent);z-index:2}
+.ph{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);z-index:6}
+.phh{position:absolute;top:0;width:12px;height:10px;margin-left:-5px;background:var(--fg);clip-path:polygon(0 0,100% 0,50% 100%);z-index:6}
+.tr{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:18px;flex-wrap:wrap}
+.knob{display:flex;flex-direction:column;gap:4px;width:150px;font-size:11px}
+.knob .t{display:flex;justify-content:space-between}
+.mono{font:14px ui-monospace,Menlo,monospace;margin-left:auto}
+.right{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden}
+.panel{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.panel .ph2{display:flex;justify-content:space-between;align-items:baseline}
+.panel .ph2 em{font-style:normal;font-size:13px;color:var(--mfg)}
+.ctl{display:flex;flex-direction:column;gap:6px}
+.ctl .t{display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mfg)}
+.ctl .t b{color:var(--fg);letter-spacing:0;text-transform:none;font-weight:500}
+.seg3{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.seg3 span{border-radius:999px;background:var(--muted);text-align:center;font-size:10.5px;padding:5px 0;white-space:nowrap}
+.seg3 span.on{background:var(--primary);color:var(--pfg);font-weight:600}
+.note{font-size:12px;color:var(--mfg);margin:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+/* create */
+.cwork{display:grid;grid-template-columns:420px 1fr;gap:16px;flex:1;min-height:0}
+.cpanel{padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.ban{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:16/6}
+.ban img{width:100%;height:100%;object-fit:cover}.ban::after{content:"";position:absolute;inset:0;background:var(--scrim)}
+.ban .t{position:absolute;left:12px;right:12px;bottom:8px;z-index:2;color:#fff;display:flex;justify-content:space-between;align-items:flex-end}
+.ban .t small{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}.ban .t strong{font-size:16px}
+.ban .c{background:rgba(255,255,255,.22);border-radius:999px;padding:4px 12px;font-size:12px}
+.pr{border-radius:14px;background:var(--bg);border:1px solid var(--border);padding:12px;min-height:112px;color:var(--mfg);font-size:14.5px}
+.lv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lv div{border:1.5px solid var(--border);border-radius:12px;padding:8px 10px;font-size:11.5px;color:var(--mfg);min-height:62px}
+.lv div b{display:block;color:var(--fg);font-size:14px}
+.lv div.on{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary) inset}
+.feed{display:flex;flex-direction:column;gap:14px;min-height:0;overflow:hidden}
+.rail2{display:flex;gap:10px;overflow:hidden}
+.try{flex:none;width:112px}.try .pic{aspect-ratio:2/3;border-radius:12px;overflow:hidden}.try img{width:100%;height:100%;object-fit:cover}.try b{display:block;font-size:12.5px;margin-top:5px}.try small{color:var(--mfg);font-size:11.5px}
+.entry{border-radius:18px;overflow:hidden;position:relative;aspect-ratio:16/8}.entry img{width:100%;height:100%;object-fit:cover}
+.entry .tg{position:absolute;left:12px;top:10px;display:flex;gap:6px}.entry .tg span{background:rgba(0,0,0,.5);color:#fff;border-radius:999px;font-size:11px;padding:2px 9px}
+.entry .cap{position:absolute;left:14px;right:14px;bottom:10px;color:#fff;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.entry .go{position:absolute;right:14px;bottom:44px}
+/* phone */
+.phone .app{grid-template-columns:1fr}.phone .rail,.phone .side,.phone .search,.phone .pill.hide{display:none}
+.phone .head{padding:8px 14px}.phone .pane{margin:0;border-radius:0;padding:14px;border:0;gap:12px;overflow:auto}
+.phone .hd{flex-wrap:wrap;gap:12px}.phone .art{width:56px;height:56px;border-radius:12px}.phone .hd h2{font-size:26px;white-space:normal}.phone .hd .tt{flex:1 1 60%}.phone .hd .acts{width:100%}.phone .hd .acts .btn{flex:1;justify-content:center;height:44px;font-size:15px;padding:0 12px}
+.phone .body{grid-template-columns:1fr;flex:none}.phone .top{grid-template-columns:1fr}.phone .mon{aspect-ratio:16/9}
+.phone .tl{grid-template-columns:112px 1fr;overflow-x:auto}.phone .tl .scroll{min-width:620px}.phone .lab{padding-left:12px}.phone .tr{gap:8px}.phone .knob{width:100%}
+.phone .cwork,.phone .cwork{grid-template-columns:1fr}.phone .hd h2.cr{font-size:28px}.phone .right{overflow:visible}
+.phone .corner .btn{display:none}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search);
+const theme=q.get('theme')||'dark',page=q.get('page')||'studio',phone=q.get('phone')==='1',sel=q.get('sel')||'music';
+document.documentElement.dataset.theme=theme;if(phone)document.body.classList.add('phone');
+const L='../../../../backend/packages/videos/assets/loops/';
+let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+const wave=(n,h,amp=1)=>`<div class="wave" style="--h:${h}">${Array.from({length:n},(_,i)=>{const e=.35+.65*Math.abs(Math.sin(i/9))*rnd();return `<s style="height:${Math.round(18+70*e*amp)}%"></s>`}).join('')}</div>`;
+const thumbs=(name,n)=>`<div class="th">${Array.from({length:n},()=>`<img src="${L}${name}.jpg" alt="">`).join('')}</div>`;
+const PX=23.5, X=s=>Math.round(s*PX);       // 24.5 px per second
+const ruler=()=>{let o='';for(let s=0;s<=24;s+=2)o+=`<span style="left:${X(s)}px">0:${String(s).padStart(2,'0')}</span>`;return `<div class="ruler">${o}<div class="ph" style="left:${X(6.4)}px"></div><div class="phh" style="left:${X(6.4)}px"></div></div>`};
+const grid=()=>`<div class="grid">${Array.from({length:13},(_,i)=>`<i style="left:${X(i*2)}px"></i>`).join('')}</div>`;
+const lab=(h,name,on,lvl,mu,so)=>`<div class="lab" style="--h:${h}"><div class="r"><span class="ic ${mu?'on':''}">M</span><span>${name}</span><span class="ic ${so?'on':''}" style="flex:none">S</span></div><div class="sl"><i style="width:${lvl}%"></i><b style="left:${lvl}%"></b></div></div>`;
+const timeline=()=>`
+<div class="tl card"><div class="corner"><span class="eyes">Tracks</span><button class="btn sm o">+ Track</button></div><div class="scroll" style="position:relative;overflow:hidden">${ruler()}</div>
+${lab('var(--hue-b)','1. Video',86,86)}
+<div class="lane" style="--h:var(--hue-b)"><div class="scroll" style="position:relative;height:100%;min-width:620px">${grid()}
+  <div class="seg" style="left:${X(0)}px;width:${X(5)}px"><div class="nm">Paper boat A</div>${thumbs('anime',4)}</div>
+  <div class="cut" style="left:${X(5)}px"></div>
+  <div class="seg ${sel==='video'?'sel':''}" style="left:${X(5)+2}px;width:${X(4)-2}px"><div class="nm">Paper boat B</div>${thumbs('anime',3)}${sel==='video'?'<div class="hdl l"></div><div class="hdl r"></div>':''}</div>
+  <div class="seg" style="left:${X(8.5)}px;width:${X(7.5)}px"><div class="nm">Lighthouse</div>${thumbs('film',4)}</div>
+  <div class="xf" style="left:${X(8.5)}px;width:${X(.5)}px"></div>
+  <div class="ph" style="left:${X(6.4)}px"></div></div></div>
+${lab('var(--hue-a)','2. Voice',72,72)}
+<div class="lane" style="--h:var(--hue-a)"><div class="scroll" style="position:relative;height:100%;min-width:620px">${grid()}
+  <div class="seg" style="left:${X(1.5)}px;width:${X(5.5)}px;background:transparent">${wave(50,'var(--hue-a)',.9)}</div>
+  <div class="ph" style="left:${X(6.4)}px"></div></div></div>
+${lab('var(--hue-c)','3. Music',54,54,0,0)}
+<div class="lane" style="--h:var(--hue-c)"><div class="scroll" style="position:relative;height:100%;min-width:620px">${grid()}
+  <div class="seg ${sel==='music'?'sel':''}" style="left:${X(0)}px;width:${X(16)}px;background:transparent">${wave(120,'var(--hue-c)',.8)}<div class="fade" style="--dir:to right;left:0;width:${X(1.5)}px"></div><div class="fade" style="--dir:to left;right:0;width:${X(3)}px"></div>${sel==='music'?'<div class="hdl l"></div><div class="hdl r"></div>':''}</div>
+  <div class="ph" style="left:${X(6.4)}px"></div></div></div>
+</div>`;
+const ctl=(t,v,p)=>`<div class="ctl"><div class="t"><span>${t}</span><b>${v}</b></div><div class="sl"><i style="width:${p}%"></i><b style="left:${p}%"></b></div></div>`;
+const panels=()=>`
+<div class="panel card"><div class="ph2"><h3>Volume</h3><button class="btn sm" style="background:transparent">Reset</button></div><div class="chips"><span class="eyes" style="text-transform:none;letter-spacing:0">Selected: ${sel==='music'?'3. Music':'Paper boat B'}</span></div>
+${ctl('Level',sel==='music'?'-8 dB':'0 dB',sel==='music'?38:62)}${ctl('Voice over this',sel==='music'?'Lower under speech':'Off',sel==='music'?70:0)}</div>
+<div class="panel card"><div class="ph2"><h3>Fades</h3><button class="btn sm" style="background:transparent">Reset</button></div>${ctl('Fade in','1.5 s',30)}${ctl('Fade out','3.0 s',60)}</div>
+<div class="panel card"><div class="ph2"><h3>Crossfade</h3><button class="btn sm" style="background:transparent">Reset</button></div>${ctl('Length at the seam','0.5 s',29)}<p class="note">Blends the two pictures and their sound where they meet. 0.3 to 1 second.</p></div>
+<div class="panel card"><div class="ph2"><h3>Level</h3></div><div class="seg3"><span>Quiet</span><span>Soft</span><span class="on">Balanced</span><span>Loud</span><span>Very loud</span></div><p class="note">How loud the voice and music sit against the clip's own sound.</p></div>
+<p class="note">The preview is what you hear in the Studio. Export makes a new clip and keeps the old one.</p>`;
+const transport=()=>`<div class="tr card"><button class="btn p lg">▶ Play</button><button class="btn">Back to start</button><button class="btn o">⟳ Loop</button><div class="knob"><div class="t"><span class="eyes" style="letter-spacing:.08em">Zoom</span></div><div class="sl"><i style="width:40%"></i><b style="left:40%"></b></div></div><span class="mono">0:06 / 0:16</span></div>`;
+const tools=()=>`<div class="tools card"><h3>Edit</h3><div class="tgrid"><button class="btn sm">Split at playhead</button><button class="btn sm">Delete piece</button><button class="btn sm">Add a clip</button><button class="btn sm">Add a voice</button><button class="btn sm">Add music</button></div><h3 style="margin-top:4px">Make more</h3><div class="tgrid"><button class="btn sm">Another take</button><button class="btn sm">Extend <small>Max</small></button><button class="btn sm">Redo from here <small>Max</small></button></div><p>Drag the handles at each end to trim. Press Split to cut at the playhead. Pieces snap to each other.</p></div>`;
+function studio(){return `
+<div class="hd"><div class="art"><img src="${L}anime.jpg" alt=""></div><div class="tt"><div class="eye">Studio</div><h2>Paper boat in the rain</h2></div><div class="acts"><button class="btn">Back to the clip</button><button class="btn p lg">Export as a new clip</button></div></div>
+<div class="body"><div class="left"><div class="top"><div class="mon"><img src="${L}anime.jpg" alt=""><span class="badge">Preview</span><span class="tc">0:06 / 0:16</span></div>${tools()}</div>${timeline()}${transport()}</div><div class="right">${panels()}</div></div>`}
+function create(){return `
+<div class="hd"><div class="tt"><div class="eye">Create</div><h2 class="cr">Make any video</h2></div></div>
+<div class="cwork"><div class="cpanel card"><div class="pr">Describe your video. Put each person's line in quotes.</div>
+<div class="ban"><img src="${L}anime.jpg" alt=""><div class="t"><div><small>Look and camera</small><strong>Anime, Dolly in</strong></div><span class="c">Change</span></div></div>
+<div class="lv"><div class="on"><b>Standard</b>Fast, with sound<br>under a minute</div><div><b>Boost</b>Sharper picture<br>about a minute</div><div style="opacity:.5"><b>Max</b>Needs the Max pack</div></div>
+<div class="chips"><span class="pill">Landscape</span><span class="pill">5 seconds</span></div>
+<div style="flex:1"></div><button class="btn p lg" style="justify-content:center;height:64px;flex-direction:column;gap:0;line-height:1.1">Generate<small style="border:0;font-size:12px;font-weight:400;margin:0">Standard, under a minute</small></button></div>
+<div class="feed"><div><div class="eyes" style="margin-bottom:8px">Try this</div><div class="rail2">${[['anime','Paper boat','Anime, Dolly in'],['aerial','Valley sunrise','Aerial'],['3d-animated','Snowy cabin','3D animated'],['classic-cartoon','Cartoon mouse','Classic cartoon'],['film','Lighthouse','Film, Handheld'],['time-lapse','City waking','Time-lapse'],['slow-motion','Slow rain','Slow motion']].map(([n,t,s])=>`<div class="try"><div class="pic"><img src="${L}${n}.jpg" alt=""></div><b>${t}</b><small>${s}</small></div>`).join('')}</div></div>
+<div class="entry"><img src="${L}film.jpg" alt=""><div class="tg"><span>Film</span><span>Handheld</span><span>Standard</span><span>5 s</span></div><div class="cap"><span>A lighthouse on a stormy night, waves breaking</span><span>Remix · Another take · More</span></div></div></div></div>`}
+document.getElementById('root').innerHTML=`<div class="app"><div class="rail"><i></i><i></i><i></i><i></i></div><div class="side"><b class="${page==='create'?'on':''}">▢ Create</b><b class="${page==='studio'?'on':''}">≋ Studio</b><b>▤ My clips</b></div><div class="col"><div class="head"><h1>🎞 Videos</h1><span class="pill search">Search Videos</span><span class="pill hide">Browse</span><span class="pill on">Create</span><span class="av"></span></div><div class="pane" data-surface="studio">${page==='create'?create():studio()}</div></div></div>`;
+</script>
+</body>
+</html>
