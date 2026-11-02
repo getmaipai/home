@@ -1,8 +1,8 @@
 # Videos Create: a two-pane workspace (control panel and results feed) and a My clips library (design draft, 2026-11-02)
 
-Status (2026-11-02): proposed; architect ruling pending on revision 5 (revision 3 was REJECTED on G1 and G2, revision 4 on three kit facts R1 to R3, all fixed here). Revision 1 (a single page with a stage, a clips column and a
+Status (2026-11-02): proposed; architect ruling pending on revision 6 (revision 3 was REJECTED on G1 and G2, revision 4 on three kit facts R1 to R3, revision 5 on further kit facts, all fixed here). Revision 1 (a single page with a stage, a clips column and a
 bottom dock) landed as f9009fc78; revision 2 (two panes, built on the generic `player`) was REJECTED because the kit already ships `VideoPlayer`;
-this text, revision 3, builds the feed entry on `VideoPlayer` and replaces both. Nothing should be built from revision 1's or 2's slices.
+this text, revision 6, builds the feed entry on `VideoPlayer` and replaces both. Nothing should be built from revision 1's or 2's slices.
 No code. Item: VIDEO-UI-01. Amends [video-create-ui-2026-11-02.md](video-create-ui-2026-11-02.md). Mockup, opened and judged at 1440 and
 390 wide, light and dark: [assets/video-one-page-2026-11-02/index.html](assets/video-one-page-2026-11-02/index.html) (captures beside it;
 `?page=clips` is the library; `bash cap.sh` regenerates them).
@@ -61,9 +61,9 @@ Owner's five screenshots, read 2026-11-02. Each pattern is named, with what we d
 What a person does: describe a clip, choose how it looks, press Generate, watch it appear, act on it, find it again. One page,
 two panes, nothing that navigates away while a clip is made.
 
-At 1024 px window width and up (1440 shown):
+At the kit's desktop breakpoint (`lg`, 960 px, `ui/src/tokens.css`) and up (1440 shown):
 
-1. **Left: the control panel** (about 370 px, its own rounded pane; `prompt_bar` with `placement: "panel"`, K2a). Top to bottom: the
+1. **Left: the control panel** (up to 360 px, the `split_view` aside maximum, its own rounded pane; `prompt_bar` with `placement: "panel"`, K2a). Top to bottom: the
    prompt box (large; the Start frame attaches inside it as a named thumbnail; three idea chips show only while it is empty); References
    (Start frame, End frame, Voice clip as slots); Style (one control showing two small thumbnails and "Anime, Dolly in"; it opens the
    Look, Camera and Sound popover); Level (Standard, Boost, Max); Shape and Length; More settings; and at the foot **Generate** with
@@ -78,8 +78,8 @@ At 1024 px window width and up (1440 shown):
    sidebar has no count field; a count would be a new kit gap and is not needed). The manifest holds the two real destinations; Favorites and Uploaded are tabs of My clips, because a sidebar entry is a page and carries no filter state, while the kit
    `tabs` node does.
 
-Below 1024 px window width (the phone and a narrow window; `split_view` switches at the window-width `lg` breakpoint, and the panel takes its
-mode from the enclosing `split_view`, never from its own width or query): the panel becomes a bottom dock (`placement: "panel"` follows the enclosing
+Below the kit's desktop breakpoint (`lg`, 960 px; the phone and a narrow window; `split_view` switches at `lg`, and the panel takes its
+mode from the enclosing `split_view`, never from its own width or query; a package never writes a breakpoint, `.github` docs/UI.md): the panel becomes a bottom dock (`placement: "panel"` follows the enclosing
 `split_view`):
 one line with the words, an **Options** round button and a round **Generate**. Options opens a bottom sheet (the kit Drawer) with References,
 Level, Shape and Length, and the Look and Camera pickers as three-column thumbnails, Generate fixed at its foot. The feed fills the width; its
@@ -97,7 +97,7 @@ the newest clip with its actions, and the top of the next.
    where the person acts, read from `useMakingAvailability` on the `["health"]` query. `prompt_bar` has a `disabledReason` prop, but
    the package-page renderer does not pass it and Home gives package pages no availability, and `player.actions` cannot be disabled
    today. K8 closes that; until it lands the page is not built. The round Generate of the phone dock and the Generate in the sheet take the
-   same `disabledReason`. A disabled icon-only action row shows the one line as visible text on the entry (VideoPlayer's `hint`, shown in every status by K1), not only a
+   same `disabledReason`. A disabled icon-only action row shows the one line as visible text on the entry (VideoPlayer's new `notice` prop, shown in every status by K1; `hint` keeps its live-only default), not only a
    tooltip. The existing one-time recovery toast of that S6 row is the only toast; nothing new is added.
 3. **The Level segment shows only what the person may use.** Standard alone is no segment (today's fill). Max appears when the Stack
    reports it ready and the person holds it, greyed with its reason when the engine has it but not its pack (`videoMaxNotReadyReason`).
@@ -157,8 +157,8 @@ Element is written (rule 9b), and ships under a new tag; Home pins it in VIDEO-U
 
 | # | Node | Addition | Default | Why existing props cannot do it |
 |---|---|---|---|---|
-| K1 | `VideoPlayer` (the Element) | additive props, each default unchanged: a `draft` status with its still and three actions; per-action `when` (statuses) and `disabledReason`; `actionsVariant: "icons"` (icon buttons, label as accessible name and tooltip); `actionsInline` N with a More menu; a Favorite toggle; a `size` prop if an entry must be wider than the Element's maximum (about 576 px); the K8 `starts` marker. `hint` shows in every status (draft, ready, failed, cancelled, not only while queued or generating, where it shows today); K8 fills it with the `makingNotice` when any `starts` action on the entry is disabled. `VideoPlayer`'s built-in Stop, Retry and Make another (`onStop`, `onRetry`, `onMakeAnother`) also take `disabledReason` and the `starts` marker (Retry and Make another start a clip; Stop does not). The generic `player` is not changed and stays the Browse player | | the Element has Stop, Retry, Download, Share, Make another and an `actions` slot; it lacks these |
-| K2a | `prompt_bar` | `placement: "panel"`: a left panel at the enclosing `split_view`'s side-by-side breakpoint, 1024 px window width (`lg`; scrolls inside, Generate pinned at its foot); below that a bottom dock (field, Options, round Generate) with the controls in a bottom sheet | `inline` | the bar is a block in the flow |
+| K1 | `VideoPlayer` (the Element) | additive props, each default unchanged: a `draft` status with its still and three built-in handlers `onRender`, `onAnotherStill`, `onEditWords` (declared once here, each taking `disabledReason` and `starts` like `onRetry`; Render and Another still start a clip or a still, Edit words does not); per-action `when` (statuses) and `disabledReason`; `actionsVariant: "icons"` (icon buttons, label as accessible name and tooltip); `actionsInline` N with a More menu; a Favorite toggle (declared once here, driven by `fields.favorite` with a `handlers.favorite` call); a `size` prop if an entry must be wider than the Element's maximum (about 576 px); the K8 `starts` marker; a NEW prop `notice`, visible text shown in every status (draft, ready, failed, cancelled), where `hint` is unchanged and stays live-only (the chat card's `videoHint` passes a hint in every status, so its meaning is not touched); K8 fills `notice` with the `makingNotice` when any `starts` action on the entry is disabled. `VideoPlayer`'s built-in Stop, Retry and Make another (`onStop`, `onRetry`, `onMakeAnother`) also take `disabledReason` and the `starts` marker (Retry and Make another start a clip; Stop does not). The generic `player` is not changed and stays the Browse player | | the Element has Stop, Retry, Download, Share, Make another and an `actions` slot; it lacks these |
+| K2a | `prompt_bar` | `placement: "panel"`: a left panel at the enclosing `split_view`'s side-by-side breakpoint (`lg`, 960 px; scrolls inside, Generate pinned at its foot); below that a bottom dock (field, Options, round Generate) with the controls in a bottom sheet. `split_view` exposes its layout (side by side or stacked) through context and `prompt_bar` reads that; `prompt_bar` never runs its own media query. `aside_sheet: "phone"` is not combined with `placement: "panel"` (the bar draws its own dock and sheet) | `inline` | the bar is a block in the flow |
 | K2b | `prompt_bar` | `suggestions`: up to 4 `{label, text}`, shown while the field is empty | none | idea chips |
 | K2c | `prompt_bar` | `submit_detail`: `{state, labels}`, the small line under the submit label chosen by a chip or tier state | none | the time under Generate |
 | K3a | `prompt_bar.chips[]` | `presentation: "popover"` on a `cards` chip and `group`: chips with the same group share one trigger with two thumbnails and open one popover (sheet on a phone); a text chip (Voices) may be in the group | inline | Look, Camera and Sound are one control |
@@ -169,7 +169,7 @@ Element is written (rule 9b), and ships under a new tag; Home pins it in VIDEO-U
 | K7 | `VideoPlayer` actions | `sheet`: `{title, submit_label, fields: [{name, label, kind: number|text|clips}]}` | none | Trim, Join, Mix need inputs (VIDEO-UI-08) |
 | K8 | host, `prompt_bar`, `VideoPlayer` actions, `result_feed` | `MediaHost.makingNotice(kind)` fed by `useMakingAvailability`; the renderer passes it as `disabledReason` and disables every action marked `starts: "picture"` or `"video"` with the same notice | no marker: unchanged | S6 row "Pictures and video are not ready" (owner ruling 2026-10-29) |
 | K9 | `result_feed` | `poll_while`: statuses in which the feed re-reads only those jobs' own records every few seconds and stops once every row is settled, like the chat card's `VIDEO_POLL_MS` query | none | the newest entry follows a running job; the job record read S6 allows, not a new polling loop; only if the refresh check fails |
-| K10 | new node `result_feed` | bound rows (newest first); per row one `VideoPlayer` (a draft is the same Element in `draft`) plus the words, tags and reference chips `{label, thumb}`; `filters` (toggle, select) that write page state the binding reads as `$state.<name>`; `group_by` (day through `DayDivider`, or the words); the entry's Stop, Try again and Another take are `VideoPlayer`'s own `onStop`, `onRetry` and `onMakeAnother`, mapped from a `handlers` prop (Cancel, Try again and Another take are not declared again as extra actions); only Remix, Make it Max, the draft actions and Favorite are extra `actions`, and an extra action with no `when` shows in `ready`; K1 and K8 | | the Dreamina feed: no existing node holds an entry with words, tags, a player and actions |
+| K10 | new node `result_feed` | bound rows (newest first); per row one `VideoPlayer` (a draft is the same Element in `draft`) plus the words, tags and reference chips `{label, thumb}`; `filters` (toggle, select) that write page state the binding reads as `$state.<name>`; `group_by` (day through `DayDivider`, or the words); the entry's Stop, Try again, Another take, the three draft actions and Favorite are `VideoPlayer`'s own built-ins (`onStop`, `onRetry`, `onMakeAnother`, `onRender`, `onAnotherStill`, `onEditWords`, and the Favorite toggle), mapped from a `handlers` prop with keys `stop`, `retry`, `make_another`, `render`, `another_still`, `edit_words`, `favorite` (none is declared again as an extra action); only Remix and Make it Max are extra `actions`, and an extra action with no `when` shows in `ready`; K1 and K8 | | the Dreamina feed: no existing node holds an entry with words, tags, a player and actions |
 | K11 | `split_view` | `aside_side: "start"` | `end` | the panel is the left pane |
 | K12 | `media_shelf` | `group_by_field` (a date field, `DayDivider` headings built as shipped: a centred label between hairlines such as "Today, 5 clips"; the mockup's left-aligned heading is not built unless a `DayDivider` variant is added here, never a className), `size_control` (`CardSizeSlider` writing tile density), `favorite` (`{field, action}` heart toggle) | none | the library of reference 9 |
 
@@ -220,13 +220,15 @@ estimates) stays in `videoCreateApp.ts` from the single lists.
       "fields": { "words": "prompt", "tags": "tags", "references": "references", "status": "status", "progress": "percent", "poster": "still", "src": "src", "favorite": "favorite" },
       "handlers": { "stop": { "call": { "target": "/api/plugins/videos/actions/cancel", "args": { "id": "{id}" } } },
                     "retry": { "starts": "video", "call": { "target": "/api/plugins/videos/actions/another", "args": { "id": "{id}" } } },
-                    "make_another": { "starts": "video", "call": { "target": "/api/plugins/videos/actions/another", "args": { "id": "{id}" } } } },
+                    "make_another": { "starts": "video", "call": { "target": "/api/plugins/videos/actions/another", "args": { "id": "{id}" } } },
+                    "render": { "starts": "video", "call": { "target": "/api/plugins/videos/actions/render", "args": { "draft": "{id}" } } },
+                    "another_still": { "starts": "picture", "call": { "target": "/api/plugins/videos/actions/still", "args": { "draft": "{id}" } } },
+                    "edit_words": { "navigate": { "to": "/apps/videos/create", "state": { "prompt": "{prompt}" } } },
+                    "favorite": { "call": { "target": "/api/plugins/videos/actions/favorite", "args": { "id": "{id}" } } } },
       "actions_variant": "icons", "actions_inline": 4,
       "actions": [
         { "label": "Remix", "icon": "pencil", "action": { "navigate": { "to": "/apps/videos/create", "state": { "prompt": "{prompt}", "look": "{look}", "camera": "{camera}", "seconds": "{seconds}", "tier": "{tier}", "orientation": "{orientation}" } } } },
-        { "label": "Make it Max", "icon": "sparkles", "starts": "video", "action": { "call": { "target": "/api/plugins/videos/actions/max", "args": { "id": "{id}" } } } },
-        { "label": "Make the video from this", "starts": "video", "when": ["draft"], "action": { "call": { "target": "/api/plugins/videos/actions/render", "args": { "draft": "{id}" } } } },
-        { "label": "Another still", "starts": "picture", "when": ["draft"], "action": { "call": { "target": "/api/plugins/videos/actions/still", "args": { "draft": "{id}" } } } },
+        { "label": "Make it Max", "icon": "sparkles", "starts": "video", "action": { "call": { "target": "/api/plugins/videos/actions/max", "args": { "id": "{id}" } } } }
       ],
       "empty_state": { "type": "empty_state", "icon": "film", "text": "Your clips show here. Describe a video on the left and press Generate." }
     }]
@@ -240,7 +242,7 @@ estimates) stays in `videoCreateApp.ts` from the single lists.
 
 Data: the `recipes` scope `feed` returns rows `{id, prompt, tags, references, state, percent, status, still, src, download_path, look, camera,
 seconds, tier, orientation, favorite, created_at}` honoring the three filters, newest first (limit 30); it replaces the scopes `newest`,
-`making`, `last` and `starters` (deleted with the old pages; the manifest data list stays at 16 ids). Routes `render`, `still` and `cancel` call
+`making`, `last` and `starters` (deleted with the old pages; the manifest data list stays at 16 ids). Routes `render`, `still`, `cancel` and `favorite` call
 the same functions as the chat still card and the existing cancel; `max` is `make_it_max`; `end_frame` joins `make` with VIDEO-INPUTS-03.
 
 ## 7. Safety and privacy
@@ -255,7 +257,7 @@ a failure says what to do ("It did not finish. Try again.").
 | Id | Size | Slice | Done when |
 |---|---|---|---|
 | VIDEO-UI-01 | S | This note, architect ruling, mockup, backlog rows | architect APPROVED; screenshots judged |
-| VIDEO-UI-02 | M, commons | K1 `VideoPlayer` additions (draft status, `when`, `disabledReason`, icon variant, More menu, Favorite) and the K8 `starts` marker; the refresh check first | commons tests and tsc; opened at 1440 and 390; tag pushed |
+| VIDEO-UI-02 | M, commons | K1 `VideoPlayer` additions (draft status with `onRender`, `onAnotherStill`, `onEditWords`, `when`, `disabledReason`, `notice`, icon variant, More menu, Favorite toggle) and the K8 `starts` marker; the refresh check first | commons tests and tsc; opened at 1440 and 390; tag pushed |
 | VIDEO-UI-03 | M, commons | K2a to K2c, K3a to K3c, K8 `disabledReason` pass-through, K6 check | same; keyboard and focus pass on popover and sheet; tag pushed |
 | VIDEO-UI-04 | M, commons | K10 `result_feed` composing `VideoPlayer` and `DayDivider` (K8, K9 if needed) and K11 `split_view.aside_side`; the row names VideoPlayer and ActivityFeed | same; an entry in each state opened; tag pushed |
 | VIDEO-UI-05 | S, commons | K12 `media_shelf` day groups, size slider, favorite | tests; opened at 1440 and 390; tag pushed |
@@ -269,5 +271,5 @@ Jesse can open; 07 follows INPUTS-02, 08 the chat edit tools, 09 the benches.
 
 ## 9. Open points
 
-None block 02 to 06. For the owner when 06 lands: whether Generate keeps the old word Make (one string). Folders, sharing and a Tools menu
+None block 02 to 06. Backlog notes from the Higgsfield and Dreamina study (`data-scratch/research/higgsfield-ui/REPORT.md` and the Dreamina report beside it), not scope of this note: (a) everything defaults to Auto so a first run needs only a prompt; (b) a camera-move picker where every thumbnail shows the same subject, with a "put on prompt" action. For the owner when 06 lands: whether Generate keeps the old word Make (one string). Folders, sharing and a Tools menu
 (reference 9, 10) are not designed here; Characters and Shows (Create note V4 and V5) join the sidebar when built.
