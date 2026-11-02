@@ -31,18 +31,44 @@ Children and teens always get Standard. They do not choose a level, and their cl
 
 ## Make a video in the Videos app
 
-Open **Videos**, then **Create**. The page has these parts.
+Open **Videos**, then **Create**. The page has two sides. The left side is where you describe a video. The right side shows your clips, newest first.
 
-- **Prompt bar.** Write what you want to see. Put each person's line in quotes.
-- **Look.** Pick one: natural, classic cartoon, anime, 3D animated or film.
-- **Camera.** Pick one: dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still.
+On the left:
+
+- **Describe your video.** Write what you want to see. Put each person's line in quotes. While the box is empty, three idea buttons sit under it. Press one to use it.
+- **Start frame.** Press it to pick a picture from your Library, or add a new one. The picture starts the video and shows inside the box with its name. Press the **x** to take it away.
+- **Style.** One button that shows your **Look** (natural, classic cartoon, anime, 3D animated or film) and your **Camera** (dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still). Press it to pick both.
 - **Level.** Standard or Boost. Max shows only when it is installed and an admin has allowed it for you.
-- **Start frame.** Pick a picture to start from. A picture you pick is the first frame.
-- **Player.** Your clip plays here when it is done.
-- **Making now.** A list of clips being made, with their progress. Press **Stop** to cancel one.
-- **Recent clips.** A strip of your latest clips. Press one to play it.
+- **Shape and Length.** Landscape or portrait, and 5 or 10 seconds.
+- **More settings.** Voices: keep it clean, or with music and effects.
+- **Generate.** Press it to start. The line under it says about how long it takes, for example "Boost, about a minute". Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
 
-Press **Make** to start. Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
+On a phone, the left side is a bar at the bottom with your words and a round **Generate** button. Press the round button with the sliders on it to open the **Options**.
+
+On the right, each clip is a card with your words, small tags for how it was made, and the video. A new clip is the top card. It shows where it is in line, then how far along it is, and it turns into the video by itself. You do not need to reload. Press **Stop** to cancel it.
+
+Under a finished video:
+
+- **Download** saves it.
+- **Another take** makes the same words again with a new result.
+- **Remix** puts the words and choices back on the left, so you can change them and press **Generate**.
+- **Make it Max** makes it again at Max. It shows only when Max is ready and allowed for you.
+- The **star** marks a favorite.
+
+If a clip did not finish, press **Try again**. The bar over the cards has **Favorites only**, **Group by words** (clips with the same words sit together) and **Type**.
+
+If Home cannot make videos right now, **Generate** and the buttons that start a clip are switched off, and a line next to them says why and what to do. Your clips still play.
+
+### My clips
+
+Open **Videos**, then **My clips**. It shows every clip you can see, in groups by day. Clips other people shared with you are here too, with their names.
+
+- **All, Favorites and Uploaded.** Uploaded shows the pictures you added. Press one to use it as a Start frame.
+- **Size.** Drag the slider to make the clips bigger or smaller.
+- **Heart.** Press the heart on a clip to make it a favorite.
+- Press a clip to play it.
+
+The Create side of Videos used to have three pages: Create, Make a video and My creations. Now it has two: Create and My clips. An old link to Make a video or My creations says the page does not exist. Use **Create** or **My clips** instead.
 
 ## Tips for better clips
 

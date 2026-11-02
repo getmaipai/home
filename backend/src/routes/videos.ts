@@ -3,15 +3,15 @@
 // clip from a route (Make another, Animate this picture) passes the same age and surface gate as the chat tool and
 // the same prompt check, so a route is never a way around either. A child, a teen, a guest and a spoken or shared
 // surface are refused here exactly as in the tool.
-import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
+import { answerableFitAsk } from "@/lib/jobs/householdQueue";
+import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
-import { jobQueueCopy, JOB_QUEUE_COPY, plainStageLabel } from "@/lib/jobQueueCopy";
-import { videoWaitLine } from "@/lib/videos/waitLine";
+import { plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -65,24 +65,7 @@ const ItemSchema = z.object({
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 
-export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
-  const hold = job.riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
-  if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
-  if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
-  const stackWait = videoWaitLine(job.phase, audience);
-  if (stackWait) return stackWait;
-  if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
-  if (job.phase === "paused: low memory") return JOB_QUEUE_COPY.picture_paused_memory[audience];
-  // A job waiting on memory is not waiting in a line: with nothing ahead of it, "You are next" is wrong, so it gets the memory words.
-  if (job.phase === "waiting for memory") return jobQueueCopy("waiting_memory", job.riseReason ?? "memory_elsewhere", job.position, null, audience);
-  if (job.state === "queued" || job.phase === "queued") return jobQueueCopy("queued", job.riseReason ?? "queue", job.position, job.estimateSeconds ?? null, audience);
-  if (job.phase === "setting up") return "Setting up the video model for the first time";
-  if (job.phase === "starting" || job.phase === "loading") return "Getting the video model ready";
-  if (job.phase === "rendering") return "Drawing the frames";
-  if (job.phase === "decoding") return "Finishing the frames";
-  if (job.phase === "encoding") return "Putting the video together";
-  return "Making your video";
-}
+export { phaseLabel };
 
 /** VIDEO-LTX-01: the card's kind and the other kind it can be made again as. A video made with a style is bound to the style's model, so it offers no switch. */
 function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean; max?: boolean }): { quality: "quick" | "detailed"; switch_to: "quick" | "detailed" | null } {

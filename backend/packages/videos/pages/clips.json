@@ -1,0 +1,164 @@
+{
+  "type": "page",
+  "id": "videos-clips",
+  "title": "My clips",
+  "body": [
+    {
+      "type": "tabs",
+      "state": "view",
+      "tabs": [
+        {
+          "id": "all",
+          "label": "All",
+          "body": [
+            {
+              "type": "media_shelf",
+              "bind": {
+                "source": "package",
+                "path": "recipes",
+                "params": {
+                  "scope": "clips",
+                  "view": "all"
+                }
+              },
+              "item_key_field": "id",
+              "item_label_field": "title",
+              "item_subtitle_field": "{subtitle}",
+              "item_media_field": "thumbnail",
+              "item_meta_field": "duration_s",
+              "aspect": "wide",
+              "variant": "plain",
+              "layout": "grid",
+              "group_by_field": "created_at",
+              "group_noun": {
+                "one": "clip",
+                "other": "clips"
+              },
+              "size_control": true,
+              "favorite": {
+                "field": "favorite",
+                "action": {
+                  "call": {
+                    "target": "/api/plugins/videos/actions/favorite",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}",
+                      "favorite": "{favorite}"
+                    }
+                  }
+                }
+              },
+              "on_select": {
+                "play": {
+                  "media_id": "{id}"
+                }
+              },
+              "empty_state": {
+                "type": "empty_state",
+                "icon": "film",
+                "text": "Your clips will show up here. Choose Create to make one."
+              }
+            }
+          ]
+        },
+        {
+          "id": "favorites",
+          "label": "Favorites",
+          "body": [
+            {
+              "type": "media_shelf",
+              "bind": {
+                "source": "package",
+                "path": "recipes",
+                "params": {
+                  "scope": "clips",
+                  "view": "favorites"
+                }
+              },
+              "item_key_field": "id",
+              "item_label_field": "title",
+              "item_subtitle_field": "{subtitle}",
+              "item_media_field": "thumbnail",
+              "item_meta_field": "duration_s",
+              "aspect": "wide",
+              "variant": "plain",
+              "layout": "grid",
+              "group_by_field": "created_at",
+              "group_noun": {
+                "one": "clip",
+                "other": "clips"
+              },
+              "size_control": true,
+              "favorite": {
+                "field": "favorite",
+                "action": {
+                  "call": {
+                    "target": "/api/plugins/videos/actions/favorite",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}",
+                      "favorite": "{favorite}"
+                    }
+                  }
+                }
+              },
+              "on_select": {
+                "play": {
+                  "media_id": "{id}"
+                }
+              },
+              "empty_state": {
+                "type": "empty_state",
+                "icon": "heart",
+                "text": "Press the heart on a clip and it shows up here."
+              }
+            }
+          ]
+        },
+        {
+          "id": "uploaded",
+          "label": "Uploaded",
+          "body": [
+            {
+              "type": "media_shelf",
+              "bind": {
+                "source": "package",
+                "path": "recipes",
+                "params": {
+                  "scope": "clips",
+                  "view": "uploaded"
+                }
+              },
+              "item_key_field": "id",
+              "item_label_field": "title",
+              "item_subtitle_field": "{subtitle}",
+              "item_media_field": "thumbnail",
+              "aspect": "wide",
+              "variant": "plain",
+              "layout": "grid",
+              "group_by_field": "created_at",
+              "group_noun": {
+                "one": "picture",
+                "other": "pictures"
+              },
+              "size_control": true,
+              "on_select": {
+                "navigate": {
+                  "to": "/apps/videos/create",
+                  "state": {
+                    "start_frame": "{id}"
+                  }
+                }
+              },
+              "empty_state": {
+                "type": "empty_state",
+                "icon": "camera",
+                "text": "Pictures you add to start a video from show up here."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

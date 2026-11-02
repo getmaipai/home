@@ -4,98 +4,215 @@
   "title": "Create",
   "body": [
     {
-      "type": "prompt_bar",
-      "label": "Describe a video",
-      "placeholder": "Describe a video",
-      "prompt_state": "prompt",
-      "max_length": 1200,
-      "submit_label": "Next",
-      "submit": {
-        "navigate": {
-          "to": "/apps/videos/make-video",
-          "state": {
-            "prompt": "{prompt}"
-          }
-        }
-      }
-    },
-    {
-      "type": "section",
-      "heading": "Ideas to start with",
-      "children": [
+      "type": "split_view",
+      "aside_side": "start",
+      "aside_label": "Make a video",
+      "aside": [
         {
-          "type": "list",
-          "bind": {
-            "source": "package",
-            "path": "recipes",
-            "params": {
-              "scope": "starters"
+          "type": "prompt_bar",
+          "placement": "panel",
+          "label": "Describe a video",
+          "placeholder": "Describe your video. Put each person's line in quotes.",
+          "prompt_state": "prompt",
+          "max_length": 1200,
+          "submit_label": "Generate",
+          "starts": "video",
+          "references": [
+            {
+              "state": "start_frame",
+              "label": "Start frame",
+              "kind": "picture",
+              "placement": "in_field"
             }
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{prompt}",
-          "item_media_field": "sparkles",
-          "row_action": {
-            "icon": "arrow-right",
-            "label": "Use {title}",
-            "action": {
-              "navigate": {
-                "to": "/apps/videos/make-video",
-                "state": {
-                  "prompt": "{prompt}"
+          ],
+          "chips": [
+            {
+              "state": "orientation",
+              "label": "Shape",
+              "default": "landscape",
+              "options": [
+                {
+                  "value": "landscape",
+                  "label": "Landscape"
+                },
+                {
+                  "value": "portrait",
+                  "label": "Portrait"
                 }
+              ]
+            }
+          ],
+          "submit": {
+            "call": {
+              "target": "/api/plugins/videos/actions/make",
+              "method": "POST",
+              "args": {
+                "prompt": "{prompt}",
+                "orientation": "{orientation}",
+                "seconds": "{seconds}",
+                "tier": "{tier}",
+                "look": "{look}",
+                "camera": "{camera}",
+                "voices": "{voices}",
+                "start_frame": "{start_frame}"
               }
             }
           }
         }
-      ]
-    },
-    {
-      "type": "section",
-      "heading": "Making now",
-      "children": [
+      ],
+      "main": [
         {
-          "type": "list",
+          "type": "result_feed",
           "bind": {
             "source": "package",
             "path": "recipes",
             "params": {
-              "scope": "making"
+              "scope": "feed",
+              "favorites": "$state.favorites_only",
+              "type": "$state.type"
             }
           },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{status}",
-          "item_media_field": "film",
+          "filters": [
+            {
+              "kind": "toggle",
+              "state": "favorites_only",
+              "label": "Favorites only"
+            },
+            {
+              "kind": "toggle",
+              "state": "group_by_words",
+              "label": "Group by words",
+              "group": true
+            },
+            {
+              "kind": "select",
+              "state": "type",
+              "label": "Type",
+              "options": [
+                {
+                  "value": "all",
+                  "label": "All"
+                },
+                {
+                  "value": "video",
+                  "label": "Videos"
+                }
+              ]
+            }
+          ],
+          "fields": {
+            "words": "prompt",
+            "tags": "tags",
+            "references": "references",
+            "status": "status",
+            "progress": "percent",
+            "phase": "phase",
+            "queue_position": "queue_position",
+            "started_at": "started_at",
+            "error": "error",
+            "poster": "still",
+            "src": "src",
+            "favorite": "favorite",
+            "created_at": "created_at",
+            "width": "width",
+            "height": "height"
+          },
+          "handlers": {
+            "stop": {
+              "call": {
+                "target": "/api/plugins/videos/actions/cancel",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            },
+            "retry": {
+              "starts": "video",
+              "call": {
+                "target": "/api/plugins/videos/actions/another",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            },
+            "make_another": {
+              "starts": "video",
+              "call": {
+                "target": "/api/plugins/videos/actions/another",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            },
+            "favorite": {
+              "call": {
+                "target": "/api/plugins/videos/actions/favorite",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            }
+          },
+          "actions_variant": "icons",
+          "actions_inline": 4,
+          "actions": [
+            {
+              "label": "Remix",
+              "icon": "pencil",
+              "action": {
+                "navigate": {
+                  "to": "/apps/videos/create",
+                  "state": {
+                    "prompt": "{prompt}",
+                    "look": "{look}",
+                    "camera": "{camera}",
+                    "seconds": "{seconds}",
+                    "tier": "{tier}",
+                    "orientation": "{orientation}",
+                    "start_frame": "{start_frame}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Make it Max",
+              "icon": "sparkles",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/actions/max",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
+            }
+          ],
+          "poll_while": {
+            "statuses": [
+              "queued",
+              "generating"
+            ],
+            "record": {
+              "path": "recipes",
+              "params": {
+                "scope": "job",
+                "id": "{id}"
+              }
+            }
+          },
           "empty_state": {
             "type": "empty_state",
             "icon": "film",
-            "text": "Nothing is being made right now."
+            "text": "Your clips show here. Describe a video on the left and press Generate."
           }
         }
       ]
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Recent creations",
-      "bind": {
-        "source": "package",
-        "path": "made-at-home"
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "item_meta_field": "duration_s",
-      "aspect": "wide",
-      "variant": "plain",
-      "hide_when_empty": true,
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      }
     }
   ]
 }

@@ -1931,6 +1931,23 @@ export const videoJobs = sqliteTable(
   (table) => [index("video_jobs_person_id_idx").on(table.personId), index("video_jobs_turn_id_idx").on(table.turnId)],
 );
 
+// VIDEO-UI-06: a person's Favorite mark on a Library clip (the Favorite heart on the Create feed and My clips). One row per person and clip, so a
+// clip shared with a household member can be a favorite of each without touching the file. `file_id` is the Library file (attachments.id).
+export const videoFavorites = sqliteTable(
+  "video_favorites",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    fileId: text("file_id").notNull(),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("video_favorites_person_file_idx").on(table.personId, table.fileId)],
+);
+
 // VIDEO-GEN-04: the household's switch on one video LoRA in the Stack's library. The Stack owns the file and its
 // metadata; Home owns whether the household lets chat use it. A missing row reads as enabled.
 export const videoAdapterPrefs = sqliteTable("video_adapter_prefs", {

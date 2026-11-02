@@ -321,6 +321,12 @@ export interface DataParams {
   length?: string;
   within?: string;
   show?: string;
+  /** VIDEO-UI-06, Videos `recipes` scope `clips`: which My clips tab (all, favorites, uploaded). */
+  view?: string;
+  /** VIDEO-UI-06, Videos `recipes` scope `feed`: the Type filter (all, video, still). */
+  type?: string;
+  /** VIDEO-UI-06, Videos `recipes` scope `feed`: only the clips the person marked as favorites. */
+  favorites?: boolean;
   limit?: number;
 }
 

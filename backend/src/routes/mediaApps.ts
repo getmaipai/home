@@ -19,12 +19,14 @@ import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { anotherTakeFor, makeVideoFor, readMakeBody } from "@/lib/videos/make";
-import { getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
+import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
+import { makeItMaxBody } from "@/lib/videos/editTool";
+import { setFavoriteFile } from "@/lib/videos/favorites";
+import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
-import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
+import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, madeFileFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
 
@@ -49,6 +51,9 @@ function paramsOf(body: Body): DataParams {
     show: typeof body.show === "string" ? body.show : undefined,
     filter: typeof body.filter === "string" && body.filter !== "" ? body.filter : undefined,
     year: coerceNumber(body.year),
+    view: typeof body.view === "string" && body.view !== "" ? body.view : undefined,
+    type: typeof body.type === "string" && body.type !== "" ? body.type : undefined,
+    favorites: body.favorites === true || body.favorites === "true",
     limit: coerceNumber(body.limit),
   };
 }
@@ -160,6 +165,50 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
     const made = await anotherTakeFor(person, source);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
+
+  // VIDEO-UI-06: the Create feed's Stop. Only the person's own Create clip (no chat behind it); a finished clip stays finished.
+  routes.post("/actions/cancel", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "cancel")) return next();
+    const body = await bodyOf(c.req.raw);
+    const job = typeof body.id === "string" ? getVideoJobFor(person, body.id) : null;
+    if (!job || job.conversationId) return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
+    const stopped = await cancelVideoJob(person, job.id);
+    return c.json({ ok: true as const, id: job.id, state: stopped?.state ?? job.state }, 200);
+  });
+
+  // VIDEO-UI-06: Make it Max on a finished Create clip. The checks and the body are the ones the chat tool's make_it_max uses (makeItMaxBody), and the make is
+  // makeVideoFor, so the Max grant, the ready Max model, the words-only rule, the age and surface gate and the one-clip-at-a-time rule are the same.
+  routes.post("/actions/max", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "max")) return next();
+    const body = await bodyOf(c.req.raw);
+    const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
+    if (!source || source.conversationId || source.state !== "done") return c.json({ error: "That video isn't available any more. Make a new one from the words on the left.", code: "gone" }, 404);
+    const audience = makeAudienceOf(person);
+    const make = bodyOfVideoJob(source);
+    const max = await makeItMaxBody(person, audience.band, source, make);
+    if (!max.ok) return c.json({ error: max.line, code: max.why }, max.why === "max_not_ready" ? 503 : 422);
+    const made = await makeVideoFor(person, make, { audience });
+    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
+
+  // VIDEO-UI-06: the Favorite heart (the feed's player and My clips' tiles). `id` is the clip's job (the feed) or its Library file (My clips); a clip the person
+  // cannot see in their own Library is a 404. `favorite` true or false sets the mark; left out, the mark is flipped.
+  routes.post("/actions/favorite", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "favorite")) return next();
+    const body = await bodyOf(c.req.raw);
+    const id = typeof body.id === "string" ? body.id : "";
+    const job = id ? getVideoJobFor(person, id) : null;
+    const fileId = job ? (job.state === "done" ? job.files[0]?.id : undefined) : id && madeFileFor(person, "videos", id) ? id : undefined;
+    if (!fileId) return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
+    const asked = body.favorite === true || body.favorite === "true" ? true : body.favorite === false || body.favorite === "false" ? false : undefined;
+    return c.json({ ok: true as const, id, favorite: setFavoriteFile(person, fileId, asked) }, 200);
   });
 
   routes.post("/actions/lyrics", requireAuth, async (c, next) => {

@@ -1,6 +1,6 @@
 {
   "id": "videos",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "kind": "app",
   "category": "Media",
   "display": "Videos",
@@ -64,8 +64,7 @@
           "mode": "create",
           "pages": [
             "create",
-            "make-video",
-            "creations"
+            "clips"
           ]
         }
       ]
@@ -137,21 +136,12 @@
         "min_role": "adult"
       },
       {
-        "id": "make-video",
-        "label": "Make a video",
-        "icon": "film",
+        "id": "clips",
+        "label": "My clips",
+        "icon": "folder",
         "nav": true,
         "kind": "schema",
-        "module": "make-video",
-        "min_role": "adult"
-      },
-      {
-        "id": "creations",
-        "label": "My creations",
-        "icon": "library",
-        "nav": true,
-        "kind": "schema",
-        "module": "creations",
+        "module": "clips",
         "min_role": "adult"
       }
     ],

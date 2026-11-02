@@ -4,6 +4,10 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-02
+
+- VIDEO-UI-06: Create is one page with two sides. Describe the video on the left (a Start frame inside the box, one Style button for Look and Camera, the level, the shape and length, and a Generate button that says about how long it takes). Your clips are on the right, newest first, and a new clip turns from waiting to a percent to a video by itself. Each clip has Download, Another take, Remix, Make it Max (when it is ready for you) and a star. A new My clips page shows every clip by day, with All, Favorites and Uploaded, a size slider and a heart. The pages Make a video and My creations are gone.
+
 ## [0.1.5] - 2026-11-02
 
 - VIDEO-CREATE-02 (U3): Make a video is rebuilt like a modern video studio. Look and Camera are grids of picture cards that play a short sample loop made by this home's own engine, a Picture slot starts the video from a picture in your Library (or a new upload), the stage shows your newest video with Another take, and a strip under it shows recent ones. Camera has eight cards (Still is new; it replaced Wide establishing shot). The loops ship inside the package as `assets/loops/` and are served only to adults.

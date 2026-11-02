@@ -195,7 +195,7 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
   const pageContext = ambientPageContextForRoute(location.pathname, appCatalog);
   return (
     <AudioSessionProvider personId={person.id}>
-      <MediaHostProvider personId={person.id}>
+      <MediaHostProvider personId={person.id} ageBand={person.age_band}>
         <IncognitoProvider>
           <AmbientPageContextProvider base={pageContext}>
             <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} appCatalog={appCatalog} />

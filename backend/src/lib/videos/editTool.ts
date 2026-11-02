@@ -95,6 +95,22 @@ function failed(callId: string, args: Record<string, unknown>, code: string, kin
   return outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
 }
 
+/** Make it Max, the one definition the chat tool and the Create page's Make it Max button share: the checks (already Max, the Max grant, the Max model
+ * ready, words only) and the body that makes the same clip again at Max with the same seed. Fills `body` in place when it is allowed. */
+export async function makeItMaxBody(actor: PersonRow, band: Parameters<typeof tierArgument>[0]["band"], source: VideoJob, body: MakeVideoBody): Promise<{ ok: true } | { ok: false; line: string; why: string }> {
+  if (body.tier === "max") return { ok: false, line: ALREADY_MAX_LINE, why: "already_max" };
+  // The same grant check the tool and the Create page use; without it nothing is made.
+  if (tierArgument({ person: actor, category: "video", arg: "max", band }).line === MAX_NEEDS_ADMIN_LINE) return { ok: false, line: MAX_NEEDS_ADMIN_LINE, why: "max_needs_admin" };
+  // Max runs only when the Stack says its model is ready; otherwise one plain status line, never a silent Boost copy and never a raw error.
+  const engine = await videoEngineStatus();
+  if (!ltx25MaxReady(engine)) return { ok: false, line: videoMaxNotReadyReason(engine), why: "max_not_ready" };
+  if ((source.request.source_file_id && !ltx25MaxPictureReady(engine)) || source.request.loras.length > 0) return { ok: false, line: MAX_WORDS_ONLY_LINE, why: "max_words_only" };
+  body.tier = "max";
+  // The same clip, made better: the same picture of the idea, so the seed stays.
+  if (source.request.seed) body.seed = source.request.seed;
+  return { ok: true };
+}
+
 export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   const parsed = editVideoArgs.safeParse(args);
@@ -156,16 +172,8 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     if (value.seconds !== undefined) body.seconds = value.seconds;
     if (value.keep_seed && source.request.seed) body.seed = source.request.seed;
   } else if (value.change === "make_it_max") {
-    if (body.tier === "max") return refused(callId, args, ALREADY_MAX_LINE, "already_max");
-    // The same grant check the tool and the Create page use; without it nothing is made.
-    if (tierArgument({ person: actor, category: "video", arg: "max", band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) return refused(callId, args, MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
-    // Max runs only when the Stack says its model is ready; otherwise one plain status line, never a silent Boost copy and never a raw error.
-    const engine = await videoEngineStatus();
-    if (!ltx25MaxReady(engine)) return refused(callId, args, videoMaxNotReadyReason(engine), "max_not_ready");
-    if ((source.request.source_file_id && !ltx25MaxPictureReady(engine)) || source.request.loras.length > 0) return refused(callId, args, MAX_WORDS_ONLY_LINE, "max_words_only");
-    body.tier = "max";
-    // The same clip, made better: the same picture of the idea, so the seed stays.
-    if (source.request.seed) body.seed = source.request.seed;
+    const max = await makeItMaxBody(actor, audience.band, source, body);
+    if (!max.ok) return refused(callId, args, max.line, max.why);
   }
 
   const made = await makeVideoFor(actor, body, { audience, state, callId, ...(prepared ? { prepared } : {}), ...(adultOnly ? { adultOnly: true } : {}) });

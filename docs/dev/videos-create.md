@@ -1,12 +1,13 @@
 # Videos Create and video editing (developer notes)
 
-Dev tier. Design and measurements are in [video-create](../design/video-create-2026-11-01.md), [the Create screen](../design/video-create-ui-2026-11-02.md), [video tiers](../design/video-tiers-2026-11-02.md) and [videos in chat](../design/video-chat-2026-11-02.md). This page is the code map. Items: VIDEO-TIERS-01, VIDEO-CREATE-01 and 02, VIDEO-CHAT-01.
+Dev tier. Design and measurements are in [video-create](../design/video-create-2026-11-01.md), [the Create screen](../design/video-create-ui-2026-11-02.md), [video tiers](../design/video-tiers-2026-11-02.md) and [videos in chat](../design/video-chat-2026-11-02.md). This page is the code map. Items: VIDEO-TIERS-01, VIDEO-CREATE-01 and 02, VIDEO-CHAT-01, VIDEO-UI-06. The page design is [the one-page Create note](../design/video-create-one-page-2026-11-02.md).
 
 ## What was verified, and what was not
 
 - Verified: the LTX-2.5 engine and the edits (trim, join, mix) ran with real clips and real ffmpeg on a scratch Stack. Home's tests run against a scripted Stack.
 - Not verified: the live hub does not have this yet. It has not been shipped. Read this page as the behavior once installed.
 - Verified for Max (LTX25-MAX-01): the Stack's own run (205 s for a 10 s clip, 48.6 GB OS footprint, speech correct, Stack main cc1198f3f) and Home's tests against a scripted Stack. The Create level segment was opened on a dev hub in the browser at desktop and phone width, with the Stack's status answered by a small proxy that forwarded to the live Stack and added `qualities.ltx25max` (ready, then installed false). **Not verified:** a real Create to Max clip through Home. No scratch Stack had the `ltx25-max-gen` runtime built (it downloads its Python environment and a 71 GB pack), so Home has never sent `ltx25-max` to a real Stack, and the clip that comes back (1024x576, quality `ltx25max`) is read only from the scripted fixture.
+- Verified for VIDEO-UI-06 (the Create workspace and My clips): both pages opened on a dev hub at 1440 and 390 wide, light and dark. Style popover, level segment, Generate, Stop's button, Favorites only, Remix, the heart, the My clips tabs, day groups and size slider were pressed. With no Stack, Generate and Make it Max were disabled with the one plain line. A clip then moved from queued to a percent to ready without a reload, on a scripted scratch video Stack that answers the video routes on a timer (not the real engine). **Not verified:** a clip from a real Stack through this page, and the entry following a job while its tab is throttled in the background (the browser pane does not throttle a background tab); the unit tests cover the same code with a scripted Stack.
 - Built 2026-11-02 (VIDEO-INPUTS-01 Home side, EDITOR-15), scripted tests only: picture start on LTX-2.5, `edit_video` `continue`, the `join` `transition` field. A real `continue` clip was not run (see the session report). Not built: `retake`, the join crossfade (needs a Stack step, below), the End frame slot and `end_frame` argument (bench VIDEO-INPUTS-04 first), Characters, Places and Storyboard. VIDEO-TIERS-01 stays open for the parts below Max (the Stack pin and one memory-measurement method are the Stack's).
 
 ## Stack requirements
@@ -41,13 +42,46 @@ The older words Quick and Detailed remain in `quality.ts` as the internal model 
 
 ## Pages
 
-`backend/packages/videos/pages/`:
+Two Create pages, both `min_role: "adult"`, in `backend/packages/videos/pages/` (manifest 0.2.0; the sidebar group `create` lists `["create", "clips"]`; the Browse and Create mode switch and Search Videos are the manifest's `header`):
 
-- The Level segment reads the Stack's video status without waiting. The first page after Home starts would have no Max, so the page route awaits one real read first (`registerAppPageWarm`, at most 1.5 s, never fails the page; MAX-FIRST-LOAD-01).
-- `make-video.json`: `split_view` of a `prompt_bar` (chips), the `player` stage, a `list` for Making now and a `media_shelf` of recent clips.
-- `create.json`: the Create home: `prompt_bar`, a section of starters, a section of Making now, and a `media_shelf`.
+- `create.json`: a `split_view` with `aside_side: "start"`. The aside is a `prompt_bar` with `placement: "panel"` (a left panel from `lg`, 960 px; a bottom dock and Options sheet below), `starts: "video"` (the K8 marker) and one in-field Start frame slot. The main side is a `result_feed` bound to `recipes` scope `feed`, with filters Favorites only, Group by words and Type, the built-in handlers `stop`, `retry`, `make_another` and `favorite`, the extra actions Remix and Make it Max, and the required `poll_while` (statuses `queued` and `generating`, record `recipes` scope `job` with `id`).
+- `clips.json`: kit `tabs` (state `view`: All, Favorites, Uploaded) over `media_shelf` grids with `group_by_field: "created_at"` (day headings), `size_control` and, on All and Favorites, the `favorite` heart.
 
-The per-person fill is in `lib/media/videoCreateApp.ts`. It builds the Look and Camera options, the level segment, lengths and the Start frame from the single lists below, and it hides Max from a person who cannot use it. The chip cards variant and `references` slots are the commons `prompt_bar` additions of the Create design (U1); the Look and Camera sample loops are package assets in `backend/packages/videos/assets/loops/`, played locally, never fetched.
+The three older pages (`create` as a text box with Next, `make-video`, `creations`) and the scopes `starters`, `making`, `last` and `newest` are gone. An unknown scope answers an empty list. A removed page is a 404 for everyone.
+
+The per-person fill is in `lib/media/videoCreateApp.ts` (`registerAppPageFill("videos", "create", ...)`). It builds Length, Look and Camera (as `popover` cards in the group Style, each card's loop from the package assets), Voices (folded under More settings), the idea chips from `VIDEO_STARTERS`, the level segment, and the time under Generate (`submit_detail`, plain words per level: `VIDEO_TIME_WORDS`). It leaves out the Make it Max action unless the person holds Max and the Stack reports the Max model ready. The Level segment reads the Stack's video status without waiting, so the page route awaits one real read first (`registerAppPageWarm`, at most 1.5 s, never fails the page; MAX-FIRST-LOAD-01). The Look and Camera sample loops are package assets in `backend/packages/videos/assets/loops/`, played locally, never fetched.
+
+## Data scopes and actions
+
+One data id, `recipes` (the manifest stays at 16 ids), answers by `scope`. All of them are adult-only because only the two Create pages bind `recipes` (`appRouteAllowed`).
+
+| Scope | Rows | Code |
+|---|---|---|
+| none | the recipe list | `recipes.ts` |
+| `feed` | the person's own Create jobs (no chat behind them, no edits), newest first, limit 30, in the `result_feed` shape; params `favorites` and `type` | `lib/videos/feed.ts` |
+| `job` | one feed row by `id`, for `poll_while.record` | `feed.ts` `feedRowById` |
+| `clips` | My clips: Library clips made at home (own and shared with the person, as the Library lists them), by `view` (`all`, `favorites`, `uploaded` pictures) | `videoCreateApp.ts` `clipRows` |
+
+A feed row is `{id, prompt, tags, references, status, state, percent, phase, queue_position, started_at, error, still, src, favorite, created_at, look, camera, start_frame, seconds, tier, orientation, width, height, kind}`. `status` is one of queued, generating, ready, failed, cancelled. A finished job whose Library file is gone or in Trash is not a row. The Remix fields (`look`, `camera`, `start_frame`) are `""` when absent: a null would leave the `{look}` placeholder text in the page state.
+
+Actions, in `routes/mediaApps.ts`, each behind `appRouteAllowed` (a child or teen gets a 404):
+
+- `make` and `another`: unchanged. `another` also serves Try again and Another take.
+- `cancel`: stops the person's own Create clip (`cancelVideoJob`).
+- `max`: Make it Max. `makeItMaxBody` (in `editTool.ts`, shared with the chat tool's `make_it_max`) does the checks (already Max, the Max grant, the Max model ready, words only) and `makeVideoFor` makes it, so every gate is the same.
+- `favorite`: flips the mark, or sets it when `favorite` is true or false. `id` is a job (the feed) or a Library file (My clips).
+
+## Favorites
+
+The Library had no per-person flag, so Favorites is a small table, `video_favorites` (migration 0158, schema version 111): `id`, `person_id`, `file_id`, `created_at`, `hlc`, `provenance`, unique on `(person_id, file_id)`. One row per person and clip, so a shared clip can be a favorite of each person alone. It is a private preference, not a shared spec record, so no spec change was needed. Code: `lib/videos/favorites.ts`.
+
+## Host wiring (K8)
+
+`MediaHostProvider` (`frontend/src/shell/mediaHost.tsx`) gives the kit `makingNotice(kind)`: it reads the same `["health"]` query as `useMakingAvailability` (`makingAvailability` is the one reading) and returns the person's own line, or a plain fallback (`MAKING_NOT_READY_LINE`) when the row is not ready and carries no words. The bar's Generate, Try again, Another take and Make it Max are disabled with that line while video is not ready. `pickMedia` offers pictures only: a voice clip or source clip slot is refused until VIDEO-INPUTS-05 and -06 pass their benches.
+
+## Not built yet
+
+End frame and Voice clip slots (VIDEO-UI-09), the still draft with Make the video from this, Another still and Edit words (VIDEO-UI-07, needs VIDEO-INPUTS-02; the `render`, `another_still` and `edit_words` handlers are not in the page), Trim, Join and Mix on an entry (VIDEO-UI-08), Characters and Shows in the sidebar (they join when built), and the Filter and Select all controls of the mockup's My clips toolbar (the kit `media_shelf` has neither). The Type filter's Stills value is not offered until stills have rows. Remix cannot clear a Camera pick: the bar takes over only a value that is one of its options.
 
 ## One list for looks, camera moves and voices
 
@@ -86,4 +120,4 @@ An edit is never lower in audience than its sources. `clipAdultOnly` marks a sou
 
 ## Tests
 
-In `backend/tests/`: `videoCreate.test.ts` (lists, wording, page data, refusals, one clip at a time), `videoEdit.test.ts` (declared arguments, `quality` still accepted, another take, remix), `videoChatEdit.test.ts` (trim, join, mix, refusals, staging cleanup, audience floor), `videoContinue.test.ts` (the picture flags, picture start at each level, `continue`, the join transition), `videoLtx25.test.ts` (the tier choice with and without the engine, and the LTX-2.5 Max cases: offered iff ready and held, hidden for a teen, a child and an adult without the grant, the model id and size on the wire, a Stack profile lowering the ceiling, the not-ready segment and line), `videoQuality.test.ts`, `videoTool.test.ts`, `videoSafety.test.ts`. The Stack side is scripted by `videoEditStackFixture.ts` and `videoFixture.ts`. Run one with `cd backend && bun test tests/videoChatEdit.test.ts`.
+In `backend/tests/`: `videoCreate.test.ts` (lists, wording, the Create page, refusals, one clip at a time), `videoCreateFeed.test.ts` (the `feed`, `job` and `clips` scopes, favorite, cancel, Make it Max, the manifest of two pages, permissions), in `frontend/src/shell/` `mediaHostMaking.test.tsx` (K8), `videoEdit.test.ts` (declared arguments, `quality` still accepted, another take, remix), `videoChatEdit.test.ts` (trim, join, mix, refusals, staging cleanup, audience floor), `videoContinue.test.ts` (the picture flags, picture start at each level, `continue`, the join transition), `videoLtx25.test.ts` (the tier choice with and without the engine, and the LTX-2.5 Max cases: offered iff ready and held, hidden for a teen, a child and an adult without the grant, the model id and size on the wire, a Stack profile lowering the ceiling, the not-ready segment and line), `videoQuality.test.ts`, `videoTool.test.ts`, `videoSafety.test.ts`. The Stack side is scripted by `videoEditStackFixture.ts` and `videoFixture.ts`. Run one with `cd backend && bun test tests/videoChatEdit.test.ts`.

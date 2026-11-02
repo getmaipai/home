@@ -8,7 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
-import { api, request } from "@/lib/api";
+import { api, request, type Roster } from "@/lib/api";
 import { mediaAppOfPath, playIsAlreadyOpen, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
@@ -18,6 +18,8 @@ import { createListenStatus, createStoryListener, type ListenStatus } from "@/sh
 import { watchLiveReconnect } from "@/lib/media/liveReconnect";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
 import { MediaPickerBody, type PickKind, type PickedMedia } from "@/shell/MediaPickerDialog";
+import { makingAvailability } from "@/apps/chat/useMakingAvailability";
+import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type Hls from "hls.js";
 
@@ -133,8 +135,12 @@ export function useMediaDock(): MediaDock {
   return useContext(MediaDockContext);
 }
 
-/** `personId` lets the picker (VIDEO-CREATE-02: `pickMedia`) list only the signed-in person's own Library pictures; without it no picker is offered. */
-export function MediaHostProvider({ children, personId }: { children: ReactNode; personId?: string }) {
+/** VIDEO-UI-06 (K8): the line a control that starts a picture or a clip shows while that engine is not ready. Used when the health row says "not ready" but carries no words. */
+export const MAKING_NOT_READY_LINE = { picture: "Pictures are not ready yet. Try again in a minute.", video: "Video is not ready yet. Try again in a minute." } as const;
+
+/** `personId` lets the picker (VIDEO-CREATE-02: `pickMedia`) list only the signed-in person's own Library pictures; without it no picker is offered.
+ * `ageBand` picks the words of the not-ready line (K8 `makingNotice`, read from the same ["health"] query `useMakingAvailability` reads). */
+export function MediaHostProvider({ children, personId, ageBand }: { children: ReactNode; personId?: string; ageBand?: Roster["age_band"] }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [store] = useState(createMediaStore);
@@ -152,10 +158,18 @@ export function MediaHostProvider({ children, personId }: { children: ReactNode;
   const [pick, setPick] = useState<{ kind: PickKind; resolve: (picked: PickedMedia | null) => void } | null>(null);
   const pickRef = useRef(pick);
   pickRef.current = pick;
-  const pickMedia = useCallback((kind: PickKind) => new Promise<PickedMedia | null>((resolve) => {
+  const pickMedia = useCallback((kind: PickKind | "audio" | "video") => new Promise<PickedMedia | null>((resolve) => {
     pickRef.current?.resolve(null);
+    // Only pictures can be picked until a voice clip or a source clip has passed its bench (VIDEO-INPUTS-05, -06): the slots are not drawn, and a stray ask is refused.
+    if (kind === "audio" || kind === "video") { resolve(null); return; }
     setPick({ kind, resolve });
   }), []);
+  // VIDEO-UI-06 (K8): the one line a Start button shows while pictures or video are not ready. Same ["health"] query and same words as `useMakingAvailability`.
+  const health = useHealthQuery().data;
+  const makingNotice = useCallback((kind: "picture" | "video"): string | undefined => {
+    const reading = makingAvailability(health?.engines?.[kind === "picture" ? "image" : "video"], ageBand ? { age_band: ageBand } : null);
+    return reading.disabled ? reading.reason ?? MAKING_NOT_READY_LINE[kind] : undefined;
+  }, [health, ageBand]);
   const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line), status), [store, status]);
   const speech = useSyncExternalStore(status.subscribe, status.get, status.get);
   const host = useMemo<MediaHost>(
@@ -181,9 +195,10 @@ export function MediaHostProvider({ children, personId }: { children: ReactNode;
       },
       // Only a media app's player plays in the host's element; anywhere else the Player keeps its own.
       ...(personId ? { pickMedia } : {}),
+      makingNotice,
       mediaFor: (ref) => (appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),
-    [navigate, store, listener, personId, pickMedia],
+    [navigate, store, listener, personId, pickMedia, makingNotice],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   // MEDIA-VIZ-03: the next song of the music queue, for the mini bar's Next and the Media Session's next track (and, when a song ends

@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { attachments, videoJobs } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { getVideoJobFor } from "@/lib/videos/jobs";
-import { VIDEO_LOOKS, VIDEO_VOICES, VIDEO_RECIPES, videoLookFor, videoRecipeFor, withVideoLook, withVideoRecipe, withVideoVoices, videoVoicesFor } from "@/lib/videos/recipes";
+import { VIDEO_LOOKS, VIDEO_STARTERS, VIDEO_VOICES, VIDEO_RECIPES, videoLookFor, videoRecipeFor, withVideoLook, withVideoRecipe, withVideoVoices, videoVoicesFor } from "@/lib/videos/recipes";
 import { MAX_NEEDS_ADMIN_LINE, allowedQuality, maxOffered } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
@@ -76,8 +76,8 @@ describe("recipes: one list in one place", () => {
     expect(rows.map((r) => r.id)).toEqual(VIDEO_RECIPES.map((r) => r.id));
     expect(rows[0]).toEqual({ id: "dolly-in", label: "Dolly in", hint: expect.any(String) });
     for (const other of [teen, child]) expect((await other.client.post("/api/plugins/videos/data/recipes", {})).status).toBe(404);
-    const starters = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "starters" })).json() as unknown[];
-    expect(starters).toHaveLength(3);
+    // VIDEO-UI-06: the scopes of the three old pages are gone (the feed replaced them); an unknown scope answers nothing.
+    for (const scope of ["starters", "making", "last", "newest", "nonsense"]) expect(await (await adult.client.post("/api/plugins/videos/data/recipes", { scope })).json()).toEqual([]);
   });
 });
 
@@ -116,19 +116,25 @@ describe("POST /api/videos/make", () => {
     expect(clip.provenance.startsWith("video-gen:")).toBe(true);
     const file = await adult.client.get(`/api/videos/jobs/${card.id}/files/${job.files[0]!.id}`);
     expect(file.status).toBe(200);
-    expect((await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" }).then((r) => r.json())) as unknown[]).toEqual([]);
+    const feed = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<Record<string, any>>;
+    expect(feed).toHaveLength(1);
+    expect(feed[0]).toMatchObject({ id: card.id, prompt: BOAT, status: "ready", state: "done", percent: 100, favorite: false, phase: null, error: null });
+    expect(feed[0]!.src).toBe(`/api/videos/jobs/${card.id}/files/${clip.id}`);
+    expect(feed[0]!.still).toContain(`/api/videos/jobs/${card.id}/files/`);
     const made = await (await adult.client.post("/api/plugins/videos/data/made-at-home", { limit: 200 })).json() as Array<{ id: string }>;
     expect(made.map((r) => r.id)).toContain(clip.id);
   });
 
-  test("a clip being made shows on the making list with a plain status", async () => {
+  test("a clip being made is the newest feed row with a plain status line", async () => {
     const { adult } = await household();
     fake.pollsToFinish = 1000;
     await adult.client.post("/api/videos/make", { prompt: BOAT });
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" })).json() as Array<{ title: string; status: string }>;
+    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ prompt: string; status: string; phase: string; src: string | null }>;
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.title).toBe(BOAT);
-    expect(rows[0]!.status.length).toBeGreaterThan(5);
+    expect(rows[0]!.prompt).toBe(BOAT);
+    expect(["queued", "generating"]).toContain(rows[0]!.status);
+    expect(rows[0]!.phase.length).toBeGreaterThan(5);
+    expect(rows[0]!.src).toBeNull();
   });
 
   test("a second clip while one is being made is refused with the Stack's own plain line", async () => {
@@ -149,25 +155,26 @@ describe("POST /api/videos/make", () => {
     expect((await adult.client.post("/api/videos/make", { prompt: BOAT, tier: "standard" })).status).toBe(200);
   });
 
-  test("words that are too short are refused; a Stack that refuses the job later shows its plain reason on the making list", async () => {
+  test("words that are too short are refused; a Stack that refuses the job later shows its plain reason on the feed row", async () => {
     const { adult } = await household();
     expect((await adult.client.post("/api/videos/make", { prompt: "hi" })).status).toBe(400);
     fake.refuseSubmit = { status: 422, code: "unsupported", error: "That size is not supported." };
     expect((await adult.client.post("/api/videos/make", { prompt: BOAT })).status).toBe(200);
-    let rows: Array<{ state: string; status: string }> = [];
+    let rows: Array<{ state: string; status: string; error: string }> = [];
     for (let i = 0; i < 80 && rows[0]?.state !== "failed"; i += 1) {
       await new Promise((resolve) => setTimeout(resolve, 25));
-      rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" })).json() as typeof rows;
+      rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as typeof rows;
     }
     expect(rows[0]?.state).toBe("failed");
-    expect(rows[0]!.status.length).toBeGreaterThan(10);
+    expect(rows[0]!.status).toBe("failed");
+    expect(rows[0]!.error.length).toBeGreaterThan(10);
   });
 });
 
-describe("the Make a video page and action", () => {
-  test("the served Make page holds the prompt bar with the recipes, lengths and only the levels this person may use", async () => {
+describe("the Create page and the make action", () => {
+  test("the served Create page holds the panel prompt bar with the recipes, lengths and only the levels this person may use, and the feed beside it", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
     expect(bar.submit.call.target).toBe("/api/plugins/videos/actions/make");
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
@@ -182,8 +189,29 @@ describe("the Make a video page and action", () => {
     expect(bar.tier?.tiers.map((t: { id: string }) => t.id) ?? []).not.toContain("max");
     expect(videoTierSegment({ ...adultRow, role: "adult" })).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
-    const again = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const again = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
+    // VIDEO-UI-06: two panes, the panel on the left, and nothing of the old three pages.
+    const split = page.body[0] as Record<string, any>;
+    expect(split.type).toBe("split_view");
+    expect(split.aside_side).toBe("start");
+    expect(bar.placement).toBe("panel");
+    expect(bar.starts).toBe("video");
+    expect(bar.submit_label).toBe("Generate");
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
+    expect(bar.suggestions.map((s: { text: string }) => s.text)).toEqual(VIDEO_STARTERS.map((idea) => idea.prompt));
+    expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
+    expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });
+    expect(chip("voices").fold).toBe(true);
+    // The time under Generate is plain words per level, never credits, memory or a model name.
+    const detail = bar.submit_detail as { state: string; labels: Record<string, string> };
+    expect(detail.state).toBe(bar.tier ? "tier" : "seconds");
+    for (const line of Object.values(detail.labels)) expect(line).toMatch(/under a minute|about a minute|about four minutes/);
+    expect(JSON.stringify(page.body)).not.toMatch(/\b(GB|RAM|memory|model|credits?|pack)\b/i);
+    const feedNode = (split.main as Array<Record<string, any>>)[0]!;
+    expect(feedNode.type).toBe("result_feed");
+    expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });
+    expect(feedNode.bind.params.scope).toBe("feed");
   });
 
   // MAX-FIRST-LOAD-01: the segment read the Stack's status without waiting, so the first page after Home started (cold cache) had no Max.
@@ -194,25 +222,26 @@ describe("the Make a video page and action", () => {
     __setStackClientForTests({} as never);
     fake.ltx25max = "ready";
     dropVideoStatusCache();
-    const first = await (await owner.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const first = await (await owner.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(first.body)!.tier.tiers.map((t: { id: string }) => t.id)).toContain("max");
     // Not ready on the Stack: a cold first page shows nothing for Max rather than a stale yes.
     fake.ltx25max = undefined;
     dropVideoStatusCache();
-    const cold = await (await owner.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const cold = await (await owner.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     expect((promptBarOf(cold.body)!.tier?.tiers ?? []).map((t: { id: string }) => t.id)).not.toContain("max");
     __setStackClientForTests(null);
   });
 
-  // MAX-WAIT-REASON-01: a Max clip the Stack holds shows its reason on the stage's Making now list, not "Making your video".
-  test("the Making now line says why a held Max clip waits, in plain words", async () => {
+  // MAX-WAIT-REASON-01: a Max clip the Stack holds shows its reason on its feed entry, not "Making your video".
+  test("the feed entry says why a held Max clip waits, in plain words", async () => {
     const { adult } = await household();
     const person = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
     const now = new Date().toISOString();
     db.insert(videoJobs).values({ id: "held-1", personId: person.id, kind: "generate", state: "running", stackJob: "stack-1", percent: 0, phase: "waiting for the computer", prompt: BOAT, request: JSON.stringify({ loras: [], create: {} }), files: "[]", createdAt: now, updatedAt: now, hlc: nextHlc() }).run();
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" })).json() as Array<{ status: string }>;
-    expect(rows[0]!.status).toBe("Waiting for the computer to finish other work. Your video starts by itself, or tap Cancel.");
-    expect(rows[0]!.status).not.toContain("Making your video");
+    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ status: string; phase: string }>;
+    expect(rows[0]!.status).toBe("generating");
+    expect(rows[0]!.phase).toBe("Waiting for the computer to finish other work. Your video starts by itself, or tap Cancel.");
+    expect(rows[0]!.phase).not.toContain("Making your video");
   });
 
   test("the prompt bar's submit args fill from the item and the action takes them", async () => {
@@ -241,29 +270,32 @@ describe("the Make a video page and action", () => {
 });
 
 describe("Create is adult-only; Browse is unchanged", () => {
+  const PAGES = ["create", "clips"];
   const appRow = async (client: TestClient) => ((await (await client.get("/api/apps")).json()) as Array<Record<string, any>>).find((row) => row.package === "videos")!;
-  test("the create group, the Create header mode and the three pages are gone below adult", async () => {
+  test("the create group, the Create header mode and the two pages are gone below adult", async () => {
     const { adult, teen, child } = await household();
     const adultApp = await appRow(adult.client);
     expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "create"]);
-    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "create").pages.map((p: { page: string }) => p.page)).toEqual(["create", "make-video", "creations"]);
+    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "create").pages.map((p: { page: string }) => p.page)).toEqual(["create", "clips"]);
     expect(adultApp.header.modes.map((m: { id: string }) => m.id)).toEqual(["play", "create"]);
     for (const other of [teen, child]) {
       const row = await appRow(other.client);
       expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play"]);
       expect(row.sidebar.groups[0].pages.map((p: { page: string }) => p.page)).toEqual(["index", "library", "history", "watch-later"]);
       expect(row.header.modes.map((m: { id: string }) => m.id)).toEqual(["play"]);
-      for (const page of ["create", "make-video", "creations"]) expect((await other.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(404);
+      for (const page of [...PAGES, "make-video", "creations"]) expect((await other.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(404);
       expect((await other.client.get("/api/plugins/videos/pages/index")).status).toBe(200);
     }
-    for (const page of ["create", "make-video", "creations"]) expect((await adult.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(200);
+    for (const page of PAGES) expect((await adult.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(200);
+    // The three old pages are gone for adults too: a removed page is a plain 404, not an empty page.
+    for (const page of ["make-video", "creations"]) expect((await adult.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(404);
   });
 });
 
 describe("V1b: look, length, voices, hint and Another take", () => {
   test("the chips come from the single lists", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("look").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_LOOKS.map((l) => l.id));
@@ -271,7 +303,6 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(chip("voices").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_VOICES.map((v) => v.id));
     expect(chip("voices").default).toBe("clean");
     expect(bar.submit.call.args.look).toBe("{look}");
-    expect(JSON.stringify(page.body)).toContain("let one person talk at a time");
     expect(videoLookFor("Classic cartoon")?.id).toBe("classic-cartoon");
     expect(withVideoLook("a dog", videoLookFor("natural"))).toBe("a dog");
     expect(withVideoLook("a dog", videoLookFor("anime"))).toStartWith("2D anime style");
@@ -306,8 +337,10 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(body.notice).toContain("5 seconds");
     expect(body.notice).not.toContain("\u2014");
     expect(fake.submitted[0]!.seconds).toBe(5);
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" })).json() as Array<{ status: string }>;
-    expect(rows[0]!.status).toContain("5 seconds");
+    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ phase: string; seconds: number; tags: string[] }>;
+    expect(rows[0]!.phase).toContain("5 seconds");
+    expect(rows[0]!.seconds).toBe(5);
+    expect(rows[0]!.tags).toContain("5 s");
   });
 
   test("an unknown look or voices choice is a plain 422", async () => {
@@ -324,8 +357,8 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     // Not while it is still being made.
     expect((await adult.client.post(`/api/videos/jobs/${first.id}/another`, {})).status).toBe(404);
     await until(() => getVideoJobFor(actor, first.id)?.state === "done");
-    const last = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "last" })).json() as Array<{ id: string; title: string }>;
-    expect(last[0]).toMatchObject({ id: first.id, title: BOAT });
+    const last = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ id: string; prompt: string; status: string; orientation: string; look: string; camera: string }>;
+    expect(last[0]).toMatchObject({ id: first.id, prompt: BOAT, status: "ready", orientation: "portrait", look: "anime", camera: "handheld" });
     const res = await adult.client.post(`/api/videos/jobs/${first.id}/another`, {});
     expect(res.status).toBe(200);
     const card = await res.json() as { id: string; conversation_id: string | null };
@@ -441,17 +474,20 @@ describe("U3: Start frame", () => {
     expect(res.status).toBe(200);
     expect(fake.submitted).toHaveLength(2);
     expect(fake.submitted[1]!.image_source).toBe("uploaded");
-    const newest = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "newest" })).json() as Array<{ id: string; src: string }>;
-    expect(newest).toHaveLength(1);
-    expect(newest[0]!.id).toBe(fileId);
-    expect(newest[0]!.src).toContain(fileId);
+    // The feed row of the first clip keeps the Start frame as a chip with its thumbnail, and the Remix refill carries its id.
+    const feed = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ id: string; src: string | null; references: Array<{ label: string; thumb: string }>; start_frame: string }>;
+    expect(feed).toHaveLength(2);
+    const old = feed.find((row) => row.id === first.id)!;
+    expect(old.src).toContain(fileId);
+    expect(old.references).toEqual([{ label: "Start frame", thumb: `/api/files/${id}/thumb?w=320` }]);
+    expect(old.start_frame).toBe(id);
   });
 });
 
 describe("U3: Camera and Look cards from the one lists, with their loops", () => {
   test("the served page puts the cards' loop paths on the options, from VIDEO_LOOKS and VIDEO_RECIPES, and lists no loop in the page JSON", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("look").variant).toBe("cards");
@@ -461,9 +497,9 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     expect(chip("camera").variant).toBe("cards");
     expect(chip("camera").default).toBe("none");
     expect(chip("camera").options).toEqual(VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) })));
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Picture", kind: "picture" }]);
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
     expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", start_frame: "{start_frame}", look: "{look}" });
-    const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "make-video.json")).text();
+    const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");
     expect(VIDEO_RECIPES).toHaveLength(8);
   });
