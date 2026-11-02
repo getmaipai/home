@@ -230,3 +230,13 @@ test("Listen now data is per person: another person's play never shows in my rec
   expect(call(atlas, "history", { scope: "quick" }).length).toBeGreaterThan(0);
   expect(call(sprout, "history", { scope: "quick" }).map((row) => row.id)).not.toContain(id(3));
 });
+
+test("genre tiles each carry a safe hsl colour and no two tiles share a hue (MUSIC-POLISH-01)", () => {
+  const genres = ["Chamber Folk", "Soft Rock", "Electronic", "Indie Pop", "Jazz", "Blues", "Ambient", "Hip Hop"];
+  genres.forEach((genre, n) => { db.update(mediaItems).set({ genre }).where(eq(mediaItems.id, id(n % 5 + 1))).run(); });
+  db.update(mediaItems).set({ genre: "Chamber Folk" }).where(eq(mediaItems.id, id(1))).run();
+  const tiles = call(atlas, "songs", { scope: "categories" });
+  expect(tiles.length).toBeGreaterThan(2);
+  const hues = tiles.map((tile) => { const match = /^hsl\((\d+) 65% 50%\)$/.exec(String(tile.color)); expect(match).not.toBeNull(); return Number(match![1]); });
+  for (let a = 0; a < hues.length; a += 1) for (let b = a + 1; b < hues.length; b += 1) { const gap = Math.abs(hues[a]! - hues[b]!); expect(Math.min(gap, 360 - gap)).toBeGreaterThanOrEqual(28); }
+});

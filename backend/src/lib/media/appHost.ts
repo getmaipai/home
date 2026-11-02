@@ -1101,7 +1101,15 @@ function categoryRows(person: PersonRow): Array<{ id: string; title: string; col
   const genres = new Map<string, string>();
   for (const item of musicLibrary(person)) { const genre = item.genre?.trim(); if (genre && !genres.has(genre.toLocaleLowerCase())) genres.set(genre.toLocaleLowerCase(), genre); }
   const hue = (name: string) => [...name].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) % 360, 7);
-  return [...genres.values()].sort((a, b) => a.localeCompare(b)).slice(0, 12).map((genre) => ({ id: genre, title: genre, color: `hsl(${hue(genre)} 65% 50%)` }));
+  // Start from the name's own hue, then step on until no earlier tile is within 28 degrees, so two tiles never share a colour.
+  const used: number[] = [];
+  const apart = (value: number) => used.every((other) => { const gap = Math.abs(value - other) % 360; return Math.min(gap, 360 - gap) >= 28; });
+  return [...genres.values()].sort((a, b) => a.localeCompare(b)).slice(0, 12).map((genre) => {
+    let value = hue(genre);
+    for (let step = 0; step < 13 && !apart(value); step += 1) value = (value + 31) % 360;
+    used.push(value);
+    return { id: genre, title: genre, color: `hsl(${value} 65% 50%)` };
+  });
 }
 /** Match rows by name for the Search page: a title or an artist, at least two letters. */
 const nameMatches = <T extends { title: string; channel?: string | null }>(rows: readonly T[], query: string | undefined): T[] => {
