@@ -784,7 +784,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/sourceMode.ts` | SOURCE_MODES, SOURCE_MODE_KEY, SOURCE_MODE_OVERRIDE_KEYS, DEFAULT_SOURCE_MODE, WEB_OFF_NOTE, LISTS_LOADING_NOTE |
 | `backend/src/lib/retrieval/sourceModeMigration.ts` | RETIRED_WIKIPEDIA_FALLBACK_KEY, migrateWikipediaFallbackToSourceMode |
 | `backend/src/lib/retrieval/wayback.ts` | WAYBACK_FALLBACK_KEY, WAYBACK_AVAILABILITY_URL, WAYBACK_HOST, waybackAllowed, waybackCopy |
-| `backend/src/lib/retrieval/webSources.ts` | WEB_SOURCES_KEY, DEFAULT_WEB_SOURCES, webSourceSearch, __setWebSourceForTests, WEB_SOURCE_IDS, NO_SOURCE_NOTE |
+| `backend/src/lib/retrieval/webSources.ts` | WEB_SOURCES_KEY, DEFAULT_WEB_SOURCES, webSourceBuilt, webSourceSearch, __setWebSourceForTests, WEB_SOURCE_IDS |
 | `backend/src/lib/robotAssets.ts` | ROBOT_ASSETS, robotAssetPath, verifyRobotAssetFile, isRobotAssetAvailable, ensureRobotAssets, readVerifiedRobotAsset |
 | `backend/src/lib/robotCheckin.ts` | ROBOT_CHECKIN_ONLINE_MS, recordRobotCheckin, getRobotCheckin, getRobotUnitOnlineAt, forgetRobotCheckin |
 | `backend/src/lib/robotClips.ts` | buildRobotClips, clipTextPassesFloor, robotClipBundlePath, robotClipBundleExists, readRobotClipBundle, robotClipAssetForDevice |
@@ -938,7 +938,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/budget.ts` | FIRST_TOKEN_DEADLINE_MS, STALL_DEADLINE_MS, MINOR_ALWAYS_THINKING_DEADLINES_MS, __setToolOfferOverridesForTests, NO_RECORD_BUDGET, resolveTurnBudget |
 | `backend/src/lib/turnMachine/deadline.ts` | nodeSignal, replyIsUncapped, modelNodeDeadlineMs, turnTotalWaitMs, streamWatchdog, retryDeadlineMs |
 | `backend/src/lib/turnMachine/documents.ts` | attachDocuments |
-| `backend/src/lib/turnMachine/entityPin.ts` | __setEntityPinForTests, articleFromBlocks, articleFromExtract, defaultCandidateFinder, pickPrompt, parsePick |
+| `backend/src/lib/turnMachine/entityPin.ts` | __setEntityPinForTests, articleFromBlocks, articleFromExtract, defaultCandidateFinder, pickPrompt, parsePickDetail |
 | `backend/src/lib/turnMachine/fabrication.ts` | NOT_IN_SOURCES, withoutLabels, namesIn, nameIsGiven, hasFactCue, markUnsourcedNames |
 | `backend/src/lib/turnMachine/machine.ts` | turnMachine |
 | `backend/src/lib/turnMachine/messages.ts` | contextToMessages, bareMessages, continuationMessages |
