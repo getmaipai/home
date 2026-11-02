@@ -293,8 +293,31 @@ I do not judge whether a real person's face matches a named person; where a real
 | spongebob | 199 s | 32.5 s | 12.6 GB | show-accurate: SpongeBob, Mr. Krabs and a blonde girl at the Krusty Krab sign (lettering slightly garbled), a pot steaming | both lines exact |
 | jake-bmo (earlier) | 202 s | 35.4 s | 12.7 GB | Jake and a proper blue BMO with face and limbs in the Tree Fort | "...DAISY!" at the end only; owner: gibberish before it, voices not the characters' |
 
-Reading: picture and word accuracy are strong on every clip: 8 of 9 transcripts hold both lines. The picture beats LTX-2.3 on Vader, SpongeBob (a clean scene with Mr. Krabs), Raymond and Terminator; Smurfs came out in a newer 3D style rather than the classic one the owner liked on LTX. "Golden Girls" is not recognisable on MiniMax either.
-Cost: 182 to 207 s per clip against LTX bf16's 62 to 100 s, at 12.6 to 13.4 GB against 40.4 GB. The remaining open question is voice: the owner heard MiniMax voices as not the characters', whereas LTX voices were.
+Reading, judged separately (a matching transcript says nothing about picture, voice quality or voice likeness, and a clip is not good because Whisper matched the words):
+- **Words:** Whisper heard both lines in 8 of 9 clips; this only says the words were spoken clearly enough to transcribe.
+- **Picture (my opened-frame reading):** sharp and detailed on Vader, SpongeBob, Raymond and Terminator; "Golden Girls" is not recognisable; Smurfs in a newer 3D look; Voltron is a different robot.
+- **Voice quality and likeness:** not judged by me (I cannot hear). Owner: the Jake and BMO voices were not the characters' and the speech was gibberish until the last word; the Golden Girls clip is "awful" despite word-perfect Whisper lines.
+- **Cost:** 182 to 207 s a clip against LTX bf16's 62 to 100 s, at 12.6 to 13.4 GB against 40.4 GB.
+
+### Owner-judged on the MiniMax clips (2026-11-02)
+
+| Clip | Owner verdict |
+|---|---|
+| `minimax-jake-bmo` | gibberish until the final "DAISY!"; voices not the characters' normal voices (LTX-2.3 clips sounded like the characters) |
+| `minimax-goldengirls` | "awful", despite word-perfect lines |
+| `minimax-willsmith` | looked pretty good; colour and vibrancy far too intense |
+| `minimax-chucknorris` | looked good but is not him |
+| all clips naming a real person | nobody got a real person right |
+
+### Saturation, with a rerun asking for natural colour (`minimax-willsmith-natural`, same seed and dialogue, wording appended: "natural realistic colour grading, muted neutral colours, true-to-life skin tones, soft contrast, not oversaturated")
+
+| Clip | Mean HSV saturation | 95th percentile | `signalstats` SATAVG |
+|---|---:|---:|---:|
+| `ltx-willsmith` (LTX-2.3 bf16) | 19.4 percent | 53.3 percent | 7.7 |
+| `minimax-willsmith` | 27.4 percent | 60.1 percent | 8.9 |
+| `minimax-willsmith-natural` | 28.3 percent | 58.3 percent | 9.1 |
+
+By the numbers MiniMax is about 40 percent more saturated than LTX on the same prompt, which fits the owner's eyes. The natural-grading wording did **not** lower the measured saturation (28.3 against 27.4 percent); in the opened frames it changed the clothing colours (the girl's pink top became a grey hoodie) and the street looks slightly cooler, but the metric sees no reduction, so prompt wording alone is not a reliable fix. The rerun took 192 s, 12.8 GB, and Whisper heard both lines ("Daisy, dinner is ready. Coming, Dad."). A colour-grade pass after generation is the untested alternative.
 
 ### Block cache (approximate residual caching) on top of Turbo
 
@@ -307,9 +330,9 @@ Cost: 182 to 207 s per clip against LTX bf16's 62 to 100 s, at 12.6 to 13.4 GB a
 
 Block cache saves 27 to 40 percent of step time and 20 to 27 percent of the clip, but it costs visible picture detail and, more importantly, the speech. **Verdict: do not use it for clips with dialogue; at most a "draft" speed mode for silent pictures, which is not what these clips are for.** One seed per case.
 
-## Clip inventory (all in `~/video-bench/capability/`)
+## Clip inventory (all clips in `~/video-bench/clips/`)
 
-Every clip below is an `.mp4` in that folder with sound unless marked silent; a `-sheet.png` (frames 0, 40, 80, 114 or 118) sits beside most.
+**Every finished clip is an `.mp4` in `~/video-bench/clips/` (flat, the file names below).** Sheets (`-sheet.png`), wavs, transcripts (`.txt`), spectrograms and logs stay in `~/video-bench/capability/`; any clip path elsewhere in this record means the same file name in `clips/`. All have sound unless marked silent.
 
 | File name pattern | Model and build | Settings |
 |---|---|---|
