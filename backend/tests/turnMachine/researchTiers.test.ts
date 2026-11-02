@@ -717,3 +717,61 @@ describe("names and facts no source gives are marked (RESEARCH-FABRICATION-01)",
     expect(result.value.reply.text).toContain("unmade (not confirmed by the sources)");
   });
 });
+
+describe("every part the answer must cover is backed, read for once more, or said to be missing (RESEARCH-COVERAGE-01)", () => {
+  const BRIEF = JSON.stringify({ subject: "the handbook", answer_type: "an explanation", must_contain: ["the key fact"], ambiguous: false, options: [], question: "", assumption: "" });
+  const FACT2 = "Deep detail: the hearing was held in March 1999 and ended the matter.";
+  const article = (withDetails: boolean) => ({
+    title: "Alder (handbook)",
+    lead: "Alder is a handbook.",
+    source: "library" as const,
+    book: "wikipedia_en_all_maxi",
+    path: "Alder_(handbook)",
+    sections: [
+      { heading: "Overview", text: "overview filler. ".repeat(180) },
+      ...(withDetails ? [{ heading: "Outcome", text: `${"outcome filler. ".repeat(100)}${FACT2}` }] : []),
+    ],
+  });
+  const setup = (withDetails: boolean) => {
+    __setStageWritersForTests({
+      brief: async () => BRIEF,
+      analysis: async () => JSON.stringify({ claims: [{ claim: "The handbook was reviewed.", status: "established", sources: [4] }], conflicts: [], gaps: [], guesses: [], parts: [{ part: "the key fact", covered: false }] }),
+    });
+    __setEntityPinForTests({ finder: async () => [{ title: "Alder (handbook)", snippet: "s", load: async () => article(withDetails) }, { title: "Other", snippet: "x", load: async () => null }], writer: async () => '{"pick": 1}' });
+    __setBackboneWriterForTests(async () => '{"sections": [1]}');
+    __setQueryWriterForTests(async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["the key fact"], queries: ["handbook review published"] }) : JSON.stringify({ queries: [] })));
+  };
+  const lastInstruction = (requests: ChatCompletionRequest[]) => lastRequest(requests).messages.filter((m) => m.role === "user").at(-1)!.content!.toString();
+
+  test("a part the analysis reports uncovered is read for from the sections not yet read, by heading, with no new search", async () => {
+    await holdMax();
+    setup(true);
+    const { requests } = await turn("owner", 1, { max: true, thinking: true, utterance: "what happened to the handbook" });
+    expect(searxQueries.length).toBe(1);
+    const instruction = lastInstruction(requests);
+    expect(instruction).toContain("More of the article, read for the parts the notes did not cover");
+    expect(instruction).toContain(FACT2);
+    expect(instruction).not.toContain("Nothing in the notes or the article speaks to");
+  });
+
+  test("a part nothing speaks to, with no section left to read, is handed to the writer as not found in the sources", async () => {
+    await holdMax();
+    setup(false);
+    const { requests } = await turn("owner", 1, { max: true, thinking: true, utterance: "what happened to the handbook" });
+    const instruction = lastInstruction(requests);
+    expect(instruction).toContain('Nothing in the notes or the article speaks to: "the key fact"');
+    expect(instruction).toContain("not found in the sources");
+    expect(instruction).not.toContain("More of the article, read for");
+  });
+
+  test("the writing round states a word target by style: about 450 for Max, about 300 for Thinking", async () => {
+    await holdMax();
+    setup(true);
+    const max = await turn("owner", 1, { max: true, thinking: true, utterance: "what happened to the handbook" });
+    expect(lastInstruction(max.requests)).toContain("about 450 words");
+    searxQueries = [];
+    setup(true);
+    const thinking = await turn("owner", 1, { thinking: true, utterance: "what happened to the handbook" });
+    expect(lastInstruction(thinking.requests)).toContain("about 300 words");
+  });
+});

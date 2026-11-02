@@ -153,6 +153,14 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
 export interface Findings { notes: PageNote[]; ledger: Ledger; read: number; dropped: number }
 
 const words = (text: string): Set<string> => new Set(squash(text).split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+/** Two phrasings of one part of a question: half of the shorter one's words are shared. */
+const samePart = (a: string, b: string): boolean => {
+  const x = words(a), y = words(b);
+  if (x.size === 0 || y.size === 0) return false;
+  let shared = 0;
+  for (const w of x) if (y.has(w)) shared += 1;
+  return shared / Math.min(x.size, y.size) >= 0.5;
+};
 const similar = (a: string, b: string): boolean => {
   const x = words(a), y = words(b);
   if (x.size === 0 || y.size === 0) return false;
@@ -190,22 +198,29 @@ export function filterFindings(notes: readonly PageNote[], numberOf: ReadonlyMap
 export type ClaimStatus = "established" | "reported" | "inferred" | "contested";
 export interface AnalysisClaim { claim: string; status: ClaimStatus; sources: number[] }
 export interface AnalysisGuess { guess: string; because: string[]; confidence: "low" | "medium" | "high"; sources: number[] }
-export interface Analysis { claims: AnalysisClaim[]; conflicts: string[]; gaps: string[]; guesses: AnalysisGuess[] }
+export interface Analysis { claims: AnalysisClaim[]; conflicts: string[]; gaps: string[]; guesses: AnalysisGuess[]; /** Parts of the question the notes and the article did not cover (the analysis's own report). */ uncovered: string[] }
+
+/** The parts a good answer must cover: what the brief says it must contain, then the plan's sub-questions, without repeats, at most six. */
+export function partsFor(brief: Brief | null, plan: DataPlan | undefined): string[] {
+  const out: string[] = [];
+  for (const p of [...(brief?.mustContain ?? []), ...(plan?.subQuestions ?? [])]) if (p.trim() && !out.some((o) => similar(o, p))) out.push(p.trim());
+  return out.slice(0, 6);
+}
 
 export const ANALYSIS_TOKENS = { thinking: 350, max: 650 } as const;
 
-export function analysisPrompt(brief: Brief | null, question: string, ledger: string, backbone = ""): string {
+export function analysisPrompt(brief: Brief | null, question: string, ledger: string, backbone = "", parts: readonly string[] = []): string {
   return `You analyse research notes before an answer is written. You write no answer here.
 The question: "${question.replace(/"/g, "'")}"
 ${brief ? `${briefBlock(brief)}\n` : ""}
 ${backbone ? `${backbone}\n\n` : ""}${ledger}
 
 Work from these notes and the article only. Answer with one JSON object and nothing else:
-{"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}], "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]}
-"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). Use at most 8 claims and 4 guesses. Name no person, title, number or detail that the notes and the article do not contain.`;
+{"claims": [{"claim": "one plain sentence", "status": "established", "sources": [1]}], "conflicts": ["where notes disagree, in one sentence each"], "gaps": ["what the question needs that no note covers"], "guesses": [{"guess": "a likely answer to the part nothing settles", "because": ["the notes it rests on, in your words"], "confidence": "low", "sources": [1]}]${parts.length > 0 ? ', "parts": [{"part": "the part, copied as written below", "covered": true}]' : ""}}
+"status" is "established" when a primary or reputable note states it, "reported" when only a fan page or a single secondhand note does, "contested" when notes disagree, and "inferred" when it follows from notes but none says it. "sources" are the [n] numbers of the notes. Every guess must rest on at least one note and say how sure you are ("low", "medium" or "high"). ${parts.length > 0 ? `\nThe parts a good answer must cover:\n${parts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nIn "parts" list every one; "covered" is true only when a claim above states something for that part from the notes or the article, false when nothing there speaks to it.\n` : ""}Use at most 8 claims and 4 guesses. Name no person, title, number or detail that the notes and the article do not contain.`;
 }
 
-export function parseAnalysis(text: string | null, valid: ReadonlySet<number>): Analysis | null {
+export function parseAnalysis(text: string | null, valid: ReadonlySet<number>, asked: readonly string[] = []): Analysis | null {
   const data = jsonOf(text);
   if (!data) return null;
   const nums = (value: unknown): number[] => (Array.isArray(value) ? value.filter((v): v is number => typeof v === "number" && valid.has(v)) : []);
@@ -226,23 +241,43 @@ export function parseAnalysis(text: string | null, valid: ReadonlySet<number>): 
     const confidence = r.confidence === "high" || r.confidence === "medium" ? r.confidence : "low";
     if (guess && because.length > 0) guesses.push({ guess, because, confidence, sources: nums(r.sources) });
   }
-  return { claims, conflicts: strings(data.conflicts, 4, 240), gaps: strings(data.gaps, 5, 200), guesses };
+  const uncovered: string[] = [];
+  for (const raw of Array.isArray(data.parts) ? data.parts.slice(0, 8) : []) {
+    const r = (raw ?? {}) as { part?: unknown; covered?: unknown };
+    const part = typeof r.part === "string" ? r.part.trim() : "";
+    // The part is matched back to the ones asked for, so the report names the question's own wording.
+    const own = asked.find((a) => samePart(a, part)) ?? (asked.length === 0 ? part : "");
+    if (own && r.covered === false && !uncovered.includes(own)) uncovered.push(own);
+  }
+  return { claims, conflicts: strings(data.conflicts, 4, 240), gaps: strings(data.gaps, 5, 200), guesses, uncovered };
 }
 
-export async function analyse(brief: Brief | null, question: string, findings: Findings, validNumbers: ReadonlySet<number>, style: AnswerStyle, signal?: AbortSignal, backbone = ""): Promise<Analysis | null> {
+export async function analyse(brief: Brief | null, question: string, findings: Findings, validNumbers: ReadonlySet<number>, style: AnswerStyle, signal?: AbortSignal, backbone = "", parts: readonly string[] = []): Promise<Analysis | null> {
   if (findings.ledger.notes === 0 && !backbone) return null;
   const tokens = style === "max" ? ANALYSIS_TOKENS.max : ANALYSIS_TOKENS.thinking;
   let reply: string | null = null;
-  try { reply = await (analysisOverride ?? chatAnalysisWriter(tokens, signal))(analysisPrompt(brief, question, findings.ledger.text, backbone)); } catch { reply = null; }
-  return parseAnalysis(reply, validNumbers);
+  try { reply = await (analysisOverride ?? chatAnalysisWriter(tokens, signal))(analysisPrompt(brief, question, findings.ledger.text, backbone, parts)); } catch { reply = null; }
+  return parseAnalysis(reply, validNumbers, parts);
 }
 
 // ---------------------------------------------------------------- stage 5: the reply
 
 const cites = (sources: readonly number[]): string => sources.map((n) => `[${n}]`).join("");
 
+/** Words in the answer the writing round aims for, by style (a target in the prompt, never a cap: an adult's written answer has none). */
+export const ANSWER_WORDS = { thinking: 300, max: 450 } as const;
+
+export interface ReplyCoverage {
+  /** Text of the article's sections read for parts the notes did not cover. */
+  read?: string;
+  /** Parts no note and no section covers: the answer says they were not found in the sources. */
+  missing?: readonly string[];
+  /** The style's word target. */
+  words?: number;
+}
+
 /** What the writing round is handed: the analysis first (what to say, how sure), then the notes behind it. */
-export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledger: string, assumption: string | null): string {
+export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledger: string, assumption: string | null, coverage: ReplyCoverage = {}): string {
   const lines: string[] = [];
   if (assumption) lines.push(`Begin with one plain sentence saying what you took the question to mean: "${assumption.replace(/"/g, "'")}"`);
   if (analysis && (analysis.claims.length > 0 || analysis.guesses.length > 0)) {
@@ -254,9 +289,21 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (analysis.conflicts.length > 0) lines.push(`Where the notes disagree:\n${analysis.conflicts.map((c) => `- ${c}`).join("\n")}`);
     if (analysis.gaps.length > 0) lines.push(`Not found:\n${analysis.gaps.map((g) => `- ${g}`).join("\n")}`);
     if (analysis.guesses.length > 0) lines.push(`Guesses to present as guesses, each with its reasons:\n${analysis.guesses.map((g) => `- (${g.confidence}) ${g.guess} because ${g.because.join("; ")} ${cites(g.sources)}`.trim()).join("\n")}`);
-    lines.push(`Write the answer like this: the direct answer first${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found. Add no fact the analysis and notes do not carry.`);
+    if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article; if it does not speak to a part, write that the part was not found in the sources):\n${coverage.read}`);
+    if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
+    lines.push(`Write the answer like this: the direct answer first${brief?.mustContain.length ? `, covering ${brief.mustContain.join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found. Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
   }
   if (ledger) lines.push(ledger);
   return lines.join("\n\n");
 }
 
+/** The notes the analysis relied on, as a ledger: only the notes whose source number it cites (all of them when it cites none), inside `budgetChars`.
+ * The writing round is handed this instead of every note, so it reads only what the answer needs. */
+export function ledgerForAnalysis(notes: readonly PageNote[], analysis: Analysis | null, numberOf: ReadonlyMap<string, number>, budgetChars: number): Ledger {
+  if (!analysis) return notesLedger(notes, numberOf, budgetChars);
+  const cited = new Set<number>([...analysis.claims.flatMap((c) => c.sources), ...analysis.guesses.flatMap((g) => g.sources)]);
+  if (cited.size === 0) return notesLedger(notes, numberOf, budgetChars);
+  const subset = notes.filter((n) => cited.has(numberOf.get(n.url) ?? -1));
+  const ledger = notesLedger(subset, numberOf, budgetChars);
+  return ledger.notes > 0 ? ledger : notesLedger(notes, numberOf, budgetChars);
+}

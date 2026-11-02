@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
-  researchQuestion, shouldAsk, understand, __setStageWritersForTests, type Brief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ledgerForAnalysis, partsFor, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
@@ -259,5 +259,54 @@ describe("planned searches are short plain keywords (RESEARCH-QUERY-04)", () => 
     const plan = await planData(async () => JSON.stringify({ sub_questions: ["a"], queries: ['"quoted phrase" OR "other phrase" with many more words than eight allow here', "short one"] }), null, "q", 4);
     expect(plan.queries.every((q) => q.split(/\s+/).length <= 8 && !q.includes('"'))).toBe(true);
     expect(plan.queries).toContain("short one");
+  });
+});
+
+describe("coverage of the parts a good answer must cover (RESEARCH-COVERAGE-01)", () => {
+  const brief: Brief = { subject: "s", answerType: "an explanation", mustContain: ["why it ended", "what came next"], ambiguous: false, options: [], question: "", assumption: "" };
+
+  test("the parts are the brief's must-contain items then the plan's sub-questions, without repeats, at most six", () => {
+    expect(partsFor(brief, { subQuestions: ["why it ended", "who ran it", "what came next in later years"], queries: [] })).toEqual(["why it ended", "what came next", "who ran it"]);
+    expect(partsFor(null, undefined)).toEqual([]);
+    expect(partsFor({ ...brief, mustContain: ["a1 aa", "b1 bb", "c1 cc", "d1 dd", "e1 ee", "f1 ff", "g1 gg"] }, undefined).length).toBe(6);
+  });
+
+  test("the analysis prompt lists the parts and asks which are covered; a part reported uncovered comes back in the question's own words", () => {
+    const parts = ["why it ended", "what came next"];
+    const prompt = analysisPrompt(brief, "q", "ledger", "", parts);
+    expect(prompt).toContain("1. why it ended");
+    expect(prompt).toContain('"covered": true');
+    const reply = JSON.stringify({ claims: [{ claim: "It ended in 1999.", status: "established", sources: [1] }], conflicts: [], gaps: [], guesses: [], parts: [{ part: "Why it ended", covered: true }, { part: "what came next afterwards", covered: false }, { part: "invented part", covered: false }] });
+    const analysis = parseAnalysis(reply, new Set([1]), parts);
+    expect(analysis!.uncovered).toEqual(["what came next"]);
+    expect(parseAnalysis(JSON.stringify({ claims: [], conflicts: [], gaps: [], guesses: [] }), new Set([1]), parts)!.uncovered).toEqual([]);
+    expect(analysisPrompt(brief, "q", "ledger")).not.toContain("parts a good answer must cover");
+  });
+
+  test("the writing round reads the section read for an uncovered part, or is told the part was not found in the sources, and aims at the style's word count", () => {
+    const analysis = { claims: [{ claim: "It ended in 1999.", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: ["what came next"] };
+    const withRead = replyBrief(brief, analysis, "", null, { read: "## Aftermath\nA corrected edition followed.", words: ANSWER_WORDS.max });
+    expect(withRead).toContain("More of the article, read for the parts the notes did not cover");
+    expect(withRead).toContain("A corrected edition followed.");
+    expect(withRead).toContain(`about ${ANSWER_WORDS.max} words`);
+    expect(withRead).not.toContain("Nothing in the notes or the article speaks to");
+    const missing = replyBrief(brief, analysis, "", null, { missing: ["what came next"], words: ANSWER_WORDS.thinking });
+    expect(missing).toContain('Nothing in the notes or the article speaks to: "what came next"');
+    expect(missing).toContain("not found in the sources");
+    expect(replyBrief(brief, analysis, "", null)).not.toContain("words");
+  });
+
+  test("the writing round's ledger keeps the notes the analysis cited and falls back to all notes when it cited none", () => {
+    const a = note({ url: "https://a.example/p", quote: "first quote text here" });
+    const b = note({ url: "https://b.example/p", quote: "second quote text here" });
+    const numbers = numberOf(["https://a.example/p", "https://b.example/p"]);
+    const analysis = { claims: [{ claim: "c", status: "established" as const, sources: [2] }], conflicts: [], gaps: [], guesses: [], uncovered: [] };
+    const only = ledgerForAnalysis([a, b], analysis, numbers, 4_000);
+    expect(only.text).toContain("second quote text here");
+    expect(only.text).not.toContain("first quote text here");
+    const all = ledgerForAnalysis([a, b], { ...analysis, claims: [] }, numbers, 4_000);
+    expect(all.text).toContain("first quote text here");
+    expect(all.text).toContain("second quote text here");
+    expect(ledgerForAnalysis([a, b], null, numbers, 4_000).notes).toBe(2);
   });
 });

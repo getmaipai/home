@@ -9,9 +9,11 @@ import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ArticleSection, ArticleText, EntityAnchor } from "./entityPin";
 
 /** Characters of the article the writing round is handed (about 3,000 tokens). */
-export const BACKBONE_CHARS = 12_000;
+export const BACKBONE_CHARS = 9_000;
+/** Characters of a targeted second read for parts the first reading did not cover. */
+export const EXTRA_READ_CHARS = 4_000;
 const LEAD_CHARS = 1_800;
-const SECTIONS_MAX = 7;
+const SECTIONS_MAX = 8;
 
 /** One model call: a prompt in, text out, or null when the model is unavailable. */
 export type BackboneWriter = (prompt: string) => Promise<string | null>;
@@ -31,10 +33,15 @@ export interface Backbone {
   title: string;
   /** The lead and the chosen sections as text, in article order, within the budget. */
   text: string;
+  /** The headings of the sections in the text, in article order. */
   headings: string[];
+  /** Every heading the article offered (the picker saw these). */
+  seen: string[];
   chars: number;
   /** The article as a source of the reply (null when it cannot be named as one). */
   source: Source | null;
+  /** Headings of sections the picker did not take, with their text, for a later targeted read. */
+  unread: ArticleSection[];
 }
 
 const wordsOf = (text: string): Set<string> => new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 3));
@@ -89,37 +96,67 @@ export function backboneSource(article: ArticleText): Source | null {
   return row ? sourcesFromRows([row])[0] ?? null : null;
 }
 
-/** The lead and the sections that bear on the question, in article order, within `budget` characters. */
+/** Splits `room` characters over `sections` in priority order so no section is starved by a long one before it: each gets an equal share
+ * (or its whole length when shorter), and what a short section leaves over goes to the cut ones in priority order. */
+export function allocate(lengths: readonly number[], room: number): number[] {
+  const out = lengths.map(() => 0);
+  if (lengths.length === 0 || room <= 0) return out;
+  const share = Math.floor(room / lengths.length);
+  let left = room;
+  lengths.forEach((len, i) => { out[i] = Math.min(len, share); left -= out[i]!; });
+  for (let i = 0; i < lengths.length && left > 0; i++) {
+    const extra = Math.min(lengths[i]! - out[i]!, left);
+    out[i]! += extra;
+    left -= extra;
+  }
+  return out;
+}
+
+/** Section numbers for `wanted` parts, chosen by the model over the headings (most useful first), then the sections whose heading and opening
+ * share the most words with the parts; at most SECTIONS_MAX. */
+async function chooseSections(sections: readonly ArticleSection[], question: string, wanted: readonly string[], signal?: AbortSignal): Promise<number[]> {
+  if (sections.length === 0) return [];
+  let reply: string | null = null;
+  try { reply = await (writerOverride ?? chatWriter(signal))(choosePrompt(question, wanted, sections)); } catch { reply = null; }
+  const modelPicks = parseChosen(reply, sections.length) ?? [];
+  const overlap = overlapChoice(wanted, sections).filter((i) => !modelPicks.includes(i));
+  const merged = [...modelPicks, ...overlap.slice(0, 2)].slice(0, SECTIONS_MAX);
+  return merged.length > 0 ? merged : sections.map((_, i) => i).slice(0, SECTIONS_MAX);
+}
+
+/** The text of chosen sections, in article order, `room` characters shared between them by priority (the order of `chosen`). */
+function sectionsText(sections: readonly ArticleSection[], chosen: readonly number[], room: number): { parts: { heading: string; text: string }[]; used: number } {
+  const lengths = chosen.map((i) => sections[i]!.text.length + sections[i]!.heading.length + 8);
+  const alloc = allocate(lengths, room);
+  const taken = chosen.map((index, k) => ({ index, room: alloc[k]! - sections[index]!.heading.length - 8 })).filter((t) => t.room >= Math.min(200, sections[t.index]!.text.length));
+  const parts = taken.sort((a, b) => a.index - b.index).map((t) => ({ heading: sections[t.index]!.heading, text: cutAtSentence(sections[t.index]!.text, t.room) }));
+  return { parts, used: parts.reduce((n, p) => n + p.text.length + p.heading.length + 8, 0) };
+}
+
+/** The lead and the sections that bear on the question, in article order, within `budget` characters. The budget is shared between the
+ * chosen sections (a long early section no longer starves a later one that holds the answer). */
 export async function pickBackbone(anchor: EntityAnchor, question: string, wanted: readonly string[], opts: { budget?: number; signal?: AbortSignal } = {}): Promise<Backbone | null> {
   const article = anchor.article;
   if (!article) return null;
   const budget = opts.budget ?? BACKBONE_CHARS;
   const sections = article.sections.filter((s) => !STRUCTURAL.test(s.heading.trim()));
-  let chosen: number[] = [];
-  if (sections.length > 0) {
-    let reply: string | null = null;
-    try { reply = await (writerOverride ?? chatWriter(opts.signal))(choosePrompt(question, wanted, sections)); } catch { reply = null; }
-    chosen = parseChosen(reply, sections.length) ?? overlapChoice(wanted, sections);
-    if (chosen.length === 0) chosen = sections.map((_, i) => i).slice(0, SECTIONS_MAX);
-  }
-  const parts: { heading: string; text: string }[] = [];
-  let used = 0;
+  const chosen = await chooseSections(sections, question, wanted, opts.signal);
   const lead = cutAtSentence(article.lead, Math.min(LEAD_CHARS, budget));
-  if (lead) { parts.push({ heading: "", text: lead }); used += lead.length; }
-  const headings: string[] = [];
-  // Chosen sections go in article order; each is cut at a sentence when the budget runs short, later ones are dropped.
-  for (const index of [...chosen].sort((a, b) => a - b)) {
-    const section = sections[index]!;
-    const room = budget - used - section.heading.length - 8;
-    if (room < 200) break;
-    const text = cutAtSentence(section.text, room);
-    parts.push({ heading: section.heading, text });
-    headings.push(section.heading);
-    used += text.length + section.heading.length + 8;
-  }
-  if (parts.length === 0) return null;
-  const body = parts.map((p) => (p.heading ? `## ${p.heading}\n${p.text}` : p.text)).join("\n\n");
-  return { title: article.title, text: body, headings, chars: body.length, source: backboneSource(article) };
+  const { parts } = sectionsText(sections, chosen, Math.max(0, budget - lead.length));
+  const all = lead ? [{ heading: "", text: lead }, ...parts] : parts;
+  if (all.length === 0) return null;
+  const body = all.map((p) => (p.heading ? `## ${p.heading}\n${p.text}` : p.text)).join("\n\n");
+  const taken = new Set(parts.map((p) => p.heading));
+  return { title: article.title, text: body, headings: parts.map((p) => p.heading), seen: sections.map((s) => s.heading), chars: body.length, source: backboneSource(article), unread: sections.filter((s) => !taken.has(s.heading)) };
+}
+
+/** A targeted read for parts the first reading did not cover: the model picks from the sections not yet read, and their text is returned
+ * (within `budget`, shared by priority). No search; the article is already in hand. Empty when nothing is left to read. */
+export async function readMoreSections(unread: readonly ArticleSection[], question: string, parts: readonly string[], opts: { budget?: number; signal?: AbortSignal } = {}): Promise<{ text: string; headings: string[] }> {
+  if (unread.length === 0 || parts.length === 0) return { text: "", headings: [] };
+  const chosen = (await chooseSections(unread, question, parts, opts.signal)).slice(0, 3);
+  const { parts: read } = sectionsText(unread, chosen, opts.budget ?? EXTRA_READ_CHARS);
+  return { text: read.map((p) => `## ${p.heading}\n${p.text}`).join("\n\n"), headings: read.map((p) => p.heading) };
 }
 
 /** The block the writing round gets for the backbone article, cited by its source number (null: the article cannot be named as a source,

@@ -1,8 +1,8 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
-import { backboneBlock, pickBackbone, type Backbone } from "../backbone";
-import { analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
+import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
+import { ANSWER_WORDS, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planData, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
@@ -776,9 +776,11 @@ let queryWriterOverride: QueryWriter | undefined;
 export function __setQueryWriterForTests(writer: QueryWriter | undefined): void { queryWriterOverride = writer; }
 /** RESEARCH-QUERY-01: how many searches the writer proposes per round (the first round plans the whole question). */
 /** RESEARCH-NOTES-01: with a notes ledger in the answering round, the raw page text of the sources shrinks to this many characters in all. */
-const RAW_EVIDENCE_WITH_LEDGER_CHARS = 4_500;
+const RAW_EVIDENCE_WITH_LEDGER_CHARS = 2_500;
 /** RESEARCH-BACKBONE-01: with the backbone article in the writing round (up to 12,000 characters) the notes ledger takes this many at most. */
-const LEDGER_WITH_BACKBONE_CHARS = 8_000;
+const LEDGER_WITH_BACKBONE_CHARS = 6_000;
+/** The notes the writing round reads: the ones the analysis relied on, under this many characters. */
+const WRITER_LEDGER_CHARS = 4_500;
 /** The writing round waits at most this long for the backbone choice (a one-second model call that ran beside the searches). */
 const BACKBONE_WAIT_MS = 4_000;
 /** The analysis may start up to this long after the cap (it takes 3 to 10 seconds). */
@@ -970,12 +972,31 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       backbone = await Promise.race([state.backbonePromise, new Promise<null>((resolve) => setTimeout(() => resolve(null), BACKBONE_WAIT_MS))]);
       state.backbone = backbone;
       if (backbone) noteResearchText(state, "backbone", backbone.text);
-      markResearch(state, `backbone wait end (${backbone ? `${backbone.chars} chars, ${backbone.headings.length} sections` : "none"})`);
+      markResearch(state, `backbone wait end (${backbone ? `${backbone.chars} chars; the picker saw ${backbone.seen.length} sections [${backbone.seen.slice(0, 20).join(" | ")}]; read [${backbone.headings.join(" | ")}]` : "none"})`);
     }
     const backboneNumber = state.outcomes.flatMap((o) => o.sources ?? []).length + 1;
     const backboneCited = backbone?.source ? backboneNumber : null;
     const backboneText = backbone ? backboneBlock(backbone, backboneCited) : "";
     const noFindings = { notes: [], ledger: { text: "", notes: 0, dropped: 0 }, read: 0, dropped: 0 };
+    const parts = partsFor(brief, state.researchPlan);
+    const wordTarget = state.answerStyle === "max" ? ANSWER_WORDS.max : ANSWER_WORDS.thinking;
+    // RESEARCH-COVERAGE-01: after the analysis, every part the answer must cover is either backed by the notes or the article, or read for
+    // once more by heading from the sections not yet read (no new search), or the writer is told to say it was not found in the sources.
+    const coverageFor = async (): Promise<ReplyCoverage> => {
+      const coverage: ReplyCoverage = { words: wordTarget };
+      const uncovered = state.researchAnalysis?.uncovered ?? [];
+      if (uncovered.length === 0) return coverage;
+      let read = "";
+      if (backbone && backbone.unread.length > 0 && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
+        markResearch(state, `coverage read start (${uncovered.length} parts uncovered)`);
+        const more = await readMoreSections(backbone.unread, rq, uncovered, { signal });
+        read = more.text;
+        markResearch(state, `coverage read end (${more.headings.length} sections, ${more.text.length} chars)`);
+      }
+      if (read) coverage.read = read;
+      else coverage.missing = uncovered;
+      return coverage;
+    };
     if (researching && state.researchBudget && state.researchBudget.notes.size > 0) {
       markResearch(state, "stage 3 notes wait start");
       const wait = Math.max(2_000, Math.min(NOTES_WAIT_MS, (researchCutAt(state) ?? Date.now()) - Date.now()));
@@ -990,17 +1011,20 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, `stage 3 ledger: ${findings.ledger.notes} notes kept of ${state.pageNotes.length} written (${findings.ledger.text.length} chars) from ${findings.read} pages; note calls ${stats?.calls ?? 0} (${Math.round((stats?.ms ?? 0) / 100) / 10} s of light-model time), quotes dropped ${stats?.droppedQuotes ?? 0}`);
       if ((haveLedger || backbone) && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backboneCited !== null ? [backboneCited] : [])]), state.answerStyle!, signal, backboneText);
-        markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
+        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backboneCited !== null ? [backboneCited] : [])]), state.answerStyle!, signal, backboneText, parts);
+        markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps, ${state.researchAnalysis.uncovered.length} of ${parts.length} parts uncovered` : "none"})`);
       }
-      replyExtra = replyBrief(brief, state.researchAnalysis ?? null, findings.ledger.text, assumption);
+      const coverage = await coverageFor();
+      // The writing round reads the notes the analysis relied on, not every note.
+      const writerLedger = ledgerForAnalysis(findings.notes, state.researchAnalysis ?? null, numberOf, WRITER_LEDGER_CHARS);
+      replyExtra = replyBrief(brief, state.researchAnalysis ?? null, writerLedger.text, assumption, coverage);
     } else if (researching && (assumption || backbone)) {
       if (backbone && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set(backboneCited !== null ? [backboneCited] : []), state.answerStyle!, signal, backboneText);
-        markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps` : "none"})`);
+        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set(backboneCited !== null ? [backboneCited] : []), state.answerStyle!, signal, backboneText, parts);
+        markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps, ${state.researchAnalysis.uncovered.length} of ${parts.length} parts uncovered` : "none"})`);
       }
-      replyExtra = replyBrief(brief, state.researchAnalysis ?? null, "", assumption);
+      replyExtra = replyBrief(brief, state.researchAnalysis ?? null, "", assumption, await coverageFor());
     }
     if (backboneText) replyExtra = [replyExtra, backboneText].filter(Boolean).join("\n\n");
     const rawChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);

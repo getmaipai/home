@@ -1,7 +1,7 @@
 // RESEARCH-BACKBONE-01: the pinned article's lead and the sections that bear on the question reach the writing round uncut, within a
 // budget, chosen by the article's real headings. A fact 9,000 characters into an article must arrive.
 import { afterEach, describe, expect, test } from "bun:test";
-import { BACKBONE_CHARS, __setBackboneWriterForTests, backboneBlock, backboneSource, choosePrompt, overlapChoice, parseChosen, pickBackbone } from "@/lib/turnMachine/backbone";
+import { BACKBONE_CHARS, __setBackboneWriterForTests, allocate, backboneBlock, backboneSource, choosePrompt, overlapChoice, parseChosen, pickBackbone, readMoreSections } from "@/lib/turnMachine/backbone";
 import { anchorFor, type ArticleText } from "@/lib/turnMachine/entityPin";
 
 afterEach(() => __setBackboneWriterForTests(undefined));
@@ -102,5 +102,52 @@ describe("the backbone", () => {
     expect(live?.url).toBe("https://en.wikipedia.org/wiki/Gout");
     expect(live?.kind).toBe("web");
     expect(backboneSource({ title: "X", lead: "", sections: [], source: "library" })).toBeNull();
+  });
+});
+
+describe("the budget is shared, so a long early section does not starve the one that holds the answer (RESEARCH-COVERAGE-01)", () => {
+  const long = (): ArticleText => ({
+    title: "Alder (handbook)",
+    lead: "Alder is a handbook.",
+    source: "library",
+    book: "wikipedia_en_all_maxi",
+    path: "Alder_(handbook)",
+    sections: [
+      { heading: "Contents", text: `${filler("contents", 900)}` },
+      { heading: "Editions", text: `${filler("editions", 400)}` },
+      { heading: "Withdrawal", text: "The publisher withdrew the handbook in 1999 after complaints about its accuracy, and a corrected edition followed in 2001." },
+    ],
+  });
+
+  test("allocate gives equal shares, lets short sections leave their share to the cut ones, and never exceeds the room", () => {
+    expect(allocate([100, 100, 100], 300)).toEqual([100, 100, 100]);
+    expect(allocate([10_000, 10_000], 1_000)).toEqual([500, 500]);
+    expect(allocate([50, 10_000], 1_000)).toEqual([50, 950]);
+    expect(allocate([], 1_000)).toEqual([]);
+    expect(allocate([100], 0)).toEqual([0]);
+    expect(allocate([700, 700, 700], 1_000).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(1_000);
+  });
+
+  test("with two long early sections chosen first, the late short section that answers the question is still in the text", async () => {
+    __setBackboneWriterForTests(async () => '{"sections": [1, 2, 3]}');
+    const a = anchorFor("Alder (handbook)", long());
+    const bb = await pickBackbone(a, "why was it withdrawn", ["why it was withdrawn"]);
+    expect(bb!.text).toContain("withdrew the handbook in 1999");
+    expect(bb!.headings).toEqual(["Contents", "Editions", "Withdrawal"]);
+    expect(bb!.chars).toBeLessThanOrEqual(BACKBONE_CHARS);
+    expect(bb!.seen).toEqual(["Contents", "Editions", "Withdrawal"]);
+  });
+
+  test("the sections not read are kept for a targeted second read, which takes only parts it is asked for and no search", async () => {
+    __setBackboneWriterForTests(async () => '{"sections": [1]}');
+    const a = anchorFor("Alder (handbook)", long());
+    const bb = await pickBackbone(a, "q", ["a"], { budget: 3_000 });
+    expect(bb!.unread.map((s) => s.heading)).toEqual(["Editions", "Withdrawal"]);
+    __setBackboneWriterForTests(async () => '{"sections": [2]}');
+    const more = await readMoreSections(bb!.unread, "why was it withdrawn", ["why it was withdrawn"]);
+    expect(more.headings).toEqual(["Withdrawal"]);
+    expect(more.text).toContain("withdrew the handbook in 1999");
+    expect(await readMoreSections([], "q", ["a"])).toEqual({ text: "", headings: [] });
+    expect(await readMoreSections(bb!.unread, "q", [])).toEqual({ text: "", headings: [] });
   });
 });
