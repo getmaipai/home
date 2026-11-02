@@ -60090,6 +60090,107 @@
                     "engine_ready": {
                       "type": "boolean"
                     },
+                    "tiers": {
+                      "type": "object",
+                      "properties": {
+                        "standard": {
+                          "type": "object",
+                          "properties": {
+                            "ready": {
+                              "type": "boolean"
+                            },
+                            "max_seconds": {
+                              "type": "number"
+                            },
+                            "sound": {
+                              "type": "boolean"
+                            },
+                            "model": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "wan",
+                                "ltx23",
+                                "ltx25",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "ready",
+                            "max_seconds",
+                            "sound",
+                            "model"
+                          ]
+                        },
+                        "boost": {
+                          "type": "object",
+                          "properties": {
+                            "ready": {
+                              "type": "boolean"
+                            },
+                            "max_seconds": {
+                              "type": "number"
+                            },
+                            "sound": {
+                              "type": "boolean"
+                            },
+                            "model": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "wan",
+                                "ltx23",
+                                "ltx25",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "ready",
+                            "max_seconds",
+                            "sound",
+                            "model"
+                          ]
+                        },
+                        "max": {
+                          "type": "object",
+                          "properties": {
+                            "ready": {
+                              "type": "boolean"
+                            },
+                            "max_seconds": {
+                              "type": "number"
+                            },
+                            "sound": {
+                              "type": "boolean"
+                            },
+                            "model": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "wan",
+                                "ltx23",
+                                "ltx25",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "ready",
+                            "max_seconds",
+                            "sound",
+                            "model"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "description": "Which levels this person can use now and how long a clip each makes (Max is not offered yet)."
+                    },
                     "adult_styles": {
                       "type": "boolean"
                     },
@@ -60119,6 +60220,7 @@
                     "can_make",
                     "reason",
                     "engine_ready",
+                    "tiers",
                     "adult_styles",
                     "limits",
                     "styles"
