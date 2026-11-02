@@ -17,6 +17,7 @@ import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos
 import { until } from "./pictureFixture";
 import { storeFile } from "@/lib/attachments";
 import { PACKAGES_DIR } from "@/lib/paths";
+import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { join } from "node:path";
 import sharp from "sharp";
 import type { PersonRow } from "@/types";
@@ -294,6 +295,33 @@ describe("Make it Max", () => {
     const rows = await data(owner, { scope: "feed" });
     expect(rows[0]).toMatchObject({ id: made.id, tier: "max" });
     expect(rows[0]!.tags).toContain("Max");
+  });
+});
+
+describe("Make it Max on a clip that started from a picture", () => {
+  const png = async () => new Uint8Array(await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 9, g: 99, b: 199 } } }).png().toBuffer());
+  test("it is refused while the Max model cannot start from a picture, and keeps the Start frame when it can", async () => {
+    const { owner, row } = await household();
+    const sage = row("Sage");
+    const made = storeFile(sage, { conversationId: null, turnId: null, mediaType: "image/png", bytes: await png(), provenance: "composer:upload", retention: "kept", deduplicate: false });
+    if (!made.ok) throw new Error(made.error);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
+    fake.ltx25 = "ready";
+    fake.ltx25max = "ready";
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed", ltx25Picture: true }));
+    const first = await makeClip(owner, sage, { prompt: BOAT, start_frame: made.value.id });
+    const refused = await action(owner, "max", { id: first.jobId });
+    expect(refused.status).toBe(422);
+    expect(((await refused.json()) as { code: string }).code).toBe("max_words_only");
+    const submitted = fake.submitted.length;
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed", ltx25Picture: true, ltx25maxPicture: true }));
+    const ok = await action(owner, "max", { id: first.jobId });
+    expect(ok.status).toBe(200);
+    expect(fake.submitted).toHaveLength(submitted + 1);
+    const sent = fake.submitted[submitted]!;
+    expect(sent.model).toBe("ltx25-max");
+    expect(sent.image_source).toBe("uploaded");
+    expect(typeof sent.image).toBe("string");
   });
 });
 

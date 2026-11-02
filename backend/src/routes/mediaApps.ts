@@ -189,7 +189,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state !== "done") return c.json({ error: "That video isn't available any more. Make a new one from the words on the left.", code: "gone" }, 404);
     const audience = makeAudienceOf(person);
-    const make = bodyOfVideoJob(source);
+    // A clip that started from a Library picture keeps it (as Another take does); makeItMaxBody refuses it unless the Max model can start from a picture.
+    const start = source.kind === "animate" && source.request.source_file_id ? { start_frame: source.request.source_file_id } : {};
+    const make = { ...bodyOfVideoJob(source), ...start };
     const max = await makeItMaxBody(person, audience.band, source, make);
     if (!max.ok) return c.json({ error: max.line, code: max.why }, max.why === "max_not_ready" ? 503 : 422);
     const made = await makeVideoFor(person, make, { audience });
