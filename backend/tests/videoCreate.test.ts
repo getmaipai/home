@@ -194,11 +194,19 @@ describe("the Create page and the make action", () => {
     const again = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
     // VIDEO-UI-06: two panes, the panel on the left, and nothing of the old three pages.
-    const split = page.body[0] as Record<string, any>;
+    // VIDEO-STUDIO-08: the page takes the Music Studio look: the studio surface, a studio header (eyebrow CREATE, title from the bound row) above the two panes.
+    expect((page as Record<string, any>).surface).toBe("studio");
+    const header = page.body[0] as Record<string, any>;
+    expect(header).toMatchObject({ type: "creation_header", variant: "studio", eyebrow: "Create", bind: { source: "package", path: "recipes", params: { scope: "header" } } });
+    expect(header.primary).toBeUndefined();
+    expect(await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "header" })).json()).toEqual([{ title: "Make any video" }]);
+    const split = page.body[1] as Record<string, any>;
     expect(split.type).toBe("split_view");
     expect(split.aside_side).toBe("start");
     // VIDEO-UI-15: the roomy panel on a recessed stage, a large prompt box, the Style banner with its wide popover, the time inside the button.
-    expect(split).toMatchObject({ aside_width: "wide", main_surface: "stage" });
+    // VIDEO-STUDIO-08: the recessed stage is replaced by the studio surface, so the panes no longer ask for one.
+    expect(split).toMatchObject({ aside_width: "wide" });
+    expect(split.main_surface).toBeUndefined();
     expect(bar.field_size).toBe("large");
     expect(chip("look")).toMatchObject({ trigger: "banner", popover_size: "wide" });
     if (bar.tier) expect(bar.tier.presentation).toBe("cards");
@@ -221,6 +229,8 @@ describe("the Create page and the make action", () => {
     expect(section.heading).toBe("Your clips");
     const feedNode = section.children[0] as Record<string, any>;
     expect(feedNode.type).toBe("result_feed");
+    expect(feedNode.heading_style).toBe("eyebrow");
+    expect((split.main as Array<Record<string, any>>)[0]).toMatchObject({ type: "media_shelf", heading: "Try this", heading_style: "eyebrow" });
     expect(feedNode).toMatchObject({ look: "media", filters_presentation: "popover" });
     expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });
     expect(feedNode.bind.params.scope).toBe("feed");

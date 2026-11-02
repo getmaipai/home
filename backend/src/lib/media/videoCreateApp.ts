@@ -164,6 +164,8 @@ registerMediaAppData("videos", (person, dataId, params) => {
   switch (params.scope) {
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
     case "showcase": return showcaseRows();
+    // VIDEO-STUDIO-08: the page header row (the studio `creation_header` reads its title from a bound row). The same for everyone who may open the page.
+    case "header": return [{ title: "Make any video" }];
     case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
     case "clips": return clipRows(person, params.view, Math.min(params.limit ?? 200, 200));

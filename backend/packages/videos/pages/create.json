@@ -2,7 +2,48 @@
   "type": "page",
   "id": "videos-create",
   "title": "Create",
+  "surface": "studio",
   "body": [
+    {
+      "type": "creation_header",
+      "variant": "studio",
+      "eyebrow": "Create",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "header"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      }
+    },
     {
       "type": "split_view",
       "aside_side": "start",
@@ -95,7 +136,8 @@
             }
           },
           "media_loop": true,
-          "item_loop_field": "loop"
+          "item_loop_field": "loop",
+          "heading_style": "eyebrow"
         },
         {
           "type": "section",
@@ -252,13 +294,13 @@
                 "text": "Your clips show here. Pick a tile or describe a video on the left and press Generate."
               },
               "look": "media",
-              "filters_presentation": "popover"
+              "filters_presentation": "popover",
+              "heading_style": "eyebrow"
             }
           ]
         }
       ],
-      "aside_width": "wide",
-      "main_surface": "stage"
+      "aside_width": "wide"
     }
   ]
 }
