@@ -31,9 +31,16 @@ function chatBriefWriter(signal?: AbortSignal): StageWriter {
     return result.ok ? result.value.text : null;
   };
 }
+/** The time one research-stage call (query writer, analysis) may take: 15 s plus 50 ms per token it may write (about 20 tokens a second), at most
+ * 60 s. The cap keeps one lost stage from eating the whole two-minute research budget; the 30 s client default was too short for a long reply
+ * from an engine under load. */
+export function stageTimeoutMs(maxTokens: number): number {
+  return Math.min(60_000, 15_000 + maxTokens * 50);
+}
+
 function chatAnalysisWriter(maxTokens: number, signal?: AbortSignal): StageWriter {
   return async (prompt) => {
-    const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: maxTokens, temperature: 0.2, thinking: false, ...(signal ? { signal } : {}) });
+    const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: maxTokens, temperature: 0.2, thinking: false, timeoutMs: stageTimeoutMs(maxTokens), ...(signal ? { signal } : {}) });
     return result.ok ? result.value.text : null;
   };
 }
@@ -358,7 +365,8 @@ export interface ReplyCoverage {
 export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledger: string, assumption: string | null, coverage: ReplyCoverage = {}): string {
   const lines: string[] = [];
   if (assumption) lines.push(`Begin with one plain sentence saying what you took the question to mean: "${assumption.replace(/"/g, "'")}"`);
-  if (analysis && (analysis.claims.length > 0 || analysis.guesses.length > 0)) {
+  const analysed = !!analysis && (analysis.claims.length > 0 || analysis.guesses.length > 0);
+  if (analysis && analysed) {
     lines.push("Analysis of the notes (write the answer from it):");
     for (const status of ["established", "reported", "contested", "inferred"] as const) {
       const group = analysis.claims.filter((c) => c.status === status);
@@ -369,9 +377,17 @@ export function replyBrief(brief: Brief | null, analysis: Analysis | null, ledge
     if (analysis.guesses.length > 0) lines.push(`Guesses to present as guesses, each with its reasons:\n${analysis.guesses.map((g) => `- (${g.confidence}) ${g.guess} because ${g.because.join("; ")} ${cites(g.sources)}`.trim()).join("\n")}`);
     if (coverage.read) lines.push(`More of the article, read for the parts the notes did not cover (use it for those parts and cite the article. A part that the analysis, the notes, the article or this text speaks to is answered from them and is never listed as not found; only a part none of them speaks to is written as not found in the sources):\n${coverage.read}`);
     if (coverage.missing && coverage.missing.length > 0) lines.push(`Nothing in the notes or the article speaks to: ${coverage.missing.map((m) => `"${m.replace(/"/g, "'")}"`).join("; ")}. For each of these write that it was not found in the sources; state no fact for it.`);
+  }
+  // The answer's shape (what the first sentence names, the shared-name line, the parts to cover, no invented fact, the word target) holds with or
+  // without an analysis: a missing analysis (the stage failed or timed out) must not leave the writer without it.
+  const shapeParts = coverage.parts?.length ? coverage.parts : brief?.mustContain ?? [];
+  if (analysed || shapeParts.length > 0 || coverage.pinned || brief) {
     if (coverage.pinned?.unsettled) lines.push(`The question's details do not tell "${coverage.pinned.title.replace(/"/g, "'")}" from "${coverage.pinned.unsettled.title.replace(/"/g, "'")}". The notes and the article are about the first. The second opens: ${coverage.pinned.unsettled.lead.replace(/"/g, "'")} In the first sentence say which one you read and that the question fits both, then cover the other one briefly from that opening (marked as read from its opening only), or say which one you chose and why.`);
-    else     if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
-    lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${(coverage.parts?.length ? coverage.parts : brief?.mustContain ?? []).length ? `, covering ${(coverage.parts?.length ? coverage.parts : brief?.mustContain ?? []).join("; ")}` : ""}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry.${coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : ""}`);
+    else if (coverage.pinned && coverage.pinned.alternatives.length > 0) lines.push(`The subject's name is shared: besides "${coverage.pinned.title.replace(/"/g, "'")}" there are ${coverage.pinned.alternatives.map((t) => `"${t.replace(/"/g, "'")}"`).join("; ")}. The notes and the article are about "${coverage.pinned.title.replace(/"/g, "'")}". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`);
+    const covering = shapeParts.length ? `, covering ${shapeParts.join("; ")}` : "";
+    const words = coverage.words ? ` Aim for about ${coverage.words} words, and use more only if the question truly needs it.` : "";
+    if (analysed) lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${covering}; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry.${words}`);
+    else lines.push(`Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version)${covering}; then the points the notes and the article support, each with its [n]; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the notes and the article do not carry.${words}`);
   }
   if (ledger) lines.push(ledger);
   return lines.join("\n\n");

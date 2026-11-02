@@ -117,6 +117,8 @@ export interface LlmCompleteOptions {
   /** Non-streaming answer budget; streaming callers own their total ceiling. */
   max_tokens?: number;
   signal?: AbortSignal;
+  /** How long the Stack may take to answer this one non-streaming call, in ms. Omitted: the client default (30 s). */
+  timeoutMs?: number;
   /** Hard engine ceiling, only for a documented smoke check. */
   exactCeiling?: boolean;
   /** Off by default (Jesse, 2026-09-04: "thinking mode off by default
@@ -456,7 +458,7 @@ export function toWireMessage(message: LlmMessage): Omit<LlmMessage, "images" | 
 }
 
 function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
-  const { thinking, dropReasoning, returnReasoning: _returnReasoning, exactCeiling: _exactCeiling, signal: _signal, tools, tool_choice, ...rest } = opts;
+  const { thinking, dropReasoning, returnReasoning: _returnReasoning, exactCeiling: _exactCeiling, signal: _signal, timeoutMs: _timeoutMs, tools, tool_choice, ...rest } = opts;
   const offering = !!tools && tools.length > 0;
   return {
     offering,
@@ -526,10 +528,10 @@ export type StackChatResult =
 /** Shared non-streaming Stack chat call for ordinary chat and the
  * background worker's judge request. Keeps identity and Repairs handling
  * in the same path for every caller. */
-async function stackRequestOnce(role: string, request: RoleRequest, signal?: AbortSignal): Promise<StackChatResult> {
+async function stackRequestOnce(role: string, request: RoleRequest, signal?: AbortSignal, timeoutMs?: number): Promise<StackChatResult> {
   try {
     const client = getStackClient();
-    const result = await client.chat(request, { signal });
+    const result = await client.chat(request, { signal, ...(timeoutMs !== undefined ? { timeoutMs } : {}) });
     if ("stream" in result) {
       // complete() never asks for stream: true; a Stack that streamed
       // anyway is a contract break worth a loud, distinct failure rather
@@ -607,7 +609,7 @@ export async function completeViaStackRequest(role: string, request: RoleRequest
 
 async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions): Promise<LlmOpResult> {
   const { offering, body } = chatRequestBody(messages, opts);
-  const result = await stackRequestOnce(role, { ...body, model: opts.model ?? role }, opts.signal);
+  const result = await stackRequestOnce(role, { ...body, model: opts.model ?? role }, opts.signal, opts.timeoutMs);
   if (!result.ok) return result.failure;
   const data = result.data as { choices?: Array<{ finish_reason?: string | null; message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
     const choice = data.choices?.[0];

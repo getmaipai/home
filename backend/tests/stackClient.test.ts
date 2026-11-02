@@ -430,6 +430,16 @@ describe("createStackClient", () => {
     await expectStackError(() => client.voicePreview("bad"), "unexpected", "the Stack returned a preview that was not a WAV");
   });
 
+  test("chat takes a per-call timeout: a reply slower than the client default still arrives when the caller allows longer", async () => {
+    // The real case is a 40 s reply against the 30 s default; the delays are scaled down (40 ms against 10 ms).
+    const slow = (async () => { await new Promise((resolve) => setTimeout(resolve, 40)); return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "late" } }] }), { headers: { "content-type": "application/json", ...IDENTITY_HEADERS } }); }) as unknown as typeof fetch;
+    const client = createStackClient({ baseUrl, timeoutMs: 10, fetch: slow });
+    const request = { model: "chat", messages: [{ role: "user", content: "hi" }] } as never;
+    await expect(client.chat(request)).rejects.toMatchObject({ kind: "timeout" });
+    const reply = await client.chat(request, { timeoutMs: 2_000 });
+    expect("data" in reply && JSON.stringify(reply.data)).toContain("late");
+  });
+
   test("voicePreview tolerates the long first download without the default timeout", async () => {
     const client = createStackClient({ baseUrl, timeoutMs: 1, fetch: (async () => { await new Promise((resolve) => setTimeout(resolve, 40)); return new Response("slow-wav", { headers: { "content-type": "audio/wav" } }); }) as unknown as typeof fetch });
     expect(await (await client.voicePreview("slow")).text()).toBe("slow-wav");

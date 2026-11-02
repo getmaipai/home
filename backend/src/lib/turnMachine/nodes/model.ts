@@ -2,7 +2,7 @@ import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
-import { ANSWER_WORDS, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planData, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
+import { ANSWER_WORDS, stageTimeoutMs, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planData, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchEvidence, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
@@ -789,7 +789,7 @@ const WRITER_QUERIES_FIRST = 6;
 const WRITER_QUERIES_LATER = 3;
 function chatQueryWriter(signal: AbortSignal): QueryWriter {
   return async (prompt) => {
-    const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 320, temperature: 0.3, thinking: false, signal });
+    const result = await complete("chat", [{ role: "user", content: prompt }], { max_tokens: 320, temperature: 0.3, thinking: false, timeoutMs: stageTimeoutMs(320), signal });
     return result.ok ? result.value.text : null;
   };
 }

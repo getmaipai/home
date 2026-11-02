@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
-  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ledgerForAnalysis, partsFor, repairJson, type Brief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ANALYSIS_TOKENS, stageTimeoutMs, ledgerForAnalysis, partsFor, repairJson, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
@@ -427,5 +427,53 @@ describe("plan angles and the pick-retry (RESEARCH-ANGLES-01)", () => {
     const withItems: Brief = { ...brief, mustContain: ["m1"] };
     expect(replyBrief(withItems, analysis, "", null, { parts: ["p1", "p2"] })).toContain("covering p1; p2");
     expect(replyBrief(withItems, analysis, "", null)).toContain("covering m1");
+  });
+});
+
+describe("the answer shape does not depend on the analysis", () => {
+  const shapeBrief: Brief = { subject: "s", answerType: "an explanation", mustContain: ["m1"], ambiguous: false, options: [], question: "", assumption: "" };
+
+  test("with no analysis the writer still gets the first-sentence rule, the parts, the shared-name line and the word target", () => {
+    const text = replyBrief(shapeBrief, null, "", null, { parts: ["p1"], pinned: { title: "Alpha (1984 television series)", alternatives: ["Alpha (1983 miniseries)"] }, words: ANSWER_WORDS.max });
+    expect(text).toContain("first sentence that names what the question is about");
+    expect(text).toContain("covering p1");
+    expect(text).toContain("name is shared");
+    expect(text).toContain("Aim for about 450 words");
+    expect(text).not.toContain("analysis");
+    expect(text).toContain("Add no fact the notes and the article do not carry");
+  });
+
+  test("with an analysis the brief is the same as before the shape moved out of the analysed branch", () => {
+    const analysis = { claims: [{ claim: "c", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: [] };
+    const text = replyBrief(shapeBrief, analysis, "LEDGER", "I took this to mean x.", { parts: ["p1"], words: ANSWER_WORDS.max, pinned: { title: "Alpha", alternatives: ["Alpha B"] } });
+    expect(text).toBe([
+      `Begin with one plain sentence saying what you took the question to mean: "I took this to mean x."`,
+      "Analysis of the notes (write the answer from it):",
+      "established:\n- c [1]",
+      `The subject's name is shared: besides "Alpha" there are "Alpha B". The notes and the article are about "Alpha". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`,
+      "Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version), covering p1; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each; then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry. Aim for about 450 words, and use more only if the question truly needs it.",
+      "LEDGER",
+    ].join("\n\n"));
+  });
+
+  test("the analysis stage asks the Stack for a timeout sized to its token budget, capped at 60 s", async () => {
+    const { __setStackClientForTests, __resetStackEngineForTests } = await import("@/lib/stackEngine");
+    const seen: Array<number | undefined> = [];
+    __setStackClientForTests({
+      chat: async (_req: unknown, opts?: { timeoutMs?: number }) => { seen.push(opts?.timeoutMs); return { data: { choices: [{ finish_reason: "stop", message: { role: "assistant", content: "{}" } }] }, identity: { host: "local", build: "b", model: "m", healthy: null } }; },
+    } as never);
+    __setStageWritersForTests(undefined);
+    try {
+      const findings = { ledger: { text: "[1] note", notes: 1 } } as never;
+      await analyse(null, "q", findings, new Set([1]), "max");
+      await analyse(null, "q", findings, new Set([1]), "thinking");
+    } finally {
+      __resetStackEngineForTests();
+    }
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    expect(stageTimeoutMs(320)).toBe(31_000);
+    expect(stageTimeoutMs(5_000)).toBe(60_000);
+    expect(seen[0]).toBe(stageTimeoutMs(ANALYSIS_TOKENS.max));
+    expect(seen[1]).toBe(stageTimeoutMs(ANALYSIS_TOKENS.thinking));
   });
 });

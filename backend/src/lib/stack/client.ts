@@ -126,7 +126,7 @@ export interface StackClient {
   codingModels?(opts?: { signal?: AbortSignal }): Promise<StackCodingModels>;
   /** POST /v1/chat/completions. For `stream: true` the Response body reader
    * and its headers come back, not parsed data. */
-  chat(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<
+  chat(request: RoleRequest, opts?: { signal?: AbortSignal; /** Replaces the client timeout for this one call (ms). */ timeoutMs?: number }): Promise<
     | { data: Record<string, unknown>; identity: EngineIdentity }
     | { stream: ReadableStream<Uint8Array>; headers: Headers }
   >;
@@ -288,8 +288,8 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     return new StackError("timeout", "the Stack stopped answering before it finished");
   }
 
-  function wrapFetch(promise: Promise<Response>): Promise<Response> {
-    return withTimeout(promise, timeoutMs, timeoutError);
+  function wrapFetch(promise: Promise<Response>, ms: number = timeoutMs): Promise<Response> {
+    return withTimeout(promise, ms, timeoutError);
   }
 
   function wrapError(err: unknown): never {
@@ -357,11 +357,11 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     path: string,
     init: RequestInit,
     parse: (res: Response) => T | Promise<T>,
-    opts?: { signal?: AbortSignal },
+    opts?: { signal?: AbortSignal; timeoutMs?: number },
   ): Promise<T> {
     let res: Response;
     try {
-      res = await wrapFetch(doFetch(base + path, { ...init, signal: opts?.signal }));
+      res = await wrapFetch(doFetch(base + path, { ...init, signal: opts?.signal }), opts?.timeoutMs ?? timeoutMs);
     } catch (err) {
       wrapError(err);
     }
@@ -383,7 +383,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       if (stream) {
         let res: Response;
         try {
-          res = await wrapFetch(doFetch(base + "/v1/chat/completions", { ...jsonInit(request), signal: opts?.signal }));
+          res = await wrapFetch(doFetch(base + "/v1/chat/completions", { ...jsonInit(request), signal: opts?.signal }), opts?.timeoutMs ?? timeoutMs);
         } catch (err) {
           wrapError(err);
         }
