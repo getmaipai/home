@@ -144,4 +144,17 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
       expect(() => withTurnToolGates({ ...base, max_tools: 15 }, true, true, true, true, true)).toThrow(/exceeds the model cap/);
     } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
   });
+  test("VIDEO-CHAT-01: edit_video needs the video gate and a clip; past sixteen the music set shrinks first and the video set stays", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    expect(withTurnToolGates(base, true, true, false, true, true, false, false, true).tools_offered).not.toContain("edit_video");
+    expect(withTurnToolGates(base, true, true, true, true, true, false, false, false).tools_offered).not.toContain("edit_video");
+    const link = { ...VIRTUAL_TOOL_REGISTRY[0]!, id: "read_link" };
+    VIRTUAL_TOOL_REGISTRY.push(link);
+    try {
+      const full = withTurnToolGates(base, true, true, true, true, true, false, false, true).tools_offered;
+      expect(full.length).toBeLessThanOrEqual(16);
+      expect(full).toEqual(expect.arrayContaining(["generate_video", "edit_video", "generate_music", "read_link"]));
+      expect(full).not.toContain("edit_music");
+    } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
+  });
 });

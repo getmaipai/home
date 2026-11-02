@@ -193,3 +193,40 @@ describe("MUSIC-LIKE-01: make_band follows a song reference, never the wording",
   });
 });
 
+
+describe("VIDEO-CHAT-01: edit_video is offered only where a clip exists and a video may be made", () => {
+  test("an adult with video ready and a finished clip in the chat is offered it; with no clip, or no engine, it is not", async () => {
+    const adult = makePerson("owner");
+    setReady(true);
+    expect(await offered(adult, { videoEditAvailable: () => true })).toContain("edit_video");
+    expect(await offered(adult, { videoEditAvailable: () => false })).not.toContain("edit_video");
+    expect(await offered(adult)).not.toContain("edit_video");
+    expect(await offered(adult, { videoEditAvailable: () => true })).toContain("generate_video");
+    setReady(false);
+    expect(await offered(adult, { videoEditAvailable: () => true })).not.toContain("edit_video");
+  });
+  test("a teen, a child, a guest, a spoken turn and a bare turn are never offered it, clip or not", async () => {
+    setReady(true);
+    const yes = { videoEditAvailable: () => true };
+    expect(await offered(makePerson("child", "person-child"), { ...yes, band: "child" })).not.toContain("edit_video");
+    expect(await offered(makePerson("teen", "person-teen"), { ...yes, band: "teen" })).not.toContain("edit_video");
+    expect(await offered(makePerson("guest", "person-guest"), yes)).not.toContain("edit_video");
+    expect(await offered(makePerson("owner"), { ...yes, surfaceClass: "spoken", spoken: true })).not.toContain("edit_video");
+    expect(await offered(makePerson("owner", "person-second-owner"), { ...yes, bare: true })).not.toContain("edit_video");
+  });
+  test("it latches for the chat once a clip exists and still needs the live gates", async () => {
+    const adult = makePerson("owner");
+    setReady(true);
+    expect(await offered(adult, { conversationId: "video-edit-chat", videoEditAvailable: () => true })).toContain("edit_video");
+    expect(await offered(adult, { conversationId: "video-edit-chat" })).toContain("edit_video");
+    expect(await offered(adult, { conversationId: "video-edit-chat", bare: true })).not.toContain("edit_video");
+  });
+  test("every other gate on at once, with the planned link reader, still fits sixteen and keeps the video set", async () => {
+    const adult = makePerson("owner");
+    setReady(true);
+    const all = await offered(adult, { text: link, musicEditAvailable: () => true, videoEditAvailable: () => true });
+    expect(all).toContain("edit_video");
+    expect(all).toContain("generate_video");
+    expect(all.length).toBeLessThanOrEqual(16);
+  });
+});

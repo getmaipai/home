@@ -1,6 +1,6 @@
 {
   "id": "generate_video",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What the video shows, written as a full description in plain English: the subject, what moves, the setting and the light or mood, built from what the person asked for. For a picture that moves, describe the motion. Keep their own words for names. Follow the model's content rules and refusal decisions; Home blocks CSAM and applies age and surface access rules. Do not add people, objects or themes they did not ask for. A video exists only if you called this tool in this reply: never say one is being made, ready or on its way without calling it, and never describe a clip you did not make."
+        "description": "What the video shows, written as a full description in plain English: the subject, what moves, the setting and the light or mood, built from what the person asked for. For a picture that moves, describe the motion. Keep their own words for names. Follow the model's content rules and refusal decisions; Home blocks CSAM and applies age and surface access rules. Do not add people, objects or themes they did not ask for. A video exists only if you called this tool in this reply: never say one is being made, ready or on its way without calling it, and never describe a clip you did not make. A line a person in the video says goes in quotes, one person speaking at a time."
       },
       "from_picture": {
         "type": "string",
@@ -53,21 +53,48 @@
         "grounded": false,
         "description": "Optional shape of the video. landscape is the default. Use portrait only for a phone-style tall video when the person asks."
       },
+      "look": {
+        "type": "string",
+        "enum": [
+          "natural",
+          "classic-cartoon",
+          "anime",
+          "3d-animated",
+          "film"
+        ],
+        "grounded": false,
+        "description": "Optional look of the video: natural (the default), classic-cartoon (a 1980s hand-drawn cartoon), anime, 3d-animated (a modern 3D animated film) or film (a live-action movie still). Set it only when the person asks for a look or a cartoon. For a cartoon character, also name and describe the character in the prompt and say its era and animation style, for example a 1980s hand-drawn cartoon fox in a red scarf."
+      },
+      "camera": {
+        "type": "string",
+        "enum": [
+          "dolly-in",
+          "slow-orbit",
+          "handheld",
+          "slow-motion",
+          "time-lapse",
+          "aerial",
+          "close-up",
+          "wide-establishing"
+        ],
+        "grounded": false,
+        "description": "Optional camera move or style: dolly-in, slow-orbit, handheld, slow-motion, time-lapse, aerial, close-up or wide-establishing. Set it only when the person asks for that kind of shot."
+      },
+      "voices": {
+        "type": "string",
+        "enum": [
+          "clean",
+          "full"
+        ],
+        "grounded": false,
+        "description": "Optional sound for a clip made at Boost or Max. clean (the default) means no laugh track and no music, and one person speaks at a time. full means music and sound effects too; use it only when the person asks for music or effects. A person's spoken line goes in the prompt inside quotes, and only one person speaks at a time."
+      },
       "seconds": {
         "type": "integer",
         "minimum": 1,
         "maximum": 10,
         "grounded": false,
-        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. A video longer than 5 seconds is made Detailed automatically."
-      },
-      "quality": {
-        "type": "string",
-        "enum": [
-          "quick",
-          "detailed"
-        ],
-        "grounded": false,
-        "description": "Optional. Leave it out for almost every request: Home then uses the household's setting. Use detailed when the person wants the people in the video to talk or speak words, wants sound, music or a sound track, wants it longer than 5 seconds, or wants a custom look; it makes a sound track and speech and starts from words only. Use quick when they want it to start from a picture, or ask for a silent one. When you choose detailed, say so in one short sentence. Spoken words are clearest in a clip of 5 seconds or less, so for a spoken line keep seconds at 5 unless the person asks for longer."
+        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. A video longer than 5 seconds is made at Boost automatically (Standard makes 5 seconds at most). Spoken words are clearest in a clip of 5 seconds or less, so for a spoken line keep it at 5 unless the person asks for longer."
       },
       "tier": {
         "type": "string",
@@ -77,7 +104,7 @@
           "max"
         ],
         "grounded": false,
-        "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
+        "description": "Optional level: standard, boost or max. Leave it out for almost every request; Home then uses the household's setting. Use boost when the person wants people to speak, wants sound or music, wants more than 5 seconds, or a better one. Use max only when they ask for max quality or the biggest model; it is for people an admin allowed, and if it is not allowed the tool says so and you tell the person in your own words. Use standard for \"just a quick one\", or when they want it to start from a picture. Do not use it for age or content reasons."
       },
       "style": {
         "type": "string",

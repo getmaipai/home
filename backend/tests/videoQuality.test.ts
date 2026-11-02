@@ -138,8 +138,8 @@ describe("the tool", () => {
       expect(text).not.toMatch(/\bwan\b|\bltx\b|gemma|fastwan/i);
     });
   });
-  test("quality detailed sends the model, 768x448, and tells the model to say so in one line, with no model names", async () => {
-    await withStub(script({ quality: "detailed" }), async (seen) => {
+  test("tier boost (what the old quality detailed word became; the manifest no longer declares quality) sends the model, 768x448, and tells the model to say so in one line, with no model names", async () => {
+    await withStub(script({ tier: "boost" }), async (seen) => {
       const value = await streamValue(people.owner, "make a video where the hero says come with me");
       const sent = fake.submitted[0]!;
       expect(sent).toMatchObject({ model: "detailed", size: "768x448", seconds: 5 });

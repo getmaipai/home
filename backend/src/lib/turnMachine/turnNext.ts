@@ -4,6 +4,7 @@ import { chatLeaseHeldBy } from "@/lib/chatLease";
 import { SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
 import { isLookupPackage } from "@/lib/ruleNames";
 import { conversationHasMusic } from "@/lib/music/jobs";
+import { conversationHasVideo } from "@/lib/videos/jobs";
 import { pageContextForTurn } from "@/lib/pageContext";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
@@ -666,8 +667,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ephemeral: opts.ephemeral === true,
     text,
     musicEditAvailable: () => conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
+    videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
   });
-  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk } = gated;
+  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -688,6 +690,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(videosOk ? { videosAllowed: true } : {}),
     ...(musicOk ? { musicAllowed: true } : {}),
     ...(musicEditOk ? { musicEditAllowed: true } : {}),
+    ...(videoEditOk ? { videoEditAllowed: true } : {}),
     ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
     ...(musicBandOk ? { musicBandAllowed: true } : {}),
     modelId: opts.model,

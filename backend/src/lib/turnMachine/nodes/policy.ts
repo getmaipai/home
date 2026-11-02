@@ -22,6 +22,7 @@ import { modelFacingArgs } from "./tool";
 import { OWN_WORDS_CALL_ID } from "./model";
 import { GENERATE_IMAGE_TOOL_ID, audienceOf, refusalFor } from "@/lib/pictures/tool";
 import { GENERATE_VIDEO_TOOL_ID, videoAudienceOf, videoRefusalFor } from "@/lib/videos/tool";
+import { EDIT_VIDEO_TOOL_ID } from "@/lib/videos/editTool";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
 import { brakeFor, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
@@ -428,10 +429,11 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
     }
 
-    if (call.tool === GENERATE_VIDEO_TOOL_ID) {
+    if (call.tool === GENERATE_VIDEO_TOOL_ID || call.tool === EDIT_VIDEO_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const videoProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
-      const refusal = !state.videosAllowed ? { kind: "denied" as const } : videoRefusalFor(videoAudienceOf(state, false), callArgs);
+      const offered = call.tool === EDIT_VIDEO_TOOL_ID ? state.videoEditAllowed : state.videosAllowed;
+      const refusal = !offered ? { kind: "denied" as const } : videoRefusalFor(videoAudienceOf(state, false), callArgs);
       if (refusal) {
         const reason = refusal.kind === "denied" ? "video_not_here" as const : "video_refused_minor" as const;
         noteRefusal(reason);

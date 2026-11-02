@@ -1,0 +1,141 @@
+{
+  "id": "edit_video",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Change a Video",
+  "description": "Make another take, a remix or a Max version of a video made here, and keep every version.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "videoEditAllowed",
+    "bench_row": "video-edit-tool",
+    "reason": "adult on their own written screen with video on and a Stack video model; this chat already holds a finished video"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "do another one",
+      "make it anime",
+      "same video but at night",
+      "make it max quality",
+      "try that again with a slow camera move",
+      "make it longer"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "clip",
+      "change"
+    ],
+    "properties": {
+      "clip": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Which video: \"latest\" for the newest one in this chat, or a video id. Use latest unless the person names another."
+      },
+      "change": {
+        "type": "string",
+        "enum": [
+          "another_take",
+          "remix",
+          "make_it_max"
+        ],
+        "grounded": false,
+        "description": "another_take makes the same video again with a new random result. remix makes it again with the changes the person asked for: set only the fields they changed. make_it_max makes the same video at the Max level; it is for people an admin allowed and the tool says so if not, and you tell the person in your own words. A video exists only if you called this tool in this reply: never say one is being made without calling it."
+      },
+      "prompt": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 1200,
+        "grounded": false,
+        "description": "For remix only: the new full description of the video, when the person changed what it shows. A line a person says goes in quotes, one person speaking at a time. Cartoon characters should be named and described with their era and animation style."
+      },
+      "look": {
+        "type": "string",
+        "enum": [
+          "natural",
+          "classic-cartoon",
+          "anime",
+          "3d-animated",
+          "film"
+        ],
+        "grounded": false,
+        "description": "For remix only: a new look, when the person asks for one."
+      },
+      "camera": {
+        "type": "string",
+        "enum": [
+          "dolly-in",
+          "slow-orbit",
+          "handheld",
+          "slow-motion",
+          "time-lapse",
+          "aerial",
+          "close-up",
+          "wide-establishing"
+        ],
+        "grounded": false,
+        "description": "For remix only: a new camera move or style, when the person asks for one."
+      },
+      "voices": {
+        "type": "string",
+        "enum": [
+          "clean",
+          "full"
+        ],
+        "grounded": false,
+        "description": "For remix only: clean means no laugh track and no music; full adds music and sound effects. Use full only when the person asks for music or effects."
+      },
+      "tier": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "boost",
+          "max"
+        ],
+        "grounded": false,
+        "description": "For remix only: a new level, when the person asks for more or less quality. Max is for people an admin allowed."
+      },
+      "seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10,
+        "grounded": false,
+        "description": "For remix only: a new length in seconds, 1 to 10. More than 5 seconds is made at Boost."
+      },
+      "keep_seed": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "For remix only: true when the person wants the same result with the change, as close to the first as possible. Leave it out otherwise."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

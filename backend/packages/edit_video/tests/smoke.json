@@ -1,0 +1,17 @@
+{
+  "description": "Recipe fallback; native chat jobs and gates are covered in backend/tests/videoEdit.test.ts.",
+  "inputs": {
+    "clip": "latest"
+  },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Videos can only be changed through chat on your own screen. Ask chat to change a video made here.",
+      "speech": "Videos can only be changed through chat on your own screen. Ask chat to change a video made here."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

@@ -3,7 +3,7 @@
 // (rule 6: a failed video never fails the answer). A temporary or Incognito chat keeps the job and its clip in
 // memory only (a two-hour window, gone with the chat); every other job is a row in `video_jobs` so a reload, a
 // second device and a restart all show the same card. Same shape as lib/pictures/jobs.ts, on purpose.
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile } from "@/lib/attachments";
@@ -186,6 +186,32 @@ export function getVideoJobFor(actor: PersonRow, id: string): VideoJob | null {
   if (live) return live.personId === actor.id ? live : null;
   const row = db.select().from(videoJobs).where(eq(videoJobs.id, id)).get();
   return row && row.personId === actor.id ? fromRow(row) : null;
+}
+
+/** VIDEO-CHAT-01: the finished clips of one person, newest first: this conversation's when given (a temporary chat keeps its own in memory), else every clip the person made (the Videos pane). */
+export function doneVideoJobsFor(actor: PersonRow, conversationId: string | null, temporary: boolean): VideoJob[] {
+  const jobs = new Map<string, VideoJob>();
+  const wanted = (job: VideoJob) => job.personId === actor.id && job.state === "done" && job.files.length > 0 && (conversationId === null || job.conversationId === conversationId);
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (wanted(job) && job.temporary === temporary) jobs.set(job.id, job);
+  if (!temporary) {
+    const rows = db.select().from(videoJobs).where(conversationId === null ? and(eq(videoJobs.personId, actor.id), eq(videoJobs.state, "done")) : and(eq(videoJobs.personId, actor.id), eq(videoJobs.conversationId, conversationId), eq(videoJobs.state, "done"))).orderBy(desc(videoJobs.createdAt)).all();
+    for (const row of rows) if (!jobs.has(row.id)) { const job = fromRow(row); if (wanted(job)) jobs.set(job.id, job); }
+  }
+  return [...jobs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+}
+
+/** The clip an edit names: "latest" or a video job id, a finished clip of this person (in this chat when there is one). */
+export function sourceVideoJob(actor: PersonRow, conversationId: string | null, clip: string, temporary: boolean): VideoJob | null {
+  const wanted = clip.trim();
+  if (!wanted || /^(latest|last|this|that)$/i.test(wanted)) return doneVideoJobsFor(actor, conversationId, temporary)[0] ?? null;
+  const job = getVideoJobFor(actor, wanted);
+  // A temporary chat never edits a saved clip and a saved chat never edits a temporary one.
+  return job && job.temporary === temporary && job.state === "done" && job.files.length > 0 ? job : null;
+}
+
+/** Whether this chat already holds a finished clip (the offer gate for `edit_video`). */
+export function conversationHasVideo(actor: PersonRow, conversationId: string, temporary: boolean): boolean {
+  return doneVideoJobsFor(actor, conversationId, temporary).length > 0;
 }
 
 /** Every job of one turn in creation order. */

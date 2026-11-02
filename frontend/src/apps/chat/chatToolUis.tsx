@@ -680,6 +680,8 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
           <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
         ],
       } : {})}
+      // VIDEO-CHAT-01: the same word as the Create page's button row; the kit button already calls the same `another` (a new seed, same words and choices).
+      copy={{ makeAnother: "Another take" }}
       {...(card.can_make_another && status !== "failed" ? { onMakeAnother: () => { void videosApi.another(item.id).then(refresh).catch(refresh); } } : {})}
     />
   );

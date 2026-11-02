@@ -1,0 +1,16 @@
+{
+  "id": "edit_video",
+  "inputs": [
+    {
+      "name": "clip",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Videos can only be changed through chat on your own screen. Ask chat to change a video made here."
+    }
+  ]
+}

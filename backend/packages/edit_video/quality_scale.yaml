@@ -1,0 +1,28 @@
+package: edit_video
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: backend/tests/videoEdit.test.ts covers the changes, the gates and the refusals
+  routing_examples:
+    met: true
+    note: 6 examples in manifest.json
+  privacy_row_per_data_source:
+    met: true
+    note: no data sources; every video is made on this computer and nothing leaves it
+  offline_behavior_stated:
+    met: true
+  smoke_test:
+    met: true
+    note: tests/smoke.json
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+gold:
+  real_service_verified:
+    met: false
+    note: live verification belongs to VIDEO-CHAT-01 bench rows

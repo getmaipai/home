@@ -72,7 +72,7 @@ describe("VideoToolRender", () => {
     await waitFor(() => expect(view.getByRole("status").textContent).toContain("Place in line: 2"));
   });
 
-  test("a finished clip plays in the kit player with its poster, loops, and offers Download, Share and Make another", async () => {
+  test("a finished clip plays in the kit player with its poster, loops, and offers Download, Share and Another take", async () => {
     card = { ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", clip: { url: "/api/videos/jobs/vid-1/files/file-a", poster_url: "/api/videos/jobs/vid-1/files/file-b", width: 832, height: 480, seconds: 5, seed: 7, file_id: "file-a", poster_file_id: "file-b" } })] };
     const view = mount();
     await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
@@ -82,7 +82,7 @@ describe("VideoToolRender", () => {
     expect(video.loop).toBe(true);
     expect(view.getByRole("button", { name: "Download" })).toBeTruthy();
     expect(view.getByRole("button", { name: "Share" })).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Make another" }));
+    fireEvent.click(view.getByRole("button", { name: "Another take" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/videos/jobs/vid-1/another")).toBe(true));
   });
 

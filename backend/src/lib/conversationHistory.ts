@@ -2418,7 +2418,7 @@ function mediaToolNote(pluginId: string | null, turnId?: string): string | null 
   if (pluginId === "generate_music" || pluginId === "edit_music" || pluginId === "make_band") {
     return musicContextNote(turnId ? musicJobStateByTurnId(turnId) : null);
   }
-  if (pluginId === "generate_video") return "[The Make a Video tool was called for this message and started the video the reply speaks of.]";
+  if (pluginId === "generate_video" || pluginId === "edit_video") return "[The Make a Video tool was called for this message and started the video the reply speaks of.]";
   return null;
 }
 

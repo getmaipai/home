@@ -2,7 +2,7 @@
 // plain route (`POST /api/videos/make`). It holds no generation logic of its own: after the same gate the other routes use, it calls
 // `runGenerateVideo`, the one definition the chat tool also runs, as the person's own screen with no chat behind it.
 import type { PersonRow } from "@/types";
-import { runGenerateVideo } from "./tool";
+import { runGenerateVideo, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
 import { getVideoJobFor, type VideoJob } from "./jobs";
 import { videoLookFor, videoRecipeFor, videoVoicesFor } from "./recipes";
 import { MAX_NEEDS_ADMIN_LINE, tierArgument } from "@/lib/tiers";
@@ -12,7 +12,9 @@ import { videoDenial, VIDEO_DENIAL_LINE, type VideoAudience } from "./policy";
 
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+/** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
+export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"] }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 422 | 502 | 503; error: string; code: string };
 
 /** The audience of the Create page: the signed-in person on their own written screen. */
@@ -62,8 +64,8 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
   return { ok: true, body };
 }
 
-export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody): Promise<MakeVideoResult> {
-  const audience = makeAudienceOf(actor);
+export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, context: MakeVideoContext = {}): Promise<MakeVideoResult> {
+  const audience = context.audience ?? makeAudienceOf(actor);
   // Create is for adults on their own screen; nobody under adult is a maker here, whatever the household switch for them says.
   const denial = videoDenial(audience);
   if (denial === "minor" || (denial === null && laneOf(audience) !== "adult")) return { ok: false, status: 403, error: MINOR_MAKE_LINE, code: "minor" };
@@ -73,9 +75,9 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody): Promi
     return { ok: false, status: 422, error: MAX_NEEDS_ADMIN_LINE, code: "max_needs_admin" };
   }
   const outcome = await runGenerateVideo({
-    state: { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.prompt, ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}) },
-    callId: "make", spoken: false, audience,
+    state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
+    args: { prompt: body.prompt, ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}) },
+    callId: context.callId ?? "make", spoken: false, audience, ...(context.prepared ? { prepared: context.prepared } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
   if (outcome.status === "succeeded" && data?.videoJobId) {
@@ -96,11 +98,12 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody): Promi
  * (shape, length, level, camera move, look, voices) go through `makeVideoFor`, so the age and surface gate, the level rules and the
  * one-clip-at-a-time rule are the ones every other make uses; the new job gets a new random seed.
  */
-export async function anotherTakeFor(actor: PersonRow, source: VideoJob): Promise<MakeVideoResult> {
+/** The choices of a stored clip, as the body that makes it again (shape, length, level, camera move, look, voices): one place for Another take, Remix and Make it Max. */
+export function bodyOfVideoJob(source: VideoJob): MakeVideoBody {
   const [w, h] = source.request.size.split("x").map(Number);
   const tier = source.request.tier ?? (source.request.quality === "detailed" ? "boost" : "standard");
   const kept = source.request.create ?? {};
-  return makeVideoFor(actor, {
+  return {
     prompt: source.prompt,
     orientation: w && h && h > w ? "portrait" : "landscape",
     seconds: source.request.seconds,
@@ -108,5 +111,10 @@ export async function anotherTakeFor(actor: PersonRow, source: VideoJob): Promis
     ...(kept.recipe ? { recipe: kept.recipe } : {}),
     ...(kept.look ? { look: kept.look } : {}),
     ...(kept.voices ? { voices: kept.voices } : {}),
-  });
+  };
+}
+
+/** Another take on a clip: the same words and choices through `makeVideoFor`, so the gates, level rules and one-at-a-time rule are the ones every make uses; the new job gets a new random seed. */
+export async function anotherTakeFor(actor: PersonRow, source: VideoJob, context: MakeVideoContext = {}): Promise<MakeVideoResult> {
+  return makeVideoFor(actor, bodyOfVideoJob(source), context);
 }

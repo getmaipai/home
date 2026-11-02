@@ -82,6 +82,8 @@ export interface RunGenerateVideoInput {
   spoken: boolean;
   /** The caller's own audience (the Create route's); a turn leaves it out and the audience is read from the turn. */
   audience?: VideoAudience;
+  /** A picture already loaded and screened by the caller (an edit of a clip that started from one, via `prepareVideoRerun`). */
+  prepared?: { image: string; imageSource: "generated" | "uploaded"; sourceFileId: string; width: number | null; height: number | null };
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -125,8 +127,11 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let portrait = args.orientation === "portrait";
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
   const refuseWith = (line: string) => refused(callId, args, { kind: "child", why: "photos", line });
-  if (from && !state.conversationId) return refuseWith("A picture can start a video from a chat. Open a chat, then ask for it there.");
-  if (isAttached(from)) {
+  if (input.prepared) {
+    image = input.prepared.image; imageSource = input.prepared.imageSource; sourceFileId = input.prepared.sourceFileId;
+    if (input.prepared.width && input.prepared.height) portrait = input.prepared.height > input.prepared.width;
+  } else if (from && !state.conversationId) return refuseWith("A picture can start a video from a chat. Open a chat, then ask for it there.");
+  else if (isAttached(from)) {
     const attached = state.images ?? [];
     if (attached.length !== 1) return refuseWith(PHOTO_ATTACH_LINE);
     const photo = loadUploadedPhoto(actor, state.conversationId!, attached[0]!.id, temporary);
@@ -173,7 +178,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
 
   // VIDEO-CREATE-01: a recipe's wording goes to the Stack after the person's words; the card keeps only what they typed. A child gets none.
-  const recipe = kid ? null : videoRecipeFor(args.recipe);
+  // VIDEO-CHAT-01: `camera` is the declared name; `recipe` is what older calls and the Create page send. `camera` wins.
+  const recipe = kid ? null : videoRecipeFor(args.camera) ?? videoRecipeFor(args.recipe);
   // V1b: a look goes first, clean-dialogue wording last (only on a clip that has sound); neither is shown on the card. A child gets none.
   const look = kid ? null : videoLookFor(args.look);
   const voicesChosen = kid ? null : videoVoicesFor(args.voices);
@@ -198,7 +204,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       body: {
         prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(withVideoTriggerWords(prompt, adapter), look), recipe), voices),
         // A new seed for every clip (stored on the job); Another take rolls a different one.
-        seed: Math.floor(Math.random() * 2_147_483_647),
+        seed: typeof args.seed === "number" && Number.isInteger(args.seed) && args.seed > 0 && args.seed < 2_147_483_647 ? args.seed : Math.floor(Math.random() * 2_147_483_647),
         size,
         seconds,
         ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}),

@@ -2,6 +2,16 @@
 
 All notable changes to the Make a Video package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.0] - 2026-11-02
+
+### Added
+
+- VIDEO-CHAT-01: the arguments the Create page already has are declared, so the model can send them: `look` (natural, classic-cartoon, anime, 3d-animated, film), `camera` (the camera move or style; the code also still reads `recipe`, and `camera` wins) and `voices` (clean or full).
+
+### Changed
+
+- `quality` is no longer declared; `tier` (standard, boost, max) replaces it. A stored or older call that still sends `quality` runs as before (quick is Standard, detailed is Boost).
+
 ## [0.2.0] - 2026-10-17
 
 ### Added

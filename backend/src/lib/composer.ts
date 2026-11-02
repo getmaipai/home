@@ -773,7 +773,7 @@ export function musicForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { i
 
 export function videoForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
   for (const outcome of outcomes) {
-    if (outcome.status !== "succeeded" || outcome.packageId !== "generate_video") continue;
+    if (outcome.status !== "succeeded" || (outcome.packageId !== "generate_video" && outcome.packageId !== "edit_video")) continue;
     const id = recordData(outcome.result?.data)?.videoJobId;
     if (typeof id === "string") return { id };
   }

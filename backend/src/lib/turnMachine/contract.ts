@@ -244,6 +244,8 @@ export interface TurnState {
   picturesAllowed?: boolean;
   /** VIDEO-GEN-05: whether this turn may make videos (videos/policy.ts, rule 0's gates, plus the Stack having a video engine), decided once in beginTurn; `generate_video` is offered only then. */
   videosAllowed?: boolean;
+  /** VIDEO-CHAT-01: this turn may make videos and the chat already holds a finished clip; `edit_video` is offered only then. */
+  videoEditAllowed?: boolean;
   /** MUSIC-GEN-03: age, surface, household switch and Stack readiness; edits also need a made-here song in this chat. */
   musicAllowed?: boolean;
   musicEditAllowed?: boolean;

@@ -26,6 +26,8 @@ export interface TurnToolGateInput {
   ephemeral: boolean;
   text: string;
   musicEditAvailable: () => boolean;
+  /** VIDEO-CHAT-01: whether the chat already holds a finished video (left out: no). */
+  videoEditAvailable?: () => boolean;
 }
 
 interface LatchedToolGates {
@@ -33,6 +35,7 @@ interface LatchedToolGates {
   videoEngineReady: boolean;
   musicEngineReady: boolean;
   musicEditOk: boolean;
+  videoEditOk: boolean;
   itemRefOk: boolean;
   musicBandOk: boolean;
 }
@@ -51,6 +54,7 @@ export interface TurnToolGateResult {
   videosOk: boolean;
   musicOk: boolean;
   musicEditOk: boolean;
+  videoEditOk: boolean;
   itemRefOk: boolean;
   musicBandOk: boolean;
 }
@@ -91,6 +95,12 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   if (latch && musicEditAvailable) latch.musicEditOk = true;
   const musicEditOk = musicEditPermission && (musicEditAvailable || latch?.musicEditOk === true);
 
+  // Adults only: a teen or child can make a clip but never edit one (makeVideoFor refuses them), so the tool is not offered to them.
+  const videoEditPermission = videosOk && videoEligible && input.band === "adult";
+  const videoEditAvailable = videoEditPermission && safeGate(input.videoEditAvailable ?? (() => false));
+  if (latch && videoEditAvailable) latch.videoEditOk = true;
+  const videoEditOk = videoEditPermission && (videoEditAvailable || latch?.videoEditOk === true);
+
   const itemRefPermission = !input.bare && input.actor.role !== "guest" && input.band !== "child" && input.surfaceClass === "written";
   // MUSIC-LIKE-01: a song reference (maipai://music/track/...) offers `make_band` and nothing else; every other reference offers
   // `read_item`. The two never share a turn, so the sixteen-tool worst case holds (a message with both kinds offers read_item only).
@@ -103,12 +113,13 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   if (latch && trackRefInMessage && musicOk) latch.musicBandOk = true;
   const musicBandOk = itemRefPermission && musicOk && !itemRefOk && (trackRefInMessage || latch?.musicBandOk === true);
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk),
     answerImagesOk,
     picturesOk,
     videosOk,
     musicOk,
     musicEditOk,
+    videoEditOk,
     itemRefOk,
     musicBandOk,
   };
@@ -122,7 +133,7 @@ function getConversationLatch(conversationId: string): LatchedToolGates {
     conversationToolGateLatches.set(conversationId, latch);
     return latch;
   }
-  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, itemRefOk: false, musicBandOk: false };
+  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, videoEditOk: false, itemRefOk: false, musicBandOk: false };
   conversationToolGateLatches.set(conversationId, latch);
   if (conversationToolGateLatches.size > MAX_LATCHED_CONVERSATIONS) {
     const oldest = conversationToolGateLatches.keys().next().value;
