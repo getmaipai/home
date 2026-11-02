@@ -2,6 +2,7 @@
 // never in the background. Every request goes through the shared net bucket (a person's pace); a mirror that refuses is skipped, and
 // when every mirror refuses the directory pauses for an hour. Nothing about the household is sent but the search words.
 import { tryConsume } from "@/lib/rateLimiter";
+import { cleanStationName } from "./radioName";
 
 export interface DirectoryStation {
   id: string;
@@ -62,7 +63,7 @@ const secure = (address: string): string => address.replace(/^http:\/\//i, "http
 
 export function stationOf(row: Record<string, unknown>): DirectoryStation | null {
   const id = text(row.stationuuid);
-  const name = text(row.name);
+  const name = cleanStationName(text(row.name));
   const url = text(row.url_resolved) || text(row.url);
   if (id === "" || name === "" || !/^https?:\/\//i.test(url)) return null;
   const favicon = secure(text(row.favicon));

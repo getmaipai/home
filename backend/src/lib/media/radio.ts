@@ -14,6 +14,7 @@ import { mediaBandOf } from "./band";
 import { sourceFromRow, sourcesFromRows, type MediaSource } from "./model";
 import { removeSource } from "./sources";
 import type { DirectoryStation } from "./radioDirectory";
+import { cleanStationName } from "./radioName";
 
 export type RadioOutcome<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409; error: string };
 
@@ -51,7 +52,7 @@ function savedOf(source: MediaSource): SavedStation | null {
   if (source.kind !== "station" || !source.url) return null;
   const detail = source.station;
   return {
-    id: source.id, name: source.label, url: source.url, favicon: detail?.favicon_url ?? null, tags: detail?.tags ?? [], country_code: detail?.country_code ?? null,
+    id: source.id, name: cleanStationName(source.label), url: source.url, favicon: detail?.favicon_url ?? null, tags: detail?.tags ?? [], country_code: detail?.country_code ?? null,
     codec: detail?.codec ?? null, bitrate_kbps: detail?.bitrate_kbps ?? null, hls: hlsAddress(source.url), for_person_id: source.owner_person_id,
     language: null, homepage: null,
     added_by_person_id: source.provenance.startsWith("person:") ? source.provenance.slice("person:".length) : null,
@@ -133,7 +134,7 @@ const cleanTags = (tags: unknown): string[] =>
 export function addStation(actor: PersonRow, input: AddStationInput, nowIso = new Date().toISOString()): RadioOutcome<SavedStation> {
   const target = targetOf(actor, input.for_person_id);
   if (!target.ok) return target;
-  const name = input.name.trim().replace(/\s+/g, " ").slice(0, 120);
+  const name = cleanStationName(input.name);
   if (name === "") return { ok: false, status: 400, error: "Give the station a name, such as Cabin FM." };
   const address = input.url.trim();
   // The shelf's address guard: https, no login in the address, no device inside the home network. A directory row may list plain http,
