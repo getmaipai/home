@@ -21,6 +21,8 @@ import { VisualizerMenu } from "@/shell/media/VisualizerMenu";
 import { SleepMenu } from "@/shell/media/SleepMenu";
 import { clock } from "@/shell/media/NowPlayingStage";
 import { useArtPalette } from "@/lib/media/artPalette";
+import { START_GIVE_UP_MS, useMediaLoading } from "@/lib/media/mediaLoading";
+import { Spinner } from "@maipai/ui/src/dashboard/components/ui/spinner";
 
 /** True when the person is on the page that plays `held` right now (its watch, play, listen or read page). */
 export function onPlayPageOf(held: HoistedMedia, pathname: string, search: string, stateId: string | undefined): boolean {
@@ -66,6 +68,8 @@ export function GlobalMiniPlayer() {
   const getAnalyser = useMediaAnalyser(held?.el ?? null, isAudio);
   const playing = useIsPlaying(held?.el ?? null);
   const { position, duration } = useMediaTime(held?.el ?? null);
+  const liveHeld = held ? liveStationIdOf(held.src) !== null : false;
+  const waiting = useMediaLoading(held?.el ?? null, liveHeld ? START_GIVE_UP_MS : null);
   const closeStage = useCallback(() => setStage(false), []);
   const stateId = (state as { pageState?: { id?: string } } | null)?.pageState?.id;
   if (!held || !held.started || onPlayPageOf(held, pathname, search, stateId)) return null;
@@ -102,6 +106,18 @@ export function GlobalMiniPlayer() {
           }}
           actionsSlot={
             <>
+              {waiting.loading ? (
+                <span role="status" data-testid="mini-loading" className="flex items-center gap-2 pe-2 text-base text-muted-foreground">
+                  <Spinner aria-hidden="true" role="presentation" />
+                  {waiting.phase === "buffering" ? "Buffering" : "Connecting"}
+                </span>
+              ) : null}
+              {waiting.failed ? (
+                <span role="alert" data-testid="mini-start-failed" className="flex items-center gap-2 pe-2 text-base text-destructive">
+                  This station did not start. Check your connection, then press Retry.
+                  <Button variant="secondary" size="sm" onClick={() => dock.retry?.()}>Retry</Button>
+                </span>
+              ) : null}
               {!live && duration > 0 && Number.isFinite(duration) ? (
                 <span className="flex items-center gap-2 pe-2 text-base tabular-nums text-muted-foreground" data-testid="mini-time">
                   <span>{clock(position)}</span>

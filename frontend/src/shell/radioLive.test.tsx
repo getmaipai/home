@@ -112,3 +112,29 @@ describe("station helpers", () => {
     expect(loads).toBe(1);
   });
 });
+
+describe("a live station that is connecting", () => {
+  test("the bar says Connecting while no sound has arrived", async () => {
+    const current = held(STREAM, "Live radio");
+    Object.defineProperty(current.el, "paused", { configurable: true, get: () => false });
+    Object.defineProperty(current.el, "readyState", { configurable: true, get: () => 0 });
+    let retried = 0;
+    const view = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TooltipProvider>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/apps/music/radio"]}>
+              <MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => {}, retry: () => { retried += 1; } }}>
+                <GlobalMiniPlayer />
+              </MediaDockContext.Provider>
+            </MemoryRouter>
+          </ToastProvider>
+        </TooltipProvider>
+      </QueryClientProvider>,
+    );
+    expect(view.getByTestId("mini-loading").textContent).toContain("Connecting");
+    expect(view.queryByTestId("mini-start-failed")).toBeNull();
+    expect(view.container.querySelector("[data-testid=mini-start-failed]")).toBeNull();
+    expect(retried).toBe(0);
+  });
+});
