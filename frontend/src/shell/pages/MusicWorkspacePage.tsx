@@ -174,7 +174,7 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
     <div className={make === "song" ? "flex flex-wrap items-center justify-between gap-3" : "invisible flex"} aria-hidden={make !== "song"}>
       <p role={problem || engineMissing ? "alert" : "status"} data-testid={engineMissing ? "music-no-engine" : "music-hint"} className="text-muted-foreground w-full text-xs sm:w-auto sm:min-w-0 sm:flex-1">{hint}</p>
       <span className="text-muted-foreground text-xs sm:ml-auto" data-testid="music-engine-chip">{status.data?.engine_ready ? "Music model: ready" : "Music model: not running"}</span>
-      <Button type="button" size="lg" aria-disabled={!ready} className={ready ? "" : "opacity-50"} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
+      <Button type="button" size="lg" aria-disabled={!ready} variant={ready ? "default" : "secondary"} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
     </div>
   </div>;
 }
