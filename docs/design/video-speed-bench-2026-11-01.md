@@ -273,6 +273,59 @@ Where they do not: flatness puts q8 as noisier than q4, while the owner heard q4
 - **Audio order, owner: bf16 > q8 > q4.** q8 had muffled static on Golden Girls and gibberish words on SpongeBob; q4 had an awful laugh track. Quantised builds only for silent or low-audio use.
 - **Quantised builds only where silent or low-audio use is accepted.** In that use q4 stays the cheaper pick (33.8 GB, about 49 s). Note the one result in q4's favour: the Marie line came out right on both quantised builds and wrong on bf16 in this seed; one seed does not outweigh the owner's listening.
 
+## MiniMax-H3 on the owner's use cases, with dialogue (2026-11-02)
+
+Argus INT8 DiT plus Turbo 4-step LoRA, 768x448, 124 frames (5.17 s) with stereo sound, seed 7, 4 denoiser steps, run one at a time under the gate lock, Low Power Mode off. Visual prompts are the same as the earlier `ltx-<slug>` clips plus a new Raymond prompt.
+Every prompt ends with the same two-line dialogue in separate turns (Dean: "Daisy, dinner is ready." then Daisy: "Coming, Dad!", one voice at a time, no laugh track, no music); for Smurfs, Voltron and SpongeBob the father and daughter were made characters of that world (Papa Smurf and Smurfette, a pilot father and daughter, Mr. Krabs and Pearl).
+Wall time includes loading and the streamed text encoder. Frames were opened (`minimax-<slug>-sheet.png`). Whisper transcripts are `minimax-<slug>.txt`. **Voice likeness to a character is not judged here: I cannot hear. Owner verdict on the first MiniMax speech clip (Jake and BMO): the words were gibberish until the last "DAISY!" and the voices did not sound like the characters' normal voices; the LTX-2.3 clips did.** Word accuracy below is from Whisper only.
+I do not judge whether a real person's face matches a named person; where a real person was named I describe the picture and leave the likeness to the owner.
+
+| Clip (`minimax-<slug>.mp4`) | Wall | Per step | Peak | Picture (opened frames) | Whisper transcript against the two lines |
+|---|---:|---:|---:|---|---|
+| goldengirls | 182 s | 30.2 s | 13.4 GB | not the Golden Girls and not Raymond: a generic bright kitchen, three women and a white-bearded man eating cheesecake; sharp, cinematic | both lines exact |
+| raymond | 196 s | 31.9 s | 13.0 GB | a very convincing 2000s multi-camera sitcom kitchen with a father standing, two girls and an older woman seated | both lines, plus an invented sentence between them |
+| chucknorris | 188 s | 30.9 s | 12.6 GB | muscular blond man in a white tee on a desert road beside a little girl; no kick (the dialogue replaced the action) | both lines, small wording changes ("dinner's ready", "Coming, Dad.") |
+| willsmith | 202 s | 32.9 s | 13.1 GB | middle-aged man with a grey goatee in a dark suit walking a city street with a girl, smiling; likeness left to the owner | both lines exact |
+| terminator | 204 s | 33.0 s | 12.6 GB | man with a glowing red cybernetic eye in armour walking out of a burning vehicle: clearly the Terminator character look, a young girl enters at the end | both lines, small wording changes |
+| vader | 207 s | 33.2 s | 12.6 GB | excellent: detailed Vader in a Death Star style corridor, a girl in a pink dress, red saber ignites; the best character match of the set | both lines exact |
+| smurfs | 192 s | 32.1 s | 13.2 GB | modern 3D Smurfs (not the classic 2D look): Smurfette, a white-bearded Smurf, a red-hatted Smurf behind, mushroom village | "Hey Zeezy, dinner is ready. Coming, Dad!" (name misheard) |
+| voltron | 187 s | 31.2 s | 13.1 GB | an 80s anime super robot in red and gold with a drawn sword, a boy pilot and an orange-haired girl in the cockpit; a Voltron-like show look but not Voltron | "Daisy, dinner is ready. It's coming, Dad." |
+| spongebob | 199 s | 32.5 s | 12.6 GB | show-accurate: SpongeBob, Mr. Krabs and a blonde girl at the Krusty Krab sign (lettering slightly garbled), a pot steaming | both lines exact |
+| jake-bmo (earlier) | 202 s | 35.4 s | 12.7 GB | Jake and a proper blue BMO with face and limbs in the Tree Fort | "...DAISY!" at the end only; owner: gibberish before it, voices not the characters' |
+
+Reading: picture and word accuracy are strong on every clip: 8 of 9 transcripts hold both lines. The picture beats LTX-2.3 on Vader, SpongeBob (a clean scene with Mr. Krabs), Raymond and Terminator; Smurfs came out in a newer 3D style rather than the classic one the owner liked on LTX. "Golden Girls" is not recognisable on MiniMax either.
+Cost: 182 to 207 s per clip against LTX bf16's 62 to 100 s, at 12.6 to 13.4 GB against 40.4 GB. The remaining open question is voice: the owner heard MiniMax voices as not the characters', whereas LTX voices were.
+
+### Block cache (approximate residual caching) on top of Turbo
+
+| Clip, seed 7 | Per step | Wall | Peak | Picture | Whisper |
+|---|---:|---:|---:|---|---|
+| goldengirls, no cache | 30.2 s | 182 s | 13.4 GB | clean | both lines exact |
+| goldengirls, `--block-cache` | 21.1 s | 146 s | 13.0 GB | same layout; faces mushier, colours more saturated, more banding on the table cloth | "Hey, hey, hey, dinner is ready. Coming down!" (words changed) |
+| smurfs, no cache | 32.1 s | 192 s | 13.2 GB | clean | name misheard, otherwise both lines |
+| smurfs, `--block-cache` | 19.2 s | 140 s | 13.2 GB | same layout; slightly posterised, small details softer | "FOX 3" (speech lost) |
+
+Block cache saves 27 to 40 percent of step time and 20 to 27 percent of the clip, but it costs visible picture detail and, more importantly, the speech. **Verdict: do not use it for clips with dialogue; at most a "draft" speed mode for silent pictures, which is not what these clips are for.** One seed per case.
+
+## Clip inventory (all in `~/video-bench/capability/`)
+
+Every clip below is an `.mp4` in that folder with sound unless marked silent; a `-sheet.png` (frames 0, 40, 80, 114 or 118) sits beside most.
+
+| File name pattern | Model and build | Settings |
+|---|---|---|
+| `ltx-<slug>.mp4` for goldengirls, chucknorris, willsmith, terminator, vader, smurfs, voltron, spongebob | LTX-2.3 distilled bf16, mlx-video 87db56a | 768x448, 121 frames, seed 7, 5 s |
+| `ltx-<slug>-q4.mp4`, `-q8.mp4` (goldengirls, smurfs, spongebob, vader; also marie-sarkis, sfx-rain) | LTX-2.3 distilled, dgrauet q4 or q8 transformer, same loader patch | as above; marie-sarkis 193 frames |
+| `ltx-terminator-i2v-bf16.mp4` | LTX-2.3 bf16 picture-to-video from `ref-terminator.png` (a Wan frame) | 768x448, 121 frames, seed 7 |
+| `ltx-bmo-finn.mp4`, `ltx-marie-sarkis.mp4` | LTX-2.3 bf16 | 768x448, 193 frames (8 s), seed 7 |
+| `cons-text-park|cafe|station.mp4`, `cons-ref-park|cafe|station.mp4` | LTX-2.3 bf16, text-only and picture-to-video from `ref-woman.png` | 768x448, 121 frames, seed 7 |
+| `speech-a1.mp4`, `speech-a2.mp4` | LTX-2.3 bf16 | seeds 7 and 8 |
+| `sfx-door.mp4`, `sfx-rain.mp4`, `sfx-car.mp4`; `sfx-rain-q4.mp4`, `-q8.mp4` | LTX-2.3 bf16 (and q4, q8 for rain) | seed 7 |
+| `wan-<slug>.mp4` (8 clips, silent) | Wan2.2 FastWan 3-step bf16, tiny `taew2_2_super` decoder; **owner: Wan rejected** | 832x480, 121 frames, seed 7 |
+| `minimax-<slug>.mp4` (cat-768x448, jake-bmo, goldengirls, raymond, chucknorris, willsmith, terminator, vader, smurfs, voltron, spongebob) | MiniMax-H3, Argus INT8 DiT, Turbo 4-step | 768x448, 124 frames, seed 7, no block cache |
+| `minimax-goldengirls-blockcache.mp4`, `minimax-smurfs-blockcache.mp4` | same plus `--block-cache` | same |
+| `ltx-bmo-jake.mp4`, `ltx-gamer-crabs.mp4`, `ltx-spongebob-patrick*.mp4`, `ltx25-*.mp4` | made by the videos app session with my driver and its own LTX-2.5 runtime; settings are in that session's notes, not in my files | not recorded here |
+
+
 ## Not run, and why
 
 Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
