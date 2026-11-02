@@ -26,6 +26,33 @@ mkdir -p "$data/green" "$data/reds"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 
+# LIBS-REFRESH-01: every helper this script sources (scripts/lib/*.sh) is a snapshot taken from origin/main, like this script. They are all
+# copied (temp file, then rename) BEFORE any of them is sourced, so a new script never runs against an older helper (2026-11-02: a new
+# lander.sh called deps_ensure, added to lib/deps.sh, and failed at startup with "command not found"). When origin/main cannot be read,
+# the copies already in $bin stay as they are.
+refresh_libs() {
+  local names name base tmp
+  names="$(git -C "$main" ls-tree --name-only origin/main scripts/lib/ 2>/dev/null)" || return 0
+  mkdir -p "$bin"
+  while IFS= read -r name; do
+    [[ "$name" == scripts/lib/*.sh ]] || continue
+    base="${name##*/}"; tmp="$bin/$base.new.$$"
+    if git -C "$main" show "origin/main:$name" >"$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+      if cmp -s "$tmp" "$bin/$base" 2>/dev/null; then rm -f "$tmp"; else mv -f "$tmp" "$bin/$base" || rm -f "$tmp"; fi
+    else
+      rm -f "$tmp"
+    fi
+  done <<<"$names"
+}
+libs_hash() {
+  local f
+  for f in "$bin"/*.sh; do
+    case "${f##*/}" in lander.sh|watcher.sh|pipeline.sh) continue ;; esac
+    [[ -f "$f" ]] && printf '%s %s\n' "${f##*/}" "$(git -C "$main" hash-object "$f" 2>/dev/null || true)"
+  done | cksum
+}
+refresh_libs
+
 # GITNET-01: every remote git operation and the dependency install are bounded (scripts/lib/gitnet.sh, kept fresh in $bin by the lander).
 # A fetch that never answers used to freeze the watcher with its pid file held; now it times out, retries and logs. Plain git until the lib exists.
 gitnet_lib="$bin/gitnet.sh"
@@ -550,6 +577,8 @@ serve() {
   local pidfile="$data/watcher.pid" poll="${MAIPAI_WATCH_POLL_SECONDS:-30}" old
   local refresh_seconds="${MAIPAI_PIPELINE_REFRESH_SECONDS:-60}" last_refresh=0 now refresh_result running_hash snapshot_hash
   running_hash="$(git -C "$main" hash-object "$0" 2>/dev/null || true)"
+  local lib_hash
+  lib_hash="$(libs_hash)"
   [[ "$refresh_seconds" =~ ^[0-9]+$ ]] || refresh_seconds=60
   (( refresh_seconds > 0 )) || refresh_seconds=1
   if [[ -f "$pidfile" ]]; then
@@ -569,6 +598,12 @@ serve() {
       snapshot_hash="$(git -C "$main" hash-object "$bin/watcher.sh" 2>/dev/null || true)"
       if [[ "$refresh_result" == changed || ( -n "$running_hash" && "$snapshot_hash" != "$running_hash" ) ]]; then
         echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) code refreshed from origin/main; restarting watcher" >> "$data/watcher.log"
+        exec bash "$bin/watcher.sh" "$@"
+      fi
+      refresh_libs
+      snapshot_hash="$(libs_hash)"
+      if [[ "$snapshot_hash" != "$lib_hash" ]]; then
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) helper libraries refreshed from origin/main; restarting watcher" >> "$data/watcher.log"
         exec bash "$bin/watcher.sh" "$@"
       fi
     fi
