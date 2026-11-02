@@ -434,7 +434,7 @@ mediaRoutes.openapi(putProgressRoute, (c) => {
   const body = c.req.valid("json");
   const item = readableItem(actor, c.req.valid("param").media_id);
   // ADULT-LOCK-05: nothing is saved for an adult-only item (no place, no history); the answer is the same as for a title that is not there.
-  if (!item || fileIsAdultOnly(item.id)) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
+  if (!item || fileIsAdultOnly((item.location as { file_id?: string }).file_id ?? item.id)) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
   const now = new Date();
   const outcome = writeProgress(actor, item, writeFrom(body, now), { now, immediate: body.immediate, meterKey: meterKeyOf(c) });
   if (!outcome.ok) return c.json({ error: REFUSAL_LINES[outcome.refusal] }, outcome.refusal === "other_persons_device" ? 403 : 422);

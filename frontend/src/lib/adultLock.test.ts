@@ -74,6 +74,18 @@ describe("blob sources", () => {
     expect(await pending).toBeNull();
   });
 
+  test("a picture drawn from one of our URLs is emptied on relock; any other picture is left", async () => {
+    setAdultProof("p1");
+    const url = (await adultBlobUrl("/api/files/a/thumb"))!;
+    const ours = document.createElement("img"); ours.setAttribute("src", url);
+    const other = document.createElement("img"); other.setAttribute("src", "/api/files/z/thumb");
+    document.body.append(ours, other);
+    unloadAdultElements();
+    expect(ours.hasAttribute("src")).toBe(false);
+    expect(other.getAttribute("src")).toBe("/api/files/z/thumb");
+    ours.remove(); other.remove();
+  });
+
   test("unloadAdultElements stops, empties and reloads only an element playing one of our URLs", async () => {
     setAdultProof("p1");
     const url = (await adultBlobUrl("/api/files/a/content"))!;
@@ -145,6 +157,35 @@ describe("the fetch choke point", () => {
       expect(rows[0]!.src).toStartWith("blob:test/");
       expect(getAdultProof()).toBe("p-secret");
       for (const text of [JSON.stringify({ ...window.localStorage }), JSON.stringify({ ...window.sessionStorage }), document.cookie, window.location.href]) expect(text.includes("p-secret")).toBe(false);
+    } finally { restore(); }
+  });
+
+  test("two installs share one wrapper and the original comes back only after both restore", () => {
+    const before = globalThis.fetch;
+    const one = installAdultFetch();
+    const wrapped = globalThis.fetch;
+    const two = installAdultFetch();
+    expect(globalThis.fetch).toBe(wrapped);
+    one();
+    expect(globalThis.fetch).toBe(wrapped);
+    two();
+    expect(globalThis.fetch).toBe(before);
+  });
+
+  test("a rewritten body drops the stale length and encoding headers", async () => {
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      return Promise.resolve(url.startsWith("/api/plugins/")
+        ? new Response(JSON.stringify([{ id: "a", adult_only: true, src: "/api/files/a/content" }]), { headers: { "content-type": "application/json", "content-length": "5", "content-encoding": "gzip" } })
+        : new Response("bytes"));
+    }) as unknown as typeof fetch;
+    const restore = installAdultFetch();
+    try {
+      setAdultProof("p");
+      const res = await fetch("/api/plugins/videos/data/recipes", { method: "POST", body: "{}" });
+      expect(res.headers.get("content-length")).toBeNull();
+      expect(res.headers.get("content-encoding")).toBeNull();
+      expect(((await res.json()) as Array<{ src: string }>)[0]!.src).toStartWith("blob:test/");
     } finally { restore(); }
   });
 

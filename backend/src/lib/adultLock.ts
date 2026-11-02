@@ -201,7 +201,9 @@ export function fileLockState(actor: PersonRow, fileId: string, proof: AdultProo
 /** Whether a stored Library file is adult-only (the machine fact, whatever the creator's lock setting): playback of it keeps no place, history or mark. */
 export function fileIsAdultOnly(fileId: string): boolean {
   const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get();
-  return row ? lockItemOfProvenance(row.owner, row.provenance)?.madeAudience === "adult-only" : false;
+  if (!row) return false;
+  // The same fact the rows' `adult_only` flag is read from (`audience`, or `made_audience`, whatever the writer): one definition for the flag and for what is not kept.
+  return lockItemOfProvenance(row.owner, row.provenance)?.madeAudience === "adult-only" || fileAudience(row.provenance) === "adult-only";
 }
 
 /** The SQL predicate "this attachment row is a locked item the viewer has no proof for", for the Library's queries (counts, lists, search). `provenance` is

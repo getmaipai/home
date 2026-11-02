@@ -62,10 +62,12 @@ export function AdultLockController() {
     document.addEventListener("timeupdate", touch, true);
     const cap = window.setTimeout(lockNow, adultClocks.capMs);
     // A flag that flips on while something plays stops it and relocks at once.
-    const stopFlip = onAdultFlip(() => {
-      const playing = Array.from(document.querySelectorAll<HTMLMediaElement>("video,audio")).some((el) => !el.paused && !el.ended) || dockRef.current.current !== null;
-      if (!playing) return;
-      dockRef.current.clear();
+    // Only the item that flipped counts: the host's held item, or an element playing that item's own address. A song in the mini bar is not touched by another item's flip.
+    const stopFlip = onAdultFlip((id) => {
+      const held = dockRef.current.current?.id === id;
+      const mine = Array.from(document.querySelectorAll<HTMLMediaElement>("video,audio")).some((el) => !el.paused && !el.ended && (el.currentSrc || el.getAttribute("src") || "").includes(encodeURIComponent(id)));
+      if (!held && !mine) return;
+      if (held) dockRef.current.clear();
       lockNow();
     });
     const stopGuard = installAdultPlaybackGuard();

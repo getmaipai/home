@@ -77,3 +77,14 @@ describe("the playback guard", () => {
     expect(session.metadata).toEqual({ title: "after" });
   });
 });
+
+test("what the Media Session held before (another item's) is put back when the clip stops", () => {
+  const song = { title: "A song" };
+  session.metadata = song;
+  const el = video(blobUrl);
+  uninstall = installAdultPlaybackGuard();
+  fire(el, "play");
+  expect(session.metadata).toBeNull();
+  fire(el, "pause");
+  expect(session.metadata).toBe(song);
+});

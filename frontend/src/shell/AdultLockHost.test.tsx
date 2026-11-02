@@ -9,7 +9,7 @@ import { PackageScopeContext, PageStateContext } from "@maipai/ui/src/schema/pac
 import { MediaShelfNodeSchema, type UiNode } from "@maipai/ui/src/schema/types";
 import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
 import { AdultLockController, unlockRequest, useAdultLockProps } from "@/shell/AdultLockHost";
-import { adultClocks, getAdultProof, setAdultProof, revokeAdultBlobs } from "@/lib/adultLock";
+import { adultClocks, adultResponse, getAdultProof, setAdultProof, revokeAdultBlobs } from "@/lib/adultLock";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import { stubMatchMedia } from "../../tests/stubMatchMedia";
 import type { Roster } from "@/lib/api";
@@ -187,6 +187,44 @@ describe("a page ends the unlock", () => {
     expect(getAdultProof()).toBeNull();
     expect(calls.some((c) => c.url === "/api/adult-lock/lock" && c.proof === PROOF)).toBe(true);
     expect(revoked.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a flag that flips on while something plays", () => {
+  const play = (src: string) => {
+    const el = document.createElement("video");
+    el.setAttribute("src", src);
+    Object.defineProperty(el, "paused", { configurable: true, get: () => false });
+    document.body.append(el);
+    return el;
+  };
+
+  test("the item that flipped, playing, stops the page and relocks", async () => {
+    const view = mount();
+    await unlock(view);
+    const el = play("/api/files/flip-1/content");
+    try {
+      await act(async () => {
+        await adultResponse([{ id: "flip-1", title: "open" }]);
+        await adultResponse([{ id: "flip-1", adult_only: true }]);
+      });
+      await view.findByRole("button", { name: TILE });
+      expect(getAdultProof()).toBeNull();
+    } finally { el.remove(); }
+  });
+
+  test("another item's flip does not touch what plays, and does not relock", async () => {
+    const view = mount();
+    await unlock(view);
+    const el = play("/api/files/other-song/content");
+    try {
+      await act(async () => {
+        await adultResponse([{ id: "flip-2", title: "open" }]);
+        await adultResponse([{ id: "flip-2", adult_only: true }]);
+      });
+      expect(getAdultProof()).toBe(PROOF);
+      expect(view.queryAllByRole("button", { name: TILE }).length).toBe(0);
+    } finally { el.remove(); }
   });
 });
 

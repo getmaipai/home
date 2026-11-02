@@ -23,13 +23,17 @@ export function hardenAdultElement(el: HTMLMediaElement, doc: Document = documen
   if (pip === el) void (doc as Document & { exitPictureInPicture?: () => Promise<void> }).exitPictureInPicture?.().catch(() => undefined);
 }
 
-/** While active, the page's Media Session never holds a title or artwork: `metadata` reads null and ignores a set. */
+/** While active, the page's Media Session never holds a title or artwork: `metadata` reads null and ignores a set. What it held before (another item's) is put back after. */
 function blockMediaSession(nav: SessionHolder): () => void {
   const session = nav.mediaSession;
   if (!session) return () => undefined;
+  const previous = session.metadata;
   try { session.metadata = null; } catch { /* a browser without metadata support */ }
   try { Object.defineProperty(session, "metadata", { configurable: true, get: () => null, set: () => undefined }); } catch { return () => undefined; }
-  return () => { try { delete (session as unknown as Record<string, unknown>).metadata; } catch { /* nothing to restore */ } };
+  return () => {
+    try { delete (session as unknown as Record<string, unknown>).metadata; } catch { /* nothing to restore */ }
+    try { session.metadata = previous; } catch { /* a browser without metadata support */ }
+  };
 }
 
 export function installAdultPlaybackGuard(doc: Document = document, nav: SessionHolder = typeof navigator === "undefined" ? {} : navigator): () => void {

@@ -73,6 +73,16 @@ describe("nothing about playback of an adult-only clip is kept", () => {
     expect(db.select().from(mediaProgress).where(eq(mediaProgress.mediaId, clip.fileId)).all()).toEqual([]);
   });
 
+  test("a person who cannot read the file gets the same answer for it as for an id that is not there", async () => {
+    const { adult, other, row } = await household();
+    const clip = await adultClip(adult.client, row("Marlow"));
+    const body = (id: string) => ({ media_id: id, position_s: 5, duration_s: 60, reason: "pause" });
+    const theirs = await other.client.post("/api/plugins/videos/progress", body(clip.fileId));
+    const missing = await other.client.post("/api/plugins/videos/progress", body("file-doesnotexist"));
+    expect(theirs.status).toBe(missing.status);
+    expect(await theirs.json()).toEqual(await missing.json());
+  });
+
   test("an all-ages clip is not an adult-only file", async () => {
     const { adult, row } = await household();
     const plain = await makeClip(adult.client, row("Marlow"), PLAIN_PROMPT);

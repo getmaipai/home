@@ -66,6 +66,8 @@ export function unloadAdultElements(root: ParentNode = document): number {
     el.removeAttribute("src");
     el.load();
   }
+  // A picture drawn from one of our URLs goes too, so nothing decoded stays on screen if the lists are slow to ask again.
+  root.querySelectorAll<HTMLImageElement>("img").forEach((img) => { if (isAdultBlobUrl(img.getAttribute("src"))) img.removeAttribute("src"); });
   return found.size;
 }
 
@@ -111,13 +113,19 @@ function visit(value: unknown, depth: number, jobs: Array<Promise<void>>, flippe
 /** Run on a page-data response: an adult-only row's picture and clip become blob URLs (only while unlocked: without a proof the hub sends the tile),
  * and an item that was an open row and is now adult-only is reported to `onAdultFlip` listeners. Returns the same body, edited in place. */
 export async function adultResponse<T>(body: T): Promise<T> {
-  if (typeof body !== "object" || body === null) return body;
+  await adultRows(body);
+  return body;
+}
+
+/** The row pass; true when it rewrote a source (the caller then sends the edited body on). */
+export async function adultRows(body: unknown): Promise<boolean> {
+  if (typeof body !== "object" || body === null) return false;
   const jobs: Array<Promise<void>> = [];
   const flipped: string[] = [];
   visit(body, 0, jobs, flipped);
   if (jobs.length) await Promise.all(jobs);
   for (const id of flipped) flipListeners.forEach((listener) => listener(id));
-  return body;
+  return jobs.length > 0;
 }
 
 // ---- The one fetch choke point -----------------------------------------------------------------------------------------------------------
@@ -137,7 +145,22 @@ function sameOriginApiPath(input: RequestInfo | URL): string | null {
 /** Wrap `fetch` once for the page: while unlocked every same-origin `/api/` request carries `X-Adult-Unlock`, and a page-data answer goes through the
  * row pass (`adultResponse`). The kit's schema interpreter has its own request function (it cannot import Home's), so the one place both Home's `request`
  * and the kit's reach the network is `fetch` itself. Returns the function that puts the original back. */
+let installs = 0;
+let restoreReal: (() => void) | null = null;
+
 export function installAdultFetch(): () => void {
+  installs += 1;
+  if (installs === 1) restoreReal = wrapFetch();
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    installs -= 1;
+    if (installs === 0) { restoreReal?.(); restoreReal = null; }
+  };
+}
+
+function wrapFetch(): () => void {
   const real = globalThis.fetch;
   const wrapped = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const path = sameOriginApiPath(input);
@@ -153,11 +176,12 @@ export function installAdultFetch(): () => void {
     const res = await real(nextInput, nextInit);
     if (!isPageDataPath(path.split("?")[0]!) || !res.ok || !(res.headers.get("content-type") ?? "").includes("json")) return res;
     const body = await res.clone().json().catch(() => undefined) as unknown;
-    if (body === undefined) return res;
-    const before = JSON.stringify(body);
-    const after = await adultResponse(body);
-    if (JSON.stringify(after) === before) return res;
-    return new Response(JSON.stringify(after), { status: res.status, statusText: res.statusText, headers: res.headers });
+    if (body === undefined || !(await adultRows(body))) return res;
+    // The body is longer than the one the hub sent: its length and encoding headers no longer describe it.
+    const headers = new Headers(res.headers);
+    headers.delete("content-length");
+    headers.delete("content-encoding");
+    return new Response(JSON.stringify(body), { status: res.status, statusText: res.statusText, headers });
   }) as typeof fetch;
   globalThis.fetch = wrapped;
   return () => { if (globalThis.fetch === wrapped) globalThis.fetch = real; };

@@ -5,4 +5,7 @@ import { File } from "@maipai/spec/gen/ts/file.js";
 import type { z } from "zod";
 
 type FileObjectOf<T> = T extends z.ZodIntersection<infer Left, z.ZodAny> ? Left : T;
-export const FileObject = ((File as unknown as { _zod?: { def?: { left?: unknown } } })._zod?.def?.left ?? File) as FileObjectOf<typeof File>;
+const left = (File as unknown as { _zod?: { def?: { left?: unknown } } })._zod?.def?.left;
+// Loud at import, never a silent fallback: a Zod or spec change that moves the object must fail here, not at the first response.
+if (!left) throw new Error("The File record is no longer an intersection with an object on its left; update lib/fileRecordObject.ts to the new shape.");
+export const FileObject = left as FileObjectOf<typeof File>;

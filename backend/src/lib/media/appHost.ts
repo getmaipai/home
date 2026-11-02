@@ -818,10 +818,11 @@ export interface ProgressArgs {
 
 /** The one progress path for an app page: coerce, check the title is readable here, then `writeProgress` (mergeProgress inside). */
 export function saveProgress(person: PersonRow, appId: MediaAppId, args: ProgressArgs, now = new Date(), meterKey?: string): ActionResult<{ applied: boolean; completed: boolean; budget?: MediaBudget }> {
-  // ADULT-LOCK-05: no resume position, history or continue-watching mark is kept for an adult-only item: an unlocked one always restarts at 0.
-  if (typeof args.media_id === "string" && fileIsAdultOnly(args.media_id)) return { ok: true, value: { applied: false, completed: false } };
   const item = typeof args.media_id === "string" ? readableIn(person, appId, args.media_id) : null;
   if (!item) return { ok: false, status: 404, error: `That ${MEDIA_APPS[appId].noun} is not in the library.` };
+  // ADULT-LOCK-05: no resume position, history or continue-watching mark is kept for an adult-only item (an unlocked one always restarts at 0). Checked after the
+  // readability test, so an id the person may not read answers 404 as before and this answer says nothing about files they cannot see.
+  if (fileIsAdultOnly((item.location as { file_id?: string }).file_id ?? item.id)) return { ok: true, value: { applied: false, completed: false } };
   let position: import("./progress").Position;
   if (item.kind === "book") {
     const locator = z.discriminatedUnion("kind", [
