@@ -123,11 +123,38 @@ describe("pinning", () => {
     expect((await pinEntity(brief("x"), "q", person)).anchor).toBeNull();
   });
 
-  test("a second lookup with the question runs when the first found fewer than two titles", async () => {
-    const seen: string[] = [];
-    __setEntityPinForTests({ finder: async (q) => { seen.push(q); return q === "a subject" ? [candidate("Only")] : [candidate("Other (2020 film)")]; }, writer: async () => '{"pick": 2}' });
-    const { anchor } = await pinEntity(brief("a subject"), "the whole question", person);
-    expect(seen).toEqual(["a subject", "the whole question"]);
-    expect(anchor?.title).toBe("Other (2020 film)");
+  test("the candidate set is widened until a pick is made: the subject, then the question, then the live search", async () => {
+    const seen: { q: string; live: boolean | undefined }[] = [];
+    const prompts: string[] = [];
+    __setEntityPinForTests({
+      finder: async (q, _p, _s, opts) => {
+        seen.push({ q, live: opts?.live });
+        if (q === "a subject" && !opts?.live) return [candidate("Unrelated one"), candidate("Unrelated two")];
+        if (q === "the whole question") return [candidate("Unrelated one"), candidate("Unrelated three")];
+        return [candidate("Right (2020 film)")];
+      },
+      writer: async (prompt) => { prompts.push(prompt); return prompt.includes("Right (2020 film)") ? '{"pick": 1}' : '{"pick": 0}'; },
+    });
+    const { anchor, candidates } = await pinEntity(brief("a subject"), "the whole question", person);
+    expect(seen).toEqual([{ q: "a subject", live: false }, { q: "the whole question", live: false }, { q: "a subject", live: true }]);
+    expect(prompts.length).toBe(3);
+    expect(anchor?.title).toBe("Right (2020 film)");
+    expect(candidates).toBe(4);
+  });
+
+  test("a pass that only offers titles already seen adds no pick, and the passes stop at the first pick", async () => {
+    let picks = 0;
+    const passes: string[] = [];
+    __setEntityPinForTests({
+      finder: async (q) => { passes.push(q); return [candidate("Same one"), candidate("Same two")]; },
+      writer: async () => { picks += 1; return '{"pick": 0}'; },
+    });
+    expect((await pinEntity(brief("s"), "the question", person)).anchor).toBeNull();
+    expect(picks).toBe(1);
+    expect(passes.length).toBe(3);
+    picks = 0;
+    __setEntityPinForTests({ finder: async () => [candidate("A"), candidate("B")], writer: async () => { picks += 1; return '{"pick": 2}'; } });
+    expect((await pinEntity(brief("s"), "q", person)).anchor?.title).toBe("B");
+    expect(picks).toBe(1);
   });
 });

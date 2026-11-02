@@ -207,7 +207,9 @@ export function partsFor(brief: Brief | null, plan: DataPlan | undefined): strin
   return out.slice(0, 6);
 }
 
-export const ANALYSIS_TOKENS = { thinking: 350, max: 650 } as const;
+/** Output room for the analysis. The reply is a JSON object (claims, conflicts, gaps, guesses and, since RESEARCH-COVERAGE-01, one entry per
+ * part of the question): a live Max run returned no analysis at all once that field was added, the reply cut off inside the object. */
+export const ANALYSIS_TOKENS = { thinking: 500, max: 900 } as const;
 
 export function analysisPrompt(brief: Brief | null, question: string, ledger: string, backbone = "", parts: readonly string[] = []): string {
   return `You analyse research notes before an answer is written. You write no answer here.
@@ -252,12 +254,14 @@ export function parseAnalysis(text: string | null, valid: ReadonlySet<number>, a
   return { claims, conflicts: strings(data.conflicts, 4, 240), gaps: strings(data.gaps, 5, 200), guesses, uncovered };
 }
 
-export async function analyse(brief: Brief | null, question: string, findings: Findings, validNumbers: ReadonlySet<number>, style: AnswerStyle, signal?: AbortSignal, backbone = "", parts: readonly string[] = []): Promise<Analysis | null> {
+export async function analyse(brief: Brief | null, question: string, findings: Findings, validNumbers: ReadonlySet<number>, style: AnswerStyle, signal?: AbortSignal, backbone = "", parts: readonly string[] = [], trace?: (what: string) => void): Promise<Analysis | null> {
   if (findings.ledger.notes === 0 && !backbone) return null;
   const tokens = style === "max" ? ANALYSIS_TOKENS.max : ANALYSIS_TOKENS.thinking;
   let reply: string | null = null;
   try { reply = await (analysisOverride ?? chatAnalysisWriter(tokens, signal))(analysisPrompt(brief, question, findings.ledger.text, backbone, parts)); } catch { reply = null; }
-  return parseAnalysis(reply, validNumbers, parts);
+  const parsed = parseAnalysis(reply, validNumbers, parts);
+  if (!parsed && trace) trace(reply === null ? "analysis: the model gave no reply" : `analysis: reply of ${reply.length} chars could not be read (ends "${reply.slice(-50).replace(/\s+/g, " ")}")`);
+  return parsed;
 }
 
 // ---------------------------------------------------------------- stage 5: the reply

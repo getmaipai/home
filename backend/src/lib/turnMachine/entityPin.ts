@@ -35,7 +35,7 @@ export interface EntityCandidate {
   load: () => Promise<ArticleText | null>;
 }
 /** One lookup of article titles for a phrase: the best few, best first. Never throws. */
-export type CandidateFinder = (query: string, person: PersonRow, signal?: AbortSignal) => Promise<EntityCandidate[]>;
+export type CandidateFinder = (query: string, person: PersonRow, signal?: AbortSignal, opts?: { live?: boolean }) => Promise<EntityCandidate[]>;
 /** One model call: a prompt in, text out, or null when the model is unavailable. */
 export type PinWriter = (prompt: string) => Promise<string | null>;
 
@@ -144,15 +144,17 @@ async function wikimediaArticle(title: string, signal?: AbortSignal): Promise<Ar
   return { ...articleFromExtract(found, extract, "wikimedia"), url: `${wikimediaLiveBaseUrl()}/wiki/${encodeURIComponent(found.replace(/ /g, "_"))}` };
 }
 
-/** The default lookup: the offline library's title and text search (an adult's, with the household's book list), then the live
- * Wikimedia search when the household allows it and the library found fewer than two titles. */
-export const defaultCandidateFinder: CandidateFinder = async (query, person, signal) => {
+/** The default lookup: the offline library's title and text search (an adult's, with the household's book list), then the live Wikimedia search
+ * when the household allows it and the library found fewer than two titles. With `live`, only the live search runs (the widening pass). */
+export const defaultCandidateFinder: CandidateFinder = async (query, person, signal, opts) => {
   const found: EntityCandidate[] = [];
-  try {
-    const { hits } = await searchReference(person, query);
-    for (const hit of hits.slice(0, CANDIDATES_MAX)) found.push({ title: hit.title, snippet: hit.snippet, load: () => libraryArticle(hit.book, hit.path, hit.title) });
-  } catch { /* the library is optional */ }
-  if (found.length < 2 && wikimediaGate("adult") === "run") {
+  if (!opts?.live) {
+    try {
+      const { hits } = await searchReference(person, query);
+      for (const hit of hits.slice(0, CANDIDATES_MAX)) found.push({ title: hit.title, snippet: hit.snippet, load: () => libraryArticle(hit.book, hit.path, hit.title) });
+    } catch { /* the library is optional */ }
+  }
+  if ((opts?.live || found.length < 2) && wikimediaGate("adult") === "run") {
     const data = await wikimediaApiJson(`/w/api.php?action=query&format=json&list=search&srlimit=${CANDIDATES_MAX}&srsearch=${encodeURIComponent(query)}`, "Wikipedia's search API didn't return JSON", signal);
     const hits = ((data?.query as { search?: { title?: unknown; snippet?: unknown }[] } | undefined)?.search) ?? [];
     for (const hit of hits) {
@@ -206,31 +208,42 @@ export function anchorFor(title: string, article: ArticleText | null, snippet = 
   return { title: title.trim(), baseName, years, phrase, lead, article, text: `${title}. ${lead}` };
 }
 
-export interface PinResult { anchor: EntityAnchor | null; candidates: number }
+export interface PinResult { anchor: EntityAnchor | null; candidates: number; /** For the bench: the candidate titles and the model's pick reply. */ debug?: { titles: string[]; reply: string | null } }
 
-/** Pins the subject of a research question to one article, or to none when no candidate is clearly it. About a second with the library,
- * plus one short model call to pick. Never throws. */
+/** Pins the subject of a research question to one article, or to none when no candidate is clearly it. The candidate set is widened until a
+ * pick is made: the subject as the brief words it, then the question itself, then the live search (when allowed). About a second per pass
+ * with the library, plus one short model call per pass; the passes stop at the first pick or after PIN_BUDGET_MS. Never throws. */
 export async function pinEntity(brief: Brief | null, question: string, person: PersonRow, signal?: AbortSignal): Promise<PinResult> {
   if (!brief) return { anchor: null, candidates: 0 };
   const find = finderOverride ?? defaultCandidateFinder;
-  let candidates: EntityCandidate[] = [];
-  try {
-    candidates = await find(brief.subject, person, signal);
-    if (candidates.length < 2) {
-      const again = await find(question.slice(0, 120), person, signal);
-      candidates = [...candidates, ...again.filter((c) => !candidates.some((k) => k.title === c.title))].slice(0, CANDIDATES_MAX);
-    }
-  } catch { candidates = []; }
-  if (candidates.length === 0) return { anchor: null, candidates: 0 };
-  let reply: string | null = null;
-  try { reply = await (pinWriterOverride ?? chatPinWriter(signal))(pickPrompt(question, brief.subject, candidates)); } catch { reply = null; }
-  const index = parsePick(reply, candidates.length);
-  if (index === null) return { anchor: null, candidates: candidates.length };
-  const picked = candidates[index]!;
-  let article: ArticleText | null = null;
-  try { article = await picked.load(); } catch { article = null; }
-  return { anchor: anchorFor(article?.title || picked.title, article, picked.snippet), candidates: candidates.length };
+  const attempts: { query: string; live: boolean }[] = [{ query: brief.subject, live: false }, { query: question.slice(0, 120), live: false }, { query: brief.subject, live: true }];
+  const started = Date.now();
+  const seen = new Set<string>();
+  let total = 0; // distinct titles offered so far
+  let debug: PinResult["debug"];
+  for (const attempt of attempts) {
+    if (Date.now() - started > PIN_BUDGET_MS) break;
+    let candidates: EntityCandidate[] = [];
+    try { candidates = (await find(attempt.query, person, signal, { live: attempt.live })).slice(0, CANDIDATES_MAX); } catch { candidates = []; }
+    // A pass that finds only titles already offered adds nothing to pick from.
+    if (candidates.length === 0 || candidates.every((c) => seen.has(c.title))) continue;
+    candidates.forEach((c) => seen.add(c.title));
+    total = seen.size;
+    let reply: string | null = null;
+    try { reply = await (pinWriterOverride ?? chatPinWriter(signal))(pickPrompt(question, brief.subject, candidates)); } catch { reply = null; }
+    debug = { titles: [...(debug?.titles ?? []), ...candidates.map((c) => c.title)], reply };
+    const index = parsePick(reply, candidates.length);
+    if (index === null) continue;
+    const picked = candidates[index]!;
+    let article: ArticleText | null = null;
+    try { article = await picked.load(); } catch { article = null; }
+    return { anchor: anchorFor(article?.title || picked.title, article, picked.snippet), candidates: total, debug };
+  }
+  return { anchor: null, candidates: total, ...(debug ? { debug } : {}) };
 }
+
+/** The passes of a pin stop starting after this long (milliseconds). */
+const PIN_BUDGET_MS = 7_000;
 
 // ---------------------------------------------------------------- queries
 

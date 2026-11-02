@@ -1011,7 +1011,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, `stage 3 ledger: ${findings.ledger.notes} notes kept of ${state.pageNotes.length} written (${findings.ledger.text.length} chars) from ${findings.read} pages; note calls ${stats?.calls ?? 0} (${Math.round((stats?.ms ?? 0) / 100) / 10} s of light-model time), quotes dropped ${stats?.droppedQuotes ?? 0}`);
       if ((haveLedger || backbone) && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backboneCited !== null ? [backboneCited] : [])]), state.answerStyle!, signal, backboneText, parts);
+        state.researchAnalysis = await analyse(brief, rq, findings, new Set([...numberOf.values(), ...(backboneCited !== null ? [backboneCited] : [])]), state.answerStyle!, signal, backboneText, parts, (what) => markResearch(state, what));
         markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps, ${state.researchAnalysis.uncovered.length} of ${parts.length} parts uncovered` : "none"})`);
       }
       const coverage = await coverageFor();
@@ -1021,7 +1021,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     } else if (researching && (assumption || backbone)) {
       if (backbone && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
         markResearch(state, "stage 4 analysis start");
-        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set(backboneCited !== null ? [backboneCited] : []), state.answerStyle!, signal, backboneText, parts);
+        state.researchAnalysis = await analyse(brief, rq, noFindings, new Set(backboneCited !== null ? [backboneCited] : []), state.answerStyle!, signal, backboneText, parts, (what) => markResearch(state, what));
         markResearch(state, `stage 4 analysis end (${state.researchAnalysis ? `${state.researchAnalysis.claims.length} claims, ${state.researchAnalysis.guesses.length} guesses, ${state.researchAnalysis.gaps.length} gaps, ${state.researchAnalysis.uncovered.length} of ${parts.length} parts uncovered` : "none"})`);
       }
       replyExtra = replyBrief(brief, state.researchAnalysis ?? null, "", assumption, await coverageFor());
@@ -1161,7 +1161,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     markResearch(state, "stage 1 pin start");
     const pinned = await pinEntity(brief, rq, state.actor, signal);
     state.entityAnchor = pinned.anchor;
-    markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates)`);
+    markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates${pinned.debug ? `: [${pinned.debug.titles.join(" | ")}], pick reply ${JSON.stringify((pinned.debug.reply ?? "").slice(0, 80))}` : ""})`);
     markResearch(state, "stage 2 plan start");
     const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor));
     markResearch(state, "stage 2 plan end");
