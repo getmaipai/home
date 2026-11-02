@@ -187,7 +187,7 @@ Candidate articles:
 ${list}
 
 Answer with one JSON object and nothing else: {"pick": 1, "settled": true, "also": 0}
-"pick" is the number of the one article the question's own words describe (the right version, edition, person, work or event, not a list, an overview of a broader topic or a different one with a similar name), or 0 when no candidate is clearly it. Compare each candidate's opening sentence with EVERY detail the question states (years, eras, formats, kinds, counts, what it says the subject did or did not do). "settled" is true when those details decide between the candidates that share a name, false when two or more of them fit and the question gives nothing that tells them apart. When "settled" is false, "also" is the number of the next-best candidate, otherwise 0. Use only what the question says.`;
+"pick" is the number of the one article whose opening fits EVERY detail the question states (years, eras, formats, counts, what it says the subject did or did not do), or 0 when no candidate fits them all. An overview of a wider subject is the pick only when the question's details span more than one of the narrower candidates (it asks how one ended, what came after it, what was planned instead). "settled" is false when two candidates fit, when a stated detail fits none of them, or when the openings say one candidate continued, followed or reworked another and the question asks about an ending, what came next or what was planned; then "also" is the other candidate. Otherwise "settled" is true and "also" 0. Use only what the question says.`;
 }
 
 /** What the pick said: the chosen candidate, whether the question's details decided it, and the runner-up when they did not. */
@@ -239,11 +239,13 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
   if (!brief) return { anchor: null, candidates: 0 };
   const find = finderOverride ?? defaultCandidateFinder;
   // Title-shaped searches first (the library's title lookup answers them at once), then the subject as worded, the question, and the live search.
-  const attempts: { query: string; live: boolean }[] = [
-    ...(brief.titles ?? []).map((query) => ({ query, live: false })),
-    { query: brief.subject, live: false },
-    { query: question.slice(0, 120), live: false },
-    { query: brief.subject, live: true },
+  const titles = brief.titles ?? [];
+  // Several brief titles are gathered together before the first pick, so a sibling the first title's lookup did not return is still offered.
+  const attempts: { queries: string[]; live: boolean }[] = [
+    ...(titles.length > 1 ? [{ queries: titles, live: false }] : titles.map((query) => ({ queries: [query], live: false }))),
+    { queries: [brief.subject], live: false },
+    { queries: [question.slice(0, 120)], live: false },
+    { queries: [brief.subject], live: true },
   ];
   const started = Date.now();
   const seen = new Set<string>();
@@ -252,7 +254,15 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
   for (const attempt of attempts) {
     if (Date.now() - started > PIN_BUDGET_MS) break;
     let candidates: EntityCandidate[] = [];
-    try { candidates = (await find(attempt.query, person, signal, { live: attempt.live })).slice(0, CANDIDATES_MAX); } catch { candidates = []; }
+    const merged = attempt.queries.length > 1;
+    for (const query of attempt.queries) {
+      if (merged && (candidates.length >= PIN_MERGED_MAX || Date.now() - started > PIN_BUDGET_MS)) break;
+      let found: EntityCandidate[] = [];
+      try { found = (await find(query, person, signal, { live: attempt.live })).slice(0, CANDIDATES_MAX); } catch { found = []; }
+      for (const c of found) if (!candidates.some((x) => x.title === c.title)) candidates.push(c);
+      if (!merged) break;
+    }
+    if (merged) candidates = candidates.slice(0, PIN_MERGED_MAX);
     // A pass that finds only titles already offered adds nothing to pick from.
     if (candidates.length === 0 || candidates.every((c) => seen.has(c.title))) continue;
     candidates.forEach((c) => seen.add(c.title));
@@ -268,7 +278,8 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
     try { article = await picked.load(); } catch { article = null; }
     const anchor = anchorFor(article?.title || picked.title, article, picked.snippet);
     // Candidates of the same base name that were passed over: the answer says which one it read.
-    const sameName = (title: string): boolean => anchorFor(title, null).baseName.toLowerCase() === anchor.baseName.toLowerCase();
+    const stem = (title: string): string => anchorFor(title, null).baseName.replace(/\s*:.*$/, "").trim().toLowerCase();
+    const sameName = (title: string): boolean => stem(title) === stem(anchor.title);
     const alternatives = [...seen].filter((title) => title !== picked.title && title !== anchor.title && sameName(title));
     if (alternatives.length > 0) anchor.alternatives = alternatives.slice(0, 4);
     if (detail.also !== null) anchor.unsettled = { title: candidates[detail.also]!.title, lead: candidates[detail.also]!.snippet.replace(/\s+/g, " ").trim().slice(0, 300) };
@@ -279,6 +290,8 @@ export async function pinEntity(brief: Brief | null, question: string, person: P
 
 /** The passes of a pin stop starting after this long (milliseconds). */
 const PIN_BUDGET_MS = 7_000;
+/** Candidates gathered across several brief titles before the first pick. */
+const PIN_MERGED_MAX = 8;
 
 // ---------------------------------------------------------------- queries
 

@@ -176,7 +176,7 @@ describe("pinning", () => {
 
 describe("title-shaped lookups first", () => {
   const candidate = (title: string): EntityCandidate => ({ title, snippet: "", load: async () => ({ title, lead: `${title} opening.`, sections: [], source: "library" }) });
-  test("the brief's guessed titles are looked up before the subject as worded and the question, and the first pick ends the passes", async () => {
+  test("the brief's guessed titles are all looked up before the subject as worded and the question, and the first pick ends the passes", async () => {
     const seen: string[] = [];
     __setEntityPinForTests({
       finder: async (q) => { seen.push(q); return q === "Alder (2001 handbook)" ? [candidate("Alder (2001 handbook)"), candidate("Alder (2009 handbook)")] : [candidate("Unrelated")]; },
@@ -184,7 +184,49 @@ describe("title-shaped lookups first", () => {
     });
     const b: Brief = { ...brief("the handbook"), titles: ["Alder (2001 handbook)", "Alder (handbook)"] };
     const { anchor } = await pinEntity(b, "the 2001 handbook, tell me more", person);
-    expect(seen).toEqual(["Alder (2001 handbook)"]);
+    expect(seen).toEqual(["Alder (2001 handbook)", "Alder (handbook)"]);
     expect(anchor?.title).toBe("Alder (2001 handbook)");
+  });
+  test("several brief titles are all looked up before the first pick, so the pick prompt offers both works", async () => {
+    const queries: string[] = [];
+    const prompts: string[] = [];
+    __setEntityPinForTests({
+      finder: async (q) => { queries.push(q); return q === "Alder (2001 film)" ? [candidate("Alder (2001 film)")] : [candidate("Alder (2009 film)")]; },
+      writer: async (prompt) => { prompts.push(prompt); return '{"pick": 1}'; },
+    });
+    const b: Brief = { ...brief("the film"), titles: ["Alder (2001 film)", "Alder (2009 film)"] };
+    const { anchor, candidates } = await pinEntity(b, "how did the film end", person);
+    expect(queries).toEqual(["Alder (2001 film)", "Alder (2009 film)"]);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("Alder (2001 film)");
+    expect(prompts[0]).toContain("Alder (2009 film)");
+    expect(candidates).toBe(2);
+    expect(anchor?.alternatives).toEqual(["Alder (2009 film)"]);
+  });
+
+  test("merged title candidates are capped at eight", async () => {
+    const prompts: string[] = [];
+    __setEntityPinForTests({
+      finder: async (q) => Array.from({ length: 5 }, (_, n) => candidate(`${q} ${n}`)),
+      writer: async (prompt) => { prompts.push(prompt); return '{"pick": 1}'; },
+    });
+    await pinEntity({ ...brief("s"), titles: ["T1", "T2", "T3"] }, "q", person);
+    expect(prompts[0]!.split("\n").filter((l) => /^\d+\. /.test(l))).toHaveLength(8);
+  });
+
+  test("a colon subtitle does not hide a sibling: it is reported in alternatives", async () => {
+    __setEntityPinForTests({ finder: async () => [candidate("Alder: The Beginning"), candidate("Alder: The Return"), candidate("Beta: The Return")], writer: async () => '{"pick": 1}' });
+    const { anchor } = await pinEntity(brief("x"), "q", person);
+    expect(anchor?.title).toBe("Alder: The Beginning");
+    expect(anchor?.alternatives).toEqual(["Alder: The Return"]);
+  });
+
+  test("the pick prompt asks for the candidate that fits every stated detail and unsettles on a continuation", () => {
+    const prompt = pickPrompt("q", "s", [{ title: "A", snippet: "x" }]);
+    expect(prompt).toContain("whose opening fits EVERY detail the question states");
+    expect(prompt).toContain("or 0 when no candidate fits them all");
+    expect(prompt).toContain("An overview of a wider subject is the pick only when the question's details span more than one of the narrower candidates");
+    expect(prompt).toContain("continued, followed or reworked another");
+    expect(prompt).toContain('{"pick": 1, "settled": true, "also": 0}');
   });
 });

@@ -38,6 +38,12 @@ describe("stage 1: what is this person asking", () => {
     expect(briefPrompt("q", "")).toContain('"titles"');
   });
 
+  test("the brief prompt names the thing as the person named it and offers one title per work the words could mean", () => {
+    const prompt = briefPrompt("q", "");
+    expect(prompt).toContain("the thing itself, named as the person named it; never the kind of answer wanted and never a year or name the person did not say");
+    expect(prompt).toContain("one per work or version the person's words could mean when the name is shared");
+  });
+
   test("understand() hands the model's reading on, and a model that is down gives null", async () => {
     __setStageWritersForTests({ brief: async () => '{"subject":"a show","ambiguous":false,"options":[]}' });
     expect((await understand("q", ""))!.subject).toBe("a show");
