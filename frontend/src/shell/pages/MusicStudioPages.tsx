@@ -13,11 +13,12 @@ import { SongStyleCard, type SongStylePatch } from "@maipai/ui/src/elements/song
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { MusicWorkspace } from "./MusicWorkspacePage";
+import { MusicStudioView } from "./MusicStudioView";
 import { request } from "@/lib/api";
 import { bandImageSrc, useBandCard } from "@/apps/chat/useBandCard";
 import { joinBandAndStudio, musicRefOf, useMusicCard, type MusicCardKind } from "@/apps/chat/useMusicCard";
 
-export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "creations", "edit"] as const;
+export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "creations", "edit", "studio"] as const;
 export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "music" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
 
 type Kind = MusicCardKind;
@@ -183,6 +184,7 @@ function songStyleProps(props: Record<string, unknown>) {
 /** The Music app's Create and library pages. `search` is the address's query string. */
 export function MusicStudioPage({ pageId, search, adult }: { pageId: string; search: string; adult: boolean }) {
   if (pageId === "create" || pageId === "make-song") return <MusicWorkspace adult={adult} search={search} />;
+  if (pageId === "studio") return <MusicStudioView adult={adult} search={search} />;
   if (pageId === "make-band") return <CreatePage kind="band" adult={adult} />;
   if (pageId === "make-album") return <CreatePage kind="album" adult={adult} />;
   if (pageId === "make-style") return <CreatePage kind="song_style" adult={adult} />;

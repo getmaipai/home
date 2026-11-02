@@ -92,6 +92,7 @@ export function SongResult({ id, onAnother }: { id: string; onAnother?: () => vo
     <MusicTrack {...props} />
     {ready ? <div className="flex flex-wrap items-center gap-2">
       <Button type="button" variant={kept ? "secondary" : "default"} disabled={kept} onClick={keep}>{kept ? "Kept in your Library" : "Keep in my Library"}</Button>
+      <Button asChild variant="outline"><Link to={`/apps/music/studio?song=${encodeURIComponent(id)}`}>Open in Studio</Link></Button>
       {fileId ? <Button asChild variant="outline"><Link to={`/files?file=${encodeURIComponent(fileId)}`}>Open in Library</Link></Button> : null}
       <Button type="button" variant="ghost" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>Make another</Button>
     </div> : null}

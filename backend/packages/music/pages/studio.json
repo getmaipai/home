@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-studio",
+  "title": "Studio",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "music",
+      "text": "The Studio needs the Home app. Open a song in Music, then choose Open in Studio."
+    }
+  ]
+}

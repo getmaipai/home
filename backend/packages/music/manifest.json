@@ -311,6 +311,14 @@
         "nav": false,
         "kind": "schema",
         "module": "edit"
+      },
+      {
+        "id": "studio",
+        "label": "Studio",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "studio"
       }
     ],
     "data": [

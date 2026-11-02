@@ -36,6 +36,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/search.json` | music | Search |
 | `backend/packages/music/pages/songs.json` | music | Songs |
 | `backend/packages/music/pages/station.json` | music | Station |
+| `backend/packages/music/pages/studio.json` | music | Studio |
 | `backend/packages/news/pages/channel.json` | news | Channel |
 | `backend/packages/news/pages/following.json` | news | Following |
 | `backend/packages/news/pages/index.json` | news | Today |
@@ -240,6 +241,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
+| `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
+| `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
 | `frontend/src/shell/pages/MusicWorkspacePage.tsx` | songLine, MusicWorkspace |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
