@@ -289,7 +289,8 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
     expect(await view.findByRole("button", { name: "Open the player: Building a birdhouse" })).toBeTruthy();
     expect(video.isConnected).toBe(true);
     fireEvent.click(view.getByRole("button", { name: "Close the player: Building a birdhouse" }));
-    await waitFor(() => expect(document.querySelector('[data-layout="mini"]')).toBeNull());
+    // Count the bars, not the node: Bun 1.3.14 crashes (SIGTRAP) printing a failed `expect(<happy-dom element>)` while the bar is still closing.
+    await waitFor(() => expect(document.querySelectorAll('[data-layout="mini"]').length).toBe(0));
     // Three page loads through the whole shell: slower than the default 5 s on a loaded machine.
   }, 30_000);
 
