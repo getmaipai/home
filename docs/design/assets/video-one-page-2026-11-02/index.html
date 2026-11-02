@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Videos Create, one page (mockup, 2026-11-02)</title>
+<!-- Design mockup for docs/design/video-create-one-page-2026-11-02.md. Not product code.
+     Query: ?theme=light|dark  &state=done|draft|rendering|empty  &open=style|sheet
+     Tokens are the kit's (commons ui/src/tokens.css). Loops are the package's own backend/packages/videos/assets/loops. Demo data only. -->
+<style>
+:root{--bg:#f4f7fb;--fg:#0b1730;--card:#fff;--border:#c9d6e6;--muted:#e3eaf3;--mfg:#4a5f7a;--primary:#21a6ff;--pfg:#07111f;--ring:#21a6ff;--shadow:0 8px 30px rgba(11,23,48,.12);--stage:#0b1730}
+:root[data-theme=dark]{--bg:#07111f;--fg:#f4f8ff;--card:#102238;--border:#294563;--muted:#142a43;--mfg:#a9bed7;--shadow:0 8px 30px rgba(0,0,0,.45);--stage:#030912}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:13.5px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+.app{display:flex;height:100vh;overflow:hidden}
+.rail{width:56px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0}
+.rail i{width:28px;height:28px;border-radius:8px;background:var(--muted);display:block}
+.rail i.on{background:var(--primary)}
+.side{width:200px;flex:none;border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:12px}
+.modes{display:flex;background:var(--muted);border-radius:999px;padding:3px}
+.modes span{flex:1;text-align:center;padding:6px 0;border-radius:999px;color:var(--mfg)}
+.modes span.on{background:var(--card);color:var(--fg);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.nav{padding:9px 12px;border-radius:10px}
+.nav.on{background:var(--muted);font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.head{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 20px}
+.head h1{font-size:18px;margin:0;font-weight:600;flex:1}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#21a6ff,#8b7bff)}
+.scroll{flex:1;overflow:auto;padding:4px 20px 24px}
+.col{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+@media (min-width:1024px){.col{grid-template-columns:minmax(0,1fr) 300px}}
+.vlist{display:flex;flex-direction:column;gap:10px}
+.vrow{display:flex;gap:10px;align-items:center;min-width:0}
+.vrow .th{position:relative;flex:none;width:112px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--stage);outline:2px solid transparent;outline-offset:2px}
+.vrow.cur .th{outline-color:var(--primary)}
+.vrow video{width:100%;height:100%;object-fit:cover;display:block}
+.vrow .tx{min-width:0;flex:1}
+.vrow .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.vrow .s{color:var(--mfg);font-size:12px}
+.vrow .ra{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--mfg)}
+.vrow .dur{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:0 5px;font-size:10px}
+.vrow .badge{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.65);color:#fff;border-radius:999px;padding:1px 7px;font-size:10px}
+.vrow .pb{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.3)}
+.vrow .pb b{display:block;height:100%;width:42%;background:var(--primary)}
+.stage{position:relative;aspect-ratio:16/9;width:100%;border-radius:16px;overflow:hidden;background:var(--stage);color:#fff;display:flex;align-items:center;justify-content:center}
+.stage video,.stage .still{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage .scrim{position:absolute;inset:0;background:linear-gradient(0deg,rgba(3,9,18,.78),rgba(3,9,18,.25) 55%,rgba(3,9,18,.1))}
+.stage .face{position:relative;text-align:center;padding:16px;max-width:520px}
+.stage .face h2{margin:0 0 6px;font-size:18px;font-weight:600}
+.stage .face p{margin:0 0 14px;opacity:.85}
+.controls{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:10px 14px;color:#fff;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent)}
+.controls .bar{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.35)}
+.controls .bar b{display:block;width:34%;height:100%;border-radius:2px;background:var(--primary)}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-weight:500}
+.btn.p{background:var(--primary);color:var(--pfg);border-color:transparent;font-weight:600}
+.stage .btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35);color:#fff}
+.stage .btn.p{background:var(--primary);color:var(--pfg)}
+.prog{width:min(360px,80%);height:6px;border-radius:3px;background:rgba(255,255,255,.3);margin:0 auto 10px;overflow:hidden}
+.prog b{display:block;height:100%;width:42%;background:var(--primary)}
+.blur{filter:blur(18px) saturate(1.2);transform:scale(1.15)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 4px}
+.meta .prompt{flex:1 1 100%;font-size:15px}
+.tag{padding:3px 10px;border-radius:999px;background:var(--muted);color:var(--mfg);font-size:12px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 22px}
+.acts.scrollx{flex-wrap:nowrap;overflow-x:auto}
+.feedhead{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.feedhead h3{margin:0;font-size:18px;font-weight:600}
+.feedhead span{color:var(--mfg)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.tile{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile .th{position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--stage);outline:2px solid transparent;outline-offset:2px}
+.tile.cur .th{outline-color:var(--primary)}
+.tile video{width:100%;height:100%;object-fit:cover;display:block}
+.tile .badge{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;border-radius:999px;padding:2px 8px;font-size:11px}
+.tile .dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:1px 6px;font-size:11px}
+.tile .pb{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.3)}
+.tile .pb b{display:block;height:100%;width:42%;background:var(--primary)}
+.tile .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.tile .s{color:var(--mfg);font-size:12px}
+.dockwrap{flex:none;padding:0 20px 16px;position:relative}
+.dock{max-width:960px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:10px;position:relative}
+.sugg{display:flex;gap:8px;flex-wrap:wrap}
+.sugg .tag{background:transparent;border:1px solid var(--border);padding:5px 12px}
+.field{min-height:60px;border:0;background:transparent;color:var(--fg);font:inherit;font-size:15px;resize:none;outline:none;width:100%}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.slot{width:44px;height:44px;border-radius:10px;border:2px dashed var(--border);color:var(--mfg);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9.5px;background:transparent;padding:0;line-height:1.1}
+.slot.f{border:1px solid var(--border);overflow:hidden;position:relative}
+.slot.f video{width:100%;height:100%;object-fit:cover}
+.slot.f u{position:absolute;top:1px;right:1px;width:14px;height:14px;border-radius:50%;background:var(--card);color:var(--fg);text-decoration:none;font-size:10px;line-height:14px;text-align:center}
+.slot.ann{opacity:.55}
+.pill{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:var(--card)}
+.pill .mini{display:flex}
+.pill .mini video{width:30px;height:30px;border-radius:7px;object-fit:cover;margin-right:-8px;border:2px solid var(--card)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;padding:3px;min-height:44px}
+.seg span{display:flex;align-items:center;padding:0 14px;border-radius:999px;color:var(--mfg)}
+.seg span.on{background:var(--primary);color:var(--pfg);font-weight:600}
+.sp{flex:1}
+.est{color:var(--mfg);font-size:12px;text-align:right}
+.gen{min-height:48px;padding:0 24px;font-size:15px}
+.pop{position:absolute;left:14px;bottom:calc(100% + 10px);width:min(560px,calc(100% - 28px));background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);padding:14px;z-index:5}
+.pop h4{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mfg);font-weight:600}
+.pop section{margin-bottom:14px}.pop section:last-child{margin-bottom:0}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.card{display:flex;flex-direction:column;gap:4px;font-size:12px;text-align:center}
+.card .th{aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--stage);outline:2px solid transparent;outline-offset:1px}
+.card.on .th{outline-color:var(--primary)}
+.card.on{font-weight:600}
+.card video{width:100%;height:100%;object-fit:cover;display:block}
+.sound{display:flex;gap:8px}
+.sheetback{position:fixed;inset:0;background:rgba(3,9,18,.55);z-index:20;display:none}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:86vh;overflow:auto;background:var(--card);border-radius:22px 22px 0 0;padding:10px 16px 18px;z-index:21;display:none}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 12px}
+.sheet h4{margin:14px 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mfg)}
+.note{position:absolute;right:-6px;top:-26px;font-size:11px;color:var(--mfg)}
+.phone-only{display:none}
+@media (max-width:899px){.side{display:none}}
+@media (max-width:639px){
+ .rail{display:none}
+ .head{padding:0 16px 0 60px}
+ .scroll{padding:4px 16px 16px}
+ .grid{grid-template-columns:repeat(2,1fr);gap:10px}
+ .stage{border-radius:12px}
+ .dockwrap{padding:0 12px 10px}
+ .dock{border-radius:20px;padding:8px 8px 8px 14px;flex-direction:row;align-items:center;gap:8px}
+ .dock .full{display:none}
+ .dock .field{min-height:44px;height:44px;padding-top:12px}
+ .phone-only{display:flex}
+ .round{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;flex:none;padding:0}
+ .round.p{background:var(--primary);color:var(--pfg);border-color:transparent;font-weight:700}
+ .acts{flex-wrap:nowrap;overflow-x:auto}
+ .acts .btn{flex:none}
+ .menu{position:fixed;left:12px;top:10px;width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--border);z-index:3}
+ .pop{display:none!important}
+}
+@media (min-width:640px){.menu{display:none}.sheetback,.sheet{display:none!important}}
+</style>
+</head>
+<body>
+<script>
+const q=new URLSearchParams(location.search);
+const theme=q.get('theme')||'light';document.documentElement.dataset.theme=theme;
+const state=q.get('state')||'done';const open=q.get('open')||'';
+const L='../../../../backend/packages/videos/assets/loops/';
+const clip=n=>`<video muted loop playsinline autoplay preload="auto" src="${L}${n}.mp4#t=0.4"></video>`;
+const looks=[['natural','Natural'],['classic-cartoon','Classic cartoon'],['anime','Anime'],['3d-animated','3D animated'],['film','Film']];
+const cams=[['still','Still'],['dolly-in','Dolly in'],['slow-orbit','Orbit'],['handheld','Handheld'],['slow-motion','Slow motion'],['time-lapse','Time-lapse'],['aerial','Aerial'],['close-up','Close-up']];
+const cardsHtml=(arr,sel)=>arr.map(([v,l])=>`<div class="card ${v===sel?'on':''}"><div class="th">${clip(v)}</div>${l}</div>`).join('');
+const popHtml=`<section><h4>Look</h4><div class="cards" style="grid-template-columns:repeat(5,1fr)">${cardsHtml(looks,'anime')}</div></section>
+<section><h4>Camera</h4><div class="cards">${cardsHtml(cams,'dolly-in')}</div></section>
+<section><h4>Sound</h4><div class="sound"><span class="seg"><span class="on">Keep it clean</span><span>Music and effects</span></span></div></section>`;
+const slots=`<button class="slot f" aria-label="Start frame">${clip('film')}<u>x</u></button><button class="slot" aria-label="End frame"><b>+</b>End frame</button><button class="slot ann" aria-label="Voice clip"><b>+</b>Voice clip</button>`;
+const level=`<span class="seg"><span>Standard</span><span class="on">Boost</span><span>Max</span></span>`;
+const stageHtml={
+ done:`${clip('anime')}<div class="controls"><span>0:02</span><div class="bar"><b></b></div><span>0:05</span></div>`,
+ rendering:`<div class="still blur">${clip('anime')}</div><div class="scrim"></div><div class="face"><div class="prog"><b></b></div><h2>Making your video, 42% done</h2><p>About a minute left. You can leave this page; it will be in Your clips.</p><button class="btn">Cancel</button></div>`,
+ draft:`${clip('anime')}<div class="controls" style="justify-content:center"><span>First picture, not yet a video</span></div>`,
+ empty:`<div class="face"><h2>Your video shows here</h2><p>Describe it below, or start from an idea.</p></div>`
+}[state];
+const metaHtml=state==='done'?`<div class="meta"><div class="prompt">A paper boat floats down a rainy street at dusk, a girl in a yellow coat follows it, "Wait for me!"</div><span class="tag">Anime</span><span class="tag">Dolly in</span><span class="tag">Boost</span><span class="tag">5 s</span><span class="tag">With sound</span></div>
+<div class="acts ${''}"><button class="btn p">Download</button><button class="btn">Another take</button><button class="btn">Remix</button><button class="btn">Make it Max</button><button class="btn">More</button></div>`:
+ state==='rendering'?`<div class="meta"><div class="prompt">A paper boat floats down a rainy street at dusk, a girl in a yellow coat follows it, "Wait for me!"</div><span class="tag">Anime</span><span class="tag">Dolly in</span><span class="tag">Boost</span><span class="tag">5 s</span></div><div class="acts"></div>`:state==='draft'?`<div class="meta"><div class="prompt">First picture ready. Check it before the video is made.</div></div><div class="acts"><button class="btn p">Make the video from this</button><button class="btn">Another still</button><button class="btn">Edit words</button></div>`:`<div class="acts"></div>`;
+const tiles=[['anime','A paper boat in the rain','Boost, 5 s','0:05',1],['aerial','Sunrise over a valley','Standard, 10 s','0:10'],['3d-animated','A robot waters a garden','Max, 10 s','0:10'],['film','A cozy cabin in the snow','Standard, 5 s','0:05'],['handheld','Birthday candles','Standard, 5 s','0:05'],['time-lapse','Clouds over the harbor','Boost, 5 s','0:05'],['classic-cartoon','A dog chases a kite','Standard, 5 s','0:05'],['slow-orbit','Teapot on a windowsill','Boost, 5 s','0:05']];
+const rowHtml=([c,t,sub,d,cur])=>`<div class="vrow ${cur&&state==='done'?'cur':''}"><div class="th">${clip(c)}<span class="dur">${d}</span></div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div><span class="ra" title="Another take">&#8635;</span></div>`;
+const mk=state==='rendering'?`<div class="vrow"><div class="th">${clip('anime')}<span class="badge">Making</span><div class="pb"><b></b></div></div><div class="tx"><div class="t">A paper boat floats down...</div><div class="s">Boost, 5 s, 42% done</div></div></div>`:'';
+const feed=state==='empty'?`<div class="feedhead"><h3>Your clips</h3></div><p style="color:var(--mfg)">Clips you make show up here, newest first.</p>`:`<div class="feedhead"><h3>Your clips</h3><span>${tiles.length+(mk?1:0)} clips</span></div><div class="vlist">${mk}${tiles.map(rowHtml).join('')}</div>`;
+const sugg=state==='empty'?`<div class="sugg"><span class="tag">A paper boat in the rain</span><span class="tag">Sunrise over a valley</span><span class="tag">A cozy cabin in the snow</span></div>`:'';
+const page=`<div class="app"><nav class="rail"><i></i><i></i><i class="on"></i><i></i></nav>
+<aside class="side"><div class="modes"><span>Browse</span><span class="on">Create</span></div><div class="nav on">Create</div></aside>
+<div class="main"><button class="menu" aria-label="Menu"></button><header class="head"><h1>Create</h1><div class="avatar"></div></header>
+<div class="scroll"><div class="col"><div><div class="stage">${stageHtml}</div>${metaHtml}</div><aside>${feed}</aside></div></div>
+<div class="dockwrap"><div class="dock">
+ ${open==='style'?`<div class="pop">${popHtml}</div>`:''}
+ <div class="full">${sugg}</div>
+ <textarea class="field" aria-label="Describe a video" placeholder="Describe your video. Put each person's line in quotes.">${state==='empty'?'':'A paper boat floats down a rainy street at dusk, a girl in a yellow coat follows it, "Wait for me!"'}</textarea>
+ <div class="row full">${slots}<span class="pill" aria-label="Style"><span class="mini">${clip('anime')}${clip('dolly-in')}</span>Anime, Dolly in &#9662;</span><span class="pill">16:9 &#9662;</span><span class="pill">5 s &#9662;</span>${level}<span class="sp"></span><button class="btn p gen" style="flex-direction:column;gap:0;line-height:1.15;padding:6px 22px">Generate<small style="font-weight:400;font-size:11px">about a minute</small></button></div>
+ <button class="round phone-only" aria-label="Options">&#9776;</button><button class="round p phone-only" aria-label="Generate">&#10148;</button>
+</div></div></div></div>
+<div class="sheetback" style="${open==='sheet'?'display:block':''}"></div>
+<div class="sheet" style="${open==='sheet'?'display:block':''}"><div class="grab"></div>
+ <div class="row">${slots}</div>
+ <h4>Level</h4>${level}
+ <h4>Shape and length</h4><div class="row"><span class="seg"><span class="on">16:9</span><span>9:16</span></span><span class="seg"><span class="on">5 s</span><span>10 s</span></span></div>
+ <h4>Look</h4><div class="cards" style="grid-template-columns:repeat(3,1fr)">${cardsHtml(looks,'anime')}</div>
+ <h4>Camera</h4><div class="cards" style="grid-template-columns:repeat(3,1fr)">${cardsHtml(cams,'dolly-in')}</div>
+ <h4>Sound</h4><span class="seg"><span class="on">Keep it clean</span><span>Music and effects</span></span>
+ <div style="display:flex;gap:10px;align-items:center;margin-top:16px;position:sticky;bottom:-18px;background:var(--card);padding:10px 0 4px;border-top:1px solid var(--border)"><span class="est" style="flex:1;text-align:left">Boost, 5 s</span><button class="btn p gen" style="flex-direction:column;gap:0;line-height:1.15;padding:6px 22px">Generate<small style="font-weight:400;font-size:11px">about a minute</small></button></div></div>`;
+document.body.innerHTML=page;
+</script>
+</body>
+</html>
