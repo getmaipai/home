@@ -83629,6 +83629,146 @@
         }
       }
     },
+    "/api/music/bands/{id}/action": {
+      "post": {
+        "tags": [
+          "Music bands"
+        ],
+        "summary": "Keep, remake or discard a band",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "mband-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "keep",
+                      "remake",
+                      "remake_portrait",
+                      "remake_logo",
+                      "discard"
+                    ],
+                    "description": "keep saves the band's finished single to Music. remake discards the band and returns the song to make a new one from. remake_portrait and remake_logo start a new picture. discard deletes the band."
+                  },
+                  "conversation_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "For remake_portrait and remake_logo: the chat the band card is in."
+                  },
+                  "turn_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "For remake_portrait and remake_logo: the turn the band card is in."
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "keep",
+                        "remake",
+                        "remake_portrait",
+                        "remake_logo",
+                        "discard"
+                      ]
+                    },
+                    "done": {
+                      "type": "string",
+                      "description": "One plain sentence for the person."
+                    },
+                    "media_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "keep: the saved track, when its single is ready."
+                    },
+                    "seed_media_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "remake: the song to make the new band from."
+                    },
+                    "pending": {
+                      "type": "boolean",
+                      "description": "keep: the single is not finished yet."
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "done"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "That action cannot run for this band",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the band's owner can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Band not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/music/status": {
       "get": {
         "tags": [
