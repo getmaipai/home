@@ -40,6 +40,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import answerImageRows from "./datasets/answer-images.json";
 import bandToolRows from "./datasets/band-tool.json";
+import studioToolRows from "./datasets/music-studio-tool.json";
 import routeDataset from "./datasets/chat-ab-01.json";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
@@ -221,7 +222,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const budgetExecuted = await budgetOfferedPass();
   const imageExecuted = await answerImagesPass();
   const bandExecuted = await bandToolPass();
-  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted, engine };
+  const studioExecuted = await studioToolPass();
+  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted + studioExecuted, engine };
 }
 
 interface RouteItem { id: string; prompt: string; kind: string; family?: string; split?: string; gold?: "must" | "must_not" | "may"; age_row?: string; acceptable_tools: string[]; expected_terms?: string[]; }
@@ -456,6 +458,38 @@ async function bandToolPass(): Promise<number> {
     console.log(`${row.label} ${called}/${REPEATS} make_band  "${row.id}" -> ${outcomes.join(" | ")}`);
   }
   console.log(`\nBand-tool pass: make_band on ${wantCalls}/${wantRuns} band runs, ${otherCalls}/${otherRuns} other runs`);
+  return executed;
+}
+
+/** MUSIC-STUDIO-HOME: the studio rows (datasets/music-studio-tool.json, the manifests' bench_row `music-studio-tool`). A row passes when its
+ * label tool is among the calls, or, for an N row, when none of the five studio tools is. The set offered is the shipped budget plus
+ * MAIPAI_BENCH_OFFER, so measure with `MAIPAI_BENCH_OFFER=make_album,make_song_style,edit_band,edit_album,edit_song_style`. */
+const STUDIO_TOOLS = ["make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"];
+async function studioToolPass(): Promise<number> {
+  const tools = budgetOfferedTools();
+  if (!STUDIO_TOOLS.every((id) => tools.some((t) => t.id === id))) {
+    console.log("\nStudio-tool rows skipped: the studio tools are not offered (set MAIPAI_BENCH_OFFER=" + STUDIO_TOOLS.join(",") + " to measure them before they ship).");
+    return 0;
+  }
+  const rows = studioToolRows.rows as { id: string; label: string; text: string }[];
+  console.log(`\nStudio-tool pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
+  let executed = 0, wantRuns = 0, wantCalls = 0, otherRuns = 0, otherCalls = 0;
+  for (const row of rows) {
+    const outcomes: string[] = [];
+    let passed = 0;
+    for (let i = 0; i < REPEATS; i++) {
+      const result = await completeWithTimeout("chat", [{ role: "user", content: row.text }], { tools, tool_choice: "auto" });
+      if (!result.ok) { outcomes.push("no reply"); continue; }
+      executed++;
+      const ids = (result.value.tool_calls ?? []).map((c) => c.tool).sort();
+      const studio = ids.filter((id) => STUDIO_TOOLS.includes(id));
+      if (row.label === "N" ? studio.length === 0 : ids.includes(row.label)) passed++;
+      outcomes.push(ids.length === 0 ? "[]" : `[${ids.join(", ")}]`);
+    }
+    if (row.label === "N") { otherRuns += REPEATS; otherCalls += REPEATS - passed; } else { wantRuns += REPEATS; wantCalls += passed; }
+    console.log(`${row.label === "N" ? "N" : "T"} ${passed}/${REPEATS} ${row.label}  "${row.id}" -> ${outcomes.join(" | ")}`);
+  }
+  console.log(`\nStudio-tool pass: the expected tool on ${wantCalls}/${wantRuns} runs, a studio tool on ${otherCalls}/${otherRuns} other runs`);
   return executed;
 }
 

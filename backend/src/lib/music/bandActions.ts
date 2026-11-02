@@ -8,16 +8,18 @@ import { nextHlc } from "@/lib/hlc";
 import { routeAudience } from "@/lib/pictures/audience";
 import { pictureDenial } from "@/lib/pictures/policy";
 import type { PersonRow } from "@/types";
-import { startBandPicture } from "./band";
-import { deleteMade, getMade } from "./madeRecords";
+import { bandBlockFromRecord, startBandPicture } from "./band";
+import { deleteMade, getMade, reviseMade, updateMade } from "./madeRecords";
 
-export const BAND_ACTION_NAMES = ["keep", "remake", "remake_portrait", "remake_logo", "discard"] as const;
+export const BAND_ACTION_NAMES = ["keep", "remake", "remake_portrait", "remake_logo", "discard", "edit"] as const;
+/** What an edit may change. `sound` is the band's style words; `look` starts a new portrait from those words (the band record has no look field). */
+export interface BandPatchInput { name?: string; backstory?: string; look?: string; sound?: string; genres?: string[] }
 export type BandActionName = (typeof BAND_ACTION_NAMES)[number];
 export type BandActionResult =
-  | { ok: true; value: { action: BandActionName; done: string; mediaId?: string | null; seedMediaId?: string | null; pending?: boolean } }
+  | { ok: true; value: { action: BandActionName; done: string; mediaId?: string | null; seedMediaId?: string | null; pending?: boolean; band?: Record<string, unknown> } }
   | { ok: false; status: 400 | 403 | 404; error: string };
 
-type Band = { id: string; name: string; owner_person_id?: string | null; backstory?: string | null; genres?: string[]; members?: { name: string; role: string }[]; seed?: { media_id?: string } | null };
+type Band = { id: string; name: string; style?: { description?: string; genres?: string[] }; owner_person_id?: string | null; backstory?: string | null; genres?: string[]; members?: { name: string; role: string }[]; seed?: { media_id?: string } | null };
 
 function portraitPrompt(band: Band, part: "portrait" | "logo"): string {
   const sound = (band.genres ?? []).slice(0, 3).join(", ") || "indie";
@@ -35,7 +37,7 @@ function ownTurn(actor: PersonRow, conversationId: string | null, turnId: string
   return conversation && turn && conversation.personId === actor.id && turn.conversationId === conversationId ? { conversationId, turnId } : null;
 }
 
-export async function runBandAction(actor: PersonRow, bandId: string, action: BandActionName, where: { conversationId: string | null; turnId: string | null } = { conversationId: null, turnId: null }): Promise<BandActionResult> {
+export async function runBandAction(actor: PersonRow, bandId: string, action: BandActionName, where: { conversationId: string | null; turnId: string | null } = { conversationId: null, turnId: null }, patch: BandPatchInput = {}): Promise<BandActionResult> {
   const found = getMade("made_artist", actor, bandId);
   if (!found.ok) return { ok: false, status: 404, error: "That band is not here any more. It may have been discarded." };
   const band = found.value as unknown as Band;
@@ -53,10 +55,30 @@ export async function runBandAction(actor: PersonRow, bandId: string, action: Ba
   if (action === "remake") {
     const seedMediaId = band.seed?.media_id ?? null;
     if (!seedMediaId) return { ok: false, status: 400, error: "This band was not made from a song, so it cannot be made again from one. Pick a song and use Band like this." };
+    reviseMade("made_artist", actor, bandId, "remake");
     const gone = deleteMade("made_artist", actor, bandId);
     // Its saved singles leave the library with it, as on discard; a new band is made from the same song.
     if (gone.ok) db.update(mediaItems).set({ hidden: true, hlc: nextHlc() }).where(eq(mediaItems.madeArtistId, bandId)).run();
     return gone.ok ? { ok: true, value: { action, seedMediaId, done: "Making a new band from the same song." } } : { ok: false, status: gone.status as 403 | 404, error: gone.error };
+  }
+  if (action === "edit") {
+    const fields: Record<string, unknown> = {};
+    if (typeof patch.name === "string") fields.name = patch.name.trim();
+    if (typeof patch.backstory === "string") fields.backstory = patch.backstory;
+    if (patch.genres !== undefined) fields.genres = patch.genres.slice(0, 8);
+    if (patch.sound !== undefined || patch.genres !== undefined) {
+      fields.style = { ...(band.style ?? {}), description: (patch.sound ?? band.style?.description ?? "original songs").trim() || "original songs", ...(patch.genres !== undefined ? { genres: patch.genres.slice(0, 8) } : {}) };
+    }
+    let lookLine = "";
+    if (typeof patch.look === "string" && patch.look.trim()) {
+      const turn = ownTurn(actor, where.conversationId, where.turnId);
+      if (turn && !pictureDenial(routeAudience(actor))) { await startBandPicture(turn, actor, bandId, "portrait", patch.look.trim().slice(0, 500)); lookLine = " A new portrait is being made from the look."; }
+      else lookLine = " The look needs the chat where the band was made, so no new portrait was started.";
+    }
+    if (Object.keys(fields).length === 0) return lookLine ? { ok: true, value: { action, done: `Nothing else changed.${lookLine}` } } : { ok: false, status: 400, error: "There was nothing to change. Tell me what to change about the band." };
+    const saved = updateMade("made_artist", actor, bandId, fields);
+    if (!saved.ok) return { ok: false, status: saved.status, error: saved.error };
+    return { ok: true, value: { action, band: bandBlockFromRecord(saved.value as never, where), done: `Changed. The earlier version is kept.${lookLine}` } };
   }
   const part = action === "remake_logo" ? "logo" : "portrait";
   const turn = ownTurn(actor, where.conversationId, where.turnId);

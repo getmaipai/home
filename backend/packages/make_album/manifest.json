@@ -1,0 +1,77 @@
+{
+  "id": "make_album",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make an Album",
+  "description": "Make a new album with a cover, a blurb and a song list, and start its first song.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicAlbumMakeAllowed",
+    "bench_row": "music-studio-tool",
+    "reason": "adult on their own written screen with music enabled and no album already open in the chat"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make me an album about summer road trips",
+      "create an album for this band with a cover and a first song",
+      "make a lofi study album in this style",
+      "put together a new album called Night Garden",
+      "I want a whole album, not just one song"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "idea": {
+        "type": "string",
+        "grounded": false,
+        "description": "What the album is about, in the person's own words, short.",
+        "maxLength": 500
+      },
+      "band": {
+        "type": "string",
+        "grounded": false,
+        "description": "A made band's id (mband-...), only when the person named a band in this chat. Otherwise leave out.",
+        "maxLength": 40
+      },
+      "song_style": {
+        "type": "string",
+        "grounded": false,
+        "description": "A saved song style's id (sstyle-...), only when the person named one. Otherwise leave out.",
+        "maxLength": 40
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "returns_blocks": [
+    "album"
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

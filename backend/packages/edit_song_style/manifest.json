@@ -1,0 +1,115 @@
+{
+  "id": "edit_song_style",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Change a Song Style",
+  "description": "Change the song style the person is looking at, its words, genres, tempo or length; the earlier version is kept.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicStyleEditAllowed",
+    "bench_row": "music-studio-tool",
+    "reason": "adult on their own written screen with music enabled and a song style reference in the message or a song style card in the chat"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make this style slower",
+      "rename the style to Rainy Sunday",
+      "add piano to the sound",
+      "set the tempo to 90 and the key to A minor",
+      "make it instrumental"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "title": {
+        "type": "string",
+        "grounded": false,
+        "description": "A new name.",
+        "maxLength": 120
+      },
+      "sound": {
+        "type": "string",
+        "grounded": false,
+        "description": "New style words. Never lyrics.",
+        "maxLength": 1000
+      },
+      "genres": {
+        "type": "array",
+        "grounded": false,
+        "description": "The new genre words.",
+        "items": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "maxItems": 8
+      },
+      "instrumental": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True for no singing."
+      },
+      "bpm": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "grounded": false,
+        "description": "Beats per minute, 30 to 300, or null to let the engine choose.",
+        "minimum": 30,
+        "maximum": 300
+      },
+      "key": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "grounded": false,
+        "description": "A musical key such as A minor, or null.",
+        "maxLength": 20
+      },
+      "length_s": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "grounded": false,
+        "description": "Wanted length in seconds, or null.",
+        "minimum": 5,
+        "maximum": 600
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "returns_blocks": [
+    "song_style"
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

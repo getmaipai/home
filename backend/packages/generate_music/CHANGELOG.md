@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] - 2026-11-02
+
+### Added
+
+- Optional `song_style`, `band` and `album` arguments: a song can be made in a saved song style or a made band's sound, and a song made for an album joins it when it finishes. The song's own words still win over the sound.
+
 ## [0.1.1] - 2026-10-18
 
 ### Changed

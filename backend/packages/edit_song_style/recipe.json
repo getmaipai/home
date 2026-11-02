@@ -1,0 +1,11 @@
+{
+  "id": "edit_song_style",
+  "inputs": [],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Change a Song Style works only through chat. Open the Music app to use it."
+    }
+  ]
+}

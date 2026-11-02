@@ -253,6 +253,8 @@ export interface TurnState {
   itemReferenceAllowed?: boolean;
   /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;
+  /** MUSIC-STUDIO-EDIT: the made-music object the turn follows ("none": the turn may make a song style but names no object). Decides the make/edit tools. */
+  musicObject?: { kind: "track" | "band" | "album" | "style" | "none"; id?: string };
   modelId?: string;
   /** MINOR-CEILING-01: the chat model the Stack runs this turn (the person's pick when they made
    * one), so a node can read the running model's record; never sent to a client. */

@@ -10,7 +10,8 @@ import { videosAllowed } from "@/lib/videos/policy";
 import { videoEngineReady } from "@/lib/videos/ready";
 import { itemRefsIn } from "@/lib/items/tool";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
-import { withTurnToolGates } from "./budget";
+import { withTurnToolGates, type MusicObjectGate } from "./budget";
+import { isMusicObjectRef, musicObjectOf, type MusicObjectRef } from "@/lib/music/objects";
 import type { TurnBudget } from "./contract";
 
 export interface TurnToolGateInput {
@@ -28,6 +29,8 @@ export interface TurnToolGateInput {
   musicEditAvailable: () => boolean;
   /** VIDEO-CHAT-01: whether the chat already holds a finished video (left out: no). */
   videoEditAvailable?: () => boolean;
+  /** MUSIC-STUDIO-EDIT: the newest band, album or song style card in the chat (left out: none). */
+  musicObjectInThread?: () => MusicObjectRef | null;
 }
 
 interface LatchedToolGates {
@@ -38,6 +41,7 @@ interface LatchedToolGates {
   videoEditOk: boolean;
   itemRefOk: boolean;
   musicBandOk: boolean;
+  musicObject: MusicObjectRef | null;
 }
 
 const MAX_LATCHED_CONVERSATIONS = 500;
@@ -57,6 +61,9 @@ export interface TurnToolGateResult {
   videoEditOk: boolean;
   itemRefOk: boolean;
   musicBandOk: boolean;
+  /** The made-music object this turn follows: a gate value for the offers, and the object itself when one is named. */
+  musicObject: MusicObjectGate;
+  musicObjectRef: MusicObjectRef | null;
 }
 
 /** Calculates the conditional offers for a real turn and for its cache warm-up. */
@@ -105,15 +112,21 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   // MUSIC-LIKE-01: a song reference (maipai://music/track/...) offers `make_band` and nothing else; every other reference offers
   // `read_item`. The two never share a turn, so the sixteen-tool worst case holds (a message with both kinds offers read_item only).
   const refsInMessage = itemRefPermission ? (() => { try { return itemRefsIn(input.text); } catch { return []; } })() : [];
-  const isTrack = (ref: { app: string; kind: string }) => ref.app === "music" && ref.kind === "track";
-  const otherRefInMessage = refsInMessage.some((ref) => !isTrack(ref));
-  const trackRefInMessage = !otherRefInMessage && refsInMessage.length > 0;
+  // MUSIC-STUDIO-EDIT: a reference to a made band, album or song style is a music object like a song. The newest object wins: the
+  // message's own reference, then the newest card in the thread, then what the chat followed before. One object, one set of tools.
+  const objectRefs = refsInMessage.filter(isMusicObjectRef);
+  const otherRefInMessage = refsInMessage.some((ref) => !isMusicObjectRef(ref));
+  const refObject = otherRefInMessage ? null : (() => { const picked = objectRefs.find((ref) => ref.kind !== "track") ?? objectRefs[0]; return picked ? musicObjectOf(picked) : null; })();
   if (latch && otherRefInMessage) latch.itemRefOk = true;
   const itemRefOk = itemRefPermission && (otherRefInMessage || latch?.itemRefOk === true);
-  if (latch && trackRefInMessage && musicOk) latch.musicBandOk = true;
-  const musicBandOk = itemRefPermission && musicOk && !itemRefOk && (trackRefInMessage || latch?.musicBandOk === true);
+  const objectAllowed = itemRefPermission && musicOk && !itemRefOk;
+  const threadObject = objectAllowed && !refObject ? (() => { try { return input.musicObjectInThread?.() ?? null; } catch { return null; } })() : null;
+  const musicObjectRef = objectAllowed ? (refObject ?? threadObject ?? latch?.musicObject ?? null) : null;
+  if (latch && objectAllowed && musicObjectRef) { latch.musicObject = musicObjectRef; if (musicObjectRef.kind === "track") latch.musicBandOk = true; }
+  const musicBandOk = objectAllowed && musicObjectRef?.kind === "track";
+  const musicObject: MusicObjectGate = !objectAllowed ? null : (musicObjectRef?.kind ?? "none");
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject),
     answerImagesOk,
     picturesOk,
     videosOk,
@@ -122,6 +135,8 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     videoEditOk,
     itemRefOk,
     musicBandOk,
+    musicObject,
+    musicObjectRef,
   };
 }
 
@@ -133,7 +148,7 @@ function getConversationLatch(conversationId: string): LatchedToolGates {
     conversationToolGateLatches.set(conversationId, latch);
     return latch;
   }
-  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, videoEditOk: false, itemRefOk: false, musicBandOk: false };
+  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, videoEditOk: false, itemRefOk: false, musicBandOk: false, musicObject: null };
   conversationToolGateLatches.set(conversationId, latch);
   if (conversationToolGateLatches.size > MAX_LATCHED_CONVERSATIONS) {
     const oldest = conversationToolGateLatches.keys().next().value;

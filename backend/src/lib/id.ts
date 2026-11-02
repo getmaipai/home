@@ -61,6 +61,14 @@ export function newSongStyleId(): string {
 export function newMadeArtistId(): string {
   return `mband-${randomSuffix(10)}`;
 }
+/** Matches spec/schemas/made-album.schema.json's `^malbum-[a-z0-9]{6,}$` (MUSIC-STUDIO-ALBUM). */
+export function newMadeAlbumId(): string {
+  return `malbum-${randomSuffix(10)}`;
+}
+/** A saved earlier version of a made record (MUSIC-STUDIO-EDIT). */
+export function newMadeRevisionId(): string {
+  return `mrev-${randomSuffix(10)}`;
+}
 
 /** Matches spec/schemas/chat-folder.schema.json's `^folder-[a-z0-9]{6,}$`
  * (PROJECTS-01a: a chat folder, shown as a Project). */

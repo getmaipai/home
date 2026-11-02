@@ -10,6 +10,7 @@ import type { PersonRow } from "@/types";
 import { readNewsStory } from "@/lib/news/discuss";
 import { readReferenceArticle } from "@/lib/reference/keyPoints";
 import { readMusicTrack } from "@/lib/music/trackItem";
+import { readMusicAlbum, readMusicBand, readMusicStyle } from "@/lib/music/objects";
 
 export const READ_ITEM_TOOL_ID = "read_item";
 export const ITEM_REF_PATTERN = /maipai:\/\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)\/([A-Za-z0-9_-]{1,80})/g;
@@ -23,6 +24,9 @@ export const ITEM_READERS: Record<string, ItemReader> = {
   "news/story": readNewsStory,
   "reference/article": readReferenceArticle,
   "music/track": readMusicTrack,
+  "music/band": readMusicBand,
+  "music/album": readMusicAlbum,
+  "music/style": readMusicStyle,
 };
 
 /** Every reference in a piece of text, in order, once each. */

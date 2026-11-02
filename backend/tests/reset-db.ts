@@ -74,6 +74,8 @@ import {
   chatFolders,
   songStyles,
   madeArtists,
+  madeAlbums,
+  madeRevisions,
   chatFolderShares,
   clonedVoices,
   feeds,
@@ -310,5 +312,7 @@ export function resetDb(): void {
   db.delete(personCredentials).run();
   db.delete(songStyles).run(); // MUSIC-STUDIO-S2: owned by a person
   db.delete(madeArtists).run(); // MUSIC-LISTEN-C5
+  db.delete(madeAlbums).run(); // MUSIC-STUDIO-ALBUM
+  db.delete(madeRevisions).run(); // MUSIC-STUDIO-EDIT
   db.delete(people).run();
 }

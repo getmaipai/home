@@ -1,0 +1,109 @@
+{
+  "id": "make_song_style",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make a Song Style",
+  "description": "Save a sound as a song style: style words, genres, tempo and key, so songs can be made in it later.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicStyleMakeAllowed",
+    "bench_row": "music-studio-tool",
+    "reason": "adult on their own written screen with music enabled and no band or album open in the chat"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "save this sound as a song style called Rainy Sunday",
+      "make me a song style for slow dreamy synth pop",
+      "create a style for upbeat road trip songs",
+      "remember this sound so I can make more songs like it",
+      "new song style: acoustic, warm, 90 bpm"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "title",
+      "sound"
+    ],
+    "properties": {
+      "title": {
+        "type": "string",
+        "grounded": false,
+        "description": "A short name for the style.",
+        "maxLength": 120
+      },
+      "sound": {
+        "type": "string",
+        "grounded": false,
+        "description": "The style words for a song engine: genre, mood, instruments, era. Never lyrics.",
+        "maxLength": 1000
+      },
+      "genres": {
+        "type": "array",
+        "grounded": false,
+        "description": "Up to 8 short genre words.",
+        "items": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "maxItems": 8
+      },
+      "instrumental": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True when songs in this style have no singing."
+      },
+      "bpm": {
+        "type": "integer",
+        "grounded": false,
+        "description": "Beats per minute, 30 to 300.",
+        "minimum": 30,
+        "maximum": 300
+      },
+      "key": {
+        "type": "string",
+        "grounded": false,
+        "description": "A musical key such as A minor.",
+        "maxLength": 20
+      },
+      "length_s": {
+        "type": "integer",
+        "grounded": false,
+        "description": "Wanted length in seconds, 5 to 600.",
+        "minimum": 5,
+        "maximum": 600
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "returns_blocks": [
+    "song_style"
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

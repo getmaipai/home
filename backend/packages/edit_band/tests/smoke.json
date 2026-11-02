@@ -1,0 +1,15 @@
+{
+  "description": "Recipe fallback; the native tool and its gates are covered in backend/tests/musicStudio.test.ts.",
+  "inputs": {},
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Change a Band works only through chat. Open the Music app to use it.",
+      "speech": "Change a Band works only through chat. Open the Music app to use it."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

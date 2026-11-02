@@ -1,6 +1,6 @@
 {
   "id": "generate_music",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Song",
@@ -110,6 +110,24 @@
         ],
         "grounded": false,
         "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
+      },
+      "song_style": {
+        "type": "string",
+        "grounded": false,
+        "description": "A saved song style's id (sstyle-...), only when the person named one. The song is made in that sound.",
+        "maxLength": 40
+      },
+      "band": {
+        "type": "string",
+        "grounded": false,
+        "description": "A made band's id (mband-...), only when the person named that band. The song is made in the band's sound and filed under it.",
+        "maxLength": 40
+      },
+      "album": {
+        "type": "string",
+        "grounded": false,
+        "description": "A made album's id (malbum-...), only when the person asked for a song for that album. The song joins the album when it is finished.",
+        "maxLength": 40
       }
     }
   },

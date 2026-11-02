@@ -1217,7 +1217,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   // Hold a plain media request until its tool call is known; also hold the follow-up after a successful music start,
   // even when the person's wording did not plainly name a song.
-  const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "edit_video" || t.id === "generate_music" || t.id === "edit_music" || t.id === "make_band");
+  const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "edit_video" || t.id === "generate_music" || t.id === "edit_music" || t.id === "make_band" || t.id === "make_album");
   const successfulMusicStart = musicForOutcomes(state.outcomes) !== null;
   const holdMedia = !input.retry && !noToolsTurn(state) && (successfulMusicStart || (!isPhrasingRound && asksForMedia(input.utterance)));
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && !continuing && (searchAssistMayHold(state, tools) || weatherAssistMayHold(state, tools)));

@@ -2026,6 +2026,27 @@ function madeRecordTable(name: string) {
 }
 export const songStyles = madeRecordTable("song_styles");
 export const madeArtists = madeRecordTable("made_artists");
+// MUSIC-STUDIO-ALBUM: an album the household made. Same column set and store as the two above (kind made_album).
+export const madeAlbums = madeRecordTable("made_albums");
+
+// MUSIC-STUDIO-EDIT: the version a made record had before an edit or a remake replaced it. An edit is a revision with provenance,
+// never a silent overwrite, so the earlier version stays retrievable. `body` is the whole prior record as JSON (a person's own words:
+// nothing logs a row, rule 6a). Rows go with the person (personLifecycle) and are never shown to anyone but the owner or a parent.
+export const madeRevisions = sqliteTable(
+  "made_revisions",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(), // song_style | made_artist | made_album
+    recordId: text("record_id").notNull(),
+    personId: text("person_id").references(() => people.id),
+    body: text("body").notNull(),
+    reason: text("reason").notNull(), // edit | remake
+    provenance: text("provenance").notNull(),
+    hlc: text("hlc").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("made_revisions_record_idx").on(t.kind, t.recordId, t.createdAt)],
+);
 
 // MUSIC-DATA-01: a local copy of an album's front cover from the Cover Art Archive, keyed by the MusicBrainz release group id.
 // A reconstructible cache, not a household record: the image file lives in the cache data class. status: found | none (no cover).

@@ -311,6 +311,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   // A stored cover may update its song, but never changes this picture's outcome.
   try { const { finishSongCover } = await import("@/lib/music/cover"); finishSongCover(job); } catch { /* optional cover linkage */ }
   try { const { finishBandPicture } = await import("@/lib/music/band"); finishBandPicture(job); } catch { /* optional band linkage */ }
+  try { const { finishAlbumPicture } = await import("@/lib/music/album"); finishAlbumPicture(job); } catch { /* optional album linkage */ }
   if (stackJob) void cancelOrDelete(stackJob);
 }
 

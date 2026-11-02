@@ -5,7 +5,7 @@
 import { isGeneratedFile } from "@/lib/libraryProvenance";
 
 /** MUSIC-LIKE-01: a picture made for something else than a chat card: a song cover, or a made band's portrait or logo (`band:<id>:portrait`). Hidden from the card. */
-export type PicturePurpose = "cover" | `band:${string}`;
+export type PicturePurpose = "cover" | `band:${string}` | `album:${string}`;
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, pictureJobs } from "@/db/schema";

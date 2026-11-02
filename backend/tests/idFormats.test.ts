@@ -50,8 +50,8 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newSongStyleId", "sstyle-", 10],
   ["newMediaCollectionId", "mcol-", 10],
   ["newMusicJobId", "mus-", 10],
-  ["newSongStyleId", "sstyle-", 10],
-  ["newMadeArtistId", "mband-", 10],
+  ["newMadeAlbumId", "malbum-", 10],
+  ["newMadeRevisionId", "mrev-", 10],
   ["newApiKeyId", "key_", 24],
 ];
 

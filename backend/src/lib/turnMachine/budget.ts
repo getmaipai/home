@@ -162,11 +162,25 @@ function modelHasRecord(id: string): boolean {
   return catalogEntries().some((m) => m.role === "chat" && m.id === id);
 }
 
-function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false): boolean {
+/** MUSIC-STUDIO-EDIT: which made-music object the turn follows. null: the turn may not follow one at all; "none": it may, and none is named. */
+export type MusicObjectGate = "track" | "band" | "album" | "style" | "none" | null;
+/** The creation and edit tools the object decides. They never share a turn with another object's tools, so the cap holds. */
+function musicObjectOffer(gate: string | undefined, object: MusicObjectGate): boolean {
+  switch (gate) {
+    case "musicStyleMakeAllowed": return object === "none" || object === "track";
+    case "musicAlbumMakeAllowed": return object === "none" || object === "track" || object === "band" || object === "style";
+    case "musicBandEditAllowed": return object === "band";
+    case "musicAlbumEditAllowed": return object === "album";
+    case "musicStyleEditAllowed": return object === "style";
+    default: return false;
+  }
+}
+
+function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null): boolean {
   if (offer.mode === "base") return true;
   if (offer.mode !== "conditional" || !offer.bench_row) return false;
   // IMGGEN-HOME-01: `picturesAllowed` is decided once per turn (pictures/policy.ts and the Stack's picture engine being up).
-  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk);
+  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
 }
 
 export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string } }, status: "enabled" | "disabled", usedInChat = false): string | null {
@@ -184,9 +198,12 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
  * off and unmeasured tools stay out, and exceeding the model cap is a
  * configuration error rather than a silently shortened offer. */
 /** The music tools dropped first, in this order, when `edit_video` would take the offer set past the model cap. */
-const MUSIC_SHRINK_ORDER = ["make_band", "edit_music", "generate_music"] as const;
+const MUSIC_SHRINK_ORDER = "make_song_style make_album edit_band edit_album edit_song_style make_band edit_music generate_music".split(" ");
 
-export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false): TurnBudget {
+/** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
+const STUDIO_SHRINK_ORDER = "make_song_style make_album edit_music".split(" ");
+
+export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null): TurnBudget {
   const cap = budget.max_tools ?? 0;
   if (budget === NO_RECORD_BUDGET) return budget;
   if (cap === 0) return budget.tools_offered.length === 0 ? budget : { ...budget, tools_offered: [] };
@@ -196,18 +213,24 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   for (const manifest of listInstalledManifests()) {
     const offer = manifest.offer;
     const forcedForMeasurement = offerOverridesForTests.has(manifest.id);
-    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk))) continue;
+    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject))) continue;
     const status = statuses.get(manifest.id);
     if (status && (status.status !== "enabled" || status.smokeOk === false)) continue;
     candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
   }
   for (const tool of VIRTUAL_TOOL_REGISTRY) {
-    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
+    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 
   // VIDEO-CHAT-01: the video set (at most four tools) keeps its place; when the total would pass the cap, the music set shrinks first.
   if (candidates.size > cap && candidates.has("edit_video")) {
     for (const id of MUSIC_SHRINK_ORDER) { if (candidates.size <= cap) break; candidates.delete(id); }
+  }
+  // MUSIC-STUDIO-HOME: the studio tools are the newest and the least needed, so they also give way (and only they) when the music set alone would pass the cap.
+  for (const id of STUDIO_SHRINK_ORDER) {
+    if (candidates.size <= cap) break;
+    if (id === "edit_music" && !(candidates.has("edit_band") || candidates.has("edit_album") || candidates.has("edit_song_style"))) continue;
+    candidates.delete(id);
   }
   const ordered = [...candidates.values()].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
   if (ordered.length > cap) {

@@ -1,4 +1,5 @@
 import { MAKE_BAND_TOOL_ID, runMakeBand } from "@/lib/music/band";
+import { isStudioTool, runStudioTool } from "@/lib/music/studioTools";
 import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMusic } from "@/lib/music/tool";
 // U2c, the `tool` node (turn-machine-state-record-2026-09-22.md's state
 // table): "runPlugin under the tool deadline; the outcome recorded in
@@ -284,6 +285,18 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       if (outcome.status === "succeeded") {
         toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
         // The band card is an answer block like any package's: it passes the same manifest allowlist, age band and floor.
+        toolEvents.push(...blockEventsFor(state, tool, callId, (outcome.result as { blocks?: unknown } | undefined)?.blocks, toolEvents));
+      } else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    // MUSIC-STUDIO-EDIT: make_album, make_song_style and the three edit tools; the policy node checked the offer and the object.
+    if (isStudioTool(tool)) {
+      const outcome = await runStudioTool(tool, { state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+      outcomes.push(outcome);
+      const data = outcome.result?.data as { musicJobId?: string } | undefined;
+      if (outcome.status === "succeeded") {
+        toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
         toolEvents.push(...blockEventsFor(state, tool, callId, (outcome.result as { blocks?: unknown } | undefined)?.blocks, toolEvents));
       } else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       continue;

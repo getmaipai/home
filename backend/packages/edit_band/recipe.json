@@ -1,0 +1,11 @@
+{
+  "id": "edit_band",
+  "inputs": [],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Change a Band works only through chat. Open the Music app to use it."
+    }
+  ]
+}

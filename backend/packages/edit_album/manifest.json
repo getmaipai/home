@@ -1,0 +1,108 @@
+{
+  "id": "edit_album",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Change an Album",
+  "description": "Change the album the person is looking at, its words, song order or cover; the earlier version is kept.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicAlbumEditAllowed",
+    "bench_row": "music-studio-tool",
+    "reason": "adult on their own written screen with music enabled and an album reference in the message or an album card in the chat"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "rename this album to Night Garden",
+      "put the slow songs at the end",
+      "take track 3 off the album",
+      "make the cover darker and moodier",
+      "change the blurb to be shorter"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "title": {
+        "type": "string",
+        "grounded": false,
+        "description": "A new album title.",
+        "maxLength": 120
+      },
+      "blurb": {
+        "type": "string",
+        "grounded": false,
+        "description": "A new blurb.",
+        "maxLength": 1000
+      },
+      "sound": {
+        "type": "string",
+        "grounded": false,
+        "description": "New style words for the album's songs. Never lyrics.",
+        "maxLength": 1000
+      },
+      "look": {
+        "type": "string",
+        "grounded": false,
+        "description": "What the cover should look like.",
+        "maxLength": 1000
+      },
+      "genres": {
+        "type": "array",
+        "grounded": false,
+        "description": "The new genre words.",
+        "items": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "maxItems": 8
+      },
+      "track_ids": {
+        "type": "array",
+        "grounded": false,
+        "description": "Media ids of the songs on the album in the new order; songs left out leave the album, not the library. Copy the ids exactly from the album.",
+        "items": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "maxItems": 100
+      },
+      "new_cover": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True to make a new cover from the look."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "returns_blocks": [
+    "album"
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

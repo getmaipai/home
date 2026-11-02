@@ -1,0 +1,103 @@
+{
+  "id": "edit_band",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Change a Band",
+  "description": "Change the band the person is looking at, its name, story, sound or look; the earlier version is kept.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicBandEditAllowed",
+    "bench_row": "music-studio-tool",
+    "reason": "adult on their own written screen with music enabled and a band reference in the message or a band card in the chat"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "rename this band to Night Garden",
+      "make the band sound more like early 80s synth pop",
+      "change the back story so they met at school",
+      "give the band a new portrait",
+      "add rock to its genres"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "name": {
+        "type": "string",
+        "grounded": false,
+        "description": "A new band name.",
+        "maxLength": 120
+      },
+      "backstory": {
+        "type": "string",
+        "grounded": false,
+        "description": "A new back story, 3 to 5 sentences.",
+        "maxLength": 4000
+      },
+      "sound": {
+        "type": "string",
+        "grounded": false,
+        "description": "New style words for the band's songs. Never lyrics.",
+        "maxLength": 1000
+      },
+      "look": {
+        "type": "string",
+        "grounded": false,
+        "description": "What a new portrait should look like. Starts a new portrait.",
+        "maxLength": 1000
+      },
+      "genres": {
+        "type": "array",
+        "grounded": false,
+        "description": "The new genre words, replacing the old ones.",
+        "items": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "maxItems": 8
+      },
+      "new_portrait": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True to make a new portrait."
+      },
+      "new_logo": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True to make a new logo."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "returns_blocks": [
+    "band"
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

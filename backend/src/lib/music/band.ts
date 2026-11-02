@@ -145,19 +145,30 @@ export const hubImageRef = (fileId: string): string => `hubimg-${Buffer.from(fil
 export const fileIdOfHubImage = (src: string): string | null => /^hubimg-([a-f0-9]{8,})$/.test(src) ? Buffer.from(src.slice(7), "hex").toString("utf8") : null;
 /** `make_band:<band id>:<conversation id>:<turn id>`. The band id is what the card's buttons send back; the other two are where a new picture is filed. */
 export const bandProvenance = (bandId: string, where: { conversationId: string | null; turnId: string | null }): string => `make_band:${bandId}:${where.conversationId ?? "-"}:${where.turnId ?? "-"}`;
-const BAND_ACTIONS = ["keep", "remake", "remake_portrait", "discard"] as const;
+const BAND_ACTIONS = ["make_album", "keep", "remake", "remake_portrait", "remake_logo", "discard"] as const;
 
 /** The band's chat card. It carries the band's own record (name, story, members, pictures made so far) and the first single's title;
- * the band id rides in `provenance`, which the card's buttons send back to the band route. make_album is not offered: albums are not built yet. */
+ * the band id rides in `provenance`, which the card's buttons send back to the band route. The card is editable: Edit sends edit_band with the changed fields. */
 export function bandBlock(bandId: string, where: { conversationId: string | null; turnId: string | null }, brief: BandBrief, draft: BandDraft, pictures: { portrait?: string | null; logo?: string | null }): Record<string, unknown> {
   const props: Record<string, unknown> = {
-    name: draft.name, genres: draft.genres, members: draft.members, singleTitle: draft.single_title.slice(0, 120),
+    name: draft.name, genres: draft.genres, members: draft.members, singleTitle: draft.single_title.slice(0, 120), editable: true, sound: draft.style,
     inspiredBy: (brief.artist ? `${brief.title} by ${brief.artist}` : brief.title).slice(0, 120), actions: [...BAND_ACTIONS],
   };
   if (draft.backstory) props.backstory = draft.backstory;
   if (pictures.portrait) props.portrait = { src: hubImageRef(pictures.portrait), alt: `Portrait of the band ${draft.name}` };
   if (pictures.logo) props.logo = { src: hubImageRef(pictures.logo), alt: `Logo of the band ${draft.name}` };
   return blockEnvelope("band", MAKE_BAND_TOOL_ID, `The band ${draft.name}, made like a song you picked, with its first single ${draft.single_title}.`, bandProvenance(bandId, where), props);
+}
+
+type BandRecord = { id: string; name: string; backstory?: string | null; genres?: string[]; members?: { name: string; role: string }[]; portrait_file_id?: string | null; logo_file_id?: string | null; style?: { description?: string } };
+
+/** The band's chat card built from the saved record (after an edit, so the card and the record agree). */
+export function bandBlockFromRecord(rec: BandRecord, where: { conversationId: string | null; turnId: string | null }): Record<string, unknown> {
+  const props: Record<string, unknown> = { name: rec.name, genres: rec.genres ?? [], members: rec.members ?? [], editable: true, sound: rec.style?.description ?? "", actions: [...BAND_ACTIONS] };
+  if (rec.backstory) props.backstory = rec.backstory;
+  if (rec.portrait_file_id) props.portrait = { src: hubImageRef(rec.portrait_file_id), alt: `Portrait of the band ${rec.name}` };
+  if (rec.logo_file_id) props.logo = { src: hubImageRef(rec.logo_file_id), alt: `Logo of the band ${rec.name}` };
+  return blockEnvelope("band", MAKE_BAND_TOOL_ID, `The band ${rec.name}.`, bandProvenance(rec.id, where), props);
 }
 
 /** Makes the band, then starts its portrait, logo and first single. Only the band itself can fail this call. */

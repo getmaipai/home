@@ -1,0 +1,11 @@
+{
+  "id": "edit_album",
+  "inputs": [],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Change an Album works only through chat. Open the Music app to use it."
+    }
+  ]
+}

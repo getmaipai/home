@@ -14,6 +14,7 @@ import { StackMusicError, musicBody, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 import { provenanceFor } from "./commercial";
+import { resolveSound } from "./sound";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
 export const EDIT_MUSIC_TOOL_ID = "edit_music";
 export function musicAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): MusicAudience {
@@ -24,7 +25,9 @@ const common = {
   description: z.string().trim().min(3).max(1200).optional(), lyrics: z.string().max(4000).optional(),
   bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).regex(/^[A-G][#b]?\s?(major|minor|maj|min|m)?$/i).optional(),
 };
-export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional() });
+export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional(),
+  /** MUSIC-STUDIO-STYLE: make the song in a saved song style, a made band's sound, or an album (ids the person can read). */
+  song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional() });
 export const editMusicArgs = z.object({
   ...common, track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems"]),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
@@ -43,6 +46,8 @@ export type MusicToolInput = {
   args: Record<string, unknown>; callId: string; spoken: boolean;
   /** MUSIC-LIKE-01: set by make_band only (never by a model argument): the song is this band's first single. */
   band?: { id: string; name: string };
+  /** MUSIC-STUDIO-ALBUM: set by make_album only: the song is this album's first track. */
+  album?: { id: string };
 };
 const newSeed = (prior?: number | null): number => { const seed = Math.floor(Math.random() * 2_147_483_646) + 1; return seed === prior ? seed + 1 : seed; };
 /** The Stack's own default (detailed on a big computer, quick on a small one); quick when it names none. */
@@ -158,6 +163,16 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
   if (request.edit?.op === "fade" && request.edit.seconds! > duration) return { ok: false, line: "That fade is longer than the song. Give a shorter fade in seconds." };
   return { ok: true, task, request, body: musicBody(request, stackTask) };
 }
+/** The song's own arguments win; a sound fills what they leave out. The style words come first, so the song's own description refines them. */
+export function applySound<T extends z.infer<typeof generateMusicArgs>>(value: T, style: import("./sound").SoundStyle | null): T {
+  if (!style) return value;
+  const description = `${style.description}${value.description ? `. ${value.description}` : ""}`.slice(0, 1200);
+  return { ...value, description,
+    instrumental: value.instrumental ?? (style.instrumental || undefined),
+    bpm: value.bpm ?? style.bpm ?? undefined, key: value.key ?? style.key ?? undefined,
+    language: value.language ?? style.language ?? undefined,
+    seconds: value.seconds ?? (value.length === undefined && style.length_s ? style.length_s : undefined) };
+}
 async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input; const packageId = editing ? EDIT_MUSIC_TOOL_ID : GENERATE_MUSIC_TOOL_ID;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
@@ -195,13 +210,17 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     engine = await musicEngineStatus();
     if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
     const parsed = generateMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
-    const value = parsed.data;
+    const sound = resolveSound(actor, { song_style: parsed.data.song_style, band: parsed.data.band ?? input.band?.id, album: parsed.data.album ?? input.album?.id });
+    if (!sound.ok) return refused(sound.line, "sound_not_available");
+    const value = applySound(parsed.data, sound.value.style);
     const lyrics = value.instrumental ? "[Instrumental]" : value.lyrics;
     const length: SongLength = value.length ?? (value.seconds !== undefined && value.seconds >= 150 ? "full" : householdSongLength());
     request = { description: value.description, lyrics, title: value.title,
       instrumental: value.instrumental ?? false, seconds: songSecondsFor(length, value.seconds, value.instrumental ? undefined : value.lyrics, engine!.limits.max_seconds),
       bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: newSeed(), length };
-    if (input.band) request.band = input.band;
+    const band = input.band ?? sound.value.band;
+    if (band) request.band = band;
+    if (sound.value.album) request.album = sound.value.album;
     sizeSong(request, value.lyrics, engine!.limits, value.seconds);
     task = "text2music"; body = musicBody(request, "text2music");
   }

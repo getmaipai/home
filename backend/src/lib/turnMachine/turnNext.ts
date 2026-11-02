@@ -4,6 +4,7 @@ import { chatLeaseHeldBy } from "@/lib/chatLease";
 import { SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
 import { isLookupPackage } from "@/lib/ruleNames";
 import { conversationHasMusic } from "@/lib/music/jobs";
+import { threadMusicObject } from "@/lib/music/objects";
 import { conversationHasVideo } from "@/lib/videos/jobs";
 import { pageContextForTurn } from "@/lib/pageContext";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
@@ -668,8 +669,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     text,
     musicEditAvailable: () => conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
+    musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
-  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk } = gated;
+  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk, musicObject, musicObjectRef } = gated;
 
   const state: TurnState = {
     turnId,
@@ -693,6 +695,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(videoEditOk ? { videoEditAllowed: true } : {}),
     ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
     ...(musicBandOk ? { musicBandAllowed: true } : {}),
+    ...(musicObject ? { musicObject: { kind: musicObject, ...(musicObjectRef ? { id: musicObjectRef.id } : {}) } } : {}),
     modelId: opts.model,
     ...(engineModelId ? { engineModelId } : {}),
     signal,

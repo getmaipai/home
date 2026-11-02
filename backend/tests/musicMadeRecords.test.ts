@@ -101,11 +101,14 @@ describe("song styles", () => {
     const mine = SongStyle.parse(await (await sage.post("/api/music/styles", { title: "Private", style: STYLE })).json());
     expect((await marlow.get(`/api/music/styles/${mine.id}`)).status).toBe(404);
     expect((await marlow.get("/api/music/styles?scope=shared")).status).toBe(200);
-    expect(await (await marlow.get("/api/music/styles?scope=shared")).json()).toEqual([]);
+    // Starter styles belong to nobody and are on everyone's shelf; nothing of Sage's is.
+    const startersOnly = SongStyle.array().parse(await (await marlow.get("/api/music/styles?scope=shared")).json());
+    expect(startersOnly.length).toBeGreaterThanOrEqual(5);
+    expect(startersOnly.every((s) => s.origin === "starter" && s.owner_person_id === null)).toBe(true);
 
     const shared = SongStyle.parse(await (await sage.post("/api/music/styles", { title: "For all", style: STYLE, shared_to: "household" })).json());
     expect((await marlow.get(`/api/music/styles/${shared.id}`)).status).toBe(200);
-    expect(SongStyle.array().parse(await (await marlow.get("/api/music/styles?scope=shared")).json()).map((s) => s.id)).toEqual([shared.id]);
+    expect(SongStyle.array().parse(await (await marlow.get("/api/music/styles?scope=shared")).json()).filter((s) => s.origin !== "starter").map((s) => s.id)).toEqual([shared.id]);
     expect((await marlow.request(`/api/music/styles/${shared.id}`, { method: "PATCH", body: { title: "Mine now" } })).status).toBe(403);
     expect((await marlow.request(`/api/music/styles/${shared.id}`, { method: "DELETE" })).status).toBe(403);
 

@@ -1,4 +1,5 @@
 import { MAKE_BAND_TOOL_ID } from "@/lib/music/band";
+import { EDIT_TOOL_OBJECT, isStudioTool } from "@/lib/music/studioTools";
 import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
 // U2c, the `policy` node (turn-machine-state-record-2026-09-22.md's
 // state table): each ActionProposal against the manifest's min_role,
@@ -412,6 +413,24 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         continue;
       }
       entries.push({ proposal: bandProposal, decision: { allow: true } });
+      continue;
+    }
+
+    // MUSIC-STUDIO-EDIT: the five Music Studio tools. An edit tool follows the one object the turn follows (a message reference or the card in
+    // the thread), never an id the model wrote; a creation tool needs the turn to be offered it and music to be allowed here.
+    if (isStudioTool(call.tool)) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const studioProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const editKind = EDIT_TOOL_OBJECT[call.tool];
+      const offered = editKind ? state.musicObject?.kind === editKind && Boolean(state.musicObject.id) : Boolean(state.musicAllowed) && (call.tool === "make_song_style" ? ["none", "track"].includes(state.musicObject?.kind ?? "") : state.musicObject?.kind !== "album");
+      const reason = !state.musicAllowed || !offered ? "music_not_here" as const : musicRefusalFor(musicAudienceOf(state, false), {}) ? "music_not_here" as const : null;
+      if (reason) {
+        noteRefusal(reason);
+        entries.push({ proposal: studioProposal, decision: { allow: false, reason } });
+        continue;
+      }
+      if (editKind) callArgs.id = state.musicObject!.id;
+      entries.push({ proposal: studioProposal, decision: { allow: true } });
       continue;
     }
 
