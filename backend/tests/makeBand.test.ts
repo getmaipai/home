@@ -155,14 +155,13 @@ describe("the band card", () => {
     expect(fileIdOfHubImage(ref)).toBe("file-abc123XYZ");
     expect(fileIdOfHubImage("https://example.com/x.png")).toBeNull();
   });
-  test("the block is a band with at most four unique actions, its pictures by reference, and the band and turn in its provenance", () => {
+  test("the block is a band with unique, known actions, its pictures by reference, and the band and turn in its provenance", () => {
     const block = bandBlock("mband-test0000001", where, brief, draft as never, { portrait: "file-portrait1" }) as { kind: string; provenance: string; props: Record<string, unknown> };
     expect(block.kind).toBe("band");
     expect(block.provenance).toBe(bandProvenance("mband-test0000001", where));
     const actions = block.props.actions as string[];
-    expect(actions.length).toBeLessThanOrEqual(4);
     expect(new Set(actions).size).toBe(actions.length);
-    expect(actions).not.toContain("make_album");
+    expect(actions).toEqual(["make_album", "keep", "remake", "remake_portrait", "remake_logo", "discard"]);
     expect(block.props.logo).toBeUndefined();
     expect(fileIdOfHubImage((block.props.portrait as { src: string }).src)).toBe("file-portrait1");
     expect(block.props.inspiredBy).toBe("Paper Boats by Rivet Row");
@@ -177,7 +176,7 @@ describe("the band actions", () => {
     return made.value.id;
   }
   test("every action name is known", () => {
-    expect([...BAND_ACTION_NAMES]).toEqual(["keep", "remake", "remake_portrait", "remake_logo", "discard"]);
+    expect([...BAND_ACTION_NAMES]).toEqual(["keep", "remake", "remake_portrait", "remake_logo", "discard", "edit"]);
   });
   test("a missing band is 404 and another person's band is 404 for them, not a leak", async () => {
     expect(await runBandAction(sage, "mband-nothere0000", "keep")).toMatchObject({ ok: false, status: 404 });
