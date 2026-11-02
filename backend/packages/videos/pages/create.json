@@ -20,7 +20,7 @@
           "references": [
             {
               "state": "start_frame",
-              "label": "Start frame",
+              "label": "Optional. Begin from a picture.",
               "kind": "picture",
               "placement": "in_field"
             }
@@ -61,6 +61,38 @@
         }
       ],
       "main": [
+        {
+          "type": "media_shelf",
+          "heading": "Try this",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "showcase"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{subtitle}",
+          "item_media_field": "thumbnail",
+          "aspect": "poster",
+          "layout": "rail",
+          "variant": "plain",
+          "density": "compact",
+          "card_radius": "tight",
+          "press_scale": true,
+          "hide_when_empty": true,
+          "on_select": {
+            "navigate": {
+              "to": "/apps/videos/create",
+              "state": {
+                "prompt": "{prompt}",
+                "look": "{look}",
+                "camera": "{camera}"
+              }
+            }
+          }
+        },
         {
           "type": "result_feed",
           "bind": {
@@ -209,7 +241,7 @@
           "empty_state": {
             "type": "empty_state",
             "icon": "film",
-            "text": "Your clips show here. Describe a video on the left and press Generate."
+            "text": "Your clips show here. Pick a tile or describe a video on the left and press Generate."
           }
         }
       ]

@@ -1,5 +1,5 @@
 // VIDEO-CREATE-01, VIDEO-UI-06: the Videos package's Create data, added to the shared media host. The manifest's `contributes.data` is at the spec's
-// cap of 16 ids, so one id, `recipes`, answers by `scope`: none = the recipe list (lib/videos/recipes.ts), "feed" = the person's own Create clips
+// cap of 16 ids, so one id, `recipes`, answers by `scope`: none = the recipe list (lib/videos/recipes.ts), "showcase" = the Try this rail (VIDEO-UI-11), "feed" = the person's own Create clips
 // as result_feed rows (newest first, with the Favorites only and Type filters), "job" = one of those rows by id (what the feed's `poll_while`
 // re-reads while a clip is made), "clips" = My clips (Library files made at home, own and shared, or the person's uploaded pictures, by `view`).
 // Only the two Create pages bind it and both have an adult floor, so appRouteAllowed refuses the rest.
@@ -7,7 +7,7 @@ import { doneVideoJobsFor } from "@/lib/videos/jobs";
 import { feedRowById, feedRowOf, feedRows, levelOfJob } from "@/lib/videos/feed";
 import { favoriteFileIds } from "@/lib/videos/favorites";
 import { listLibrary } from "@/lib/library";
-import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_STARTERS, VIDEO_VOICES } from "@/lib/videos/recipes";
+import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_STARTERS, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
@@ -22,7 +22,7 @@ import { madeFiles, registerMediaAppData } from "./appHost";
 function maxTierEntry(person: PersonRow, band: ReturnType<typeof speakerAgeBand>, engine: ReturnType<typeof peekVideoEngineStatus>): Array<Record<string, unknown>> {
   const holds = band === "adult" && maxOffered(person, "video", band, true);
   if (!holds) return [];
-  if (ltx25MaxReady(engine)) return [{ id: "max", label: "Max", hint: `Up to ${maxSecondsFor("detailed", "ltx25max", engine)} seconds, sharpest picture, with sound` }];
+  if (ltx25MaxReady(engine)) return [{ id: "max", label: "Max", hint: "Sharpest picture, with sound" }];
   if (engine?.qualities?.ltx25max) return [{ id: "max", label: "Max", disabled_reason: videoMaxNotReadyReason(engine) }];
   return [];
 }
@@ -42,8 +42,8 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
   const ltx25 = ltx25VideoReady(engine);
   const boostOffered = allowedQuality(person, "video", "detailed", band) === "detailed";
   const tiers = [
-    { id: "standard", label: "Standard", hint: ltx25 ? `Up to ${maxSecondsFor("quick", "ltx25", engine)} seconds, with sound` : `Up to ${QUICK_MAX_SECONDS} seconds` },
-    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: `Up to ${ltx25 ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS} seconds, with sound` }] : []),
+    { id: "standard", label: "Standard", hint: ltx25 ? "Fast, with sound" : "Fast" },
+    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: "Sharper picture" }] : []),
     ...maxTierEntry(person, band, engine),
   ];
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
@@ -95,9 +95,9 @@ registerAppPageFill("videos", "create", (person, page) => {
   bar.chips = [
     ...chips,
     { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
-    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) })) },
-    // No camera move is the start: "none" is not a card, so no card is chosen until the person picks one (the route reads "none" as not given).
-    { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) })) },
+    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
+    // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
+    { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
     { state: "voices", label: "Voices", fold: true, default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
   ];
   // Make it Max shows only when this person holds Max and the Stack reports the Max model ready (the same offer the level segment makes); otherwise the
@@ -144,10 +144,23 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
 
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];
 
+/** VIDEO-UI-11: the "Try this" rail rows. A tile whose poster is not in the package is left out, never a broken picture. `look` and `camera` are the ids the Create panel's chips use
+ * (a camera of "none" is the Auto card). Never a clip of the person's, so the rows are the same for everyone who may open the page (adults; appRouteAllowed refuses the rest). */
+function showcaseRows(): Array<Record<string, unknown>> {
+  return VIDEO_SHOWCASE.flatMap((tile) => {
+    const poster = tile.poster.replace(/\.mp4$/, ".jpg");
+    if (!packageAssetFile("videos", poster)) return [];
+    const look = videoLookFor(tile.look)!;
+    const camera = videoRecipeFor(tile.camera);
+    return [{ id: tile.id, title: tile.title, subtitle: [look.id === "natural" ? null : look.label, camera?.label ?? null].filter(Boolean).join(", ") || "Auto", thumbnail: `/api/plugins/videos/assets/${poster}`, prompt: tile.prompt, look: look.id, camera: camera?.id ?? "none" }];
+  });
+}
+
 registerMediaAppData("videos", (person, dataId, params) => {
   if (dataId !== "recipes") return null;
   switch (params.scope) {
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
+    case "showcase": return showcaseRows();
     case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
     case "clips": return clipRows(person, params.view, Math.min(params.limit ?? 200, 200));

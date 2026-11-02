@@ -44,7 +44,7 @@ The older words Quick and Detailed remain in `quality.ts` as the internal model 
 
 Two Create pages, both `min_role: "adult"`, in `backend/packages/videos/pages/` (manifest 0.2.0; the sidebar group `create` lists `["create", "clips"]`; the Browse and Create mode switch and Search Videos are the manifest's `header`):
 
-- `create.json`: a `split_view` with `aside_side: "start"`. The aside is a `prompt_bar` with `placement: "panel"` (a left panel from `lg`, 960 px; a bottom dock and Options sheet below), `starts: "video"` (the K8 marker) and one in-field Start frame slot. The main side is a `result_feed` bound to `recipes` scope `feed`, with filters Favorites only, Group by words and Type, the built-in handlers `stop`, `retry`, `make_another` and `favorite`, the extra actions Remix and Make it Max, and the required `poll_while` (statuses `queued` and `generating`, record `recipes` scope `job` with `id`).
+- `create.json`: a `split_view` with `aside_side: "start"`. The aside is a `prompt_bar` with `placement: "panel"` (a left panel from `lg`, 960 px; a bottom dock and Options sheet below), `starts: "video"` (the K8 marker) and one in-field Start frame slot. The main side is a `media_shelf` rail (VIDEO-UI-11, heading Try this: `aspect: "poster"`, `layout: "rail"`, `variant: "plain"`, `density: "compact"` so a phone tile is 44 percent of the width, `press_scale`, `hide_when_empty`) bound to `recipes` scope `showcase`, whose `on_select` is a `navigate` to Create with `{prompt, look, camera}` (the refill Remix uses; a press starts nothing), then a `result_feed` bound to `recipes` scope `feed`, with filters Favorites only, Group by words and Type, the built-in handlers `stop`, `retry`, `make_another` and `favorite`, the extra actions Remix and Make it Max, and the required `poll_while` (statuses `queued` and `generating`, record `recipes` scope `job` with `id`).
 - `clips.json`: kit `tabs` (state `view`: All, Favorites, Uploaded) over `media_shelf` grids with `group_by_field: "created_at"` (day headings), `size_control` and, on All and Favorites, the `favorite` heart.
 
 The three older pages (`create` as a text box with Next, `make-video`, `creations`) and the scopes `starters`, `making`, `last` and `newest` are gone. An unknown scope answers an empty list. A removed page is a 404 for everyone.
@@ -59,6 +59,7 @@ One data id, `recipes` (the manifest stays at 16 ids), answers by `scope`. All o
 |---|---|---|
 | none | the recipe list | `recipes.ts` |
 | `feed` | the person's own Create jobs (no chat behind them, no edits), newest first, limit 30, in the `result_feed` shape; params `favorites` and `type` | `lib/videos/feed.ts` |
+| `showcase` | the Try this rail: `{id, title, subtitle, thumbnail, prompt, look, camera}`, the same rows for every adult; a row whose poster is missing from the package is left out. A camera of `none` is the Auto card | `videoCreateApp.ts` `showcaseRows`, list `VIDEO_SHOWCASE` in `recipes.ts` |
 | `job` | one feed row by `id`, for `poll_while.record` | `feed.ts` `feedRowById` |
 | `clips` | My clips: Library clips made at home (own and shared with the person, as the Library lists them), by `view` (`all`, `favorites`, `uploaded` pictures) | `videoCreateApp.ts` `clipRows` |
 
@@ -82,6 +83,12 @@ The Library had no per-person flag, so Favorites is a small table, `video_favori
 ## Not built yet
 
 End frame and Voice clip slots (VIDEO-UI-09), the still draft with Make the video from this, Another still and Edit words (VIDEO-UI-07, needs VIDEO-INPUTS-02; the `render`, `another_still` and `edit_words` handlers are not in the page), Trim, Join and Mix on an entry (VIDEO-UI-08), Characters and Shows in the sidebar (they join when built), and the Filter and Select all controls of the mockup's My clips toolbar (the kit `media_shelf` has neither). The Type filter's Stills value is not offered until stills have rows. Remix cannot clear a Camera pick: the bar takes over only a value that is one of its options.
+
+## Try this posters and Auto
+
+`VIDEO_SHOWCASE` (`recipes.ts`) holds the eight tiles: words plus a Look id and a Camera id from the two lists below, and the loop whose poster is the picture. Each loop in `assets/loops/` has a poster JPEG beside it (`anime.mp4`, `anime.jpg`), the frame at 0.8 s. Regenerate them with `swift scripts/video-posters.swift` (Apple's decoder, no ffmpeg, no network); the files are committed package assets, served by `GET /api/plugins/videos/assets/loops/<name>.jpg` under the same adult-only rule as the loops (`appAssetAllowed`). Titles stay under about 14 characters because the kit draws one caption line.
+
+Auto is the stated default (VIDEO-UI-11). Look's first card is `natural` and is drawn as "Auto" (same value; a clip's tag still says "Natural"). Camera gets a first option `none` labelled "Auto", with no media, which the route reads as no camera move. The Level hints say what each level is: Standard "Fast, with sound" (only "Fast" while the engine in use has no sound), Boost "Sharper picture", Max "Sharpest picture, with sound" or its reason when greyed. The Start frame slot's label is "Optional. Begin from a picture." until the reference tile (VIDEO-UI-12) gives it a separate hint.
 
 ## One list for looks, camera moves and voices
 

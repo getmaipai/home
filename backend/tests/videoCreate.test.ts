@@ -180,7 +180,7 @@ describe("the Create page and the make action", () => {
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("orientation").options.map((o: { value: string }) => o.value)).toEqual(["landscape", "portrait"]);
     expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS]);
-    expect(chip("camera").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_RECIPES.map((r) => r.id));
+    expect(chip("camera").options.map((o: { value: string }) => o.value)).toEqual(["none", ...VIDEO_RECIPES.map((r) => r.id)]);
     // Levels: Standard first; Max only when the person is offered it, Boost only when they may use it; one level alone shows no segment.
     const adultRow = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
     const expected = ["standard", ...(allowedQuality(adultRow, "video", "detailed", speakerAgeBand(adultRow, new Date())) === "detailed" ? ["boost"] : []), ...(maxOffered(adultRow, "video", speakerAgeBand(adultRow, new Date())) ? ["max"] : [])];
@@ -198,7 +198,7 @@ describe("the Create page and the make action", () => {
     expect(bar.placement).toBe("panel");
     expect(bar.starts).toBe("video");
     expect(bar.submit_label).toBe("Generate");
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Optional. Begin from a picture.", kind: "picture", placement: "in_field" }]);
     expect(bar.suggestions.map((s: { text: string }) => s.text)).toEqual(VIDEO_STARTERS.map((idea) => idea.prompt));
     expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });
@@ -208,7 +208,7 @@ describe("the Create page and the make action", () => {
     expect(detail.state).toBe(bar.tier ? "tier" : "seconds");
     for (const line of Object.values(detail.labels)) expect(line).toMatch(/under a minute|about a minute|about four minutes/);
     expect(JSON.stringify(page.body)).not.toMatch(/\b(GB|RAM|memory|model|credits?|pack)\b/i);
-    const feedNode = (split.main as Array<Record<string, any>>)[0]!;
+    const feedNode = (split.main as Array<Record<string, any>>).find((node) => node.type === "result_feed")!;
     expect(feedNode.type).toBe("result_feed");
     expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });
     expect(feedNode.bind.params.scope).toBe("feed");
@@ -492,12 +492,12 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("look").variant).toBe("cards");
     const shipped = (loop: string) => existsSync(join(PACKAGES_DIR, "videos", "assets", loop));
-    expect(chip("look").options).toEqual(VIDEO_LOOKS.map((l) => ({ value: l.id, label: l.label, ...(shipped(l.loop) ? { media: l.loop } : {}) })));
+    expect(chip("look").options).toEqual(VIDEO_LOOKS.map((l) => ({ value: l.id, label: l.id === "natural" ? "Auto" : l.label, ...(shipped(l.loop) ? { media: l.loop } : {}) })));
     expect(chip("look").options.some((o: { media?: string }) => o.media)).toBe(true);
     expect(chip("camera").variant).toBe("cards");
     expect(chip("camera").default).toBe("none");
-    expect(chip("camera").options).toEqual(VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) })));
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
+    expect(chip("camera").options).toEqual([{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) }))]);
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Optional. Begin from a picture.", kind: "picture", placement: "in_field" }]);
     expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", start_frame: "{start_frame}", look: "{look}" });
     const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");

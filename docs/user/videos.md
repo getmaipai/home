@@ -31,17 +31,19 @@ Children and teens always get Standard. They do not choose a level, and their cl
 
 ## Make a video in the Videos app
 
-Open **Videos**, then **Create**. The page has two sides. The left side is where you describe a video. The right side shows your clips, newest first.
+Open **Videos**, then **Create**. The page has two sides. The left side is where you describe a video. The right side starts with a row of **Try this** pictures, then your clips, newest first.
 
 On the left:
 
 - **Describe your video.** Write what you want to see. Put each person's line in quotes. While the box is empty, three idea buttons sit under it. Press one to use it.
-- **Start frame.** Press it to pick a picture from your Library, or add a new one. The picture starts the video and shows inside the box with its name. Press the **x** to take it away.
-- **Style.** One button that shows your **Look** (natural, classic cartoon, anime, 3D animated or film) and your **Camera** (dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still). Press it to pick both.
-- **Level.** Standard or Boost. Max shows only when it is installed and an admin has allowed it for you.
+- **Start frame.** It says "Optional. Begin from a picture." Press it to pick a picture from your Library, or add a new one. The picture starts the video and shows inside the box with its name. Press the **x** to take it away.
+- **Style.** One button that shows your **Look** (natural, classic cartoon, anime, 3D animated or film) and your **Camera** (dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still). Press it to pick both. **Auto** is the first choice in each, and it is what you get if you pick nothing: Home keeps the look natural and lets the words decide the camera.
+- **Level.** Standard ("Fast, with sound") or Boost ("Sharper picture"). Max shows only when it is installed and an admin has allowed it for you.
 - **Shape and Length.** Landscape or portrait, and 5 or 10 seconds.
 - **More settings.** Voices: keep it clean, or with music and effects.
 - **Generate.** Press it to start. The line under it says about how long it takes, for example "Boost, about a minute". Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
+
+**Try this.** Each picture is a ready idea with a look and a camera move already chosen, for example "Paper boat". Press one and the words, the look and the camera fill in on the left. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, the pictures show above the line "Your clips show here. Pick a tile or describe a video on the left and press Generate."
 
 On a phone, the left side is a bar at the bottom with your words and a round **Generate** button. Press the round button with the sliders on it to open the **Options**.
 

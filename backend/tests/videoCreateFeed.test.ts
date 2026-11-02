@@ -19,6 +19,8 @@ import { storeFile } from "@/lib/attachments";
 import { PACKAGES_DIR } from "@/lib/paths";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { join } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { VIDEO_LOOKS, VIDEO_RECIPES } from "@/lib/videos/recipes";
 import sharp from "sharp";
 import type { PersonRow } from "@/types";
 
@@ -169,7 +171,7 @@ describe("scope job: one row by id, for poll_while", () => {
 
   test("a child and a teen reach no scope", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips"]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope, id: "x" })).status).toBe(404);
+    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase"]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope, id: "x" })).status).toBe(404);
   });
 });
 
@@ -340,6 +342,61 @@ describe("Another take, Stop and the gates the buttons call", () => {
     expect((await action(adult.client, "cancel", { id: made.id })).status).toBe(200);
     expect((await action(adult.client, "cancel", { id: made.id })).status).toBe(200);
     expect(getVideoJobFor(row("Marlow"), made.id)!.state).toBe("cancelled");
+  });
+});
+
+describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
+  test("five to eight rows of {id, title, subtitle, thumbnail, prompt, look, camera}, each look and camera a real card value and each poster served", async () => {
+    const { adult, owner } = await household();
+    const rows = await data(adult.client, { scope: "showcase" });
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+    expect(rows.length).toBeLessThanOrEqual(8);
+    expect(new Set(rows.map((r) => r.id)).size).toBe(rows.length);
+    for (const row of rows) {
+      expect(Object.keys(row).sort()).toEqual(["camera", "id", "look", "prompt", "subtitle", "thumbnail", "title"]);
+      expect(VIDEO_LOOKS.map((l) => l.id)).toContain(row.look);
+      expect(["none", ...VIDEO_RECIPES.map((r) => r.id)]).toContain(row.camera);
+      expect(row.prompt.length).toBeGreaterThan(20);
+      expect(row.thumbnail).toMatch(/^\/api\/plugins\/videos\/assets\/loops\/[a-z0-9-]+\.jpg$/);
+      const res = await adult.client.get(row.thumbnail);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/jpeg");
+    }
+    expect((await data(owner, { scope: "showcase" })).length).toBe(rows.length);
+  });
+
+  test("every loop has a small poster beside it, and the rows never name a resource, a model or a credit", async () => {
+    const { adult } = await household();
+    for (const loop of [...VIDEO_LOOKS, ...VIDEO_RECIPES].map((entry) => entry.loop)) {
+      const poster = join(PACKAGES_DIR, "videos", "assets", loop.replace(/\.mp4$/, ".jpg"));
+      expect(existsSync(poster)).toBe(true);
+      expect(statSync(poster).size).toBeLessThan(300 * 1024);
+    }
+    const text = JSON.stringify(await data(adult.client, { scope: "showcase" }));
+    expect(text).not.toMatch(/\b(RAM|VRAM|memory|GPU|credits?|LTX|Wan|model)\b/i);
+  });
+
+  test("a minor reaches the rows and the posters on no path, and nothing the rail does starts a clip", async () => {
+    const { teen, child, adult } = await household();
+    for (const who of [teen, child]) {
+      expect((await who.client.post("/api/plugins/videos/data/recipes", { scope: "showcase" })).status).toBe(404);
+      expect((await who.client.get("/api/plugins/videos/assets/loops/anime.jpg")).status).toBe(404);
+    }
+    const before = db.select().from(videoJobs).all().length;
+    await data(adult.client, { scope: "showcase" });
+    expect(db.select().from(videoJobs).all().length).toBe(before);
+  });
+
+  test("the served Create page puts the rail above the feed: a plain poster shelf whose press only navigates with prompt, look and camera; the empty feed keeps its one line", async () => {
+    const { adult } = await household();
+    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
+    const main = page.body[0]!.main as Row[];
+    expect(main.map((node) => node.type)).toEqual(["media_shelf", "result_feed"]);
+    const shelf = main[0]!;
+    expect(shelf).toMatchObject({ heading: "Try this", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", bind: { path: "recipes", params: { scope: "showcase" } } });
+    expect(shelf.on_select).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
+    expect(JSON.stringify(shelf)).not.toContain("call");
+    expect(main[1]!.empty_state.text).toBe("Your clips show here. Pick a tile or describe a video on the left and press Generate.");
   });
 });
 

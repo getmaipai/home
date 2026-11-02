@@ -199,11 +199,11 @@ describe("minors and Max", () => {
     const { ownerRow } = await household();
     const segment = videoTierSegment(ownerRow) as { tiers: Array<{ id: string; hint: string }> };
     expect(segment.tiers.map((t) => t.id)).toEqual(["standard", "boost"]);
-    expect(segment.tiers[0]!.hint).toBe("Up to 10 seconds, with sound");
-    expect(segment.tiers[1]!.hint).toBe("Up to 5 seconds, with sound");
+    expect(segment.tiers[0]!.hint).toBe("Fast, with sound");
+    expect(segment.tiers[1]!.hint).toBe("Sharper picture");
     __setVideoStatusForTests(NOT_READY());
     const old = videoTierSegment(ownerRow) as { tiers: Array<{ id: string; hint: string }> };
-    expect(old.tiers.map((t) => t.hint)).toEqual(["Up to 5 seconds", "Up to 10 seconds, with sound"]);
+    expect(old.tiers.map((t) => t.hint)).toEqual(["Fast", "Sharper picture"]);
   });
 
   test("/api/videos/status reports each level", async () => {
@@ -367,7 +367,7 @@ describe("LTX-2.5 Max: who is offered it, and the request on the wire", () => {
     __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
     const segment = videoTierSegment(ownerRow) as { tiers: Array<{ id: string; label?: string; hint?: string; disabled_reason?: string }> };
     expect(ids(segment)).toEqual(["standard", "boost", "max"]);
-    expect(segment.tiers[2]).toEqual({ id: "max", label: "Max", hint: "Up to 10 seconds, sharpest picture, with sound" });
+    expect(segment.tiers[2]).toEqual({ id: "max", label: "Max", hint: "Sharpest picture, with sound" });
     expect(JSON.stringify(segment)).not.toMatch(/\b(GB|RAM|memory|LTX|ltx)\b/);
     expect(ids(videoTierSegment(adultRow))).not.toContain("max");
     expect(ids(videoTierSegment(teen))).not.toContain("max");
