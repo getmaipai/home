@@ -511,10 +511,12 @@ preflight_stage() { stage "$1"; }
 run_preflight() {
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
     preflight_stage "pre: settings registry generated files"
-    if ! (cd backend && MAIPAI_COMMONS_DIR="$MAIPAI_COMMONS_DIR" bun run gen:settings >/dev/null); then
-      echo "backend settings registry could not be generated"; return 1
+    # Generated into a private scratch directory, never into the shared commons checkout (2026-11-02).
+    PRE_SETTINGS_SCRATCH="$(mktemp -d)"
+    if ! (cd backend && MAIPAI_COMMONS_DIR="$PRE_SETTINGS_SCRATCH" bun run gen:settings >/dev/null); then
+      rm -rf "$PRE_SETTINGS_SCRATCH"; echo "backend settings registry could not be generated"; return 1
     fi
-    if ! node - "$SPEC_DIR" "$MAIPAI_COMMONS_DIR/spec/settings/keys.json" <<'NODE'
+    if ! node - "$SPEC_DIR" "$PRE_SETTINGS_SCRATCH/spec/settings/keys.json" <<'NODE'
 const fs = require("node:fs");
 const { execFileSync } = require("node:child_process");
 const [specDir, outputPath] = process.argv.slice(2);
@@ -536,9 +538,11 @@ if (missing.length || missingRequired.length) {
 }
 NODE
     then
+      rm -rf "$PRE_SETTINGS_SCRATCH"
       echo "backend settings registry is stale against $SPEC_TAG"
       return 1
     fi
+    rm -rf "$PRE_SETTINGS_SCRATCH"
   fi
 
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then

@@ -8,7 +8,8 @@
 // moved the registry out of this repo), never through the installed
 // @maipai/spec package - that's a file: snapshot in node_modules, not a
 // live link back to the source.
-import { writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CORE_SETTINGS_KEYS } from "../src/settings/coreKeys.js";
 import { AI_SETTINGS_KEYS } from "../src/settings/aiKeys.js";
@@ -32,8 +33,12 @@ import { WAKEWORD_SETTINGS_KEYS } from "../src/settings/wakewordKeys.js";
 import { ROBOT_SETTINGS_KEYS } from "../src/settings/robotSettingsKeys.js";
 import { ALARM_SETTINGS_KEYS } from "../src/settings/alarmKeys.js";
 
-const SHARED_DIR = process.env.MAIPAI_COMMONS_DIR ?? join(import.meta.dir, "..", "..", "..", "commons");
+// DEPS-SELFHEAL-01: the output goes only where the caller says (MAIPAI_COMMONS_DIR: a commons worktree being edited, or a scratch
+// copy a check compares). With no variable it used to fall back to the shared ../commons checkout, which every session reads, and
+// a landing or a stray run left that checkout dirty (2026-11-02). Now the fallback is a private temp directory.
+const SHARED_DIR = process.env.MAIPAI_COMMONS_DIR ?? mkdtempSync(join(tmpdir(), "maipai-settings-"));
 const outPath = join(SHARED_DIR, "spec", "settings", "keys.json");
+mkdirSync(join(SHARED_DIR, "spec", "settings"), { recursive: true });
 
 const sorted = [
   ...CORE_SETTINGS_KEYS,

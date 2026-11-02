@@ -43,6 +43,15 @@ GITNET_TIMED_OUT=0
 export GITNET_OPS_DIR="$data/ops" GITNET_STUCK_LOG="$data/stuck.log"
 gitnet_env "$main"
 
+# DEPS-SELFHEAL-01: install_deps makes the pinned commons tag worktrees, installs, and deletes node_modules and retries once when an install fails or leaves a dangling link.
+deps_lib="$bin/deps.sh"
+[[ -f "$deps_lib" ]] || deps_lib="$main/scripts/lib/deps.sh"
+if [[ -f "$deps_lib" ]]; then source "$deps_lib"
+else
+  DEPS_ERROR=""; DEPS_LAST_RC=0
+  install_deps() { local dir="$1"; shift; bounded_run "${DEPS_INSTALL_SECONDS:-600}" "${DEPS_INSTALL_LABEL:-bun install}" bash -c 'cd "$1" && shift && bun install --frozen-lockfile "$@"' _ "$dir" "$@"; }
+fi
+
 refresh_snapshot() {
   local script="$1" src="${2:-scripts/$1}" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
@@ -69,7 +78,7 @@ checkout_warm() {
     local d
     for d in backend frontend; do
       [[ -d "$checkout/$d" ]] || continue
-      bounded_run "${MAIPAI_LAND_INSTALL_SECONDS:-600}" "bun install $d (warm checkout)" bash -c 'cd "$1" && bun install --frozen-lockfile' _ "$checkout/$d" || { error "bun install failed or timed out in $d; repair dependencies in $checkout and retry."; return 1; }
+      DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d (warm checkout)" install_deps "$checkout/$d" || { error "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies in $checkout and retry."; return 1; }
     done
   fi
 }
@@ -189,8 +198,8 @@ reinstall_main_dependencies() {
   for d in backend frontend; do
     printf '%s\n' "$changed" | grep -Eq "^$d/" || continue
     # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md).
-    if bounded_run "${MAIPAI_LAND_INSTALL_SECONDS:-600}" "bun install $d (main checkout)" bash -c 'cd "$1" && bun install --frozen-lockfile --force' _ "$main/$d" >/dev/null 2>&1; then done_dirs+=("$d")
-    else echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout install failed in $d; run bun install there" >> "$data/lander.log"; fi
+    if DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d (main checkout)" install_deps "$main/$d" --force >/dev/null 2>&1; then done_dirs+=("$d")
+    else echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout install failed in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; run bun install there" >> "$data/lander.log"; fi
   done
   [[ ${#done_dirs[@]} -eq 0 ]] || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout dependencies reinstalled (${done_dirs[*]})" >> "$data/lander.log"
 }
@@ -544,6 +553,9 @@ PY
   origin_branch="$(git -C "$checkout" rev-parse --verify -q "origin/$branch" 2>/dev/null || true)"
   if [[ "$local_branch" != "$sha" && "$origin_branch" != "$sha" ]]; then bounce "$request" "$branch" "$sha" "branch $branch is no longer at $sha; run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
   prev_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo "$base")"
+  # A failed earlier entry can leave a half-rebased or dirty tree (and HEAD on its unlanded commit); tracked files go back to HEAD first. Ignored files (node_modules) stay.
+  git -C "$checkout" rebase --abort >/dev/null 2>&1 || true
+  git -C "$checkout" reset --hard -q HEAD >/dev/null 2>&1 || true
   if ! git -C "$checkout" checkout --detach "$sha"; then bounce "$request" "$branch" "$sha" "could not check out $sha; inspect the warm checkout, then land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
   phase "rebasing"
   if ! git -C "$checkout" rebase "$base"; then
@@ -561,14 +573,15 @@ PY
       if printf '%s\n' "$package_changed" | grep -Eq "^$d/"; then
         # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md), which made the generated adoption file name the old kit and turned main red.
         phase "installing dependencies"
-        bounded_step "${MAIPAI_LAND_INSTALL_SECONDS:-600}" "bun install $d" "$output" bash -c 'cd "$1" && bun install --frozen-lockfile --force' _ "$checkout/$d" || { bounce "$request" "$branch" "$sha" "bun install failed or timed out in $d; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; }
+        install_rc=0
+        DEPS_INSTALL_SECONDS="${MAIPAI_LAND_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d" install_deps "$checkout/$d" --force >"$output" 2>&1 || install_rc=$?
+        if (( install_rc != 0 )); then bounce "$request" "$branch" "$sha" "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
       fi
     done
   fi
   export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github"
-  # gen:settings writes ../commons/spec/settings/keys.json (backend/scripts/gen-settings-registry.ts); include it only when that output lives inside this checkout.
-  settings_file="${MAIPAI_COMMONS_DIR}/spec/settings/keys.json"
-  case "$settings_file" in "$checkout"/*) generated_paths+=("${settings_file#"$checkout"/}");; esac
+  # gen:settings writes its registry into MAIPAI_COMMONS_DIR; the landing points it at a private scratch directory so the shared commons checkout is never written (2026-11-02).
+  gen_scratch="$(mktemp -d "$data/.gen-settings.XXXXXX")"
   if [[ -n "${MAIPAI_LAND_GENERATE_CMD:-}" ]]; then
     phase "generating files"
     if ! bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$MAIPAI_LAND_GENERATE_CMD"; then
@@ -577,11 +590,12 @@ PY
     fi
   else
     phase "generating files"
-    if ! bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
+    if ! MAIPAI_COMMONS_DIR="$gen_scratch" bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
       last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
     fi
   fi
+  rm -rf "$gen_scratch"
   changed_files="$(git -C "$checkout" status --porcelain --untracked-files=all -- "${generated_paths[@]}" | sed -E 's/^...//')"
   if [[ -n "$changed_files" ]]; then
     while IFS= read -r changed_file; do
@@ -733,6 +747,7 @@ serve() {
         exec bash "$bin/lander.sh" "$@"
       fi
       outbox_resume_check
+      REFRESH_SKIP_FETCH=1 refresh_snapshot deps.sh scripts/lib/deps.sh >/dev/null || true
       REFRESH_SKIP_FETCH=1 refresh_snapshot gitnet.sh scripts/lib/gitnet.sh >/dev/null || true
       snapshot_hash="$(git -C "$main" hash-object "$bin/gitnet.sh" 2>/dev/null || true)"
       if [[ -n "$snapshot_hash" && "$snapshot_hash" != "$lib_hash" ]]; then

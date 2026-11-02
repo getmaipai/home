@@ -45,6 +45,15 @@ GITNET_TIMED_OUT=0
 export GITNET_OPS_DIR="$data/ops" GITNET_STUCK_LOG="$data/stuck.log"
 gitnet_env "$main"
 
+# DEPS-SELFHEAL-01: same install helper as the lander (kept fresh in $bin by the lander).
+deps_lib="$bin/deps.sh"
+[[ -f "$deps_lib" ]] || deps_lib="$main/scripts/lib/deps.sh"
+if [[ -f "$deps_lib" ]]; then source "$deps_lib"
+else
+  DEPS_ERROR=""; DEPS_LAST_RC=0
+  install_deps() { local dir="$1"; shift; bounded_run "${DEPS_INSTALL_SECONDS:-600}" "${DEPS_INSTALL_LABEL:-bun install}" bash -c 'cd "$1" && shift && bun install --frozen-lockfile "$@"' _ "$dir" "$@"; }
+fi
+
 refresh_snapshot() {
   local script="$1" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
@@ -86,7 +95,7 @@ install_if_needed() {
   for d in backend frontend; do
     [[ -d "$checkout/$d" ]] || continue
     # --force for the same reason as the lander: a changed commons pin is a file: dependency and a plain install keeps the old snapshot.
-    bounded_run "${MAIPAI_WATCH_INSTALL_SECONDS:-600}" "bun install $d" bash -c 'cd "$1" && bun install --frozen-lockfile --force' _ "$checkout/$d" || { error "bun install failed or timed out in $d; repair dependencies in $checkout and retry."; return 1; }
+    DEPS_INSTALL_SECONDS="${MAIPAI_WATCH_INSTALL_SECONDS:-600}" DEPS_INSTALL_LABEL="bun install $d" install_deps "$checkout/$d" --force || { error "bun install failed or timed out in $d${DEPS_ERROR:+ ($DEPS_ERROR)}; repair dependencies in $checkout and retry."; return 1; }
   done
 }
 
