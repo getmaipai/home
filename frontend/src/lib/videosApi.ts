@@ -24,8 +24,21 @@ export interface VideoItem {
   /** TIER-PRIO-07: set while the card asks whether to make it now with the level it can run at and this person may answer; null otherwise. */
   fit_ask?: { job_id: string; picked?: string | null; actual?: string | null } | null;
   max_offered?: boolean;
+  /** ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null while it is made, for a minor, in a temporary chat). */
+  adult?: VideoAdultState | null;
   clip: VideoClip | null;
 }
+/** ADULT-LOCK-06: what the item's menu needs. `can_clear` shows "Unmark as NSFW" (confirm dialog and a fresh passcode); `can_mark` shows "Mark as NSFW". */
+export interface VideoAdultState {
+  made_audience: "all-ages" | "adult-only";
+  lock: "on" | "off";
+  can_clear: boolean;
+  can_mark: boolean;
+  line: string | null;
+  history: Array<{ action: "clear" | "mark"; via: "creator_passcode" | "creator" | "admin" | "auto"; at: string }>;
+}
+/** ADULT-LOCK-02: a card that holds an adult-only clip while the page holds no unlock proof: the one lock tile. */
+export interface LockedVideoCard { locked: true; making: boolean }
 export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; limits: string }
 export interface VideoStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; limits: string; styles: Array<{ id: string; name: string }> }
 export interface VideoAdapterRow { id: string; name: string; classification: "all-ages" | "adult-only"; enabled: boolean; needs_confirmation: boolean; sha256: string; base_model: string; trigger_words: string[]; licence: string; strength_default: number; bytes: number; source_url: string | null; added_at: string }
@@ -44,9 +57,13 @@ export const videosApi = {
   status: () => requestJson<VideoStatus>("/api/videos/status"),
   /** The clip prepared for texting (a sound track, a name from the prompt). */
   messagesUrl: (id: string) => `/api/videos/jobs/${encodeURIComponent(id)}/messages.mp4`,
-  card: (id: string, signal?: AbortSignal) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
+  card: (id: string, signal?: AbortSignal) => requestJson<VideoCard | LockedVideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   another: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt || tier ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
+  /** A fresh passcode for one action on one clip: a single-use ticket valid 30 seconds (an unlock proof does not replace it). */
+  confirmUnmark: (item: string, secret: string) => requestJson<{ ticket: string; expires_in: number }>("/api/adult-lock/confirm", json({ secret, action: "unmark", item })),
+  /** Clear the lock (with the ticket) or mark the clip NSFW again (no passcode). */
+  adultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => requestJson<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/videos/jobs/${encodeURIComponent(id)}/adult-mark`, json(body)),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),
   settings: () => requestJson<VideoSettings>("/api/videos/settings"),
   setAdapter: (id: string, patch: { enabled?: boolean; classification?: "all-ages" | "adult-only" }) => requestJson<VideoAdapterRow>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),

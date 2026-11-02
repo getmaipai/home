@@ -28,6 +28,7 @@ import { musicApi } from "@/lib/musicApi";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { useSongByline } from "@/apps/chat/useSongByline";
+import { useVideoAdultMark } from "@/apps/chat/videoAdultMark";
 import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 export { musicFileName, musicHint } from "@/apps/chat/MusicCardView";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
@@ -616,7 +617,7 @@ function useVideoCard(id: string | undefined) {
     queryKey: ["video", id],
     queryFn: ({ signal }) => videosApi.card(id!, signal),
     enabled: id !== undefined,
-    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && q.state.data.items.every((item) => VIDEO_SETTLED.has(item.state))) ? false : VIDEO_POLL_MS),
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && ("locked" in q.state.data ? !q.state.data.making : q.state.data.items.every((item) => VIDEO_SETTLED.has(item.state)))) ? false : VIDEO_POLL_MS),
   });
 }
 
@@ -635,7 +636,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   const card = query.data;
   // The messaging copy is fetched when the clip is on the card, so Share can call the system share sheet inside the click
   // (a share call after an await loses the user gesture and Safari refuses it).
-  const readyItem = card?.items[card.items.length - 1];
+  const readyItem = card && !("locked" in card) ? card.items[card.items.length - 1] : undefined;
   const readyId = readyItem && videoStatusOf(readyItem) === "ready" ? readyItem.id : undefined;
   const prepared = useQuery({
     queryKey: ["video-messages", readyId],
@@ -645,12 +646,16 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
     gcTime: 10 * 60_000,
     retry: false,
   });
+  // ADULT-LOCK-06: the creator's "Unmark as NSFW" and "Mark as NSFW" actions and the confirm dialog (a hook, so it is called before any early return).
+  const refresh = () => { void query.refetch(); };
+  const adultMark = useVideoAdultMark(readyItem ?? null, refresh);
   if (!result) return null;
   if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that video" detail="Reload the chat to try again." retrying={false} /> : null;
+  // ADULT-LOCK-02: a card with an adult-only clip while the page holds no unlock proof is the one lock tile (a creator marking a clip NSFW lands here too).
+  if ("locked" in card) return <VideoPlayer locked making={card.making} />;
   // The newest clip of the turn is the one on show; earlier ones stay in the Library as files.
   const item = card.items[card.items.length - 1];
   if (!item) return null;
-  const refresh = () => { void query.refetch(); };
   const status = videoStatusOf(item);
   const clip = status === "ready" ? item.clip : null;
   const pendingActions = status === "queued" ? fitAskActions(item.fit_ask, refresh) : undefined;
@@ -666,6 +671,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       queuePosition={item.position}
       startedAt={item.started_at}
       hint={videoHint(item)}
+      {...(adultMark.stateLine ? { notice: adultMark.stateLine } : {})}
       {...(pendingActions ? { pendingActions } : {})}
       {...(item.error ? { error: item.error } : {})}
       downloadName={prepared.data?.name ?? "video.mp4"}
@@ -680,6 +686,8 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
           ...(item.switch_to && card.can_make_another ? [<TierSegment key="tier" label="Quality" value={item.quality === "detailed" ? "boost" : "standard"} tiers={[{ id: "standard", label: "Standard", hint: "No sound, up to 5 seconds, can start from a picture", ...(making.reason ? { disabledReason: making.reason } : {}) }, { id: "boost", label: "Boost", hint: "With sound and speech, up to 10 seconds", ...(making.reason ? { disabledReason: making.reason } : {}) }, ...(item.max_offered ? [{ id: "max" as const, label: "Max", hint: "The biggest model", confirm: "Max uses the whole computer. Other big jobs wait, and Home goes back to normal by itself when it is done. Continue?", ...(making.reason ? { disabledReason: making.reason } : {}) }] : [])]} onValueChange={(tier) => { void videosApi.another(item.id, tier === "standard" ? "quick" : "detailed", undefined, tier === "max" ? "max" : undefined).then(refresh).catch(refresh); }} />] : []),
           ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? undefined} onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
           <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
+          ...adultMark.actions,
+          ...(adultMark.dialog ? [adultMark.dialog] : []),
         ],
       } : {})}
       // VIDEO-CHAT-01: the same word as the Create page's button row; the kit button already calls the same `another` (a new seed, same words and choices).
