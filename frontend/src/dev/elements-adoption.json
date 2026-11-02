@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-02T13:36:54.147Z",
-  "kitTag": "ui-v0.5.464",
+  "generatedAt": "2026-11-02T16:46:36.988Z",
+  "kitTag": "ui-v0.5.469",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -139,6 +139,14 @@
       "group": "trace/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for ELT-T1-22, covered by the Commons TraceWaterfall tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "VideoPlayerShowcase.tsx",
+      "name": "VideoPlayerShowcase",
+      "group": "VideoPlayerShowcase",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -1267,6 +1275,14 @@
       "implemented": false
     },
     {
+      "file": "result-feed.tsx",
+      "name": "result-feed",
+      "group": "result",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "retrieval-chunks.tsx",
       "name": "retrieval-chunks",
       "group": "sources/citations",
@@ -1766,6 +1782,14 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
+    },
+    {
+      "file": "video-player-actions.tsx",
+      "name": "video-player-actions",
+      "group": "video",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "video-player.tsx",
