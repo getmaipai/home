@@ -349,6 +349,27 @@ Block cache saves 27 to 40 percent of step time and 20 to 27 percent of the clip
 | `ltx-bmo-jake.mp4`, `ltx-gamer-crabs.mp4`, `ltx-spongebob-patrick*.mp4`, `ltx25-*.mp4` | made by the videos app session with my driver and its own LTX-2.5 runtime; settings are in that session's notes, not in my files | not recorded here |
 
 
+## Two other H3 runners against the Argus baseline (2026-11-02)
+
+Same prompt for all three: the Golden Girls prompt with the Dean and Daisy dialogue (`minimax-goldengirls`), seed 7, 768x448, 124 frames (5.17 s), one run each, one at a time under the gate lock, Low Power Mode off. Clips: `~/video-bench/clips/minimax-goldengirls.mp4`, `minimax-goldengirls-solattn.mp4`, `minimax-goldengirls-h3c.mp4`.
+
+| Runner | Weights used | Steps | Wall | Per step | Peak | Words (Whisper) | Picture (opened frames) |
+|---|---|---|---:|---:|---:|---|---|
+| Argus MLX (baseline) | Argus INT8 DiT, lightx2v Turbo LoRA | 4 | 182 s | 30.2 s | 13.4 GB | both lines exact | four older people at a table, saturated colour, sharp |
+| MLX + Sol-Attn (`yshenaw/ComfyUI-MiniMax-H3-MLX-SolAttn`, commit 55bb7ddd0) | plain 8-bit DiT built locally from the BF16 download, larryvrh Turbo LoRA | 4 | 184 s | 25.4 s | 56.5 GB | both lines exact | very close to the baseline: same four people and table, colour as saturated |
+| `h3.c` (`antirez/h3.c`, commit 8974cc055) | BF16 transformer straight from the upstream folder, no LoRA | 20, 45 layers, reuse 2, token reduction, int8 fc2 | 162 s | 11 DiT evaluations, 97 s in total | 20.1 GB | "Days. Get his dinners ready. Yeah. He's coming. Coming, Dad." (words partly wrong, extra words) | four older people at a round table, warmer and flatter light, a tidy kitchen; not the Golden Girls in any of the three |
+
+Mean HSV saturation of the three clips: 54.2 (Argus), 55.7 (Sol-Attn), 52.4 percent (h3.c): no meaningful difference, so the owner's "too vibrant" note applies to all three.
+
+Findings:
+- **Sol-Attn is not a win on this machine.** Its step is 16 percent faster (25.4 against 30.2 s) but the whole clip takes the same 184 s, and it needs 56.5 GB against 13.4 GB because it stages the text encoder at 26 GB and holds the DiT resident. It cannot load the Argus INT8 build (8 quantised tensors differ) or the lightx2v LoRA (key names differ); it needed its own 8-bit build (44 GB of disk, made from the existing BF16 download with its `build_quant.py`) and a 0.78 GB LoRA download (`larryvrh/MiniMax-H3-Turbo-Lora`, owner yes). The runner wrote PNG frames and a wav but no mp4 (no ffmpeg on its path); I muxed them with the Stack's ffmpeg, H.264 and AAC, no other change.
+- **h3.c is fastest and smallest to run (162 s)**, a plain C and Metal program that builds in seconds with `make`, reads the BF16 upstream folder with no conversion, and needs no Python. Its price is quality control: it has no Turbo LoRA option, so it runs 20 steps with approximations (45 of 50 blocks, reused steps, paired tokens), and the speech came out partly wrong. The 162 s includes a 57 s video decode that is not part of the DiT.
+- **None of the three is better than the others on picture or colour.** For this prompt the baseline Argus run has the best words; h3.c is the fastest; Sol-Attn is neither faster nor lighter.
+- The first h3.c run also ended without a clip because ffmpeg and ffprobe were not on its PATH (about 188 s lost); the clip above is the rerun.
+
+Verdict: **skip Sol-Attn; h3.c is worth a closer look** (needs-more: try its 6-step and 8-step settings, a Turbo-style LoRA if the author adds one, and a speech-focused check) while the Argus INT8 + Turbo run stays the reference at 182 s and 13.4 GB.
+
+
 ## Not run, and why
 
 Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
