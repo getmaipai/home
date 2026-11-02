@@ -2,7 +2,7 @@
 // from a Blob URL (lib/adultLock.ts). The kit's Player sets Media Session metadata (title, artwork) for anything it plays and the browser offers
 // Picture in Picture, remote playback and AirPlay on any `<video>`; this guard switches all of that off for exactly the elements whose source is one of
 // our object URLs, while the page is unlocked. It is installed by AdultLockHost and removed on relock.
-import { isAdultBlobUrl } from "@/lib/adultLock";
+import { isAdultBlobUrl, trackAdultElement } from "@/lib/adultLock";
 
 export const ADULT_CONTROLS_LIST = "nodownload noremoteplayback";
 
@@ -13,6 +13,7 @@ const isAdultElement = (value: EventTarget | null): value is HTMLMediaElement =>
 
 /** Switch off every way an element can be handed to another surface. */
 export function hardenAdultElement(el: HTMLMediaElement, doc: Document = document): void {
+  trackAdultElement(el);
   (el as HTMLVideoElement).disablePictureInPicture = true;
   (el as HTMLMediaElement & { disableRemotePlayback?: boolean }).disableRemotePlayback = true;
   el.setAttribute("controlsList", ADULT_CONTROLS_LIST);

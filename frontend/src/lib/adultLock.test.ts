@@ -1,6 +1,6 @@
 // ADULT-LOCK-03b and -05: the page's side of the lock (lib/adultLock.ts): the in-memory proof, blob sources, the fetch choke point, the flag-flip watch.
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { ADULT_PROOF_HEADER, adultBlobUrl, adultResponse, forgetOpenIds, getAdultProof, installAdultFetch, isAdultBlobUrl, onAdultFlip, revokeAdultBlobs, setAdultProof, unloadAdultElements } from "@/lib/adultLock";
+import { ADULT_PROOF_HEADER, trackAdultElement, adultBlobUrl, adultResponse, forgetOpenIds, getAdultProof, installAdultFetch, isAdultBlobUrl, onAdultFlip, revokeAdultBlobs, setAdultProof, unloadAdultElements } from "@/lib/adultLock";
 
 const originalFetch = globalThis.fetch;
 const realCreate = URL.createObjectURL;
@@ -11,7 +11,7 @@ let n = 0;
 
 beforeEach(() => {
   seen = []; revoked = []; n = 0;
-  setAdultProof(null); revokeAdultBlobs(); forgetOpenIds();
+  setAdultProof(null); revokeAdultBlobs(); forgetOpenIds(); unloadAdultElements();
   URL.createObjectURL = (() => `blob:test/${++n}`) as typeof URL.createObjectURL;
   URL.revokeObjectURL = ((url: string) => { revoked.push(url); }) as typeof URL.revokeObjectURL;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -85,6 +85,15 @@ describe("blob sources", () => {
     expect(other.getAttribute("src")).toBe("/api/files/z/content");
     ours.remove(); other.remove();
   });
+});
+
+test("an element already removed from the page is still unloaded when it was tracked", async () => {
+  setAdultProof("p1");
+  const url = (await adultBlobUrl("/api/files/a/content"))!;
+  const gone = document.createElement("video"); gone.setAttribute("src", url);
+  trackAdultElement(gone);
+  expect(unloadAdultElements()).toBe(1);
+  expect(gone.hasAttribute("src")).toBe(false);
 });
 
 describe("a flag that flips on", () => {

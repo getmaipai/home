@@ -56,17 +56,22 @@ export function revokeAdultBlobs(): void {
 
 /** Stop and unload every element that holds one of our object URLs (pause, drop `src`, `load()`), so nothing keeps playing from a revoked URL. */
 export function unloadAdultElements(root: ParentNode = document): number {
-  let n = 0;
+  const found = new Set<HTMLMediaElement>(tracked);
   root.querySelectorAll<HTMLMediaElement>("video,audio").forEach((el) => {
-    const src = el.getAttribute("src") ?? el.currentSrc;
-    if (!isAdultBlobUrl(src) && !isAdultBlobUrl(el.currentSrc)) return;
+    if (isAdultBlobUrl(el.getAttribute("src")) || isAdultBlobUrl(el.currentSrc)) found.add(el);
+  });
+  tracked.clear();
+  for (const el of found) {
     el.pause();
     el.removeAttribute("src");
     el.load();
-    n += 1;
-  });
-  return n;
+  }
+  return found.size;
 }
+
+// An element the page already removed (a route change unmounts the player before the relock runs) is still unloaded: the guard hands each one it saw to here.
+const tracked = new Set<HTMLMediaElement>();
+export function trackAdultElement(el: HTMLMediaElement): void { tracked.add(el); }
 
 // ---- Rows ---------------------------------------------------------------------------------------------------------------------------------
 

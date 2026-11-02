@@ -83,7 +83,7 @@ export function AdultLockController() {
 
   const LockIcon = getIcon("lock");
   return unlocked ? (
-    <div className="fixed bottom-4 left-4 z-40">
+    <div className="fixed right-4 bottom-4 z-40 max-md:bottom-20">
       <Button type="button" variant="secondary" size="sm" onClick={() => relock()}>
         <LockIcon aria-hidden />
         Lock now

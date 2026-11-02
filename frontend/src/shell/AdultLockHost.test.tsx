@@ -30,7 +30,9 @@ beforeEach(() => {
   stubMatchMedia({});
   calls = []; revoked = []; created = 0;
   setAdultProof(null); revokeAdultBlobs();
-  URL.createObjectURL = (() => `blob:adult-test/${++created}`) as typeof URL.createObjectURL;
+  // The test document starts at about:blank (origin "null"); the kit draws a blob: source only when it is of the page's own origin, as in a real page.
+  (window as unknown as { happyDOM: { setURL(url: string): void } }).happyDOM.setURL("http://localhost:3000/apps/videos/clips");
+  URL.createObjectURL = (() => `blob:${window.location.origin}/adult-test-${++created}`) as typeof URL.createObjectURL;
   URL.revokeObjectURL = ((url: string) => { revoked.push(url); }) as typeof URL.revokeObjectURL;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -96,7 +98,7 @@ async function unlock(view: ReturnType<typeof mount>) {
   await view.findByText("Enter your passcode");
   const input = document.querySelector('[data-slot="adult-lock-dialog"] input') as HTMLInputElement;
   await act(async () => { fireEvent.change(input, { target: { value: "0000" } }); });
-  try { await view.findByText(TITLE); } catch (e) { console.log("CALLS", JSON.stringify(calls), "PROOF", getAdultProof(), document.body.textContent); throw e; }
+  await view.findByText(TITLE);
 }
 
 describe("while locked", () => {
@@ -116,8 +118,7 @@ describe("after the unlock", () => {
     expect(getAdultProof()).toBe(PROOF);
     expect(calls.some((c) => c.url.startsWith("/api/plugins/videos/data/") && c.proof === PROOF)).toBe(true);
     await waitFor(() => expect(calls.some((c) => c.url === "/api/files/c1/thumb" && c.proof === PROOF)).toBe(true));
-    console.log("HTML", document.querySelector("[data-slot=media-shelf]")?.outerHTML.slice(0, 1500), JSON.stringify(calls.map((c) => c.url + ":" + c.proof)));
-    await waitFor(() => expect(document.querySelector("img")?.getAttribute("src") ?? "").toStartWith("blob:adult-test/"));
+    await waitFor(() => expect(document.querySelector("img")?.getAttribute("src") ?? "").toStartWith("blob:http://localhost:3000/adult-test-"));
     const stores = [JSON.stringify({ ...window.localStorage }), JSON.stringify({ ...window.sessionStorage }), document.cookie, window.location.href];
     for (const text of stores) expect(text.includes(PROOF)).toBe(false);
     expect(view.queryAllByRole("button", { name: TILE }).length).toBe(0);
