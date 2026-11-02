@@ -1,8 +1,8 @@
 # Videos Create: a two-pane workspace (control panel and results feed) and a My clips library (design draft, 2026-11-02)
 
-Status (2026-11-02): proposed; architect ruling pending on revision 6 (revision 3 was REJECTED on G1 and G2, revision 4 on three kit facts R1 to R3, revision 5 on further kit facts, all fixed here). Revision 1 (a single page with a stage, a clips column and a
+Status (2026-11-02): proposed; revision 6 was APPROVED and landed (37e548442); this text is revision 7 (K9 `poll_while` required after a measured refresh failure), architect ruling on revision 7 APPROVED (earlier: revision 3 was REJECTED on G1 and G2, revision 4 on three kit facts R1 to R3, revision 5 on further kit facts, all fixed here). Revision 1 (a single page with a stage, a clips column and a
 bottom dock) landed as f9009fc78; revision 2 (two panes, built on the generic `player`) was REJECTED because the kit already ships `VideoPlayer`;
-this text, revision 6, builds the feed entry on `VideoPlayer` and replaces both. Nothing should be built from revision 1's or 2's slices.
+this text builds the feed entry on `VideoPlayer` and replaces both. Nothing should be built from revision 1's or 2's slices.
 No code. Item: VIDEO-UI-01. Amends [video-create-ui-2026-11-02.md](video-create-ui-2026-11-02.md). Mockup, opened and judged at 1440 and
 390 wide, light and dark: [assets/video-one-page-2026-11-02/index.html](assets/video-one-page-2026-11-02/index.html) (captures beside it;
 `?page=clips` is the library; `bash cap.sh` regenerates them).
@@ -34,6 +34,7 @@ Nothing approved is deleted; each line names the passage and what it says after 
   `["create", "clips"]`; `make-video` and `creations` leave `contributes.pages` with their files; `clips` ("My clips", adult, schema page)
   is added. The `create` mode of `contributes.header.modes` (`page: "create"`) is unchanged.
 - [../dev/videos-create.md](../dev/videos-create.md) "Pages" is rewritten in VIDEO-UI-06, in the same commit as the code.
+- Revision 6 of this note: its K9 "only if the refresh check fails" and VIDEO-UI-02's "first step measures whether package data refreshes" are replaced: the check failed on a real run, K9 is built in VIDEO-UI-04, and VIDEO-UI-02 no longer measures.
 - Revision 1 of this note (stage, Your clips column, bottom dock): the `media_shelf` `select_state` prop (old K5) and the dock-only bar are
   dropped; the dock survives only as the phone form of the panel.
 
@@ -168,13 +169,12 @@ Element is written (rule 9b), and ships under a new tag; Home pins it in VIDEO-U
 | K6 | `prompt_bar` | initial values of chips, tier and references read from page state on arrival (the prompt already is) | | Remix refills through `navigate` state. Verify first: if the bar already does it for chips, K6 is not needed |
 | K7 | `VideoPlayer` actions | `sheet`: `{title, submit_label, fields: [{name, label, kind: number|text|clips}]}` | none | Trim, Join, Mix need inputs (VIDEO-UI-08) |
 | K8 | host, `prompt_bar`, `VideoPlayer` actions, `result_feed` | `MediaHost.makingNotice(kind)` fed by `useMakingAvailability`; the renderer passes it as `disabledReason` and disables every action marked `starts: "picture"` or `"video"` with the same notice | no marker: unchanged | S6 row "Pictures and video are not ready" (owner ruling 2026-10-29) |
-| K9 | `result_feed` | `poll_while`: statuses in which the feed re-reads only those jobs' own records every few seconds and stops once every row is settled, like the chat card's `VIDEO_POLL_MS` query | none | the newest entry follows a running job; the job record read S6 allows, not a new polling loop; only if the refresh check fails |
+| K9 | `result_feed` | `poll_while`: statuses in which the feed re-reads only those jobs' own records every few seconds and stops once every row is settled, like the chat card's `VIDEO_POLL_MS` query | none | the newest entry follows a running job; the job record read S6 allows, not a new polling loop; required, not conditional: the refresh check failed on a real run (see below) |
 | K10 | new node `result_feed` | bound rows (newest first); per row one `VideoPlayer` (a draft is the same Element in `draft`) plus the words, tags and reference chips `{label, thumb}`; `filters` (toggle, select) that write page state the binding reads as `$state.<name>`; `group_by` (day through `DayDivider`, or the words); the entry's Stop, Try again, Another take, the three draft actions and Favorite are `VideoPlayer`'s own built-ins (`onStop`, `onRetry`, `onMakeAnother`, `onRender`, `onAnotherStill`, `onEditWords`, and the Favorite toggle), mapped from a `handlers` prop with keys `stop`, `retry`, `make_another`, `render`, `another_still`, `edit_words`, `favorite` (none is declared again as an extra action); only Remix and Make it Max are extra `actions`, and an extra action with no `when` shows in `ready`; K1 and K8 | | the Dreamina feed: no existing node holds an entry with words, tags, a player and actions |
 | K11 | `split_view` | `aside_side: "start"` | `end` | the panel is the left pane |
 | K12 | `media_shelf` | `group_by_field` (a date field, `DayDivider` headings built as shipped: a centred label between hairlines such as "Today, 5 clips"; the mockup's left-aligned heading is not built unless a `DayDivider` variant is added here, never a className), `size_control` (`CardSizeSlider` writing tile density), `favorite` (`{field, action}` heart toggle) | none | the library of reference 9 |
 
-Not verified: whether a package data binding refreshes while a job runs. VIDEO-UI-02's first step reads the host code and measures on a dev
-hub; if it does not refresh, K9 is built.
+Measured 2026-11-02 on the current three-page UI (Home 97eb65021, scratch Stack): a real Create to Max run left the stage list on a stale "Waiting for its turn" for the whole 3-minute render and never moved to progress or percent without a reload, while the Home API said "Making your video, 58% done" (it may be Browser-pane timer throttling in a background tab; not investigated). So a package data binding does not refresh while a job runs, and K9 `poll_while` is built, not conditional: a feed entry must refresh while its job runs (poll only the running jobs' records, stop when settled). VIDEO-UI-04 and VIDEO-UI-06 each carry an acceptance line for it, and VIDEO-UI-04 also checks the background-tab case (a timer that is throttled must catch up on visibility).
 
 ## 6. Page JSON shape
 
@@ -257,11 +257,11 @@ a failure says what to do ("It did not finish. Try again.").
 | Id | Size | Slice | Done when |
 |---|---|---|---|
 | VIDEO-UI-01 | S | This note, architect ruling, mockup, backlog rows | architect APPROVED; screenshots judged |
-| VIDEO-UI-02 | M, commons | K1 `VideoPlayer` additions (draft status with `onRender`, `onAnotherStill`, `onEditWords`, `when`, `disabledReason`, `notice`, icon variant, More menu, Favorite toggle) and the K8 `starts` marker; the refresh check first | commons tests and tsc; opened at 1440 and 390; tag pushed |
+| VIDEO-UI-02 | M, commons | K1 `VideoPlayer` additions (draft status with `onRender`, `onAnotherStill`, `onEditWords`, `when`, `disabledReason`, `notice`, icon variant, More menu, Favorite toggle) and the K8 `starts` marker; the refresh check is settled (it failed, K9 is built in 04) | commons tests and tsc; opened at 1440 and 390; tag pushed |
 | VIDEO-UI-03 | M, commons | K2a to K2c, K3a to K3c, K8 `disabledReason` pass-through, K6 check | same; keyboard and focus pass on popover and sheet; tag pushed |
-| VIDEO-UI-04 | M, commons | K10 `result_feed` composing `VideoPlayer` and `DayDivider` (K8, K9 if needed) and K11 `split_view.aside_side`; the row names VideoPlayer and ActivityFeed | same; an entry in each state opened; tag pushed |
+| VIDEO-UI-04 | M, commons | K10 `result_feed` composing `VideoPlayer` and `DayDivider` (K8, K9) and K11 `split_view.aside_side`; the row names VideoPlayer and ActivityFeed | same; an entry in each state opened; a real run where the entry moves from queued to percent to done without a reload, tab foregrounded and backgrounded; tag pushed |
 | VIDEO-UI-05 | S, commons | K12 `media_shelf` day groups, size slider, favorite | tests; opened at 1440 and 390; tag pushed |
-| VIDEO-UI-06 | M, Home | pin the tags; `create.json` and `clips.json`; `feed` scope and fields; Favorite flag (reuse the Library's if it has one); K8 host wiring (`makingNotice` from `useMakingAvailability`); manifest three pages to two; delete old pages and four scopes; rewrite `docs/dev/videos-create.md` Pages; update `videoCreate.test.ts` | dev hub opened at 1440 and 390 with a real clip made and every entry state seen once; every starting control seen disabled while `engines.video` is not ready; a removed page link checked |
+| VIDEO-UI-06 | M, Home | pin the tags; `create.json` and `clips.json`; `feed` scope and fields; Favorite flag (reuse the Library's if it has one); K8 host wiring (`makingNotice` from `useMakingAvailability`); manifest three pages to two; delete old pages and four scopes; rewrite `docs/dev/videos-create.md` Pages; update `videoCreate.test.ts` | dev hub opened at 1440 and 390 with a real clip made and every entry state seen once; every starting control seen disabled while `engines.video` is not ready; a removed page link checked; a real run where the entry moves from queued to percent to done without a reload, tab foregrounded and backgrounded |
 | VIDEO-UI-07 | S, Home | the `draft` entry wired to the still-first draft record (needs VIDEO-INPUTS-02) | each action pressed once on desktop and phone |
 | VIDEO-UI-08 | M, commons then Home | K7 edit sheet on `VideoPlayer` actions; Trim, Join, Mix on an entry (needs VIDEO-CHAT-01 C3 and C4) | each tool run once from the page and from chat |
 | VIDEO-UI-09 | S, Home | End frame and Voice clip slots after their benches pass (VIDEO-INPUTS-03, -05) | a clip with each input made from the page |
