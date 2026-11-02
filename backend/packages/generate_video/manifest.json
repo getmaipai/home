@@ -75,10 +75,10 @@
           "time-lapse",
           "aerial",
           "close-up",
-          "wide-establishing"
+          "still"
         ],
         "grounded": false,
-        "description": "Optional camera move or style: dolly-in, slow-orbit, handheld, slow-motion, time-lapse, aerial, close-up or wide-establishing. Set it only when the person asks for that kind of shot."
+        "description": "Optional camera move or style: dolly-in, slow-orbit, handheld, slow-motion, time-lapse, aerial, close-up or still. Set it only when the person asks for that kind of shot."
       },
       "voices": {
         "type": "string",
