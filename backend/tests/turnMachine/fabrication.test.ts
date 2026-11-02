@@ -89,3 +89,22 @@ describe("section labels and the words between two quotes are not names (found o
     expect(namesIn("Then **Anna Marsh** arrived and left.")).toEqual(["Anna Marsh"]);
   });
 });
+
+describe("a source's own name and invented guess names (bench 2026-11-02)", () => {
+  // The writer cites a site by its display name ("Daily Health Digest"); the sources hold it only as a host (dailyhealthdigest.example).
+  test("a name that is a source's host with the spaces taken out is given", () => {
+    const evidence = "Bronchitis: Symptoms and treatment\ndailyhealthdigest.example https://www.dailyhealthdigest.example/articles/bronchitis";
+    expect(markUnsourcedNames("Daily Health Digest lists these as reasons to see a doctor [6].", evidence, "").marked).toBe(0);
+    // Not a free pass: the same words with no such host stay marked.
+    expect(markUnsourcedNames("Daily Health Digest lists these as reasons to see a doctor [6].", "bronchitis notes from another-site.example", "").marked).toBe(1);
+  });
+
+  // The analysis held one guess; the writer added a second one naming a company no source gives. Marking it kept a name nobody can trace.
+  test("a guess sentence that names something no source gives is dropped, a sourced fact with such a name is marked", () => {
+    const text = "**My guesses**\nI infer the lead would clash with the captain [3]. I also guess the series would have explored Acme Holding Group more deeply [3].\n\nThe pilot aired in 2002 and Acme Holding Group sponsored it [3].";
+    const out = markUnsourcedNames(text, "the lead clashed with the captain in 2002", "");
+    expect(out.text).not.toContain("explored Acme Holding Group");
+    expect(out.text).toContain("I infer the lead would clash with the captain [3].");
+    expect(out.text).toContain(`Acme Holding Group sponsored it [3]${NOT_IN_SOURCES}.`);
+  });
+});

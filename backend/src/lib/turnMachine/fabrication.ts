@@ -60,11 +60,25 @@ export function namesIn(text: string): string[] {
 const NAME_GAP_CHARS = 24;
 const escapeRe = (w: string): string => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** A source is named by its host ("dailyhealthdigest.example"), and a writer cites it by its display name ("Daily Health Digest"). A name of
+ * two or more words whose letters, spaces taken out, are one label of a host the evidence holds is that source's own name, so it is given. */
+function givenAsHost(name: string, haystack: string): boolean {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return false;
+  const compact = name.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  if (compact.length < 6) return false;
+  for (const host of haystack.matchAll(/[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu)) {
+    if (host[0].split(".").some((label) => label.replace(/-/g, "") === compact)) return true;
+  }
+  return false;
+}
+
 /** A name counts as given when the evidence holds it as written, or holds each pair of neighbouring words of it close together (a writer may
  * drop a connective or join a title to a surname). Words that each appear somewhere in the sources but never near one another do not make
  * a name given: an invented person assembled from known words is still marked. */
 export function nameIsGiven(name: string, haystack: string): boolean {
   if (haystack.includes(squashText(name))) return true;
+  if (givenAsHost(name, haystack)) return true;
   const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
   if (words.length < 2) return words.length === 1 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(haystack);
   const near = (a: string, b: string): boolean => {
@@ -79,21 +93,27 @@ export function hasFactCue(sentence: string): boolean {
   return /\d/.test(sentence) || namesIn(sentence).length > 0;
 }
 
-export interface MarkResult { text: string; marked: number }
+export interface MarkResult { text: string; marked: number; dropped: number }
+
+/** A sentence that says it is a guess or an inference. The writer may only repeat the analysis's guesses, which rest on notes; one that adds
+ * a name no source gives has nothing to rest on, so it is dropped instead of marked. */
+const GUESS_CUE = /\b(?:guess(?:es|ed)?|infer(?:s|red)?|speculat\w*|presum\w*|suppos\w*)\b/i;
 
 /** Marks each sentence that names someone or something no part of the evidence (nor the person's own question) contains. */
 export function markUnsourcedNames(text: string, evidence: string, question: string): MarkResult {
   const haystack = squashText(`${evidence}\n${question}`);
   let marked = 0;
+  let dropped = 0;
   const parts = text.split(/(?<=[.!?])(\s+)/);
   const out = parts.map((part) => {
     if (part.trim() === "" || part.includes(NOT_IN_SOURCES)) return part;
     const unknown = namesIn(part).filter((name) => !nameIsGiven(name, haystack));
     if (unknown.length === 0) return part;
+    if (GUESS_CUE.test(part)) { dropped += 1; return ""; }
     marked += 1;
     const bare = part.replace(/\s+$/, "");
     const punct = bare.match(/[.!?]$/)?.[0] ?? "";
     return `${punct ? bare.slice(0, -1) : bare}${NOT_IN_SOURCES}${punct}${part.slice(bare.length)}`;
   });
-  return { text: out.join(""), marked };
+  return { text: out.join(""), marked, dropped };
 }

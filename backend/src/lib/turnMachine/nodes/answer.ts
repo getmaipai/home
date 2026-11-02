@@ -195,8 +195,8 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // RESEARCH-CLAIM-01: a sentence its cited sources do not back is marked "not confirmed by the sources" (admin switch research.claim_check, default on).
       // RESEARCH-FABRICATION-01: a name or title that no source, note or article gives is marked; an uncited sentence that states a fact is judged
       // against the notes' quotes and the article.
-      const evidenceText = `${researchEvidence(state.outcomes)}\n${state.backbone?.text ?? ""}\n${state.entityAnchor?.text ?? ""}\n${(state.pageNotes ?? []).map((n) => `${n.note} ${n.quote}`).join("\n")}`;
-      const marked = research ? markUnsourcedNames(credited.text, evidenceText, state.utterance) : { text: credited.text, marked: 0 };
+      const evidenceText = `${researchEvidence(state.outcomes)}\n${state.backbone?.text ?? ""}\n${state.entityAnchor?.text ?? ""}\n${(state.pageNotes ?? []).map((n) => `${n.note} ${n.quote}`).join("\n")}\n${sources.map((s) => `${s.site ?? ""} ${s.url}`).join("\n")}`;
+      const marked = research ? markUnsourcedNames(credited.text, evidenceText, state.utterance) : { text: credited.text, marked: 0, dropped: 0 };
       const uncitedPassages = research ? `${state.backbone?.text.slice(0, 3_000) ?? ""}\n${(state.pageNotes ?? []).map((n) => n.quote).join("\n")}\n${state.entityAnchor?.lead ?? ""}\n${researchEvidence(state.outcomes)}`.trim() : "";
       const claims = research && sources.length > 0 && getHouseholdSettingValue("research.claim_check") !== false
         ? await checkClaims(marked.text, [...evidenceBySource(state.outcomes, state.pageNotes ?? []), ...(backboneSource ? [state.backbone?.text ?? ""] : [])], claimJudgeOverride ?? lightModelJudge, { uncitedPassages })
