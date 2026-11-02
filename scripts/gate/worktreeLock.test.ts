@@ -22,6 +22,8 @@ test("worktree lock refuses a second check, lets nested preflight inherit, and s
     source "$LOCK_LIBRARY"
     acquire_worktree_lock || exit 1
     bash -c 'source "$LOCK_LIBRARY"; acquire_worktree_lock && echo nested-preflight-shared-lock'
+    # The machine-wide gate-lock.sh wraps the child --pre and uses descriptors 7, 8 and 9 (closing them on unlock).
+    bash -c 'exec 7>&- 8>&- 9>&-; source "$LOCK_LIBRARY"; acquire_worktree_lock && echo nested-after-wrapper-closed-7-8-9'
     echo holder-ready
     while [ ! -e "$RELEASE_PATH" ]; do sleep 0.02; done
   `], {
@@ -40,6 +42,7 @@ test("worktree lock refuses a second check, lets nested preflight inherit, and s
       output += decoder.decode(result.value, { stream: true });
     }
     expect(output).toContain("nested-preflight-shared-lock");
+    expect(output).toContain("nested-after-wrapper-closed-7-8-9");
 
     const duplicate = Bun.spawnSync(["bash", "-c", `source "$LOCK_LIBRARY"; acquire_worktree_lock`], {
       cwd: firstRepo,

@@ -21,7 +21,8 @@ import { itemRefsIn } from "@/lib/items/tool";
 import { outcomeOf } from "@/lib/turnContext";
 import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/types";
-import { createMade, updateMade } from "./madeRecords";
+import { blockEnvelope } from "@/lib/packageBlocks";
+import { createMade, getMade, updateMade } from "./madeRecords";
 import { musicDenial } from "./policy";
 import { musicAudienceOf, runGenerateMusic } from "./tool";
 
@@ -44,7 +45,7 @@ export async function briefFor(actor: PersonRow, mediaId: string): Promise<BandB
   return { title: item.title, artist: item.artist ?? item.album_artist ?? null, genre: item.genre ?? null, year: item.year ?? null, tags };
 }
 
-interface BandDraft {
+export interface BandDraft {
   name: string; backstory: string; genres: string[]; members: { name: string; role: string }[];
   style: string; portrait_prompt: string; logo_prompt: string; single_title: string; single_lyrics: string;
 }
@@ -123,7 +124,7 @@ export function finishBandPicture(picture: PictureJob): void {
   updateMade("made_artist", owner as unknown as PersonRow, match[1]!, match[2] === "portrait" ? { portrait_file_id: picture.files[0].id } : { logo_file_id: picture.files[0].id });
 }
 
-async function startBandPicture(state: BandState, actor: PersonRow, bandId: string, part: "portrait" | "logo", prompt: string): Promise<void> {
+export async function startBandPicture(state: { conversationId: string | null; turnId: string | null }, actor: PersonRow, bandId: string, part: "portrait" | "logo", prompt: string): Promise<void> {
   try {
     const audience = routeAudience(actor);
     const full = `${prompt} No text, no letters.`.slice(0, 578);
@@ -136,7 +137,28 @@ async function startBandPicture(state: BandState, actor: PersonRow, bandId: stri
 }
 
 export type BandState = Pick<TurnState, "utterance" | "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
-export type BandResult = { ok: true; bandId: string; line: string; musicJobId: string | null } | { ok: false; line: string };
+export type BandResult = { ok: true; bandId: string; line: string; musicJobId: string | null; block: Record<string, unknown> } | { ok: false; line: string };
+
+/** The answer block's picture reference: the file id in hex, because a block image must read `hubimg-` and hex digits. The chat card turns it back into the file's own address. */
+export const hubImageRef = (fileId: string): string => `hubimg-${Buffer.from(fileId, "utf8").toString("hex")}`;
+/** The file id a `hubimg-` reference names, or null (the reverse of hubImageRef; the chat card decodes the same format). */
+export const fileIdOfHubImage = (src: string): string | null => /^hubimg-([a-f0-9]{8,})$/.test(src) ? Buffer.from(src.slice(7), "hex").toString("utf8") : null;
+/** `make_band:<band id>:<conversation id>:<turn id>`. The band id is what the card's buttons send back; the other two are where a new picture is filed. */
+export const bandProvenance = (bandId: string, where: { conversationId: string | null; turnId: string | null }): string => `make_band:${bandId}:${where.conversationId ?? "-"}:${where.turnId ?? "-"}`;
+const BAND_ACTIONS = ["keep", "remake", "remake_portrait", "discard"] as const;
+
+/** The band's chat card. It carries the band's own record (name, story, members, pictures made so far) and the first single's title;
+ * the band id rides in `provenance`, which the card's buttons send back to the band route. make_album is not offered: albums are not built yet. */
+export function bandBlock(bandId: string, where: { conversationId: string | null; turnId: string | null }, brief: BandBrief, draft: BandDraft, pictures: { portrait?: string | null; logo?: string | null }): Record<string, unknown> {
+  const props: Record<string, unknown> = {
+    name: draft.name, genres: draft.genres, members: draft.members, singleTitle: draft.single_title.slice(0, 120),
+    inspiredBy: (brief.artist ? `${brief.title} by ${brief.artist}` : brief.title).slice(0, 120), actions: [...BAND_ACTIONS],
+  };
+  if (draft.backstory) props.backstory = draft.backstory;
+  if (pictures.portrait) props.portrait = { src: hubImageRef(pictures.portrait), alt: `Portrait of the band ${draft.name}` };
+  if (pictures.logo) props.logo = { src: hubImageRef(pictures.logo), alt: `Logo of the band ${draft.name}` };
+  return blockEnvelope("band", MAKE_BAND_TOOL_ID, `The band ${draft.name}, made like a song you picked, with its first single ${draft.single_title}.`, bandProvenance(bandId, where), props);
+}
 
 /** Makes the band, then starts its portrait, logo and first single. Only the band itself can fail this call. */
 export async function makeBand(input: { state: BandState; mediaId: string; callId: string; spoken: boolean }): Promise<BandResult> {
@@ -157,11 +179,15 @@ export async function makeBand(input: { state: BandState; mediaId: string; callI
   let single = false; let musicJobId: string | null = null;
   try {
     const outcome = await runGenerateMusic({ state, callId: input.callId, spoken: input.spoken,
+      band: { id: bandId, name: draft.name },
       args: { description: `${draft.style}. By the band ${draft.name}.`, lyrics: draft.single_lyrics || undefined, title: draft.single_title } });
     single = outcome.status === "succeeded";
     musicJobId = (outcome.result?.data as { musicJobId?: string } | undefined)?.musicJobId ?? null;
   } catch { single = false; }
-  return { ok: true, bandId, musicJobId, line: `The band is made and saved in Music under Make a band: say its name and one line about its sound.${single ? " Its first single is being made now." : " Its first single could not start, so offer to try it again."} The portrait and logo appear on its page when ready.` };
+  const saved = getMade("made_artist", actor, bandId);
+  const body = saved.ok ? saved.value as unknown as { portrait_file_id?: string | null; logo_file_id?: string | null } : {};
+  const block = bandBlock(bandId, state, brief, draft, { portrait: body.portrait_file_id, logo: body.logo_file_id });
+  return { ok: true, bandId, musicJobId, block, line: `The band is made and saved in Music under Make a band: say its name and one line about its sound.${single ? " Its first single is being made now." : " Its first single could not start, so offer to try it again."} The portrait and logo appear on its page when ready.` };
 }
 
 /** The turn's runner for `make_band`: the policy node has already checked the offer and that the reference is the one the person sent. */
@@ -171,5 +197,5 @@ export async function runMakeBand(input: { state: BandState; args: Record<string
   if (!ref) return outcomeOf({ callId, packageId: MAKE_BAND_TOOL_ID, status: "failed", via: "tool_call", args, errorCode: "bad_arguments", failureKind: "bad_arguments", durationMs: 0 });
   const made = await makeBand({ state, mediaId: ref.id, callId, spoken: input.spoken });
   if (!made.ok) return outcomeOf({ callId, packageId: MAKE_BAND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: made.line }, actions: [] } });
-  return outcomeOf({ callId, packageId: MAKE_BAND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: made.line }, data: { bandId: made.bandId, ...(made.musicJobId ? { musicJobId: made.musicJobId } : {}) }, actions: [] } });
+  return outcomeOf({ callId, packageId: MAKE_BAND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: made.line }, data: { bandId: made.bandId, ...(made.musicJobId ? { musicJobId: made.musicJobId } : {}) }, blocks: [made.block], actions: [] } as NonNullable<ToolExecutionOutcome["result"]> });
 }

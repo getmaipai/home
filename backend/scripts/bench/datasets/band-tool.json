@@ -1,0 +1,14 @@
+{
+  "about": "MUSIC-LIKE-01: rows for the make_band tool (bench_row band-tool). label B = a song reference with a plain ask to make a band like it (make_band expected); N = anything else, music-related or not (make_band must not be called). The song reference is the maipai://music/track/<id> link the Band like this button sends. Persona names only.",
+  "rows": [
+    { "id": "b-button", "label": "B", "text": "Create a band like this song, with a first single.\n\nmaipai://music/track/media-a1b2c3d4e5" },
+    { "id": "b-plain", "label": "B", "text": "Make me a new band that sounds like this one: maipai://music/track/media-f6a7b8c9d0" },
+    { "id": "b-invent", "label": "B", "text": "Invent a band inspired by maipai://music/track/media-0a1b2c3d4e and give it a first song." },
+    { "id": "n-song", "label": "N", "text": "Make a song like this one.\n\nmaipai://music/track/media-a1b2c3d4e5" },
+    { "id": "n-play", "label": "N", "text": "Play maipai://music/track/media-a1b2c3d4e5" },
+    { "id": "n-about", "label": "N", "text": "Tell me about the band Velvet Atlas." },
+    { "id": "n-lyrics", "label": "N", "text": "What are the lyrics to maipai://music/track/media-f6a7b8c9d0 about?" },
+    { "id": "n-weather", "label": "N", "text": "What is the weather in Chicago today?" },
+    { "id": "n-recommend", "label": "N", "text": "Recommend three folk bands I might like." }
+  ]
+}

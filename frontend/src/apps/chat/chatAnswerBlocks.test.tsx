@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as plainRender } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router-dom";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { AnswerBlockDataRender, drawableBlocks } from "@/apps/chat/chatAnswerBlocks";
 import * as api from "@/lib/api";
 import bandFixture from "@maipai/spec/fixtures/answer-block/valid-band.json";
 import newsFeedFixture from "@maipai/spec/fixtures/answer-block/valid-story_feed.json";
 
 afterEach(cleanup);
+
+// The chat draws answer blocks under the router and the toast host; a band card uses both.
+const render = (ui: ReactElement) => plainRender(<MemoryRouter><ToastProvider>{ui}</ToastProvider></MemoryRouter>);
 
 const block = {
   id: "blk-aaaaaaaaaaaa",

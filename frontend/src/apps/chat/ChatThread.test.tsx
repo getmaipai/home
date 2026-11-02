@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { api } from "@/lib/api";
@@ -35,7 +36,7 @@ test("history reply faces use the retained portrait and finished replies contain
   const PORTRAIT_URL = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
   const portrait = spyOn(api, "companionPortrait").mockReturnValue(PORTRAIT_URL);
   const messages: ThreadMessageLike[] = [{ role: "assistant", content: [{ type: "text", text: "A saved reply." }], status: { type: "complete", reason: "stop" }, metadata: { custom: { answered_by: speaker } } }];
-  const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band="adult" messages={messages} /></MemoryRouter>);
+  const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} band="adult" messages={messages} /></ToastProvider></MemoryRouter>);
   expect(await view.findByText("A saved reply.")).toBeTruthy();
   await waitFor(() => expect(view.container.querySelector(`img[src="${PORTRAIT_URL}"]`)).toBeTruthy());
   expect(portrait).toHaveBeenCalledWith("rivet/look1");
@@ -60,7 +61,7 @@ test("every assistant activity state draws the companion face row", async () => 
       { role: "user", content: [{ type: "text", text: "Q" }] },
       { role: "assistant", content, ...(status ? { status } : {}), metadata: { custom: { answered_by: speaker } } },
     ];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band="adult" messages={messages} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} band="adult" messages={messages} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.querySelectorAll('[data-slot="aui_assistant-message-root"]').length).toBe(1), { timeout: 3000 });
     expect(view.container.querySelectorAll('[data-slot="aui_reply-face-row"]').length, name).toBe(1);
     expect(view.container.querySelector('[data-slot="aui_reply-face-row"]')?.textContent, name).toContain("Rivet");
@@ -118,7 +119,7 @@ describe("ChatThread", () => {
     const adapter: ChatModelAdapter = { run: async function* () {
       yield { content: [{ type: "text", text: "I couldn't look that up just now, but here's what I know." }] };
     } };
-    const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness adapter={adapter} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><SearchBannerHarness adapter={adapter} /></ToastProvider></MemoryRouter>);
     act(() => searchBannerRuntime!.thread.composer.setText("Look this up"));
     act(() => searchBannerRuntime!.thread.composer.send());
     expect(await view.findByText("I couldn't look that up just now, but here's what I know.")).toBeTruthy();
@@ -134,7 +135,7 @@ describe("ChatThread", () => {
     const settings = spyOn(api, "settingsValues").mockResolvedValue([{
       key: "search.source_mode.web", value: "offline",
     }] as never);
-    const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><SearchBannerHarness /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.querySelector("textarea, [contenteditable]")).not.toBeNull());
     expect(view.queryByText("Web search is off")).toBeNull();
     expect(view.queryByText("Web search is unavailable")).toBeNull();
@@ -143,7 +144,7 @@ describe("ChatThread", () => {
   });
 
   test("does not render a queue row for an empty queue, including while a reply is running", async () => {
-    const idle = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={NOOP} /></MemoryRouter>);
+    const idle = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={NOOP} /></ToastProvider></MemoryRouter>);
     expect(idle.container.querySelector('[data-slot="message-queue"]')).toBeNull();
     idle.unmount();
 
@@ -153,7 +154,7 @@ describe("ChatThread", () => {
       await waiting;
       yield { content: [{ type: "text", text: "Reply finished." }] };
     } };
-    const running = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    const running = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={adapter} /></ToastProvider></MemoryRouter>);
     act(() => queuedRuntime!.thread.composer.setText("start a reply"));
     act(() => queuedRuntime!.thread.composer.send());
     await waitFor(() => expect(running.getByRole("button", { name: "Stop generating" })).toBeTruthy());
@@ -174,7 +175,7 @@ describe("ChatThread", () => {
       if (runs++ === 0) await firstRun;
       yield { content: [{ type: "text", text: "Reply finished." }] };
     } };
-    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={adapter} /></ToastProvider></MemoryRouter>);
     expect(queuedRuntime).toBeDefined();
     queuedRuntime!.thread.composer.setText("first message");
     act(() => queuedRuntime!.thread.composer.send());
@@ -204,7 +205,7 @@ describe("ChatThread", () => {
       if (runs++ === 0) await firstRun;
       yield { content: [{ type: "text", text: "Reply finished." }] };
     } };
-    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={adapter} /></ToastProvider></MemoryRouter>);
     act(() => queuedRuntime!.thread.composer.setText("first message"));
     act(() => queuedRuntime!.thread.composer.send());
     await waitFor(() => expect(sent).toEqual(["first message"]));
@@ -237,7 +238,7 @@ describe("ChatThread", () => {
       if (runs++ === 0) await firstRun;
       yield { content: [{ type: "text", text: "Reply finished." }] };
     } };
-    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={adapter} /></ToastProvider></MemoryRouter>);
     act(() => queuedRuntime!.thread.composer.setText("first message"));
     act(() => queuedRuntime!.thread.composer.send());
     await waitFor(() => expect(view.getByRole("button", { name: "Stop generating" })).toBeTruthy());
@@ -260,7 +261,7 @@ describe("ChatThread", () => {
       jest.useFakeTimers();
       let view: ReturnType<typeof renderWithQueryClient> | undefined;
       try {
-        view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} band={band} /></MemoryRouter>);
+        view = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={adapter} band={band} /></ToastProvider></MemoryRouter>);
         act(() => queuedRuntime!.thread.composer.setText("Please think about this"));
         act(() => queuedRuntime!.thread.composer.send());
         await waitFor(() => expect(view!.getByRole("button", { name: "Stop generating" })).toBeTruthy());
@@ -298,7 +299,7 @@ describe("ChatThread", () => {
       load: async () => ({ messages: [] }),
       append: async ({ message }) => { persisted.push(JSON.stringify(message)); },
     };
-    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} history={history} temporary /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><QueuedHarness adapter={adapter} history={history} temporary /></ToastProvider></MemoryRouter>);
     act(() => queuedRuntime!.thread.composer.setText("first message"));
     act(() => queuedRuntime!.thread.composer.send());
     await waitFor(() => expect(runs).toBe(1));
@@ -348,7 +349,7 @@ describe("ChatThread", () => {
       ] }],
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.querySelector('[data-slot="tool-group-root"]')).not.toBeNull());
     await view.getByRole("button", { name: /1 tool call/ }).click();
     expect(view.container.querySelector('[data-slot="tool-timeline"]')).not.toBeNull();
@@ -363,7 +364,7 @@ describe("ChatThread", () => {
       metadata: { custom: { turnId: "turn-failed-tool", failedTool: true } },
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.querySelector('[data-slot="tool-group-root"]')).not.toBeNull());
     await view.getByRole("button", { name: /1 tool call/ }).click();
     const timeline = view.container.querySelector('[data-slot="tool-timeline"]');
@@ -386,7 +387,7 @@ describe("ChatThread", () => {
       metadata: { custom: { turnId: "turn-failed-tool", failedTool: true } },
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.getByRole("button", { name: "Error details" })).toBeTruthy());
   });
 
@@ -396,7 +397,7 @@ describe("ChatThread", () => {
       content: [{ type: "tool-call", toolCallId: `unknown-${band}`, toolName: "unbound_tool", args: {}, result: { private: "raw private tool JSON" } }],
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band={band} messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} band={band} messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.querySelector('[data-slot="aui_assistant-message-root"]')).not.toBeNull());
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
     expect(view.container.textContent).not.toContain("raw private tool JSON");
@@ -412,13 +413,13 @@ describe("ChatThread", () => {
       content: [{ type: "tool-call", toolCallId: "unknown-admin", toolName: "unbound_tool", args: {}, result: { private: "admin raw result" }, mcp: { app: { resourceUri: "ui://unknown/tool" } } }],
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin messages={[{ role: "assistant", content: [{ type: "text", text: "Admin sees fallback." }] }, ...message]} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin messages={[{ role: "assistant", content: [{ type: "text", text: "Admin sees fallback." }] }, ...message]} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).not.toBeNull());
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).not.toBeNull();
   });
 
   test("a message with every bound part type renders its Elements", async () => {
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.textContent).toContain("It will be mild."));
     // spec-sheet tool binding
     expect(view.container.textContent).toContain("Weather in Springfield");
@@ -437,7 +438,7 @@ describe("ChatThread", () => {
       content: [...SHOWCASE_BLOCKS.map((block) => ({ type: "data" as const, name: "answer_block", data: block })), { type: "text", text: "Eight kinds." }],
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.textContent).toContain("Eight kinds."));
     const drawn = [...view.container.querySelectorAll('[data-slot="answer-block"]')];
     expect(drawn.map((el) => el.getAttribute("data-kind"))).toEqual(SHOWCASE_BLOCKS.map((b) => b.kind));
@@ -448,7 +449,7 @@ describe("ChatThread", () => {
   test("an answer_block data part the dispatcher cannot read shows its alt sentence and does not break the reply", async () => {
     const bad = { ...SHOWCASE_BLOCKS[0], kind: "hologram", alt: "A hologram nobody can draw." };
     const message: ThreadMessageLike[] = [{ role: "assistant", content: [{ type: "data", name: "answer_block", data: bad }, { type: "text", text: "Reply survives." }], status: { type: "complete", reason: "stop" } }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.textContent).toContain("Reply survives."));
     expect(view.container.textContent).toContain("A hologram nobody can draw.");
   });
@@ -464,20 +465,20 @@ describe("ChatThread", () => {
       ],
       status: { type: "complete", reason: "stop" },
     }];
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin={false} messages={message} /></ToastProvider></MemoryRouter>);
     await waitFor(() => expect(view.container.textContent).toContain("Here are three results."));
     for (const value of ["Current time", "3:15 PM", "Marsh Lantern", "A. Director", "North Lights", "Canada"]) expect(view.container.textContent).toContain(value);
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
   });
 
   test("while the engine is loading the empty thread shows the generation loader", () => {
-    const view = renderWithQueryClient(<MemoryRouter><WelcomeHarness availability="starting" /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><WelcomeHarness availability="starting" /></ToastProvider></MemoryRouter>);
     expect(view.container.querySelector('[data-slot="generation-loader"]')).not.toBeNull();
     expect(view.container.textContent).toContain("Starting your AI");
   });
 
   test("once the engine is ready the loader is gone", () => {
-    const view = renderWithQueryClient(<MemoryRouter><WelcomeHarness availability="ready" /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><WelcomeHarness availability="ready" /></ToastProvider></MemoryRouter>);
     expect(view.container.querySelector('[data-slot="generation-loader"]')).toBeNull();
   });
 
@@ -511,17 +512,17 @@ describe("ChatThread", () => {
   });
 
   test("the loader does not appear when the engine is unavailable", () => {
-    const view = renderWithQueryClient(<MemoryRouter><WelcomeHarness availability="unavailable" /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><WelcomeHarness availability="unavailable" /></ToastProvider></MemoryRouter>);
     expect(view.container.querySelector('[data-slot="generation-loader"]')).toBeNull();
   });
 
   test("the banner shows nothing when online", () => {
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin /></ToastProvider></MemoryRouter>);
     expect(view.container.querySelector('[data-slot="connection-state"]')).toBeNull();
   });
 
   test("the connection banner takes space in the layout and does not overlap the thread", () => {
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin connection={{ phase: "reconnecting", attempt: 1 }} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin connection={{ phase: "reconnecting", attempt: 1 }} /></ToastProvider></MemoryRouter>);
     const banner = view.container.querySelector('[data-slot="connection-state"]');
     expect(banner).not.toBeNull();
     const bannerRow = banner!.parentElement!;
@@ -532,7 +533,7 @@ describe("ChatThread", () => {
   });
 
   test("no banner element or height when online", () => {
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin /></ToastProvider></MemoryRouter>);
     expect(view.container.querySelector('[data-slot="connection-state"]')).toBeNull();
     const bannerRow = Array.from(view.container.querySelectorAll("div")).find((element) => element.className === "flex justify-center");
     expect(bannerRow?.children).toHaveLength(0);
@@ -540,7 +541,7 @@ describe("ChatThread", () => {
   });
 
   test("the connection banner shows Reconnecting with the attempt number", () => {
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin connection={{ phase: "reconnecting", attempt: 2 }} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin connection={{ phase: "reconnecting", attempt: 2 }} /></ToastProvider></MemoryRouter>);
     expect(view.container.textContent).toContain("Reconnecting");
     expect(view.container.textContent).toContain("attempt 2");
   });
@@ -548,7 +549,7 @@ describe("ChatThread", () => {
   test("Reconnect on a dropped banner reruns the reply", async () => {
     let runs = 0;
     const adapter: ChatModelAdapter = { run: async function* () { runs++; yield { content: [{ type: "text", text: "Reconnected." }] }; } };
-    const view = renderWithQueryClient(<MemoryRouter><Harness admin adapter={adapter} connection={{ phase: "dropped" }} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><Harness admin adapter={adapter} connection={{ phase: "dropped" }} /></ToastProvider></MemoryRouter>);
     fireEvent.click(view.getByRole("button", { name: "Reconnect" }));
     await waitFor(() => expect(runs).toBe(1));
   });

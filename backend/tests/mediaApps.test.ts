@@ -5,12 +5,13 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { scanRoot } from "@/lib/media/scan";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
-import { coerceNumber } from "@/lib/media/appHost";
+import { coerceNumber, saveBandSingles } from "@/lib/media/appHost";
 import { buildMediaTree } from "./support/mediaTree";
 import { db } from "@/db";
-import { people, shares, videoJobs, musicJobs, mediaItems } from "@/db/schema";
+import { people, shares, videoJobs, musicJobs, mediaItems, madeArtists } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
+import { createMade, deleteMade } from "@/lib/music/madeRecords";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import { rememberPreviewStations, __resetRadioDirectoryForTests } from "@/lib/media/radioDirectory";
@@ -101,6 +102,46 @@ describe("the media-app host: data ids", () => {
     expect(JSON.parse(item.lyrics!)).toEqual({ source: "made", text: "[Verse]\nWords from home" });
     const view = await (await adult.client.post("/api/plugins/music/data/item", { id: item.id })).json() as Record<string, unknown>;
     expect(view.lyrics_lookup).toBe("none");
+  });
+  test("a band's single is saved under the band: artist and made_artist_id are set, and a discarded band's single is not credited", async () => {
+    const { adult } = await setup();
+    const person = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const band = createMade("made_artist", person, { name: "Clover Lane", style: { description: "soft folk" } });
+    if (!band.ok) throw new Error("band not made");
+    const single = (jobId: string, bandId: string, bytes: number[]) => {
+      const file = storeFile(person, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array(bytes), provenance: `music-gen:{"job_id":"${jobId}","title":"Slow River"}`, deduplicate: false });
+      if (!file.ok) throw new Error(file.error);
+      db.insert(musicJobs).values({ id: jobId, personId: adult.id, task: "text2music", state: "done", request: JSON.stringify({ title: "Slow River", lyrics: "[Verse]\nla", band: { id: bandId, name: "Clover Lane" } }), fileId: file.value.id, durationS: 30, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: `1:0:${jobId}` }).run();
+      return file.value.id;
+    };
+    const kept = single("band-single-kept", band.value.id, [1, 2, 3]);
+    await adult.client.post("/api/plugins/music/queue", { id: kept });
+    const item = db.select().from(mediaItems).where(eq(mediaItems.locFileId, kept)).get()!;
+    expect(item.artist).toBe("Clover Lane");
+    expect(item.madeArtistId).toBe(band.value.id);
+    const stray = single("band-single-stray", "mband-nothere00000", [4, 5, 6]);
+    await adult.client.post("/api/plugins/music/queue", { id: stray });
+    const other = db.select().from(mediaItems).where(eq(mediaItems.locFileId, stray)).get()!;
+    expect(other.madeArtistId).toBeNull();
+    expect(other.artist).not.toBe("Clover Lane");
+    expect(db.select().from(madeArtists).all()).toHaveLength(1);
+  });
+  test("opening Music saves a live band's finished single but never revives a discarded band's", async () => {
+    const { adult } = await setup();
+    const person = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const make = (name: string) => { const band = createMade("made_artist", person, { name, style: { description: "soft folk" } }); if (!band.ok) throw new Error("band not made"); return band.value.id; };
+    const single = (jobId: string, bandId: string, bytes: number[]) => {
+      const file = storeFile(person, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array(bytes), provenance: `music-gen:{"job_id":"${jobId}","title":"Slow River"}`, deduplicate: false });
+      if (!file.ok) throw new Error(file.error);
+      db.insert(musicJobs).values({ id: jobId, personId: adult.id, task: "text2music", state: "done", request: JSON.stringify({ title: "Slow River", lyrics: "[Verse]\nla", band: { id: bandId, name: "Clover Lane" } }), fileId: file.value.id, durationS: 30, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: `1:0:${jobId}` }).run();
+      return file.value.id;
+    };
+    const live = make("Clover Lane"); const dropped = make("Daisy Hill");
+    const liveFile = single("live-single", live, [1, 2, 3]); const droppedFile = single("dropped-single", dropped, [4, 5, 6]);
+    expect(deleteMade("made_artist", person, dropped).ok).toBe(true);
+    saveBandSingles(person);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, liveFile)).get()?.madeArtistId).toBe(live);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, droppedFile)).get()).toBeUndefined();
   });
   test("Videos lists made clips through Library visibility and plays them in the existing player", async () => {
     const { owner, adult, child } = await setup();

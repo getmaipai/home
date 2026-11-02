@@ -281,8 +281,11 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const outcome = await runMakeBand({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
       outcomes.push(outcome);
       const data = outcome.result?.data as { musicJobId?: string } | undefined;
-      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
-      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      if (outcome.status === "succeeded") {
+        toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
+        // The band card is an answer block like any package's: it passes the same manifest allowlist, age band and floor.
+        toolEvents.push(...blockEventsFor(state, tool, callId, (outcome.result as { blocks?: unknown } | undefined)?.blocks, toolEvents));
+      } else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       continue;
     }
 

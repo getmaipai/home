@@ -190,6 +190,7 @@ const EXEMPT: Record<string, string> = {
   "lib/turnMachine/nodes/answer.ts": "a one-word supported-or-not verdict per cited sentence (claim check, 40 tokens); no text reaches the person",
   "lib/turnMachine/pageNotes.ts": "short notes with an exact quote for one fetched page, checked mechanically against the page; the notes feed the writing round, which carries the topic block, and are never shown as a reply",
   "lib/turnMachine/researchPipeline.ts": "the understand, plan and analysis stages of a research turn, JSON or notes handed to the writing round; the writing round that answers the person carries the topic block",
+  "lib/music/band.ts": "writes a made-up band record (name, history, sound words) for an adult only (make_band is min_role adult, offered on an adult's own written screen); the tool runs inside a chat turn that carries the topic block, and the card gives no advice",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",

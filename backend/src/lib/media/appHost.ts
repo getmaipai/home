@@ -31,6 +31,7 @@ import { libraryProvenance } from "@/lib/libraryProvenance";
 import { speakerAgeBand } from "@/lib/ageBand";
 
 import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
+import { getMade } from "@/lib/music/madeRecords";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 
 export type MediaKind = MediaItem["kind"];
@@ -931,7 +932,12 @@ function musicLibrary(person: PersonRow): MediaItem[] {
 /** Turn a visible generated Library audio file into the shared media record used by Music queues.
  * The file visibility check is delegated to madeFileFor. A person's own root is valid when the
  * fresh hub has no household root; readableIn still applies the ordinary source and band gates. */
-function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | null {
+/** A music job's request JSON, or null when the row does not parse (one bad row never breaks a Music page). */
+function parseJobRequest(text: string): unknown {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+export function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | null {
   // A file saved by an earlier press is a media item already (and no longer listed as a made file): reuse it.
   const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
   if (existing) return readableIn(person, "music", existing.id);
@@ -958,19 +964,53 @@ function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | nu
   if (!source) return null;
   const now = new Date().toISOString();
   const id = `media-${crypto.randomUUID().replace(/-/g, "")}`;
+  const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, file.id)).get();
+  const request = job ? parseJobRequest(job.request) as { instrumental?: boolean; lyrics?: string; written_lyrics?: string; band?: { id?: string; name?: string } } : null;
+  // MUSIC-LIKE-01: a made band's single is filed under the band, only while that band is still the person's own.
+  const band = request?.band?.id && request.band.name && getMade("made_artist", person, request.band.id).ok ? { id: request.band.id, name: request.band.name } : null;
   db.insert(mediaItems).values({
     id, kind: "track", title: file.name, sourceId: source.id, locFileId: file.id, mediaType: file.media_type,
     durationS: file.duration_seconds, size: file.size_bytes, playable: "original", bandOk: file.audience === "adult-only" ? "adult" : "child",
-    lyrics: (() => {
-      const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, file.id)).get();
-      if (!job) return null;
-      const request = JSON.parse(job.request) as { instrumental?: boolean; lyrics?: string; written_lyrics?: string };
-      const text = request.lyrics;
-      return !request.instrumental && text?.trim() ? JSON.stringify({ source: "made", text }) : null;
-    })(),
+    artist: band?.name ?? null, madeArtistId: band?.id ?? null,
+    lyrics: request && !request.instrumental && request.lyrics?.trim() ? JSON.stringify({ source: "made", text: request.lyrics }) : null,
     addedAt: file.created_at, createdAt: now, hlc: nextHlc(), provenance: "music:generated-library",
   }).run();
   return readableIn(person, "music", id);
+}
+/** MUSIC-LIKE-01: the finished single files of a made band, newest first (the music jobs that carry its id). */
+export function bandSingles(person: PersonRow, bandId?: string): Array<{ bandId: string; fileId: string }> {
+  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.state, "done"))).orderBy(desc(musicJobs.createdAt)).all();
+  const out: Array<{ bandId: string; fileId: string }> = [];
+  for (const row of rows) {
+    if (!row.fileId || !row.request.includes('"band"')) continue;
+    try {
+      const id = (JSON.parse(row.request) as { band?: { id?: string } }).band?.id;
+      if (id && (!bandId || id === bandId)) out.push({ bandId: id, fileId: row.fileId });
+    } catch { /* A job row that does not parse belongs to no band. */ }
+  }
+  return out;
+}
+/** Saves the finished singles of the person's live made bands (or one band) to the Music library under the band, so the band shows as an artist.
+ * Idempotent: a single already saved is reused. Returns the first saved track's id, or null when no single is ready. */
+export function saveBandSingles(person: PersonRow, bandId?: string): string | null {
+  let first: string | null = null;
+  const live = new Map<string, boolean>();
+  for (const single of bandSingles(person, bandId)) {
+    // A discarded or remade band is gone: its unsaved singles must not come back as plain tracks.
+    if (!live.has(single.bandId)) live.set(single.bandId, getMade("made_artist", person, single.bandId).ok);
+    if (!live.get(single.bandId)) continue;
+    const item = promoteMadeMusicFile(person, single.fileId);
+    if (item && !first) first = item.id;
+  }
+  return first;
+}
+/** The made bands of these tracks (by `made_artist_id`), for an artist tile's picture: the band's own portrait when it has one. */
+function bandPortraitUrl(person: PersonRow, tracks: readonly MediaItem[]): string | null {
+  const bandId = tracks.find((item) => item.made_artist_id)?.made_artist_id;
+  if (!bandId) return null;
+  const band = getMade("made_artist", person, bandId);
+  const file = band.ok ? (band.value as { portrait_file_id?: string | null }).portrait_file_id : null;
+  return file ? `/api/files/${encodeURIComponent(file)}/thumb?w=480` : null;
 }
 function musicNext(person: PersonRow, id: string): MediaItem[] {
   const queue = resolveCollection(person.id, "queue");
@@ -1134,7 +1174,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
   if (dataId === "artist" && params.scope === "popular") return popularTracks(person, params.id ?? "");
   if (dataId === "artist-albums" && params.scope) return discography(person, params.id ?? "", params.scope);
   if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
-  if (dataId === "songs") return trackRows(person, musicLibrary(person));
+  if (dataId === "songs") { saveBandSingles(person); return trackRows(person, musicLibrary(person)); }
   if (dataId === "albums") {
     const groups = [...groupTracks(musicLibrary(person), "album")];
     // `scope: "recent"` is Listen now's "Recently added": the newest albums first, a dozen of them.
@@ -1145,9 +1185,11 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     return groups.map(([id, tracks]) => albumTile(person, id, tracks)).sort((a, b) => a.title.localeCompare(b.title));
   }
   if (dataId === "artists") {
+    saveBandSingles(person);
     return [...groupTracks(musicLibrary(person), "artist")].map(([id, tracks]) => {
       const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
-      return { ...rowsOf(person, [pictured])[0]!, id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist" };
+      const portrait = bandPortraitUrl(person, tracks);
+      return { ...rowsOf(person, [pictured])[0]!, ...(portrait ? { thumbnail: portrait, backdrop: portrait } : {}), id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist" };
     }).sort((a, b) => a.title.localeCompare(b.title));
   }
   if (dataId === "header" && params.scope === "album") {
@@ -1168,6 +1210,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
       ...(tracks[0]!.description ? { description: tracks[0]!.description } : {}), shuffle_id: `shuffle:${params.id}` }];
   }
   if (dataId === "header" && params.scope === "artist") {
+    saveBandSingles(person);
     const tracks = groupTracks(musicLibrary(person), "artist").get(params.id ?? "") ?? [];
     if (tracks.length === 0) return [];
     const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
@@ -1175,12 +1218,15 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     const genres = [...new Set(tracks.map((item) => item.genre?.trim()).filter((genre): genre is string => !!genre))];
     // MUSIC-WIKI-01: a kept Wikimedia photo and short bio for a matched artist; otherwise the page is as it was (cover art or initials).
     const wiki = artistProfileFor(mostCommon(tracks.map((item) => item.musicbrainz_artist_id)));
-    const art = wiki?.photoUrl ?? artworkUrl(pictured);
+    const art = wiki?.photoUrl ?? bandPortraitUrl(person, tracks) ?? artworkUrl(pictured);
     const credit = wiki ? creditLines(wiki) : [];
     // MUSIC-LISTEN-04 About: the bio (when MUSIC-WIKI-01 kept one), then the library's own facts, then the photo credit. Never empty for a real artist.
     const albumCount = groupTracks(tracks, "album").size;
     const facts = [`${songCount(tracks.length)} on ${albumCount} ${albumCount === 1 ? "album" : "albums"} in your library`, genres.length ? genres.join(", ") : null, years.length ? `Years in your library: ${years.length === 1 ? years[0] : `${Math.min(...years)} to ${Math.max(...years)}`}` : null].filter((line): line is string => !!line);
-    const about = [...(wiki?.bio ? [wiki.bio] : []), ...facts, ...credit];
+    const bandId = tracks.find((item) => item.made_artist_id)?.made_artist_id;
+    const bandRecord = bandId ? getMade("made_artist", person, bandId) : null;
+    const story = bandRecord?.ok ? (bandRecord.value as { backstory?: string | null }).backstory : null;
+    const about = [...(story ? [story] : []), ...(wiki?.bio ? [wiki.bio] : []), ...facts, ...credit];
     return [{ ...rowsOf(person, [pictured])[0]!, id: params.id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist",
       art, meta: "Artist", radio_id: `radio:artist:${params.id}`, visibility: { mode: "shared", people: [], can_manage: false }, made_at: tracks.map((item) => item.added_at).sort().at(-1),
       footer_lines: about,

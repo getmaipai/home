@@ -619,6 +619,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/modelDownload.ts` | sweepStaleDownloads, sha256OfFile, downloadUrl |
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
 | `backend/src/lib/music/band.ts` | MAKE_BAND_TOOL_ID, BAND_NOT_HERE_LINE, BAND_MODEL_LINE, briefFor, bandPrompt, parseDraft |
+| `backend/src/lib/music/bandActions.ts` | BAND_ACTION_NAMES, runBandAction |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, prepareOwnedStemsJob |

@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
 import { db } from "@/db";
 import { madeArtists, mediaItems, mediaSources, people } from "@/db/schema";
-import { BAND_NOT_HERE_LINE, bandPrompt, briefFor, copiesSeed, finishBandPicture, makeBand, parseDraft } from "@/lib/music/band";
+import { BAND_NOT_HERE_LINE, bandBlock, bandProvenance, bandPrompt, briefFor, copiesSeed, fileIdOfHubImage, finishBandPicture, hubImageRef, makeBand, parseDraft } from "@/lib/music/band";
+import { BAND_ACTION_NAMES, runBandAction } from "@/lib/music/bandActions";
+import { deleteMade } from "@/lib/music/madeRecords";
 import { createMade, getMade } from "@/lib/music/madeRecords";
 import { __setMusicBrainzClientForTests, type MusicBrainzClient } from "@/lib/media/musicbrainzMatch";
 import type { PictureJob } from "@/lib/pictures/jobs";
@@ -140,5 +142,66 @@ describe("who may make a band", () => {
       expect((made.value.seed as { media_id: string }).media_id).toBe("media-song000001");
       expect(getMade("made_artist", nova, made.value.id).ok).toBe(false);
     }
+  });
+});
+
+describe("the band card", () => {
+  const brief = { title: "Paper Boats", artist: "Rivet Row", genre: "Folk", year: 1974, tags: [] };
+  const draft = { name: "Clover Lane", backstory: "Two friends.", genres: ["folk"], members: [{ name: "Iris", role: "vocals" }], style: "soft", portrait_prompt: "a", logo_prompt: "b", single_title: "Slow River", single_lyrics: "la" };
+  const where = { conversationId: "conv-test000001", turnId: "turn-test000001" };
+  test("a file id survives the picture reference the block carries", () => {
+    const ref = hubImageRef("file-abc123XYZ");
+    expect(ref).toMatch(/^hubimg-[a-f0-9]{8,}$/);
+    expect(fileIdOfHubImage(ref)).toBe("file-abc123XYZ");
+    expect(fileIdOfHubImage("https://example.com/x.png")).toBeNull();
+  });
+  test("the block is a band with at most four unique actions, its pictures by reference, and the band and turn in its provenance", () => {
+    const block = bandBlock("mband-test0000001", where, brief, draft as never, { portrait: "file-portrait1" }) as { kind: string; provenance: string; props: Record<string, unknown> };
+    expect(block.kind).toBe("band");
+    expect(block.provenance).toBe(bandProvenance("mband-test0000001", where));
+    const actions = block.props.actions as string[];
+    expect(actions.length).toBeLessThanOrEqual(4);
+    expect(new Set(actions).size).toBe(actions.length);
+    expect(actions).not.toContain("make_album");
+    expect(block.props.logo).toBeUndefined();
+    expect(fileIdOfHubImage((block.props.portrait as { src: string }).src)).toBe("file-portrait1");
+    expect(block.props.inspiredBy).toBe("Paper Boats by Rivet Row");
+  });
+});
+
+describe("the band actions", () => {
+  function band(owner: PersonRow = sage) {
+    song(null);
+    const made = createMade("made_artist", owner, { name: "Clover Lane", style: { description: "soft folk" }, seed: { media_id: "media-song000001" } });
+    if (!made.ok) throw new Error("band not made");
+    return made.value.id;
+  }
+  test("every action name is known", () => {
+    expect([...BAND_ACTION_NAMES]).toEqual(["keep", "remake", "remake_portrait", "remake_logo", "discard"]);
+  });
+  test("a missing band is 404 and another person's band is 404 for them, not a leak", async () => {
+    expect(await runBandAction(sage, "mband-nothere0000", "keep")).toMatchObject({ ok: false, status: 404 });
+    const id = band();
+    expect(await runBandAction(nova, id, "discard")).toMatchObject({ ok: false, status: 404 });
+    expect(db.select().from(madeArtists).all()).toHaveLength(1);
+  });
+  test("keep with no finished single is pending, not an error", async () => {
+    const id = band();
+    expect(await runBandAction(sage, id, "keep")).toMatchObject({ ok: true, value: { action: "keep", pending: true } });
+  });
+  test("remake removes the band and names the song to start again from; discard removes it", async () => {
+    const first = band();
+    expect(await runBandAction(sage, first, "remake")).toMatchObject({ ok: true, value: { seedMediaId: "media-song000001" } });
+    expect(getMade("made_artist", sage, first).ok).toBe(false);
+    db.delete(mediaItems).run();
+    const second = band();
+    expect(await runBandAction(sage, second, "discard")).toMatchObject({ ok: true });
+    expect(getMade("made_artist", sage, second).ok).toBe(false);
+    expect(deleteMade("made_artist", sage, second).ok).toBe(false);
+  });
+  test("a new picture needs the chat the band was made in", async () => {
+    const id = band();
+    expect(await runBandAction(sage, id, "remake_portrait")).toMatchObject({ ok: false, status: 400 });
+    expect(await runBandAction(sage, id, "remake_logo", { conversationId: "conv-nothere0000", turnId: "turn-nothere0000" })).toMatchObject({ ok: false, status: 400 });
   });
 });

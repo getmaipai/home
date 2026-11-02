@@ -2072,6 +2072,8 @@ export const mediaItems = sqliteTable(
     artist: text("artist"),
     album: text("album"),
     albumArtist: text("album_artist"),
+    // MUSIC-LIKE-01: the made band this song belongs to (spec media-item `made_artist_id`); null for a song found on disk.
+    madeArtistId: text("made_artist_id"),
     // MUSIC-MB-01: optional MusicBrainz ids (spec media-item), from an embedded tag or the background match. The checked key
     // is hub-internal: the normalised text last searched, so an unmatched song is not searched again until its text changes.
     musicbrainzRecordingId: text("musicbrainz_recording_id"),
@@ -2115,6 +2117,7 @@ export const mediaItems = sqliteTable(
     index("media_items_source_kind_idx").on(table.sourceId, table.kind),
     index("media_items_kind_band_idx").on(table.kind, table.bandOk),
     index("media_items_parent_idx").on(table.parentId),
+    index("media_items_made_artist_idx").on(table.madeArtistId),
     index("media_items_file_idx").on(table.locFileId),
     index("media_items_dupes_idx").on(table.size, table.title),
   ],

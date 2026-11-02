@@ -1,6 +1,6 @@
 {
   "id": "make_band",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Band",
@@ -51,6 +51,7 @@
   "data_sources": [],
   "permissions": [],
   "notifications": [],
+  "returns_blocks": ["band"],
   "backup": "exclude",
   "background": false,
   "contributes": {},

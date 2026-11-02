@@ -41,6 +41,8 @@ export function musicRefusalFor(audience: MusicAudience, args: Record<string, un
 export type MusicToolInput = {
   state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
   args: Record<string, unknown>; callId: string; spoken: boolean;
+  /** MUSIC-LIKE-01: set by make_band only (never by a model argument): the song is this band's first single. */
+  band?: { id: string; name: string };
 };
 const newSeed = (prior?: number | null): number => { const seed = Math.floor(Math.random() * 2_147_483_646) + 1; return seed === prior ? seed + 1 : seed; };
 /** The Stack's own default (detailed on a big computer, quick on a small one); quick when it names none. */
@@ -199,6 +201,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     request = { description: value.description, lyrics, title: value.title,
       instrumental: value.instrumental ?? false, seconds: songSecondsFor(length, value.seconds, value.instrumental ? undefined : value.lyrics, engine!.limits.max_seconds),
       bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: newSeed(), length };
+    if (input.band) request.band = input.band;
     sizeSong(request, value.lyrics, engine!.limits, value.seconds);
     task = "text2music"; body = musicBody(request, "text2music");
   }

@@ -3,6 +3,7 @@ import { SongStyle } from "@maipai/spec/gen/ts/song-style.js";
 import { MadeArtist } from "@maipai/spec/gen/ts/made-artist.js";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
+import { BAND_ACTION_NAMES, runBandAction } from "@/lib/music/bandActions";
 import { createMade, deleteMade, getMade, listMade, updateMade, type MadeKind, type StoreResult } from "@/lib/music/madeRecords";
 
 // MUSIC-STUDIO-S2, MUSIC-LISTEN-C5: the saved song styles (/api/music/styles) and the bands the household made (/api/music/bands).
@@ -67,3 +68,27 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
 
 export const songStylesRoutes = makeRouter("song_style", SongStyle, "Music styles", "song style", "sstyle-example123", "title, style, seed, shared_to");
 export const madeArtistsRoutes = makeRouter("made_artist", MadeArtist, "Music bands", "band", "mband-example123", "name, backstory, genres, members, portrait_file_id, logo_file_id, style, seed, shared_to");
+
+// MUSIC-LIKE-01: the band card's buttons. The card sends the band id and, for a new picture, the chat turn it was made in.
+const BandAction = createRoute({
+  method: "post", path: "/{id}/action", tags: ["Music bands"], summary: "Keep, remake or discard a band", middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id", "mband-example123"),
+    body: { content: { "application/json": { schema: z.object({
+      action: z.enum(BAND_ACTION_NAMES).describe("keep saves the band's finished single to Music. remake discards the band and returns the song to make a new one from. remake_portrait and remake_logo start a new picture. discard deletes the band."),
+      conversation_id: z.string().nullable().optional().describe("For remake_portrait and remake_logo: the chat the band card is in."),
+      turn_id: z.string().nullable().optional().describe("For remake_portrait and remake_logo: the turn the band card is in."),
+    }) } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ action: z.enum(BAND_ACTION_NAMES), done: z.string().describe("One plain sentence for the person."), media_id: z.string().nullable().optional().describe("keep: the saved track, when its single is ready."), seed_media_id: z.string().nullable().optional().describe("remake: the song to make the new band from."), pending: z.boolean().optional().describe("keep: the single is not finished yet.") }) } }, description: "Done." },
+    ...errorResponses({ 400: "That action cannot run for this band", 401: "Sign in first", 403: "Only the band's owner can do that", 404: "Band not found" }),
+  },
+});
+madeArtistsRoutes.openapi(BandAction, async (c) => {
+  const body = c.req.valid("json");
+  const r = await runBandAction(c.get("person"), c.req.valid("param").id, body.action, { conversationId: body.conversation_id ?? null, turnId: body.turn_id ?? null });
+  if (!r.ok) return c.json({ error: r.error }, r.status);
+  const { mediaId, seedMediaId, ...rest } = r.value;
+  return c.json({ ...rest, ...(mediaId !== undefined ? { media_id: mediaId } : {}), ...(seedMediaId !== undefined ? { seed_media_id: seedMediaId } : {}) }, 200);
+});

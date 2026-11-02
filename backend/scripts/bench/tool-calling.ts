@@ -39,6 +39,7 @@ import { SPEC_DIR } from "@/lib/specDir";
 import { CATALOG } from "@/lib/modelCatalog";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import answerImageRows from "./datasets/answer-images.json";
+import bandToolRows from "./datasets/band-tool.json";
 import routeDataset from "./datasets/chat-ab-01.json";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
@@ -219,7 +220,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
 
   const budgetExecuted = await budgetOfferedPass();
   const imageExecuted = await answerImagesPass();
-  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted, engine };
+  const bandExecuted = await bandToolPass();
+  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted, engine };
 }
 
 interface RouteItem { id: string; prompt: string; kind: string; family?: string; split?: string; gold?: "must" | "must_not" | "may"; age_row?: string; acceptable_tools: string[]; expected_terms?: string[]; }
@@ -425,6 +427,35 @@ async function answerImagesPass(): Promise<number> {
     console.log(`${row.label} ${called}/${REPEATS} show_images  "${row.text}" -> ${outcomes.join(" | ")}`);
   }
   console.log(`\nAnswer-images pass: show_images on ${visualCalls}/${visualRuns} visual runs, ${otherCalls}/${otherRuns} non-visual runs`);
+  return executed;
+}
+
+/** MUSIC-LIKE-01: the make_band rows (datasets/band-tool.json, the manifest's bench_row) as a bare `complete()` over the offered
+ * set: a B row passes when `make_band` is among the calls, an N row when it is not. */
+async function bandToolPass(): Promise<number> {
+  const tools = budgetOfferedTools();
+  if (!tools.some((t) => t.id === "make_band")) {
+    console.log("\nBand-tool rows skipped: make_band is not offered (set MAIPAI_BENCH_OFFER=make_band to measure it before it ships).");
+    return 0;
+  }
+  const rows = bandToolRows.rows as { id: string; label: "B" | "N"; text: string }[];
+  console.log(`\nBand-tool pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
+  let executed = 0, wantRuns = 0, wantCalls = 0, otherRuns = 0, otherCalls = 0;
+  for (const row of rows) {
+    const outcomes: string[] = [];
+    let called = 0;
+    for (let i = 0; i < REPEATS; i++) {
+      const result = await completeWithTimeout("chat", [{ role: "user", content: row.text }], { tools, tool_choice: "auto" });
+      if (!result.ok) { outcomes.push("no reply"); continue; }
+      executed++;
+      const ids = (result.value.tool_calls ?? []).map((c) => c.tool).sort();
+      if (ids.includes("make_band")) called++;
+      outcomes.push(ids.length === 0 ? "[]" : `[${ids.join(", ")}]`);
+    }
+    if (row.label === "B") { wantRuns += REPEATS; wantCalls += called; } else { otherRuns += REPEATS; otherCalls += called; }
+    console.log(`${row.label} ${called}/${REPEATS} make_band  "${row.id}" -> ${outcomes.join(" | ")}`);
+  }
+  console.log(`\nBand-tool pass: make_band on ${wantCalls}/${wantRuns} band runs, ${otherCalls}/${otherRuns} other runs`);
   return executed;
 }
 

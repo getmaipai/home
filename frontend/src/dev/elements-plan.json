@@ -4165,6 +4165,13 @@
       "verdictReason": "New kit media card; Home adopts it when the media shelves are rebuilt on the kit."
     },
     {
+      "file": "band.tsx",
+      "name": "band",
+      "group": "band",
+      "verdict": "wire-now",
+      "verdictReason": "Draws a made band (portrait, logo, first single) in a chat answer, with Keep, Remake and Discard (MUSIC-LIKE-01); adopted as shipped with props only."
+    },
+    {
       "file": "activity-feed.tsx",
       "name": "activity-feed",
       "group": "activity",

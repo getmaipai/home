@@ -78,6 +78,15 @@ A button pair in the kit `Player`'s existing `actionsSlot` (no Home wrapper, no 
   MUSIC-GEN-14 is Jesse's decision). The adult-content rule applies as in C5: no classifier gate on an adult's request; a minor's
   lane keeps its floors.
 
+### Follow-up (2026-11-02): card, artist, layout, bench
+
+- `make_band` returns a `band` answer block (spec 0.1.297+, kit Band). The card actions are keep, remake, remake_portrait and
+  discard (the kit allows four). Make-album and remake-logo stay off the card for that cap; the route
+  `POST /api/music/bands/{id}/action` and the Music band page still do them. The card polls the band every 3 s for the picture job.
+- The first single gets `artist` and `made_artist_id` (migration 0156), so the band appears under Music artists.
+- The player action row wraps (`actions_wrap`, additive kit prop, ui 0.5.461) instead of clipping beside the left nav.
+- Bench: `datasets/band-tool.json`, run with `MAIPAI_BENCH_OFFER=make_band`.
+
 ## 3. Open questions for Jesse
 
 None block MUSIC-MB-01 (the background-send ruling is answered above). For MUSIC-LIKE-01: how close a "like this" may be named (the new band may say "inspired by Metallica" on

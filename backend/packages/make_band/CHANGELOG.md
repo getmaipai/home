@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0] - 2026-11-02
+
+### Added
+
+- The tool now returns a `band` card in chat: portrait, logo and first single, with Keep, Remake, Remake portrait and Discard.
+- The first single carries the band as its artist, so the made band shows in the Music app.
+- Bench rows for the tool (`band-tool`).
+
 ## [0.1.0] - 2026-11-02
 
 ### Added

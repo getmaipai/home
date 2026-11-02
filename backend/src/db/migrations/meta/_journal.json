@@ -1093,6 +1093,13 @@
       "when": 1793333349244,
       "tag": "0155_made_music_records",
       "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "6",
+      "when": 1793419749244,
+      "tag": "0156_media_made_artist",
+      "breakpoints": true
     }
   ]
 }

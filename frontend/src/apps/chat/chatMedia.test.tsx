@@ -4,12 +4,16 @@
 // picture test (pictures render with alt text and a source link; none renders nothing; the badge never reads +1)
 // on the shape that now reaches the thread, live and from a stored turn.
 import { afterEach, describe, expect, test } from "bun:test";
+import { cleanup, fireEvent, render as plainRender, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { AnswerBlockDataRender, textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
 import { galleryBlockFor, legacyGalleryBlock } from "@maipai/home-backend/src/lib/answerImages/gallery";
 import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
 import type { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
+
+const render = (ui: ReactElement) => plainRender(<MemoryRouter><ToastProvider>{ui}</ToastProvider></MemoryRouter>);
 
 afterEach(cleanup);
 // Hub-relative picture addresses need a page address to resolve against, as in

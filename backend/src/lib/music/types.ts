@@ -10,6 +10,8 @@ export interface MusicRequest {
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; /** TIER-HOME-03: read by the household queue. Music has no Max maker yet. */ tier?: "standard" | "boost"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
+  /** MUSIC-LIKE-01: a made band's first single. The song saved from this job is filed under the band (artist text and made_artist_id). */
+  band?: { id: string; name: string };
 }
 export interface MusicJob {
   id: string; personId: string; conversationId: string | null; turnId: string | null; companionId?: string | null; task: MusicTask; request: MusicRequest;
