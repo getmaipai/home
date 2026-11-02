@@ -27,6 +27,8 @@ export interface ResearchRunBudget {
   /** RESEARCH-NOTES-01: the notes being written, one promise per page address. */
   notes: Map<string, Promise<PageNote[]>>;
   noteStats?: NoteStats;
+  /** RESEARCH-EMPTY-01: reworded retries of empty searches made so far this run. */
+  emptyRetries?: number;
 }
 
 const store = new AsyncLocalStorage<ResearchRunBudget>();

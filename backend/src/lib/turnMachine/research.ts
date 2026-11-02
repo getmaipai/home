@@ -401,3 +401,29 @@ export function suggestedSearchesNote(queries: readonly string[]): string {
   if (queries.length === 0) return "";
   return ` Searches worth running, written for this question: ${queries.map((q) => `"${q.replace(/"/g, "'")}"`).join("; ")}. Run them one at a time, reword one if you have a better idea, and skip any that no longer matter.`;
 }
+
+/** RESEARCH-EMPTY-01: the words of a research search that returned no rows, reworded for one more try. The entity title stays (the anchor's
+ * words, or the leading run of capitalised words and numbers); of the rest, the capitalised and numbered words (the rare specifics that
+ * made the search too narrow) go, and up to three plain topic words stay. Null when no reworded query differs from the original. */
+export function rewordEmptyQuery(query: string, anchorText: string | null): string | null {
+  const words = plainQuery(query).split(/\s+/).filter(Boolean);
+  const anchorWords = new Set((anchorText ?? "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean));
+  const head: string[] = [];
+  const rest: string[] = [];
+  let leading = anchorWords.size === 0;
+  for (const word of words) {
+    const inAnchor = anchorWords.has(word.toLowerCase());
+    const specific = /^[\p{Lu}\p{N}]/u.test(word);
+    if (inAnchor || (leading && specific)) head.push(word);
+    else { leading = false; rest.push(word); }
+  }
+  const plain = rest.filter((w) => !/^[\p{Lu}\p{N}]/u.test(w));
+  let keep = plain.slice(0, 3);
+  if (keep.length === 0) return null;
+  let reworded = [...head, ...keep].join(" ");
+  if (reworded.toLowerCase() === words.join(" ").toLowerCase() && keep.length >= 2) {
+    keep = keep.slice(0, -1);
+    reworded = [...head, ...keep].join(" ");
+  }
+  return reworded.toLowerCase() === words.join(" ").toLowerCase() ? null : reworded;
+}

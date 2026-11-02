@@ -16,7 +16,7 @@ import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { PageDeclinedError, __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
-import { __setResearchCapForTests, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
+import { __setResearchCapForTests, rewordEmptyQuery, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
@@ -33,6 +33,8 @@ let searxQueries: string[] = [];
 let sameResults = false;
 let searxDelayMs = 0;
 let extraRows: { title: string; url: string; content: string }[] = [];
+let emptyWhen: RegExp | null = null;
+let refillPace = false;
 
 const UTTERANCE = "the 1980s TV series V only had one season, tell me why the series was cancelled and what happened after";
 const QUERIES = [
@@ -67,6 +69,8 @@ beforeEach(() => {
   sameResults = false;
   searxDelayMs = 0;
   extraRows = [];
+  emptyWhen = null;
+  refillPace = false;
   __setClaimJudgeForTests(async () => '{"supported": true}');
   __setQueryWriterForTests(async () => null);
   __setNoteWriterForTests(async () => null);
@@ -80,6 +84,8 @@ beforeEach(() => {
       const q = url.searchParams.get("q") ?? "";
       searxQueries.push(q);
       if (searxDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, searxDelayMs));
+      if (refillPace) __resetRateLimiterForTests(); // Home paces searches at a burst of three; this test is about the retries, not the pace
+      if (emptyWhen?.test(q)) return Response.json({ results: [] });
       const n = sameResults ? 1 : searxQueries.length;
       return Response.json({ results: [...extraRows, ...[1, 2, 3].map((i) => ({ title: `Page ${n}.${i} about ${q}`, url: `https://site${n}x${i}.example/page`, content: `Snippet ${n}.${i} for ${q}` }))] });
     },
@@ -808,5 +814,94 @@ describe("every part the answer must cover is backed, read for once more, or sai
     setup(true);
     const thinking = await turn("owner", 1, { thinking: true, utterance: "what happened to the handbook" });
     expect(lastInstruction(thinking.requests)).toContain("about 300 words");
+  });
+});
+
+// RESEARCH-NOTES-01: the page-notes writer is told the research cut-off, so no note call starts that could not finish before it.
+describe("the research cut-off reaches the note writer", () => {
+  afterEach(() => __setResearchCapForTests(undefined));
+  const pageWithFact = (url: string) => ({ type: "document" as const, file_id: "f", url, title: "A page", text: longPage(TOPICS[0]!.fact), chunks: [], links: [], sections: [] });
+  const withNotes = (cut: number | null) => {
+    if (cut !== null) __setResearchCapForTests({ thinking: cut, max: cut });
+    __setPageReaderForTests(async (url) => pageWithFact(url));
+    __setQueryWriterForTests(writerWithGaps(["Harbor Lights television series cancelled"], []));
+    __setStageWritersForTests({ brief: async () => JSON.stringify({ subject: "a show", answer_type: "an explanation", must_contain: ["the key fact"], ambiguous: false, options: [], assumption: "" }), analysis: async () => null });
+  };
+  test("a Max turn whose cut-off is nearer than one note call writes no notes", async () => {
+    await holdMax();
+    withNotes(5_000);
+    let noteCalls = 0;
+    __setNoteWriterForTests(async () => { noteCalls += 1; return null; });
+    await turn("owner", 1, { max: true, thinking: true, utterance: TOPICS[0]!.utterance });
+    expect(searxQueries.length).toBe(1);
+    expect(noteCalls).toBe(0);
+  });
+
+  test("with time to spare the same turn writes notes", async () => {
+    await holdMax();
+    withNotes(null);
+    let noteCalls = 0;
+    __setNoteWriterForTests(async () => { noteCalls += 1; return null; });
+    await turn("owner", 1, { max: true, thinking: true, utterance: TOPICS[0]!.utterance });
+    expect(noteCalls).toBeGreaterThan(0);
+  });
+});
+
+// RESEARCH-EMPTY-01: a planned search that returns no rows (or fails) is run once more, reworded, beside the round's other searches.
+describe("an empty planned search is retried once, reworded", () => {
+  afterEach(() => __setResearchCapForTests(undefined));
+  const ASKED = "why was the television series Harbor Lights cancelled after one season, and what did the Visitor do next";
+  const plan = (queries: string[]) => __setQueryWriterForTests(writerWithGaps(queries, []));
+
+  test("the reword keeps the entity title and the lowercase topic words and drops the rare specifics", () => {
+    expect(rewordEmptyQuery("Harbor Lights series Visitor sequel novel plot", null)).toBe("Harbor Lights series sequel novel");
+    expect(rewordEmptyQuery("Harbor Lights 1984 series Visitor leader motive", "Harbor Lights 1984")).toBe("Harbor Lights 1984 series leader motive");
+    expect(rewordEmptyQuery("Harbor Lights 1984 series sequel book plot", "Harbor Lights 1984 series")).toBe("Harbor Lights 1984 series sequel book");
+    // nothing left to drop, nothing to reword
+    expect(rewordEmptyQuery("Harbor Lights interview", "Harbor Lights")).toBeNull();
+    expect(rewordEmptyQuery("Harbor Lights", "Harbor Lights")).toBeNull();
+  });
+
+  test("a search with no rows is searched again without its rare words, and the retry's rows are sources", async () => {
+    await holdMax();
+    emptyWhen = /Visitor/;
+    plan(["Harbor Lights series Visitor sequel novel plot"]);
+    const { result } = await turn("owner", 1, { max: true, thinking: true, utterance: ASKED });
+    expect(searxQueries.length).toBe(2);
+    expect(searxQueries[0]).toContain("Visitor");
+    expect(searxQueries[1]).not.toContain("Visitor");
+    expect(searxQueries[1]).toContain("Harbor Lights");
+    expect(result.value.sources!.length).toBe(3);
+  });
+
+  test("a search that returned rows is not retried", async () => {
+    await holdMax();
+    plan(["Harbor Lights series Visitor sequel novel plot"]);
+    await turn("owner", 1, { max: true, thinking: true, utterance: ASKED });
+    expect(searxQueries.length).toBe(1);
+  });
+
+  test("the retries of one round run beside each other, at most two to a round", async () => {
+    await holdMax();
+    refillPace = true;
+    emptyWhen = /Visitor|Regent|Warden/;
+    searxDelayMs = 400;
+    plan(["Harbor Lights series Visitor sequel novel plot", "Harbor Lights series Regent motive finale", "Harbor Lights series Warden cast reunion"]);
+    const started = Date.now();
+    await turn("owner", 3, { max: true, thinking: true, utterance: `${ASKED} and the Regent and the Warden`, perRound: 3 });
+    const retries = searxQueries.filter((q) => !/Visitor|Regent|Warden/.test(q));
+    expect(retries.length).toBe(2);
+    // three searches one after another (1.2 s), then the two retries together (0.4 s), not one after another (0.8 s)
+    expect(Date.now() - started).toBeLessThan(3_000);
+  });
+
+  test("no retry when more than half of the research time is gone", async () => {
+    await holdMax();
+    __setResearchCapForTests({ thinking: 1_000, max: 1_000 });
+    emptyWhen = /Visitor/;
+    searxDelayMs = 900;
+    plan(["Harbor Lights series Visitor sequel novel plot"]);
+    await turn("owner", 1, { max: true, thinking: true, utterance: ASKED });
+    expect(searxQueries.length).toBe(1);
   });
 });

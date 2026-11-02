@@ -11,7 +11,7 @@ import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from 
 import { researchQuestion } from "../researchPipeline";
 import { NOTES_START_BUDGET_MS, NOTE_CONCURRENCY, currentNoteWriter, makeGate, newNoteStats, writePageNotes } from "../pageNotes";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { isRepeatQuery, markResearch, memoryDetailsIn, researchCutAt, researchEvidence, withoutMemoryDetails } from "../research";
+import { isRepeatQuery, markResearch, memoryDetailsIn, researchCapMs, researchCutAt, researchEvidence, rewordEmptyQuery, withoutMemoryDetails } from "../research";
 import { anchorQuery } from "../entityPin";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
 import { ASK_FORM_TTL_MS } from "@/lib/askForm";
@@ -120,6 +120,63 @@ async function waitForImageLead(done: Promise<void>): Promise<boolean> {
   }
 }
 
+/** RESEARCH-EMPTY-01: at most this many reworded retries per question, each at most EMPTY_RETRY_MAX_MS long, and none once half the research time is gone. */
+const EMPTY_RETRIES_MAX = 4;
+/** Home paces searches at one new token every six seconds (a research search waits up to eight for one), so a round retries at most two. */
+const EMPTY_RETRIES_PER_ROUND = 2;
+const EMPTY_RETRY_MAX_MS = 10_000;
+const EMPTY_RETRY_TIME_SHARE = 0.5;
+
+/** A planned search that returned no rows (or failed) is run once more, reworded (its rare words dropped, the entity title and plain topic
+ * words kept), beside the other empty searches of the round. A retry that finds rows takes the place of the empty outcome, so the source
+ * numbers and the notes see it as the planned search. */
+async function retryEmptySearches(
+  state: Parameters<typeof toolNode>[0],
+  researchRun: NonNullable<typeof state.researchBudget>,
+  empties: { index: number; callId: string; args: Record<string, unknown>; runArgs: Record<string, unknown> }[],
+  outcomes: ToolExecutionOutcome[],
+  toolEvents: ToolStreamEvent[],
+  toolDeadlineAt: number | undefined,
+  signal: AbortSignal,
+): Promise<void> {
+  const cap = researchCapMs(state.answerStyle);
+  const left = researchRun.deadlineAt === undefined ? 0 : researchRun.deadlineAt - Date.now();
+  if (cap === undefined || left < cap * EMPTY_RETRY_TIME_SHARE || signal.aborted) return;
+  const anchor = state.entityAnchor ?? null;
+  const anchorText = anchor ? `${anchor.phrase} ${anchor.years.join(" ")}` : null;
+  const earlier = [...state.outcomes, ...outcomes].filter((o) => o.packageId === "websearch").map((o) => String((o.args as { expression?: unknown } | undefined)?.expression ?? ""));
+  const planned: { empty: (typeof empties)[number]; expression: string }[] = [];
+  for (const empty of empties) {
+    if ((researchRun.emptyRetries ?? 0) + planned.length >= EMPTY_RETRIES_MAX || planned.length >= EMPTY_RETRIES_PER_ROUND) break;
+    const original = String(empty.args.expression ?? "");
+    const expression = rewordEmptyQuery(original, anchorText);
+    if (expression === null || isRepeatQuery([...earlier.filter((q) => q !== original), ...planned.map((p) => p.expression)], expression)) continue;
+    planned.push({ empty, expression });
+  }
+  if (planned.length === 0) return;
+  researchRun.emptyRetries = (researchRun.emptyRetries ?? 0) + planned.length;
+  markResearch(state, `retry start (${planned.length} empty searches reworded)`);
+  const retrySignal = AbortSignal.any([signal, AbortSignal.timeout(EMPTY_RETRY_MAX_MS)]);
+  const ran = await Promise.all(planned.map(async ({ empty, expression }) => {
+    const startedAt = Date.now();
+    const raced = await withDeadline(runWithResearchBudget(researchRun, () => runPlugin("websearch", state.actor, { ...empty.runArgs, expression }, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal: retrySignal, deadlineAt: Math.min(toolDeadlineAt ?? Infinity, Date.now() + EMPTY_RETRY_MAX_MS), spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) })), retrySignal).catch(() => "deadline" as const);
+    return { empty, expression, raced, durationMs: Date.now() - startedAt };
+  }));
+  let found = 0;
+  for (const { empty, expression, raced, durationMs } of ran) {
+    if (raced === "deadline" || !raced.ok) continue;
+    const outcome = outcomeOf({ callId: empty.callId, packageId: "websearch", status: "succeeded", via: "tool_call", args: { ...empty.args, expression }, queryRewritten: true, result: raced.value, durationMs });
+    if ((outcome.sources?.length ?? 0) === 0) continue;
+    found += 1;
+    outcomes[empty.index] = outcome;
+    const at = toolEvents.findIndex((e) => (e as { call_id?: string }).call_id === empty.callId);
+    const sites = outcome.sources?.slice(0, TOOL_RESULT_SITES_MAX).map((s) => ({ host: s.site, url: s.url }));
+    const event: ToolStreamEvent = { t: "tool_result", call_id: empty.callId, package_id: "websearch", outcome: { text: raced.value.reply?.text, ...(sites?.length ? { sites } : {}) } };
+    if (at >= 0) toolEvents[at] = event; else toolEvents.push(event);
+  }
+  markResearch(state, `retry end (${found} of ${planned.length} found rows)`);
+}
+
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
   const researchRun = state.answerStyle !== undefined && state.answerStyle !== "instant" && state.budget.rounds > 1 ? (state.researchBudget ??= newResearchBudget(state.answerStyle === "max" && state.researchLibraryOnly === true)) : undefined;
@@ -138,11 +195,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       // Notes are written only while time allows: no new call starts 25 seconds after the first.
       firstNoteAt ??= Date.now();
       if (Date.now() - firstNoteAt > NOTES_START_BUDGET_MS) return;
-      researchRun.notes.set(page.url, writePageNotes(currentNoteWriter(), gate, question, page, stats, Date.now, focus).catch(() => []));
+      researchRun.notes.set(page.url, writePageNotes(currentNoteWriter(), gate, question, page, stats, Date.now, focus, { cutAt: researchRun.deadlineAt }).catch(() => []));
     };
   }
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
+  // RESEARCH-EMPTY-01: research searches of this round that returned no rows or failed, with what they ran on.
+  const emptySearches: { index: number; callId: string; args: Record<string, unknown>; runArgs: Record<string, unknown> }[] = [];
   // ANSWER-IMG-02: a round's show_images call starts its picture pipeline
   // before any other proposal of the round runs, so the pictures are fetched
   // beside a search rather than after it (section 4.3).
@@ -453,6 +512,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       detail: result.ok ? undefined : resumedAsk ? "package failed after a form submission" : result.error.slice(0, MAX_DETAIL_CHARS),
     });
     outcomes.push(outcome);
+    if (researchRun && tool === "websearch" && !resumedAsk && (result.ok ? (outcome.sources?.length ?? 0) === 0 : outcome.failureKind !== "timed_out")) emptySearches.push({ index: outcomes.length - 1, callId, args: args as Record<string, unknown>, runArgs });
     if (result.ok) {
       // TOOL-EVENTS-02: the same sites `outcome.sources` already carries
       // (sourcesFromRows, turnContext.ts) for the reply's own citation
@@ -475,6 +535,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.failureKind! });
     }
   }
+  if (researchRun && emptySearches.length > 0) await retryEmptySearches(state, researchRun, emptySearches, outcomes, toolEvents, input.deadlineAt, signal);
   // THIN-4C: how many fetched rows and pages the minor floor dropped this
   // turn, counted on the trace (never their text).
   const droppedByFloor = outcomes.reduce((sum, o) => sum + (o.status === "succeeded" ? Number((o.result?.data as { floor_dropped?: unknown } | undefined)?.floor_dropped) || 0 : 0), 0);
