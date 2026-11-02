@@ -13,6 +13,7 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { Waveform, usePeaks } from "./MusicWaveform";
 import { MAKE_SONG_ADULT_LINE } from "./MakeSongPage";
+import { Cover } from "./MusicCreateUi";
 
 /** One audio row of the Studio. */
 export interface StudioTrack { id: string; name: string; url: string; hue: string }
@@ -39,7 +40,7 @@ function Row({ track, number, duration, now, muted, solo, volume, onMute, onSolo
 }) {
   const { peaks, failed } = usePeaks(track.url);
   return <div className="contents" data-testid="studio-row" style={{ "--track": track.hue } as CSSProperties}>
-    <div className="bg-card flex flex-col justify-center gap-2 border-b p-3">
+    <div className="bg-(--track)/10 flex flex-col justify-center gap-2 rounded-2xl p-3 sm:rounded-r-none">
       <div className="flex items-center gap-2">
         <span className="bg-(--track) text-background flex size-5 shrink-0 items-center justify-center rounded text-xs font-semibold">{number}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{track.name}</span>
@@ -48,11 +49,11 @@ function Row({ track, number, duration, now, muted, solo, volume, onMute, onSolo
       </div>
       <Slider aria-label={`Volume of ${track.name}`} min={0} max={100} value={[Math.round(volume * 100)]} onValueChange={(value) => onVolume((value[0] ?? 100) / 100)} />
     </div>
-    <button type="button" aria-label={`${track.name} waveform; click to move the playhead`} className="bg-(--track)/10 relative h-24 w-full border-b p-2 text-left"
+    <button type="button" aria-label={`${track.name} waveform; click to move the playhead`} className="bg-(--track)/15 hover:bg-(--track)/25 relative h-24 w-full rounded-2xl sm:col-span-3 sm:rounded-l-none p-2 text-left transition-colors"
       onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); onSeek(Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))); }}>
       {peaks ? <Waveform peaks={peaks} played={duration > 0 ? now / duration : 0} hue={track.hue} label={`${track.name} waveform`} />
         : <span className="text-muted-foreground text-xs">{failed ? "This audio could not be drawn. It still plays." : "Drawing the waveform"}</span>}
-      <span className="text-foreground/80 absolute top-1 left-2 text-xs tracking-wide uppercase">{track.name}</span>
+      <span className="text-foreground/80 absolute top-1 left-2 text-xs font-semibold tracking-wide uppercase">{track.name}</span>
     </button>
     <audio ref={audioRef} src={track.url} preload="auto" className="hidden"><track kind="captions" /></audio>
   </div>;
@@ -116,28 +117,33 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   const sections = (song.data?.timed_lyrics ?? []).filter((line, index, all) => line.section && line.section !== all[index - 1]?.section);
   const ticks = duration > 0 ? Array.from({ length: Math.floor(duration / 15) + 1 }, (_, index) => index * 15) : [];
 
-  return <section className="flex flex-col gap-4 px-4 lg:px-0" data-testid="music-studio-view">
-    <div className="flex flex-wrap items-center gap-2">
-      <h2 className="min-w-0 flex-1 truncate text-2xl font-semibold tracking-tight">{song.data?.title ?? "Studio"}</h2>
-      <Button asChild variant="outline"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>Back to the song</Link></Button>
-      <Button type="button" variant="outline" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy ? "Splitting into stems" : tracks.length > 1 ? "Split into stems (done)" : "Split into stems"}</Button>
+  const lime = { "--accent-lime": "var(--hue-yellow)", "--primary": "var(--hue-yellow)", "--primary-foreground": "var(--background)" } as CSSProperties;
+  return <section className="dark bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" style={lime} data-testid="music-studio-view">
+    <div className="flex shrink-0 flex-wrap items-end gap-4">
+      <div className="size-28 shrink-0 overflow-hidden rounded-2xl shadow-2xl sm:size-36"><Cover id={songId} title={song.data?.title ?? "Studio"} url={song.data?.cover_url ?? null} bare /></div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Studio</p>
+        <h2 className="min-w-0 text-3xl leading-none font-black tracking-tight uppercase sm:text-5xl">{song.data?.title ?? "Studio"}</h2></div>
+      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+      <Button asChild variant="secondary"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>Back to the song</Link></Button>
+      <Button type="button" variant="secondary" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy ? "Splitting into stems" : tracks.length > 1 ? "Split into stems (done)" : "Split into stems"}</Button>
+      </div>
     </div>
     {stemsProblem ? <p role="alert" className="text-muted-foreground text-sm">{stemsProblem}</p> : null}
     {tracks.length === 0 ? <p role="status" className="text-muted-foreground text-sm">{song.data?.state === "failed" ? "This song could not be made, so there is nothing to open." : "Opening your song. The Studio shows it as soon as it is made."}</p> : <>
-      <div className="grid grid-cols-4 overflow-hidden rounded-2xl border" data-testid="studio-timeline">
-        <div className="bg-card border-b p-2 text-xs text-muted-foreground">Tracks</div>
-        <div className="relative col-span-3 h-8 border-b" data-testid="studio-ruler">
+      <div className="grid shrink-0 grid-cols-1 gap-y-1 sm:grid-cols-4" data-testid="studio-timeline">
+        <div className="text-muted-foreground hidden p-2 text-xs font-semibold tracking-widest uppercase sm:block">Tracks</div>
+        <div className="relative h-8 sm:col-span-3" data-testid="studio-ruler">
           {ticks.map((tick) => <span key={tick} className="text-muted-foreground absolute top-1 left-(--at) text-xs tabular-nums" style={{ "--at": `${(tick / duration) * 100}%` } as CSSProperties}>{timeLabel(tick)}</span>)}
           {sections.map((line) => <span key={`${line.t}`} className="bg-(--hue-orange) text-background absolute bottom-0 left-(--at) rounded-t px-1 text-xs font-semibold" style={{ "--at": `${(line.t / duration) * 100}%` } as CSSProperties}>{line.section}</span>)}
         </div>
         {tracks.map((track, index) => <Row key={track.id} track={track} number={index + 1} duration={duration} now={now} muted={muted.has(track.id)} solo={soloed.has(track.id)} volume={volumes[track.id] ?? 1}
           onMute={() => setMuted(flip(muted, track.id))} onSolo={() => setSoloed(flip(soloed, track.id))} onVolume={(value) => setVolumes({ ...volumes, [track.id]: value })} onSeek={seek}
           audioRef={(el) => { if (el) audios.current.set(track.id, el); else audios.current.delete(track.id); }} />)}
-        {tracks.length === 1 ? <div className="bg-card col-span-4 p-3 text-sm text-muted-foreground" data-testid="studio-stems-hint">{stemsBusy ? "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done." : "Vocals, drums, bass and other rows appear here after you split the song into stems."}</div> : null}
+        {tracks.length === 1 ? <div className="bg-foreground/5 text-muted-foreground rounded-2xl sm:col-span-4 p-3 text-sm" data-testid="studio-stems-hint">{stemsBusy ? "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done." : "Vocals, drums, bass and other rows appear here after you split the song into stems."}</div> : null}
       </div>
-      <div className="bg-card flex items-center gap-3 rounded-2xl border p-3" data-testid="studio-transport">
-        <Button type="button" onClick={playing ? pause : play}>{playing ? "Pause" : "Play"}</Button>
-        <Button type="button" variant="outline" onClick={() => { pause(); seek(0); }}>Back to start</Button>
+      <div className="bg-background/60 sticky bottom-2 flex items-center gap-3 rounded-3xl p-3 shadow-2xl backdrop-blur-xl" data-testid="studio-transport">
+        <Button type="button" size="lg" onClick={playing ? pause : play}>{playing ? "Pause" : "Play"}</Button>
+        <Button type="button" variant="secondary" onClick={() => { pause(); seek(0); }}>Back to start</Button>
         <span className="ml-auto font-mono text-sm tabular-nums">{timeLabel(now)} / {timeLabel(duration)}</span>
       </div>
     </>}

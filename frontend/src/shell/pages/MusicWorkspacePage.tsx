@@ -110,7 +110,7 @@ function SongDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const again = (length: "quick" | "full") => { void musicApi.setLength(id, length).then(() => { push(length === "full" ? "Making the full version. It appears on this song." : "Making the quick version. It appears on this song."); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, "That could not start. Try again."))); };
   const newCover = () => { void musicApi.newCover(id, `Album cover art for the song "${song?.title ?? "Untitled song"}"`).then(() => { push("Making a new cover."); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, "A new cover could not start. Try again."))); };
   const reasonOff = ready ? "" : "Available once the song is finished.";
-  return <section className="relative isolate flex flex-col gap-5 overflow-hidden rounded-3xl p-5 sm:p-8" data-testid="music-song-result" aria-label="Open song">
+  return <section className="relative isolate flex shrink-0 flex-col gap-5 overflow-hidden rounded-3xl p-5 sm:p-8" data-testid="music-song-result" aria-label="Open song">
     <div aria-hidden="true" className="absolute inset-0 -z-10 scale-125 opacity-60 blur-3xl"><Cover id={id} title={song?.title ?? ""} url={song?.cover_url ?? null} /></div>
     <div aria-hidden="true" className="from-background/20 to-background absolute inset-0 -z-10 bg-linear-to-b" />
     <div className="flex items-start justify-between gap-3">
@@ -183,7 +183,7 @@ function Hero({ styles, onStyles, onMade }: { styles: string[]; onStyles: (next:
   const { list } = useShown("");
   const mine = (list.data ?? []).filter((card) => card.state === "done").slice(0, 12);
   const wall = Array.from({ length: 12 }, (_, index) => mine[index] ?? null);
-  return <div className="relative isolate flex min-h-144 flex-col justify-between gap-8 overflow-hidden rounded-3xl p-4 sm:p-8" data-testid="music-hero">
+  return <div className="relative isolate flex min-h-144 shrink-0 flex-col justify-between gap-8 overflow-hidden rounded-3xl p-4 sm:p-8" data-testid="music-hero">
     <div aria-hidden="true" className="absolute inset-0 -z-10 grid grid-cols-3 gap-1 sm:grid-cols-4 lg:grid-cols-6">
       {wall.map((card, index) => <div key={card?.id ?? index} className="overflow-hidden"><Cover id={card?.id ?? STARTER_STYLES[index % STARTER_STYLES.length] ?? `wall-${index}`} title={card?.title ?? STARTER_STYLES[index % STARTER_STYLES.length] ?? ""} url={card?.cover_url ?? null} bare /></div>)}
     </div>

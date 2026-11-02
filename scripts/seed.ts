@@ -112,7 +112,10 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
       method: "PUT", cookie, body: JSON.stringify({ scope: "household", key: "household.home", value: entity.id }),
     }), "setting household.home failed");
   }
-  if (options.music !== false) await seedDemoMusic(options.baseUrl, options.dataDir, cookie);
+  if (options.music !== false) {
+    await seedDemoMusic(options.baseUrl, options.dataDir, cookie);
+    seedDemoSongs(options.dataDir);
+  }
   return { cookie, people };
 }
 
@@ -160,6 +163,12 @@ async function seedDemoMusic(baseUrl: string, dataDir: string, cookie: string): 
   for (const station of DEMO_STATIONS) {
     await requireOk(await request(baseUrl, "/api/plugins/music/radio/stations", { method: "POST", cookie, body: JSON.stringify(station) }), `saving station ${station.name} failed`);
   }
+}
+
+/** MUSIC-DEMO-02: six finished AI-made songs for the owner (scripts/seedSongs.ts), run as its own process on the dev data directory. */
+function seedDemoSongs(dataDir: string): void {
+  const run = Bun.spawnSync(["bun", "run", join(import.meta.dir, "seedSongs.ts"), "--data-dir", dataDir], { stdout: "pipe", stderr: "pipe" });
+  if (run.exitCode !== 0) throw new Error(`seeding the demo songs failed: ${run.stderr.toString().trim() || run.stdout.toString().trim()}`);
 }
 
 function parseArgs(args: string[]): SeedOptions {

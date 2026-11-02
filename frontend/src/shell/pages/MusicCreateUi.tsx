@@ -71,7 +71,7 @@ export function MediaTile({ id, title, line, coverUrl, selected = false, busy = 
 export function Carousel({ title, line, children, label }: { title: string; line?: string; children: ReactNode; label: string }) {
   const track = useRef<HTMLUListElement>(null);
   const move = (direction: 1 | -1) => track.current?.scrollBy({ left: direction * Math.max(240, track.current.clientWidth * 0.8), behavior: "smooth" });
-  return <div className="flex min-w-0 flex-col gap-3">
+  return <div className="flex min-w-0 shrink-0 flex-col gap-3">
     <div className="flex items-end justify-between gap-3">
       <div className="flex flex-col gap-1"><h2 className="text-2xl font-black tracking-wide uppercase">{title}</h2>{line ? <p className="text-muted-foreground text-sm">{line}</p> : null}</div>
       <div className="hidden gap-2 sm:flex">
