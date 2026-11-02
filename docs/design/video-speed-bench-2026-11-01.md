@@ -113,7 +113,60 @@ set, 1536x864, and a 2-stage latent upscale. Not run: BF16 DiT, the 8-step Turbo
 
 None of these reach "1440p in 440 s"; the ladder here is 480p in 25 s (Quick, silent), 768x448 with sound in 49 s (Boost) and 4 min (MiniMax-H3).
 
+## Capability panel (2026-11-02)
+
+What the models make from named people, icons, repeat characters, speech and sound effects. No prompt was softened. Nothing was downloaded. Every clip is in
+`~/video-bench/capability/` (mp4 with sound for LTX, silent for Wan) with `<name>-sheet.png` (frames 0, 40, 80, 114) beside it; LTX clips also have `<name>-spec.png` (audio spectrogram).
+LTX = Boost bf16, 768x448, 121 frames, seed 7, 68 to 101 s per clip under load (peak 40.4 GB). Wan = Quick FastWan 3-step with the tiny decoder, 832x480, seed 7, 22 to 42 s per clip.
+"Recognisable" is my reading of opened frames, one clip per prompt: yes, partial (right cues, wrong design) or no (generic lookalike).
+
+**Audio limit, stated plainly:** I cannot hear. The only local speech-to-text with MLX weights (whisper-large-v3-turbo) lacked its tokenizer files and fetching them was outside this task, so no transcript exists.
+Audio is judged from loudness (`volumedetect`) and spectrograms only. "Matches" below means the sound's shape fits the prompt; **Jesse should listen to the speech and sound clips before relying on any audio line.**
+
+| Prompt | Model | Recognisable | What the opened frames show | Audio |
+|---|---|---|---|---|
+| Golden Girls, four older women, cheesecake, sitcom light | LTX | no | four women of mixed ages at a sitcom-style kitchen table, one white-haired; not the cast; very sitcom-like set and light | present, -31 dB mean; not checked for talking |
+| same | Wan | no | three older women (pink, blue, lilac) eating cake; generic; only three, not four | silent |
+| Chuck Norris roundhouse kick, desert road | LTX | no | bald blond man in a black vest throws a high kick, a man in a hat walks by; no resemblance claimed | present |
+| same | Wan | no | shirtless dark-haired man high-kicking on a desert road; kick pose correct | silent |
+| Will Smith walking, talking to camera | LTX | no | white man, short grey hair, navy suit, walking down a city street, mouth moving; no likeness | present |
+| same | Wan | no (cannot confirm a likeness) | Black man in an olive coat and tie, speaking to camera on a brick street | silent |
+| Terminator (T-800) out of a burning wreck, red eye | LTX | partial | switched to a cartoon style: dark-red armoured humanoid, red glowing eyes and chest lights, fire behind; not a chrome endoskeleton | present |
+| same | Wan | partial to yes | chrome skeletal robot, red eyes, standing before a burning vehicle: the closest T-800 look of all clips | silent |
+| Darth Vader on a bridge igniting a red lightsaber | LTX | yes | helmet, cape, chest box on a suspension bridge; red blade ignites during the clip | present |
+| same | Wan | yes | Vader in dark red light with a lit red saber already held, bridge | silent |
+| Smurfs dancing in mushroom village | LTX | yes | classic cartoon look: blue Smurfs, white hats, Smurfette, mushroom houses; little dancing, mostly gesturing | present |
+| same | Wan | partial | three blue 3D-style figures with red and white hats; wrong style, right idea | silent |
+| Voltron forming and drawing sword | LTX | no | generic grey and yellow cartoon robot draws a sword, a boy in a red jacket beside it; not Voltron, no forming | present |
+| same | Wan | no | a blue and red robot with a blue-white blade that resembles Optimus Prime, not Voltron | silent |
+| SpongeBob cooking in the Krusty Krab kitchen | LTX | yes (SpongeBob); the second character is a Patrick and Mr. Krabs mix | show-accurate style, a spatula, a galley kitchen | present |
+| same | Wan | yes | SpongeBob cooking at a stove in a purple kitchen; not the Krusty Krab | silent |
+
+Reading: named real people come out as generic lookalikes in both models. Fictional icons split: Vader, SpongeBob and the Smurfs are recognisable on LTX, the Terminator is better on Wan, Voltron fails on both.
+Composition from the prompt is good (kick, saber, spatula); fine action ("forming", "dancing", "igniting") is weaker.
+
+### Character consistency (LTX; same woman in a red coat with short grey hair)
+
+| Run | Consistent | Notes (frames opened) |
+|---|---|---|
+| Text-only, three shots (park, cafe, train station): `cons-text-*` | partial | red coat and short grey hair hold in all three; the coat's cut, the handbag and the apparent age change; faces cannot be compared (distant in two shots, close-up in one) |
+| Each shot started from the same reference picture (a cafe frame): `cons-ref-*` | yes for identity, no for the prompt | all three clips keep the same face, coat and room, but ignore the new scene: the "park" and "station" clips stay in the cafe and barely move (a passer-by or a bus crosses the window). The picture pins the person and also the place |
+
+So a reference picture gives sameness at the price of controlling the scene; text-only follows the scene but drifts. Not tried: a reference with a face plus a changed background, or picture anchors at the end of a clip (VIDEO-EVAL-03).
+
+### Speech and sound effects (LTX only; Wan Quick makes no sound)
+
+| Prompt | Audio inspected | Matches |
+|---|---|---|
+| man in a dark corridor says "We leave at dawn, and we do not look back." seed 7 (`speech-a1`) | voiced bursts with harmonic structure, mean -37.6 dB; man speaks to camera, mouth and face steady | unverified by ear; speech-like |
+| same prompt, seed 8 (`speech-a2`) | similar voiced bursts, mean -33.3 dB | unverified; same voice across runs not testable without listening |
+| door slam (`sfx-door`) | two sharp broadband impacts and one at the end, peak -8.9 dB; the clip shows a woman opening and closing a door (anime style) | partial to yes |
+| rain on a window (`sfx-rain`) | very faint noise, mean -46.9 dB, no clear rain texture | partial to no |
+| car passing (`sfx-car`) | loud steady broadband noise, peak -2.7 dB, no rise and fall for a pass; the picture shows a wet street and cyclists, no prominent car | partial |
+
+Wan Quick is silent by design; no audio stream is written.
+
 ## Not run, and why
 
-Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
+A transcript of any speech (no tokenizer for the local whisper; owner to listen); Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
 seed per setting; 1440p and the refiner (no MLX path); `taew2_1` (does not fit the 5B VAE).
