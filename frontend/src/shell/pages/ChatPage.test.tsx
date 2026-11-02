@@ -4344,15 +4344,8 @@ describe("ChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger)", 
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/engines")) {
-        const roles = sttTtsReady
-          ? [
-              { id: "stt", label: "stt", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-23T00:00:00.000Z" }, reason: null, model: null, check: { state: "not checked", at: null, reason: null, stale: false } },
-              { id: "tts", label: "tts", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-23T00:00:00.000Z" }, reason: null, model: null, check: { state: "not checked", at: null, reason: null, stale: false } },
-            ]
-          : [];
-        return Promise.resolve(Response.json({ configured: sttTtsReady, roles, engines: [], budget: null }));
-      }
+      // The call gate reads the health row every person can read (`voice_call_ready`), not the admin-only engines route.
+      if (url.endsWith("/api/health")) return Promise.resolve(Response.json({ voice_call_ready: sttTtsReady, engines: {} }));
       if (url.includes("/api/voice/stt/status")) return Promise.resolve(Response.json({ installed: true, sileroInstalled: true, moonshineInstalled: true, recognizerLoaded: false }));
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-voicelive1", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
