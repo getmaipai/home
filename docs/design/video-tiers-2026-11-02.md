@@ -68,6 +68,12 @@ is not comparable: LTX comes from the model's counter, H3 from the OS footprint,
 | Boost | 640x352 or 768x448, up to 10 s | 5 s: 42 to 49 s at 640x352 (32.4 GB), 64 to 74 s at 768x448 (45.8 GB) |
 | Max | 10 s, 15 s or more, under a 64 GB per-clip footprint cap | 1024x576 5 s: 87 to 101 s but footprint 68.6 to 69.2 GB, FAILS the cap; cause not isolated (not the VAE decode budget, not eval-every); bf16 and 15 to 20 s runs pending |
 
+True output sizes (checked with ffprobe on the judged clips, 2026-11-02): the distilled two-stage engine rounds the requested height so
+that half of it is a multiple of 32, so heights must be multiples of 64. A request for 512x288 produced 512x256, 640x352 produced 640x320,
+while 768x448 and 1024x576 came out as asked. The sizes the owner judged are therefore 512x256 (Standard), 640x320 and 768x448 (Boost). The
+Stack maps a nominal request to the true size and reports the real width and height; where this note says 512x288 or 640x352 it means
+those true sizes.
+
 Wan's silent floor is 22 to 42 s per 5 s; Standard is within 2x of it with sound. Each tier keeps rule 8: a minor stays on the Wan Quick lane (decision 1); Max stays
 admin-gated. The Max cap is the owner's (wizard, 2026-11-02): 64 GB total on top of the live hub's about 28 GB, measured as the OS
 footprint, not the model's own counter.
