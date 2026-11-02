@@ -172,14 +172,21 @@ export const shouldAsk = (brief: Brief | null, history: readonly { role: string;
 
 // ---------------------------------------------------------------- stage 2: what data do I need
 
-export interface DataPlan { subQuestions: string[]; queries: string[] }
+export interface DataPlan {
+  subQuestions: string[];
+  queries: string[];
+  /** The sub-questions that came from the angles (they are also in `subQuestions`); `partsFor` keeps them when the eight-part cap bites. */
+  angleParts?: string[];
+}
 
 export function briefBlock(brief: Brief): string {
   return `What the person is asking: ${brief.subject}. A good answer is: ${brief.answerType || "a complete answer"}. It must contain: ${brief.mustContain.length > 0 ? brief.mustContain.join("; ") : "what the question asks"}.`;
 }
 
 /** Stage 2's reminder that an answer depends on more than the literal ask. The model words each angle from the question's own subject; nothing here names a topic. */
-export const SUB_QUESTION_ANGLES = 'A good answer depends on more than the literal ask. Also fill "angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": ""}: for each key a sub-question worded from this question\'s subject when the question\'s answer rests on it, or "" when it does not.';
+export const SUB_QUESTION_ANGLES = 'A good answer depends on more than the literal ask. Also fill "angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": "", "how_it_ended": "", "legacy_or_later_work": ""}: for each key a sub-question worded from this question\'s subject when the question\'s answer rests on it, or "" when it does not. When the question is about something unfinished, ended or changed, fill what_was_planned_or_announced, what_came_after and how_it_ended.';
+/** Stage 2's rule that every distinct ask is a part of its own. Topic neutral: it names no work, person or site. */
+export const SUB_QUESTION_SPLIT = 'Give one sub-question for every distinct thing the question asks for; a question that asks for two or more things ("X and Y", "X, Y, Z", "what and why") becomes separate sub-questions, never one merged part. For an open question about a work, an event or a person, also cover how it ended or turned out, what came after it (follow-ups, revivals, legacy, later work) and, when it is unfinished, ended or changed, what was planned but not done. One search may serve several parts.';
 /** Stage 2's rule against invented names in the plan (the code guard in `unnamedParts` backs it up). */
 export const SUB_QUESTION_NAMES = "A sub-question names only what the question, the pinned subject or the person's words name; a part about people or works not named there is worded without names.";
 
@@ -211,7 +218,7 @@ export async function planDataWithin(
 
 export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = "", given = ""): Promise<DataPlan> {
   const base = queryWriterPrompt(utterance, researchProgress([]), "", count, anchorNote);
-  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 6 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "angles": {...}, "queries": ["..."]}.\n${SUB_QUESTION_ANGLES} ${SUB_QUESTION_NAMES}` : base;
+  const prompt = brief ? `${briefBlock(brief)}\n\n${base}\nAlso list, in "sub_questions", the 3 to 8 parts of the question that the searches must answer, so the reply is {"sub_questions": ["..."], "angles": {...}, "queries": ["..."]}.\n${SUB_QUESTION_SPLIT} ${SUB_QUESTION_ANGLES} ${SUB_QUESTION_NAMES}` : base;
   let reply: string | null = null;
   try { reply = await writer(prompt); } catch { reply = null; }
   const data = jsonOf(reply);
@@ -223,18 +230,19 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
     if (query.length > 3 && query.split(/\s+/).length >= 2 && !isRepeatQuery(kept, query)) kept.push(query);
   }
   const haystack = `${utterance} ${brief?.subject ?? ""} ${given}`;
-  if (!brief) return { subQuestions: strings(data.sub_questions, 6, 160), queries: kept.slice(0, count) };
-  const subQuestions = unnamedParts(strings(data.sub_questions, 6, 160), haystack);
+  if (!brief) return { subQuestions: strings(data.sub_questions, 8, 160), queries: kept.slice(0, count) };
+  const subQuestions = unnamedParts(strings(data.sub_questions, 8, 160), haystack);
   // The angles the answer may rest on: each non-empty one joins the list after the model's own, through the same name guard, without repeats.
   const angles = data.angles && typeof data.angles === "object" && !Array.isArray(data.angles) ? Object.values(data.angles as Record<string, unknown>) : [];
+  const angleParts: string[] = [];
   for (const raw of angles) {
     if (typeof raw !== "string" || !raw.trim()) continue;
     // An angle is optional, so one that names what was never given is dropped outright (no fallback to the bracket-stripped text).
     const part = raw.replace(EXAMPLE_LIST, "").trim().slice(0, 160);
     const given = squashText(haystack);
-    if (part && namesIn(part).every((name) => nameIsGiven(name, given)) && !subQuestions.some((o) => samePart(o, part))) subQuestions.push(part);
+    if (part && namesIn(part).every((name) => nameIsGiven(name, given)) && !subQuestions.some((o) => samePart(o, part))) { subQuestions.push(part); angleParts.push(part); }
   }
-  return { subQuestions, queries: kept.slice(0, count) };
+  return { subQuestions, queries: kept.slice(0, count), angleParts };
 }
 
 // ---------------------------------------------------------------- stage 3: grab and filter
@@ -305,7 +313,12 @@ export function partsFor(brief: Brief | null, plan: DataPlan | undefined, given 
   const out: string[] = [];
   const mustContain = brief ? unnamedParts(brief.mustContain, `${given} ${brief.subject}`) : [];
   for (const p of [...mustContain, ...unnamedParts(plan?.subQuestions ?? [], given)]) if (p.trim() && !out.some((o) => similar(o, p))) out.push(p.trim());
-  return out.slice(0, 8);
+  if (out.length <= 8) return out;
+  // Over the cap: the angle parts (ending, what came after, what was planned) are kept, and the earliest other parts fill the rest, in order.
+  const angles = new Set((plan?.angleParts ?? []).map((a) => a.trim()));
+  const keepAngles = out.filter((p) => angles.has(p)).slice(0, 8);
+  let room = 8 - keepAngles.length;
+  return out.filter((p) => (angles.has(p) ? keepAngles.includes(p) : room-- > 0));
 }
 
 /** Output room for the analysis. The reply is a JSON object (claims, conflicts, gaps, guesses and, since RESEARCH-COVERAGE-01, one entry per

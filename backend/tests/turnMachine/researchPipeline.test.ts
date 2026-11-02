@@ -404,13 +404,41 @@ describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angl
   });
 });
 
+describe("every ask becomes its own part (RESEARCH-PLAN-GAPS-01)", () => {
+  const brief: Brief = { subject: "the show", answerType: "an explanation", mustContain: ["a1 aa", "b1 bb", "c1 cc", "d1 dd", "e1 ee"], ambiguous: false, options: [], question: "", assumption: "" };
+
+  test("the plan prompt tells the model to split compound asks and to cover the ending, what came after and what was planned but not done", async () => {
+    let seen = "";
+    await planData(async (prompt) => { seen = prompt; return "{}"; }, brief, "q", 3);
+    expect(seen).toContain("separate sub-questions");
+    expect(seen).toContain("what was planned but not done");
+    expect(seen).toContain("3 to 8");
+  });
+
+  test("the plan keeps up to eight sub-questions", async () => {
+    const subs = ["f1 ff", "g1 gg", "h1 hh", "i1 ii", "j1 jj", "k1 kk", "l1 ll", "m1 mm"];
+    const plan = await planData(async () => JSON.stringify({ sub_questions: subs, queries: [] }), brief, "q", 3);
+    expect(plan.subQuestions).toEqual(subs);
+  });
+
+  test("the angle parts reach the writer: a full brief and a long sub-question list cannot push them past the eight-part cap", async () => {
+    const reply = JSON.stringify({ sub_questions: ["f1 ff", "g1 gg", "h1 hh", "i1 ii", "j1 jj", "k1 kk"], angles: { what_was_planned_or_announced: "what was planned next", what_came_after: "later sequels and revivals" }, queries: [] });
+    const plan = await planData(async () => reply, brief, "q", 3);
+    const parts = partsFor(brief, plan);
+    expect(parts.length).toBe(8);
+    expect(parts).toContain("what was planned next");
+    expect(parts).toContain("later sequels and revivals");
+    expect(parts.slice(0, 3)).toEqual(["a1 aa", "b1 bb", "c1 cc"]);
+  });
+});
+
 describe("plan angles and the pick-retry (RESEARCH-ANGLES-01)", () => {
   const brief: Brief = { subject: "the show", answerType: "an explanation", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" };
 
   test("the plan prompt asks for the angles as keys, each a sub-question or empty", async () => {
     let seen = "";
     await planData(async (prompt) => { seen = prompt; return "{}"; }, brief, "q", 3);
-    expect(seen).toContain('"angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": ""}');
+    expect(seen).toContain('"angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": "", "how_it_ended": "", "legacy_or_later_work": ""}');
     expect(seen).not.toContain("wherever they apply");
   });
 
