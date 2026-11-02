@@ -93,6 +93,8 @@ const SERVICE_NAMES: Record<string, string> = {
   "wikimedia-live": "Wikipedia",
   "wiktionary-live": "Wiktionary",
   "wayback": "Wayback Machine",
+  "wikimedia-artists": "Wikimedia Commons",
+  "cover-art-archive": "Cover Art Archive",
 };
 
 describe("What Home looks up page", () => {

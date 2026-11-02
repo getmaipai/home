@@ -4291,6 +4291,57 @@
       "replacesHandBuilt": [],
       "realTurnToday": true,
       "verdictReason": "Drawn in the ambient companion pane for a robot companion; Home passes its name, colour and expression as props only."
+    },
+    {
+      "file": "answer-style-select.tsx",
+      "name": "answer-style-select",
+      "group": "answer",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": ["chat composer"],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "Drawn in the chat composer as the answer-style control; Home passes the choices and the picked id as props only."
+    },
+    {
+      "file": "pending-actions.tsx",
+      "name": "pending-actions",
+      "group": "pending",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": ["held job card"],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "Drawn under a held job's status line; Home passes the labels and what each answer does as props only."
+    },
+    {
+      "file": "prompt-bar.tsx",
+      "name": "prompt-bar",
+      "group": "prompt",
+      "verdict": "later",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "verdictReason": "Added to the kit for generation prompts; no Home screen draws it yet. Wire it when a generation screen takes a prompt with options."
     }
   ]
 }

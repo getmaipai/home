@@ -242,7 +242,8 @@ describe("POST /api/turn - U6a's non-stream twin", () => {
     await withStubReply("Hello! How can I help?", async (seen) => {
       const res = await client.post("/api/turn", { surface: "chat", text: "hi", thinking: true });
       expect(res.status).toBe(200);
-      expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(true);
+      // The pipeline's understand and query-writer requests come first; the answer is the streamed one.
+      expect((seen.requests.find((r) => r.stream === true) ?? seen.requests.at(-1))?.chat_template_kwargs?.enable_thinking).toBe(true);
     });
   });
 });

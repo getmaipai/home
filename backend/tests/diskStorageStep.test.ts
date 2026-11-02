@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { spaceRows } from "../src/routes/setupFolders";
 import { minimum } from "../src/lib/placement";
-import { aiRequiredBytes, shippedPlanForLevel, recordedLevel } from "../src/lib/diskPlan";
+import { aiRequiredBytes, selectionTotals, shippedPlanForLevel, recordedLevel } from "../src/lib/diskPlan";
 import { planDiskCheck } from "../src/setup/checks/planDisk";
 import { shippedDiskPlan } from "../src/lib/diskPlan";
 import { classDir } from "../src/lib/paths";
@@ -49,8 +49,11 @@ describe("the storage step asks for what the plan needs", () => {
 describe("the checks screen reports disk with the same function", () => {
   const level = recordedLevel();
   const levelPlan = shippedPlanForLevel(level);
-  const full = levelPlan.default.required_free_bytes + 2 * GIB;
-  const smallest = levelPlan.minimum.required_free_bytes + 2 * GIB;
+  // The verdict sums the rows (the default selection, and the required rows alone for the smallest setup), so the thresholds do the
+  // same: the plan's summary figures are the Stack's own totals and can sit a little off the row sum.
+  const required = levelPlan.rows.filter((row) => row.kind !== "engine" && row.need === "required").map((row) => row.id);
+  const full = selectionTotals(levelPlan, levelPlan.default_selected).required_free_bytes + 2 * GIB;
+  const smallest = selectionTotals(levelPlan, required).required_free_bytes + 2 * GIB;
   const run = (free: number, extra = {}) => planDiskCheck({ io: { freeBytes: () => free, device: () => 1 }, stackPlan: null, ...extra });
 
   test("green with room for the default setup; amber when it is tight", () => {
@@ -60,7 +63,7 @@ describe("the checks screen reports disk with the same function", () => {
 
   test("a default setup that does not fit warns and points at the plan screen, because the plan screen can shrink it", () => {
     if (full - smallest < 2 * GIB) return;
-    const result = run(Math.floor((full + smallest) / 2) + levelPlan.headroom_warn_bytes);
+    const result = run(full - GIB);
     expect(result.status).toBe("amber");
     expect(result.message).toContain("turn off extras");
     expect(result.message).toMatch(/needs about \d+(\.\d)? GB free/);

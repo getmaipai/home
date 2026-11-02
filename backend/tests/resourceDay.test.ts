@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { describeResourceDay, readResourceDay } from "@/lib/resourceDay";
-import { restoreDefaultScriptedStack, setDefaultScriptedStackFixture, startStackFixture } from "./stackFixture";
+import { restoreDefaultScriptedStack, startStackFixture } from "./stackFixture";
 import type { StackDailyResources } from "@/lib/stack/types";
 
 const blank = (date: string): StackDailyResources => ({
@@ -32,7 +32,8 @@ describe("resource day summary", () => {
     const fixture = startStackFixture({
       "GET /stack/v1/memory/daily": () => Response.json({ days: [blank("today"), day] }),
     });
-    setDefaultScriptedStackFixture(fixture);
+    // Only this test's client is swapped. Replacing the shared default fixture here (and stopping it below) left every later test file
+    // with a dead default Stack, which broke llm, stackEngine, dashboard and the turn-failure tests in a full run.
     const { __setStackClientForTests } = await import("@/lib/stackEngine");
     __setStackClientForTests(fixture.client);
     expect(await readResourceDay()).toEqual({ date: "yesterday", text: "Yesterday: big jobs were paused 1 time for chat." });

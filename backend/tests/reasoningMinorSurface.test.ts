@@ -110,7 +110,8 @@ describe("POST /api/turn/stream - reasoning never reaches a minor", () => {
     await withStubReply("17 times 24 is 408.", async (seen) => {
       const res = await client.post("/api/turn/stream", { text: "what's 17 times 24", thinking: true });
       const events = await readNdjson(res);
-      expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(true);
+      // A thinking turn first runs the research stages (understand, write searches), which never think; the streamed answer request is the one that asks to.
+      expect(seen.requests.find((r) => r.stream === true)?.chat_template_kwargs?.enable_thinking).toBe(true);
       const reasoningText = events.filter((e) => e.type === "reasoning").map((e) => e.text ?? "").join("");
       expect(reasoningText).toBe("carry the two");
       const deltaText = events.filter((e) => e.type === "delta").map((e) => e.text ?? "").join("");
@@ -130,7 +131,8 @@ describe("POST /api/turn/stream - reasoning never reaches a minor", () => {
     await withStubReply("17 times 24 is 408.", async (seen) => {
       const res = await childClient.post("/api/turn/stream", { text: "what's 17 times 24", thinking: true });
       const events = await readNdjson(res);
-      expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(false);
+      expect(seen.requests.length).toBeGreaterThan(0);
+      expect(seen.requests.every((r) => r.chat_template_kwargs?.enable_thinking === false)).toBe(true);
       expect(events.some((e) => e.type === "reasoning")).toBe(false);
       const deltaText = events.filter((e) => e.type === "delta").map((e) => e.text ?? "").join("");
       expect(deltaText).toBe("17 times 24 is 408.");

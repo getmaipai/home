@@ -17,8 +17,14 @@ describe("radioDirectoryAllowed", () => {
 });
 
 describe("stationOf", () => {
+  test("keeps up to three languages and an https homepage only", () => {
+    const s = stationOf({ ...row, language: "english, french,german,spanish", homepage: "https://cabin.example.com" });
+    expect(s?.language).toBe("english, french, german");
+    expect(s?.homepage).toBe("https://cabin.example.com");
+    expect(stationOf({ ...row, homepage: "http://cabin.example.com" })?.homepage).toBeNull();
+  });
   test("cleans the row", () => {
-    expect(stationOf(row)).toEqual({ id: "abc-1", name: "Cabin FM", url: "https://stream.example.com/live.mp3", favicon: "https://img.example.com/a.png", tags: ["jazz", "blues"], country_code: "US", codec: "mp3", bitrate_kbps: 128, hls: false });
+    expect(stationOf(row)).toEqual({ id: "abc-1", name: "Cabin FM", url: "https://stream.example.com/live.mp3", favicon: "https://img.example.com/a.png", tags: ["jazz", "blues"], country_code: "US", codec: "mp3", bitrate_kbps: 128, hls: false, language: null, homepage: null });
   });
   test("flags HLS and rejects rows without an address or name", () => {
     expect(stationOf({ ...row, url_resolved: "https://x.example.com/p.m3u8" })?.hls).toBe(true);

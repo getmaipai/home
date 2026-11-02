@@ -17,6 +17,7 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import type { PersonRow } from "@/types";
+import { THINKING_ALLOWANCE_FACTOR } from "@/lib/turnMachine/research";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
 // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - this file's
@@ -60,7 +61,11 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
     // (the regeneration) gets a real reply.
     let requestIndex = -1;
     const stub = startStubLlmServer(0, {
-      scriptedChatReply: () => {
+      scriptedChatReply: (request) => {
+        // A thinking turn first sends the research pipeline's understand and
+        // query-writer requests (RESEARCH-PIPELINE-01); only the streamed
+        // answer requests are the generations this test counts.
+        if (request.stream !== true) return "Hi there!";
         requestIndex++;
         return requestIndex === 0 ? undefined : "Hi there!";
       },
@@ -132,12 +137,15 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
     try {
       await readNdjson(await client.post("/api/turn/stream", { text: "hi", thinking: false }));
       await readNdjson(await client.post("/api/turn/stream", { text: "hi", thinking: true }));
-      const requests = stub.requests();
+      // The thinking turn also sends the pipeline's own non-streamed requests; the answer is the streamed one.
+      const requests = stub.requests().filter((r) => r.stream === true);
       expect(requests).toHaveLength(2);
       const withoutThinking = requests[0]!.max_tokens;
       const withThinking = requests[1]!.max_tokens;
       expect(typeof withoutThinking).toBe("number");
-      expect(withThinking).toBe(withoutThinking! + 512);
+      // A Thinking turn's reasoning room is the 512-token allowance times THINKING_ALLOWANCE_FACTOR.thinking
+      // (RESEARCH-TIER-01); a turn with thinking off adds none.
+      expect(withThinking).toBe(withoutThinking! + 512 * THINKING_ALLOWANCE_FACTOR.thinking);
     } finally {
       await stub.stop();
       __resetLlmSupervisorForTests();
