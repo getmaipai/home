@@ -370,6 +370,26 @@ Findings:
 Verdict: **skip Sol-Attn; h3.c is worth a closer look** (needs-more: try its 6-step and 8-step settings, a Turbo-style LoRA if the author adds one, and a speech-focused check) while the Argus INT8 + Turbo run stays the reference at 182 s and 13.4 GB.
 
 
+## PipeNetwork's own port and quantised builds (2026-11-02)
+
+`PipeNetwork/minimax-h3-mlx` (Apache-2.0, commit b2f7e4d2b), run in the engine's Python with the upstream FL2VA folder for the text encoder and VAEs, with its published 8-bit and 6-bit DiT builds (`pipenetwork/MiniMax-H3-MLX-8bit` 35.3 GB and `-6bit` 30.3 GB, fetched on the owner's yes into `~/video-bench/mm/models-pipenet/`). Same Golden Girls and Dean/Daisy prompt, seed 7, 768x448, 124 frames, text-to-video only.
+Its `generate.py` has no Turbo LoRA option (and no sigma-shift or ffmpeg flags), so this is the base model on the fewest steps it allows for the comparison: 5 sigma points, 4 forwards. One run each, gate lock held, ffmpeg from the Stack's copy on the path.
+
+| Build | Wall | Steps (first, then the rest) | Peak footprint | Words (Whisper) | Picture (opened frames) |
+|---|---:|---|---:|---|---|
+| Argus INT8 + Turbo, baseline | 182 s | 30.2 s mean | 13.4 GB | both lines exact | four older people, bright kitchen |
+| PipeNetwork 8-bit, no LoRA | 434 s | 93.7, then 25.5, 21.6, 21.5 s | 113.1 GB | "Easy dinner is ready. Coming, Dad!" | coherent: a man and three women eating cheesecake at a patterned tablecloth; darker, with an odd quilted-leather wall; no flicker seen |
+| PipeNetwork 6-bit, no LoRA | 323 s | 60.8, then 20.2, 34.8, 24.4 s | 113.0 GB | "Daisy, dinner is ready. Coming, Dad." | the same layout and cast, candles on the shelf, same quilted wall; coherent |
+
+Reading:
+- **The steps are fast once warm** (about 21 to 25 s against the baseline's 30 s) because the DiT stays resident, but the first step pays 61 to 94 s of loading and the AdaLN cache build takes 12 to 40 s, so the whole clip is 323 to 434 s, 1.8 to 2.4 times the baseline.
+- **Peak memory is 113 GB for both builds**, near the machine's total: the port keeps a 50 GB text encoder, the DiT and the VAEs live together. That is not safe beside the live hub; it ran only because nothing else heavy was running. The Argus runner stays at 13.4 GB by streaming.
+- **No LoRA means no speed gain from Turbo:** four forwards without the distillation LoRA still gave a clean picture here, but the colour balance and background differ from the Turbo clips, and one seed cannot say more.
+- 8-bit against 6-bit: 6-bit is 25 percent faster and sounded better in this one pair; both are coherent.
+
+Verdict: **skip as a runner** (slower and 8 times the memory of Argus INT8 + Turbo). Argus remains the reference at 182 s and 13.4 GB, with h3.c (162 s, 20.1 GB) as the one faster candidate to study. PipeNetwork's builds are useful only as a check that the picture holds at 6 and 8 bits; a Turbo LoRA loader for this port was not found.
+
+
 ## Not run, and why
 
 Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
