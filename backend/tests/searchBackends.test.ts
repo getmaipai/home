@@ -10,6 +10,7 @@ import {
   __reloadSearchBackendsForTests,
   __resetSearchBackendsForTests,
   __setBackendPaceForTests,
+  __setMaxWaitMsForTests,
   backendAvailable,
   pageCacheGet,
   pageCachePut,
@@ -190,6 +191,43 @@ describe("rotation across backends", () => {
     const good = fake("wikimedia", "ok");
     const out = await ask("empty then good", [empty.adapter, good.adapter]);
     expect(out.via).toEqual(["wikimedia"]);
+  });
+});
+
+describe("SEARCH-EMPTY-FAST-01: a call never ends empty while a backend has not been tried", () => {
+  test("a backend benched only for empty answers is still tried when the others give nothing", async () => {
+    const flaky = fake("searxng", "empty");
+    const other = fake("wikimedia", "empty");
+    // Three empty answers bench the flaky backend for twenty seconds.
+    for (const q of ["bench one", "bench two", "bench three"]) await ask(q, [flaky.adapter, other.adapter]);
+    expect(backendAvailable("searxng")).toBe(false);
+    // It recovers inside the bench window; the next call must still ask it.
+    flaky.behaviour = "ok";
+    const hitsBefore = flaky.hits.length;
+    const out = await ask("recovered topic", [flaky.adapter, other.adapter]);
+    expect(flaky.hits.length).toBe(hitsBefore + 1);
+    expect(out.rows.length).toBeGreaterThan(0);
+  });
+
+  test("a backend skipped for pace is waited for once when nothing else answered", async () => {
+    __setMaxWaitMsForTests(40);
+    const only = fake("searxng", "ok");
+    __setBackendPaceForTests("searxng", { minGapMs: 150, burst: 1 });
+    const first = await ask("paced one", [only.adapter]);
+    expect(first.rows.length).toBeGreaterThan(0);
+    const second = await ask("paced two", [only.adapter]);
+    expect(second.rows.length).toBeGreaterThan(0);
+    expect(second.tried.some((t) => t.outcome === "busy")).toBe(true);
+    expect(second.tried.some((t) => t.outcome === "ok")).toBe(true);
+  });
+
+  test("a cooling-down backend is still skipped (a refusal is not an empty answer)", async () => {
+    const refuser = fake("searxng", "429");
+    const good = fake("wikimedia", "ok");
+    await ask("refused once", [refuser.adapter, good.adapter]);
+    const before = refuser.hits.length;
+    await ask("refused twice", [refuser.adapter, good.adapter]);
+    expect(refuser.hits.length).toBe(before);
   });
 });
 

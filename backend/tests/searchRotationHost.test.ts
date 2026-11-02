@@ -7,7 +7,7 @@ import { TestClient } from "./client";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
-import { createHost, __resetSearchCacheForTests, __resetSearxngEnginesCacheForTests } from "@/lib/packageHost";
+import { createHost, __benchEngineForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __resetSearxngEnginesCacheForTests, __setEmptyRetryDelayForTests } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
 import { searchBackendStatus, __setBackendPaceForTests } from "@/lib/retrieval/searchBackends";
@@ -96,5 +96,44 @@ describe("a research round through the host", () => {
     await run("harbor lighthouse history");
     await run("Harbor  Lighthouse History");
     expect(counts.searx).toBe(1);
+  });
+});
+
+describe("SEARCH-EMPTY-FAST-01: a silent empty answer is retried once with every engine", () => {
+  test("bing and mwmbl answer nothing without saying why; the retry also asks the benched yahoo and gets rows", async () => {
+    __resetSearchCacheForTests();
+    __resetSearxngEnginesCacheForTests();
+    __resetSearchRotationForTests();
+    __resetRateLimiterForTests();
+    __setEmptyRetryDelayForTests(0);
+    for (const id of ["searxng", "wikimedia"] as const) __setBackendPaceForTests(id, { minGapMs: 0, burst: 1 });
+    const asked: string[] = [];
+    const searx = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        if (url.pathname === "/config") return Response.json({ engines: ["bing", "mwmbl", "yahoo", "wikipedia"].map((name) => ({ name, enabled: true, safesearch: true, categories: name === "wikipedia" ? ["general"] : ["general", "web"] })) });
+        const engines = url.searchParams.get("engines") ?? "";
+        asked.push(engines);
+        const q = url.searchParams.get("q") ?? "";
+        if (!engines.split(",").includes("yahoo")) return Response.json({ results: [], infoboxes: [], unresponsive_engines: [] });
+        return Response.json({ results: [1, 2, 3].map((i) => ({ title: `${q} result ${i}`, url: `https://site${i}.example.com/${i}`, content: `about ${q}`, engine: "yahoo" })), infoboxes: [], unresponsive_engines: [] });
+      },
+    });
+    const wiki = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("nope", { status: 404 }) });
+    servers.push(searx, wiki);
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = `http://127.0.0.1:${wiki.port}`;
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searx.port}`);
+    __benchEngineForTests("yahoo", Date.now() + 120_000);
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const host = createHost({ ...person, role: "adult" } as typeof person, manifest());
+    const out = (await runWithResearchBudget(newResearchBudget(false), () => host.integration.call("searxng", "search", { query: "harbor lighthouse keeper" }))) as { rows: { url: string | null }[] };
+    expect(out.rows.length).toBe(3);
+    expect(asked.length).toBe(2);
+    expect(asked[1]!.split(",")).toContain("yahoo");
+    __setEmptyRetryDelayForTests(null);
   });
 });

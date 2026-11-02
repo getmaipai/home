@@ -49,7 +49,9 @@ const FAIL_MAX_MS = 10 * 60_000;
 const JUNK_BENCH_MS = 5 * 60_000;
 const EMPTY_BENCH_MS = 20_000;
 /** The longest a query waits for a backend's turn before the next backend is tried instead. */
-const MAX_WAIT_MS = 6000;
+let MAX_WAIT_MS = 6000;
+/** SEARCH-EMPTY-FAST-01: when a call found nothing and a backend was skipped only for its pace, that backend is waited for this many times as long. */
+const LAST_PASS_WAIT_FACTOR = 4;
 const SNAPSHOT_FILE = "search-backends.json";
 const QUERY_CACHE_TTL_MS = 10 * 60_000;
 const QUERY_CACHE_MAX = 300;
@@ -68,9 +70,11 @@ interface BackendState {
   lastLatencyMs: number;
   lastOkAt: number;
   probing: boolean;
+  /** The current bench came from empty answers only (not a refusal, a failure or unrelated rows): it never keeps a backend out of a call. */
+  emptyBench: boolean;
 }
 
-const fresh = (): BackendState => ({ level: 0, bannedUntil: 0, nextFree: 0, ok: 0, fail: 0, junkStreak: 0, emptyStreak: 0, credit: 0, lastLatencyMs: 0, lastOkAt: 0, probing: false });
+const fresh = (): BackendState => ({ level: 0, bannedUntil: 0, nextFree: 0, ok: 0, fail: 0, junkStreak: 0, emptyStreak: 0, credit: 0, lastLatencyMs: 0, lastOkAt: 0, probing: false, emptyBench: false });
 const state = new Map<BackendId, BackendState>();
 let loaded = false;
 let clock: () => number = Date.now;
@@ -145,6 +149,7 @@ function cool(id: BackendId, outcome: "blocked" | "failed"): void {
   const entry = backend(id);
   const ms = outcome === "blocked" ? backoff(BLOCK_BASE_MS, BLOCK_MAX_MS, entry.level) : backoff(FAIL_BASE_MS, FAIL_MAX_MS, entry.level);
   entry.level += 1;
+  entry.emptyBench = false;
   entry.bannedUntil = clock() + ms;
   console.warn(`[search] backend ${id} cooling down for ${Math.round(ms / 1000)} s (${outcome === "blocked" ? "it asked Home to slow down" : "it did not answer"})`);
   scheduleSave();
@@ -158,6 +163,7 @@ export function reportBackendOutcome(id: BackendId, outcome: BackendOutcome, lat
     entry.ok += 1;
     entry.level = 0;
     entry.bannedUntil = 0;
+    entry.emptyBench = false;
     entry.junkStreak = 0;
     entry.emptyStreak = 0;
     entry.lastOkAt = clock();
@@ -174,6 +180,7 @@ export function reportBackendOutcome(id: BackendId, outcome: BackendOutcome, lat
     entry.junkStreak += 1;
     if (entry.junkStreak >= 2) {
       entry.bannedUntil = clock() + JUNK_BENCH_MS;
+      entry.emptyBench = false;
       entry.junkStreak = 0;
       console.warn(`[search] backend ${id} benched for ${JUNK_BENCH_MS / 60000} minutes: it returned rows unrelated to the query twice in a row`);
       scheduleSave();
@@ -183,6 +190,7 @@ export function reportBackendOutcome(id: BackendId, outcome: BackendOutcome, lat
   entry.emptyStreak += 1;
   if (entry.emptyStreak >= 3) {
     entry.bannedUntil = clock() + EMPTY_BENCH_MS;
+    entry.emptyBench = true;
     entry.emptyStreak = 0;
   }
 }
@@ -192,6 +200,10 @@ export function backendAvailable(id: BackendId): boolean {
   const entry = backend(id);
   return entry.bannedUntil <= clock();
 }
+
+/** Whether a call may ask the backend: it is not cooling down, or it is benched only for empty answers (SEARCH-EMPTY-FAST-01:
+ * an empty answer is not a refusal, and a bench from empties must not turn the next question into an instant empty). */
+const askable = (id: BackendId): boolean => backendAvailable(id) || backend(id).emptyBench;
 
 const weight = (id: BackendId): number => {
   const entry = backend(id);
@@ -319,7 +331,7 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
   const maxBackends = opts.maxBackends ?? 2;
   const wantHosts = opts.wantHosts ?? 1;
   const byId = new Map(adapters.map((adapter) => [adapter.id, adapter] as const));
-  let candidates = adapters.map((adapter) => adapter.id).filter(backendAvailable);
+  let candidates = adapters.map((adapter) => adapter.id).filter(askable);
   const tried: RotateResult["tried"] = [];
   if (candidates.length === 0) {
     // Every backend is cooling down. One probe at a time goes to the one whose cooldown ends first, so a lone backend is never
@@ -341,15 +353,18 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
   // Fall-through backends come after every ordinary one, and only while the rows found so far are fewer than wanted.
   const ordinary = candidates.filter((id) => byId.get(id)!.fallbackOnly !== true);
   const fallbacks = candidates.filter((id) => byId.get(id)!.fallbackOnly === true);
-  for (const id of [...orderFor(ordinary), ...orderFor(fallbacks)]) {
+  // Backends that are cooling down for empty answers only are asked after the healthy ones.
+  const healthyFirst = (ids: BackendId[]): BackendId[] => [...orderFor(ids.filter(backendAvailable)), ...orderFor(ids.filter((id) => !backendAvailable(id)))];
+  type Step = "next" | "stop";
+  const attempt = async (id: BackendId, maxWait: number): Promise<Step> => {
     const fallback = byId.get(id)!.fallbackOnly === true;
-    if (fallback && enough()) break;
-    if (!fallback && counted >= maxBackends) break;
+    if (fallback && enough()) return "stop";
+    if (!fallback && counted >= maxBackends) return "stop";
     const adapter = byId.get(id)!;
-    const wait = reserve(id, MAX_WAIT_MS);
+    const wait = reserve(id, maxWait);
     if (wait === null) {
       tried.push({ id, outcome: "busy", ms: 0 });
-      continue;
+      return "next";
     }
     try {
       await sleep(wait, signal);
@@ -366,13 +381,13 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
       if (answer.rows.length === 0) {
         reportBackendOutcome(id, "empty", ms);
         tried.push({ id, outcome: "empty", ms });
-        continue;
+        return "next";
       }
       if (!rowsRelevant(query, answer.rows)) {
         reportBackendOutcome(id, "junk", ms);
         tried.push({ id, outcome: "junk", ms });
         unrelated ??= { rows: answer.rows, id };
-        continue;
+        return "next";
       }
       reportBackendOutcome(id, "ok", ms);
       tried.push({ id, outcome: "ok", ms });
@@ -381,7 +396,7 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
       const own = new Set<string>();
       for (const row of answer.rows) { const host = hostOf(row); if (host) { own.add(host); hosts.add(host); } }
       if (wantHosts <= 1 || own.size > 1) counted += 1;
-      if (answer.rows.length >= wantRows && hosts.size >= wantHosts) break;
+      if (answer.rows.length >= wantRows && hosts.size >= wantHosts) return "stop";
     } catch (err) {
       if (signal?.aborted) {
         backend(id).probing = false;
@@ -393,6 +408,19 @@ async function rotateUncached(opts: RotateOptions): Promise<RotateResult> {
       lastError = err;
       reportBackendOutcome(id, outcome, ms);
       tried.push({ id, outcome, ms });
+    }
+    return "next";
+  };
+  const order = [...healthyFirst(ordinary), ...healthyFirst(fallbacks)];
+  for (const id of order) {
+    if ((await attempt(id, MAX_WAIT_MS)) === "stop") break;
+  }
+  // SEARCH-EMPTY-FAST-01: a call that found nothing does not end empty while a backend was skipped only for its pace: each is
+  // waited for once, up to a longer turn, before the answer is "nothing".
+  if (lists.length === 0 && !unrelated) {
+    const skipped = order.filter((id) => tried.some((t) => t.id === id && t.outcome === "busy") && !tried.some((t) => t.id === id && t.outcome !== "busy"));
+    for (const id of skipped) {
+      if ((await attempt(id, MAX_WAIT_MS * LAST_PASS_WAIT_FACTOR)) === "stop") break;
     }
   }
   for (const id of IDS) backend(id).probing = false;
@@ -488,6 +516,7 @@ export function __resetSearchBackendsForTests(options: { now?: () => number; fil
   pageCache.clear();
   loaded = false;
   for (const id of IDS) PACE[id] = DEFAULT_PACE[id];
+  MAX_WAIT_MS = 6000;
   clock = options.now ?? Date.now;
   const file = options.file;
   snapshotPath = file ? () => file : () => join(dataDir, SNAPSHOT_FILE);
@@ -511,6 +540,11 @@ export function __reloadSearchBackendsForTests(): void {
 }
 
 /** Test seam: replace one backend's pace (null restores the default). */
+/** Test seam: the longest a query waits for a backend's turn (null restores the default). */
+export function __setMaxWaitMsForTests(ms: number | null): void {
+  MAX_WAIT_MS = ms ?? 6000;
+}
+
 export function __setBackendPaceForTests(id: BackendId, pace: { minGapMs: number; burst: number } | null): void {
   PACE[id] = pace ?? DEFAULT_PACE[id];
 }

@@ -1,7 +1,7 @@
 // RESEARCH-HOSTS-01: SearXNG engines that report themselves unavailable are benched for 5 minutes, and a pool left under two
 // engines lets one benched engine through as a probe.
 import { beforeEach, describe, expect, test } from "bun:test";
-import { __benchEngineForTests, __pickSearchEnginesForTests, __resetSearchRotationForTests, __searxngEngineBenchMsForTests } from "@/lib/packageHost";
+import { __benchEngineForTests, __lastResortEnginesForTests, __pickSearchEnginesForTests, __resetSearchRotationForTests, __searxngEngineBenchMsForTests } from "@/lib/packageHost";
 
 beforeEach(() => __resetSearchRotationForTests());
 
@@ -27,5 +27,13 @@ describe("engine bench", () => {
   test("an empty pool gets one probe, never wikipedia", () => {
     __benchEngineForTests("brave", Date.now() + 60_000);
     expect(__pickSearchEnginesForTests(["brave", "wikipedia"])).toEqual(["brave"]);
+  });
+});
+
+describe("SEARCH-EMPTY-FAST-01: the last-resort engine list", () => {
+  test("it ignores the bench: unbenched engines first, then benched ones by when their bench ends, never wikipedia", () => {
+    __benchEngineForTests("yahoo", Date.now() + 200_000);
+    __benchEngineForTests("brave", Date.now() + 60_000);
+    expect(__lastResortEnginesForTests(["yahoo", "brave", "bing", "mwmbl", "wikipedia"])).toEqual(["bing", "mwmbl", "brave"]);
   });
 });

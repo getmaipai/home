@@ -1078,6 +1078,31 @@ function poolWithProbe(pool: string[]): string[] {
   return probe ? [...available, probe] : available;
 }
 
+/** SEARCH-EMPTY-FAST-01: every text engine of the pool, bench ignored, for the one retry of a search that came back with nothing.
+ * A bench is a guess that an engine is down; when everything else gave nothing, asking it once is better than answering "no
+ * results". Engines never benched come first, then the benched ones whose bench ends soonest. wikipedia is never one of them. */
+function lastResortEngines(pool: string[], count = SEARCH_ENGINE_COUNT): string[] {
+  return pool
+    .filter((name) => name !== "wikipedia")
+    .map((name, order) => ({ name, order, until: searxngBenchedUntil.get(name) ?? 0 }))
+    .sort((a, b) => a.until - b.until || a.order - b.order)
+    .slice(0, count)
+    .map((entry) => entry.name);
+}
+
+const callerAborted = (opts: { fallbackSignal?: AbortSignal }): boolean => opts.fallbackSignal?.aborted === true;
+
+/** The short, jittered wait before that retry (at most 1.5 s), so a throttled upstream is not hit again in the same instant. */
+let emptyRetryDelay: () => number = () => 400 + Math.random() * 1100;
+export function __setEmptyRetryDelayForTests(ms: number | null): void { emptyRetryDelay = ms === null ? () => 400 + Math.random() * 1100 : () => ms; }
+export const __lastResortEnginesForTests = (pool: string[]): string[] => lastResortEngines(pool);
+const pauseBeforeRetry = (signal?: AbortSignal): Promise<void> => new Promise((resolve) => {
+  const ms = Math.min(1500, Math.max(0, emptyRetryDelay()));
+  if (ms <= 0 || signal?.aborted) return resolve();
+  const timer = setTimeout(resolve, ms);
+  signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+});
+
 /** THIN-GROUND-01 part 2: one search names this many engines. It is still ONE
  * request to SearXNG, which fans out, so Home's request count and page-read
  * budget are unchanged. */
@@ -1231,6 +1256,17 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
       const retryNext = pickSearchEngines(rotationPool!, asked);
       widened = true;
       if (retryNext.length === 0) {
+        // SEARCH-EMPTY-FAST-01: nothing unbenched is left, so the one retry asks the pool ignoring the bench, after a short wait.
+        const last = lastResortEngines(rotationPool!);
+        if (last.length > 0 && callerAborted(opts) === false) {
+          await pauseBeforeRetry(opts.fallbackSignal);
+          try {
+            const again = await searxngSearchUncached(args, { ...opts, safeEngines: last, supplementary: true });
+            if (again.rows.length > 0) return again;
+          } catch (retryErr) {
+            if (callerAborted(opts)) throw retryErr;
+          }
+        }
         // Benching during the request emptied the pool: the first request left the
         // Wikipedia fallback for a retry that cannot happen, so try it here.
         const fallback = (opts.allowWikipediaFallback ?? true) && opts.speakerBand === "adult" ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand) : null;
@@ -1243,6 +1279,20 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
     const more = pickSearchEngines(rotationPool, asked);
     widened = true;
     if (more.length === 0 && wikipedia.length === 0) {
+      // SEARCH-EMPTY-FAST-01: an empty answer with no unasked engine left (the rest benched, or silently throttled) is not final:
+      // one retry after a short jittered wait asks the pool ignoring the bench.
+      if (result.rows.length === 0 && callerAborted(opts) === false) {
+        const last = lastResortEngines(rotationPool);
+        if (last.length > 0) {
+          await pauseBeforeRetry(opts.fallbackSignal);
+          try {
+            const again = await searxngSearchUncached(args, { ...opts, safeEngines: last, supplementary: true });
+            if (again.rows.length > 0) return again;
+          } catch (retryErr) {
+            if (callerAborted(opts)) throw retryErr;
+          }
+        }
+      }
       const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && opts.speakerBand === "adult" && next.length > 0 ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand) : null;
       return fallback ?? result;
     }
