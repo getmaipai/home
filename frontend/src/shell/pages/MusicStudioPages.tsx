@@ -3,7 +3,7 @@
 // SongStyleCard (rule 9: as shipped, restyled by tokens only, no wrapper component); the cards are the same ones the chat shows, and
 // they save through the same routes as the edit tools, so a change made here or in chat is one change to one record.
 // A page cannot be a schema page: the schema has no node for an editor card, so (like the Now playing page) it is drawn here, inside
-// the app's own sidebar chrome. Pictures and songs are made in chat; each page says so and opens chat with the right ask.
+// the app's own sidebar chrome. Pictures are made in chat, songs on the Make a song page; each page says so and opens chat with the right ask.
 import { useMemo, type ComponentProps, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,11 +12,12 @@ import { Band, type BandPatch } from "@maipai/ui/src/elements/band";
 import { SongStyleCard, type SongStylePatch } from "@maipai/ui/src/elements/song-style";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
+import { MakeSongPage } from "./MakeSongPage";
 import { request } from "@/lib/api";
 import { bandImageSrc, useBandCard } from "@/apps/chat/useBandCard";
 import { joinBandAndStudio, musicRefOf, useMusicCard, type MusicCardKind } from "@/apps/chat/useMusicCard";
 
-export const STUDIO_PAGE_IDS = ["create", "make-band", "make-album", "make-style", "creations", "edit"] as const;
+export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "creations", "edit"] as const;
 export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "music" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
 
 type Kind = MusicCardKind;
@@ -29,7 +30,7 @@ const ASK: Record<Kind, string> = {
   album: "Make me an album, with a cover and a first song. Ask me what sound I want if you need to.",
   song_style: "Save a song style for me. Ask me what sound I want if you need to.",
 };
-const ADULT_ONLY_LINE = "Making a band, an album or a style is for adults. Ask a grown-up to make one with you.";
+const ADULT_ONLY_LINE = "Making a song, a band, an album or a style is for adults. Ask a grown-up to make one with you.";
 
 const toKind = (value: string | null): Kind | null => (value === "band" || value === "album" || value === "song_style" ? value : null);
 
@@ -144,14 +145,15 @@ function CreationsPage({ adult }: { adult: boolean }) {
 
 function CreateChooser({ adult }: { adult: boolean }) {
   if (!adult) return <EmptyState icon="music" text={ADULT_ONLY_LINE} />;
-  const choices: Array<{ kind: Kind; to: string; title: string; line: string }> = [
+  const choices: Array<{ kind: Kind | "song"; to: string; title: string; line: string }> = [
+    { kind: "song", to: "/apps/music/make-song", title: "A song", line: "Describe it, add your words, and hear it." },
     { kind: "band", to: "/apps/music/make-band", title: "A band", line: "A name, a look and a sound." },
     { kind: "album", to: "/apps/music/make-album", title: "An album", line: "A cover and a list of songs." },
     { kind: "song_style", to: "/apps/music/make-style", title: "A song style", line: "A sound to reuse in any song." },
   ];
   return <section className="flex flex-col gap-4" data-testid="music-create">
     <Heading title="Create" line="Make something new, or open what you already made in My creations." />
-    <ul className="grid gap-3 px-4 sm:grid-cols-3 lg:px-0">
+    <ul className="grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4 lg:px-0">
       {choices.map((choice) => <li key={choice.kind}><Link to={choice.to} className="bg-card hover:bg-muted flex h-full flex-col gap-1 rounded-2xl border p-4 transition-colors"><span className="text-base font-semibold">{choice.title}</span><span className="text-muted-foreground text-sm">{choice.line}</span></Link></li>)}
     </ul>
   </section>;
@@ -180,7 +182,7 @@ function EditPage({ kind, id }: { kind: Kind; id: string }) {
   };
   const actions = kind === "band" ? ["make_album", "discard"] : kind === "album" ? ["play_all", "remake_cover", "discard"] : ["make_song", "discard"];
   const shared = { editable: props.editable !== false, defaultEditing: props.editable !== false };
-  const footer = <p className="text-muted-foreground px-4 text-sm lg:px-0">Pictures and new songs are made in chat. <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/creations">Back to My creations</Link></p>;
+  const footer = <p className="text-muted-foreground px-4 text-sm lg:px-0">Pictures are made in chat; songs are made on <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/make-song">Make a song</Link>. <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/creations">Back to My creations</Link></p>;
   return <Frame testId="music-edit" title={`Edit your ${NOUN[kind]}`} line="Every change keeps the earlier version, so nothing is lost." footer={footer}>
     {kind === "band" ? <Band {...(props as unknown as ComponentProps<typeof Band>)} actions={actions as never} {...shared} resolveImageSrc={bandImageSrc} onAction={(action) => act(action)} onEdit={(patch) => act("edit_band", { ...patch })} />
         : kind === "album" ? <Album {...(props as unknown as ComponentProps<typeof Album>)} actions={actions as never} {...shared} resolveImageSrc={bandImageSrc} onAction={(action) => act(action)} onPlayTrack={(mediaId) => act("play_track", { media_id: mediaId })} onEdit={(patch) => act("edit_album", { ...patch })} />
@@ -197,6 +199,7 @@ function songStyleProps(props: Record<string, unknown>) {
 /** The Music app's Create and library pages. `search` is the address's query string. */
 export function MusicStudioPage({ pageId, search, adult }: { pageId: string; search: string; adult: boolean }) {
   if (pageId === "create") return <CreateChooser adult={adult} />;
+  if (pageId === "make-song") return <MakeSongPage adult={adult} search={search} />;
   if (pageId === "make-band") return <CreatePage kind="band" adult={adult} />;
   if (pageId === "make-album") return <CreatePage kind="album" adult={adult} />;
   if (pageId === "make-style") return <CreatePage kind="song_style" adult={adult} />;

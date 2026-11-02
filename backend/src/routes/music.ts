@@ -22,7 +22,8 @@ import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { cancelMusicJob, getMusicJobFor, jobsForConversation, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { authorizeTier } from "@/lib/tiers";
-import { lengthOf, prepareMusicEdit } from "@/lib/music/tool";
+import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, runGenerateMusic, type MusicToolInput } from "@/lib/music/tool";
+import { resolveSound } from "@/lib/music/sound";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -203,6 +204,68 @@ musicRoutes.openapi(reviseRoute, async (c) => {
   plan.request.description = description;
   plan.body.caption = description;
   const refusal = refuseMusicPrompt([description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "));
+  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
+  try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
+  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  return c.json(await musicCardView(actor, root), 200);
+});
+// MUSIC-STUDIO-SONG: the Make a song page. It runs the same runGenerateMusic path as the generate_music tool, in a chat of its own
+// (so the song shows in chat history like any song made there), and answers with the song card the page polls.
+const makeSongBody = z.object({
+  idea: z.string().trim().min(3).max(1200).describe("What the song is about and how it should sound."),
+  lyrics: z.string().max(4000).optional().describe("The words to sing. Leave out for Home to write them."),
+  instrumental: z.boolean().optional(), title: z.string().trim().min(1).max(200).optional(), length: z.enum(["quick", "full"]).optional(),
+  bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).optional(),
+  song_style: z.string().optional().describe("A saved song style's id (starter or the person's own)."), band: z.string().optional().describe("A made band's id: make the song in that band's sound."),
+});
+const makeSongRoute = createRoute({ method: "post", path: "/songs", tags: ["Music"], summary: "Make a song from the Make a song page", middleware,
+  request: { body: { content: { "application/json": { schema: makeSongBody } } } },
+  responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The song card, still being made." }, 422: { description: "The song cannot be made as asked." }, ...refusals, ...errorResponses({ 503: "No music model is installed or the computer cannot make songs now" }) } });
+musicRoutes.openapi(makeSongRoute, async (c) => {
+  const actor = c.get("person"); const body = c.req.valid("json");
+  const engine = await musicEngineStatus();
+  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  const args: Record<string, unknown> = { description: body.idea, ...(body.lyrics?.trim() ? { lyrics: body.lyrics } : {}), ...(body.instrumental ? { instrumental: true } : {}),
+    ...(body.title ? { title: body.title } : {}), ...(body.length ? { length: body.length } : {}), ...(body.bpm !== undefined ? { bpm: body.bpm } : {}),
+    ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
+  if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
+  const refusal = musicRefusalFor(musicRouteAudience(actor), args);
+  if (refusal) return c.json({ error: refusal.line }, 403) as never;
+  const sound = resolveSound(actor, { song_style: body.song_style, band: body.band });
+  if (!sound.ok) return c.json({ error: sound.line }, 422) as never;
+  const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});
+  if (!conversation.ok) return c.json({ error: plainMusicFailure("failed") }, 503) as never;
+  const turnId = newConversationTurnId();
+  const state = { actor, persona: null, surface: "chat", speakerEvidence: null, planBasis: { surfaceClass: "written" }, plan: undefined, conversationId: conversation.value.id, turnId, temporary: false, ephemeral: false } as unknown as MusicToolInput["state"];
+  const outcome = await runGenerateMusic({ state, args, callId: `page-${turnId}`, spoken: false });
+  const jobId = (outcome.result?.data as { musicJobId?: string } | undefined)?.musicJobId;
+  const job = jobId ? getMusicJobFor(actor, jobId) : null;
+  if (!job) {
+    const refused = (outcome.result?.data as { refused?: string } | undefined)?.refused;
+    if (refused) return c.json({ error: (outcome.result?.reply?.text ?? "").replace(REFUSED_PREFIX, "") || plainMusicFailure("failed") }, 422) as never;
+    return c.json({ error: plainMusicFailure(outcome.errorCode === "no_engine" ? "not_installed" : outcome.errorCode ?? "failed") }, outcome.failureKind === "bad_arguments" ? 422 : 503) as never;
+  }
+  logTurn(actor, "chat", body.title ? `Make a song: ${body.title}` : "Make a song", { reply: { text: "Making your song." }, source: "plugin", plugin_id: "generate_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  return c.json(await musicCardView(actor, job), 201);
+});
+// Change a song's title, words, style, tempo or key: a new version on the same card; the earlier versions stay.
+const detailsRoute = createRoute({ method: "post", path: "/jobs/{id}/details", tags: ["Music"], summary: "Make a new version of the song with a new title, words, style, tempo or key", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({
+    title: z.string().trim().min(1).max(200).optional(), lyrics: z.string().max(4000).optional(), description: z.string().trim().min(3).max(1200).optional(),
+    bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).regex(/^[A-G][#b]?\s?(major|minor|maj|min|m)?$/i).optional(), file_id: z.string().min(1).max(80).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
+musicRoutes.openapi(detailsRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id, ...changes } = c.req.valid("json");
+  if (!Object.values(changes).some((v) => v !== undefined)) return c.json({ error: "Change at least one thing: the title, the words, the style, the tempo or the key." }, 422) as never;
+  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
+  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
+  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  const engine = await musicEngineStatus();
+  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  const plan = prepareMusicEdit(source, { track: source.fileId!, change: "remake", ...changes }, engine!.limits);
+  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
+  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
   plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
   try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }

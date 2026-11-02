@@ -46,6 +46,13 @@
         "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the person will see them. Omit for an instrumental.",
         "maxLength": 4000
       },
+      "title": {
+        "type": "string",
+        "grounded": false,
+        "description": "A new title for the song, when the person asks to rename it.",
+        "minLength": 1,
+        "maxLength": 200
+      },
       "bpm": {
         "type": "number",
         "grounded": false,

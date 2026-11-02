@@ -2,6 +2,13 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.14] - 2026-11-02
+
+### Added
+
+- Make a song page: describe a song, add your own words or make it instrumental, pick a saved style or a band's sound, then Make. The song card has Play, Keep in my Library and Edit. Edit now has a Details tab (title, words, style) that makes a new version and keeps the old one. In chat, edit_music also takes a new title.
+- The Create page lists Song first. Placeholder texts no longer say "comes here soon".
+
 ## [0.3.13] - 2026-11-02
 
 ### Added

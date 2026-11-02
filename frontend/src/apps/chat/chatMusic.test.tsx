@@ -143,7 +143,7 @@ describe("MusicToolRender", () => {
     const edit = view.getByRole("button", { name: "Edit" });
     if (edit.getAttribute("aria-expanded") !== "true") fireEvent.click(edit);
     expect(view.getByRole("dialog", { name: "Edit song" })).toBeTruthy();
-    for (const label of ["Remix", "New cover", "Full song", "Stems"]) expect(view.getByRole("tab", { name: label })).toBeTruthy();
+    for (const label of ["Remix", "New cover", "Full song", "Stems", "Details"]) expect(view.getByRole("tab", { name: label })).toBeTruthy();
     expect(view.getByText("Describe a song change to enable Remix.")).toBeTruthy();
     fireEvent.change(view.getByLabelText("How should it change? For example: heavy metal"), { target: { value: "make it heavy metal" } });
     fireEvent.click(view.getByRole("button", { name: "Remix" }));

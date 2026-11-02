@@ -15,6 +15,8 @@ import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 import { provenanceFor } from "./commercial";
 import { resolveSound } from "./sound";
+/** What a refused song's reply starts with; the Make a song page strips it to show the person the plain line. */
+export const REFUSED_PREFIX = "No song was made. Say this to the person and keep its meaning: ";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
 export const EDIT_MUSIC_TOOL_ID = "edit_music";
 export function musicAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): MusicAudience {
@@ -29,7 +31,7 @@ export const generateMusicArgs = z.object({ ...common, description: common.descr
   /** MUSIC-STUDIO-STYLE: make the song in a saved song style, a made band's sound, or an album (ids the person can read). */
   song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional() });
 export const editMusicArgs = z.object({
-  ...common, track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems"]),
+  ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems"]),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
   seconds: z.number().finite().positive().optional(), at: z.enum(["start", "end"]).optional(), where: z.enum(["in", "out", "both"]).optional(),
   strength: z.number().finite().min(0.3).max(1).optional(), lufs: z.number().finite().min(-70).max(-5).optional(),
@@ -110,6 +112,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
   const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, ...stored } = source.request;
   const request: MusicRequest = { ...stored, seconds: source.durationS ?? stored.seconds, seed: source.seed ?? stored.seed,
     ...(args.description !== undefined ? { description: args.description } : {}), ...(args.lyrics !== undefined ? { lyrics: args.lyrics } : {}),
+    ...(args.title !== undefined ? { title: args.title } : {}),
     ...(args.bpm !== undefined ? { bpm: args.bpm } : {}), ...(args.key !== undefined ? { key: args.key } : {}) };
   delete request.retried;
   let task: MusicTask; let stackTask: MusicBody["task"];
@@ -176,7 +179,7 @@ export function applySound<T extends z.infer<typeof generateMusicArgs>>(value: T
 async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input; const packageId = editing ? EDIT_MUSIC_TOOL_ID : GENERATE_MUSIC_TOOL_ID;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
-  const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No song was made. Say this to the person and keep its meaning: ${line}` }, data: { refused: why }, actions: [] } });
+  const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
   const refusal = musicRefusalFor(musicAudienceOf(state, input.spoken), args);
   if (refusal) return refused(refusal.line, refusal.why);
   const temporary = state.temporary === true || state.ephemeral === true;

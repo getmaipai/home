@@ -7,7 +7,7 @@ import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, waitForMusic, LYRICS, testM4a } from "./musicFixture";
 import { runGenerateMusic, runEditMusic, prepareMusicEdit } from "@/lib/music/tool";
 import { musicForOutcomes } from "@/lib/composer";
-import { getMusicJobFor, type MusicJob } from "@/lib/music/jobs";
+import { getMusicJobFor, musicVersions, type MusicJob } from "@/lib/music/jobs";
 import { sourceMusicJob } from "@/lib/music/jobs";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { commercialUseOf } from "@/lib/music/commercial";
@@ -219,5 +219,45 @@ describe("music routes", () => {
     expect(existsSync(attachmentFilePath(row.storagePath))).toBe(true);
     truncateSync(attachmentFilePath(row.storagePath), 100);
     expect((await client.get(url, { Range: "bytes=0-9" })).status).toBe(404);
+  });
+});
+
+describe("Make a song page routes", () => {
+  test("makes a song in a chat of its own, then a changed title and words become a new version beside the old one", async () => {
+    const { actor, client } = await owner();
+    const made = await client.post("/api/music/songs", { idea: "a gentle folk song about pancakes", lyrics: LYRICS, title: "Pancakes", instrumental: false });
+    expect(made.status).toBe(201);
+    const card = await made.json() as { id: string; title: string | null };
+    expect(card.title).toBe("Pancakes");
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+    const job = getMusicJobFor(actor, card.id)!;
+    const history = listConversationTurns(actor, job.conversationId!);
+    expect(history.ok && history.value.filter((turn) => turn.music?.id).map((turn) => turn.music!.id)).toEqual([card.id]);
+    const changed = await client.post(`/api/music/jobs/${card.id}/details`, { title: "Waffles", lyrics: `${LYRICS}\n[Outro]\nWaffles too` });
+    expect(changed.status).toBe(200);
+    await waitForMusic(() => musicVersions(actor, getMusicJobFor(actor, card.id)!).filter((v) => v.state === "done").length === 2);
+    const after = await (await client.get(`/api/music/jobs/${card.id}`)).json() as { versions: unknown[]; title: string; lyrics: string };
+    expect(after.versions.length).toBe(2);
+    expect(after.title).toBe("Waffles");
+    expect(after.lyrics).toContain("Waffles too");
+    expect((await client.post(`/api/music/jobs/${card.id}/details`, {})).status).toBe(422);
+  });
+  test("says plainly what to do when no music model is installed", async () => {
+    const { client } = await owner();
+    __setMusicStatusForTests(null);
+    const response = await client.post("/api/music/songs", { idea: "a song about rain" });
+    expect(response.status).toBe(503);
+    expect((await response.json() as { error: string }).error).toContain("No music model is installed");
+    __setMusicStatusForTests(undefined);
+  });
+  test("a teen cannot make one from the page", async () => {
+    const { client, actor } = await owner();
+    db.update(people).set({ role: "teen" }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
+    expect((await client.post("/api/music/songs", { idea: "a song about rain" })).status).toBe(403);
+  });
+  test("the edit_music chat tool renames a song too (the same change the page's Edit tab makes)", async () => {
+    const { actor } = await owner(); const { job } = await song(actor);
+    const plan = prepareMusicEdit(job, { track: job.fileId!, change: "remake", title: "Waffles" });
+    expect(plan.ok && plan.request.title).toBe("Waffles");
   });
 });

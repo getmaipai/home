@@ -233,6 +233,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/EnginesPage.tsx` | EnginesIcon, EnginesConsole |
 | `frontend/src/shell/pages/FamilyPage.tsx` | FamilyPage |
 | `frontend/src/shell/pages/FilesPage.tsx` | FilesPage |
+| `frontend/src/shell/pages/MakeSongPage.tsx` | MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, songAddress, MakeSongPage |
 | `frontend/src/shell/pages/MarkdownDocument.tsx` | MarkdownDocument |
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
@@ -641,7 +642,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/studioTools.ts` | EDIT_BAND_TOOL_ID, STUDIO_TOOL_IDS, isStudioTool, EDIT_TOOL_OBJECT, runStudioTool |
 | `backend/src/lib/music/styleCard.ts` | MAKE_SONG_STYLE_TOOL_ID, EDIT_SONG_STYLE_TOOL_ID, STYLE_NOT_HERE_LINE, STYLE_BAD_LINE, styleProvenance, styleBlock |
-| `backend/src/lib/music/tool.ts` | GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs, musicRefusalFor |
+| `backend/src/lib/music/tool.ts` | REFUSED_PREFIX, GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs |
 | `backend/src/lib/music/trackItem.ts` | readMusicTrack |
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |
 | `backend/src/lib/nasMounts.ts` | listNasMounts, createNasMount, deleteNasMount |
