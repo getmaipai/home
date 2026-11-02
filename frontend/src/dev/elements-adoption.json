@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T08:57:58.172Z",
+  "generatedAt": "2026-11-02T09:38:40.308Z",
   "kitTag": "ui-v0.5.461",
   "items": [
     {
@@ -276,8 +276,8 @@
       "file": "band.tsx",
       "name": "band",
       "group": "band",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-after",
+      "verdictReason": "MUSIC-LISTEN-C5 chat card for a band the household made; Home wires it when the band-making turn emits the band structured part.",
       "implemented": false
     },
     {
