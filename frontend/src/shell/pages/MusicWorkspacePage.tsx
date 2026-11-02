@@ -4,7 +4,7 @@
 // Picking a song opens it above the rows with every action as a visible button; one the engine cannot do is turned off with its plain reason.
 // The same tiles serve the Studio, Stems and Remix pages (`SongGallery`).
 // Every change made here has its edit card in chat (the edit_* actions), so a change is one change to one record.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -94,6 +94,9 @@ const TOOLS = [
 /** The song opened above the rows: its cover blurred into the background, the kit player, and every action as a button, each off with its reason. */
 function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; remix: boolean }) {
   const [remixing, setRemixing] = useState(remix);
+  const top = useRef<HTMLElement>(null);
+  // The song opens above the tiles; bring it into view so a click on a tile's Remix or Stems is seen to do something.
+  useEffect(() => { top.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }, [id]);
   const { push } = useToast();
   const queryClient = useQueryClient();
   const card = useQuery({ queryKey: ["music-song", id], queryFn: ({ signal }) => musicApi.card(id, signal), staleTime: 0 });
@@ -103,7 +106,7 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const again = (length: "quick" | "full") => { void musicApi.setLength(id, length).then(() => { push(length === "full" ? "Making the full version. It appears on this song." : "Making the quick version. It appears on this song."); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, "That could not start. Try again."))); };
   const newCover = () => { void musicApi.newCover(id, `Album cover art for the song "${song?.title ?? "Untitled song"}"`).then(() => { push("Making a new cover."); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, "A new cover could not start. Try again."))); };
   const reasonOff = ready ? "" : "Available once the song is finished.";
-  return <section className="relative isolate flex shrink-0 flex-col gap-5 overflow-hidden rounded-3xl p-5 sm:p-8" data-testid="music-song-result" aria-label="Open song">
+  return <section ref={top} className="relative isolate flex shrink-0 flex-col gap-5 overflow-hidden rounded-3xl p-5 sm:p-8" data-testid="music-song-result" aria-label="Open song">
     <div aria-hidden="true" className="absolute inset-0 -z-10 scale-125 opacity-60 blur-3xl"><Cover id={id} title={song?.title ?? ""} url={song?.cover_url ?? null} /></div>
     <div aria-hidden="true" className="from-background/20 to-background absolute inset-0 -z-10 bg-linear-to-b" />
     <div className="flex items-start justify-between gap-3">
