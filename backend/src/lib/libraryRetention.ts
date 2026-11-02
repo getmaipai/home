@@ -16,7 +16,7 @@ const SOURCE = "library_retention";
 type FileRow = typeof attachments.$inferSelect;
 // Music uses File.origin's parser; other made files use their reserved provenance markers.
 function typeFor(row: FileRow): LibraryRetentionType | null {
-  const generated = row.origin === "made" || generationOf(row.provenance) || ["picture-gen:", "video-gen:", "video-poster:", "image-edit:"].some((prefix) => row.provenance.startsWith(prefix));
+  const generated = row.origin === "made" || generationOf(row.provenance) || ["picture-gen:", "video-gen:", "video-edit:", "video-poster:", "image-edit:"].some((prefix) => row.provenance.startsWith(prefix));
   if (!generated) return null;
   if (row.mediaType.startsWith("image/")) return "pictures";
   if (row.mediaType.startsWith("video/")) return "videos";

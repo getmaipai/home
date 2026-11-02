@@ -34,7 +34,7 @@ export function trashDays(): number {
 /** The files that travel with an item: a picture's edit versions, a video's poster and a song's cover. */
 export function companionsOf(row: Row): Row[] {
   const meta = libraryProvenance(row.provenance);
-  const job = meta.writer === "video-gen" && typeof meta.job === "string" ? meta.job : null;
+  const job = (meta.writer === "video-gen" || meta.writer === "video-edit") && typeof meta.job === "string" ? meta.job : null;
   const found = sqlite.query<{ id: string }, (string | null)[]>(
     `SELECT a.id FROM attachments a WHERE a.owner_person_id = ? AND a.id != ? AND (
        (a.provenance LIKE 'image-edit:%' AND json_extract(${libraryProvenanceSql("a.provenance")}, '$.root') = ?)
@@ -52,7 +52,7 @@ export function parentOf(row: Row): Row | undefined {
   const live = (id: string) => db.select().from(attachments).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, row.ownerPersonId), isNull(attachments.deletedAt))).get();
   if (meta.writer === "image-edit" && typeof meta.root === "string") return live(meta.root);
   if (meta.writer === "video-poster" && typeof meta.job === "string") {
-    const found = sqlite.query<{ id: string }, string[]>(`SELECT a.id FROM attachments a WHERE a.owner_person_id = ? AND a.deleted_at IS NULL AND a.provenance LIKE 'video-gen:%' AND json_extract(${libraryProvenanceSql("a.provenance")}, '$.job') = ?`).get(row.ownerPersonId, meta.job);
+    const found = sqlite.query<{ id: string }, string[]>(`SELECT a.id FROM attachments a WHERE a.owner_person_id = ? AND a.deleted_at IS NULL AND (a.provenance LIKE 'video-gen:%' OR a.provenance LIKE 'video-edit:%') AND json_extract(${libraryProvenanceSql("a.provenance")}, '$.job') = ?`).get(row.ownerPersonId, meta.job);
     return found ? live(found.id) : undefined;
   }
   const job = db.select({ file: musicJobs.fileId }).from(musicJobs).where(eq(musicJobs.coverFileId, row.id)).get();
@@ -102,7 +102,7 @@ function trashedMain(person: PersonRow): Row[] {
   const ids = new Set(trashed.map((row) => row.id));
   const videoJobs = new Set<string>();
   const metas = trashed.map((row) => ({ row, meta: libraryProvenance(row.provenance) }));
-  for (const { meta } of metas) if (meta.writer === "video-gen" && typeof meta.job === "string") videoJobs.add(meta.job);
+  for (const { meta } of metas) if ((meta.writer === "video-gen" || meta.writer === "video-edit") && typeof meta.job === "string") videoJobs.add(meta.job);
   const covers = new Set(db.select({ cover: musicJobs.coverFileId }).from(musicJobs).where(inArray(musicJobs.fileId, [...ids])).all().map((job) => job.cover).filter((id): id is string => Boolean(id)));
   const companion = (row: Row, meta: ReturnType<typeof libraryProvenance>) =>
     (meta.writer === "image-edit" && typeof meta.root === "string" && ids.has(meta.root)) ||

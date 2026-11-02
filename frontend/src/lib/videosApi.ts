@@ -15,7 +15,7 @@ export interface VideoItem {
   preview_url: string | null;
   started_at: number;
   prompt: string;
-  kind: "generate" | "animate";
+  kind: "generate" | "animate" | "edit";
   error: string | null;
   /** VIDEO-LTX-01: Quick (about two minutes, no sound) or Detailed (with sound and speech), and the other kind this video can be made again as (null: a style binds it, or the other kind is not on this computer). */
   quality?: "quick" | "detailed";

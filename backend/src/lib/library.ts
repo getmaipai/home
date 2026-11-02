@@ -56,7 +56,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
         WHERE cm.cover_file_id = m.id)
         OR (json_extract(meta,'$.writer') = 'video-poster' AND EXISTS(
           SELECT 1 FROM meta parent WHERE parent.owner_person_id = m.owner_person_id
-            AND json_extract(parent.meta,'$.writer') = 'video-gen'
+            AND json_extract(parent.meta,'$.writer') IN ('video-gen','video-edit')
             AND json_extract(parent.meta,'$.job') = json_extract(m.meta,'$.job')))) AS companion
     FROM meta m
   ), visible AS (

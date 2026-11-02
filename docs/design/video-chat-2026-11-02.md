@@ -96,6 +96,11 @@ ready" row (S6); no new status surface.
 | C5 | S | Storyboard and Character cards, with Create V4 and V5 | the card is the Create Element |
 | C6 | S | `retake` after its own bench | only if it beats a plain remix |
 
+**Built on the Home side (2026-11-02, C3 and C4):** `edit_video` takes `trim` (`from_s`, `to_s`), `join` (`clips`, 2 to 6 of the person's own videos) and `mix`
+(`sound` voice with `line` and an optional household `voice`, or music with `track`; `level` quiet to very_loud; `start_s`) through the Stack's
+`media.edit` job (`lib/videos/stackEdit.ts`, `editPlan.ts`). The result is a new video job of kind `edit` (Library note `video-edit:`, linked to the first
+clip); the old clip stays. `continue` and `retake` are not built: the Stack's LTX-2.5 refuses a picture start.
+
 ## 7. Open points
 
 None block C1 and C2. Later: whether `mix` may take a voice made from a clip's own sound (the home-made voices feature takes a 6 to 30 s

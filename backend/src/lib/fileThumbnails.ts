@@ -34,7 +34,7 @@ function allowed(actor: PersonRow, row: Row | undefined): row is Row { return !!
 function sourceFor(actor: PersonRow, row: Row): Row | undefined {
   if (row.mediaType.startsWith("image/")) return row;
   const meta = libraryProvenance(row.provenance);
-  if (row.mediaType.startsWith("video/") && meta.writer === "video-gen" && typeof meta.job === "string") {
+  if (row.mediaType.startsWith("video/") && (meta.writer === "video-gen" || meta.writer === "video-edit") && typeof meta.job === "string") {
     const noteSql = sql.raw(libraryProvenanceSql("attachments.provenance"));
     return db.select().from(attachments).where(and(eq(attachments.ownerPersonId,row.ownerPersonId),
       sql`json_extract(${noteSql}, '$.writer') = 'video-poster'`,

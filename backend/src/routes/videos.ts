@@ -54,7 +54,7 @@ const ItemSchema = z.object({
   preview_url: z.string().nullable().describe("While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."),
   started_at: z.number().describe("Epoch milliseconds the job started, for the card's elapsed clock."),
   prompt: z.string(),
-  kind: z.enum(["generate", "animate"]),
+  kind: z.enum(["generate", "animate", "edit"]),
   error: z.string().nullable(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),

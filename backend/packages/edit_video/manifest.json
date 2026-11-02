@@ -1,15 +1,15 @@
 {
   "id": "edit_video",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Change a Video",
-  "description": "Make another take, a remix or a Max version of a video made here, and keep every version.",
+  "description": "Change a video made here: make another take, cut it, join videos, or lay a voice or song over it.",
   "offer": {
     "mode": "conditional",
     "gate": "videoEditAllowed",
     "bench_row": "video-edit-tool",
-    "reason": "adult on their own written screen with video on and a Stack video model; this chat already holds a finished video"
+    "reason": "adult on their own written screen with video on; this chat already holds a finished video (a cut, a join or a voice or song over it needs only the video editor on this computer)"
   },
   "author": "MaiPai",
   "license": "AGPL-3.0",
@@ -21,7 +21,11 @@
       "same video but at night",
       "make it max quality",
       "try that again with a slow camera move",
-      "make it longer"
+      "make it longer",
+      "cut the first two seconds",
+      "put my voice over it",
+      "add some music to the video",
+      "join these two videos"
     ],
     "patterns": []
   },
@@ -36,17 +40,20 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Which video: \"latest\" for the newest one in this chat, or a video id. Use latest unless the person names another."
+        "description": "Which video: \"latest\" for the newest one in this chat, or a video id. Use latest unless the person names another. For join, the videos go in clips."
       },
       "change": {
         "type": "string",
         "enum": [
           "another_take",
           "remix",
-          "make_it_max"
+          "make_it_max",
+          "trim",
+          "join",
+          "mix"
         ],
         "grounded": false,
-        "description": "another_take makes the same video again with a new random result. remix makes it again with the changes the person asked for: set only the fields they changed. make_it_max makes the same video at the Max level; it is for people an admin allowed and the tool says so if not, and you tell the person in your own words. A video exists only if you called this tool in this reply: never say one is being made without calling it."
+        "description": "another_take makes the same video again with a new random result. remix makes it again with the changes the person asked for: set only the fields they changed. make_it_max makes the same video at the Max level; it is for people an admin allowed and the tool says so if not, and you tell the person in your own words. trim cuts the video: set from_s and to_s (seconds). join puts the person's own videos in order into one: set clips. mix lays a spoken line or one of the person's songs over the video: set sound, and line or track. Cutting, joining and mixing make a new video from the finished one; the old one is kept. A video exists only if you called this tool in this reply: never say one is being made without calling it."
       },
       "prompt": {
         "type": "string",
@@ -112,6 +119,78 @@
         "type": "boolean",
         "grounded": false,
         "description": "For remix only: true when the person wants the same result with the change, as close to the first as possible. Leave it out otherwise."
+      },
+      "from_s": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 600,
+        "grounded": false,
+        "description": "For trim only: where the kept part starts, in seconds from the start of the video. Leave it out to keep from the start."
+      },
+      "to_s": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 600,
+        "grounded": false,
+        "description": "For trim only: where the kept part ends, in seconds from the start. \"Cut the first two seconds\" is from_s 2 with to_s left out; \"keep the first four seconds\" is to_s 4."
+      },
+      "clips": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 6,
+        "items": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "grounded": false,
+        "description": "For join only: 2 to 6 of the person's own videos in the order they want them, each a video id or \"latest\". Only videos made by this person."
+      },
+      "sound": {
+        "type": "string",
+        "enum": [
+          "voice",
+          "music"
+        ],
+        "grounded": false,
+        "description": "For mix only: voice lays a spoken line over the video (set line); music lays one of the person's own songs or sound files (set track)."
+      },
+      "line": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 600,
+        "grounded": false,
+        "description": "For mix with voice: the exact words to say, as the person typed or dictated them. A line of about 12 words fits 5 seconds."
+      },
+      "voice": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "For mix with voice: the name of one of this home's voices when the person names one. Leave it out to use the person's own voice."
+      },
+      "track": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "For mix with music: the id of the person's own song (a music job) or sound file in their Library."
+      },
+      "level": {
+        "type": "string",
+        "enum": [
+          "quiet",
+          "soft",
+          "balanced",
+          "loud",
+          "very_loud"
+        ],
+        "grounded": false,
+        "description": "For mix only: how loud the new sound is against the video's own sound, from quiet to very_loud. Leave it out for the default: a voice over a lowered video sound, a song softly under it."
+      },
+      "start_s": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 600,
+        "grounded": false,
+        "description": "For mix only: seconds into the video where the new sound starts. Leave it out to start at the beginning."
       }
     }
   },

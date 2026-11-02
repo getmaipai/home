@@ -24,7 +24,7 @@ import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
-export type VideoJobKind = "generate" | "animate";
+export type VideoJobKind = "generate" | "animate" | "edit";
 export type VideoJobState = "queued" | "running" | "done" | "failed" | "cancelled";
 
 export interface VideoFile {
@@ -59,6 +59,8 @@ export interface VideoRequest {
   tier?: "boost" | "max";
   /** VIDEO-CREATE-01 (V1b): what the Create page added to the words (ids from recipes.ts) and the one plain line it showed, so Another take repeats the choices. */
   create?: { recipe?: string; look?: string; voices?: string; note?: string };
+  /** VIDEO-CHAT-01 (C3, C4): set on a clip made by editing others (trim, join, mix): the job it came from (the first clip of a join) and what was done. The old clips stay. */
+  edit?: { from: string; change: "trim" | "join" | "mix"; with?: string[] };
 }
 
 export interface VideoJob {
@@ -495,6 +497,60 @@ function saveFailureLine(status: number): string {
   return status === 403 ? `${VIDEO_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${VIDEO_FAILED_PREFIX} The video couldn't be saved. Try again.`;
 }
 
+/** The finished-clip check, the store and the job's end, for a clip the Stack made (`finish`) and one an edit made (`finishEdit`). The Stack's bytes are stored unchanged. */
+async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, posterIn: Uint8Array | null, clip: StackClip, signal: AbortSignal, writer: "video-gen" | "video-edit"): Promise<void> {
+  // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
+  // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
+  const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
+  const keyframes = await extractKeyframes(video, clip.seconds ?? job.request.seconds);
+  // An edit has no poster from the Stack: frame 0 of the new clip is its poster, and a clip no frame can be taken from is not stored.
+  const poster = posterIn ?? keyframes?.[0] ?? null;
+  if (!poster) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video didn't come out right. Try again.`; saveVideoJob(job); return; }
+  const checks = await checkImages(keyframes ?? [poster], "video");
+  // The poster is frame 0 only. For an adult-only clip that is not enough to answer for the rest of it, so it counts as "could not check".
+  if (!keyframes) checks.push({ ok: false, why: "unavailable" });
+  if (signal.aborted) return;
+  const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
+  if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
+  const conversationId = job.conversationId;
+  // VIDEO-CREATE-01: no conversation means the Create page made it; the clip and poster are kept Library files, not chat attachments.
+  if (!conversationId && job.temporary) throw new Error("no conversation");
+  const width = clip.width ?? 832;
+  const height = clip.height ?? 480;
+  // VIDEO-TIERS-01: an LTX-2.5 clip is Standard ("quick") or Boost ("detailed") by the level the job ran at; it has sound either way (`audio`).
+  const quality = clip.quality === "detailed" || (clip.quality === "ltx25" && job.request.quality === "detailed") ? "detailed" as const : "quick" as const;
+  const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height, quality, audio: clip.audio === true };
+  let file: VideoFile;
+  if (job.temporary) {
+    const id = newFileId();
+    const posterId = newFileId();
+    storeTemporaryClip({ id, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
+    storeTemporaryClip({ id: posterId, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
+    file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
+  } else {
+    const own = conversationId === null;
+    if (!own && (!job.turnId || !(await waitForTurnRow(job.turnId)))) throw new Error("turn row never appeared");
+    if (signal.aborted) return;
+    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta, ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
+    const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height,  })}`;
+    const made = own
+      ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept" })
+      : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation" });
+    if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
+    const madePoster = own
+      ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "kept" })
+      : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "conversation" });
+    if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
+    file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
+  }
+  job.files = [file];
+  job.state = "done";
+  job.percent = 100;
+  job.phase = "ready";
+  job.error = null;
+  saveVideoJob(job);
+}
+
 async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signal: AbortSignal): Promise<void> {
   const stackJob = job.stackJob!;
   try {
@@ -505,56 +561,63 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     const poster = await fetchPoster(stackJob);
     if (signal.aborted) return;
     if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video didn't come out right. Try again.`; saveVideoJob(job); return; }
-    // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
-    // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
-    const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
-    const keyframes = await extractKeyframes(video, clip.seconds ?? job.request.seconds);
-    const checks = await checkImages(keyframes ?? [poster], "video");
-    // The poster is frame 0 only. For an adult-only clip that is not enough to answer for the rest of it, so it counts as "could not check".
-    if (!keyframes) checks.push({ ok: false, why: "unavailable" });
-    if (signal.aborted) return;
-    const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
-    if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
-    const conversationId = job.conversationId;
-    // VIDEO-CREATE-01: no conversation means the Create page made it; the clip and poster are kept Library files, not chat attachments.
-    if (!conversationId && job.temporary) throw new Error("no conversation");
-    const width = clip.width ?? 832;
-    const height = clip.height ?? 480;
-    // VIDEO-TIERS-01: an LTX-2.5 clip is Standard ("quick") or Boost ("detailed") by the level the job ran at; it has sound either way (`audio`).
-    const quality = clip.quality === "detailed" || (clip.quality === "ltx25" && job.request.quality === "detailed") ? "detailed" as const : "quick" as const;
-    const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height, quality, audio: clip.audio === true };
-    let file: VideoFile;
-    if (job.temporary) {
-      const id = newFileId();
-      const posterId = newFileId();
-      storeTemporaryClip({ id, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
-      storeTemporaryClip({ id: posterId, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
-      file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
-    } else {
-      const own = conversationId === null;
-      if (!own && (!job.turnId || !(await waitForTurnRow(job.turnId)))) throw new Error("turn row never appeared");
-      if (signal.aborted) return;
-      const clipProvenance = `video-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta })}`;
-      const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height,  })}`;
-      const made = own
-        ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept" })
-        : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation" });
-      if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
-      const madePoster = own
-        ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "kept" })
-        : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "conversation" });
-      if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
-      file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
-    }
-    job.files = [file];
-    job.state = "done";
-    job.percent = 100;
-    job.phase = "ready";
-    job.error = null;
-    saveVideoJob(job);
+    await settleClip(job, actor, video, poster, clip, signal, "video-gen");
   } finally {
     // Done or not, Home has taken what it wanted: the Stack's copy goes (a failed save would otherwise leave a clip on its disk).
     void cancelOrDeleteVideo(stackJob);
+  }
+}
+
+// ---------------------------------------------------------------- edits (VIDEO-CHAT-01, C3 and C4)
+
+/** What an edit hands back: the new clip's bytes and what the Stack measured. Frame 0 of the clip is its poster. */
+export interface EditedClip { video: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number }
+/** The work of one edit (the Stack call, and any speech made first). It never throws: a failure is one plain line. */
+export type EditRun = (signal: AbortSignal) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
+export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
+export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
+
+export interface StartEditInput { actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun }
+
+/** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
+ * One clip at a time per person, as for a made clip; a refusal is the plain line. */
+export function startVideoEditJob(input: StartEditInput): { ok: true; job: VideoJob } | { ok: false; line: string } {
+  if (activeVideoJobsFor(input.actor) > 0) return { ok: false, line: "You already have a video being made. Wait for it to finish, or stop it first." };
+  const now = new Date().toISOString();
+  const from = input.source.request;
+  const job: VideoJob = {
+    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
+    percent: 5, phase: "editing", position: null, prompt: input.source.prompt,
+    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit },
+    error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
+  };
+  liveJobs.set(job.id, job);
+  saveVideoJob(job);
+  void runEdit(job, input.actor, input.run, input.source);
+  return { ok: true, job };
+}
+
+async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: VideoJob): Promise<void> {
+  const controller = new AbortController();
+  watching.set(job.id, controller);
+  try {
+    const made = await run(controller.signal);
+    if (controller.signal.aborted) return;
+    if (!made.ok) { job.state = "failed"; job.error = made.line; saveVideoJob(job); return; }
+    const { clip } = made;
+    if (!looksLikeMp4(clip.video)) { job.state = "failed"; job.error = `${EDIT_FAILED_PREFIX} The edited video didn't come out right. Try again.`; saveVideoJob(job); return; }
+    const seconds = clip.seconds === null ? null : Math.round(clip.seconds * 100) / 100;
+    if (seconds !== null) job.request.seconds = Math.max(1, Math.round(seconds));
+    const quality = job.request.quality === "detailed" ? "detailed" as const : "quick" as const;
+    await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit");
+  } catch {
+    job.state = "failed";
+    job.error = `${EDIT_FAILED_PREFIX} Something went wrong while making it. Try again.`;
+    try { saveVideoJob(job); } catch { /* the job ends here either way */ }
+  } finally {
+    watching.delete(job.id);
+    liveJobs.delete(job.id);
+    refreshHouseholdQueue();
   }
 }
 
@@ -582,6 +645,7 @@ export function resumeVideoJobs(): void {
 async function resume(job: VideoJob): Promise<void> {
   const person = db.select().from(people).where(eq(people.id, job.personId)).get();
   if (!person) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It did not finish. Try again.`; saveVideoJob(job); return; }
+  if (job.kind === "edit") { job.state = "failed"; job.error = EDIT_RESTART_LINE; saveVideoJob(job); return; }
   liveJobs.set(job.id, job);
   if (!job.stackJob) return;
   void watch(job, person as PersonRow);

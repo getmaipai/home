@@ -1,0 +1,19 @@
+{
+  "about": "VIDEO-CHAT-01 (bench_row video-edit-tool): rows for edit_video next to generate_video. label = the one tool expected, or N when neither video tool may be called. A video already exists in the chat. Persona names only.",
+  "rows": [
+    { "id": "take-again", "label": "edit_video", "text": "Do another one of that video." },
+    { "id": "remix-anime", "label": "edit_video", "text": "Make it anime." },
+    { "id": "remix-night", "label": "edit_video", "text": "Same video but at night." },
+    { "id": "max", "label": "edit_video", "text": "Make that video at max quality." },
+    { "id": "trim-start", "label": "edit_video", "text": "Cut the first two seconds off the video." },
+    { "id": "trim-keep", "label": "edit_video", "text": "Keep only the first four seconds." },
+    { "id": "join-two", "label": "edit_video", "text": "Put the boat video and the rain video together, boat first." },
+    { "id": "mix-voice", "label": "edit_video", "text": "Put my voice over it saying \"Look at the little boat go.\"" },
+    { "id": "mix-named-voice", "label": "edit_video", "text": "Have Nadia say \"Here we go\" over the video, quietly." },
+    { "id": "mix-music", "label": "edit_video", "text": "Add my rainy Sunday song to the video, softly." },
+    { "id": "new-video", "label": "generate_video", "text": "Make a video of a cat on a skateboard." },
+    { "id": "no-video-1", "label": "N", "text": "What is a good name for a paper boat?" },
+    { "id": "no-video-2", "label": "N", "text": "Write a line I could say at the start of a film." },
+    { "id": "no-video-3", "label": "N", "text": "Make me a song about boats." }
+  ]
+}

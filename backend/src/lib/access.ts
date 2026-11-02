@@ -126,7 +126,7 @@ export function fileDisclosure(ownerPersonId: string): "child_ok" | "adult_only"
  * The spec has no audience field yet, so generators put it in their provenance JSON. */
 export function fileAudience(provenance: string): "all-ages" | "adult-only" | null {
   const meta = libraryProvenance(provenance);
-  if (!["picture-gen", "video-gen", "video-poster", "image-edit"].includes(meta.writer ?? "")) return null;
+  if (!["picture-gen", "video-gen", "video-edit", "video-poster", "image-edit"].includes(meta.writer ?? "")) return null;
   return meta.audience === "all-ages" || meta.audience === "adult-only" ? meta.audience : null;
 }
 
@@ -140,7 +140,7 @@ export function canReadFileAudience(actor: PersonRow, file: { ownerPersonId: str
  * actor ids remain bound parameters. Used before Library LIMIT and aggregation. */
 function fileAccessSql(actor: PersonRow, file: string, shared: string): string {
   const meta = libraryProvenanceSql(`${file}.provenance`);
-  const audience = `(json_extract(${meta},'$.writer') IN ('picture-gen','video-gen','video-poster','image-edit') AND (SELECT value FROM json_each(${meta}) WHERE key = 'audience' ORDER BY id DESC LIMIT 1) = 'all-ages')`;
+  const audience = `(json_extract(${meta},'$.writer') IN ('picture-gen','video-gen','video-edit','video-poster','image-edit') AND (SELECT value FROM json_each(${meta}) WHERE key = 'audience' ORDER BY id DESC LIMIT 1) = 'all-ages')`;
   const gate = speakerAgeBand(actor, new Date()) === "adult" ? "1=1" : audience;
   const granted = `CASE WHEN ${file}.origin = 'fetched' THEN ${isOwnerOrAdmin(actor) ? "1" : "0"} ELSE (${shared}) END`;
   // LIBRARY-REVAMP-10: a file in Trash (or kept only as a chat copy) is out of the Library for everyone, its owner included;
