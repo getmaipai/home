@@ -20,7 +20,7 @@ import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/pol
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
-import { cancelMusicJob, getMusicJobFor, jobsForConversation, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
+import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { authorizeTier } from "@/lib/tiers";
 import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, runGenerateMusic, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
@@ -166,6 +166,12 @@ const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"
 musicRoutes.openapi(statusRoute, async (c) => {
   const engine = await musicEngineStatus(); const ready = musicStatusReady(engine);
   return c.json({ can_make: ready, engine_ready: ready, limits: engine?.limits ?? null }, 200);
+});
+const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], summary: "The owner's songs, newest first", middleware: viewMiddleware,
+  responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "Up to 40 song cards." }, ...refusals } });
+musicRoutes.openapi(listRoute, async (c) => {
+  const actor = c.get("person");
+  return c.json(await Promise.all(jobsForPerson(actor, 40).map((job) => musicCardView(actor, job))), 200);
 });
 const getRoute = createRoute({ method: "get", path: "/jobs/{id}", tags: ["Music"], summary: "The owner's song card", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "Progress and versions." }, ...refusals } });

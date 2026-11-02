@@ -12,7 +12,7 @@ import { Band, type BandPatch } from "@maipai/ui/src/elements/band";
 import { SongStyleCard, type SongStylePatch } from "@maipai/ui/src/elements/song-style";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { MakeSongPage } from "./MakeSongPage";
+import { MusicWorkspace } from "./MusicWorkspacePage";
 import { request } from "@/lib/api";
 import { bandImageSrc, useBandCard } from "@/apps/chat/useBandCard";
 import { joinBandAndStudio, musicRefOf, useMusicCard, type MusicCardKind } from "@/apps/chat/useMusicCard";
@@ -78,7 +78,7 @@ function AskHome({ kind }: { kind: Kind }) {
 }
 
 /** A blank card in edit mode: save makes the record, then the editor opens on it. */
-function CreatePage({ kind, adult }: { kind: Kind; adult: boolean }) {
+export function CreatePage({ kind, adult }: { kind: Kind; adult: boolean }) {
   const navigate = useNavigate();
   const { push } = useToast();
   const queryClient = useQueryClient();
@@ -143,22 +143,6 @@ function CreationsPage({ adult }: { adult: boolean }) {
   </section>;
 }
 
-function CreateChooser({ adult }: { adult: boolean }) {
-  if (!adult) return <EmptyState icon="music" text={ADULT_ONLY_LINE} />;
-  const choices: Array<{ kind: Kind | "song"; to: string; title: string; line: string }> = [
-    { kind: "song", to: "/apps/music/make-song", title: "A song", line: "Describe it, add your words, and hear it." },
-    { kind: "band", to: "/apps/music/make-band", title: "A band", line: "A name, a look and a sound." },
-    { kind: "album", to: "/apps/music/make-album", title: "An album", line: "A cover and a list of songs." },
-    { kind: "song_style", to: "/apps/music/make-style", title: "A song style", line: "A sound to reuse in any song." },
-  ];
-  return <section className="flex flex-col gap-4" data-testid="music-create">
-    <Heading title="Create" line="Make something new, or open what you already made in My creations." />
-    <ul className="grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4 lg:px-0">
-      {choices.map((choice) => <li key={choice.kind}><Link to={choice.to} className="bg-card hover:bg-muted flex h-full flex-col gap-1 rounded-2xl border p-4 transition-colors"><span className="text-base font-semibold">{choice.title}</span><span className="text-muted-foreground text-sm">{choice.line}</span></Link></li>)}
-    </ul>
-  </section>;
-}
-
 /** The kit card for a saved record, opened in edit mode. Edits, remakes and discards go to the same routes the chat card uses. */
 function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const navigate = useNavigate();
@@ -198,8 +182,7 @@ function songStyleProps(props: Record<string, unknown>) {
 
 /** The Music app's Create and library pages. `search` is the address's query string. */
 export function MusicStudioPage({ pageId, search, adult }: { pageId: string; search: string; adult: boolean }) {
-  if (pageId === "create") return <CreateChooser adult={adult} />;
-  if (pageId === "make-song") return <MakeSongPage adult={adult} search={search} />;
+  if (pageId === "create" || pageId === "make-song") return <MusicWorkspace adult={adult} search={search} />;
   if (pageId === "make-band") return <CreatePage kind="band" adult={adult} />;
   if (pageId === "make-album") return <CreatePage kind="album" adult={adult} />;
   if (pageId === "make-style") return <CreatePage kind="song_style" adult={adult} />;

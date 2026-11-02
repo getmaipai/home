@@ -48,7 +48,7 @@ export const songAddress = (id: string): string => `/apps/music/make-song?song=$
 
 const text = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 
-function Field({ id, label, hint, children }: { id?: string; label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ id, label, hint, children }: { id?: string; label: string; hint?: string; children: React.ReactNode }) {
   return <div className="flex flex-col gap-2">
     {id ? <Label htmlFor={id}>{label}</Label> : <p className="text-sm font-semibold">{label}</p>}
     {children}
@@ -56,7 +56,7 @@ function Field({ id, label, hint, children }: { id?: string; label: string; hint
   </div>;
 }
 
-function Shelf({ label, hint, picks, value, onChange, empty }: { label: string; hint: string; picks: Pick[]; value: string | null; onChange: (id: string | null) => void; empty?: React.ReactNode }) {
+export function Shelf({ label, hint, picks, value, onChange, empty }: { label: string; hint: string; picks: Pick[]; value: string | null; onChange: (id: string | null) => void; empty?: React.ReactNode }) {
   return <Field label={label} hint={hint}>
     {picks.length === 0 ? <p className="text-muted-foreground text-sm">{empty}</p>
       : <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
@@ -66,7 +66,7 @@ function Shelf({ label, hint, picks, value, onChange, empty }: { label: string; 
 }
 
 /** The finished (or still-being-made) song: the kit song card plus Keep and Make another. */
-function SongResult({ id }: { id: string }) {
+export function SongResult({ id, onAnother }: { id: string; onAnother?: () => void }) {
   const navigate = useNavigate();
   const { push } = useToast();
   const queryClient = useQueryClient();
@@ -84,7 +84,7 @@ function SongResult({ id }: { id: string }) {
     onRefresh: () => { void card.refetch(); void queryClient.invalidateQueries({ queryKey: ["library"] }); },
     onStop: () => { void musicApi.stop(id).then(() => card.refetch()).catch((error: unknown) => push(text(error, "The song could not be stopped. Try again."))); },
   });
-  if (card.isError && !card.data) return <EmptyState icon="music" text="That song is not here any more. It may have been removed from your Library." actionLabel="Make a song" onAction={() => navigate("/apps/music/make-song")} />;
+  if (card.isError && !card.data) return <EmptyState icon="music" text="That song is not here any more. It may have been removed from your Library." actionLabel="Make a song" onAction={() => (onAnother ?? (() => navigate("/apps/music/create")))()} />;
   const ready = shown.state === "done" && shown.versions.length > 0;
   const fileId = shown.current_id ?? shown.versions.at(-1)?.id ?? null;
   const keep = () => { if (!fileId) return; api.updateLibraryFile(fileId, { keep: true }).then(() => { setKept(true); push("Kept. This song stays in your Library until you delete it."); }).catch((error: unknown) => push(text(error, "The song could not be kept. Try again."))); };
@@ -93,14 +93,15 @@ function SongResult({ id }: { id: string }) {
     {ready ? <div className="flex flex-wrap items-center gap-2">
       <Button type="button" variant={kept ? "secondary" : "default"} disabled={kept} onClick={keep}>{kept ? "Kept in your Library" : "Keep in my Library"}</Button>
       {fileId ? <Button asChild variant="outline"><Link to={`/files?file=${encodeURIComponent(fileId)}`}>Open in Library</Link></Button> : null}
-      <Button type="button" variant="ghost" onClick={() => navigate("/apps/music/make-song")}>Make another</Button>
+      <Button type="button" variant="ghost" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>Make another</Button>
     </div> : null}
     {ready ? <p className="text-muted-foreground text-sm">Every song you make lands in your Library. Keep pins it so storage clean-up never removes it. Open Edit above to change the title, words or style; your earlier version stays.</p> : null}
-    {shown.state === "failed" || shown.state === "cancelled" ? <Button type="button" variant="outline" onClick={() => navigate("/apps/music/make-song")}>Start over</Button> : null}
+    {shown.state === "failed" || shown.state === "cancelled" ? <Button type="button" variant="outline" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>Start over</Button> : null}
   </>;
 }
 
-function Maker({ search }: { search: string }) {
+/** The song form. `simple` is the Suno-style short form (the idea and Create); the full form adds words, a title, tempo and the saved sounds. */
+export function Maker({ search, simple = false, onMade }: { search: string; simple?: boolean; onMade?: (id: string) => void }) {
   const navigate = useNavigate();
   const { push } = useToast();
   const prefill = useMemo(() => new URLSearchParams(search), [search]);
@@ -111,7 +112,7 @@ function Maker({ search }: { search: string }) {
   const [instrumental, setInstrumental] = useState(false); const [length, setLength] = useState<"quick" | "full" | "">("");
   const [bpm, setBpm] = useState(""); const [key, setKey] = useState("");
   const [styleId, setStyleId] = useState<string | null>(prefill.get("style")); const [bandId, setBandId] = useState<string | null>(prefill.get("band"));
-  const [making, setMaking] = useState(false); const [problem, setProblem] = useState("");
+  const [tags, setTags] = useState<string[]>([]); const [tag, setTag] = useState(""); const [making, setMaking] = useState(false); const [problem, setProblem] = useState("");
   useEffect(() => { setStyleId(prefill.get("style")); setBandId(prefill.get("band")); }, [prefill]);
 
   const stylePicks: Pick[] = (styles.data ?? []).map((row) => ({ id: row.id, name: row.title ?? "Untitled style", line: row.style?.description ?? "" }));
@@ -124,43 +125,52 @@ function Maker({ search }: { search: string }) {
   const make = () => {
     if (!ready) return;
     setMaking(true); setProblem("");
-    musicApi.makeSong(makeSongBody({ idea, lyrics, instrumental, title, length, bpm, key, styleId, bandId }))
-      .then((card) => navigate(songAddress(card.id)))
+    musicApi.makeSong(makeSongBody({ idea: tags.length ? `${idea.trim()} Style: ${tags.join(", ")}.` : idea, lyrics, instrumental, title, length, bpm, key, styleId, bandId }))
+      .then((card) => { if (onMade) { setIdea(""); setTags([]); onMade(card.id); } else navigate(songAddress(card.id)); })
       .catch((error: unknown) => { const line = text(error, "Home could not start the song. Check the request and try again."); setProblem(line); push(line); })
       .finally(() => setMaking(false));
   };
 
-  return <div className="flex flex-col gap-6 px-4 lg:px-0" data-testid="music-make-song-form">
+  const addTag = () => { const next = tag.trim().replace(/,$/, "").slice(0, 40); if (next && !tags.includes(next) && tags.length < 8) setTags([...tags, next]); setTag(""); };
+  return <div className={`flex flex-col gap-5 ${onMade ? "" : "px-4 lg:px-0"}`} data-testid="music-make-song-form">
     {engineMissing ? <Alert role="alert" data-testid="music-no-engine"><AlertDescription>{NO_MUSIC_ENGINE_LINE}</AlertDescription></Alert> : null}
     {blocked ? <Alert role="alert" variant="destructive"><AlertDescription>{blocked}</AlertDescription></Alert> : null}
-    <Field id="song-idea" label="What is the song about?" hint="Say the mood, the story or the sound. For example: a mellow porch-swing folk song about summer rain.">
-      <Textarea id="song-idea" rows={3} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="A dreamy synth-pop song about driving home at night" />
+    <Field id="song-idea" label="Describe your song" hint={`${idea.length} / 1200`}>
+      <Textarea id="song-idea" rows={simple ? 5 : 3} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="A dreamy indie pop song about new beginnings, with warm guitar and an upbeat tempo" />
+    </Field>
+    <Field label="Styles" hint="Type a style and press Enter. Words only, never lyrics.">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Styles">
+        {tags.map((name) => <Chip key={name} selected onClick={() => setTags(tags.filter((one) => one !== name))} aria-label={`Remove ${name}`}>{name} ×</Chip>)}
+      </div>
+      <Input id="song-tag" aria-label="Add a style" maxLength={40} value={tag} onChange={(event) => setTag(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addTag(); } }} onBlur={addTag} placeholder="slow ballad, ethereal synths" />
     </Field>
     <div className="flex items-center justify-between gap-4 rounded-2xl border p-4">
       <div className="flex min-w-0 flex-col"><Label htmlFor="song-instrumental">Instrumental</Label><p className="text-muted-foreground text-xs">No singing, just the music.</p></div>
       <Switch id="song-instrumental" checked={instrumental} onCheckedChange={setInstrumental} />
     </div>
-    {instrumental ? null : <Field id="song-lyrics" label="Lyrics (optional)" hint="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes the words.">
-      <Textarea id="song-lyrics" rows={6} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} />
-    </Field>}
-    <Shelf label="Song style (optional)" hint="A saved sound to start from. Pick it again to clear it." picks={stylePicks} value={styleId} onChange={setStyleId}
-      empty={styles.isPending ? "Loading styles" : styles.isError ? "Styles could not be loaded. Open this page again." : <>No styles yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-style">Make a song style</Link></>} />
-    <Shelf label="In a band's sound (optional)" hint="Makes the song sound like one of the bands you made." picks={bandPicks} value={bandId} onChange={setBandId}
-      empty={bands.isPending ? "Loading bands" : bands.isError ? "Bands could not be loaded. Open this page again." : <>No bands yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-band">Make a band</Link></>} />
-    <Field id="song-title" label="Title (optional)"><Input id="song-title" maxLength={200} value={title} onChange={(event) => setTitle(event.currentTarget.value)} placeholder="Home picks one if you leave this empty" /></Field>
-    <div className="grid gap-4 sm:grid-cols-3">
-      <Field label="Length" hint={limits ? `Up to ${Math.floor(limits.max_seconds / 60)} minutes on this computer.` : undefined}>
-        <ToggleGroup type="single" variant="outline" value={length} onValueChange={(next) => setLength(next === "quick" || next === "full" ? next : "")} aria-label="Length">
-          <ToggleGroupItem value="quick">Quick</ToggleGroupItem><ToggleGroupItem value="full">Full</ToggleGroupItem>
-        </ToggleGroup>
-      </Field>
-      <Field id="song-bpm" label="Tempo (BPM)"><Input id="song-bpm" inputMode="numeric" type="number" min={20} max={300} value={bpm} onChange={(event) => setBpm(event.currentTarget.value)} placeholder="Auto" /></Field>
-      <Field id="song-key" label="Key"><Input id="song-key" maxLength={20} value={key} onChange={(event) => setKey(event.currentTarget.value)} placeholder="Auto, for example C major" /></Field>
-    </div>
+    {simple ? null : <>
+      {instrumental ? null : <Field id="song-lyrics" label="Lyrics (optional)" hint="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes the words.">
+        <Textarea id="song-lyrics" rows={6} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} />
+      </Field>}
+      <Shelf label="Song style (optional)" hint="A saved sound to start from. Pick it again to clear it." picks={stylePicks} value={styleId} onChange={setStyleId}
+        empty={styles.isPending ? "Loading styles" : styles.isError ? "Styles could not be loaded. Open this page again." : <>No styles yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-style">Make a song style</Link></>} />
+      <Shelf label="In a band's sound (optional)" hint="Makes the song sound like one of the bands you made." picks={bandPicks} value={bandId} onChange={setBandId}
+        empty={bands.isPending ? "Loading bands" : bands.isError ? "Bands could not be loaded. Open this page again." : <>No bands yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-band">Make a band</Link></>} />
+      <Field id="song-title" label="Title (optional)"><Input id="song-title" maxLength={200} value={title} onChange={(event) => setTitle(event.currentTarget.value)} placeholder="Home picks one if you leave this empty" /></Field>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Length" hint={limits ? `Up to ${Math.floor(limits.max_seconds / 60)} minutes on this computer.` : undefined}>
+          <ToggleGroup type="single" variant="outline" value={length} onValueChange={(next) => setLength(next === "quick" || next === "full" ? next : "")} aria-label="Length">
+            <ToggleGroupItem value="quick">Quick</ToggleGroupItem><ToggleGroupItem value="full">Full</ToggleGroupItem>
+          </ToggleGroup>
+        </Field>
+        <Field id="song-bpm" label="Tempo (BPM)"><Input id="song-bpm" inputMode="numeric" type="number" min={20} max={300} value={bpm} onChange={(event) => setBpm(event.currentTarget.value)} placeholder="Auto" /></Field>
+        <Field id="song-key" label="Key"><Input id="song-key" maxLength={20} value={key} onChange={(event) => setKey(event.currentTarget.value)} placeholder="Auto, for example C major" /></Field>
+      </div>
+    </>}
     {problem ? <Alert variant="destructive"><AlertDescription>{problem}</AlertDescription></Alert> : null}
-    <div className="flex flex-wrap items-center gap-3">
-      <Button type="button" size="lg" disabled={!ready} onClick={make}>{making ? "Starting your song" : "Make song"}</Button>
-      <p className="text-muted-foreground text-sm">{idea.trim().length < 3 ? "Say what the song is about to start." : "It takes about a minute. You can watch it here."}</p>
+    <div className="flex flex-col gap-2">
+      <Button type="button" size="lg" disabled={!ready} onClick={make}>{making ? "Starting your song" : "Create song"}</Button>
+      <p className="text-muted-foreground text-sm">{idea.trim().length < 3 ? "Say what the song is about to start." : "It takes about a minute. It shows up in your list."}</p>
     </div>
   </div>;
 }

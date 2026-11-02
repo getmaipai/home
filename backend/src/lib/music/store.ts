@@ -56,6 +56,12 @@ export function jobsForConversation(actor: { id: string }, conversationId: strin
   if (temporary) return [...memory.values()].filter((j) => j.personId === actor.id && j.conversationId === conversationId);
   return db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), eq(musicJobs.conversationId, conversationId))).all().map((r) => liveJobs.get(r.id) ?? fromRow(r));
 }
+/** The person's own songs, newest first (the Create workspace's list). Stem splits and temporary chat songs are not songs of the list. */
+export function jobsForPerson(actor: { id: string }, limit = 40): MusicJob[] {
+  pruneMusicJobs();
+  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), eq(musicJobs.task, "text2music"))).all().map((r) => liveJobs.get(r.id) ?? fromRow(r));
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+}
 export function activeMusicJobsFor(actor: { id: string }): number {
   pruneMusicJobs();
   const ids = new Set([...memory.values(), ...liveJobs.values()].filter((j) => j.personId === actor.id && (j.state === "queued" || j.state === "running")).map((j) => j.id));

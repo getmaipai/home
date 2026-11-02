@@ -48,6 +48,14 @@ async function makeStems(client: TestClient, source: MusicJob) {
   return { response, client };
 }
 describe("music routes", () => {
+  test("lists the owner's songs newest first, and nobody else's", async () => {
+    const { actor, client } = await owner(); const { job } = await song(actor);
+    const mine = await (await client.get("/api/music/jobs")).json() as { id: string; title: string | null }[];
+    expect(mine.map((card) => card.id)).toEqual([job.id]);
+    expect(mine[0]!.title).toBe("Pancakes");
+    const other = new TestClient();
+    expect((await other.get("/api/music/jobs")).status).toBe(401);
+  });
   test("splits the shown song and shows its stems as one card that steps through them in order", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor);
     fake.stems = true;

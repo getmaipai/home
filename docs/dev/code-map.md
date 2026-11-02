@@ -233,13 +233,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/EnginesPage.tsx` | EnginesIcon, EnginesConsole |
 | `frontend/src/shell/pages/FamilyPage.tsx` | FamilyPage |
 | `frontend/src/shell/pages/FilesPage.tsx` | FilesPage |
-| `frontend/src/shell/pages/MakeSongPage.tsx` | MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, songAddress, MakeSongPage |
+| `frontend/src/shell/pages/MakeSongPage.tsx` | MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, songAddress, Field, Shelf |
 | `frontend/src/shell/pages/MarkdownDocument.tsx` | MarkdownDocument |
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
-| `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, MusicStudioPage |
+| `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
+| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | songLine, MusicWorkspace |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |

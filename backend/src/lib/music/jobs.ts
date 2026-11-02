@@ -22,8 +22,8 @@ import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { slotRun } from "@/lib/tiers";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
-import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
-export { getMusicJobFor, jobsForConversation, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
+import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, jobsForPerson, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
+export { getMusicJobFor, jobsForConversation, jobsForPerson, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
 
 let POLL_MS = 1000;
