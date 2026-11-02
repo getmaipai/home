@@ -13,6 +13,8 @@ import { applySound } from "@/lib/music/tool";
 import { EDIT_TOOL_OBJECT, STUDIO_TOOL_IDS, isStudioTool, runStudioTool } from "@/lib/music/studioTools";
 import { resolveTurnBudget, withTurnToolGates, type MusicObjectGate } from "@/lib/turnMachine/budget";
 import type { PersonRow } from "@/types";
+import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
+import { bandBlockFromRecord } from "@/lib/music/band";
 import { resetDb } from "./reset-db";
 
 // MUSIC-STUDIO-HOME: albums, saved song styles, edits as revisions, and the sound a song takes from a style, band or album.
@@ -270,5 +272,14 @@ describe("the tool cap with every music tool in play", () => {
       }
     }
     for (const id of ["generate_music", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"]) expect(seen.has(id)).toBe(true);
+  }, 30000);
+
+  test("the band, album and style cards satisfy the strict spec, so the thread draws them (a six-button band card was dropped)", () => {
+    const where = { conversationId: "conv-example0001", turnId: "turn-example0001" };
+    const band = createMade("made_artist", sage, { name: "Clover Lane", backstory: "Two friends.", genres: ["folk"], members: [{ name: "Iris", role: "vocals" }], style: { description: "soft folk", genres: ["folk"] } });
+    const set = createMade("song_style", sage, { title: "Sunny road trip", style: STYLE });
+    if (!band.ok || !set.ok) throw new Error("seed");
+    const blocks = [bandBlockFromRecord(band.value as never, where), albumBlock(sage, album(sage) as never, where), styleBlock(set.value as never, where)];
+    for (const block of blocks) expect(AnswerBlock.safeParse(block).success).toBe(true);
   });
 });

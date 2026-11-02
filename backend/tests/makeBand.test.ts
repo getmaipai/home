@@ -162,7 +162,7 @@ describe("the band card", () => {
     const actions = block.props.actions as string[];
     expect(actions.length).toBeLessThanOrEqual(4);
     expect(new Set(actions).size).toBe(actions.length);
-    expect(actions).not.toContain("make_album");
+    expect(actions).toContain("make_album");
     expect(block.props.logo).toBeUndefined();
     expect(fileIdOfHubImage((block.props.portrait as { src: string }).src)).toBe("file-portrait1");
     expect(block.props.inspiredBy).toBe("Paper Boats by Rivet Row");
@@ -177,7 +177,7 @@ describe("the band actions", () => {
     return made.value.id;
   }
   test("every action name is known", () => {
-    expect([...BAND_ACTION_NAMES]).toEqual(["keep", "remake", "remake_portrait", "remake_logo", "discard"]);
+    expect([...BAND_ACTION_NAMES]).toEqual(["keep", "remake", "remake_portrait", "remake_logo", "discard", "edit"]);
   });
   test("a missing band is 404 and another person's band is 404 for them, not a leak", async () => {
     expect(await runBandAction(sage, "mband-nothere0000", "keep")).toMatchObject({ ok: false, status: 404 });
