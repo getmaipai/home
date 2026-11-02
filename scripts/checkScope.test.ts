@@ -141,6 +141,7 @@ describe("check.sh run bare (no MAIPAI_COMMONS_DIR in the environment)", () => {
     const assigned = lines.findIndex((l) => /^\s*MAIPAI_COMMONS_DIR=/.test(l));
     const firstUse = lines.findIndex((l) => /\$MAIPAI_COMMONS_DIR|\$\{MAIPAI_COMMONS_DIR\}/.test(l));
     expect(assigned).toBeGreaterThan(-1);
-    expect(assigned).toBeLessThan(firstUse);
+    // A bare read aborts under set -u; no bare read at all is also safe (${VAR:-default} is not matched).
+    if (firstUse !== -1) expect(assigned).toBeLessThan(firstUse);
   });
 });

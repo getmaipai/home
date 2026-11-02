@@ -4342,6 +4342,23 @@
       "replacesHandBuilt": [],
       "realTurnToday": false,
       "verdictReason": "Added to the kit for generation prompts; no Home screen draws it yet. Wire it when a generation screen takes a prompt with options."
+    },
+    {
+      "file": "band.tsx",
+      "name": "band",
+      "group": "band",
+      "verdict": "wire-after",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "verdictReason": "MUSIC-LISTEN-C5 chat card for a band the household made; Home wires it when the band-making turn emits the band structured part."
     }
   ]
 }
