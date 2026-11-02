@@ -17,6 +17,7 @@ import { PageDeclinedError, __setPageReaderForTests, __resetSearchCacheForTests 
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
 import { __setResearchCapForTests, rewordEmptyQuery, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
+import { __setWebSearchToolDeadlineForTests } from "@/lib/webSearchBudget";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
 import { researchStepsFor } from "@/lib/conversationHistory";
@@ -893,6 +894,25 @@ describe("an empty planned search is retried once, reworded", () => {
     expect(retries.length).toBe(2);
     // three searches one after another (1.2 s), then the two retries together (0.4 s), not one after another (0.8 s)
     expect(Date.now() - started).toBeLessThan(3_000);
+  });
+
+  // The shape every live bench run showed: searches are paced (a burst of three, then one per six seconds), so the later searches of a
+  // round meet the round's tool deadline. The cut search is a "failed / timed_out" outcome and the node's own signal is already aborted.
+  test("searches cut by the round's tool deadline are retried, reworded, on their own short limit", async () => {
+    await holdMax();
+    refillPace = true;
+    emptyWhen = null;
+    searxDelayMs = 400;
+    __setWebSearchToolDeadlineForTests(600);
+    try {
+      plan(["Harbor Lights series Visitor sequel novel plot", "Harbor Lights series Regent motive finale", "Harbor Lights series Warden cast reunion"]);
+      const { result } = await turn("owner", 3, { max: true, thinking: true, utterance: `${ASKED} and the Regent and the Warden`, perRound: 3 });
+      const retries = searxQueries.filter((q) => !/Visitor|Regent|Warden/.test(q));
+      expect(retries.length).toBe(2);
+      expect(result.value.sources!.length).toBeGreaterThan(3);
+    } finally {
+      __setWebSearchToolDeadlineForTests(undefined);
+    }
   });
 
   test("no retry when more than half of the research time is gone", async () => {

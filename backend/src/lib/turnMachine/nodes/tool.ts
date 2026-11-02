@@ -141,7 +141,10 @@ async function retryEmptySearches(
 ): Promise<void> {
   const cap = researchCapMs(state.answerStyle);
   const left = researchRun.deadlineAt === undefined ? 0 : researchRun.deadlineAt - Date.now();
-  if (cap === undefined || left < cap * EMPTY_RETRY_TIME_SHARE || signal.aborted) return;
+  // A round's own tool deadline cuts the later paced searches (the live bench's only "failed" searches); that abort is the node's
+  // timer, not the person leaving, so the retry runs on its own limit. Any other abort (the turn stopped) means no retry.
+  const nodeTimedOut = signal.aborted && signal.reason instanceof DOMException && signal.reason.name === "TimeoutError";
+  if (cap === undefined || left < cap * EMPTY_RETRY_TIME_SHARE || (signal.aborted && !nodeTimedOut)) return;
   const anchor = state.entityAnchor ?? null;
   const anchorText = anchor ? `${anchor.phrase} ${anchor.years.join(" ")}` : null;
   const earlier = [...state.outcomes, ...outcomes].filter((o) => o.packageId === "websearch").map((o) => String((o.args as { expression?: unknown } | undefined)?.expression ?? ""));
@@ -156,10 +159,10 @@ async function retryEmptySearches(
   if (planned.length === 0) return;
   researchRun.emptyRetries = (researchRun.emptyRetries ?? 0) + planned.length;
   markResearch(state, `retry start (${planned.length} empty searches reworded)`);
-  const retrySignal = AbortSignal.any([signal, AbortSignal.timeout(EMPTY_RETRY_MAX_MS)]);
+  const retrySignal = nodeTimedOut ? AbortSignal.timeout(EMPTY_RETRY_MAX_MS) : AbortSignal.any([signal, AbortSignal.timeout(EMPTY_RETRY_MAX_MS)]);
   const ran = await Promise.all(planned.map(async ({ empty, expression }) => {
     const startedAt = Date.now();
-    const raced = await withDeadline(runWithResearchBudget(researchRun, () => runPlugin("websearch", state.actor, { ...empty.runArgs, expression }, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal: retrySignal, deadlineAt: Math.min(toolDeadlineAt ?? Infinity, Date.now() + EMPTY_RETRY_MAX_MS), spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) })), retrySignal).catch(() => "deadline" as const);
+    const raced = await withDeadline(runWithResearchBudget(researchRun, () => runPlugin("websearch", state.actor, { ...empty.runArgs, expression }, { id: state.turnId, conversationId: state.conversationId, userText: state.utterance }, { signal: retrySignal, deadlineAt: nodeTimedOut ? Date.now() + EMPTY_RETRY_MAX_MS : Math.min(toolDeadlineAt ?? Infinity, Date.now() + EMPTY_RETRY_MAX_MS), spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) })), retrySignal).catch(() => "deadline" as const);
     return { empty, expression, raced, durationMs: Date.now() - startedAt };
   }));
   let found = 0;
@@ -169,7 +172,7 @@ async function retryEmptySearches(
     if ((outcome.sources?.length ?? 0) === 0) continue;
     found += 1;
     outcomes[empty.index] = outcome;
-    const at = toolEvents.findIndex((e) => (e as { call_id?: string }).call_id === empty.callId);
+    const at = toolEvents.findIndex((e) => (e as { call_id?: string }).call_id === empty.callId && (e.t === "tool_result" || e.t === "tool_error"));
     const sites = outcome.sources?.slice(0, TOOL_RESULT_SITES_MAX).map((s) => ({ host: s.site, url: s.url }));
     const event: ToolStreamEvent = { t: "tool_result", call_id: empty.callId, package_id: "websearch", outcome: { text: raced.value.reply?.text, ...(sites?.length ? { sites } : {}) } };
     if (at >= 0) toolEvents[at] = event; else toolEvents.push(event);
@@ -464,6 +467,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: resumedAsk ? "ask" : "tool_call", ...(resumedAsk ? {} : { args }), errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.failureKind! });
+      if (researchRun && tool === "websearch" && !resumedAsk) emptySearches.push({ index: outcomes.length - 1, callId, args: args as Record<string, unknown>, runArgs });
       continue;
     }
     const result = raced;
