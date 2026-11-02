@@ -22,10 +22,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/artists.json` | music | Artists |
 | `backend/packages/music/pages/create.json` | music | Create |
 | `backend/packages/music/pages/creations.json` | music | My creations |
+| `backend/packages/music/pages/edit.json` | music | Edit |
 | `backend/packages/music/pages/index.json` | music | Listen now |
 | `backend/packages/music/pages/liked.json` | music | Liked |
+| `backend/packages/music/pages/make-album.json` | music | Make an album |
 | `backend/packages/music/pages/make-band.json` | music | Make a band |
 | `backend/packages/music/pages/make-song.json` | music | Make a song |
+| `backend/packages/music/pages/make-style.json` | music | Make a song style |
 | `backend/packages/music/pages/play.json` | music | Now playing |
 | `backend/packages/music/pages/playlist.json` | music | Playlist |
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
@@ -235,6 +238,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
+| `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, MusicStudioPage |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
@@ -619,6 +623,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | sweepStaleDownloads, sha256OfFile, downloadUrl |
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
+| `backend/src/lib/music/album.ts` | MAKE_ALBUM_TOOL_ID, EDIT_ALBUM_TOOL_ID, ALBUM_NOT_HERE_LINE, ALBUM_MODEL_LINE, ALBUM_GONE_LINE, albumPrompt |
 | `backend/src/lib/music/band.ts` | MAKE_BAND_TOOL_ID, BAND_NOT_HERE_LINE, BAND_MODEL_LINE, briefFor, bandPrompt, parseDraft |
 | `backend/src/lib/music/bandActions.ts` | BAND_ACTION_NAMES, runBandAction |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
@@ -627,11 +632,15 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/m4a.ts` | m4aSeconds |
 | `backend/src/lib/music/madeRecords.ts` | MADE_KINDS, listMade, getMade, createMade, updateMade, deleteMade |
 | `backend/src/lib/music/models.ts` | MUSIC_ENGINE, KNOWN_MUSIC_MODELS, modelStampFor |
+| `backend/src/lib/music/objects.ts` | isMusicObjectRef, musicObjectOf, cardProvenance, threadMusicObject, readMusicBand, readMusicAlbum |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
+| `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
 | `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic, getMusicJob |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
+| `backend/src/lib/music/studioTools.ts` | EDIT_BAND_TOOL_ID, STUDIO_TOOL_IDS, isStudioTool, EDIT_TOOL_OBJECT, runStudioTool |
+| `backend/src/lib/music/styleCard.ts` | MAKE_SONG_STYLE_TOOL_ID, EDIT_SONG_STYLE_TOOL_ID, STYLE_NOT_HERE_LINE, STYLE_BAD_LINE, styleProvenance, styleBlock |
 | `backend/src/lib/music/tool.ts` | GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs, musicRefusalFor |
 | `backend/src/lib/music/trackItem.ts` | readMusicTrack |
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |

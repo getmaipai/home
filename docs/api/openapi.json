@@ -82132,6 +82132,642 @@
         }
       }
     },
+    "/api/music/styles/{id}/card": {
+      "get": {
+        "tags": [
+          "Music styles"
+        ],
+        "summary": "The song style's card as it is now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sstyle-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "conversation_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "turn_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The song style's card. Someone who is not its owner gets it read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "block": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                    }
+                  },
+                  "required": [
+                    "block"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "song style not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/styles/{id}/revisions": {
+      "get": {
+        "tags": [
+          "Music styles"
+        ],
+        "summary": "Earlier versions of a song style",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sstyle-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The earlier versions, newest first. An edit or a remake keeps the version it replaces.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "edit",
+                          "remake"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "provenance": {
+                        "type": "string"
+                      },
+                      "record": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "reason",
+                      "created_at",
+                      "provenance",
+                      "record"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not its earlier versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "song style not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/styles/{id}/revisions/{revision}/restore": {
+      "post": {
+        "tags": [
+          "Music styles"
+        ],
+        "summary": "Put an earlier version of a song style back",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The song style's id.",
+              "example": "sstyle-example123"
+            },
+            "required": true,
+            "description": "The song style's id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "A revision id from the list.",
+              "example": "mrev-example123"
+            },
+            "required": true,
+            "description": "A revision id from the list.",
+            "name": "revision",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The song style as it was. The version replaced is kept too.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^sstyle-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "description": "What the person calls this style. Trimmed; not unique."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "starter",
+                        "household"
+                      ],
+                      "description": "starter: ships with Music. household: a person saved it."
+                    },
+                    "owner_person_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Whose style this is; null for a starter."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Whose style this is; null for a starter."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Whose style this is; null for a starter."
+                    },
+                    "style": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                        },
+                        "genres": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "maxItems": 8,
+                          "default": [],
+                          "description": "Short genre words, for browsing and for the band's page."
+                        },
+                        "instrumental": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "length_s": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 5,
+                              "maximum": 600,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Wanted length in seconds; null lets the engine choose."
+                        },
+                        "bpm": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 30,
+                              "maximum": 300
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "key": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For example 'A minor' or 'F# major'."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                    },
+                    "seed": {
+                      "nullable": true,
+                      "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the record, for example 'person-a1b2c3 (self)' or 'starter'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the style is deleted, so a syncing client drops it."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the style is deleted, so a syncing client drops it."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the style is deleted, so a syncing client drops it."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "origin",
+                    "style",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MUSIC-STUDIO-S2. A saved way a song should sound: the style words and a few knobs, never lyrics. It is the one 'make one like this' shape: the starter shelf, a made song's 'Make one like this' and 'Create a song like this' (MUSIC-LIKE-01) all produce one, and a made band (made-artist) holds the same `style` shape for every track it makes. Person scope; `origin` says whether MaiPai ships it or the household saved it. The style words are a person's own words, so a hub never logs them (rule 6a). Lyrics are never stored here and a seed's lyrics, melody or voice are never copied."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "That version cannot be put back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not change it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/styles/{id}/action": {
+      "post": {
+        "tags": [
+          "Music styles"
+        ],
+        "summary": "Save, change or discard a song style",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sstyle-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "save",
+                      "discard",
+                      "edit",
+                      "make_song"
+                    ],
+                    "description": "save and make_song return the style's card. edit changes the fields in patch and keeps the earlier version. discard deletes the style."
+                  },
+                  "conversation_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "For a new picture: the chat the card is in."
+                  },
+                  "turn_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "For a new picture: the turn the card is in."
+                  },
+                  "patch": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "sound": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "genres": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "maxItems": 8
+                      },
+                      "instrumental": {
+                        "type": "boolean"
+                      },
+                      "bpm": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 30,
+                        "maximum": 300
+                      },
+                      "key": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 20
+                      },
+                      "length_s": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 5,
+                        "maximum": 600
+                      }
+                    },
+                    "description": "For edit: only the fields that changed."
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "save",
+                        "discard",
+                        "edit",
+                        "make_song"
+                      ]
+                    },
+                    "done": {
+                      "type": "string",
+                      "description": "One plain sentence for the person."
+                    },
+                    "style": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "The style's card as it is now."
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "done"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "That action cannot run for this style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the style's owner can do that; a starter style is nobody's to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Style not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/music/bands": {
       "get": {
         "tags": [
@@ -83635,6 +84271,551 @@
         }
       }
     },
+    "/api/music/bands/{id}/card": {
+      "get": {
+        "tags": [
+          "Music bands"
+        ],
+        "summary": "The band's card as it is now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "mband-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "conversation_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "turn_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The band's card. Someone who is not its owner gets it read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "block": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                    }
+                  },
+                  "required": [
+                    "block"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "band not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/bands/{id}/revisions": {
+      "get": {
+        "tags": [
+          "Music bands"
+        ],
+        "summary": "Earlier versions of a band",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "mband-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The earlier versions, newest first. An edit or a remake keeps the version it replaces.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "edit",
+                          "remake"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "provenance": {
+                        "type": "string"
+                      },
+                      "record": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "reason",
+                      "created_at",
+                      "provenance",
+                      "record"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not its earlier versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "band not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/bands/{id}/revisions/{revision}/restore": {
+      "post": {
+        "tags": [
+          "Music bands"
+        ],
+        "summary": "Put an earlier version of a band back",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The band's id.",
+              "example": "mband-example123"
+            },
+            "required": true,
+            "description": "The band's id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "A revision id from the list.",
+              "example": "mrev-example123"
+            },
+            "required": true,
+            "description": "A revision id from the list.",
+            "name": "revision",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The band as it was. The version replaced is kept too.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mband-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "The band's name, as shown and as written on each track's artist field. Trimmed; not unique."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "made"
+                      ],
+                      "description": "Always made: a band found in the library is a media-item artist, not this record."
+                    },
+                    "owner_person_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Who made the band."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Who made the band."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Who made the band."
+                    },
+                    "backstory": {
+                      "type": "string",
+                      "maxLength": 4000,
+                      "default": "",
+                      "description": "Plain text, never HTML. Passes the same output gate as chat before it is stored (rule 10)."
+                    },
+                    "genres": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "maxItems": 8,
+                      "default": [],
+                      "description": "Genre words for the band's page and for browsing."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 60,
+                            "description": "For example 'vocals' or 'drums'."
+                          },
+                          "portrait_file_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^file-[a-z0-9]{6,}$"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 12,
+                      "default": []
+                    },
+                    "portrait_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "The band picture."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The band picture."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The band picture."
+                    },
+                    "logo_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "style": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                        },
+                        "genres": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "maxItems": 8,
+                          "default": [],
+                          "description": "Short genre words, for browsing and for the band's page."
+                        },
+                        "instrumental": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "length_s": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 5,
+                              "maximum": 600,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Wanted length in seconds; null lets the engine choose."
+                        },
+                        "bpm": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 30,
+                              "maximum": 300
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "key": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For example 'A minor' or 'F# major'."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                    },
+                    "seed": {
+                      "nullable": true,
+                      "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the band, for example 'person-a1b2c3 (self)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the band is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the band is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the band is deleted, so a syncing client drops it. Its tracks stay as songs."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "origin",
+                    "style",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MUSIC-LISTEN-C5. A band or artist the household made here: name, back story, members, portrait and logo, and the `style` every track of the band reuses so an album sounds like one band. Only what a media-item cannot hold gets this record: a track is a normal made song whose `artist` text is the band's name, and an album is a media-collection, so there is no album record here. Person scope, always labelled 'Made here'. Fictional by default (the creator's prompt asks for a fictional band and fictional people); that is a default, not a block for an adult. Names, back story and member names are a person's words and are never logged (rule 6a). A band made 'like' a playing track keeps that track as its `seed`; the new band's own name, members, back story and lyrics are never a copy of it."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "That version cannot be put back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not change it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/music/bands/{id}/action": {
       "post": {
         "tags": [
@@ -83665,7 +84846,8 @@
                       "remake",
                       "remake_portrait",
                       "remake_logo",
-                      "discard"
+                      "discard",
+                      "edit"
                     ],
                     "description": "keep saves the band's finished single to Music. remake discards the band and returns the song to make a new one from. remake_portrait and remake_logo start a new picture. discard deletes the band."
                   },
@@ -83678,6 +84860,36 @@
                     "type": "string",
                     "nullable": true,
                     "description": "For remake_portrait and remake_logo: the turn the band card is in."
+                  },
+                  "patch": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "backstory": {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      "look": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "sound": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "genres": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "maxItems": 8
+                      }
+                    },
+                    "description": "For edit: only the fields that changed. The earlier version is kept."
                   }
                 },
                 "required": [
@@ -83702,7 +84914,8 @@
                         "remake",
                         "remake_portrait",
                         "remake_logo",
-                        "discard"
+                        "discard",
+                        "edit"
                       ]
                     },
                     "done": {
@@ -83722,6 +84935,13 @@
                     "pending": {
                       "type": "boolean",
                       "description": "keep: the single is not finished yet."
+                    },
+                    "band": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "edit: the band's card as it is now."
                     }
                   },
                   "required": [
@@ -83764,6 +84984,2279 @@
           },
           "404": {
             "description": "Band not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums": {
+      "get": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "List albums",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Whose; defaults to you. A parent may name a child."
+            },
+            "required": false,
+            "description": "Whose; defaults to you. A parent may name a child.",
+            "name": "person",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mine",
+                "shared",
+                "all"
+              ],
+              "description": "mine (default): the person's own. shared: others' shared with you, and starters. all: both."
+            },
+            "required": false,
+            "description": "mine (default): the person's own. shared: others' shared with you, and starters. all: both.",
+            "name": "scope",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The live albums, newest change first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^malbum-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused."
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "description": "The album's title. Trimmed; not unique."
+                      },
+                      "origin": {
+                        "type": "string",
+                        "enum": [
+                          "made"
+                        ],
+                        "description": "Always made: an album found in the library is a media-item album, not this record."
+                      },
+                      "owner_person_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "Who made the album."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Who made the album."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Who made the album."
+                      },
+                      "made_artist_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^mband-[a-z0-9]{6,}$",
+                            "description": "The made band the album belongs to; null for an album of mixed artists."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The made band the album belongs to; null for an album of mixed artists."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The made band the album belongs to; null for an album of mixed artists."
+                      },
+                      "song_style_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^sstyle-[a-z0-9]{6,}$",
+                            "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                      },
+                      "blurb": {
+                        "type": "string",
+                        "maxLength": 1000,
+                        "default": "",
+                        "description": "A short plain-text description for the album page. Never HTML. Passes the same output gate as chat before it is stored (rule 10)."
+                      },
+                      "look": {
+                        "type": "string",
+                        "maxLength": 1000,
+                        "default": "",
+                        "description": "The words the cover picture is made from (what it should look like)."
+                      },
+                      "cover_file_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^file-[a-z0-9]{6,}$",
+                            "description": "The cover picture."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The cover picture."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The cover picture."
+                      },
+                      "cover_seed": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295,
+                            "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                      },
+                      "track_media_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^media-[a-z0-9]{6,}$"
+                        },
+                        "maxItems": 100,
+                        "default": [],
+                        "description": "The tracks in play order, as media-item ids. Removing a track here does not delete the song."
+                      },
+                      "style": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                          },
+                          "genres": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 40
+                            },
+                            "maxItems": 8,
+                            "default": [],
+                            "description": "Short genre words, for browsing and for the band's page."
+                          },
+                          "instrumental": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "length_s": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 5,
+                                "maximum": 600,
+                                "description": "Wanted length in seconds; null lets the engine choose."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Wanted length in seconds; null lets the engine choose."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Wanted length in seconds; null lets the engine choose."
+                          },
+                          "bpm": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 30,
+                                "maximum": 300
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "key": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                                "description": "For example 'A minor' or 'F# major'."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "For example 'A minor' or 'F# major'."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "For example 'A minor' or 'F# major'."
+                          },
+                          "language": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                                "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                          }
+                        },
+                        "required": [
+                          "description"
+                        ],
+                        "additionalProperties": false,
+                        "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                      },
+                      "seed": {
+                        "nullable": true,
+                        "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                      },
+                      "shared_to": {
+                        "nullable": true,
+                        "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ],
+                        "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Free text naming who made the album, for example 'person-a1b2c3 (self)'."
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "origin",
+                      "style",
+                      "source",
+                      "provenance",
+                      "hlc",
+                      "created_at",
+                      "updated_at"
+                    ],
+                    "additionalProperties": false,
+                    "description": "MUSIC-STUDIO-ALBUM. An album the household made here: a title, the made band it belongs to, the sound every track reuses, a cover and the ordered tracks. A track is a normal made song (a media-item whose `made_artist_id` is the band), so the album only lists their ids in play order; there is no second copy of a song. It holds the SAME shared `style` and `seed` definitions as song-style and made-artist (one definition each), and may name a saved SongStyle it started from. Person scope, always labelled 'Made here'. Title and blurb are a person's own words and are never logged (rule 6a). The cover is a picture made from `cover_seed`: the same seed and look make the same cover, a new seed makes a new one."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Person not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "Save a album",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "person": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Whose album; defaults to you. A parent may make one for a child."
+                  }
+                },
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "The album's own fields: title, made_artist_id, song_style_id, blurb, look, cover_file_id, cover_seed, track_media_ids, style, seed, shared_to. The server sets the id, owner, clock stamps and origin."
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new album.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^malbum-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "The album's title. Trimmed; not unique."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "made"
+                      ],
+                      "description": "Always made: an album found in the library is a media-item album, not this record."
+                    },
+                    "owner_person_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Who made the album."
+                    },
+                    "made_artist_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^mband-[a-z0-9]{6,}$",
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The made band the album belongs to; null for an album of mixed artists."
+                    },
+                    "song_style_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^sstyle-[a-z0-9]{6,}$",
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                    },
+                    "blurb": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "A short plain-text description for the album page. Never HTML. Passes the same output gate as chat before it is stored (rule 10)."
+                    },
+                    "look": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "The words the cover picture is made from (what it should look like)."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The cover picture."
+                    },
+                    "cover_seed": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                    },
+                    "track_media_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^media-[a-z0-9]{6,}$"
+                      },
+                      "maxItems": 100,
+                      "default": [],
+                      "description": "The tracks in play order, as media-item ids. Removing a track here does not delete the song."
+                    },
+                    "style": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                        },
+                        "genres": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "maxItems": 8,
+                          "default": [],
+                          "description": "Short genre words, for browsing and for the band's page."
+                        },
+                        "instrumental": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "length_s": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 5,
+                              "maximum": 600,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Wanted length in seconds; null lets the engine choose."
+                        },
+                        "bpm": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 30,
+                              "maximum": 300
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "key": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For example 'A minor' or 'F# major'."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                    },
+                    "seed": {
+                      "nullable": true,
+                      "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the album, for example 'person-a1b2c3 (self)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "origin",
+                    "style",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MUSIC-STUDIO-ALBUM. An album the household made here: a title, the made band it belongs to, the sound every track reuses, a cover and the ordered tracks. A track is a normal made song (a media-item whose `made_artist_id` is the band), so the album only lists their ids in play order; there is no second copy of a song. It holds the SAME shared `style` and `seed` definitions as song-style and made-artist (one definition each), and may name a saved SongStyle it started from. Person scope, always labelled 'Made here'. Title and blurb are a person's own words and are never logged (rule 6a). The cover is a picture made from `cover_seed`: the same seed and look make the same cover, a new seed makes a new one."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field is missing or not valid, or the text is not allowed for a child or teen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A child's albums are made by a parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Person, file or library item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}": {
+      "get": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "One album",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The album.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^malbum-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "The album's title. Trimmed; not unique."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "made"
+                      ],
+                      "description": "Always made: an album found in the library is a media-item album, not this record."
+                    },
+                    "owner_person_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Who made the album."
+                    },
+                    "made_artist_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^mband-[a-z0-9]{6,}$",
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The made band the album belongs to; null for an album of mixed artists."
+                    },
+                    "song_style_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^sstyle-[a-z0-9]{6,}$",
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                    },
+                    "blurb": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "A short plain-text description for the album page. Never HTML. Passes the same output gate as chat before it is stored (rule 10)."
+                    },
+                    "look": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "The words the cover picture is made from (what it should look like)."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The cover picture."
+                    },
+                    "cover_seed": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                    },
+                    "track_media_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^media-[a-z0-9]{6,}$"
+                      },
+                      "maxItems": 100,
+                      "default": [],
+                      "description": "The tracks in play order, as media-item ids. Removing a track here does not delete the song."
+                    },
+                    "style": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                        },
+                        "genres": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "maxItems": 8,
+                          "default": [],
+                          "description": "Short genre words, for browsing and for the band's page."
+                        },
+                        "instrumental": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "length_s": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 5,
+                              "maximum": 600,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Wanted length in seconds; null lets the engine choose."
+                        },
+                        "bpm": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 30,
+                              "maximum": 300
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "key": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For example 'A minor' or 'F# major'."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                    },
+                    "seed": {
+                      "nullable": true,
+                      "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the album, for example 'person-a1b2c3 (self)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "origin",
+                    "style",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MUSIC-STUDIO-ALBUM. An album the household made here: a title, the made band it belongs to, the sound every track reuses, a cover and the ordered tracks. A track is a normal made song (a media-item whose `made_artist_id` is the band), so the album only lists their ids in play order; there is no second copy of a song. It holds the SAME shared `style` and `seed` definitions as song-style and made-artist (one definition each), and may name a saved SongStyle it started from. Person scope, always labelled 'Made here'. Title and blurb are a person's own words and are never logged (rule 6a). The cover is a picture made from `cover_seed`: the same seed and look make the same cover, a new seed makes a new one."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "album not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "Change a album",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "The album's own fields: title, made_artist_id, song_style_id, blurb, look, cover_file_id, cover_seed, track_media_ids, style, seed, shared_to. The server sets the id, owner, clock stamps and origin."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed album.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^malbum-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "The album's title. Trimmed; not unique."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "made"
+                      ],
+                      "description": "Always made: an album found in the library is a media-item album, not this record."
+                    },
+                    "owner_person_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Who made the album."
+                    },
+                    "made_artist_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^mband-[a-z0-9]{6,}$",
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The made band the album belongs to; null for an album of mixed artists."
+                    },
+                    "song_style_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^sstyle-[a-z0-9]{6,}$",
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                    },
+                    "blurb": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "A short plain-text description for the album page. Never HTML. Passes the same output gate as chat before it is stored (rule 10)."
+                    },
+                    "look": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "The words the cover picture is made from (what it should look like)."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The cover picture."
+                    },
+                    "cover_seed": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                    },
+                    "track_media_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^media-[a-z0-9]{6,}$"
+                      },
+                      "maxItems": 100,
+                      "default": [],
+                      "description": "The tracks in play order, as media-item ids. Removing a track here does not delete the song."
+                    },
+                    "style": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                        },
+                        "genres": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "maxItems": 8,
+                          "default": [],
+                          "description": "Short genre words, for browsing and for the band's page."
+                        },
+                        "instrumental": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "length_s": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 5,
+                              "maximum": 600,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Wanted length in seconds; null lets the engine choose."
+                        },
+                        "bpm": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 30,
+                              "maximum": 300
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "key": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For example 'A minor' or 'F# major'."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                    },
+                    "seed": {
+                      "nullable": true,
+                      "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the album, for example 'person-a1b2c3 (self)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "origin",
+                    "style",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MUSIC-STUDIO-ALBUM. An album the household made here: a title, the made band it belongs to, the sound every track reuses, a cover and the ordered tracks. A track is a normal made song (a media-item whose `made_artist_id` is the band), so the album only lists their ids in play order; there is no second copy of a song. It holds the SAME shared `style` and `seed` definitions as song-style and made-artist (one definition each), and may name a saved SongStyle it started from. Person scope, always labelled 'Made here'. Title and blurb are a person's own words and are never logged (rule 6a). The cover is a picture made from `cover_seed`: the same seed and look make the same cover, a new seed makes a new one."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nothing to change, or a field is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not change it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "album not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "Delete a album",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted. The record stays marked deleted so a syncing client drops it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not delete it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "album not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}/card": {
+      "get": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "The album's card as it is now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "conversation_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "turn_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The album's card. Someone who is not its owner gets it read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "block": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                    }
+                  },
+                  "required": [
+                    "block"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "album not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}/revisions": {
+      "get": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "Earlier versions of a album",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The earlier versions, newest first. An edit or a remake keeps the version it replaces.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "edit",
+                          "remake"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "provenance": {
+                        "type": "string"
+                      },
+                      "record": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "reason",
+                      "created_at",
+                      "provenance",
+                      "record"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not its earlier versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "album not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}/revisions/{revision}/restore": {
+      "post": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "Put an earlier version of a album back",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The album's id.",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "description": "The album's id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "A revision id from the list.",
+              "example": "mrev-example123"
+            },
+            "required": true,
+            "description": "A revision id from the list.",
+            "name": "revision",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The album as it was. The version replaced is kept too.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^malbum-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "The album's title. Trimmed; not unique."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "made"
+                      ],
+                      "description": "Always made: an album found in the library is a media-item album, not this record."
+                    },
+                    "owner_person_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Who made the album."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Who made the album."
+                    },
+                    "made_artist_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^mband-[a-z0-9]{6,}$",
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The made band the album belongs to; null for an album of mixed artists."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The made band the album belongs to; null for an album of mixed artists."
+                    },
+                    "song_style_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^sstyle-[a-z0-9]{6,}$",
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The saved SongStyle the album started from, if any. `style` is the album's own copy and wins."
+                    },
+                    "blurb": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "A short plain-text description for the album page. Never HTML. Passes the same output gate as chat before it is stored (rule 10)."
+                    },
+                    "look": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": "",
+                      "description": "The words the cover picture is made from (what it should look like)."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The cover picture."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The cover picture."
+                    },
+                    "cover_seed": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The picture seed of the cover. Remaking the cover picks a new one."
+                    },
+                    "track_media_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^media-[a-z0-9]{6,}$"
+                      },
+                      "maxItems": 100,
+                      "default": [],
+                      "description": "The tracks in play order, as media-item ids. Removing a track here does not delete the song."
+                    },
+                    "style": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "The style words handed to the song engine (genre, mood, instruments, era). Never lyrics."
+                        },
+                        "genres": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "maxItems": 8,
+                          "default": [],
+                          "description": "Short genre words, for browsing and for the band's page."
+                        },
+                        "instrumental": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "length_s": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 5,
+                              "maximum": 600,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Wanted length in seconds; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Wanted length in seconds; null lets the engine choose."
+                        },
+                        "bpm": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 30,
+                              "maximum": 300
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "key": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-G][#b]? ?(major|minor|maj|min|m)?$",
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For example 'A minor' or 'F# major'."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For example 'A minor' or 'F# major'."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "A BCP 47 tag for the sung language; null lets the engine choose."
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The ONE style shape. SongStyle holds one; MadeArtist holds one that every track of the band reuses. Words only: never lyrics."
+                    },
+                    "seed": {
+                      "nullable": true,
+                      "description": "The ONE field that says what a style or a band was made 'like': a file made here (a song the household made) or a library item (a track the household holds). An input description only: the original audio is never sent to the engine (voice, cover and edit sources stay closed, MUSIC-GEN-14), and the seed's lyrics, melody and voice are never copied. Exactly one of the two ids; the property that holds it is null when there is none."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. 'household' shares with everyone in the household; a list shares with those people. A child's records are never shared outside the household."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the album, for example 'person-a1b2c3 (self)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the album is deleted, so a syncing client drops it. Its tracks stay as songs."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "origin",
+                    "style",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MUSIC-STUDIO-ALBUM. An album the household made here: a title, the made band it belongs to, the sound every track reuses, a cover and the ordered tracks. A track is a normal made song (a media-item whose `made_artist_id` is the band), so the album only lists their ids in play order; there is no second copy of a song. It holds the SAME shared `style` and `seed` definitions as song-style and made-artist (one definition each), and may name a saved SongStyle it started from. Person scope, always labelled 'Made here'. Title and blurb are a person's own words and are never logged (rule 6a). The cover is a picture made from `cover_seed`: the same seed and look make the same cover, a new seed makes a new one."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "That version cannot be put back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can see it, not change it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}/action": {
+      "post": {
+        "tags": [
+          "Music albums"
+        ],
+        "summary": "Keep, change, remake the cover of or discard an album",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "malbum-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "keep",
+                      "remake_cover",
+                      "discard",
+                      "edit",
+                      "play_all"
+                    ],
+                    "description": "keep and play_all return the album's first song. edit changes the fields in patch and keeps the earlier version. remake_cover starts a new cover. discard deletes the album; its songs stay."
+                  },
+                  "conversation_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "For a new picture: the chat the card is in."
+                  },
+                  "turn_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "For a new picture: the turn the card is in."
+                  },
+                  "patch": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "blurb": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "look": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "sound": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "genres": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "maxItems": 8
+                      },
+                      "track_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100
+                      }
+                    },
+                    "description": "For edit: only the fields that changed. track_ids is the full new order; songs left out leave the album, not the library."
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "keep",
+                        "remake_cover",
+                        "discard",
+                        "edit",
+                        "play_all"
+                      ]
+                    },
+                    "done": {
+                      "type": "string",
+                      "description": "One plain sentence for the person."
+                    },
+                    "media_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "album": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "The album's card as it is now."
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "done"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "That action cannot run for this album",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the album's owner can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Album not found",
             "content": {
               "application/json": {
                 "schema": {

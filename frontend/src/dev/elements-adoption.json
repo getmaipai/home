@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T10:56:00.613Z",
+  "generatedAt": "2026-11-02T10:57:16.387Z",
   "kitTag": "ui-v0.5.463",
   "items": [
     {
@@ -228,7 +228,7 @@
       "group": "album",
       "verdict": "wire-after",
       "verdictReason": "MUSIC-STUDIO-ALBUM chat card for an album the household made; Home wires it when the album-making turn emits the album structured part.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "answer-block.tsx",
@@ -286,7 +286,7 @@
       "group": "band",
       "verdict": "wire-after",
       "verdictReason": "MUSIC-LISTEN-C5 chat card for a band the household made; Home wires it when the band-making turn emits the band structured part.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "canvas-split.tsx",
@@ -1370,7 +1370,7 @@
       "group": "song-style",
       "verdict": "wire-after",
       "verdictReason": "MUSIC-STUDIO-EDIT chat card for a saved song style; Home wires it when the song-style turn emits the song-style structured part.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "sources.aui.tsx",
