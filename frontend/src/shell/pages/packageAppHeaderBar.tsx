@@ -57,15 +57,15 @@ function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
 }
 
 /** The app's search and mode switch, centred on the whole header row (the sticky header is its positioning parent), so it sits over the
- * middle of the right pane whatever the title and the buttons weigh. Registered in the header's left slot; the right group only holds what sits beside the avatar. */
+ * middle of the right pane whatever the title and the buttons weigh. Below 768 px there is no room to centre it over the title: it sits in the row after the title (MUSIC-POLISH-01), and below 640 px the search icon steps aside because the phone bar already has a Search tab. Registered in the header's left slot; the right group only holds what sits beside the avatar. */
 function PackageAppHeaderCenter() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   if (!state) return null;
   const { header } = state;
   const modes = header?.modes ?? [];
   return (
-    <div className="absolute left-1/2 top-1/2 flex w-max max-w-lg -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-3" data-testid="app-header-center">
-      {header?.search && state.searchTo ? <AppSearch label={state.label} searchTo={state.searchTo} /> : null}
+    <div className="flex shrink-0 items-center gap-2 max-md:-ms-2 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3" data-testid="app-header-center">
+      {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} /></div> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
           <TabsList variant="pill" aria-label={`${state.label} mode`}>
@@ -98,7 +98,7 @@ export function PackageAppHeaderActions() {
         <DropdownMenuContent align="end">{more.map((item) => <DropdownMenuItem key={item.label} onSelect={() => open(item.open)}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent>
       </DropdownMenu>
     ) : null}
-    {state.settingsArea ? <Button type="button" variant="ghost" size="icon-lg" aria-label={`${state.label} settings`} onClick={() => navigate(`/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button> : null}
+    {state.settingsArea ? <Button type="button" variant="ghost" size="icon-lg" className="max-md:hidden" aria-label={`${state.label} settings`} onClick={() => navigate(`/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button> : null}
   </>;
 }
 
