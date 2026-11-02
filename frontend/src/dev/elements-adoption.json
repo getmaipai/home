@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-02T22:44:35.495Z",
-  "kitTag": "ui-v0.5.476",
+  "generatedAt": "2026-11-02T23:33:20.668Z",
+  "kitTag": "ui-v0.5.482",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -195,6 +195,14 @@
       "group": "charts/data",
       "verdict": "later",
       "verdictReason": "Deferred until admin usage endpoint.",
+      "implemented": false
+    },
+    {
+      "file": "adult-lock.tsx",
+      "name": "adult-lock",
+      "group": "adult",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
