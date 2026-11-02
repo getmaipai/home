@@ -183,6 +183,8 @@
                 }
               ],
               "fields": {
+                "locked": "locked",
+                "making": "making",
                 "words": "prompt",
                 "tags": "tags",
                 "references": "references",

@@ -27,6 +27,7 @@ import { madeFileFor } from "@/lib/media/appHost";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
 import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal } from "@/lib/media/watchTime";
+import { fileIsAdultOnly } from "@/lib/adultLock";
 import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
 import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedVisibleTo } from "@/lib/media/collections";
 
@@ -432,7 +433,8 @@ mediaRoutes.openapi(putProgressRoute, (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   const item = readableItem(actor, c.req.valid("param").media_id);
-  if (!item) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
+  // ADULT-LOCK-05: nothing is saved for an adult-only item (no place, no history); the answer is the same as for a title that is not there.
+  if (!item || fileIsAdultOnly(item.id)) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
   const now = new Date();
   const outcome = writeProgress(actor, item, writeFrom(body, now), { now, immediate: body.immediate, meterKey: meterKeyOf(c) });
   if (!outcome.ok) return c.json({ error: REFUSAL_LINES[outcome.refusal] }, outcome.refusal === "other_persons_device" ? 403 : 422);

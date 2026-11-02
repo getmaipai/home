@@ -33,7 +33,15 @@ export function audioKindOfApp(appId: string): AudioKind {
   return "video";
 }
 
-export function MediaPlayerRegistration({ appId, mediaId, element, next, liveSubtitle }: { appId: string; mediaId: string | null; element: HTMLMediaElement | null; next?: (() => void) | undefined; liveSubtitle?: string }) {
+/** ADULT-LOCK-05: an adult-only item never registers with the audio session (no Media Session title, no speed, no sleep timer reach) and nothing is looked up
+ * for it. The host never holds one (createMediaStore refuses it), so this only closes the door for a caller that reaches here some other way. */
+export function MediaPlayerRegistration({ adultOnly = false, ...props }: RegistrationProps) {
+  return adultOnly ? null : <RegisteredPlayer {...props} />;
+}
+
+interface RegistrationProps { appId: string; mediaId: string | null; element: HTMLMediaElement | null; next?: (() => void) | undefined; liveSubtitle?: string; adultOnly?: boolean }
+
+function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<RegistrationProps, "adultOnly">) {
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {

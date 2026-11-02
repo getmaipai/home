@@ -91,6 +91,7 @@ import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@maipai/home-backe
 import type { RobotSelfTestPart, RobotSelfTestResult } from "@maipai/home-backend/src/wire";
 export type { RobotSelfTestPart, RobotSelfTestResult } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
+import { ADULT_PROOF_HEADER, getAdultProof, revokeAdultBlobs, setAdultProof, unloadAdultElements } from "@/lib/adultLock";
 
 // GET /api/people (routes/people.ts) returns toRoster()'s output directly
 // - the same Omit<Person, "birthdate"> shape Roster wraps, minus
@@ -767,9 +768,18 @@ function jsonHeaders(given?: HeadersInit): Headers {
   return headers;
 }
 
+/** Sign-out ends the unlock: the proof is dropped and every object URL made for an unlocked item is revoked, before the session goes. */
+function endAdultUnlock(): void {
+  const used = getAdultProof();
+  if (used) void fetch("/api/adult-lock/lock", { method: "POST", credentials: "include", headers: { [ADULT_PROOF_HEADER]: used } }).catch(() => undefined);
+  setAdultProof(null);
+  unloadAdultElements();
+  revokeAdultBlobs();
+}
+
 export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   // An explicit sign-out discards the copies (a shared browser). An expired session never does.
-  if (path === "/api/auth/logout") await removeAllOfflineMedia();
+  if (path === "/api/auth/logout") { endAdultUnlock(); await removeAllOfflineMedia(); }
   const { timeoutMs, ...rest } = init ?? {};
   const { signal, clear } = withTimeout(timeoutMs);
   try {

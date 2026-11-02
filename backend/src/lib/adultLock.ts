@@ -198,6 +198,12 @@ export function fileLockState(actor: PersonRow, fileId: string, proof: AdultProo
   return row ? lockState(lockItemOfProvenance(row.owner, row.provenance), actor, proof) : "open";
 }
 
+/** Whether a stored Library file is adult-only (the machine fact, whatever the creator's lock setting): playback of it keeps no place, history or mark. */
+export function fileIsAdultOnly(fileId: string): boolean {
+  const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get();
+  return row ? lockItemOfProvenance(row.owner, row.provenance)?.madeAudience === "adult-only" : false;
+}
+
 /** The SQL predicate "this attachment row is a locked item the viewer has no proof for", for the Library's queries (counts, lists, search). `provenance` is
  * the SQL expression of the provenance JSON (libraryProvenanceSql). With a live proof for the viewer it is "0" (nothing is locked); the minor ceiling is
  * the Library's own audience gate and is unchanged. Written so any `audience` or `made_audience` of adult-only counts and only an explicit `lock` of off

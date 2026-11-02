@@ -6,6 +6,7 @@
 import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
+import { fileIsAdultOnly } from "@/lib/adultLock";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
@@ -97,6 +98,8 @@ export interface MediaItemView extends MediaRow {
   parent_id?: string;
   linked?: MediaRow[];
   up_next?: { id: string; title: string; subtitle?: string; art?: string };
+  /** ADULT-LOCK-05: plays only in its own page's player (no mini bar, no audio session, no resume). */
+  adult_only?: boolean;
 }
 
 /** Whether `appId` is an installed, visible app for this person. A media app that is not installed falls through to the generic 404. */
@@ -208,6 +211,8 @@ export function madeFileItemView(file: MadeLibraryFile, appId: "music" | "videos
     id: file.id, title, channel: file.owner.display_name || "Made at home", summary: "", kind, thumbnail: poster, backdrop: poster,
     duration_s: file.duration_seconds, copy_label: "Saved", src: `/api/files/${encodeURIComponent(file.id)}/content`,
     subtitle: null, description: null, poster, chapters: [], captions: [], liked: false, watch_later: false,
+    // ADULT-LOCK-05: an adult-only item plays only in its own page's player: the kit keeps it out of the host's element and the mini bar.
+    ...(file.audience === "adult-only" ? { adult_only: true } : {}),
   };
 }
 
@@ -813,6 +818,8 @@ export interface ProgressArgs {
 
 /** The one progress path for an app page: coerce, check the title is readable here, then `writeProgress` (mergeProgress inside). */
 export function saveProgress(person: PersonRow, appId: MediaAppId, args: ProgressArgs, now = new Date(), meterKey?: string): ActionResult<{ applied: boolean; completed: boolean; budget?: MediaBudget }> {
+  // ADULT-LOCK-05: no resume position, history or continue-watching mark is kept for an adult-only item: an unlocked one always restarts at 0.
+  if (typeof args.media_id === "string" && fileIsAdultOnly(args.media_id)) return { ok: true, value: { applied: false, completed: false } };
   const item = typeof args.media_id === "string" ? readableIn(person, appId, args.media_id) : null;
   if (!item) return { ok: false, status: 404, error: `That ${MEDIA_APPS[appId].noun} is not in the library.` };
   let position: import("./progress").Position;

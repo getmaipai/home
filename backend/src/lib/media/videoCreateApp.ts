@@ -138,11 +138,12 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
     const job = jobOf.get(file.id);
     const seconds = job?.files[0]?.seconds ?? file.duration_seconds;
     const level = job ? levelWords(job) : null;
-    return { id: file.id, title: file.name, subtitle: job ? [level, seconds ? `${Math.round(seconds)} s` : null].filter(Boolean).join(", ") : file.owner.display_name || "Made at home", thumbnail: file.thumb_url, duration_s: file.duration_seconds, created_at: file.created_at, favorite: favorites.has(file.id), kind: "video" };
+    return { id: file.id, title: file.name, subtitle: job ? [level, seconds ? `${Math.round(seconds)} s` : null].filter(Boolean).join(", ") : file.owner.display_name || "Made at home", thumbnail: file.thumb_url, duration_s: file.duration_seconds, created_at: file.created_at, favorite: favorites.has(file.id), kind: "video", ...(file.audience === "adult-only" ? { adult_only: true } : {}) };
   });
   // ADULT-LOCK-02: locked clips are not in the list (the Library query leaves them out); one tile stands for all of them, leading the list.
   const locked = lockedVideoTile(person);
-  return locked && !view ? [locked, ...rows] : rows;
+  // The All tab is the whole list; Favorites and Uploaded are narrower lists a locked clip is not part of (the tile would count it in).
+  return locked && (!view || view === "all") ? [locked, ...rows] : rows;
 }
 
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];

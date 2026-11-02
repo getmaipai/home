@@ -60,8 +60,10 @@ A clip made with an adult-only style is marked `request.adultOnly` at job start 
 - Passkey unlock (`passkey_assertion`) is not built; `/unlock` takes the secret only.
 - A clip that turns adult-only only at the finished-clip check (prompt word list, nude verdict) is locked from then on, but a tool part stored before that
   keeps its words. ADULT-LOCK-06 sets the lock at job start from every source and closes this.
-- LoRA listings (VIDEO-LORA slices), pictures and songs (ADULT-LOCK-07), playback guards (ADULT-LOCK-05) and the frontend `AdultLockProvider` (ADULT-LOCK-03b) are their own rows.
-- Pin: `lock` and `made_audience` become spec fields with VIDEO-LORA-02; bump the `@maipai/spec` pin with `scripts/pin.sh` then and read them from the record.
+- The Stack's job list and progress (ADULT-LOCK-04), LoRA listings (VIDEO-LORA slices) and pictures and songs (ADULT-LOCK-07) are their own rows.
+- The kit's unlock dialog takes a digit passcode. A person whose sign-in secret is a password (no digit count) sees "Set a passcode in Account to open these" until they set a digit passcode.
+- A flag that flips on while an item plays is caught only when the page reads the item again as an `adult_only` row it had seen open (the poll the page already makes); a person who never unlocked gets the tile, which has no id to match.
+- `lock` and `made_audience` are spec fields since spec-v0.1.309 (pinned with ADULT-LOCK-03b); the backend still reads them from the provenance note until ADULT-LOCK-06 moves it to the record.
 
 ## The Stack's full view (ADULT-LOCK-03)
 
@@ -107,3 +109,24 @@ prove it against the real Stack, then `bash scripts/pin.sh stack <sha>` as its o
 **Tests.** `backend/tests/adultFullView.test.ts` runs Home's real job code against a Stack that enforces the Stack's rules (`tests/fixtures/adultStack.ts`: redacted by default, 404 on files, 403 on a bad key
 on every route): an adult clip and picture finish, Home's own lock answers the tile and 404 before an unlock, a job that is not adult, a minor and a shared or spoken surface never send the headers, a
 missing, wrong, rotated, environment and remote-stored key. `tests/preload.ts` gives every other test a default key so an adult job in an unrelated test never waits on one.
+
+## Frontend (ADULT-LOCK-03b and -05)
+
+The kit draws every lock tile, the dialog and the live region (`AdultLockProvider`, `LockTile`, `AdultLockDialog`, ui-v0.5.477). Home writes no lock UI
+(RULES 9b); it supplies the check and the clocks.
+
+| Piece | File | What it does |
+|---|---|---|
+| Host | `frontend/src/shell/AdultLockHost.tsx` | Mounted in `RoutesInner` inside `MediaHostProvider`. `unlock(passcode)` calls `POST /api/adult-lock/unlock` and maps 200, 401 (with `attemptsLeft`) and 429 (`retryAfter`) to the kit's ok, failed and locked_out. `onRelock` sends `POST /api/adult-lock/lock` with the proof being dropped. Credential word is "passcode", digits from `pinDigits`. |
+| Controller | same file, `LockController` | While unlocked: relock on route change, `visibilitychange` to hidden, `pagehide`, 2 minutes without activity (pointer, key, wheel, touch, a playing clip's `timeupdate`), the 15 minute cap, and Lock now (a button, bottom left). Also stops the host's element when a flag flips on. |
+| Proof and blobs | `frontend/src/lib/adultLock.ts` | The proof is one module variable: never storage, a cookie, a URL or the query cache. `installAdultFetch` wraps `fetch` (the kit's schema interpreter has its own request function, so `fetch` is the one place both reach the network): every same-origin `/api/` call carries `X-Adult-Unlock`, and a page-data answer's `adult_only` rows get their picture and clip fetched with the header into Blob URLs. `revokeAdultBlobs` and `unloadAdultElements` run on relock. |
+| Refetch | `AdultLockHost` | `queryClient.resetQueries()` on unlock and on relock, so every list asks again and nothing unlocked stays cached. |
+| Sign-out | `request("/api/auth/logout")` in `lib/api.ts`, and the host unmounting | Drops the proof, tells the hub, revokes the blobs. |
+| Media host rule | `frontend/src/shell/mediaHost.tsx` | `createMediaStore().elementFor` throws `ADULT_ONLY_PAGE_ONLY` for an item with `adultOnly` (`refuseAdultOnly` from the kit); `mediaFor` returns null for one; `MediaPlayerRegistration` takes `adultOnly` and registers nothing. So no mini bar, no dock, no audio session. |
+| Playback guard | `frontend/src/shell/adultPlaybackGuard.ts` | While unlocked, an element whose source is one of our blob URLs gets `disablePictureInPicture`, `disableRemotePlayback`, `controlsList="nodownload noremoteplayback"`, `x-webkit-airplay="deny"` and no `loop`; while it plays, `navigator.mediaSession.metadata` reads null and ignores a set. |
+| Rows | `lib/videos/feed.ts`, `lib/media/videoCreateApp.ts`, `lib/media/appHost.ts` | An open adult-only clip's row carries `adult_only: true` (feed, My clips, the watch item). The kit keeps such a row out of the host (`mediaFor`, the `play` action) and turns its Media Session off (ui-v0.5.480). The My clips All tab leads with the one tile. |
+| No resume or history | `saveProgress` (`lib/media/appHost.ts`), `PUT /api/media/progress/:id` | Nothing is written for an adult-only file; the media route answers 404 as for a title that is not there. An unlocked item always restarts at 0. |
+| Pages | `backend/packages/videos/pages/clips.json`, `create.json` | `locked_field` and `making_field` on the My clips All shelf; `fields.locked` and `fields.making` on the Create feed. Only these scopes emit the tile today; the Style picker and the settings Styles page get theirs with the VIDEO-LORA slices. |
+
+Tests: `frontend/src/lib/adultLock.test.ts`, `frontend/src/shell/AdultLockHost.test.tsx` (note tests 2 to 4: one tile and no title while locked, the proof in no storage,
+each relock cause), `adultPlaybackGuard.test.ts`, `mediaHostAdult.test.tsx`, `backend/tests/adultLockPlayback.test.ts`. Kit side: `commons/ui/src/schema/adultLockNodes.test.tsx`.

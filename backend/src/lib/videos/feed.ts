@@ -11,7 +11,7 @@ import { clipUrl, getVideoJobFor, posterUrl, type VideoJob } from "@/lib/videos/
 import { favoriteFileIds } from "@/lib/videos/favorites";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
-import { videoJobLockState, lockedJobView } from "@/lib/videos/lock";
+import { videoJobLockItem, videoJobLockState, lockedJobView } from "@/lib/videos/lock";
 import type { PersonRow } from "@/types";
 
 /** The newest rows the feed shows. My clips is the library of everything. */
@@ -81,6 +81,8 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
     width: file?.width ?? w ?? null,
     height: file?.height ?? h ?? null,
     kind: "video",
+    // ADULT-LOCK-05: an open adult-only clip (unlocked, or the creator cleared the lock) plays only in its own page's player.
+    ...(videoJobLockItem(job)?.madeAudience === "adult-only" ? { adult_only: true } : {}),
   };
 }
 

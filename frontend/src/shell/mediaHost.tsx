@@ -7,7 +7,7 @@
 // note section 6). The element is registered with the shell's one audio session for as long as it is loaded.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
+import { ADULT_ONLY_PAGE_ONLY, MediaHostContext, refuseAdultOnly, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
 import { api, request, type Roster } from "@/lib/api";
 import { mediaAppOfPath, playIsAlreadyOpen, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
@@ -68,6 +68,9 @@ export function createMediaStore() {
       return () => listeners.delete(listener);
     },
     elementFor(ref: MediaItemRef, appId: string): HTMLMediaElement {
+      // ADULT-LOCK-05: the one rule point. An adult-only item is never registered and never given an element here: it plays only inside its own
+      // page's player (no mini bar, no audio session, no Media Session). The kit already keeps it away (`adult_only` rows); this refuses a caller that did not.
+      if (refuseAdultOnly(ref)) throw new Error(ADULT_ONLY_PAGE_ONLY);
       if (current && current.id === ref.id && current.src === ref.src && current.appId === appId) {
         // A live station's subtitle is the song the hub last reported; the page's own copy (fetched earlier) must not put it back.
         const subtitle = liveStationIdOf(current.src) !== null && current.subtitle ? current.subtitle : ref.subtitle;
@@ -196,7 +199,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
       // Only a media app's player plays in the host's element; anywhere else the Player keeps its own.
       ...(personId ? { pickMedia } : {}),
       makingNotice,
-      mediaFor: (ref) => (appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
+      mediaFor: (ref) => (!refuseAdultOnly(ref) && appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),
     [navigate, store, listener, personId, pickMedia, makingNotice],
   );
@@ -299,7 +302,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     <MediaHostContext.Provider value={host}>
       <MediaDockContext.Provider value={dock}>
        <ListenStatusContext.Provider value={speech}>
-        {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
+        {current ? <MediaPlayerRegistration adultOnly={refuseAdultOnly(current)} appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
         {children}
         {pick ? (
           <Dialog open onOpenChange={(open) => { if (!open) { pick.resolve(null); setPick(null); } }}>

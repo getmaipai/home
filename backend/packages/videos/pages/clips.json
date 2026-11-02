@@ -26,6 +26,8 @@
               "item_subtitle_field": "{subtitle}",
               "item_media_field": "thumbnail",
               "item_meta_field": "duration_s",
+              "locked_field": "locked",
+              "making_field": "making",
               "aspect": "wide",
               "variant": "plain",
               "layout": "grid",

@@ -170,3 +170,22 @@ The video engine checks the file and refuses any style that puts a child in an a
 ## Private chats
 
 In an Incognito or temporary chat, the video lives only in memory and is gone when the chat ends. In those chats you can still animate a picture chat made or the first frame of a video you just made.
+
+## Locked items
+
+Some videos are for adults only. When one of yours is adult-only, Home hides it. In its place you see one tile that says **Locked items**. It has a lock on it. It shows no name, no picture and no count, so a glance at your screen shows nothing about what is inside. If a locked video is being made, the tile also has a small spinning circle.
+
+To open your locked items, press the tile. Type your passcode. If you use a PIN or a password to sign in, you may need to set a passcode first: open **Account** and set one. Only your own code opens locked items. A child or a teen never sees them, even with your code.
+
+After you unlock, your locked videos show on that page. A locked video plays only on its own page. It does not go to the small player at the edge of the screen, it does not show its name on your lock screen or in a car, and you cannot send it to a TV or another screen. Home also does not remember how far you watched, so it starts at the beginning next time.
+
+Home locks them again by itself when you:
+
+- go to another page,
+- switch to another tab or hide the window,
+- do nothing for 2 minutes,
+- keep the page open for 15 minutes in a row.
+
+You can also press **Lock now**, the button at the bottom left of the screen. Signing out locks them too.
+
+If you type a wrong passcode too many times, unlocking waits for a short while. Signing in is not affected. Try again when the timer ends.

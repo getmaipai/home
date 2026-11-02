@@ -26,6 +26,8 @@ import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { AudioSessionProvider } from "@/shell/audioSessionContext";
 import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
+import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
+import { AdultLockController, useAdultLockProps } from "@/shell/AdultLockHost";
 import { GlobalMiniPlayer } from "@/shell/GlobalMiniPlayer";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
@@ -193,12 +195,16 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
   useAccent(person.accent);
 
   const pageContext = ambientPageContextForRoute(location.pathname, appCatalog);
+  const adultLock = useAdultLockProps(person);
   return (
     <AudioSessionProvider personId={person.id}>
       <MediaHostProvider personId={person.id} ageBand={person.age_band}>
         <IncognitoProvider>
           <AmbientPageContextProvider base={pageContext}>
-            <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} appCatalog={appCatalog} />
+            <AdultLockProvider {...adultLock}>
+              <AdultLockController />
+              <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} appCatalog={appCatalog} />
+            </AdultLockProvider>
           </AmbientPageContextProvider>
         </IncognitoProvider>
       </MediaHostProvider>
