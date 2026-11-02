@@ -8,6 +8,8 @@
 // FABRICATION: a person, place or title in the answer that appears in no fetched passage, no note, no query and not in the question fails.
 export interface ResearchCase {
   id: string;
+  /** The kind of subject, for the held-out set's pass rate per type. */
+  type?: string;
   utterance: string;
   /** The exact work the question is about, as the judge is told it (title, years, kind). */
   production: string;
