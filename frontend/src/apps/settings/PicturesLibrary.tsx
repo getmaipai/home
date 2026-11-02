@@ -313,7 +313,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Label htmlFor="style-words">Words that switch the style on (optional, separated by commas)</Label>
           <Input id="style-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
-        <p className="text-sm text-muted-foreground">The picture engine checks that the file can be used. Content decisions belong to the model; Home keeps its CSAM and age protections.</p>
+        <p className="text-sm text-muted-foreground">The picture engine checks that the file can be used. A style is never refused for an adult. A style that names a real person is adult-only, and children and teens never see it. Home keeps its CSAM and age protections.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {card}
         {progress?.state === "failed" ? <p role="alert" className="text-sm text-destructive">{progress.error}</p> : null}

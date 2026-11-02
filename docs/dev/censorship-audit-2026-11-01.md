@@ -26,10 +26,13 @@ or rewrite adult content and says what stays.
 - Dead adult categories removed from `codeSafety.ts`; stale "absolute lines" comments fixed.
 - `backend/tests/censorRemoval.test.ts`: an adult is not refused for a real-person, undress or real-voice prompt; a child and a teen still are;
   minor sexual stays refused in every lane.
+- MODELS-CENSOR-05 (done 2026-11-02, Stack commit a62b58a, pinned in Home): the Stack's adult picture and video gates are removed. The signed
+  likeness proofs and the refusal of real-person and public-figure styles are gone. A style whose own description names a real person is now
+  classed adult-only, so children and teens never see it; an adult is never refused. Minor protections are unchanged. The Home add-style notes
+  in `PicturesLibrary.tsx` and `VideoLibrary.tsx` say so.
 
 ## Still open (not done here)
 
 - MODELS-CENSOR-04: the chat classifier's spec change needs a new `commons` tag; Jesse approves tags.
-- MODELS-CENSOR-05: the Stack's LoRA word list and signed-proof gates live in the `stack` repo and need Jesse's decision.
 - `screenInputImage` unrun-check rule above: confirm keep or remove.
 - CONTENT-POLICY-02 and -03: consumer rewiring of the opt-in filters (child and teen focus), not adult censorship.

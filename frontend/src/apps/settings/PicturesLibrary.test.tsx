@@ -47,6 +47,15 @@ describe("Pictures and videos settings view", () => {
     v.restore();
   });
 
+  test("MODELS-CENSOR-05: the add-style note says an adult is never refused and a real-person style is adult-only, with no refusal wording", async () => {
+    const v = mount(overview());
+    await waitFor(() => expect(v.getByText("Pixel Art")).toBeTruthy());
+    const note = v.getByText(/A style is never refused for an adult/);
+    expect(note.textContent).toContain("A style that names a real person is adult-only");
+    expect(note.textContent).not.toMatch(/real people (are|is) refused/i);
+    v.restore();
+  });
+
   test("IMGGEN-QUALITY-01: Quick and Detailed in plain words, the difference and the model names only when opened, and Get Detailed pictures with its size", async () => {
     const detailed = { id: "z-image-turbo", label: "Z-Image-Turbo", installed: false, available: true, licence: "Apache-2.0", edit: false, peak_gb: 34, remaining_bytes: 32_800_000_000 };
     const base = overview();

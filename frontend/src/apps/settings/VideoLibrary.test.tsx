@@ -47,6 +47,15 @@ describe("video settings view", () => {
     v.restore();
   });
 
+  test("MODELS-CENSOR-05: the add-style note says an adult is never refused and a real-person style is adult-only, with no refusal wording", async () => {
+    const v = mount(settings());
+    await waitFor(() => expect(v.getByText("Quick and Detailed videos")).toBeTruthy());
+    const note = v.getByText(/A style is never refused for an adult/);
+    expect(note.textContent).toContain("A style that names a real person is adult-only");
+    expect(note.textContent).not.toMatch(/real people (are|is) refused/i);
+    v.restore();
+  });
+
   test("a computer that cannot make videos says why, and adults read as off when the household switched them off", async () => {
     expect(videoStateLine(settings({ available: false, reason: "Video needs a computer with 128 GB of memory; this one has 64 GB." }))).toContain("128 GB");
     expect(videoStateLine(settings({ model_installed: false }))).toContain("No video model is installed");
