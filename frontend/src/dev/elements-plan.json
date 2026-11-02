@@ -4487,6 +4487,23 @@
       "replacesHandBuilt": [],
       "realTurnToday": false,
       "verdictReason": "VIDEO-CREATE-02 picture-card chooser (look and length cards); Home wires it when the Create screen is built."
+    },
+    {
+      "file": "adult-lock.tsx",
+      "name": "adult-lock",
+      "group": "adult",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": ["media_shelf", "result_feed"],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "The Adult lock tile, dialog and provider (ADULT-LOCK-01): the shell mounts the provider (ADULT-LOCK-03b), and the Videos My clips and Create pages draw the locked state through media_shelf and result_feed."
     }
   ]
 }
