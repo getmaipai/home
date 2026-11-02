@@ -69,6 +69,9 @@ export const personCredentials = sqliteTable("person_credentials", {
   secretDigits: integer("secret_digits"),
   failedAttempts: integer("failed_attempts").notNull().default(0),
   lockedUntil: text("locked_until"),
+  // ADULT-LOCK-02: the Adult lock's own counter and lockout, so a wrong code at an open adult page never locks the person out of signing in.
+  adultFailedAttempts: integer("adult_failed_attempts").notNull().default(0),
+  adultLockedUntil: text("adult_locked_until"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

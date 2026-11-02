@@ -11,6 +11,7 @@ import { clipUrl, getVideoJobFor, posterUrl, type VideoJob } from "@/lib/videos/
 import { favoriteFileIds } from "@/lib/videos/favorites";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
+import { videoJobLockState, lockedJobView } from "@/lib/videos/lock";
 import type { PersonRow } from "@/types";
 
 /** The newest rows the feed shows. My clips is the library of everything. */
@@ -43,6 +44,8 @@ function fileIsLive(person: PersonRow, fileId: string): boolean {
 /** One job as a feed row, or null when it should not show (an edit, a chat clip, a finished clip whose file is gone). */
 export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlySet<string>): Record<string, unknown> | null {
   if (job.personId !== person.id || job.conversationId !== null || job.kind === "edit") return null;
+  // ADULT-LOCK-02: a locked job is the lock tile, built from nothing of the job (no prompt, tags, poster, clip, seed, size, level or favorite).
+  if (videoJobLockState(person, job) !== "open") return lockedJobView(job);
   const file = job.state === "done" ? job.files[0] : undefined;
   if (job.state === "done" && (!file || !fileIsLive(person, file.id))) return null;
   const [w, h] = (job.request.size ?? "").split("x").map(Number);
@@ -94,13 +97,16 @@ export function feedRows(person: PersonRow, params: FeedParams): Array<Record<st
   const jobs = createJobsOf(person, params.favorites ? 200 : Math.min(params.limit ?? FEED_LIMIT, 200));
   const favorites = favoriteFileIds(person, jobs.flatMap((job) => (job.state === "done" && job.files[0] ? [job.files[0].id] : [])));
   const rows: Array<Record<string, unknown>> = [];
+  let lock = null as { locked: true; making: boolean } | null;
   for (const job of jobs) {
     const row = feedRowOf(person, job, favorites);
-    if (!row || (params.favorites && row.favorite !== true)) continue;
+    if (!row || (params.favorites && row.favorite !== true && row.locked !== true)) continue;
+    // One tile for any number of locked jobs: the screen leaks neither a count nor an order (it always leads the feed).
+    if (row.locked === true) { lock = { locked: true, making: lock?.making === true || (row as { making?: boolean }).making === true }; continue; }
     rows.push(row);
     if (rows.length >= (params.limit ?? FEED_LIMIT)) break;
   }
-  return rows;
+  return lock && !params.favorites ? [lock, ...rows] : rows;
 }
 
 /** `scope: "job"`: one running row read by its id (what `poll_while.record` asks), or no rows when the job is not this person's Create job. */

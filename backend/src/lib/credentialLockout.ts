@@ -54,20 +54,26 @@ export function ensureCredentialRowExists(personId: string): void {
     .run();
 }
 
-export function clearFailedAttempts(personId: string): void {
+/** ADULT-LOCK-02: what a counter protects. Each purpose has its own failed-attempt count and lockout on the one schedule above, so a child poking at an
+ * open adult page cannot lock the adult out of signing in. The IP throttle is shared (lib/secretThrottle.ts). */
+export type LockoutPurpose = "signin" | "adult_unlock";
+
+export function clearFailedAttempts(personId: string, purpose: LockoutPurpose = "signin"): void {
+  const set = purpose === "adult_unlock" ? { adultFailedAttempts: 0, adultLockedUntil: null } : { failedAttempts: 0, lockedUntil: null };
   db.update(personCredentials)
-    .set({ failedAttempts: 0, lockedUntil: null, updatedAt: new Date().toISOString() })
+    .set({ ...set, updatedAt: new Date().toISOString() })
     .where(eq(personCredentials.personId, personId))
     .run();
 }
 
-export function currentLockout(personId: string): { failedAttempts: number; lockedUntil: string | null } | null {
+export function currentLockout(personId: string, purpose: LockoutPurpose = "signin"): { failedAttempts: number; lockedUntil: string | null } | null {
   const row = db
-    .select({ failedAttempts: personCredentials.failedAttempts, lockedUntil: personCredentials.lockedUntil })
+    .select({ failedAttempts: personCredentials.failedAttempts, lockedUntil: personCredentials.lockedUntil, adultFailedAttempts: personCredentials.adultFailedAttempts, adultLockedUntil: personCredentials.adultLockedUntil })
     .from(personCredentials)
     .where(eq(personCredentials.personId, personId))
     .get();
-  return row ?? null;
+  if (!row) return null;
+  return purpose === "adult_unlock" ? { failedAttempts: row.adultFailedAttempts, lockedUntil: row.adultLockedUntil } : { failedAttempts: row.failedAttempts, lockedUntil: row.lockedUntil };
 }
 
 // Atomic read-modify-write for the failed-attempt counter. A code review
@@ -82,18 +88,19 @@ export function currentLockout(personId: string): { failedAttempts: number; lock
 // a value read before the async gap. ensureCredentialRowExists() must be
 // called first for a person with no PIN/password/passkey row yet - this
 // function's UPDATE is a no-op against a row that doesn't exist.
-export const recordFailedAttempt = sqlite.transaction((personId: string): FailedAttemptResult => {
+export const recordFailedAttempt = sqlite.transaction((personId: string, purpose: LockoutPurpose = "signin"): FailedAttemptResult => {
+  const [countColumn, untilColumn] = purpose === "adult_unlock" ? ["adult_failed_attempts", "adult_locked_until"] : ["failed_attempts", "locked_until"];
   const row = sqlite
-    .query("SELECT failed_attempts FROM person_credentials WHERE person_id = ?")
-    .get(personId) as { failed_attempts: number } | undefined;
-  const failedAttempts = (row?.failed_attempts ?? 0) + 1;
+    .query(`SELECT ${countColumn} AS n FROM person_credentials WHERE person_id = ?`)
+    .get(personId) as { n: number } | undefined;
+  const failedAttempts = (row?.n ?? 0) + 1;
   const lockedUntil =
     failedAttempts >= LOCKOUT_THRESHOLD
       ? new Date(Date.now() + lockoutDurationMs(failedAttempts)).toISOString()
       : null;
   sqlite
     .query(
-      "UPDATE person_credentials SET failed_attempts = ?, locked_until = ?, updated_at = ? WHERE person_id = ?",
+      `UPDATE person_credentials SET ${countColumn} = ?, ${untilColumn} = ?, updated_at = ? WHERE person_id = ?`,
     )
     .run(failedAttempts, lockedUntil, new Date().toISOString(), personId);
   return { failedAttempts, lockedUntil };

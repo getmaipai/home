@@ -13,6 +13,7 @@ import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { db } from "@/db";
+import { videoRowIsLocked } from "@/lib/videos/lock";
 import { people, settingsValues, jobs, projects, conversations, pictureJobs, videoJobs, musicJobs } from "@/db/schema";
 import { isNull, eq, and, sql } from "drizzle-orm";
 import { listDevicesByKind } from "@/lib/devices";
@@ -78,7 +79,7 @@ function companionCounts(personId: string, companionId: string) {
   const projectRows = db.select().from(projects).where(and(eq(projects.person, personId), sql`json_extract(${projects.provenance}, '$.companion_id') = ${companionId}`)).all();
   const mediaJobs = [
     ...db.select().from(pictureJobs).where(and(eq(pictureJobs.personId, personId), eq(pictureJobs.companionId, companionId))).all(),
-    ...db.select().from(videoJobs).where(and(eq(videoJobs.personId, personId), eq(videoJobs.companionId, companionId))).all(),
+    ...db.select().from(videoJobs).where(and(eq(videoJobs.personId, personId), eq(videoJobs.companionId, companionId))).all().filter((row) => !videoRowIsLocked(personId, row.id)),
     ...db.select().from(musicJobs).where(and(eq(musicJobs.personId, personId), eq(musicJobs.companionId, companionId))).all(),
   ];
   const chats = db.select().from(conversations).where(and(eq(conversations.personId, personId), eq(conversations.companionId, companionId))).all();
@@ -239,7 +240,7 @@ companionsRoutes.openapi(activityRoute, (c) => {
   const ownJobs = db.select().from(jobs).where(and(eq(jobs.forPerson, person.id), eq(jobs.companionId, id))).all().map((row) => ({ id: row.id, kind: row.kind, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: row.waitingReason, progress: typeof row.progress === "string" ? row.progress.trim().slice(0, 200) : null, result_ref: row.resultRef, needs_you: needsYou(row.state, row.waitingReason) }));
   const ownProjects = db.select().from(projects).where(and(eq(projects.person, person.id), sql`json_extract(${projects.provenance}, '$.companion_id') = ${id}`)).all().map((row) => ({ id: row.id, kind: row.type, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: null, waiting_reason: null, progress: null, result_ref: null, needs_you: needsYou(row.state, null) }));
   const ownPictures = db.select().from(pictureJobs).where(and(eq(pictureJobs.personId, person.id), eq(pictureJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "picture", title: "Made a picture", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.phase?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
-  const ownVideos = db.select().from(videoJobs).where(and(eq(videoJobs.personId, person.id), eq(videoJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "video", title: "Made a video", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.phase?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
+  const ownVideos = db.select().from(videoJobs).where(and(eq(videoJobs.personId, person.id), eq(videoJobs.companionId, id))).all().filter((row) => !videoRowIsLocked(person, row.id)).map((row) => ({ id: row.id, kind: "video", title: "Made a video", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.phase?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
   const ownSongs = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "music", title: "Made a song", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.stage?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
   const ownChats = db.select().from(conversations).where(and(eq(conversations.personId, person.id), eq(conversations.companionId, id))).all().filter((row) => row.status !== "deleted").map((row) => ({ id: row.id, kind: "chat", title: row.title || "Conversation", state: "done", created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.id, placement: row.placement as "chat" | "side", waiting_reason: null, progress: null, result_ref: null, needs_you: false }));
   const activity = [...ownJobs, ...ownProjects, ...ownPictures, ...ownVideos, ...ownSongs, ...ownChats].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);

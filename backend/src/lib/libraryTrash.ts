@@ -8,6 +8,7 @@
 //
 // Ahead of the spec: deleted_at and trash_until are columns on `attachments` until `file.deleted_at` and `file.trash_until`
 // exist in commons (LIBRARY-REVAMP-03).
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { and, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { attachments, musicJobs, people, shares } from "@/db/schema";
@@ -108,7 +109,8 @@ function trashedMain(person: PersonRow): Row[] {
     (meta.writer === "image-edit" && typeof meta.root === "string" && ids.has(meta.root)) ||
     (meta.writer === "video-poster" && typeof meta.job === "string" && videoJobs.has(meta.job)) ||
     covers.has(row.id);
-  return metas.filter(({ row, meta }) => !companion(row, meta)).map(({ row }) => row).sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!) || a.id.localeCompare(b.id));
+  // ADULT-LOCK-02: a locked item is not in the Trash list, its count or its bytes until the person unlocks.
+  return metas.filter(({ row, meta }) => !companion(row, meta) && lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), person) === "open").map(({ row }) => row).sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!) || a.id.localeCompare(b.id));
 }
 
 export function listTrashedFiles(person: PersonRow, now = new Date()): Array<{ id: string; title: string; deleted_at: string; trash_until: string; can_restore: boolean; thumb_url: string | null }> {
@@ -118,7 +120,8 @@ export function listTrashedFiles(person: PersonRow, now = new Date()): Array<{ i
 /** Counts for the Library header: items in Trash and the bytes they still hold (identical bytes count once). */
 export function trashTotals(person: PersonRow): { items: number; bytes: number } {
   const items = trashedMain(person).length;
-  const rows = db.select({ sha: attachments.sha256, size: attachments.size }).from(attachments).where(and(eq(attachments.ownerPersonId, person.id), isNotNull(attachments.deletedAt), isNotNull(attachments.trashUntil))).all();
+  const rows = db.select({ sha: attachments.sha256, size: attachments.size, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, person.id), isNotNull(attachments.deletedAt), isNotNull(attachments.trashUntil))).all()
+    .filter((row) => lockState(lockItemOfProvenance(person.id, row.provenance), person) === "open");
   const bySha = new Map<string, number>();
   for (const row of rows) bySha.set(row.sha, Math.max(bySha.get(row.sha) ?? 0, row.size));
   return { items, bytes: [...bySha.values()].reduce((sum, size) => sum + size, 0) };

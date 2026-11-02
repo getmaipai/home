@@ -25,6 +25,8 @@ import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
+import { videoJobLockItem, videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
+import { lockedView } from "@/lib/adultLock";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -32,6 +34,8 @@ import { conversationTurns } from "@/db/schema";
 import type { PersonRow } from "@/types";
 
 export const videosRoutes = apiRouter();
+/** A locked item's media routes never let a cache keep a 404 or a body (ADULT-LOCK-02). */
+const NO_STORE = { "cache-control": "private, no-store" } as const;
 
 /** The audience of a route call: the signed-in person on the web chat screen. */
 export function videoRouteAudience(actor: PersonRow): VideoAudience {
@@ -64,6 +68,9 @@ const ItemSchema = z.object({
   clip: z.object({ url: z.string(), poster_url: z.string(), width: z.number(), height: z.number(), seconds: z.number().nullable(), seed: z.number().nullable(), file_id: z.string(), poster_file_id: z.string(), has_sound: z.boolean().describe("The clip has a sound track the model made (speech included).") }).nullable(),
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
+/** ADULT-LOCK-02: a card with an adult-only clip in it, while the person holds no unlock proof: the one tile and nothing else (no id, words, picture or count). */
+const LockedCardSchema = z.object({ locked: z.literal(true), making: z.boolean() }).describe("An adult-only item that is locked: draw the lock tile; `making` adds its spinner.");
+const CardOrLocked = z.union([CardSchema, LockedCardSchema]);
 
 export { phaseLabel };
 
@@ -91,10 +98,19 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
   };
 }
 
+/** ADULT-LOCK-02: the card a route sends. Any adult-only clip in the card without an unlock proof turns the whole card into the one lock tile (no id, words, picture or count). */
+export function videoCardOrLocked(actor: PersonRow, root: VideoJob, canMake: boolean, ready?: { quick: boolean; detailed: boolean; max?: boolean }) {
+  const group = root.turnId ? videoJobsForTurn(actor, root.turnId) : [root];
+  const jobs = group.length > 0 ? group : [root];
+  if (jobs.some((j) => videoJobLockState(actor, j) !== "open")) return lockedView(jobs.some((j) => j.state === "queued" || j.state === "running"));
+  return videoCardView(actor, root, canMake, ready);
+}
+
 /** The card for a job: every clip made in the same turn (the first and each Make another), oldest first. */
 export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean, ready: { quick: boolean; detailed: boolean; max?: boolean } = { quick: false, detailed: false }) {
   const group = root.turnId ? videoJobsForTurn(actor, root.turnId) : [root];
   const jobs = group.length > 0 ? group : [root];
+
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
   return {
     id: root.id, conversation_id: root.conversationId, items: jobs.map((j) => itemView(j, actor, ready)),
@@ -151,13 +167,13 @@ videosRoutes.openapi(statusRoute, async (c) => {
 const getRoute = createRoute({
   method: "get", path: "/jobs/{id}", tags: ["Videos"], summary: "Progress, then the finished clip, of one video job", middleware: [requireAuth] as const,
   request: { params: idParams },
-  responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card as its owner sees it." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The card as its owner sees it, or the lock tile." }, ...refusals },
 });
 videosRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person");
   const job = getVideoJobFor(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(videoCardView(actor, job, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
+  return c.json(videoCardOrLocked(actor, job, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
 });
 
 const previewRoute = createRoute({
@@ -168,8 +184,9 @@ const previewRoute = createRoute({
 videosRoutes.openapi(previewRoute, (c) => {
   const actor = c.get("person");
   const job = getVideoJobFor(actor, c.req.valid("param").id);
-  const preview = job && laneOfPerson(actor) === "adult" ? getLive(job.id)?.preview : null;
-  if (!job || !preview) return c.json({ error: "There is no preview for that video." }, 404) as never;
+  // ADULT-LOCK-02: a locked job's first frame is a picture of the item: 404 like a missing one, never cached, until a proof is held.
+  const preview = job && laneOfPerson(actor) === "adult" && videoJobLockState(actor, job) === "open" ? getLive(job.id)?.preview : null;
+  if (!job || !preview) return c.json({ error: "There is no preview for that video." }, 404, NO_STORE) as never;
   return new Response(preview, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
@@ -183,8 +200,9 @@ videosRoutes.openapi(fileRoute, (c) => {
   const actor = c.get("person");
   const { id, fileId } = c.req.valid("param");
   const job = getVideoJobFor(actor, id);
-  const file = job ? readVideoFile(actor, job, fileId) : null;
-  if (!job || !file) return c.json({ error: "That video isn't available any more." }, 404) as never;
+  // ADULT-LOCK-02: a locked clip or poster answers exactly like a missing one (404, same body, no-store) until a proof is held.
+  const file = job && videoJobLockState(actor, job) === "open" ? readVideoFile(actor, job, fileId) : null;
+  if (!job || !file) return c.json({ error: "That video isn't available any more." }, 404, NO_STORE) as never;
   const total = file.bytes.byteLength;
   const headers: Record<string, string> = { "content-type": file.mediaType, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
   const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header("Range") ?? "");
@@ -214,21 +232,23 @@ videosRoutes.openapi(messagesRoute, async (c) => {
   const actor = c.get("person");
   const job = getVideoJobFor(actor, c.req.valid("param").id);
   const first = job?.state === "done" ? job.files[0] : undefined;
-  const file = job && first ? readVideoFile(actor, job, first.id) : null;
-  if (!job || !first || !file) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
+  const file = job && first && videoJobLockState(actor, job) === "open" ? readVideoFile(actor, job, first.id) : null;
+  if (!job || !first || !file) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404, NO_STORE) as never;
+  // ADULT-LOCK-02: an adult-only clip is texted and downloaded under a generic name, never one made from its words.
+  const generic = videoJobLockItem(job)?.madeAudience === "adult-only";
   let bytes: Uint8Array;
-  try { bytes = await messagesCopyOf(first.id, file.bytes, videoTitle(job.prompt)); } catch (error) {
+  try { bytes = await messagesCopyOf(first.id, file.bytes, generic ? "Video" : videoTitle(job.prompt)); } catch (error) {
     if (error instanceof StackVideoError) return c.json({ error: `I couldn't prepare the video for texting. ${error.message}`, code: error.code }, error.status >= 500 ? 503 : 422) as never;
     throw error;
   }
-  const name = videoFileName(job.prompt);
+  const name = generic ? "video.mp4" : videoFileName(job.prompt);
   return new Response(bytes, { status: 200, headers: { "content-type": "video/mp4", "content-length": String(bytes.byteLength), "content-disposition": `attachment; filename="${name}"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
 const cancelRoute = createRoute({
   method: "post", path: "/jobs/{id}/cancel", tags: ["Videos"], summary: "Stop a video that is waiting or being made", middleware: [requireAuth] as const,
   request: { params: idParams },
-  responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card, with the clip stopped (a finished clip stays finished)." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The card, with the clip stopped (a finished clip stays finished)." }, ...refusals },
 });
 videosRoutes.openapi(cancelRoute, async (c) => {
   const actor = c.get("person");
@@ -238,7 +258,7 @@ videosRoutes.openapi(cancelRoute, async (c) => {
   const live = (wanted.turnId ? videoJobsForTurn(actor, wanted.turnId) : [wanted]).filter((j) => j.state === "queued" || j.state === "running");
   for (const job of live) await cancelVideoJob(actor, job.id);
   const fresh = getVideoJobFor(actor, wanted.id) ?? wanted;
-  return c.json(videoCardView(actor, fresh, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
+  return c.json(videoCardOrLocked(actor, fresh, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
 });
 
 async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 403 | 422 | 503; body: { error: string; code: string } } | null> {
@@ -255,17 +275,19 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
 const anotherRoute = createRoute({
   method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed (also Try again after a failed or stopped one, and Make it Detailed or Quick)", middleware: [requireAuth] as const,
   request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the video keeps its own kind."), tier: z.enum(["standard", "boost", "max"]).optional().describe("Make it again at this level. Max needs an admin's OK and a Max model; a level the person may not use is lowered."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the clip is made again from its own words.") }) } } } },
-  responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card, with a new clip queued." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The card, with a new clip queued (or the lock tile)." }, ...refusals },
 });
 videosRoutes.openapi(anotherRoute, async (c) => {
   const actor = c.get("person");
   const source = getVideoJobFor(actor, c.req.valid("param").id);
   if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
+  // ADULT-LOCK-02: another take, remix and the like of a locked clip need an unlock first; nothing starts.
+  if (videoJobLockState(actor, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423) as never;
   // A clip made on the Create page has no chat behind it: Another take runs the same make again with a new seed.
   if (!source.conversationId) {
     const again = await anotherTakeFor(actor, source);
     if (!again.ok) return c.json({ error: again.error, code: again.code }, again.status) as never;
-    return c.json(videoCardView(actor, again.job, true, await readyFlags(actor)), 200);
+    return c.json(videoCardOrLocked(actor, again.job, true, await readyFlags(actor)), 200);
   }
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; tier?: unknown; prompt?: unknown };
   const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
@@ -302,7 +324,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
         ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}),
       },
     });
-    return c.json(videoCardView(actor, started, true, await readyFlags(actor)), 200);
+    return c.json(videoCardOrLocked(actor, started, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
@@ -323,13 +345,13 @@ const makeRoute = createRoute({
     voices: z.string().trim().min(1).max(40).optional().describe("clean (the default: no laugh track, no music, one speaker at a time) or full (music and effects)."),
     start_frame: z.string().trim().min(1).max(200).optional().describe("The id of a picture in your own Library; the video starts from it (404 when it is not yours)."),
   }) } } } },
-  responses: { 200: { content: { "application/json": { schema: CardSchema.extend({ notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") }) } }, description: "The card for the new clip." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: z.union([CardSchema, LockedCardSchema]).and(z.object({ notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") })) } }, description: "The card for the new clip." }, ...refusals },
 });
 videosRoutes.openapi(makeRoute, async (c) => {
   const actor = c.get("person");
   const result = await makeVideoFor(actor, c.req.valid("json"));
   if (!result.ok) return c.json({ error: result.error, code: result.code }, result.status) as never;
-  return c.json({ ...videoCardView(actor, result.job, true, await readyFlags(actor)), notice: result.notice }, 200);
+  return c.json({ ...videoCardOrLocked(actor, result.job, true, await readyFlags(actor)), notice: result.notice } as never, 200);
 });
 
 const animateRoute = createRoute({
@@ -337,7 +359,7 @@ const animateRoute = createRoute({
   request: { body: { content: { "application/json": { schema: z.object({
     conversation_id: z.string().min(1).max(80), file_id: z.string().min(1).max(80).optional(), turn_id: z.string().min(1).max(80), prompt: z.string().trim().min(3).max(1200).optional(),
   }) } } } },
-  responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card for the new clip." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The card for the new clip (or the lock tile)." }, ...refusals },
 });
 videosRoutes.openapi(animateRoute, async (c) => {
   const actor = c.get("person");
@@ -366,7 +388,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
     });
-    return c.json(videoCardView(actor, job, true, await readyFlags(actor)), 200);
+    return c.json(videoCardOrLocked(actor, job, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;

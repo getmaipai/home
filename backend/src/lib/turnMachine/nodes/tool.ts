@@ -26,6 +26,7 @@ import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } fro
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
 import { GENERATE_VIDEO_TOOL_ID, runGenerateVideo } from "@/lib/videos/tool";
+import { redactLockedVideoOutcome } from "@/lib/videos/lock";
 import { EDIT_VIDEO_TOOL_ID, runEditVideo } from "@/lib/videos/editTool";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
@@ -376,7 +377,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
 
     // VIDEO-GEN-05: the card follows the job after this call returns.
     if (tool === GENERATE_VIDEO_TOOL_ID || tool === EDIT_VIDEO_TOOL_ID) {
-      const outcome = await (tool === EDIT_VIDEO_TOOL_ID ? runEditVideo : runGenerateVideo)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+      // ADULT-LOCK-02: a locked item's outcome is stored as a placeholder (no prompt, styles or file ids), and so is what the wire carries.
+      const outcome = redactLockedVideoOutcome(state.actor, await (tool === EDIT_VIDEO_TOOL_ID ? runEditVideo : runGenerateVideo)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" }));
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

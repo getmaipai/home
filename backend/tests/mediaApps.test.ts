@@ -1,5 +1,6 @@
 // MEDIA-VIDEOS-01: the shared media-app host (lib/media/appHost.ts, routes/mediaApps.ts) over HTTP, through the Videos package's
 // data ids and actions: rows per band, progress with string numbers, the lists, and the child's allowlist-only view.
+import { unlock, unlockHeader } from "./fixtures/adultLock";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -43,7 +44,7 @@ async function setup() {
   await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
   const musicSource = await owner.post("/api/media/sources", { label: "music", path: tree.music, kinds: ["track"] });
   await scanRoot(((await musicSource.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
-  const data = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => (await client.post(`/api/plugins/videos/data/${id}`, body)).json() as Promise<Row[]>;
+  const data = async (client: TestClient, id: string, body: Record<string, unknown> = {}, headers?: Record<string, string>) => (await client.post(`/api/plugins/videos/data/${id}`, body, headers)).json() as Promise<Row[]>;
   const rows = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => data(client, id, body);
   const idOf = async (title: string) => (await rows(adult.client, "library")).find((row) => row.title === title)!.id;
   return { owner, adult, admin, child, data, rows, idOf };
@@ -179,7 +180,8 @@ describe("the media-app host: data ids", () => {
     expect(view[0]).not.toHaveProperty("candidates");
     expect(view[0]?.creator.avatar_seed).toBe(seedOf(adult.id));
     expect(stringsOnly(view).join(" ")).not.toMatch(/[{}]/);
-    const adultOnlyCandidates = await data(owner, "creation", { id: adultsOnly.value.id, scope: "people" }) as unknown as Array<Record<string, any>>;
+    // ADULT-LOCK-02: an adult-only clip is a locked item; its owner reads its details after an unlock on their own screen.
+    const adultOnlyCandidates = await data(owner, "creation", { id: adultsOnly.value.id, scope: "people" }, unlockHeader(await unlock(owner, "correcthorse"))) as unknown as Array<Record<string, any>>;
     expect(adultOnlyCandidates.map((candidate) => candidate.id).sort()).toEqual([adult.id, admin.id].sort());
     const owned = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([9, 9, 9]), provenance: 'video-gen:{"prompt":"A short family clip","audience":"all-ages"}', deduplicate: false });
     if (!owned.ok) throw new Error(owned.error);

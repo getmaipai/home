@@ -4,6 +4,7 @@
 // re-reads while a clip is made), "clips" = My clips (Library files made at home, own and shared, or the person's uploaded pictures, by `view`).
 // Only the two Create pages bind it and both have an adult floor, so appRouteAllowed refuses the rest.
 import { doneVideoJobsFor } from "@/lib/videos/jobs";
+import { lockedVideoTile } from "@/lib/videos/lock";
 import { feedRowById, feedRowOf, feedRows, levelOfJob } from "@/lib/videos/feed";
 import { favoriteFileIds } from "@/lib/videos/favorites";
 import { listLibrary } from "@/lib/library";
@@ -139,7 +140,9 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
     const level = job ? levelWords(job) : null;
     return { id: file.id, title: file.name, subtitle: job ? [level, seconds ? `${Math.round(seconds)} s` : null].filter(Boolean).join(", ") : file.owner.display_name || "Made at home", thumbnail: file.thumb_url, duration_s: file.duration_seconds, created_at: file.created_at, favorite: favorites.has(file.id), kind: "video" };
   });
-  return rows;
+  // ADULT-LOCK-02: locked clips are not in the list (the Library query leaves them out); one tile stands for all of them, leading the list.
+  const locked = lockedVideoTile(person);
+  return locked && !view ? [locked, ...rows] : rows;
 }
 
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];

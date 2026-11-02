@@ -18,9 +18,10 @@ import { requiresCredential, getAuthMethods, pinDigitsHint, roleRequiresCredenti
 import { isTotpEnabled } from "@/lib/totp";
 import { hashSessionToken, issueSession, sessionSignInSource } from "@/lib/session";
 import { deviceTokens } from "@/db/schema";
-import { hashSecret, secretDigitsOf, verifySecret } from "@/lib/secret";
-import { recordFailedAttempt, clearFailedAttempts, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
-import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
+import { hashSecret, secretDigitsOf } from "@/lib/secret";
+import { clearFailedAttempts } from "@/lib/credentialLockout";
+import { verifyAgainstRecord } from "@/lib/secretCheck";
+import { getClientIp, throttleCheck } from "@/lib/secretThrottle";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { requireAuth, invalidateSessionCache, invalidateSessionCacheForPerson } from "@/middleware/auth";
@@ -33,57 +34,6 @@ export const auth = apiRouter();
 auth.use("/setup", setupLocalOnly);
 
 const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), pinDigits: z.number().int().nullable(), hasPasskeys: z.boolean(), age_band: z.enum(["child", "teen", "adult"]) });
-
-// Shared by /verify-secret and /change-secret: "prove you know this
-// person's current secret" is the identical lockout-check, verify,
-// failure-bookkeeping, success-reset sequence either way. A code review
-// (2026-09-04) found this duplicated near-verbatim between the two the
-// moment a second real consumer (change-secret) needed it - the same
-// "extract on the second consumer" pattern lib/access.ts's own header
-// comment documents. Callers still run their own IP throttleCheck first
-// (not folded in here): verify-secret's real behavior is to check that
-// before even confirming the person/record exist, and change-secret's
-// record-exists branch needs to decide whether to throttle-check at all
-// before this function has anything to verify against.
-//
-// Returns a plain result rather than calling c.json() itself (a code
-// review, 2026-09-06, found the @hono/zod-openapi conversion of this
-// file couldn't typecheck a shared helper's Response against each
-// route's own distinct declared response union) - each caller builds its
-// own c.json(...) from the returned body/status, keeping full type
-// safety against that route's own createRoute() schema.
-type SecretCheckFailure = { ok: false; status: 401 | 429; body: { error: string; retryAfter?: number; attemptsLeft?: number } };
-async function verifyAgainstRecord(
-  ip: string,
-  personId: string,
-  record: { secretHash: string; lockedUntil: string | null },
-  providedSecret: string,
-  wrongSecretMessage: string,
-): Promise<{ ok: true } | SecretCheckFailure> {
-  if (record.lockedUntil && new Date(record.lockedUntil).getTime() > Date.now()) {
-    const retryAfter = Math.ceil((new Date(record.lockedUntil).getTime() - Date.now()) / 1000);
-    return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter } };
-  }
-
-  const valid = await verifySecret(providedSecret, record.secretHash);
-  if (!valid) {
-    throttleFail(ip);
-    // Atomic re-read-and-increment (lib/credentialLockout.ts): a code
-    // review (2026-09-04) found an earlier inline `record.failedAttempts
-    // + 1` used a count read before this function's `await` above, so
-    // concurrent requests for the same profile could undercount real
-    // attempts.
-    const { failedAttempts } = recordFailedAttempt(personId);
-    return {
-      ok: false,
-      status: 401,
-      body: { error: wrongSecretMessage, attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) },
-    };
-  }
-
-  throttleReset(ip);
-  return { ok: true };
-}
 
 // The profile picker: every non-deleted person, never a secret hash, and
 // never a birthdate (3.1: core-only). Public (unauthenticated) by design,

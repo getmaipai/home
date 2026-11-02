@@ -10,6 +10,8 @@ import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
+import { unlockedFor } from "@/lib/adultLock";
+import { lockedStyleOutcome } from "@/lib/videos/lock";
 import { videoAdaptersFor, matchVideoAdapter, withVideoTriggerWords } from "./adapters";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
 import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
@@ -161,6 +163,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const available = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
   const named = typeof args.style === "string" ? args.style.trim() : "";
   const adapter = named && !kid ? matchVideoAdapter(available, named) : null;
+  // ADULT-LOCK-02: an adult-only style from chat needs a live unlock proof on the turn request; without one nothing starts and the card is the lock tile.
+  if (adapter && adapter.classification === "adult-only" && !unlockedFor(state.actor as PersonRow)) return lockedStyleOutcome(callId, GENERATE_VIDEO_TOOL_ID, args);
   const styleNote = named && !adapter ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
   // VIDEO-LTX-01: Quick or Detailed. A style made for one model decides; a length past five seconds needs Detailed; else what was asked for, else the household's setting.
   // LTX25-MAX-01: Max is offered only when the Stack reports its pack ready (not the slot list) and only to an adult; the grant is `tierArgument`'s own check.

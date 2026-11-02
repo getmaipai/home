@@ -27,6 +27,7 @@ import { synthesizeSpeech } from "@/lib/tts";
 import { listClonedVoices } from "@/lib/clonedVoices";
 import { getOfferedVoices } from "@/lib/voiceResolve";
 import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
+import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, readVideoFile, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, crossfadeProblem, frameOps, joinOps, lastFrameAt, mixOps, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, type EditFile } from "./stackEdit";
@@ -136,6 +137,8 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const continuing = value.change === "continue";
   const source = continuing ? ownClip(actor, state, value.clip, temporary) : sourceVideoJob(actor, state.conversationId, value.clip, temporary);
   if (!source) return refused(callId, args, NO_CLIP_LINE, "no_clip");
+  // ADULT-LOCK-02 (design 3.7): a locked source needs an unlock first; nothing starts and nothing of it is named.
+  if (videoJobLockState(actor, source) !== "open") return refused(callId, args, LOCKED_START_LINE, "locked");
 
   const body: MakeVideoBody = bodyOfVideoJob(source);
   // A clip that started from a picture (made here or an attached photo) starts from it again, through the same loader and input screening a Make another uses.
@@ -254,6 +257,7 @@ function ownClip(actor: PersonRow, state: GenerateVideoState, clip: string, temp
   const job = sourceVideoJob(actor, state.conversationId, clip, temporary);
   if (!job || job.personId !== actor.id) return null;
   if (temporary && job.conversationId !== state.conversationId) return null;
+  if (videoJobLockState(actor, job) !== "open") return null;
   return job;
 }
 

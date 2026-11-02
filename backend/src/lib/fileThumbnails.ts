@@ -6,6 +6,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, musicJobs } from "@/db/schema";
 import { canAccessFile } from "@/lib/access";
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { attachmentFilePath } from "@/lib/attachments";
 import { classDir } from "@/lib/paths";
 import { libraryProvenance, libraryProvenanceSql } from "@/lib/libraryProvenance";
@@ -30,7 +31,10 @@ export function clearPreviews() {
   return stats;
 }
 type Row = typeof attachments.$inferSelect;
-function allowed(actor: PersonRow, row: Row | undefined): row is Row { return !!row && canAccessFile(actor,row.ownerPersonId,row.id); }
+// ADULT-LOCK-02: a locked item answers exactly like a missing one (the same 404) until the viewer holds a proof.
+function allowed(actor: PersonRow, row: Row | undefined): row is Row { return !!row && canAccessFile(actor,row.ownerPersonId,row.id) && lockState(lockItemOfProvenance(row.ownerPersonId,row.provenance),actor) === "open"; }
+/** An adult-only item's preview is never cached, even after an unlock (the proof is per page visit). */
+function previewCache(row: Row): string { return lockItemOfProvenance(row.ownerPersonId,row.provenance)?.madeAudience === "adult-only" ? "private, no-store" : "private, no-cache"; }
 function sourceFor(actor: PersonRow, row: Row): Row | undefined {
   if (row.mediaType.startsWith("image/")) return row;
   const meta = libraryProvenance(row.provenance);
@@ -73,11 +77,11 @@ function generate(row: Row, path: string, width: number, mayRead: () => boolean)
 }
 export async function fileThumbnail(actor: PersonRow, id: string, width: 320 | 640, ifNoneMatch?: string): Promise<Response> {
   const row = db.select().from(attachments).where(eq(attachments.id,id)).get();
-  if (!allowed(actor,row)) return new Response("attachment not found",{ status:404 });
+  if (!allowed(actor,row)) return new Response("attachment not found",{ status:404, headers:{ "cache-control":"private, no-store" } });
   const source = sourceFor(actor,row);
   if (!allowed(actor,source) || !source.mediaType.startsWith("image/") || source.size > MAX_CHAT_IMAGE_BYTES || !/^[a-f0-9]{64}$/.test(source.sha256)) return new Response("no preview",{ status:404 });
   const etag = `"${source.sha256}-${width}"`;
-  const headers = { "content-type":"image/webp", "cache-control":"private, no-cache", etag };
+  const headers = { "content-type":"image/webp", "cache-control":previewCache(row), etag };
   try {
     const bytes = await generate(source,join(thumbnailsDir,`${source.sha256}-${width}.webp`),width,() => allowed(actor,row) && allowed(actor,source));
     // Shares may have changed while a queued native decode was running.
@@ -93,7 +97,7 @@ export async function fileThumbnail(actor: PersonRow, id: string, width: 320 | 6
 /** A small preview of one of the caller's own files in Trash: the picture itself, a video's poster or a song's cover. */
 export async function trashedFileThumbnail(actor: PersonRow, id: string): Promise<Response> {
   const row = db.select().from(attachments).where(eq(attachments.id,id)).get();
-  const inTrash = (r: Row | undefined): r is Row => !!r && r.ownerPersonId === actor.id && r.deletedAt !== null && r.trashUntil !== null;
+  const inTrash = (r: Row | undefined): r is Row => !!r && r.ownerPersonId === actor.id && r.deletedAt !== null && r.trashUntil !== null && lockState(lockItemOfProvenance(r.ownerPersonId, r.provenance), actor) === "open";
   if (!inTrash(row)) return new Response("attachment not found",{ status:404 });
   const source = row.mediaType.startsWith("image/") ? row : companionsOf(row).find(other => other.mediaType.startsWith("image/") && inTrash(other));
   if (!source || source.size > MAX_CHAT_IMAGE_BYTES || !/^[a-f0-9]{64}$/.test(source.sha256)) return new Response("no preview",{ status:404 });

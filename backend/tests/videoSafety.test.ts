@@ -2,6 +2,7 @@
 // everything. The matrix is band by surface by LoRA class, then the two absolute lines, then every entrance (the chat
 // tool, the card's routes, the status and settings routes): none of them reaches the Stack for a person or a surface
 // that may not, and no household setting reaches the absolute lines or turns video on for a minor.
+import { __unlockRestOfTest } from "@/lib/adultLock";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -232,6 +233,7 @@ describe("the chat tool, even when a model calls it without being offered it", (
     });
   });
   test("with adult-only styles allowed, an adult's named adult-only style rides along with audience adult", async () => {
+    __unlockRestOfTest(people.owner.id); // ADULT-LOCK-02: an adult-only style from chat needs an unlocked page
     await withStub(calling({ prompt: "a woman by a window", style: "boudoir motion" }, "On its way."), async () => {
       await turn(people.owner, "a clip of a woman by a window in boudoir motion style");
       expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-2222222222222222", strength: 0.9 }]);

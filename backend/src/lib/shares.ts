@@ -25,6 +25,7 @@ import { attachments, people, shares } from "@/db/schema";
 import { Share as ShareSchema, type Share } from "@maipai/spec/gen/ts/share.js";
 import { newShareId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { canAccessFile, canReadFileAudience, fileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { toRecord } from "@/lib/attachments";
@@ -77,7 +78,8 @@ function targetIsAdult(to: string): boolean {
  * target that already has a live pointer just returns it. */
 export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpResult<Share, 400 | 403 | 404> {
   const file = db.select().from(attachments).where(eq(attachments.id, input.fileId)).get();
-  if (!file || file.deletedAt !== null || !canReadFileAudience(actor, file)) return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
+  // ADULT-LOCK-02: a locked item cannot be shared (it answers like a missing one); after an unlock the share goes through the adult-only rule below.
+  if (!file || file.deletedAt !== null || !canReadFileAudience(actor, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), actor) !== "open") return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
 
   if (!canAccessFile(actor, file.ownerPersonId, input.fileId)) {
     return { ok: false, status: 403, error: "you do not have access to this file" };
@@ -155,7 +157,8 @@ function notifyShareCreated(actor: PersonRow, to: string, file: typeof attachmen
   // value the map doesn't list - `Record<FileRecord["kind"], string>`
   // only guarantees exhaustiveness against today's type declaration, not
   // against whatever toRecord() actually returns at runtime.
-  const kindPhrase = KIND_PHRASES[toRecord(file).kind] ?? "a file";
+  // ADULT-LOCK-02: the notice for an adult-only item says no kind (a notice is a surface a bystander can read).
+  const kindPhrase = lockItemOfProvenance(file.ownerPersonId, file.provenance)?.madeAudience === "adult-only" ? "a file" : KIND_PHRASES[toRecord(file).kind] ?? "a file";
   const vars = { fromDisplayName: actor.displayName, kindPhrase };
   if (to === "household") {
     trackBackgroundWork(
@@ -185,7 +188,7 @@ export function deleteShare(actor: PersonRow, shareId: string): ShareOpResult<{ 
   const share = db.select().from(shares).where(eq(shares.id, shareId)).get();
   if (!share) return { ok: false, status: 404, error: "share not found" };
   const file = db.select().from(attachments).where(eq(attachments.id, share.fileId)).get();
-  if (!file || !canReadFileAudience(actor, file)) return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
+  if (!file || !canReadFileAudience(actor, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), actor) !== "open") return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
 
   const canDelete =
     actor.id === share.fromPersonId ||
@@ -287,7 +290,9 @@ export interface VisibleFile {
  * acceptance ("a shared file appears in each recipient's Library under
  * the owner's name"). */
 export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
-  const owned = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).all();
+  // ADULT-LOCK-02: locked items are left out of the list (owned and shared alike) until the person unlocks.
+  const unlocked = (row: { ownerPersonId: string; provenance: string }) => lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) === "open";
+  const owned = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).all().filter(unlocked);
   const allShares = db.select().from(shares).where(eq(shares.to, actor.id)).all().concat(db.select().from(shares).where(eq(shares.to, "household")).all());
 
   const result: VisibleFile[] = owned.map((row) => ({ file: toRecord(row), ownerPersonId: row.ownerPersonId, shared: false, household: false, formerOwnerName: null }));
@@ -310,7 +315,7 @@ export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
       : [],
   );
   for (const file of sharedFiles) {
-    if (!canAccessFile(actor, file.ownerPersonId, file.id)) continue;
+    if (!canAccessFile(actor, file.ownerPersonId, file.id) || !unlocked(file)) continue;
     // An orphaned pointer (the file itself was deleted) simply has no
     // matching row here - nothing to list, no special case needed.
     const formerOwnerName = departed.get(file.ownerPersonId) ?? null;

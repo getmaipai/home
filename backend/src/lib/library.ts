@@ -2,6 +2,7 @@ import { sqlite } from "@/db";
 import { canReadFileAudience, fileAudience, fileVisibilitySql } from "@/lib/access";
 import { mediaKindSql } from "@/lib/storage/usage";
 import { isGeneratedFile, libraryProvenance, libraryProvenanceSql } from "@/lib/libraryProvenance";
+import { lockedFilterSql } from "@/lib/adultLock";
 import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
@@ -48,6 +49,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
     LEFT JOIN video_jobs vj ON vj.id = json_extract(${libraryProvenanceSql("a.provenance")},'$.job') AND vj.person_id = a.owner_person_id
     LEFT JOIN music_jobs mj ON mj.id = coalesce(json_extract(${libraryProvenanceSql("a.provenance")},'$.job_id'),json_extract(${libraryProvenanceSql("a.provenance")},'$.job')) AND mj.person_id = a.owner_person_id
     WHERE ${fileVisibilitySql(actor, "a", "s.visible")}
+      AND NOT ${lockedFilterSql(actor, libraryProvenanceSql("a.provenance"))}
   ), named AS (
     SELECT *, coalesce(picture_prompt,video_prompt,json_extract(meta,'$.prompt'),'') AS prompt,
       coalesce(json_extract(CASE WHEN json_valid(music_request) THEN music_request ELSE '{}' END,'$.title'),json_extract(meta,'$.title'),'') AS title,

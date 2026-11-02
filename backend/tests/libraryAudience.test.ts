@@ -1,3 +1,4 @@
+import { unlock, unlockHeader } from "./fixtures/adultLock";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -92,8 +93,10 @@ for (const role of ["child", "teen"] as const) {
       if (!unknown.ok) throw new Error(unknown.error);
       ids.push(unknown.value.id);
       const shareIds = new Map<string, string>();
+      // ADULT-LOCK-02: the adult-only clip is a locked item; its owner unlocks on their own screen before sharing it.
+      const ownerProof = unlockHeader(await unlock(owner, "correcthorse"));
       for (const id of [...ids, ...derivedIds]) {
-        const shared = await owner.post(`/api/files/${id}/shares`, { to: "household" });
+        const shared = await owner.post(`/api/files/${id}/shares`, { to: "household" }, ownerProof);
         if (shared.status === 403) {
           // LIBRARY-REVAMP-04 now refuses an adult-only file here; a share made before that rule must still stay hidden from a minor.
           const legacy = { id: newShareId(), fileId: id, fromPersonId: ownerId, to: "household", provenance: "files-page:share", createdAt: new Date().toISOString(), hlc: nextHlc() };
@@ -119,15 +122,18 @@ for (const role of ["child", "teen"] as const) {
         for (const v of ["thumb", "full"]) expect((await minor.get(`/api/attachments/${id}?v=${v}&conversation_id=${conversationId}`)).status).toBe(404);
       }
       expect((await minor.get(`/api/files/${safeId}/content`)).status).toBe(200);
-      for (const reader of [owner, readers[1]!]) {
-        const rows = await (await reader.get("/api/files")).json() as { file: { id: string } }[];
+      // Each adult reads the locked clip only on their own unlock.
+      for (const [reader, secret] of [[owner, "correcthorse"], [readers[1]!, "0000"]] as const) {
+        const proof = unlockHeader(await unlock(reader, secret));
+        const rows = await (await reader.get("/api/files", proof)).json() as { file: { id: string } }[];
         expect(rows.map(row => row.file.id).sort()).toEqual([...ids, ...derivedIds].sort());
-        for (const id of [...ids, ...derivedIds]) expect((await reader.get(`/api/files/${id}/content`)).status).toBe(200);
+        for (const id of [...ids, ...derivedIds]) expect((await reader.get(`/api/files/${id}/content`, proof)).status).toBe(200);
       }
       // Owners retain access even after their role changes to a minor band.
       db.update(people).set({ role }).where(eq(people.id, ownerId)).run();
       const minorOwner = db.select().from(people).where(eq(people.id, ownerId)).get()!;
-      expect(listFilesVisibleToActor(minorOwner).map(row => row.file.id).sort()).toEqual([...ids, ...derivedIds].sort());
+      // ADULT-LOCK-02: a minor never receives an adult-only clip, its former owner included (the lock is never unlockable for a minor).
+      expect(listFilesVisibleToActor(minorOwner).map(row => row.file.id).sort()).toEqual([...ids].sort());
       for (const id of ids) {
         expect(getAttachment(minorOwner, id).ok).toBe(true);
         expect(readAttachment(minorOwner, id).ok).toBe(true);

@@ -1,5 +1,6 @@
 // VIDEO-CHAT-01 (C3, C4, docs/design/video-chat-2026-11-02.md): edit_video trim, join and mix on the Stack's media.edit job, through a fake Stack.
 // The clips are real finished jobs made through the fake video Stack; the edit runs through lib/videos/stackEdit.ts against the fake edit Stack.
+import { __unlockRestOfTest } from "@/lib/adultLock";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -338,6 +339,7 @@ const teenReads = (job: VideoJob) => canReadFileAudience(nova(), { ownerPersonId
 describe("an edit is never lower than its sources", () => {
   test("a clean source stays all-ages and a teen can read it; an adult-only source stays adult-only in trim and a teen cannot read it", async () => {
     const owner = person("owner");
+    __unlockRestOfTest(owner.id); // ADULT-LOCK-02: a locked source is read on an unlocked page only
     const clean = await makeClip(owner);
     const cleanEdit = await finished(owner, await edit(clean.state, { clip: clean.job.id, change: "trim", to_s: 3 }));
     expect(audienceOf(cleanEdit)).toBe("all-ages");
@@ -352,6 +354,7 @@ describe("an edit is never lower than its sources", () => {
 
   test("a join of one adult-only and one all-ages clip is adult-only, in either order", async () => {
     const owner = person("owner");
+    __unlockRestOfTest(owner.id);
     const clean = await makeClip(owner);
     const spicy = await makeClip(owner, clean.state.conversationId!, false, SPICY);
     const state = chatState(owner, clean.state.conversationId!);

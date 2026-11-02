@@ -5,6 +5,7 @@ import { eq, gt, and, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, people, deviceTokens } from "@/db/schema";
 import { hashSessionToken } from "@/lib/session";
+import { revokeProofsForPerson, revokeProofsForSession } from "@/lib/adultLock";
 import { resolveDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
 import { mayHoldMediaOffline } from "@/lib/devices";
 import { mediaBandOf } from "@/lib/media/band";
@@ -33,6 +34,8 @@ const sessionCache = new Map<string, CachedAuth>();
 
 export function invalidateSessionCache(token: string): void {
   sessionCache.delete(hashSessionToken(token));
+  // ADULT-LOCK-02: signing out (or any session ending) takes the Adult lock's proofs for that session with it.
+  revokeProofsForSession(hashSessionToken(token));
 }
 
 /** Test-only: sessionCache is module-local state with no other reset
@@ -48,6 +51,8 @@ export function __clearSessionCacheForTests(): void {
 // for the `enabled` flag below. Person deletion and role changes invalidate
 // the same cache when their routes update a profile.
 export function invalidateSessionCacheForPerson(personId: string): void {
+  // ADULT-LOCK-02: a role or age change, a changed secret, a disabled profile: the person's unlock proofs end with the cached sessions.
+  revokeProofsForPerson(personId);
   for (const [key, entry] of sessionCache) {
     if (entry.person.id === personId) sessionCache.delete(key);
   }

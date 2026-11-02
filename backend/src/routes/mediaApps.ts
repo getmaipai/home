@@ -22,6 +22,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { setFavoriteFile } from "@/lib/videos/favorites";
+import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
@@ -163,6 +164,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await bodyOf(c.req.raw);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
+    // ADULT-LOCK-02: another take of a locked clip needs an unlock first; nothing starts.
+    if (videoJobLockState(person, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423 as never);
     const made = await anotherTakeFor(person, source);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
   });
@@ -174,7 +177,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "cancel")) return next();
     const body = await bodyOf(c.req.raw);
     const job = typeof body.id === "string" ? getVideoJobFor(person, body.id) : null;
-    if (!job || job.conversationId) return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
+    if (!job || job.conversationId || videoJobLockState(person, job) !== "open") return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
     const stopped = await cancelVideoJob(person, job.id);
     return c.json({ ok: true as const, id: job.id, state: stopped?.state ?? job.state }, 200);
   });
@@ -188,6 +191,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await bodyOf(c.req.raw);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state !== "done") return c.json({ error: "That video isn't available any more. Make a new one from the words on the left.", code: "gone" }, 404);
+    if (videoJobLockState(person, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423 as never);
     const audience = makeAudienceOf(person);
     // A clip that started from a Library picture keeps it (as Another take does); makeItMaxBody refuses it unless the Max model can start from a picture.
     const start = source.kind === "animate" && source.request.source_file_id ? { start_frame: source.request.source_file_id } : {};
@@ -207,7 +211,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await bodyOf(c.req.raw);
     const id = typeof body.id === "string" ? body.id : "";
     const job = id ? getVideoJobFor(person, id) : null;
-    const fileId = job ? (job.state === "done" ? job.files[0]?.id : undefined) : id && madeFileFor(person, "videos", id) ? id : undefined;
+    const fileId = job ? (job.state === "done" && videoJobLockState(person, job) === "open" ? job.files[0]?.id : undefined) : id && madeFileFor(person, "videos", id) ? id : undefined;
     if (!fileId) return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
     const asked = body.favorite === true || body.favorite === "true" ? true : body.favorite === false || body.favorite === "false" ? false : undefined;
     return c.json({ ok: true as const, id, favorite: setFavoriteFile(person, fileId, asked) }, 200);

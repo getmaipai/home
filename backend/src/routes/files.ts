@@ -141,7 +141,7 @@ filesRoutes.openapi(contentRoute, (c) => {
   // returns (404 for no access/missing bytes, 500 for a failed
   // integrity check) - narrowed here the same way getRoute above
   // hardcodes 404 rather than passing `result.status` straight through.
-  if (!result.ok) return c.json({ error: result.error }, result.status === 500 ? 500 : 404);
+  if (!result.ok) return c.json({ error: result.error }, result.status === 500 ? 500 : 404, { "cache-control": "private, no-store" });
   const { bytes, record } = result.value;
   // A code review caught the first cut of this: sha256 content-addressing
   // (file.schema.json) makes the BYTES at this id immutable forever, but

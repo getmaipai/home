@@ -2,6 +2,7 @@
 // owner changes a file. Rename stores the owner's name (ahead of the spec's `file.name`, LIBRARY-REVAMP-03); Keep pins the
 // item (retention "kept"), which the nightly job and the storage rules never remove. Un-keeping is only for generated items,
 // which then follow the Library's storage rules again; anything a person added stays until they delete it.
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
@@ -21,7 +22,7 @@ export function cleanFileName(raw: string): string {
 
 export function updateLibraryFile(actor: PersonRow, id: string, patch: { name?: string | null; keep?: boolean }): EditResult {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
-  if (!row || !canAccessFile(actor, row.ownerPersonId, id)) return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
+  if (!row || !canAccessFile(actor, row.ownerPersonId, id) || lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
   if (row.ownerPersonId !== actor.id) return { ok: false, status: 403, error: "Only the person who added this file can change it." };
   if (row.origin === "fetched") return { ok: false, status: 403, error: "Saved media belongs to its app. Change it there." };
   const set: Partial<typeof attachments.$inferInsert> = {};

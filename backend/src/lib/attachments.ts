@@ -22,6 +22,7 @@ import { checkStorageCap, kindForMediaType } from "@/lib/storage/usage";
 import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { contentFor, dropFileReferences, ensureContent, releaseContent, syncFileReferences } from "@/lib/fileContent";
 import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
 
 export type AttachmentOpResult<T> =
@@ -271,6 +272,8 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
 export function getAttachment(actor: PersonRow, id: string): AttachmentOpResult<FileRecord> {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
   if (!row || !canAccessFile(actor, row.ownerPersonId, id)) return { ok: false, status: 404, error: "attachment not found" };
+  // ADULT-LOCK-02: a locked item answers exactly like a missing one until the viewer holds an unlock proof.
+  if (lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return { ok: false, status: 404, error: "attachment not found" };
   return { ok: true, value: toRecord(row) };
 }
 
@@ -294,7 +297,7 @@ export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult
  * while the general Library keeps its explicit-share rule. */
 export function readAttachmentForConversation(actor: PersonRow, conversationId: string, id: string): AttachmentOpResult<{ record: FileRecord; bytes: Uint8Array }> {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
-  if (!row || row.conversationId !== conversationId || !canReadFileAudience(actor, row)) return { ok: false, status: 404, error: "attachment not found" };
+  if (!row || row.conversationId !== conversationId || !canReadFileAudience(actor, row) || lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return { ok: false, status: 404, error: "attachment not found" };
   const conversation = db.select({ personId: conversations.personId }).from(conversations).where(eq(conversations.id, conversationId)).get();
   if (!conversation || !canAccessPerson(actor, conversation.personId)) return { ok: false, status: 404, error: "attachment not found" };
   const filePath = attachmentFilePath(row.storagePath);

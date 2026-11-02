@@ -81,6 +81,8 @@ import { imageEditRoutes } from "@/routes/imageEdit";
 import { picturesRoutes } from "@/routes/pictures";
 import { picturesAdminRoutes } from "@/routes/picturesAdmin";
 import { videosRoutes } from "@/routes/videos";
+import { adultLockRoutes } from "@/routes/adultLock";
+import { adultLockContext } from "@/lib/adultLock";
 import { trashRoutes } from "@/routes/trash";
 import { offlineRoutes } from "@/routes/offline";
 import { mediaOfflineRoutes } from "@/routes/mediaOffline";
@@ -120,6 +122,8 @@ import { slowRequestMiddleware } from "@/lib/perfWatch";
 // generation, it doesn't require every mounted router to use it.
 export const app = apiRouter();
 app.use("*", slowRequestMiddleware);
+// ADULT-LOCK-02: the unlock proof header and session key of this request, for every producer of an adult-only item (lib/adultLock.ts).
+app.use("/api/*", adultLockContext);
 
 // Session F, step 2: real sidecar reporting, per the wave-2 contract
 // ("F to E: health, repairs, updates..."). gpu/disk/last_backup/
@@ -308,6 +312,7 @@ app.route("/api/image-edit", imageEditRoutes);
 app.route("/api/pictures/admin", picturesAdminRoutes);
 app.route("/api/pictures", picturesRoutes);
 app.route("/api/videos", videosRoutes);
+app.route("/api/adult-lock", adultLockRoutes);
 app.route("/api/media/home", mediaHomeRoutes);
 app.route("/api/companions", companionsRoutes);
 app.route("/api/media/search", mediaSearchRoutes);

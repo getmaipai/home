@@ -327,6 +327,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/addressFallback.ts` | ADDRESS_ATTEMPT_MS, ipv4First, isConnectFailure, fetchTryingEachAddress |
+| `backend/src/lib/adultLock.ts` | PROOF_IDLE_MS, PROOF_ABSOLUTE_MS, TICKET_MS, PROOF_HEADER, LOCKED_WRITERS, __setAdultLockClockForTests |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
@@ -842,6 +843,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/searchTestSummary.ts` | summarizeSearchStatus, SearchTestSummarySchema |
 | `backend/src/lib/searxngHealth.ts` | lastSearxngCanaryResult, __setLastSearxngCanaryResultForTests, __resetSearxngHealthThrottleForTests, checkSearxngHealth |
 | `backend/src/lib/secret.ts` | ensureSecretPepperReady, secretDigitsOf, hashSecret, verifySecret, __resetPepperCacheForTests, hashApiKeySecret |
+| `backend/src/lib/secretCheck.ts` | verifyAgainstRecord |
 | `backend/src/lib/secretPaths.ts` | protectSecretPath, protectExistingSecretPaths |
 | `backend/src/lib/secretThrottle.ts` | throttleCheck, throttleFail, throttleReset, __resetThrottleForTests, getClientIp |
 | `backend/src/lib/secrets.ts` | encryptSecret, decryptSecret, __resetSecretsKeyCacheForTests |
@@ -990,6 +992,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob, conversationHasVideo |
+| `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
