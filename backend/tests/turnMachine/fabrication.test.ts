@@ -6,6 +6,10 @@ import { CLAIM_UNCONFIRMED, checkClaims } from "@/lib/turnMachine/research";
 describe("names", () => {
   test("runs of capitalized words and short quoted titles are names; one capitalized word, a calendar date or a sentence start is not", () => {
     expect(namesIn("Marcus Quillon wrote “The Long Road” in March 1999.").sort()).toEqual(["Marcus Quillon", "The Long Road"].sort());
+    expect(namesIn("- My guess (high confidence): Any Visitors remaining on Earth would live under oversight [75].")).toEqual([]);
+    expect(namesIn("**My guesses:**\n- The Cold War backdrop made the win feel bigger.")).toEqual(["Cold War"]);
+    expect(namesIn("This made New York City the Atlantic home port for the Midwest.")).toEqual(["New York City"]);
+    expect(namesIn('The title (e.g., "Baku Decision") is not stated.')).toEqual(["Baku Decision"]);
     expect(namesIn("It rained in March. On Tuesday the road closed.")).toEqual([]);
     expect(namesIn("The Federal Reserve of the United States raised rates.").length).toBeGreaterThan(0);
   });

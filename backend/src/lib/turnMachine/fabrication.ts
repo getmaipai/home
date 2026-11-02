@@ -8,7 +8,12 @@
 /** Appended to a sentence whose names appear in no source. */
 export const NOT_IN_SOURCES = " (not in the sources)";
 
-const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of|the|de|von|van)){0,3}(?:\s+[A-Z][a-z]+)\b/g;
+// A bare "the" does not join two capitalized runs ("New York City the Atlantic"); it joins only as "of the" ("Wedding of the Waters").
+// Side effect: a name with a bare "the" ("Jack the Ripper") splits into its capitalized parts and is not checked as one name.
+const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of(?:\s+the)?|de|von|van)){0,3}(?:\s+[A-Z][a-z]+)\b/g;
+// A clause starts after a sentence end, a newline, or a colon, semicolon or opening bracket; a list marker is not part of the clause.
+const CLAUSE_SPLIT = /\n+|\s*[:;(]\s*/;
+const LIST_MARK = /^\s*(?:[-*•]|\d+[.)])\s+/;
 // A quoted title: starts with a capital letter or digit and ends on a non-space, so the words BETWEEN two quoted phrases ("A" and "B") are not one.
 // A comma, full stop or similar closing a quote in American punctuation ("Title,") is not part of the title.
 const QUOTED = /[“"]([A-Z0-9][^“”"\n]{1,58}[^“”"\s,.;:!])[”"]/g;
@@ -25,24 +30,27 @@ const CALENDAR = new Set(["january", "february", "march", "april", "may", "june"
 export const squashText = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ");
 
 /** Words that open sentences in ordinary English and are capitalized only for being first; they are never part of a name there. */
-const OPENERS = new Set(["the", "a", "an", "in", "on", "at", "it", "he", "she", "they", "we", "this", "that", "these", "those", "there", "then", "when", "while", "after", "before", "during", "but", "and", "so", "if", "as", "by", "for", "from", "with", "some", "many", "one", "two", "its", "his", "her", "their", "our", "my", "your", "no", "not", "also", "however", "since", "because", "although", "once", "today", "later", "earlier", "first", "second", "finally", "overall", "most", "all", "both", "each", "every", "such", "yes"]);
+const OPENERS = new Set(["the", "a", "an", "in", "on", "at", "it", "he", "she", "they", "we", "this", "that", "these", "those", "there", "then", "when", "while", "after", "before", "during", "but", "and", "so", "if", "as", "by", "for", "from", "with", "some", "many", "one", "two", "its", "his", "her", "their", "our", "my", "your", "no", "not", "also", "however", "since", "because", "although", "once", "today", "later", "earlier", "first", "second", "finally", "overall", "most", "all", "both", "each", "every", "such", "yes", "any", "another", "other", "several", "few", "more", "much", "only", "even", "still", "yet", "thus", "here", "now", "what", "which", "who", "how", "why", "where", "perhaps", "maybe", "unlike", "like", "despite", "without", "within", "under", "over", "between", "among", "through", "though", "until", "unless", "whether", "neither", "either", "nor", "or", "to", "into", "of", "about", "i", "you", "me", "us", "him", "them", "none", "nothing", "something", "anything", "everything", "someone", "anyone", "everyone", "instead", "meanwhile", "otherwise", "indeed", "again", "already", "almost", "often"]);
 
 /** The names in a text: runs of two or more capitalized words (a calendar word alone is not a name, and a sentence-opening function word is
  * not part of one) and short quoted titles. */
 export function namesIn(text: string): string[] {
   const found = new Set<string>();
   for (const sentence of withoutLabels(text).split(/(?<=[.!?])\s+/)) {
-    for (const m of sentence.matchAll(NAME_RUN)) {
-      // The name is kept as written ("Wedding of the Waters"), so the connecting words it carries are still part of what is looked up.
-      let run = m[0];
-      const atStart = sentence.slice(0, m.index).trim() === "";
-      if (atStart && OPENERS.has(run.split(/\s+/)[0]!.toLowerCase())) run = run.replace(/^\S+\s+/, "");
-      const words = run.split(/\s+/).filter((w) => /^[A-Z]/.test(w));
-      if (words.length < 2 || !/^[A-Z]/.test(run)) continue;
-      if (words.every((w) => CALENDAR.has(w.toLowerCase()))) continue;
-      found.add(run);
-    }
     for (const m of sentence.matchAll(QUOTED)) found.add(m[1]!);
+    for (const clause of sentence.split(CLAUSE_SPLIT)) {
+      const body = clause.replace(LIST_MARK, "");
+      for (const m of body.matchAll(NAME_RUN)) {
+        // The name is kept as written ("Wedding of the Waters"), so the connecting words it carries are still part of what is looked up.
+        let run = m[0];
+        const atStart = body.slice(0, m.index).trim() === "";
+        if (atStart && OPENERS.has(run.split(/\s+/)[0]!.toLowerCase())) run = run.replace(/^\S+\s+/, "");
+        const words = run.split(/\s+/).filter((w) => /^[A-Z]/.test(w));
+        if (words.length < 2 || !/^[A-Z]/.test(run)) continue;
+        if (words.every((w) => CALENDAR.has(w.toLowerCase()))) continue;
+        found.add(run);
+      }
+    }
   }
   return [...found];
 }
