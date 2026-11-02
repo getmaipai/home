@@ -1,6 +1,6 @@
 ---
 title: Videos
-description: Ask chat for a short video, stop it, make another, and choose who can make videos and which styles are on.
+description: Make a short video in the Videos app or in chat, change it, and choose who can make videos and which styles are on.
 ---
 
 Home can make short videos on your own computer. Nothing is sent to anyone.
@@ -19,23 +19,70 @@ To share a video you made, press **Private** or **Shared**, then choose people i
 
 A Mac with 128 GB of memory and the video model installed. On any other computer, Home says videos are not available and why.
 
-There are two kinds, the same two words as pictures. **Quick** is a short clip with no sound that can start from a picture. **Detailed** adds sound and spoken words and runs longer, and can start from a picture when the engine supports it. Quick comes with video. Detailed is an extra download (about 74 GB) that an owner or admin gets once, in **Settings**.
+There are three levels: **Standard**, **Boost** and **Max**.
+
+- **Standard** makes a small picture with sound, up to 10 seconds long. It takes about 43 seconds.
+- **Boost** makes a bigger picture with better sound. It takes about a minute.
+- **Max** is for the best picture. It is not offered yet. Home turns it on only after it has been measured to fit in the memory one clip may use (64 GB). Until then you will not see it.
+
+These times come from tests on a Mac with 128 GB. Your computer may be a little slower or faster, and the first clip after a restart takes longer.
+
+Children and teens always get Standard. They do not choose a level, and their clips are short and have no sound.
+
+## Make a video in the Videos app
+
+Open **Videos**, then **Create**. The page has these parts.
+
+- **Prompt bar.** Write what you want to see. Put each person's line in quotes.
+- **Look.** Pick one: natural, classic cartoon, anime, 3D animated or film.
+- **Camera.** Pick one: dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still.
+- **Level.** Standard or Boost. Max shows only when it is offered to you.
+- **Start frame.** Pick a picture to start from. A picture you pick is the first frame.
+- **Player.** Your clip plays here when it is done.
+- **Making now.** A list of clips being made, with their progress. Press **Stop** to cancel one.
+- **Recent clips.** A strip of your latest clips. Press one to play it.
+
+Press **Make** to start. Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
+
+## Tips for better clips
+
+- Name and describe each character, for example "a short blue gnome with a white hat". A vague prompt can give you real people instead of cartoons.
+- Say the animation style, for example "hand-drawn cartoon from the 1980s". The Look cards do this for you.
+- Let one person speak at a time. Write each line as its own turn.
+- Spell a hard name the way it sounds. Write "Seer-ah" for "Ciara".
+- Do not write stage directions inside a line of speech, such as "(laughs)". The model says them out loud.
+- Real, named people and famous voices do not come out right. A reference picture can keep a look, but it will not copy a voice.
 
 ## Ask in chat
 
 Type "make a short video of a paper boat in the rain". Home answers in a few words and shows a card. The card shows what Home is doing, how many seconds it has taken, and a bar. Press **Stop** on the card to cancel.
 
-A Quick video is 5 seconds at 480p with no sound and takes about 2 minutes. A Detailed video has sound and spoken words, runs up to 10 seconds, and takes about a minute or two. Chat picks the kind for you: it uses the one your home chose in **Settings**, and it picks Detailed when you ask for people to talk, for sound or music, or for more than 5 seconds. You can say it yourself too, for example "make a Detailed video where the hero says come with me". Spoken words come out clearest in a video of 5 seconds or less; in a longer one a line can come out garbled or not at all, so keep a spoken line short. If a picture, video or song is ahead of yours, the card shows your place in the household queue. Your video starts when its turn comes.
+You can ask for a look, a camera move, a length, a level, or "keep it clean" (no music or laugh track, one speaker at a time). For example: "make a 10 second anime video of a fox in the snow, slow orbit". If a picture, video or song is ahead of yours, the card shows your place in the household queue. Your video starts when its turn comes.
 
 If someone is chatting or talking to Home while a video is being made, the video pauses ("Paused while chat is working") and carries on after the reply, so chat is never slowed down. The wait is not counted against the video.
 
-When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words. The **Standard** and **Boost** buttons under the video make the same words again as the other kind (Boost adds sound and speech). A video made with a style cannot switch, because a style is made for one kind.
+When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words.
+
+## Change a video in chat
+
+Ask chat to change a video you made. Home keeps the old video and makes a new one next to it.
+
+- **Another take.** "Do another one." Same words, a new result.
+- **Remix.** "Make it anime" or "same but at night." Same video with the change you name. You can change the words, look, camera, sound, length or level.
+- **Make it Max.** "Make it Max." Only when Max is offered to you. Otherwise Home says so.
+- **Trim.** "Cut the first two seconds." Say where it starts and ends, in seconds.
+- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order.
+- **Mix.** "Put my voice over it" or "add my song." Home lays a spoken line, one of your songs or a sound over the video. You can ask for it quieter or louder.
+
+Only videos you made can be changed. Changing, joining and mixing are for adults. A changed video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
+
+Trim, join and mix need the video editor on the AI engine. If your engine does not have it, Home says it cannot change the video.
 
 ## Send a video in a text
 
 Press **Share** on the card. On an iPhone, iPad or Mac in Safari, your device's own share sheet opens with the video attached, so you can pick Messages, AirDrop or Mail. On a browser that cannot share a file, **Share** opens the video in your Library instead, where you can make a link.
 
-**Download** saves a copy made for texting, named after your words (for example `paper-boat-in-the-rain.mp4`). A Quick video has a silent sound track, which phones expect from a video. A Detailed video keeps the sound it was made with. If you want the exact file the engine made, press **Download original**.
+**Download** saves a copy made for texting, named after your words (for example `paper-boat-in-the-rain.mp4`). A video with no sound gets a silent sound track, which phones expect from a video. A video with sound keeps it. If you want the exact file the engine made, press **Download original**.
 
 If a video will not send from a file you saved, use **Share** on the card instead of dragging the file into Messages.
 
@@ -43,13 +90,13 @@ To choose who in your home can watch a saved video, open it in the Library and u
 
 ## Make a picture move
 
-After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. Home makes a 5 second video that starts from that picture.
+After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. Home makes a 5 second video with no sound that starts from that picture.
 
 Home can animate a picture you made or a photo you attach. Describe the motion you want. The model decides whether to fulfill adult requests; Home blocks output only when its CSAM check finds a candidate.
 
 ## Who can make videos
 
-Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual and only the everyday styles. Children can make short cartoon videos of safe things, up to 5 a day, switched on for every child unless you turn it off, with the same limits as pictures. An owner or admin can turn this off. Teens and children get Quick videos only. They never see a half-drawn frame. Spoken answers, the TV and other shared screens never make videos. A guest cannot.
+Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual and only the everyday styles. Children can make short cartoon videos of safe things, up to 5 a day, switched on for every child unless you turn it off, with the same limits as pictures. An owner or admin can turn this off. Teens and children get Standard only, as short clips with no sound. They never see a half-drawn frame. Spoken answers, the TV and other shared screens never make videos. A guest cannot.
 
 See [cartoon controls](people.md#cartoon-pictures-and-videos) for the home switch, daily limits and each child's switch.
 
@@ -61,14 +108,14 @@ Open **Settings**, **Pictures, videos and music**.
 
 - **Adults can make videos.** Turn it off to stop all video making.
 - **Adult-only video styles.** Choose whether styles marked adults only can be used.
-- **Video quality.** Quick (the default) or Detailed. This is what chat makes when nobody asks for a kind. Adults can ask chat for the other kind for one video. Teens and children get Quick videos only.
-- **Quick and Detailed videos.** Shows what each kind is and whether it is on this computer. **Get Detailed videos** (with its size) downloads the extra model. First it shows the maker's licence in plain points. You accept once. **What is the difference?** is a short table, and **Details** names the models.
+- **Video quality.** The level chat uses when nobody asks for one. Adults can ask chat for another level for one video. Teens and children always get Standard.
+- **Videos with sound.** Shows whether the sound models are on this computer. The download button shows its size and the maker's licence in plain points. You accept once. **Details** names the models. Some Settings labels still use the older words Quick (no sound) and Detailed (sound).
 - **Video styles.** A style gives videos a look, like old colour film. Each has a switch, a note on who can use it, its licence and its size. Remove one to delete its file.
 
 ### Add a video style
 
 1. Open **Add a video style**.
-2. Give it a name and choose the file from this computer. It must be made for Quick or Detailed videos; Home reads which from the file. A style for Detailed videos needs Detailed to be on this computer.
+2. Give it a name and choose the file from this computer. Home reads which video model it was made for from the file. A style made for the models with sound needs those models to be on this computer.
 3. Say what the licence is and tick the box to say you read it.
 4. Say if it is fine for all ages. If you are not sure, only adults can use it.
 5. Press **Add video style**. Check the fingerprint and licence it shows, then press **Turn it on**.
@@ -79,8 +126,8 @@ The video engine checks the file and refuses any style that puts a child in an a
 
 - **No video option.** Why: your Mac has less than 128 GB, your account cannot make videos, or videos are off. Fix: ask an owner or admin to check Settings.
 - **"No video model is installed".** Why: the video model is not downloaded. Fix: an owner or admin installs it in Settings.
-- **Chat says it made a Quick video when I asked for sound.** Why: Detailed videos are not on this computer yet. Fix: an owner or admin chooses **Get Detailed videos** in **Settings**, **Pictures, videos and music**, and accepts the licence.
-- **A Detailed video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. A 10 second one takes about two minutes, and the first one after a restart a little more.
+- **Chat made a clip with no sound when I asked for sound.** Why: the sound models are not on this computer yet, or you started from a picture, which makes a clip with no sound. Fix: an owner or admin gets the sound models in **Settings**, **Pictures, videos and music**, and accepts the licence. Or ask for a video from words only.
+- **A video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. Boost takes about a minute, and the first one after a restart a little more.
 - **Your video is waiting.** Why: picture, video and song jobs share a household queue. Fix: wait. Its card shows its place in line and it starts when its turn comes.
 - **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.
 - **Home cannot reach the engine.** Why: the AI engine is restarting. Fix: wait a minute and ask again. Still stuck? Open **Repairs**.
