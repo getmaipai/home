@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
+import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { createHost } from "@/lib/packageHost";
 import {

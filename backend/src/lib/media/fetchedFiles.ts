@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
-import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
+import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 import { attachmentFilePath, purgeFileRecord, removeFileBlobs, storedFileIntact, toRecord } from "@/lib/attachments";
 import { contentFor, ensureContent, syncFileReferences } from "@/lib/fileContent";
 import { nextHlc } from "@/lib/hlc";

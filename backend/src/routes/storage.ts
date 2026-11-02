@@ -15,7 +15,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 // Renamed from the bare `File` export, same reason attachments.ts's own
 // toRecord() does: `File` is a Bun/Fetch global, so importing the spec's
 // zod object under that name would shadow it.
-import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
+import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 
 export const storageRoutes = apiRouter();
 

@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import type { Subprocess } from "bun";
 // Renamed to FileRecordSchema locally: `File` is a Bun/Fetch global, so
 // importing the spec's zod object under that bare name would shadow it.
-import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
+import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 import { readAttachment } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 

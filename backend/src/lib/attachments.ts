@@ -12,7 +12,8 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 // Bun/Fetch global (the Web API type for a multipart upload), so importing
 // the spec's zod object under that bare name would shadow it everywhere in
 // this module.
-import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
+import { type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
+import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 import { db } from "@/db";
 import { attachments, conversationTurns, conversations, shares } from "@/db/schema";
 import { newFileId } from "@/lib/id";

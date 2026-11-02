@@ -10,7 +10,7 @@ import { getAttachment, readAttachment } from "@/lib/attachments";
 import { canDeleteInherited, trashFile } from "@/lib/libraryTrash";
 import { updateLibraryFile } from "@/lib/libraryEdit";
 import { createShare, deleteShare, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
-import { File as FileSchema } from "@maipai/spec/gen/ts/file.js";
+import { FileObject as FileSchema } from "@/lib/fileRecordObject";
 import { Share as ShareSchema } from "@maipai/spec/gen/ts/share.js";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
