@@ -96,7 +96,7 @@ registerAppPageFill("videos", "create", (person, page) => {
   bar.chips = [
     ...chips,
     { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
-    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
+    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", trigger: "banner", popover_size: "wide", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
     { state: "voices", label: "Voices", fold: true, default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
@@ -108,12 +108,12 @@ registerAppPageFill("videos", "create", (person, page) => {
   bar.suggestions = VIDEO_STARTERS.map(({ title, prompt }) => ({ label: title, text: prompt }));
   const tier = videoTierSegment(person);
   if (tier) {
-    bar.tier = tier;
+    bar.tier = { ...tier, presentation: "cards" };
     const ids = (tier.tiers as Array<{ id: keyof typeof VIDEO_TIME_WORDS }>).map((entry) => entry.id);
-    bar.submit_detail = { state: "tier", labels: Object.fromEntries(ids.map((id) => [id, VIDEO_TIME_WORDS[id]])) };
+    bar.submit_detail = { state: "tier", placement: "in_button", labels: Object.fromEntries(ids.map((id) => [id, VIDEO_TIME_WORDS[id]])) };
   } else {
     // Standard alone: no segment, so the line follows the length.
-    bar.submit_detail = { state: "seconds", labels: Object.fromEntries(lengths.map((value) => [String(value), VIDEO_TIME_WORDS.standard])) };
+    bar.submit_detail = { state: "seconds", placement: "in_button", labels: Object.fromEntries(lengths.map((value) => [String(value), VIDEO_TIME_WORDS.standard])) };
   }
 });
 
@@ -155,7 +155,7 @@ function showcaseRows(): Array<Record<string, unknown>> {
     if (!packageAssetFile("videos", poster)) return [];
     const look = videoLookFor(tile.look)!;
     const camera = videoRecipeFor(tile.camera);
-    return [{ id: tile.id, title: tile.title, subtitle: [look.id === "natural" ? null : look.label, camera?.label ?? null].filter(Boolean).join(", ") || "Auto", thumbnail: `/api/plugins/videos/assets/${poster}`, prompt: tile.prompt, look: look.id, camera: camera?.id ?? "none" }];
+    return [{ id: tile.id, title: tile.title, subtitle: [look.id === "natural" ? null : look.label, camera?.label ?? null].filter(Boolean).join(", ") || "Auto", thumbnail: `/api/plugins/videos/assets/${poster}`, loop: `/api/plugins/videos/assets/${tile.poster}`, prompt: tile.prompt, look: look.id, camera: camera?.id ?? "none" }];
   });
 }
 

@@ -20,9 +20,10 @@
           "references": [
             {
               "state": "start_frame",
-              "label": "Optional. Begin from a picture.",
+              "label": "Start frame",
               "kind": "picture",
-              "placement": "in_field"
+              "placement": "tile",
+              "hint": "Optional. Begin from a picture."
             }
           ],
           "chips": [
@@ -57,7 +58,8 @@
                 "start_frame": "{start_frame}"
               }
             }
-          }
+          },
+          "field_size": "large"
         }
       ],
       "main": [
@@ -91,160 +93,172 @@
                 "camera": "{camera}"
               }
             }
-          }
+          },
+          "media_loop": true,
+          "item_loop_field": "loop"
         },
         {
-          "type": "result_feed",
-          "bind": {
-            "source": "package",
-            "path": "recipes",
-            "params": {
-              "scope": "feed",
-              "favorites": "$state.favorites_only",
-              "type": "$state.type"
-            }
-          },
-          "filters": [
+          "type": "section",
+          "heading": "Your clips",
+          "children": [
             {
-              "kind": "toggle",
-              "state": "favorites_only",
-              "label": "Favorites only"
-            },
-            {
-              "kind": "toggle",
-              "state": "group_by_words",
-              "label": "Group by words",
-              "group": true
-            },
-            {
-              "kind": "select",
-              "state": "type",
-              "label": "Type",
-              "options": [
+              "type": "result_feed",
+              "bind": {
+                "source": "package",
+                "path": "recipes",
+                "params": {
+                  "scope": "feed",
+                  "favorites": "$state.favorites_only",
+                  "type": "$state.type"
+                }
+              },
+              "filters": [
                 {
-                  "value": "all",
-                  "label": "All"
+                  "kind": "toggle",
+                  "state": "favorites_only",
+                  "label": "Favorites only"
                 },
                 {
-                  "value": "video",
-                  "label": "Videos"
+                  "kind": "toggle",
+                  "state": "group_by_words",
+                  "label": "Group by words",
+                  "group": true
+                },
+                {
+                  "kind": "select",
+                  "state": "type",
+                  "label": "Type",
+                  "options": [
+                    {
+                      "value": "all",
+                      "label": "All"
+                    },
+                    {
+                      "value": "video",
+                      "label": "Videos"
+                    }
+                  ]
                 }
-              ]
-            }
-          ],
-          "fields": {
-            "words": "prompt",
-            "tags": "tags",
-            "references": "references",
-            "status": "status",
-            "progress": "percent",
-            "phase": "phase",
-            "queue_position": "queue_position",
-            "started_at": "started_at",
-            "error": "error",
-            "poster": "still",
-            "src": "src",
-            "favorite": "favorite",
-            "created_at": "created_at",
-            "width": "width",
-            "height": "height"
-          },
-          "handlers": {
-            "stop": {
-              "call": {
-                "target": "/api/plugins/videos/actions/cancel",
-                "method": "POST",
-                "args": {
-                  "id": "{id}"
-                }
-              }
-            },
-            "retry": {
-              "starts": "video",
-              "call": {
-                "target": "/api/plugins/videos/actions/another",
-                "method": "POST",
-                "args": {
-                  "id": "{id}"
-                }
-              }
-            },
-            "make_another": {
-              "starts": "video",
-              "call": {
-                "target": "/api/plugins/videos/actions/another",
-                "method": "POST",
-                "args": {
-                  "id": "{id}"
-                }
-              }
-            },
-            "favorite": {
-              "call": {
-                "target": "/api/plugins/videos/actions/favorite",
-                "method": "POST",
-                "args": {
-                  "id": "{id}"
-                }
-              }
-            }
-          },
-          "actions_variant": "icons",
-          "actions_inline": 4,
-          "actions": [
-            {
-              "label": "Remix",
-              "icon": "pencil",
-              "action": {
-                "navigate": {
-                  "to": "/apps/videos/create",
-                  "state": {
-                    "prompt": "{prompt}",
-                    "look": "{look}",
-                    "camera": "{camera}",
-                    "seconds": "{seconds}",
-                    "tier": "{tier}",
-                    "orientation": "{orientation}",
-                    "start_frame": "{start_frame}"
+              ],
+              "fields": {
+                "words": "prompt",
+                "tags": "tags",
+                "references": "references",
+                "status": "status",
+                "progress": "percent",
+                "phase": "phase",
+                "queue_position": "queue_position",
+                "started_at": "started_at",
+                "error": "error",
+                "poster": "still",
+                "src": "src",
+                "favorite": "favorite",
+                "created_at": "created_at",
+                "width": "width",
+                "height": "height"
+              },
+              "handlers": {
+                "stop": {
+                  "call": {
+                    "target": "/api/plugins/videos/actions/cancel",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                },
+                "retry": {
+                  "starts": "video",
+                  "call": {
+                    "target": "/api/plugins/videos/actions/another",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                },
+                "make_another": {
+                  "starts": "video",
+                  "call": {
+                    "target": "/api/plugins/videos/actions/another",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                },
+                "favorite": {
+                  "call": {
+                    "target": "/api/plugins/videos/actions/favorite",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
                   }
                 }
-              }
-            },
-            {
-              "label": "Make it Max",
-              "icon": "sparkles",
-              "starts": "video",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/videos/actions/max",
-                  "method": "POST",
-                  "args": {
+              },
+              "actions_variant": "icons",
+              "actions_inline": 4,
+              "actions": [
+                {
+                  "label": "Remix",
+                  "icon": "pencil",
+                  "action": {
+                    "navigate": {
+                      "to": "/apps/videos/create",
+                      "state": {
+                        "prompt": "{prompt}",
+                        "look": "{look}",
+                        "camera": "{camera}",
+                        "seconds": "{seconds}",
+                        "tier": "{tier}",
+                        "orientation": "{orientation}",
+                        "start_frame": "{start_frame}"
+                      }
+                    }
+                  }
+                },
+                {
+                  "label": "Make it Max",
+                  "icon": "sparkles",
+                  "starts": "video",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/max",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}"
+                      }
+                    }
+                  }
+                }
+              ],
+              "poll_while": {
+                "statuses": [
+                  "queued",
+                  "generating"
+                ],
+                "record": {
+                  "path": "recipes",
+                  "params": {
+                    "scope": "job",
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "empty_state": {
+                "type": "empty_state",
+                "icon": "film",
+                "text": "Your clips show here. Pick a tile or describe a video on the left and press Generate."
+              },
+              "look": "media",
+              "filters_presentation": "popover"
             }
-          ],
-          "poll_while": {
-            "statuses": [
-              "queued",
-              "generating"
-            ],
-            "record": {
-              "path": "recipes",
-              "params": {
-                "scope": "job",
-                "id": "{id}"
-              }
-            }
-          },
-          "empty_state": {
-            "type": "empty_state",
-            "icon": "film",
-            "text": "Your clips show here. Pick a tile or describe a video on the left and press Generate."
-          }
+          ]
         }
-      ]
+      ],
+      "aside_width": "wide",
+      "main_surface": "stage"
     }
   ]
 }
