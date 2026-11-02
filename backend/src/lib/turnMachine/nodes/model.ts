@@ -20,7 +20,7 @@ import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { missingRequired } from "@/lib/capabilities";
 import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
-import { isBarePronoun, ownWordsQuery } from "@/lib/text";
+import { collapseSpaces, isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
 import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
@@ -839,7 +839,7 @@ function recentConversation(messages: LlmMessage[]): string {
   return messages
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim() !== "")
     .slice(-5, -1)
-    .map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${(m.content as string).replace(/\s+/g, " ").slice(0, 400)}`)
+    .map((m) => `${m.role === "user" ? "Person" : "Assistant"}: ${collapseSpaces(m.content as string).slice(0, 400)}`)
     .join("\n");
 }
 

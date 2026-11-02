@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { tokenize, isBarePronoun } from "@/lib/text";
+import { tokenize, isBarePronoun, collapseSpaces } from "@/lib/text";
 
 describe("tokenize()", () => {
   test("returns a lowercase word set with stopwords dropped", () => {
@@ -53,5 +53,13 @@ describe("isBarePronoun()", () => {
   test("an empty or numbers-only value is not a bare pronoun (nothing to refuse on that ground)", () => {
     expect(isBarePronoun("")).toBe(false);
     expect(isBarePronoun("2026")).toBe(false);
+  });
+});
+
+describe("collapseSpaces()", () => {
+  test("folds runs of spaces, tabs and new lines to one space and trims the ends", () => {
+    expect(collapseSpaces("  a \n\n b\t\tc  ")).toBe("a b c");
+    expect(collapseSpaces("")).toBe("");
+    expect(collapseSpaces(" \n ")).toBe("");
   });
 });

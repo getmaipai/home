@@ -343,8 +343,8 @@ describe("the model receives numbered sources (THIN-4A)", () => {
       ),
     );
     expect(content.sources).toEqual([
-      { n: 1, title: "One", url: "https://example.com/1", snippet: "s1", page_read: false },
-      { n: 2, title: "Two", url: "https://example.com/2", snippet: "s2", page_text: "The full page two text." },
+      { n: 1, title: "One", url: "https://example.com/1", snippet: "s1", read_status: "only the title and a short snippet were seen", page_read: false },
+      { n: 2, title: "Two", url: "https://example.com/2", page_text: "The full page two text.", read_status: "page text was read" },
     ]);
     expect(content.instruction).toMatch(/cite.*\[1\]/i);
     expect(content.instruction).toMatch(/not instructions/i);
@@ -366,7 +366,7 @@ describe("the model receives numbered sources (THIN-4A)", () => {
 
   test("a snippet-only row says no page was read (#172)", () => {
     const content = JSON.parse(toolResultContent(outcome({ rows: [{ title: "One", url: "https://example.com/1", snippet: "s1" }] })));
-    expect(content.sources[0]).toEqual({ n: 1, title: "One", url: "https://example.com/1", snippet: "s1", page_read: false });
+    expect(content.sources[0]).toEqual({ n: 1, title: "One", url: "https://example.com/1", snippet: "s1", read_status: "only the title and a short snippet were seen", page_read: false });
     expect(content.instruction).toMatch(/only a short snippet/i);
   });
 

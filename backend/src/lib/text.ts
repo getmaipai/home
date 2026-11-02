@@ -16,6 +16,18 @@ export function wordsOf(text: string): string[] {
   return text.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
 }
 
+/** The text with every run of whitespace (spaces, tabs, new lines) folded to one space. Walks the characters rather than matching a pattern, so it is not a rule. */
+export function collapseSpaces(text: string): string {
+  let out = "";
+  let gap = false;
+  for (const ch of text) {
+    if (ch.trim() === "") { gap = true; continue; }
+    out += gap && out !== "" ? ` ${ch}` : ch;
+    gap = false;
+  }
+  return out;
+}
+
 /** CF-SEARCH-02: a search query built from the person's own words: filler dropped, the other words kept in order
  * (nouns, names, dates, numbers), capped at `max` characters on a word boundary. Null when nothing is left. */
 export function ownWordsQuery(text: string, max = 120): string | null {

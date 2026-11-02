@@ -1069,6 +1069,12 @@ function searchContent(payload: Record<string, unknown>, maxChars = SEARCH_SOURC
       if (text.length <= maxChars) break;
     }
   }
+  if (text.length > maxChars) {
+    // Still over on a tiny window: the plain-words read_status of a snippet-only source goes first. Its page_read false and the
+    // instruction say the same thing, so the label is the cheapest part to lose and the JSON stays whole.
+    for (const source of payload.sources as { read_status?: string; page_read?: boolean }[]) if (source.page_read === false) delete source.read_status;
+    text = JSON.stringify(payload);
+  }
   return text.length > maxChars ? `${text.slice(0, Math.max(0, maxChars - 3))}…"}` : text;
 }
 

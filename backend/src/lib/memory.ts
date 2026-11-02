@@ -401,7 +401,7 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => validAt(r, asOf));
-  rows = rows.filter((r) => r.deviceId === null || (opts.robotBound === "all" && opts.deviceId != null && r.deviceId === opts.deviceId));
+  rows = rows.filter((r) => r.deviceId === null || (opts.robotBound === "all" && opts.deviceId == null) || (opts.deviceId != null && r.deviceId === opts.deviceId && (opts.robotBound === "all" || opts.surface === "robot")));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
   rows.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;

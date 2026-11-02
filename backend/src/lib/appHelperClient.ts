@@ -1,4 +1,4 @@
-import { connect } from "node:net";
+import { Socket } from "node:net";
 import { homedir } from "node:os";
 
 /** MEM-SPACE-09/03: the one reader of running apps is the Mac app helper (native/app-helper). This only asks it to list; closing and reopening belong to the live-fit step. */
@@ -12,7 +12,8 @@ export function listHelperApps(path = helperSocketPath(), timeoutMs = 2000): Pro
   return new Promise((resolve) => {
     let done = false;
     let buffer = "";
-    const socket = connect(path);
+    // Handlers go on before connect(): Bun reports a missing socket file (ENOENT) while connect() is still running, and an error with no listener yet fails the caller.
+    const socket = new Socket();
     const finish = (value: HelperListing) => { if (done) return; done = true; clearTimeout(timer); socket.destroy(); resolve(value); };
     const timer = setTimeout(() => finish({ installed: false, apps: [] }), timeoutMs);
     socket.on("connect", () => socket.write(`${JSON.stringify({ op: "list" })}\n`));
@@ -32,6 +33,7 @@ export function listHelperApps(path = helperSocketPath(), timeoutMs = 2000): Pro
     });
     socket.on("error", () => finish({ installed: false, apps: [] }));
     socket.on("close", () => finish({ installed: false, apps: [] }));
+    socket.connect(path);
   });
 }
 
@@ -40,7 +42,8 @@ export function askHelper(request: Record<string, unknown>, path = helperSocketP
   return new Promise((resolve) => {
     let done = false;
     let buffer = "";
-    const socket = connect(path);
+    // Handlers go on before connect(): Bun reports a missing socket file (ENOENT) while connect() is still running, and an error with no listener yet fails the caller.
+    const socket = new Socket();
     const finish = (value: Record<string, unknown> | null) => { if (done) return; done = true; clearTimeout(timer); socket.destroy(); resolve(value); };
     const timer = setTimeout(() => finish(null), timeoutMs);
     socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
@@ -52,6 +55,7 @@ export function askHelper(request: Record<string, unknown>, path = helperSocketP
     });
     socket.on("error", () => finish(null));
     socket.on("close", () => finish(null));
+    socket.connect(path);
   });
 }
 

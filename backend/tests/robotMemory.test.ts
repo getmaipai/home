@@ -65,36 +65,44 @@ describe("recall never mixes two robots", () => {
   test("robot A's rapport with Pippa is absent from robot B's recall and from Pippa's chat recall", async () => {
     const { pippa, rover, otherRobot } = await household();
     rapport(pippa, JOKE, rover);
-    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: rover }))).toContain(JOKE);
-    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: otherRobot }))).not.toContain(JOKE);
+    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: rover, surface: "robot" }))).toContain(JOKE);
+    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: otherRobot, surface: "robot" }))).not.toContain(JOKE);
     expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: null }))).not.toContain(JOKE);
     expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true }))).not.toContain(JOKE);
+  });
+
+  test("a chat-surface turn that carries Rover's device_id (a side chat) still does not recall Rover's rapport", async () => {
+    const { pippa, rover } = await household();
+    rapport(pippa, JOKE, rover);
+    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: rover, surface: "chat" }))).not.toContain(JOKE);
+    expect(list(pippa, { deviceId: rover, surface: "chat" }).map((m) => m.text)).not.toContain(JOKE);
+    expect(list(pippa, { deviceId: rover, surface: "robot" }).map((m) => m.text)).toContain(JOKE);
   });
 
   test("Pippa's rapport with Rover is absent from Oliver's recall on Rover", async () => {
     const { pippa, oliver, rover } = await household();
     rapport(pippa, JOKE, rover);
-    expect(texts(recall(oliver, "purple walrus joke", { selfOnly: true, deviceId: rover }))).not.toContain(JOKE);
+    expect(texts(recall(oliver, "purple walrus joke", { selfOnly: true, deviceId: rover, surface: "robot" }))).not.toContain(JOKE);
   });
 
   test("an unknown speaker on Rover gets no rapport", async () => {
     const { pippa, rover } = await household();
     rapport(pippa, JOKE, rover);
-    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: rover, anonymous: true }))).not.toContain(JOKE);
+    expect(texts(recall(pippa, "purple walrus joke", { selfOnly: true, deviceId: rover, surface: "robot", anonymous: true }))).not.toContain(JOKE);
   });
 
   test("an adult's rapport never reaches a child on the same robot", async () => {
     const { pippa, bruno, rover } = await household();
     rapport(pippa, JOKE, rover);
-    expect(texts(recall(bruno, "purple walrus joke", { selfOnly: true, deviceId: rover }))).not.toContain(JOKE);
+    expect(texts(recall(bruno, "purple walrus joke", { selfOnly: true, deviceId: rover, surface: "robot" }))).not.toContain(JOKE);
   });
 
   test("a person fact (no device) told on robot A is recalled on robot B", async () => {
     const { pippa, rover, otherRobot } = await household();
     const fact = remember(pippa, { text: "Pippa keeps a pet axolotl named Mopey", category: "fact", tier: "durable", scope: "person", person: pippa.id, source: "test", importance: 0.9 });
     expect(fact.ok && fact.value.device_id).toBeNull();
-    expect(texts(recall(pippa, "pet axolotl Mopey", { selfOnly: true, deviceId: otherRobot }))).toContain("Pippa keeps a pet axolotl named Mopey");
-    expect(texts(recall(pippa, "pet axolotl Mopey", { selfOnly: true, deviceId: rover }))).toContain("Pippa keeps a pet axolotl named Mopey");
+    expect(texts(recall(pippa, "pet axolotl Mopey", { selfOnly: true, deviceId: otherRobot, surface: "robot" }))).toContain("Pippa keeps a pet axolotl named Mopey");
+    expect(texts(recall(pippa, "pet axolotl Mopey", { selfOnly: true, deviceId: rover, surface: "robot" }))).toContain("Pippa keeps a pet axolotl named Mopey");
   });
 
   test("the Memory page list (robotBound all) shows the person's own rapport with each robot, still through canRead", async () => {
@@ -160,7 +168,7 @@ async function judgeOnce(actor: PersonRow, surface: "robot" | "chat", deviceId: 
   const conv = resolveOrCreateConversation(actor, surface, undefined, surface === "robot" ? { deviceId } : {});
   if (!conv.ok) throw new Error("setup failed");
   const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
-  logTurn(actor, surface, userText, { reply: { text: "Noted." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+  logTurn(actor, surface, userText, { reply: { text: "Noted." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId }, { speakerEvidence: surface === "robot" ? { person: actor.id, basis: "signed_in", level: "confirmed" } : null });
   const turn = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
   await judgeTurn(turn);
   return db.select().from(memoryRecords).all().filter((r) => r.source === turnId);

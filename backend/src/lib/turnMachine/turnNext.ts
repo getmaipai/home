@@ -335,7 +335,10 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // VISION-02d (ATT-01's rule): a child's or teen's picture turn never
   // enters the memory judge; an adult's follows the existing policy.
   const minorPictureTurn = (state.images?.length ?? 0) > 0 && state.plan.age_band !== "adult";
-  logTurn(actor, surface, text, value, { ...opts, answeredBy: value.answered_by ?? null, judgeStatus: state.bare || minorPictureTurn ? "skipped" : judgeStatusAtInsert(value, state.signal, text) });
+  // A turn cut off before any of its reply reached the person (a Stop right after sending, a reopened voice turn) leaves no
+  // judge-eligible row, however its words classify: nothing was said back, so nothing is learned from it.
+  const nothingDelivered = value.reply.text.trim() === "";
+  logTurn(actor, surface, text, value, { ...opts, answeredBy: value.answered_by ?? null, judgeStatus: state.bare || minorPictureTurn || nothingDelivered ? "skipped" : judgeStatusAtInsert(value, state.signal, text) });
   // THIN-7E (ASK-01): the question the reply ended with stands as the conversation's pending ask only
   // now that the delivered text is known to carry it (a refusal that lost it commits nothing).
   state.askCommit?.(value.reply.text);
