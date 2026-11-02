@@ -131,6 +131,8 @@ Home can animate a picture you made or a photo you attach. Describe the motion y
 
 A video made with an adults-only style is marked NSFW and locked the moment it starts. You do not have to do anything. While it is locked, it shows as one lock tile, with no title or picture, and it opens only when you enter your passcode on your own screen.
 
+A video made with no adults-only style is not locked just because its words are adult. It is still marked for adults only, so people under 18 never see it. If the picture check finds nudity in it, Home locks it for you.
+
 People under 18 never see an adults-only video, locked or not. The TV and other shared screens do not show it either.
 
 **Change your mind about a video you made.** You can take the lock off.

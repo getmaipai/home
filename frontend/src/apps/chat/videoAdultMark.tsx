@@ -15,6 +15,7 @@ export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): 
   const me = useContext(WakeWordPersonContext);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const adult = item?.adult ?? null;
   if (!item || !adult) return { actions: [], dialog: null, stateLine: null };
 
@@ -32,7 +33,9 @@ export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): 
   const markAgain = () => {
     if (busy) return;
     setBusy(true);
-    void videosApi.adultMark(item.id, { action: "mark" }).catch(() => undefined).finally(() => { setBusy(false); refresh(); });
+    setProblem(null);
+    // A refusal is Home's own plain line (not an adult's own screen, not ready); never silence.
+    void videosApi.adultMark(item.id, { action: "mark" }).catch((error: unknown) => setProblem(error instanceof ApiError ? error.message : "Could not mark it. Check your connection and try again.")).finally(() => { setBusy(false); refresh(); });
   };
 
   const actions: ReactNode[] = [];
@@ -52,5 +55,5 @@ export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): 
       actionLabel="Remove lock"
     />
   ) : null;
-  return { actions, dialog, stateLine: adult.line };
+  return { actions, dialog, stateLine: problem ?? adult.line };
 }

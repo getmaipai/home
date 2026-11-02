@@ -101,6 +101,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerDraftRestore.tsx` | useComposerDraftRestore |
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, DUPLEX_CONFIRM_MS, REACTION_MIN_WORDS |
+| `frontend/src/apps/chat/videoAdultMark.tsx` | UNMARK_EXPLAINER, useVideoAdultMark |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
 | `frontend/src/apps/clock/AlarmDays.tsx` | AlarmDays |
 | `frontend/src/apps/clock/AlarmEditor.tsx` | AlarmEditor |
@@ -329,6 +330,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/addressFallback.ts` | ADDRESS_ATTEMPT_MS, ipv4First, isConnectFailure, fetchTryingEachAddress |
 | `backend/src/lib/adultLock.ts` | PROOF_IDLE_MS, PROOF_ABSOLUTE_MS, TICKET_MS, PROOF_HEADER, LOCKED_WRITERS, __setAdultLockClockForTests |
+| `backend/src/lib/adultMarks.ts` | SHARED_SCREEN_MARK_LINE, NEED_PASSCODE_LINE, NOT_FOUND_LINE, NOT_READY_LINE, TEMPORARY_LINE, NOT_MARKED_LINE |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
@@ -991,6 +993,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, PENDING, allVideoAdapters, videoAdaptersFor, setVideoAdapterEnabled |
+| `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/editPlan.ts` | MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL, MIN_JOIN_CLIPS, MAX_JOIN_CLIPS |
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_PICTURE_LINE, ALREADY_MAX_LINE |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |

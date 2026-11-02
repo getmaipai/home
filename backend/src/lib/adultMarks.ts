@@ -27,6 +27,7 @@ export const SHARED_SCREEN_MARK_LINE = "Change this on your own screen. Open Hom
 export const NEED_PASSCODE_LINE = "Enter your passcode again to remove the lock. It only works for the item you just chose.";
 export const NOT_FOUND_LINE = "That item is not here.";
 export const NOT_READY_LINE = "Wait until it is made, then try again.";
+export const TEMPORARY_LINE = "A video made in a temporary chat is not saved, so it cannot be marked.";
 export const NOT_MARKED_LINE = "This item is not locked.";
 export const ALREADY_LOCKED_LINE = "This item is already locked.";
 
@@ -77,7 +78,7 @@ export function adultStateOf(actor: PersonRow, fileId: string): AdultStateView |
     can_clear: adultOnly && item.lock === "on",
     can_mark: !adultOnly || item.lock === "off",
     line: adultOnly ? (item.lock === "on" ? STATE_LINES.locked : STATE_LINES.cleared) : null,
-    history: markHistory(actor, row.id, row.ownerPersonId),
+    history: adultOnly ? markHistory(actor, row.id, row.ownerPersonId) : [],
   };
 }
 
@@ -90,7 +91,9 @@ function writeLock(row: ItemRow, lock: "on" | "off", raise: boolean): void {
   const apply = (id: string, provenance: string) => { const next = withMark(provenance, { lock, raiseToAdult: raise }); if (next) db.update(attachments).set({ provenance: next }).where(eq(attachments.id, id)).run(); };
   apply(row.id, row.provenance);
   if (!jobId) return;
-  const posters = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, "video-poster:%"))).all();
+  // The clip's poster and any frame continued from it carry its job id in the note; job ids are plain id characters, so the LIKE needs no escaping.
+  if (!/^[A-Za-z0-9_-]+$/.test(jobId)) return;
+  const posters = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `video-poster:%"job":"${jobId}"%`))).all();
   for (const poster of posters) if (libraryProvenance(poster.provenance).job === jobId) apply(poster.id, poster.provenance);
 }
 
@@ -103,7 +106,8 @@ export function setItemLock(input: { actor: PersonRow; fileId: string; action: M
   const row = itemRow(input.fileId);
   if (!row || row.deletedAt !== null) return { ok: false, status: 404, error: NOT_FOUND_LINE };
   const owner = row.ownerPersonId === actor.id;
-  const item = lockItemOfProvenance(row.ownerPersonId, row.provenance) as LockItem;
+  const item: LockItem | null = lockItemOfProvenance(row.ownerPersonId, row.provenance);
+  if (!item) return { ok: false, status: 404, error: NOT_FOUND_LINE };
   const adultActor = speakerAgeBand(actor, new Date()) === "adult";
   if (action === "clear") {
     // Only the creator. Anyone else gets the answer a missing item gets (an admin cannot see another person's item, so it is not theirs to unmark).
@@ -113,15 +117,14 @@ export function setItemLock(input: { actor: PersonRow; fileId: string; action: M
     if (item.lock === "off") return { ok: true, made_audience: "adult-only", lock: "off", changed: false };
     // Last check, so a ticket is spent only by a request that could succeed: a fresh passcode, for this item, once.
     if (!consumeTicket(input.ticket, actor.id, input.sessionKey, input.ticketItem ?? row.id)) return { ok: false, status: 403, error: NEED_PASSCODE_LINE };
-    writeLock(row, "off", false);
-    logMark({ itemId: row.id, action: "clear", actorId: actor.id, via: "creator_passcode" });
+    // One transaction: the clip, its poster and the audit row change together or not at all.
+    sqlite.transaction(() => { writeLock(row, "off", false); logMark({ itemId: row.id, action: "clear", actorId: actor.id, via: "creator_passcode" }); })();
     return { ok: true, made_audience: "adult-only", lock: "off", changed: true };
   }
   if (!owner && !isOwnerOrAdmin(actor)) return { ok: false, status: 404, error: NOT_FOUND_LINE };
-  if (owner && !adultActor) return { ok: false, status: 403, error: SHARED_SCREEN_MARK_LINE };
+  if (!adultActor) return { ok: false, status: owner ? 403 : 404, error: owner ? SHARED_SCREEN_MARK_LINE : NOT_FOUND_LINE };
   if (item.madeAudience === "adult-only" && item.lock === "on") return { ok: true, made_audience: "adult-only", lock: "on", changed: false };
-  writeLock(row, "on", true);
-  logMark({ itemId: row.id, action: "mark", actorId: actor.id, via: owner ? "creator" : "admin" });
+  sqlite.transaction(() => { writeLock(row, "on", true); logMark({ itemId: row.id, action: "mark", actorId: actor.id, via: owner ? "creator" : "admin" }); })();
   return { ok: true, made_audience: "adult-only", lock: "on", changed: true };
 }
 

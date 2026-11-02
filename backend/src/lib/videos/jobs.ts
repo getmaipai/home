@@ -548,8 +548,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
   if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
   // ADULT-LOCK-06: the lock is on from the start (an adult-only style or source: `request.adultLock`), or now, when the finished-clip check's own verdict is nude or
-  // sexual. The prompt word check above raised the audience only. An edit follows its sources (the table), so a verdict never relocks a clip the creator cleared.
-  const verdictNude = !job.request.edit && checks.some((check) => check.ok && check.verdict.is_nude_or_sexual);
+  // sexual. The prompt word check above raised the audience only. A job that started from a source (an edit, a continued frame) follows the source's flags (the table), so a verdict never relocks a clip the creator cleared.
+  const verdictNude = !job.request.edit && job.request.adultLock === undefined && checks.some((check) => check.ok && check.verdict.is_nude_or_sexual);
   const lock: "on" | "off" = (startedAdult && job.request.adultLock !== "off") || verdictNude ? "on" : "off";
   job.request.adultLock = lock;
   const madeAdult = adult || verdictNude;

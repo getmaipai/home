@@ -103,6 +103,21 @@ describe("auto-mark at job start", () => {
   });
 });
 
+describe("a job that starts from a cleared source follows it", () => {
+  test("a continued clip of a source the creator cleared stays cleared even when the finished-clip check says nude; a plain start with that verdict locks", async () => {
+    const { row } = await household();
+    const me = row("Marlow");
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: NUDE_VERDICT })));
+    const job = await startVideoJob({ actor: me, conversationId: null, turnId: null, temporary: false, kind: "generate", prompt: PLAIN_PROMPT, adultOnly: true, adultLock: "off", body: { prompt: PLAIN_PROMPT, audience: "adult", seed: 3 } as never });
+    expect(job.request).toMatchObject({ adultOnly: true, adultLock: "off" });
+    await until(() => getVideoJobFor(me, job.id)?.state === "done");
+    expect(noteOf(getVideoJobFor(me, job.id)!.files[0]!.id)).toMatchObject({ madeAudience: "adult-only", lock: "off" });
+    const plain = await startVideoJob({ actor: me, conversationId: null, turnId: null, temporary: false, kind: "generate", prompt: PLAIN_PROMPT, body: { prompt: PLAIN_PROMPT, audience: "adult", seed: 4 } as never });
+    await until(() => getVideoJobFor(me, plain.id)?.state === "done");
+    expect(noteOf(getVideoJobFor(me, plain.id)!.files[0]!.id)).toMatchObject({ madeAudience: "adult-only", lock: "on" });
+  });
+});
+
 describe("unmark: the creator, the confirm, a fresh passcode", () => {
   test("a ticket from a fresh passcode clears the lock; the clip then shows with no unlock, the audit row holds no content, and made_audience stays adult-only", async () => {
     const { adult, row } = await household();
