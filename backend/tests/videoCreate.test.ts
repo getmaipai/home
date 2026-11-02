@@ -18,6 +18,12 @@ import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { until } from "./pictureFixture";
 import type { PersonRow } from "@/types";
+import sharp from "sharp";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { storeFile } from "@/lib/attachments";
+import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
+import { PACKAGES_DIR } from "@/lib/paths";
 import { people as peopleTable } from "@/db/schema";
 
 let fake: FakeVideoStack;
@@ -39,6 +45,15 @@ async function household() {
   const child = await signIn("Sprout", "child", { birthdate: "2018-03-01" });
   const ownerRow = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Sage")).get()! as PersonRow;
   return { owner, ownerRow, adult, teen, child };
+}
+/** The prompt bar sits in the aside of the page's split view (VIDEO-CREATE-02). */
+function promptBarOf(body: Array<Record<string, any>>): Record<string, any> | undefined {
+  for (const node of body) {
+    if (node.type === "prompt_bar") return node;
+    const hit = promptBarOf([...(node.main ?? []), ...(node.aside ?? [])]);
+    if (hit) return hit;
+  }
+  return undefined;
 }
 const BOAT = "A paper boat floats down a rainy street, soft evening light";
 
@@ -151,12 +166,12 @@ describe("the Make a video page and action", () => {
   test("the served Make page holds the prompt bar with the recipes, lengths and only the levels this person may use", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
-    const bar = page.body.find((node) => node.type === "prompt_bar")!;
+    const bar = promptBarOf(page.body)!;
     expect(bar.submit.call.target).toBe("/api/plugins/videos/actions/make");
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("orientation").options.map((o: { value: string }) => o.value)).toEqual(["landscape", "portrait"]);
     expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS]);
-    expect(chip("recipe").options.map((o: { value: string }) => o.value)).toEqual(["none", ...VIDEO_RECIPES.map((r) => r.id)]);
+    expect(chip("camera").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_RECIPES.map((r) => r.id));
     // Levels: Standard first; Max only when the person is offered it, Boost only when they may use it; one level alone shows no segment.
     const adultRow = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
     const expected = ["standard", ...(allowedQuality(adultRow, "video", "detailed", speakerAgeBand(adultRow, new Date())) === "detailed" ? ["boost"] : []), ...(maxOffered(adultRow, "video", speakerAgeBand(adultRow, new Date())) ? ["max"] : [])];
@@ -166,7 +181,7 @@ describe("the Make a video page and action", () => {
     expect(videoTierSegment({ ...adultRow, role: "adult" })).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
-    expect(again.body.find((node) => node.type === "prompt_bar")!.chips).toHaveLength(5);
+    expect(promptBarOf(again.body)!.chips).toHaveLength(5);
   });
 
   test("the prompt bar's submit args fill from the item and the action takes them", async () => {
@@ -218,7 +233,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
   test("the chips come from the single lists", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
-    const bar = page.body.find((node) => node.type === "prompt_bar")!;
+    const bar = promptBarOf(page.body)!;
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("look").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_LOOKS.map((l) => l.id));
     expect(chip("look").default).toBe("natural");
@@ -308,5 +323,134 @@ describe("V1b: look, length, voices, hint and Another take", () => {
       expect(res.status).toBe(403);
     }
     expect(fake.submitted).toHaveLength(0);
+  });
+});
+
+// VIDEO-CREATE-02 (U3): the Start frame (the Picture slot), the Camera cards and the per-person fill's loops.
+describe("U3: Start frame", () => {
+  const person = (name: string) => db.select().from(peopleTable).where(eq(peopleTable.displayName, name)).get()! as PersonRow;
+  async function libraryPicture(owner: PersonRow, width = 64, height = 64, mediaType = "image/png"): Promise<{ id: string; png: Uint8Array }> {
+    const png = new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r: 10, g: 120, b: 200 } } }).png().toBuffer());
+    const made = storeFile(owner, { conversationId: null, turnId: null, mediaType, bytes: png, provenance: "composer:upload", retention: "kept", deduplicate: false });
+    if (!made.ok) throw new Error(`file: ${made.error}`);
+    return { id: made.value.id, png };
+  }
+  const screened = () => { const seen = { calls: 0 }; __setAgeCheckRunnerForTests(async (images) => { seen.calls += images.length; return images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })); }); return seen; };
+
+  test("a Library picture the person owns starts the clip: the stored bytes go to the Stack as an uploaded picture, the picture's shape sets the size, and the input screen ran", async () => {
+    const { adult } = await household();
+    const { id, png } = await libraryPicture(person("Marlow"), 64, 128);
+    const seen = screened();
+    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, orientation: "landscape", start_frame: id });
+    expect(res.status).toBe(200);
+    const job = getVideoJobFor(person("Marlow"), ((await res.json()) as { id: string }).id)!;
+    expect(job.kind).toBe("animate");
+    expect(job.request.source_file_id).toBe(id);
+    expect(seen.calls).toBe(1);
+    const sent = fake.submitted[0]!;
+    expect(sent.image_source).toBe("uploaded");
+    expect(Buffer.from(sent.image as string, "base64").equals(Buffer.from(png))).toBe(true);
+    expect(sent.size).toBe("480x832");
+  });
+
+  test("an empty slot leaves {start_frame} in place and means no picture: a text clip", async () => {
+    const { adult } = await household();
+    const seen = screened();
+    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: "{start_frame}", camera: "{camera}" });
+    expect(res.status).toBe(200);
+    expect(fake.submitted[0]!.image).toBeUndefined();
+    expect(seen.calls).toBe(0);
+  });
+
+  test("an unknown id, another person's file and a file that is not a picture are one plain 404 and nothing reaches the Stack", async () => {
+    const { adult } = await household();
+    const theirs = await libraryPicture(person("Sage"));
+    const notPicture = storeFile(person("Marlow"), { conversationId: null, turnId: null, mediaType: "application/pdf", bytes: new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10]), provenance: "composer:upload", retention: "kept", deduplicate: false });
+    if (!notPicture.ok) throw new Error("pdf");
+    const seen = screened();
+    const lines = new Set<string>();
+    for (const id of ["nope", theirs.id, notPicture.value.id]) {
+      const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: id });
+      expect(res.status).toBe(404);
+      lines.add(((await res.json()) as { error: string }).error);
+    }
+    expect([...lines]).toHaveLength(1);
+    expect([...lines][0]).toContain("Library");
+    expect(fake.submitted).toHaveLength(0);
+    expect(seen.calls).toBe(0);
+  });
+
+  test("a teen and a child are refused before the picture is read or screened", async () => {
+    const { teen, child } = await household();
+    const mine = await libraryPicture(person("Nova"));
+    const seen = screened();
+    for (const who of [teen, child]) expect((await who.client.post("/api/videos/make", { prompt: BOAT, start_frame: mine.id })).status).toBe(403);
+    expect(seen.calls).toBe(0);
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("a picture the input screen refuses (a possible minor in a nude or sexual picture) is a plain 422 and nothing reaches the Stack", async () => {
+    const { adult } = await household();
+    const { id } = await libraryPicture(person("Marlow"));
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 12, label: "minor" as never, is_nude_or_sexual: true, confidence: 1 } })));
+    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: id });
+    expect(res.status).toBe(422);
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("Another take keeps the Start frame, and both the clip's file id and its job id name the source", async () => {
+    const { adult } = await household();
+    const actor = person("Marlow");
+    const { id } = await libraryPicture(actor);
+    screened();
+    const first = await (await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: id })).json() as { id: string };
+    await until(() => getVideoJobFor(actor, first.id)?.state === "done");
+    const fileId = getVideoJobFor(actor, first.id)!.files[0]!.id;
+    const res = await adult.client.post("/api/plugins/videos/actions/another", { id: fileId });
+    expect(res.status).toBe(200);
+    expect(fake.submitted).toHaveLength(2);
+    expect(fake.submitted[1]!.image_source).toBe("uploaded");
+    const newest = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "newest" })).json() as Array<{ id: string; src: string }>;
+    expect(newest).toHaveLength(1);
+    expect(newest[0]!.id).toBe(fileId);
+    expect(newest[0]!.src).toContain(fileId);
+  });
+});
+
+describe("U3: Camera and Look cards from the one lists, with their loops", () => {
+  test("the served page puts the cards' loop paths on the options, from VIDEO_LOOKS and VIDEO_RECIPES, and lists no loop in the page JSON", async () => {
+    const { adult } = await household();
+    const page = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    const bar = promptBarOf(page.body)!;
+    const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
+    expect(chip("look").variant).toBe("cards");
+    const shipped = (loop: string) => existsSync(join(PACKAGES_DIR, "videos", "assets", loop));
+    expect(chip("look").options).toEqual(VIDEO_LOOKS.map((l) => ({ value: l.id, label: l.label, ...(shipped(l.loop) ? { media: l.loop } : {}) })));
+    expect(chip("look").options.some((o: { media?: string }) => o.media)).toBe(true);
+    expect(chip("camera").variant).toBe("cards");
+    expect(chip("camera").default).toBe("none");
+    expect(chip("camera").options).toEqual(VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) })));
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Picture", kind: "picture" }]);
+    expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", start_frame: "{start_frame}", look: "{look}" });
+    const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "make-video.json")).text();
+    expect(source).not.toContain(".mp4");
+    expect(VIDEO_RECIPES).toHaveLength(8);
+  });
+
+  test("every loop that ships is small and served only to an adult; a card without its loop is a plain tile", async () => {
+    const { adult, teen, child, owner } = await household();
+    const loops = [...VIDEO_LOOKS, ...VIDEO_RECIPES].map((entry) => entry.loop);
+    expect(new Set(loops).size).toBe(13);
+    const present = loops.filter((loop) => existsSync(join(PACKAGES_DIR, "videos", "assets", loop)));
+    expect(present.length).toBeGreaterThan(0);
+    for (const loop of present) {
+      const file = join(PACKAGES_DIR, "videos", "assets", loop);
+      expect(statSync(file).size).toBeLessThan(300 * 1024);
+      const res = await adult.client.get(`/api/plugins/videos/assets/${loop}`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("video/mp4");
+      for (const other of [teen, child]) expect((await other.client.get(`/api/plugins/videos/assets/${loop}`)).status).toBe(404);
+    }
+    expect((await owner.get(`/api/plugins/videos/assets/${present[0]}`)).status).toBe(200);
   });
 });

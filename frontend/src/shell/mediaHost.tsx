@@ -17,6 +17,8 @@ import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { createListenStatus, createStoryListener, type ListenStatus } from "@/shell/newsListen";
 import { watchLiveReconnect } from "@/lib/media/liveReconnect";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
+import { MediaPickerBody, type PickKind, type PickedMedia } from "@/shell/MediaPickerDialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type Hls from "hls.js";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
@@ -131,7 +133,8 @@ export function useMediaDock(): MediaDock {
   return useContext(MediaDockContext);
 }
 
-export function MediaHostProvider({ children }: { children: ReactNode }) {
+/** `personId` lets the picker (VIDEO-CREATE-02: `pickMedia`) list only the signed-in person's own Library pictures; without it no picker is offered. */
+export function MediaHostProvider({ children, personId }: { children: ReactNode; personId?: string }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [store] = useState(createMediaStore);
@@ -145,6 +148,14 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   pushRef.current = push;
   // NEWS-04: Listen on an article reads it into the host's element, which the global mini player then shows.
   const [status] = useState(createListenStatus);
+  // VIDEO-CREATE-02 (U3): one picker at a time; a second request while one is open resolves the first with null.
+  const [pick, setPick] = useState<{ kind: PickKind; resolve: (picked: PickedMedia | null) => void } | null>(null);
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
+  const pickMedia = useCallback((kind: PickKind) => new Promise<PickedMedia | null>((resolve) => {
+    pickRef.current?.resolve(null);
+    setPick({ kind, resolve });
+  }), []);
   const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line), status), [store, status]);
   const speech = useSyncExternalStore(status.subscribe, status.get, status.get);
   const host = useMemo<MediaHost>(
@@ -169,9 +180,10 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
         navigate(to, { state: { pageState: { id: mediaId } } });
       },
       // Only a media app's player plays in the host's element; anywhere else the Player keeps its own.
+      ...(personId ? { pickMedia } : {}),
       mediaFor: (ref) => (appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),
-    [navigate, store, listener],
+    [navigate, store, listener, personId, pickMedia],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   // MEDIA-VIZ-03: the next song of the music queue, for the mini bar's Next and the Media Session's next track (and, when a song ends
@@ -274,6 +286,17 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
        <ListenStatusContext.Provider value={speech}>
         {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
         {children}
+        {pick ? (
+          <Dialog open onOpenChange={(open) => { if (!open) { pick.resolve(null); setPick(null); } }}>
+            <DialogContent scroll="viewport">
+              <DialogHeader>
+                <DialogTitle>Choose a picture</DialogTitle>
+                <DialogDescription>The video starts from this picture. Choose one from your Library or add a new one.</DialogDescription>
+              </DialogHeader>
+              <MediaPickerBody kind={pick.kind} personId={personId} onDone={(picked) => { pick.resolve(picked); setPick(null); }} />
+            </DialogContent>
+          </Dialog>
+        ) : null}
        </ListenStatusContext.Provider>
       </MediaDockContext.Provider>
     </MediaHostContext.Provider>

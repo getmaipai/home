@@ -4,6 +4,10 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-02
+
+- VIDEO-CREATE-02 (U3): Make a video is rebuilt like a modern video studio. Look and Camera are grids of picture cards that play a short sample loop made by this home's own engine, a Picture slot starts the video from a picture in your Library (or a new upload), the stage shows your newest video with Another take, and a strip under it shows recent ones. Camera has eight cards (Still is new; it replaced Wide establishing shot). The loops ship inside the package as `assets/loops/` and are served only to adults.
+
 ## [0.1.4] - 2026-11-02
 
 - VIDEO-CREATE-01 (V1b): Make a video shows what the video tests found. Length offers 5 and 10 seconds (a level that cannot make the length says so in one line), a Look chip (Natural, Classic cartoon, Anime, 3D animated, Film), a Voices chip (Keep it clean is the default), a one-line hint on writing speech, and an Another take button on the last video (same words, new seed).

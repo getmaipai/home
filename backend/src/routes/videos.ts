@@ -319,6 +319,7 @@ const makeRoute = createRoute({
     recipe: z.string().trim().min(1).max(40).optional().describe("A recipe id from the package's `recipes` data (a camera move or style); its wording goes to the model after the prompt."),
     look: z.string().trim().min(1).max(40).optional().describe("A look id (natural, classic-cartoon, anime, 3d-animated, film); its wording goes to the model before the prompt."),
     voices: z.string().trim().min(1).max(40).optional().describe("clean (the default: no laugh track, no music, one speaker at a time) or full (music and effects)."),
+    start_frame: z.string().trim().min(1).max(200).optional().describe("The id of a picture in your own Library; the video starts from it (404 when it is not yours)."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardSchema.extend({ notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") }) } }, description: "The card for the new clip." }, ...refusals },
 });

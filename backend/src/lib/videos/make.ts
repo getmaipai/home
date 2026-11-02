@@ -9,13 +9,16 @@ import { MAX_NEEDS_ADMIN_LINE, tierArgument } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { laneOf } from "@/lib/pictures/lane";
 import { videoDenial, VIDEO_DENIAL_LINE, type VideoAudience } from "./policy";
+import { loadLibraryPicture } from "./jobs";
+import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
+import sharp from "sharp";
 
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
 export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"] }
-export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 422 | 502 | 503; error: string; code: string };
+export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
 
 /** The audience of the Create page: the signed-in person on their own written screen. */
 export function makeAudienceOf(actor: PersonRow): VideoAudience {
@@ -61,6 +64,18 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     if (!videoVoicesFor(voices)) return { ok: false, error: "That voices choice is not in the list. Use a name from the list on this page, or leave it empty." };
     body.voices = voices;
   }
+  // The Camera cards send `camera` (a recipe id); `recipe` stays accepted for the chat tool and Another take. The camera wins when both are given.
+  const camera = typeof raw.camera === "string" ? raw.camera.trim() : "";
+  if (camera) {
+    if (!videoRecipeFor(camera)) return { ok: false, error: "That camera move is not in the list. Use a name from the list on this page, or leave it empty." };
+    body.recipe = camera;
+  }
+  // An empty Picture slot leaves `{start_frame}` in place, which `notGiven` already turned into "".
+  const startFrame = typeof raw.start_frame === "string" ? raw.start_frame.trim() : "";
+  if (startFrame) {
+    if (startFrame.length > 200) return { ok: false, error: "Choose a picture from your Library, or leave the Picture slot empty." };
+    body.start_frame = startFrame;
+  }
   return { ok: true, body };
 }
 
@@ -74,10 +89,24 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   if (body.tier && tierArgument({ person: actor, category: "video", arg: body.tier, band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) {
     return { ok: false, status: 422, error: MAX_NEEDS_ADMIN_LINE, code: "max_needs_admin" };
   }
+  // VIDEO-CREATE-02 (U3): a Start frame is a picture in the person's own Library. It gets the same input-side screening as an attached photo
+  // (the prompt and the viewer's band) before the Stack is asked; an unknown or someone else's id is one plain 404 line.
+  let startFrame: { id: string; base64: string; width: number | null; height: number | null } | undefined;
+  if (body.start_frame && !context.prepared) {
+    const photo = loadLibraryPicture(actor, body.start_frame);
+    if (!photo.ok) return { ok: false, status: 404, error: photo.line, code: "start_frame_gone" };
+    const screened = await screenInputImage(photo.bytes, body.prompt, viewerOf(actor, audience.band));
+    if (!screened.ok) return { ok: false, status: 422, error: screened.line, code: screened.code };
+    let { width, height } = photo;
+    if (!width || !height) {
+      try { const meta = await sharp(Buffer.from(photo.bytes)).metadata(); width = meta.width ?? null; height = meta.height ?? null; } catch { /* the shape stays what the person chose */ }
+    }
+    startFrame = { id: photo.id, base64: photo.base64, width, height };
+  }
   const outcome = await runGenerateVideo({
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
     args: { prompt: body.prompt, ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}) },
-    callId: context.callId ?? "make", spoken: false, audience, ...(context.prepared ? { prepared: context.prepared } : {}),
+    callId: context.callId ?? "make", spoken: false, audience, ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
   if (outcome.status === "succeeded" && data?.videoJobId) {
@@ -95,7 +124,7 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
 
 /**
  * VIDEO-CREATE-01 (V1b): Another take on a clip made on the Create page (no chat behind it). The same words and the same choices
- * (shape, length, level, camera move, look, voices) go through `makeVideoFor`, so the age and surface gate, the level rules and the
+ * (shape, length, level, camera move, look, voices, Start frame) go through `makeVideoFor`, so the age and surface gate, the level rules and the
  * one-clip-at-a-time rule are the ones every other make uses; the new job gets a new random seed.
  */
 /** The choices of a stored clip, as the body that makes it again (shape, length, level, camera move, look, voices): one place for Another take, Remix and Make it Max. */
@@ -116,5 +145,7 @@ export function bodyOfVideoJob(source: VideoJob): MakeVideoBody {
 
 /** Another take on a clip: the same words and choices through `makeVideoFor`, so the gates, level rules and one-at-a-time rule are the ones every make uses; the new job gets a new random seed. */
 export async function anotherTakeFor(actor: PersonRow, source: VideoJob, context: MakeVideoContext = {}): Promise<MakeVideoResult> {
-  return makeVideoFor(actor, bodyOfVideoJob(source), context);
+  // A Create-page clip that started from a Library picture keeps it (chat clips keep theirs through `prepareVideoRerun`).
+  const start = !source.conversationId && source.kind === "animate" && source.request.source_file_id ? { start_frame: source.request.source_file_id } : {};
+  return makeVideoFor(actor, { ...bodyOfVideoJob(source), ...start }, context);
 }

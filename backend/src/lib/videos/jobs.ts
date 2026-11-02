@@ -3,7 +3,7 @@
 // (rule 6: a failed video never fails the answer). A temporary or Incognito chat keeps the job and its clip in
 // memory only (a two-hour window, gone with the chat); every other job is a row in `video_jobs` so a reload, a
 // second device and a restart all show the same card. Same shape as lib/pictures/jobs.ts, on purpose.
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile } from "@/lib/attachments";
@@ -214,6 +214,14 @@ export function conversationHasVideo(actor: PersonRow, conversationId: string, t
   return doneVideoJobsFor(actor, conversationId, temporary).length > 0;
 }
 
+/** VIDEO-CREATE-02 (U3): the person's job that made a Library clip (the stage player and the shot strip know a clip by its file id). */
+export function getVideoJobByFileFor(actor: PersonRow, fileId: string): VideoJob | null {
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(fileId)) return null;
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (job.personId === actor.id && job.files.some((file) => file.id === fileId)) return job;
+  const row = db.select().from(videoJobs).where(and(eq(videoJobs.personId, actor.id), like(videoJobs.files, `%"${fileId}"%`))).get();
+  return row ? fromRow(row) : null;
+}
+
 /** Every job of one turn in creation order. */
 export function videoJobsForTurn(actor: PersonRow, turnId: string): VideoJob[] {
   const jobs = new Map<string, VideoJob>();
@@ -332,6 +340,25 @@ export function loadUploadedPhoto(actor: PersonRow, conversationId: string, file
   const read = readAttachmentForConversation(actor, conversationId, fileId);
   if (!read.ok) return { ok: false, line: NOT_A_PHOTO_LINE };
   return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width: null, height: null };
+}
+
+const NOT_YOUR_PICTURE_LINE = "That picture isn't in your Library any more. Choose another one, or add it again.";
+
+/** VIDEO-CREATE-02 (U3): a picture in this person's own Library (an upload or a picture made here) as its stored bytes, for a Start frame.
+ * Another person's file, a file in Trash, an unknown id and anything that is not a png, jpeg or webp picture all get the same plain line. */
+export function loadLibraryPicture(actor: PersonRow, fileId: string): PhotoResult {
+  const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
+  if (!row || row.ownerPersonId !== actor.id || row.deletedAt !== null || !["image/png", "image/jpeg", "image/webp"].includes(row.mediaType)) return { ok: false, line: NOT_YOUR_PICTURE_LINE };
+  const read = readAttachment(actor, fileId);
+  if (!read.ok) return { ok: false, line: NOT_YOUR_PICTURE_LINE };
+  let width: number | null = null;
+  let height: number | null = null;
+  try {
+    const meta = JSON.parse((row.provenance ?? "").slice((row.provenance ?? "").indexOf(":") + 1)) as { width?: number; height?: number };
+    width = typeof meta.width === "number" ? meta.width : null;
+    height = typeof meta.height === "number" ? meta.height : null;
+  } catch { /* the size is only a hint for the clip's shape */ }
+  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height };
 }
 
 /** How many of this person's clips are waiting or being made. */

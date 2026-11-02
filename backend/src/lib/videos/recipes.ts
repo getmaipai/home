@@ -1,17 +1,19 @@
 // VIDEO-CREATE-01 (docs/design/video-create-2026-11-01.md section 6): the one list of video recipes. A recipe is tested wording for a
 // camera move or style, added to the words the Stack gets (never to the words the person typed, which stay on the card). One list in
 // one place: the Make a video page reads it through the package's `recipes` data id, the chat tool reads it by id.
-export interface VideoRecipe { id: string; label: string; hint: string; wording: string }
+/** `loop` is the card's sample clip, a path inside the Videos package's `assets/` folder (VIDEO-CREATE-02). */
+export interface VideoRecipe { id: string; label: string; hint: string; wording: string; loop: string }
 
+// VIDEO-CREATE-02: these are the Camera cards, in the order they show. Still is the eighth (it replaced Wide establishing shot, which no card or loop used).
 export const VIDEO_RECIPES: readonly VideoRecipe[] = [
-  { id: "dolly-in", label: "Dolly in", hint: "The camera glides slowly toward the subject.", wording: "slow dolly-in, the camera glides smoothly toward the subject" },
-  { id: "slow-orbit", label: "Slow orbit", hint: "The camera circles around the subject.", wording: "slow orbiting camera move circling around the subject" },
-  { id: "handheld", label: "Handheld", hint: "A natural, slightly shaky camera, like a phone.", wording: "handheld camera with natural, subtle shake" },
-  { id: "slow-motion", label: "Slow motion", hint: "The action plays out slowly.", wording: "slow motion, every movement stretched and smooth" },
-  { id: "time-lapse", label: "Time-lapse", hint: "Hours pass in seconds.", wording: "time-lapse, time passing quickly, clouds and light moving fast" },
-  { id: "aerial", label: "Aerial", hint: "A view from high above, like a drone.", wording: "aerial drone shot from high above, moving smoothly forward" },
-  { id: "close-up", label: "Close-up", hint: "Fills the frame with a detail.", wording: "close-up shot, shallow depth of field, fine detail in focus" },
-  { id: "wide-establishing", label: "Wide establishing shot", hint: "Shows the whole place at once.", wording: "wide establishing shot showing the whole scene, steady camera" },
+  { id: "dolly-in", label: "Dolly in", hint: "The camera glides slowly toward the subject.", wording: "slow dolly-in, the camera glides smoothly toward the subject", loop: "loops/dolly-in.mp4" },
+  { id: "slow-orbit", label: "Slow orbit", hint: "The camera circles around the subject.", wording: "slow orbiting camera move circling around the subject", loop: "loops/slow-orbit.mp4" },
+  { id: "handheld", label: "Handheld", hint: "A natural, slightly shaky camera, like a phone.", wording: "handheld camera with natural, subtle shake", loop: "loops/handheld.mp4" },
+  { id: "slow-motion", label: "Slow motion", hint: "The action plays out slowly.", wording: "slow motion, every movement stretched and smooth", loop: "loops/slow-motion.mp4" },
+  { id: "time-lapse", label: "Time-lapse", hint: "Hours pass in seconds.", wording: "time-lapse, time passing quickly, clouds and light moving fast", loop: "loops/time-lapse.mp4" },
+  { id: "aerial", label: "Aerial", hint: "A view from high above, like a drone.", wording: "aerial drone shot from high above, moving smoothly forward", loop: "loops/aerial.mp4" },
+  { id: "close-up", label: "Close-up", hint: "Fills the frame with a detail.", wording: "close-up shot, shallow depth of field, fine detail in focus", loop: "loops/close-up.mp4" },
+  { id: "still", label: "Still", hint: "The camera stays put.", wording: "locked-off static camera, no camera movement", loop: "loops/still.mp4" },
 ];
 
 /** A recipe by its id or its label (any letter case), or null. */
@@ -37,14 +39,14 @@ export const VIDEO_STARTERS: readonly { id: string; title: string; prompt: strin
 // VIDEO-CREATE-01 (V1b): the Look and Voices lists, one place each. Measured on LTX-2.5 (docs/design/video-create-2026-11-01.md): a classic
 // cartoon came back only when its era and animation style were said outright, and people looked right only with "natural colour grading"
 // wording. A look goes BEFORE the person's words (style first); the card keeps only what they typed.
-export interface VideoLook { id: string; label: string; wording: string }
+export interface VideoLook { id: string; label: string; wording: string; /** The card's sample clip, a path inside the package's `assets/` folder. */ loop: string }
 
 export const VIDEO_LOOKS: readonly VideoLook[] = [
-  { id: "natural", label: "Natural", wording: "" },
-  { id: "classic-cartoon", label: "Classic cartoon", wording: "1980s Saturday-morning hand-drawn cartoon, cel animation, flat colours, thick black outlines, Hanna-Barbera style" },
-  { id: "anime", label: "Anime", wording: "2D anime style, painted backdrop, limited animation" },
-  { id: "3d-animated", label: "3D animated", wording: "modern 3D animated film look" },
-  { id: "film", label: "Film", wording: "cinematic live-action film still, natural colour grading, muted realistic colours, soft contrast, true-to-life skin tones" },
+  { id: "natural", label: "Natural", wording: "", loop: "loops/natural.mp4" },
+  { id: "classic-cartoon", label: "Classic cartoon", wording: "1980s Saturday-morning hand-drawn cartoon, cel animation, flat colours, thick black outlines, Hanna-Barbera style", loop: "loops/classic-cartoon.mp4" },
+  { id: "anime", label: "Anime", wording: "2D anime style, painted backdrop, limited animation", loop: "loops/anime.mp4" },
+  { id: "3d-animated", label: "3D animated", wording: "modern 3D animated film look", loop: "loops/3d-animated.mp4" },
+  { id: "film", label: "Film", wording: "cinematic live-action film still, natural colour grading, muted realistic colours, soft contrast, true-to-life skin tones", loop: "loops/film.mp4" },
 ];
 
 /** A look by its id or label (any letter case), or null. */

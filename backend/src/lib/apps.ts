@@ -365,6 +365,32 @@ export function appImageAllowed(person: PersonRow, packageId: string): boolean {
   return visibleApp(person, packageId) !== null;
 }
 
+const assetMentionCache = new WeakMap<object, Set<string>>();
+/** Every string value in a document, whole (an asset is named only by a value that is exactly its path). */
+function collectStrings(node: unknown, into: Set<string>): void {
+  if (typeof node === "string") into.add(node);
+  else if (Array.isArray(node)) node.forEach((child) => collectStrings(child, into));
+  else if (typeof node === "object" && node !== null) Object.values(node).forEach((child) => collectStrings(child, into));
+}
+
+/** VIDEO-CREATE-02 (U3): may this person fetch the package's asset `rel` (`GET /api/plugins/:id/assets/<rel>`)? They must see the app, and
+ * clear the floor of a page that names the file in its document; a file no page document names (the cards' loops are filled in by the
+ * hub, not written in the JSON) needs the floor of every page, so an adult-only Create page's loops are adult-only. */
+export function appAssetAllowed(person: PersonRow, packageId: string, rel: string): boolean {
+  const app = visibleApp(person, packageId);
+  if (!app) return false;
+  const entries = app.contributes.pages ?? [];
+  const owners = entries.filter((entry) => {
+    const doc = app.pages.get(entry.module);
+    if (typeof doc !== "object" || doc === null) return false;
+    let named = assetMentionCache.get(doc);
+    if (named === undefined) { named = new Set(); collectStrings(doc, named); assetMentionCache.set(doc, named); }
+    return named.has(rel);
+  });
+  if (owners.length > 0) return owners.some((entry) => pageVisibleTo(person, app.manifest, entry));
+  return entries.every((entry) => pageVisibleTo(person, app.manifest, entry));
+}
+
 /** The role floors alone, without the app's health (lint problems, smoke status, capabilities, platform): the person clears the index page's
  * floor. `null` for a package that is not an app. */
 export function appIndexFloorOk(person: PersonRow, packageId: string): boolean | null {

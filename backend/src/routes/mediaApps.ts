@@ -20,7 +20,7 @@ import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, makeVideoFor, readMakeBody } from "@/lib/videos/make";
-import { getVideoJobFor } from "@/lib/videos/jobs";
+import { getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -156,7 +156,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
     if (!appRouteAllowed(person, appId, "actions", "another")) return next();
     const body = await bodyOf(c.req.raw);
-    const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) : null;
+    const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
     const made = await anotherTakeFor(person, source);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);

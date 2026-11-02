@@ -200,7 +200,7 @@ export function madeFileFor(person: PersonRow, appId: "music" | "videos", id: st
   return madeFiles(person, appId).find((file) => file.id === id) ?? null;
 }
 
-function madeFileItemView(file: MadeLibraryFile, appId: "music" | "videos"): MediaItemView {
+export function madeFileItemView(file: MadeLibraryFile, appId: "music" | "videos"): MediaItemView {
   const kind = appId === "music" ? "track" : "video";
   const title = file.name;
   const poster = file.thumb_url;

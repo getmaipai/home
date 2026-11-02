@@ -17,7 +17,8 @@ import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
-import { appRunAllowed, getAppData, getAppPage, manifestForViewer } from "@/lib/apps";
+import { appAssetAllowed, appRunAllowed, getAppData, getAppPage, manifestForViewer } from "@/lib/apps";
+import { assetResponse, cleanAssetPath, packageAssetFile } from "@/lib/packageAssets";
 import { newsRoutes } from "./newsRoutes";
 
 export const pluginsRoutes = apiRouter();
@@ -185,6 +186,18 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
 // NEWS-02: the News app's own data, action and picture routes. Registered before the generic `/:id/data/:dataId` below so
 // `/news/...` reaches them; they apply the same app gate and the owning page's floor (lib/apps.ts).
 pluginsRoutes.route("/news", newsRoutes);
+
+// VIDEO-CREATE-02 (U3): a package app's own picture and loop files (lib/packageAssets.ts). The same gate as its pages: a package the person may
+// not use, a file no page lets them see and a name that does not resolve are all the same plain 404.
+pluginsRoutes.get("/:id/assets/*", requireAuth, (c) => {
+  const id = c.req.param("id");
+  const marker = `/${id}/assets/`;
+  const at = c.req.path.indexOf(marker);
+  const rel = at < 0 ? null : cleanAssetPath(c.req.path.slice(at + marker.length));
+  const asset = rel ? packageAssetFile(id, rel) : null;
+  if (!rel || !asset || !appAssetAllowed(c.get("person"), id, rel)) return c.json({ error: "no such file" }, 404);
+  return assetResponse(asset, { range: c.req.header("range"), ifNoneMatch: c.req.header("if-none-match") }) as never;
+});
 
 // APP-KIND-03: a package app's page document and its data. Both apply the one gate in lib/apps.ts
 // (appVisibleTo); a package the person may not use is a 404, so its existence does not leak.
