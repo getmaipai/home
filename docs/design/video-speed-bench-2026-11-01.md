@@ -16,6 +16,8 @@ CUDA card). Rule 11 rules ComfyUI out, so each lever is tried in our own runtime
   `dgrauet/ltx-2.3-mlx-q4` and `-q8` transformer files 11.3 and 20.6 GB (plus unused extras); MiniMax-H3 set below, 109 GB.
 - Drivers are in `docs/design/video-speed-bench-2026-11-01/`.
 
+> Owner: Wan rejected on quality (2026-11-01). Sections 1 and 2 are history; the LTX sections and the tier verdict below carry the decision.
+
 ## 1. Tiny Wan decoder (VIDEO-GEN-11, VIDEO-EVAL-01)
 
 `taew2_2` (the file made for the Wan 2.2 5B VAE: 48 latent channels, 16x spatial, 4x temporal) fits our latents. `taew2_1` is the 16-channel Wan 2.1 VAE and does
@@ -144,6 +146,48 @@ Audio is judged from loudness (`volumedetect`) and spectrograms only. "Matches" 
 
 Reading: named real people come out as generic lookalikes in both models. Fictional icons split: Vader, SpongeBob and the Smurfs are recognisable on LTX, the Terminator is better on Wan, Voltron fails on both.
 Composition from the prompt is good (kick, saber, spatula); fine action ("forming", "dancing", "igniting") is weaker.
+
+### Owner-judged (2026-11-01, Jesse watched the first eight LTX clips)
+
+| Prompt | Owner verdict |
+|---|---|
+| "Golden Girls" | recognisable show, wrong show: it produced the cast of Everybody Loves Raymond |
+| SpongeBob | pretty good |
+| Smurfs | almost perfect |
+| Darth Vader | a little odd |
+| Terminator, Voltron, Chuck Norris, Will Smith | all wrong |
+
+**Owner: Wan rejected on quality (2026-11-01).** Every Wan Quick clip above and in sections 1 and 2 is kept as history only; no further Wan work. The Wan tiny-decoder numbers stay valid as measurements.
+
+### Picture-to-video and the new prompts (LTX bf16, all with sound)
+
+| Clip | Result |
+|---|---|
+| Terminator from a reference picture (`ltx-terminator-i2v-bf16`, 768x448, 117 s, 42.8 GB) | yes, a clear gain: a chrome skeletal robot with a red eye walks out of flames and wreckage, the T-800 look the text-only clip (a cartoon) never reached. The reference was the only local stand-in, a frame Wan made; the model keeps its look and adds motion and sound |
+| Voltron, Chuck Norris, Will Smith from a picture | **not run**: no local picture of any of them exists and nothing was downloaded; a stand-in made by the same model would test motion, not likeness |
+| BMO and Finn shouting "DEAN!" and "DAISY!" (`ltx-bmo-finn`, 8 s) | Adventure Time look and Tree Fort are right; two Finns appear (white hat, blue shirt) and no BMO, only a small teal block held between them; mouths open and shouting; audio present (mean -28.3 dB). Words not verifiable (no transcript) |
+| Marie Barone, "Poor naive Sarkis. I kinda feel bad for him." (`ltx-marie-sarkis`, 8 s) | the set, light and framing match a 2000s multi-camera sitcom kitchen; an older woman with short white hair in a floral shirt shakes her head and looks down. Audio present (mean -31.6 dB); the line is unverified, and no likeness to a specific person is claimed |
+
+## LTX tier verdict (q4 against q8 against bf16)
+
+The quality pairs opened (same prompt and seed, bf16 first): Vader, Smurfs, SpongeBob, Golden Girls (q4) and Vader, SpongeBob, Smurfs (q8). Sheets: `pair-<name>-bf16-q4.png`, `ltx-<name>-q8-sheet.png`.
+Seeds give different compositions per build, so these are quality samples, not pixel comparisons.
+
+| Prompt | q4 against bf16 | q8 |
+|---|---|---|
+| Vader | q4 is the better clip: night bridge, the helmet, cape and chest panel read as Vader, the saber ignites on cue (bf16 was the "a little odd" one) | clean cinematic night, silhouette then saber, no flaw seen |
+| SpongeBob | q4 cleaner: SpongeBob and a correct Mr. Krabs (bf16 gave a Patrick and Krabs mix) | clean, SpongeBob cooking beside Patrick, a bottle pours into a pot |
+| Smurfs | q4 has Papa Smurf and Brainy as well; as good as bf16 | clean, no flaw seen |
+| Golden Girls | same Raymond-style cast and kitchen, one extra man standing; no loss | not run |
+
+Numbers (section 3 and these runs): q4 33.8 GB and 48.5 s (warm, light load); q8 33.8 GB and 62 to 71 s; bf16 40.4 GB and 62 to 72 s. Under load the capability clips took 55 to 78 s on q4, 66 s on q8 and 68 to 101 s on bf16.
+No flaw seen on q4 or q8 beyond the single duplicate cat in the q8 benchmark clip, and bf16 had its own odd Vader and a mixed-up SpongeBob scene. Seven pairs, one seed each, and no speech check, so this is a lean, not a proof.
+
+Pick per slot:
+- **Lowest tier and default: q4.** Least memory (33.8 GB), fastest (about 49 s a 5 s clip), no quality loss I could find in the opened pairs.
+- **A higher tier with spare memory: still q4.** bf16 costs 6.6 GB and 15 to 25 percent more time and did not look better. Keep bf16 only as the reference build for bench comparisons, not as a tier.
+- **q8: drop.** Same peak as q4, slower, no visible gain.
+- Before pinning q4: a speech check (VIDEO-LTX-03), the derivative licence text shipped with it, and a worker patch for the quantised load (`bench_ltx.py` shows the 15 lines).
 
 ### Character consistency (LTX; same woman in a red coat with short grey hair)
 
