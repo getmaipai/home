@@ -82167,7 +82167,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The song style's card. Someone who is not its owner gets it read-only.",
+            "description": "The song style's card. Someone who is not its owner gets it read-only. An album with no cover also says whether one can still come: cover_state is no_engine when no picture engine is set up.",
             "content": {
               "application/json": {
                 "schema": {
@@ -82179,6 +82179,15 @@
                         "nullable": true
                       },
                       "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                    },
+                    "cover_state": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "pending",
+                        "no_engine"
+                      ],
+                      "description": "Albums only. ready: the cover is on the card. pending: a cover may still arrive. no_engine: none will, because no picture engine is set up."
                     }
                   },
                   "required": [
@@ -84306,7 +84315,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The band's card. Someone who is not its owner gets it read-only.",
+            "description": "The band's card. Someone who is not its owner gets it read-only. An album with no cover also says whether one can still come: cover_state is no_engine when no picture engine is set up.",
             "content": {
               "application/json": {
                 "schema": {
@@ -84318,6 +84327,15 @@
                         "nullable": true
                       },
                       "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                    },
+                    "cover_state": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "pending",
+                        "no_engine"
+                      ],
+                      "description": "Albums only. ready: the cover is on the card. pending: a cover may still arrive. no_engine: none will, because no picture engine is set up."
                     }
                   },
                   "required": [
@@ -86573,7 +86591,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The album's card. Someone who is not its owner gets it read-only.",
+            "description": "The album's card. Someone who is not its owner gets it read-only. An album with no cover also says whether one can still come: cover_state is no_engine when no picture engine is set up.",
             "content": {
               "application/json": {
                 "schema": {
@@ -86585,6 +86603,15 @@
                         "nullable": true
                       },
                       "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                    },
+                    "cover_state": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "pending",
+                        "no_engine"
+                      ],
+                      "description": "Albums only. ready: the cover is on the card. pending: a cover may still arrive. no_engine: none will, because no picture engine is set up."
                     }
                   },
                   "required": [
@@ -87257,6 +87284,16 @@
           },
           "404": {
             "description": "Album not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A new cover needs a picture engine and none is set up",
             "content": {
               "application/json": {
                 "schema": {
