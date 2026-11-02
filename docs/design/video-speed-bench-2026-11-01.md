@@ -427,6 +427,41 @@ The three refine steps take 7 to 12 s at 512x288 (Smurfs 7, rain 10, Marie 11), 
 **Against the Wan FastWan Quick floor** (`capability/wan.log`, 8 clips, 832x480, silent, tiny decoder, no mux): 22.3 to 42.1 s, median 25.0 s. LTX-2.5 q8 with sound is within about 2x of that floor at 512x288 (27 to 52 s per process, warm runs 27 to 31 s) and at 640x352 (42 to 49 s, 1.7 to 2.0 times the median); 768x448 (64 to 74 s) is 2.5 to 3 times it. So **sound plus video at Wan's speed is reachable at 512x288, and at about twice Wan's time at 640x352**, with 25 to 32 GB peak against Wan's 25.5 GB at 832x480. The price is smaller pictures (512x288 and 640x352 against 832x480).
 
 
+### SpongeBob and Patrick turn by turn, and LTX-2.3 against LTX-2.5 for cartoon recall (2026-11-02)
+
+Prompt: the videos session's turn-by-turn SpongeBob and Patrick prompt (DEAN! then DAISY!, alternating, one voice at a time), seed 7, 121 frames.
+
+| Model | Size | Tool time | Peak | Whisper | Picture (opened frames) |
+|---|---|---:|---:|---|---|
+| LTX-2.5 q8 `--distilled` | 512x288 | 26.6 s | 25.4 GB footprint | "Deanne! Daisy! Deanne! Daisy! Daisy!" | show-accurate SpongeBob and Patrick, speaker's mouth moves, the other's is closed |
+| LTX-2.5 q8 | 640x352 | 37.4 s | 32.5 GB | "Deanne! Daisy! Deanne! Daisy!" | same, plain sea background |
+| LTX-2.5 q8 | 768x448 | 58.7 s | 45.9 GB | "Deanne! Daisy! Deanne! Daisy!" | same, with the pineapple house |
+| LTX-2.3 bf16 | 512x320 | 42.7 s | 40.0 GB (MLX counter) | "T helemaal" | show-accurate, pineapple house |
+| LTX-2.3 bf16 | 640x384 | 48.7 s | 40.1 GB (MLX counter) | garbled | show-accurate, house door |
+
+Smurfs (plain prompt, no dialogue): LTX-2.3 bf16 at 512x320 and 640x384 (49.1 s and 48.3 s, 40.0 and 40.1 GB MLX counter) gives the classic Smurfs: blue Smurfs in white hats, mushroom houses, 80s cartoon look. LTX-2.5 q8 gives live-action village dancers at 512x288 and 768x448. **Cartoon recall of Smurfs is a 2.3 strength; the speech turn order is a 2.5 strength; SpongeBob and Patrick look right on both.** 2.3 cannot run 512x288 or 640x352 (half size must be a multiple of 32), so the nearest valid heights 320 and 384 were used. Loudness: 2.5 SpongeBob about -13 LUFS, 2.3 about -21 LUFS. I did not listen for voice likeness.
+
+## LTX-2.5 q8 Max ladder under the 64 GB cap (2026-11-02)
+
+Cap (owner, 2026-11-02): one Max clip may use at most 64 GB on top of the live hub's 28 GB. MrMofer LTX-2.5 q8 `--distilled`, the Marie line, 121 frames, seed 7, one run at a time under the gate lock. Three measures per run, reported side by side: **MLX peak** (the tool's own counter, read in-process at exit), **footprint** (`/usr/bin/time -l` "peak memory footprint" for the whole process: what the operating system charges) and **rss** (resident set sampled every 2 s with `ps` on the recorded process).
+Cap rule used: **the footprint**, because it is what the machine pays and what protects the hub; the MLX counter alone would pass every run.
+
+| Size | Mode | Time | MLX peak | Footprint | rss max | Cap | Whisper |
+|---|---|---:|---:|---:|---:|---|---|
+| 768x448 | resident | 55.0 s | 22.7 GB | 45.8 GB | 17.7 GB | pass | exact |
+| 1024x576 | resident | 101.0 s | 23.5 GB | 68.6 GB | 15.0 GB | **FAILED-CAP** | exact |
+| 1024x576 | `--low-ram` | 82.6 s | 22.3 GB | 69.2 GB | 10.7 GB | **FAILED-CAP** | exact |
+| 1024x576 | resident, MLX cache limit 4.41 GB | 89.2 s | 23.5 GB | 69.0 GB | 21.0 GB | **FAILED-CAP** | not transcribed |
+| 1280x704 | resident | 168.3 s | 33.3 GB | 97.4 GB | 20.9 GB | **FAILED-CAP** | exact |
+| 1280x704 | `--low-ram` | 140.6 s | 33.3 GB | 97.9 GB | 8.5 GB | **FAILED-CAP** | "Poor Naive Sarkis..." (case only) |
+| 1280x704 | resident, cache limit 4.41 GB | 157.0 s | 33.3 GB | 97.4 GB | 20.0 GB | **FAILED-CAP** | not transcribed |
+| 1280x704 | `--low-ram`, cache limit 4.41 GB | 139.0 s | 33.3 GB | 98.0 GB | 10.3 GB | **FAILED-CAP** | not transcribed |
+
+What the three measures say: the MLX counter (22 to 33 GB) and the rss (8 to 21 GB) are far below the footprint (46 to 98 GB), and neither `--low-ram` nor a 4.41 GB MLX cache limit changed the footprint (it lowered the rss, which shows the weights were streamed). The gap grows with picture size (23 GB at 768x448, 45 GB at 1024x576, 64 GB at 1280x704), so the extra memory is tied to the picture, not to the weights; its cause was not isolated (candidates: decode-stage buffers outside MLX's counter, or compressed memory). Until it is explained the footprint is the number to trust.
+Pictures (opened frames, resident runs): all three sizes are sharp sitcom frames with the line exact; the larger sizes show finer set detail (tiles, curtains, fabric) and cleaner faces. Loudness stays at -20 to -23 LUFS at every size. **1024x576 at 69 GB and 1280x704 at 97 GB are not recommended: FAILED-CAP.** 768x448 at 55 s and 45.8 GB is the largest size that passes.
+
+Not run: the official dgrauet bf16 and q8 packs. They do not load in the `ltx25-runtime` fork ("Missing 4 parameters: text_embedding_projection.audio and video aggregate embed") and need the newer runtime in `ltx25-new`, which the videos session reserved; I asked whether I may run its venv read-only and have no answer yet. The dev two-stage and `--two-stages-hq` modes were not run: they need the 38 GB dev transformer plus 8.9 GB LoRA, which the owner has not approved downloading.
+
 ## Not run, and why
 
 Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
