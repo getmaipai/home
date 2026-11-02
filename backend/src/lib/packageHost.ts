@@ -83,7 +83,7 @@ import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources,
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
-import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
+import { effectiveMode, refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, getList } from "@/lib/lists";
 import { PARENT_CAN_DO_THAT, runListAction } from "@/lib/listActions";
@@ -105,7 +105,8 @@ import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { CREDENTIAL_SAFE_MESSAGE, detectCredential } from "@/lib/memoryContentPolicy";
-import { hostedSearch } from "@/lib/hostedSearch";
+import { hostedSearch, hostedSearchAllowed, hostedSearchKey } from "@/lib/hostedSearch";
+import { __resetSearchBackendsForTests, backendAvailable, pageCacheGet, pageCachePut, rotateSearch, type BackendAdapter } from "@/lib/retrieval/searchBackends";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
 import { getPersonSettingValue } from "@/lib/settings";
 import { createHash } from "node:crypto";
@@ -873,8 +874,8 @@ type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadRe
  * an identical copy of this same four-step sequence, which a future
  * change (a retry, a different null convention) would otherwise have
  * to make twice and could silently drift between. */
-async function wikipediaGetJson(url: string, base: string, hint: string, signal?: AbortSignal, deadlineAt?: number): Promise<Record<string, unknown> | null> {
-  if (!tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT)) return null;
+async function wikipediaGetJson(url: string, base: string, hint: string, signal?: AbortSignal, deadlineAt?: number, tokenTaken = false): Promise<Record<string, unknown> | null> {
+  if (!tokenTaken && !tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT)) return null;
   const remaining = deadlineAt === undefined ? ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS : deadlineAt - Date.now();
   if (remaining <= 0 || signal?.aborted) return null;
   const result = await attemptHttpFetch(url, "GET", { "user-agent": HOME_USER_AGENT }, undefined, remaining, undefined, { signal });
@@ -943,6 +944,34 @@ async function wikipediaFallback(query: string, signal?: AbortSignal, deadlineAt
     rows: [row],
     page: { type: "document", file_id: pageFileId(pageUrl), url: pageUrl, title, text: pageText, chunks: [], links: [], sections: [] },
   };
+}
+
+/** SEARCH-ROTATE-01: the live Wikimedia search as one more rows backend for an adult's web search (the same gate and the same
+ * pace as the fallback above): up to eight pages with their short descriptions, so a thin or walled-off answer from another
+ * backend has a second source to turn to. Throws when Wikimedia does not answer, like every backend. */
+export async function wikimediaSearchRows(query: string, signal?: AbortSignal, deadlineAt?: number): Promise<{ text: string; rows: { title: string; url: string | null; snippet: string | null }[] }> {
+  const base = wikipediaBaseUrl();
+  // Home's own Wikimedia pace running out is a wait, not a fault: the rotation tries another backend and does not cool this one down.
+  // It waits a few seconds for its turn at that pace first (a person doing this by hand would), then lets the rotation move on.
+  let turn = tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT);
+  for (let waited = 0; !turn && waited < 4000 && !signal?.aborted; waited += 250) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    turn = tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT);
+  }
+  if (!turn) throw new HostError("rate_limited", "Wikipedia search is rate-limited - try again shortly");
+  bumpReferenceCounter("wikimedia_live_call", "adult");
+  const value = await wikipediaGetJson(`${base}/w/rest.php/v1/search/page?q=${encodeURIComponent(query)}&limit=8`, base, "Wikipedia's search API didn't return JSON", signal, deadlineAt, true);
+  if (!value) throw new HostError("search_unavailable", "Wikipedia search isn't answering right now.");
+  const rows: { title: string; url: string | null; snippet: string | null }[] = [];
+  for (const raw of Array.isArray(value.pages) ? (value.pages as unknown[]) : []) {
+    const item = raw as { key?: unknown; title?: unknown; excerpt?: unknown; description?: unknown };
+    if (typeof item.key !== "string" || item.key.length === 0 || typeof item.title !== "string") continue;
+    const excerpt = typeof item.excerpt === "string" ? item.excerpt.replace(/<[^>]*>/g, "").replace(/&quot;/g, '"').replace(/&amp;/g, "&").trim() : "";
+    const description = typeof item.description === "string" ? item.description.trim() : "";
+    const snippet = truncate([description, excerpt].filter(Boolean).join(" - "), SEARXNG_FIELD_MAX_CHARS);
+    rows.push({ title: item.title, url: `${base}/wiki/${encodeURIComponent(item.key)}`, snippet: snippet || null });
+  }
+  return { text: rows.map((row, i) => `${i + 1}. ${row.title} (${row.url})${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n"), rows };
 }
 
 interface SearxngEngine {
@@ -1148,6 +1177,7 @@ const searchInFlight = new Map<string, Promise<SearxngSearchResult>>();
 export function __resetSearchCacheForTests(): void {
   searchCache.clear();
   searchInFlight.clear();
+  __resetSearchBackendsForTests(); // SEARCH-ROTATE-01: the rotation's cache, cooldowns and page cache start empty too
 }
 
 type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; attemptLimitMs?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number; supplementary?: boolean };
@@ -1645,6 +1675,15 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     if (signal?.aborted) return "stop";
     const remaining = deadline - Date.now();
     if (remaining <= 0) return "stop";
+    // SEARCH-ROTATE-01: an adult's plain page read from the last hour is not fetched again (no pace, no site request).
+    const cacheable = !minorBand && !temporary;
+    const cachedDoc = cacheable ? pageCacheGet<PageReadResult>(row.url!) : undefined;
+    if (cachedDoc) {
+      const cachedText = cachedDoc.text.trim().slice(0, pageChars);
+      if (!cachedText) return null;
+      if (runBudget?.noteJob) runBudget.noteJob({ url: row.url!, title: cachedDoc.title || row.title || "", text: cachedDoc.text });
+      return { page: { url: row.url!, title: cachedDoc.title || row.title, text: cachedText }, doc: cachedDoc };
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const rowHost = runBudget ? new URL(row.url!).hostname : "";
     if (runBudget) {
@@ -1660,6 +1699,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
         new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), Math.max(0, deadline - Date.now())); }),
       ]);
       if (!doc) return "stop";
+      if (cacheable) pageCachePut(row.url!, doc);
       const text = doc.text.trim().slice(0, pageChars);
       if (!text) return null;
       // RESEARCH-NOTES-01: a research run's light model starts reading the page's whole text now, beside the other pages and the next round.
@@ -1727,15 +1767,43 @@ function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
 export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; role: string; spoken: boolean; temporary: boolean; searxOpts: SearchOptions; signal?: AbortSignal; deadlineAt?: number; imagesOrVideos?: boolean }): Promise<SearxngSearchResult> {
   const sources = p.imagesOrVideos ? (["searxng"] as WebSourceId[]) : webSourcesFor(p.band, p.temporary, p.spoken).filter((id) => !(id === "ddgs" && p.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
   if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
-  if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(p.args, p.searxOpts);
   const rowsOnly = { ...(p.args as object), read_page: false };
-  const blended = await runWebSources(sources.map((id) => (): Promise<WebRows> => {
-    if (id === "searxng") return searxngSearch(rowsOnly, p.searxOpts);
-    const search = webSourceSearch(id);
-    if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
-    return search({ args: rowsOnly, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
-  }));
-  return attachSearchPages(blended, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
+  const asked = p.args as { query?: unknown; category?: unknown } | undefined;
+  const plainQuery = typeof asked?.query === "string" && asked.query.trim() !== "" && (asked.category === undefined || asked.category === "general");
+  // SEARCH-ROTATE-01: a plain household (one SearXNG, no research run) keeps its direct path while SearXNG is healthy; a research run,
+  // a second picked source, or a SearXNG that is cooling down goes through the rotation so no one backend takes every search.
+  const adultPlain = !p.imagesOrVideos && plainQuery && p.band === "adult" && p.role !== "guest";
+  const wikimediaMode = adultPlain ? effectiveMode("wikimedia", "adult") : "closed";
+  const hostedOn = adultPlain && Boolean(hostedSearchKey()) && hostedSearchAllowed("adult");
+  const hasExtras = wikimediaMode === "live" || wikimediaMode === "mix" || hostedOn;
+  const rotate = plainQuery && !p.imagesOrVideos && (sources.length > 1 || currentResearchBudget() !== undefined || (hasExtras && !backendAvailable("searxng")));
+  // The extra backends an adult's search may turn to (the live Wikimedia search, a configured hosted key). They answer only when
+  // another backend is thin, walled off or cooling down, never beside a healthy one that already gave enough rows.
+  const extras: BackendAdapter[] = [];
+  if (rotate && (wikimediaMode === "live" || wikimediaMode === "mix")) extras.push({ id: "wikimedia", search: (query) => wikimediaSearchRows(query, p.signal, p.deadlineAt) });
+  if (rotate && hostedOn) {
+    extras.push({ id: "hosted", search: async (query) => { const found = await hostedSearch(query, "adult", p.searxOpts.safeSearchLevel ?? "off", asked?.category, p.role, p.signal); return found ? { text: found.text, rows: found.rows } : { text: "", rows: [] }; } });
+  }
+  if (!rotate) {
+    if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(p.args, p.searxOpts);
+    const blended = await runWebSources(sources.map((id) => (): Promise<WebRows> => {
+      if (id === "searxng") return searxngSearch(rowsOnly, p.searxOpts);
+      const search = webSourceSearch(id);
+      if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
+      return search({ args: rowsOnly, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
+    }));
+    return attachSearchPages(blended, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
+  }
+  const adapters: BackendAdapter[] = sources.map((id): BackendAdapter => {
+    if (id === "searxng") return { id: "searxng", blockedCodes: ["search_unavailable"], search: (query) => searxngSearch({ ...rowsOnly, query }, p.searxOpts) };
+    return { id: "ddgs", blockedCodes: ["search_unavailable"], search: (query) => {
+      const search = webSourceSearch(id);
+      if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
+      return search({ args: { ...rowsOnly, query }, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
+    } };
+  });
+  const found = await rotateSearch({ query: (asked!.query as string), adapters: [...adapters, ...extras], scope: `${p.band}${p.temporary ? ":temporary" : ""}`, signal: p.signal });
+  return attachSearchPages({ text: found.text, rows: found.rows }, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
 }
 
 export type MinorBand = "child" | "teen";

@@ -225,7 +225,7 @@ describe("the blend through the host", () => {
       fetch: (req) => {
         const path = new URL(req.url).pathname;
         if (path === "/config") return Response.json({ engines: [] });
-        return Response.json({ results: searxUrls.map((url) => ({ title: url, url, content: "about it" })), infoboxes: [] });
+        return Response.json({ results: searxUrls.map((url) => ({ title: `juniper falls ${url}`, url, content: "about juniper falls" })), infoboxes: [] });
       },
     });
     servers.push(server);
@@ -239,7 +239,7 @@ describe("the blend through the host", () => {
 
   test("two sources blend into one list with a shared URL ranked first and no duplicates", async () => {
     setHouseholdSettingValue(WEB_SOURCES_KEY, ["searxng", "ddgs"]);
-    __setWebSourceForTests("ddgs", async () => ok([row("https://b.example/"), row("https://c.example/")]));
+    __setWebSourceForTests("ddgs", async () => ok([row("https://b.example/", "juniper falls b"), row("https://c.example/", "juniper falls c")]));
     const out = await search("adult", ["https://a.example/", "https://b.example/"]);
     expect(out.rows.map((r) => r.url)).toEqual(["https://b.example/", "https://a.example/", "https://c.example/"]);
   });
