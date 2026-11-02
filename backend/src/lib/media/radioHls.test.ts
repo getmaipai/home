@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetRadioStreamsForTests, claimRadioSlot } from "./radioStream";
 import { decodeHlsResource, openHlsResource } from "./radioHls";
 import type { SavedStation } from "./radio";
@@ -16,7 +17,7 @@ function fixture(): { origin: string; requests: string[]; fetcher: (input: strin
   return { origin, requests, fetcher };
 }
 const depsFor = (source: ReturnType<typeof fixture>) => ({ fetch: source.fetcher as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
-afterEach(() => { __resetRadioStreamsForTests(); });
+afterEach(() => { __resetRadioStreamsForTests(); __resetRateLimiterForTests(); });
 
 describe("radio HLS proxy", () => {
   test("rewrites a playlist's two segment URIs through the same-origin route and serves segments", async () => {
@@ -35,6 +36,21 @@ describe("radio HLS proxy", () => {
       if (opened.ok) expect(new Uint8Array(await opened.response.arrayBuffer())).toEqual(new Uint8Array([0x47, 0x40, 0, 0]));
     }
     expect(source.requests).toEqual(["/live.m3u8", "/a.ts", "/b.ts"]);
+  });
+
+  test("a playing stream is never refused by the pace: a playlist and a segment every two seconds for two minutes", async () => {
+    const source = fixture();
+    const base = { ...depsFor(source), nowMs: undefined as number | undefined };
+    let clock = 1_000_000;
+    const deps = { fetch: base.fetch, dnsLookup: base.dnsLookup, nowMs: () => clock };
+    for (let i = 0; i < 60; i++) {
+      for (const path of ["/live.m3u8", i % 2 === 0 ? "/a.ts" : "/b.ts"]) {
+        const opened = await openHlsResource("p1", { ...station, url: `${source.origin}/live.m3u8` }, `${source.origin}${path}`, deps);
+        expect(opened.ok).toBe(true);
+        if (opened.ok) await opened.response.arrayBuffer();
+      }
+      clock += 2000;
+    }
   });
 
   test("refuses a private segment address before making a request", async () => {

@@ -9,7 +9,9 @@ import { MAX_REDIRECTS, CONNECT_TIMEOUT_MS, claimRadioSlot } from "./radioStream
 const MAX_PLAYLIST_BYTES = 2 * 1024 * 1024;
 const HLS_TYPE = /mpegurl/i;
 const platformFetch = globalThis.fetch;
-const pace = { capacity: 6, refillPerSecond: 1 / 5 } as const;
+// An HLS player asks for the playlist every few seconds and a new segment every few seconds, so this must allow about two requests a second
+// to one station host for a few listeners. The earlier 6 then 1 per 5 s refused the hub's own player after about ten seconds, which stalled the stream for a minute or more.
+const pace = { capacity: 40, refillPerSecond: 2 } as const;
 export interface HlsDeps { fetch?: typeof fetch; dnsLookup?: DnsLookup; nowMs?: () => number; connectTimeoutMs?: number }
 export type HlsFailure = { ok: false; status: 404 | 415 | 422 | 429 | 502 | 504; error: string };
 export type HlsOpen = { ok: true; response: Response };

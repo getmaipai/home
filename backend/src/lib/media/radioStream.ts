@@ -30,7 +30,8 @@ export async function publicRecordingAddress(station: SavedStation, dnsLookup?: 
 }
 export const MAX_STREAMS_PER_HOME = 4;
 const HLS_TYPE = /mpegurl/i;
-const HOST_PACE = { capacity: 6, refillPerSecond: 1 / 5 } as const;
+// A plain stream is one connection per play, plus a reconnect try or a second click now and then; one connect a second is still polite to a station.
+const HOST_PACE = { capacity: 12, refillPerSecond: 1 } as const;
 const platformFetch = globalThis.fetch;
 
 export interface StreamDeps {
