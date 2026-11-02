@@ -252,7 +252,7 @@ describe("C2 review fixes", () => {
   const png = async () => new Uint8Array(await sharp({ create: { width: 64, height: 48, channels: 3, background: { r: 10, g: 120, b: 200 } } }).png().toBuffer());
   let screened: number;
   beforeEach(() => { screened = 0; __setAgeCheckRunnerForTests(async (images) => { screened += images.length; return images.map(() => ({ ok: true as const, verdict: { adult: false } as never })); }); });
-  afterEach(() => { __setAgeCheckRunnerForTests(null); });
+  // tests/preload.ts restores the suite default runner after every test; never set the seam to null here.
 
   async function clipFromPicture(actor: PersonRow, provenance: string, from: "attached" | "latest") {
     const state = chatState(actor);
