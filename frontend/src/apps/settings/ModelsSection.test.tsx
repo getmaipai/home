@@ -570,7 +570,7 @@ describe("ModelsSection chat model choices (MODEL-SWITCH-01)", () => {
       await findByText("Chat models");
       expect(await findByText("In use")).toBeTruthy();
       expect(await findByText("Thinking can be switched off, so short questions get quick answers")).toBeTruthy();
-      expect(getByRole("button", { name: /Download \(21 GB\)/ })).toBeTruthy();
+      expect(getByRole("button", { name: /Download \(20\.8 GB\)/ })).toBeTruthy();
     } finally { restore(); }
   });
 
