@@ -460,7 +460,52 @@ Cap rule used: **the footprint**, because it is what the machine pays and what p
 What the three measures say: the MLX counter (22 to 33 GB) and the rss (8 to 21 GB) are far below the footprint (46 to 98 GB), and neither `--low-ram` nor a 4.41 GB MLX cache limit changed the footprint (it lowered the rss, which shows the weights were streamed). The gap grows with picture size (23 GB at 768x448, 45 GB at 1024x576, 64 GB at 1280x704), so the extra memory is tied to the picture, not to the weights; its cause was not isolated (candidates: decode-stage buffers outside MLX's counter, or compressed memory). Until it is explained the footprint is the number to trust.
 Pictures (opened frames, resident runs): all three sizes are sharp sitcom frames with the line exact; the larger sizes show finer set detail (tiles, curtains, fabric) and cleaner faces. Loudness stays at -20 to -23 LUFS at every size. **1024x576 at 69 GB and 1280x704 at 97 GB are not recommended: FAILED-CAP.** 768x448 at 55 s and 45.8 GB is the largest size that passes.
 
-Not run: the official dgrauet bf16 and q8 packs. They do not load in the `ltx25-runtime` fork ("Missing 4 parameters: text_embedding_projection.audio and video aggregate embed") and need the newer runtime in `ltx25-new`, which the videos session reserved; I asked whether I may run its venv read-only and have no answer yet. The dev two-stage and `--two-stages-hq` modes were not run: they need the 38 GB dev transformer plus 8.9 GB LoRA, which the owner has not approved downloading.
+The official dgrauet packs were first tried in the fork and did not load (see the length ladder for the runs in the newer runtime). Original note: they do not load in the `ltx25-runtime` fork ("Missing 4 parameters: text_embedding_projection.audio and video aggregate embed") and need the newer runtime in `ltx25-new`, which the videos session reserved; I asked whether I may run its venv read-only and have no answer yet. The dev two-stage and `--two-stages-hq` modes were not run: they need the 38 GB dev transformer plus 8.9 GB LoRA, which the owner has not approved downloading.
+
+## Normal at 10 s, the footprint cause, and length up to 20 s (2026-11-02)
+
+### Normal: LTX-2.5 q8, 512x288, 10 s (241 frames), with sound
+
+Fork runtime, MrMofer q8 `--distilled`, seed 7, one at a time under the gate. Clips are named `ltx25-max-normal-512x288-f241-<slug>.mp4` in `~/video-bench/clips/` (the "max" prefix is the helper script's, not a tier).
+
+| Prompt | Tool time | MLX peak | Footprint | rss max | Loudness | Whisper |
+|---|---:|---:|---:|---:|---:|---|
+| SpongeBob and Patrick, three turns each (`sb10`) | 42.9 s | 22.45 GB | 39.4 GB | 20.0 GB | -10.7 LUFS | "Dan! Daisy. Dan! Daisy. Dan! Daisy! Daisy!" (three turns, right order, one extra Daisy) |
+| Papa Smurf and Smurfette, four lines (`smurfs10`) | 43.4 s | 22.45 GB | 39.4 GB | 20.0 GB | -17.0 LUFS | "Smurfette, dinner is ready. Coming, Papa. Hurry, the soup is hot. I am hungry." plus the instruction "Never both talking at once." spoken aloud |
+
+10 s costs about 1.7 times the 5 s clip's time (43 against 27 to 31 s) and 14 GB more footprint (39.4 against 25.3 GB). Frames: the Smurfs clip is clean across the 10 s; the SpongeBob clip shows the pineapple house merged into SpongeBob's head like a hat and one smeared eye.
+**Correction to the Smurfs finding above:** with the characters named in the prompt (Papa Smurf with the red hat and white beard, Smurfette the blonde Smurf in a white dress) LTX-2.5 q8 draws the classic Smurfs. The earlier live-action dancers came from the vague prompt "the Smurfs dancing in their mushroom village", not from lost knowledge. Name the characters.
+
+### What the extra footprint is
+
+Footprint (the OS charge) is far above the MLX counter and the resident set at larger pictures in the fork runtime. Tests at 1024x576 (q8, Marie, fork): `LTX2_VAE_DECODE_BUDGET_GB` 2 and 16 (the fork's default is 8): 90.2 and 89.1 s, footprint 69.2 GB in both; `LTX2_DIT_EVAL_EVERY=1`: 91.0 s, 69.05 GB; both together: 89.6 s, 69.2 GB; MLX peak 23.47 GB in every run. **None of the knobs moves the footprint.**
+`footprint -p` sampled every 2 s (1024x576, q8): 8.4 GB while loading, 40 GB through the denoise, then **62 GB, almost all of it the "IOAccelerator (graphics)" category** (1,374 Metal regions), reached late in the run; CPU heap (Malloc) was under 0.6 GB. So the excess is GPU memory the MLX counter does not see. The newer runtime (next section) does not show it at 1024x576.
+
+### Length ladder, official dgrauet packs in the newer runtime (`ltx25-new`, read-only)
+
+768x448, the four-line Smurfs prompt, seed 7, `--distilled`, one at a time under the gate. MLX peak / footprint / rss max in GB.
+
+| Pack | Length (frames) | Mode | Time | MLX peak | Footprint | rss max | Cap (64 GB, footprint) |
+|---|---|---|---:|---:|---:|---:|---|
+| bf16 | 10 s (241) | resident | 114.9 s | 62.9 | 45.2 | 31.3 | pass |
+| bf16 | 10 s | `--low-ram` | 147.1 s | 62.9 | 33.4 | 27.8 | pass |
+| bf16 | 15 s (361) | resident | 188.6 s | 22.4 | 47.5 | 25.7 | pass |
+| bf16 | 15 s | `--low-ram` | 218.9 s | 22.4 | 32.6 | 28.1 | pass |
+| bf16 | 20 s (481) | resident | 285.2 s | 22.4 | 49.8 | 22.2 | pass |
+| bf16 | 20 s | `--low-ram` | 334.4 s | 22.4 | 32.6 | 24.4 | pass |
+| q8 | 10 s | resident | 125.1 s | 62.9 | 44.7 | 19.4 | pass |
+| q8 | 20 s | resident | 315.4 s | 22.4 | 31.4 | 20.3 | pass |
+| bf16 | 10 s at 1024x576 | resident | 272.0 s | 37.2 | 48.6 | 20.6 | pass |
+| bf16 | 10 s at 1024x576 | `--low-ram` | 324.5 s | 37.2 | 32.5 | 7.0 | pass |
+
+- **Growth with length:** footprint rises about 2.3 GB per extra 5 s (45.2, 47.5, 49.8 GB), linear. Time rises a little faster than linear (115, 189, 285 s: +74 s, then +96 s per 5 s), as attention grows with sequence length. No length up to 20 s at 768x448 reaches the cap; the 15 s and 20 s clips took 3.1 and 4.8 minutes. The MLX counter reads 62.9 GB at 241 frames and 22.4 GB at 361 and 481: it appears to cover a different phase in different runs, so the footprint is the number used.
+- **`--low-ram`** lowers the footprint by 12 to 17 GB and costs 15 to 30 percent more time; the clip is the same (identical transcript).
+- **q8 against bf16** in the official packs: 9 to 11 percent slower, and no memory gain at 10 s (44.7 against 45.2 GB footprint); at 20 s the footprint is 18 GB lower (31.4 against 49.8). No speed reason to use q8.
+- **1024x576 at 10 s passes the cap in the newer runtime** (48.6 GB resident, 32.5 GB with `--low-ram`), where the fork's q8 had 69 GB at 5 s: the footprint blow-up is a property of the fork, not of the size. Time is 272 s (4.5 minutes).
+- **Speech across length:** Whisper hears the same four lines, in order, at 10, 15 and 20 s, bf16 and q8, resident and `--low-ram`; the lines do not spread out, the clip gains silent or ambient tails (loudness falls from -11.5 to -14.8 to -15.9 LUFS), so the second line survives but a 20 s clip is not 20 s of dialogue. At 1024x576, 10 s: all four lines, -14.1 LUFS.
+- **Drift:** 10 s and 15 s frames are clean. The last frame of the 20 s bf16 clip shows Smurfette's body smeared and deformed (late-clip degradation); the 1024x576 10 s clip is clean at its end.
+- Clips: `ltx25-max-new-<bf16|bf16-lowram|q8>-768x448-f<241|361|481>-smurfs10.mp4` and `ltx25-max-new-bf16[-lowram]-1024x576-f241-smurfs10.mp4` in `~/video-bench/clips/`.
+
 
 ## Not run, and why
 
