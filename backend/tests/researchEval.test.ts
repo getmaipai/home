@@ -82,6 +82,15 @@ describe("the research eval", () => {
     expect(judgeFabrication(CASE, { answer: GOOD, sources, queries: [], evidence: EVIDENCE })).toEqual([]);
   });
 
+  test("fabrication: a marked sentence naming an ungiven name still fails; a name split by St. does not", () => {
+    const marked = judgeFabrication(CASE, { answer: `${GOOD} Victor Hale left the show (not in the sources).`, sources, queries: [], evidence: EVIDENCE });
+    expect(marked.length).toBe(1);
+    expect(marked[0]).toContain("Victor Hale");
+    const st = judgeFabrication(CASE, { answer: GOOD, sources, queries: [], evidence: `${EVIDENCE} Filmed at St. Jude Hall.` });
+    expect(st).toEqual([]);
+    expect(judgeFabrication(CASE, { answer: `${GOOD} It was filmed at St. Jude Hall.`, sources, queries: [], evidence: `${EVIDENCE} Filmed at St. Jude Hall.` })).toEqual([]);
+  });
+
   test("a wrong-subject answer fails the whole verdict even when it mentions every topic word", async () => {
     const wrong = "The earlier miniseries was cancelled; a second season was planned; a novel followed [1][2][3].";
     const verdict = await judgeResearch(CASE, { answer: wrong, sources, queries: [], evidence: EVIDENCE }, judge);

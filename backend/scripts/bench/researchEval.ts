@@ -39,7 +39,7 @@ export type Judge = (prompt: string) => Promise<string>;
 export type SentenceKind = "credit" | "other_work" | "context";
 export interface ClassifiedSentence { person: string; sentence: string; kind: SentenceKind; supported: boolean }
 
-import { NOT_IN_SOURCES, SENTENCE_OR_LINE_BREAK, namesIn, nameIsGiven } from "@/lib/turnMachine/fabrication";
+import { SENTENCE_OR_LINE_BREAK, namesIn, nameIsGiven } from "@/lib/turnMachine/fabrication";
 const squashText = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ");
 const sentences = (text: string): string[] => text.split(SENTENCE_OR_LINE_BREAK).map((s) => (s ?? "").trim()).filter(Boolean);
 
@@ -144,8 +144,8 @@ export async function judgeIdentification(c: ResearchCase, run: ResearchRun, jud
 export function judgeFabrication(c: ResearchCase, run: ResearchRun): string[] {
   const haystack = squashText(`${run.evidence ?? ""}\n${run.queries.join("\n")}\n${c.utterance}\n${run.sources.map((s) => `${s.site ?? ""} ${s.url}`).join("\n")}`);
   const unknown = new Set<string>();
-  // A sentence the answer already carries the "(not in the sources)" mark on is shown to the person as unconfirmed, so it is not a hidden invention.
-  for (const sentence of sentences(run.answer)) for (const name of sentence.includes(NOT_IN_SOURCES) ? [] : namesIn(sentence)) if (!nameIsGiven(name, haystack)) unknown.add(name);
+  // Fixed criterion: a name no source gives fails even inside a sentence marked "(not in the sources)"; the mark helps users, not the bench.
+  for (const sentence of sentences(run.answer)) for (const name of namesIn(sentence)) if (!nameIsGiven(name, haystack)) unknown.add(name);
   return unknown.size > 0 ? [`names no source gives: ${[...unknown].slice(0, 8).join("; ")}`] : [];
 }
 
