@@ -104,6 +104,10 @@ It is the best picture of the clips in this bench, with sound, in a quarter of t
 speech were not tried. **Verdict: needs-more, leaning adopt as a Max-tier video candidate** (4.0 min for 5 s, 14.8 GB): check licence terms (MiniMax-H3 community licence), sound and speech, a 5-prompt
 set, 1536x864, and a 2-stage latent upscale. Not run: BF16 DiT, the 8-step Turbo, the 2x latent upscaler and refiner the video used (no MLX path found).
 
+Second MiniMax clip, run after the capability work (`mm-jake-768x448-5s.mp4`, prompt "Adventure Time cartoon, Jake the Dog and BMO in the Tree Fort, Jake yells DAISY! in a deep goofy voice"): 202 s total, 35.4 s per step, 12.7 GB peak footprint, 124 frames with stereo sound (mean -22.2 dB, peak -6.5 dB).
+Opened frames (`mm-jake-sheet.png`): both characters are right, Jake with his green backpack and a blue BMO with face, arms and legs in a Tree Fort setting, mouths animated, Jake's mouth wide open in the last frame; a better character match than any LTX clip for BMO. Whisper heard "prison", so the shouted word is not confirmed intelligible; the owner must listen.
+Both runs had Low Power Mode off; `pmset` shows no High Power Mode entry. Step times stayed between 34 and 42 s, so no throttling mid-run. The 608x352 fallback was not needed (under 10 minutes). `h3.c` was not tried (needs an owner yes first). The 109 GB MiniMax download is still in `~/video-bench/mm/models`; deleting it needs the owner's yes.
+
 ## Ranked verdict
 
 1. Tiny Wan decoder `taew2_2_super`: adopt. Quick drops from about 240 s (130 to 140 s unloaded) to about 25 s; the largest single gain measured.
@@ -248,10 +252,25 @@ What the numbers show: on Golden Girls the three spectrograms (`gg-audio-spectro
 (nothing above 8 kHz) and no clipping, so the "awful" laughter is not explained by noise or distortion in these numbers. On SpongeBob the quantised builds are 8 to 10 dB louder with a quiet floor 6 to 12 dB higher: they added sound the bf16 clip did not have, which fits the owner hearing invented words. Rain is near silent on all three (peak -45 dB), no build makes a convincing rain bed.
 I cannot hear, so the owner's ears outrank this table. The q8 Golden Girls clip (`ltx-goldengirls-q8.mp4`) and the q8 and q4 Marie and rain clips are in the folder for listening; the owner has not yet heard q8.
 
+### Owner verdict on the Golden Girls laugh track (same prompt, seed 7; 2026-11-02)
+
+bf16: "perfect". q8: "a mix of laugh track and muffled static". q4: "awful". Owner's audio order: **bf16 > q8 > q4**.
+
+Measured on the same three clips (ffmpeg `ebur128` and a spectral-flatness pass over 100 Hz to 12 kHz; flatness near 0 is tonal, higher is more noise-like):
+
+| Build | Integrated loudness | Loudness range | True peak | Flatness, whole clip | Flatness, first quarter | Flatness, rest |
+|---|---:|---:|---:|---:|---:|---:|
+| bf16 | -21.9 LUFS | 1.5 LU | -10.8 dBFS | 0.0045 | 0.0124 | 0.0019 |
+| q8 | -22.0 LUFS | 0.5 LU | -11.2 dBFS | 0.0155 | 0.0490 | 0.0045 |
+| q4 | -21.7 LUFS | 0.7 LU | -9.6 dBFS | 0.0112 | 0.0307 | 0.0047 |
+
+Where the numbers agree with his ears: q8 is the most noise-like by a wide margin (3.4 times bf16 over the clip, 4 times in the first quarter), which fits "muffled static"; q4 is also noisier than bf16 (2.5 times). Loudness is the same in all three, so it is not a level difference.
+Where they do not: flatness puts q8 as noisier than q4, while the owner heard q4 as worse; "awful" in q4 may be the laughter's character rather than static, and these measures do not capture that. Both quantised clips have a loudness range one third to one half of bf16's (0.5 and 0.7 against 1.5 LU), a flatter, less lively track.
+
 ### Verdict for sound (replaces the pick-per-slot list above for any clip with audio)
 
 - **bf16 for anything with sound.** Two owner reports (q4 laughter awful, q8 invented words) and the louder, higher-floor quantised tracks all point one way. bf16 stays Boost unless the owner listens to q8 and finds it equal.
-- **Not for sound: q4** (owner heard bad laughter), and q8 until heard (owner heard gibberish on SpongeBob).
+- **Audio order, owner: bf16 > q8 > q4.** q8 had muffled static on Golden Girls and gibberish words on SpongeBob; q4 had an awful laugh track. Quantised builds only for silent or low-audio use.
 - **Quantised builds only where silent or low-audio use is accepted.** In that use q4 stays the cheaper pick (33.8 GB, about 49 s). Note the one result in q4's favour: the Marie line came out right on both quantised builds and wrong on bf16 in this seed; one seed does not outweigh the owner's listening.
 
 ## Not run, and why
