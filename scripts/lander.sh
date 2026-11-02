@@ -182,6 +182,13 @@ for want in glob.glob(os.path.join(wdir, '*.want')):
 PY
 }
 
+# GEN-DATADIR-01: a landing's generate step runs with a private MAIPAI_DATA_DIR (see run_one). A killed lander can leave its scratch
+# directory behind; anything older than a day is removed at the start of each landing.
+sweep_gen_scratch() {
+  find "$data" -maxdepth 1 -type d -name '.gen-settings.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true
+  return 0
+}
+
 # DISK-REMOVE-01: remove finished worktrees after a landing. Best effort: errors are logged, a landing never fails because of it.
 sweep_worktrees() {
   [[ -f "$main/scripts/pipeline.sh" ]] || return 0
@@ -581,17 +588,24 @@ PY
   fi
   export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github"
   # gen:settings writes its registry into MAIPAI_COMMONS_DIR; the landing points it at a private scratch directory so the shared commons checkout is never written (2026-11-02).
+  # The generators import backend code that opens <dataDir>/hub.db and refuses a schema newer than the build. With the default data
+  # directory (the warm checkout's data/) a branch carrying a newer migration stamped that shared DB and bounced every later landing
+  # (2026-11-02, schema 111 vs 110). So the generate step gets its own empty data directory, removed with the scratch directory.
+  sweep_gen_scratch
   gen_scratch="$(mktemp -d "$data/.gen-settings.XXXXXX")"
+  mkdir -p -m 0700 "$gen_scratch/data"
   if [[ -n "${MAIPAI_LAND_GENERATE_CMD:-}" ]]; then
     phase "generating files"
-    if ! bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$MAIPAI_LAND_GENERATE_CMD"; then
+    if ! MAIPAI_DATA_DIR="$gen_scratch/data" bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$MAIPAI_LAND_GENERATE_CMD"; then
       last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
+      rm -rf "$gen_scratch"
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
     fi
   else
     phase "generating files"
-    if ! MAIPAI_COMMONS_DIR="$gen_scratch" bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
+    if ! MAIPAI_COMMONS_DIR="$gen_scratch" MAIPAI_DATA_DIR="$gen_scratch/data" bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
       last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
+      rm -rf "$gen_scratch"
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
     fi
   fi

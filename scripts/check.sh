@@ -511,9 +511,10 @@ preflight_stage() { stage "$1"; }
 run_preflight() {
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
     preflight_stage "pre: settings registry generated files"
-    # Generated into a private scratch directory, never into the shared commons checkout (2026-11-02).
+    # Generated into a private scratch directory, never into the shared commons checkout (2026-11-02). The generators also get a private
+    # MAIPAI_DATA_DIR (GEN-DATADIR-01): they import backend code that opens hub.db, and a leftover DB with a newer schema broke them.
     PRE_SETTINGS_SCRATCH="$(mktemp -d)"
-    if ! (cd backend && MAIPAI_COMMONS_DIR="$PRE_SETTINGS_SCRATCH" bun run gen:settings >/dev/null); then
+    if ! (cd backend && MAIPAI_COMMONS_DIR="$PRE_SETTINGS_SCRATCH" MAIPAI_DATA_DIR="$PRE_SETTINGS_SCRATCH/data" bun run gen:settings >/dev/null); then
       rm -rf "$PRE_SETTINGS_SCRATCH"; echo "backend settings registry could not be generated"; return 1
     fi
     if ! node - "$SPEC_DIR" "$PRE_SETTINGS_SCRATCH/spec/settings/keys.json" <<'NODE'
@@ -547,7 +548,7 @@ NODE
 
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
     preflight_stage "pre: API docs generated files"
-    (cd backend && bun run gen:api-docs >/dev/null)
+    (gen_data="$(mktemp -d)"; trap 'rm -rf "$gen_data"' EXIT; cd backend && MAIPAI_DATA_DIR="$gen_data/data" bun run gen:api-docs >/dev/null)
   fi
 
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
@@ -684,7 +685,7 @@ run_backend_suite() {
   SETTINGS_SCRATCH="$(mktemp -d)"
   mkdir -p "$SETTINGS_SCRATCH/spec/settings"
   git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json > "$SETTINGS_SCRATCH/spec/settings/keys.json"
-  (cd backend && MAIPAI_COMMONS_DIR="$SETTINGS_SCRATCH" bun run gen:settings >/dev/null)
+  (cd backend && MAIPAI_COMMONS_DIR="$SETTINGS_SCRATCH" MAIPAI_DATA_DIR="$SETTINGS_SCRATCH/data" bun run gen:settings >/dev/null)
   if ! node - "$SPEC_DIR" "$SETTINGS_SCRATCH/spec/settings/keys.json" <<'NODE'
 const fs = require("node:fs");
 const { execFileSync } = require("node:child_process");
@@ -712,7 +713,7 @@ NODE
   rm -rf "$SETTINGS_SCRATCH"
 
   stage "backend: API docs, regenerate and check for drift"
-  (cd backend && bun run gen:api-docs >/dev/null)
+  (gen_data="$(mktemp -d)"; trap 'rm -rf "$gen_data"' EXIT; cd backend && MAIPAI_DATA_DIR="$gen_data/data" bun run gen:api-docs >/dev/null)
   if ! git diff --quiet -- docs/api; then
     echo "docs/api/ is out of date with the route registrations in backend/src/app.ts and its route files. Run 'bun run gen:api-docs' in backend/ and commit the result."
     git --no-pager diff --stat -- docs/api
