@@ -158,3 +158,18 @@ describe("pinning", () => {
     expect(picks).toBe(1);
   });
 });
+
+describe("title-shaped lookups first", () => {
+  const candidate = (title: string): EntityCandidate => ({ title, snippet: "", load: async () => ({ title, lead: `${title} opening.`, sections: [], source: "library" }) });
+  test("the brief's guessed titles are looked up before the subject as worded and the question, and the first pick ends the passes", async () => {
+    const seen: string[] = [];
+    __setEntityPinForTests({
+      finder: async (q) => { seen.push(q); return q === "Alder (2001 handbook)" ? [candidate("Alder (2001 handbook)"), candidate("Alder (2009 handbook)")] : [candidate("Unrelated")]; },
+      writer: async () => '{"pick": 1}',
+    });
+    const b: Brief = { ...brief("the handbook"), titles: ["Alder (2001 handbook)", "Alder (handbook)"] };
+    const { anchor } = await pinEntity(b, "the 2001 handbook, tell me more", person);
+    expect(seen).toEqual(["Alder (2001 handbook)"]);
+    expect(anchor?.title).toBe("Alder (2001 handbook)");
+  });
+});

@@ -31,6 +31,13 @@ describe("stage 1: what is this person asking", () => {
     expect(parseBrief(null)).toBeNull();
   });
 
+  test("the brief carries up to three guessed encyclopedia titles for the lookup, and the prompt asks for them", () => {
+    const parsed = parseBrief(JSON.stringify({ subject: "a thing", titles: ["Alpha (2001 work)", "Alpha", "Alpha (work)", "Alpha (extra)", 7], answer_type: "x", must_contain: [], ambiguous: false, options: [], question: "", assumption: "" }));
+    expect(parsed!.titles).toEqual(["Alpha (2001 work)", "Alpha", "Alpha (work)"]);
+    expect(parseBrief(JSON.stringify({ subject: "a thing" }))!.titles).toEqual([]);
+    expect(briefPrompt("q", "")).toContain('"titles"');
+  });
+
   test("understand() hands the model's reading on, and a model that is down gives null", async () => {
     __setStageWritersForTests({ brief: async () => '{"subject":"a show","ambiguous":false,"options":[]}' });
     expect((await understand("q", ""))!.subject).toBe("a show");

@@ -1158,7 +1158,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       return { outcome: { ok: true }, output: { kind: "text", text: clarifyingQuestion(brief!), thinking: false } };
     }
     // RESEARCH-PIN-01: the subject is pinned to one article before any search, and every search carries its name and years.
-    markResearch(state, "stage 1 pin start");
+    markResearch(state, `stage 1 pin start (subject "${brief?.subject ?? ""}", titles [${(brief?.titles ?? []).join(" | ")}])`);
     const pinned = await pinEntity(brief, rq, state.actor, signal);
     state.entityAnchor = pinned.anchor;
     markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates${pinned.debug ? `: [${pinned.debug.titles.join(" | ")}], pick reply ${JSON.stringify((pinned.debug.reply ?? "").slice(0, 80))}` : ""})`);

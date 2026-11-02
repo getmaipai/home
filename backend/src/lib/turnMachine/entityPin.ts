@@ -216,7 +216,13 @@ export interface PinResult { anchor: EntityAnchor | null; candidates: number; /*
 export async function pinEntity(brief: Brief | null, question: string, person: PersonRow, signal?: AbortSignal): Promise<PinResult> {
   if (!brief) return { anchor: null, candidates: 0 };
   const find = finderOverride ?? defaultCandidateFinder;
-  const attempts: { query: string; live: boolean }[] = [{ query: brief.subject, live: false }, { query: question.slice(0, 120), live: false }, { query: brief.subject, live: true }];
+  // Title-shaped searches first (the library's title lookup answers them at once), then the subject as worded, the question, and the live search.
+  const attempts: { query: string; live: boolean }[] = [
+    ...(brief.titles ?? []).map((query) => ({ query, live: false })),
+    { query: brief.subject, live: false },
+    { query: question.slice(0, 120), live: false },
+    { query: brief.subject, live: true },
+  ];
   const started = Date.now();
   const seen = new Set<string>();
   let total = 0; // distinct titles offered so far

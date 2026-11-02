@@ -61,6 +61,9 @@ export interface Brief {
   question: string;
   /** One plain sentence saying what the question was taken to mean. */
   assumption: string;
+  /** Up to three titles an encyclopedia might give the subject (a bracketed qualifier when the name is shared). Only used to look the article
+   * up; the pin checks each candidate against the question. */
+  titles?: string[];
 }
 
 export function briefPrompt(utterance: string, recent: string): string {
@@ -68,8 +71,8 @@ export function briefPrompt(utterance: string, recent: string): string {
 The person asked: "${utterance.replace(/"/g, "'")}"
 ${recent.trim() ? `\nThe conversation so far, most recent last:\n${recent.trim()}\n` : ""}
 Answer with one JSON object and nothing else:
-{"subject": "what it is about, in a few words", "answer_type": "the shape of a good answer", "must_contain": ["up to 5 things a good answer must contain for this question"], "ambiguous": false, "options": [], "question": "", "assumption": "one plain sentence: what you took the question to mean"}
-Use only what the question and the conversation say; add no detail of your own to "subject" or "assumption".
+{"subject": "what it is about, in a few words", "titles": ["up to 3 titles an encyclopedia might give the subject, written as such a title is, with a bracketed qualifier when the name is shared"], "answer_type": "the shape of a good answer", "must_contain": ["up to 5 things a good answer must contain for this question"], "ambiguous": false, "options": [], "question": "", "assumption": "one plain sentence: what you took the question to mean"}
+Use only what the question and the conversation say; add no detail of your own to "subject" or "assumption". "titles" are guesses used only to look the article up, so give them in the form an encyclopedia would use; use [] when the question has no single subject to look up.
 "ambiguous" is true ONLY when it is unclear WHAT is meant (which version, edition, person, product, event, or what subject at all) AND neither the question's own words nor the conversation so far settle it. If the words already point to one reading, "ambiguous" is false. When true, "options" holds two or three short labels naming the readings themselves (never a description of the person, never "missing context"), or is empty when the question names no subject at all, and "question" is the one short question to ask ("Do you mean the A or the B?" or "Which one do you mean?").`;
 }
 
@@ -88,6 +91,7 @@ export function parseBrief(text: string | null): Brief | null {
     options: data.ambiguous === true ? options : [],
     question: data.ambiguous === true ? question : "",
     assumption: typeof data.assumption === "string" ? data.assumption.trim().slice(0, 200) : "",
+    titles: strings(data.titles, 3, 100),
   };
 }
 
