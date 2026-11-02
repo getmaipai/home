@@ -6,7 +6,8 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { db } from "@/db";
-import { attachments } from "@/db/schema";
+import { attachments, videoJobs } from "@/db/schema";
+import { nextHlc } from "@/lib/hlc";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { VIDEO_LOOKS, VIDEO_VOICES, VIDEO_RECIPES, videoLookFor, videoRecipeFor, withVideoLook, withVideoRecipe, withVideoVoices, videoVoicesFor } from "@/lib/videos/recipes";
 import { MAX_NEEDS_ADMIN_LINE, allowedQuality, maxOffered } from "@/lib/tiers";
@@ -15,7 +16,8 @@ import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS } from "@/lib/videos/quality";
 import { videoTierSegment } from "@/lib/media/videoCreateApp";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
-import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { __setVideoStatusForTests, dropVideoStatusCache, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { until } from "./pictureFixture";
 import type { PersonRow } from "@/types";
 import sharp from "sharp";
@@ -182,6 +184,35 @@ describe("the Make a video page and action", () => {
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
+  });
+
+  // MAX-FIRST-LOAD-01: the segment read the Stack's status without waiting, so the first page after Home started (cold cache) had no Max.
+  test("the first Make page after a cold start already offers Max to a person who holds it", async () => {
+    const { owner } = await household();
+    // The real status read (cold cache), answered by the fake Stack: the fixture's own test status is switched off for this test.
+    __setVideoStatusForTests(undefined);
+    __setStackClientForTests({} as never);
+    fake.ltx25max = "ready";
+    dropVideoStatusCache();
+    const first = await (await owner.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    expect(promptBarOf(first.body)!.tier.tiers.map((t: { id: string }) => t.id)).toContain("max");
+    // Not ready on the Stack: a cold first page shows nothing for Max rather than a stale yes.
+    fake.ltx25max = undefined;
+    dropVideoStatusCache();
+    const cold = await (await owner.get("/api/plugins/videos/pages/make-video")).json() as { body: Array<Record<string, any>> };
+    expect((promptBarOf(cold.body)!.tier?.tiers ?? []).map((t: { id: string }) => t.id)).not.toContain("max");
+    __setStackClientForTests(null);
+  });
+
+  // MAX-WAIT-REASON-01: a Max clip the Stack holds shows its reason on the stage's Making now list, not "Making your video".
+  test("the Making now line says why a held Max clip waits, in plain words", async () => {
+    const { adult } = await household();
+    const person = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
+    const now = new Date().toISOString();
+    db.insert(videoJobs).values({ id: "held-1", personId: person.id, kind: "generate", state: "running", stackJob: "stack-1", percent: 0, phase: "waiting for the computer", prompt: BOAT, request: JSON.stringify({ loras: [], create: {} }), files: "[]", createdAt: now, updatedAt: now, hlc: nextHlc() }).run();
+    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "making" })).json() as Array<{ status: string }>;
+    expect(rows[0]!.status).toBe("Waiting for the computer to finish other work. Your video starts by itself, or tap Cancel.");
+    expect(rows[0]!.status).not.toContain("Making your video");
   });
 
   test("the prompt bar's submit args fill from the item and the action takes them", async () => {

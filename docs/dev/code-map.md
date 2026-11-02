@@ -613,7 +613,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
-| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment |
+| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/memory.ts` | validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord, remember |
@@ -997,6 +997,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
+| `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
 | `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, isVisionAssetInstalled, areVisionAssetsInstalled, ensureVisionAssets |
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |

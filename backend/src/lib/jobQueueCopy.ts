@@ -5,7 +5,7 @@ export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
   | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
-  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_chat" | "heavy_slot" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
+  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -81,6 +81,11 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
   max_drain: {
     adult: "Max starts when the jobs ahead finish (about N minutes). New jobs wait behind it.",
     child: "Waiting for its turn. Yours starts after.",
+  },
+  // MAX-WAIT-REASON-01: the Max job's own wait when nothing is running ahead of it and the computer is still busy. No resource words for people.
+  max_hold: {
+    adult: "Waiting for the computer to finish other work. Your video starts by itself, or tap Cancel.",
+    child: "Waiting for its turn.",
   },
   heavy_slot: { adult: "Another job is running; this one starts when it finishes.", child: "Another job is running. Yours starts when it finishes." },
   fairness_wait: { adult: "Other people's jobs go first this round; this one is next.", child: "Other people's jobs go first this round. Yours is next." },

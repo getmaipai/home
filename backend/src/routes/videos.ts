@@ -11,6 +11,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
 import { jobQueueCopy, JOB_QUEUE_COPY, plainStageLabel } from "@/lib/jobQueueCopy";
+import { videoWaitLine } from "@/lib/videos/waitLine";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -68,6 +69,8 @@ export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   const hold = job.riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
   if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
   if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
+  const stackWait = videoWaitLine(job.phase, audience);
+  if (stackWait) return stackWait;
   if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.phase === "paused: low memory") return JOB_QUEUE_COPY.picture_paused_memory[audience];
   // A job waiting on memory is not waiting in a line: with nothing ahead of it, "You are next" is wrong, so it gets the memory words.

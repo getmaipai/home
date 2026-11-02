@@ -17,7 +17,7 @@ import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
-import { appAssetAllowed, appRunAllowed, getAppData, getAppPage, manifestForViewer } from "@/lib/apps";
+import { appAssetAllowed, appRunAllowed, getAppData, getAppPage, manifestForViewer, warmAppPage } from "@/lib/apps";
 import { assetResponse, cleanAssetPath, packageAssetFile } from "@/lib/packageAssets";
 import { newsRoutes } from "./newsRoutes";
 
@@ -201,7 +201,8 @@ pluginsRoutes.get("/:id/assets/*", requireAuth, (c) => {
 
 // APP-KIND-03: a package app's page document and its data. Both apply the one gate in lib/apps.ts
 // (appVisibleTo); a package the person may not use is a 404, so its existence does not leak.
-pluginsRoutes.get("/:id/pages/:pageId", requireAuth, (c) => {
+pluginsRoutes.get("/:id/pages/:pageId", requireAuth, async (c) => {
+  await warmAppPage(c.req.param("id"), c.req.param("pageId"));
   const result = getAppPage(c.get("person"), c.req.param("id"), c.req.param("pageId"));
   return result.ok ? c.json(result.value as Record<string, unknown>, 200) : c.json({ error: result.error }, result.status as 404);
 });

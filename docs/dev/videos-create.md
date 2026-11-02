@@ -42,6 +42,7 @@ The older words Quick and Detailed remain in `quality.ts` as the internal model 
 
 `backend/packages/videos/pages/`:
 
+- The Level segment reads the Stack's video status without waiting. The first page after Home starts would have no Max, so the page route awaits one real read first (`registerAppPageWarm`, at most 1.5 s, never fails the page; MAX-FIRST-LOAD-01).
 - `make-video.json`: `split_view` of a `prompt_bar` (chips), the `player` stage, a `list` for Making now and a `media_shelf` of recent clips.
 - `create.json`: the Create home: `prompt_bar`, a section of starters, a section of Making now, and a `media_shelf`.
 

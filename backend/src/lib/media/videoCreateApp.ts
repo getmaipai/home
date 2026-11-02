@@ -10,15 +10,17 @@ import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_STARTERS, VIDEO
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
-import { peekVideoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
-import { registerAppPageFill } from "@/lib/apps";
+import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
+import { videoWaitLine } from "@/lib/videos/waitLine";
+import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
 import { packageAssetFile } from "@/lib/packageAssets";
 import type { PersonRow } from "@/types";
 import { madeFileFor, madeFileItemView, registerMediaAppData } from "./appHost";
 
 /** One plain line for what a Create job is doing now. */
-function statusLine(state: string, percent: number, error: string | null, note?: string): string {
-  const line = state === "queued" ? "Waiting for its turn" : state === "running" ? (percent > 0 ? `Making your video, ${percent}% done` : "Making your video") : state === "done" ? "Ready" : error ?? "It did not finish. Try again.";
+function statusLine(state: string, percent: number, error: string | null, note?: string, phase?: string | null): string {
+  const held = state === "running" ? videoWaitLine(phase, "adult") : null;
+  const line = held ?? (state === "queued" ? "Waiting for its turn" : state === "running" ? (percent > 0 ? `Making your video, ${percent}% done` : "Making your video") : state === "done" ? "Ready" : error ?? "It did not finish. Try again.");
   return note ? `${line} ${note}` : line;
 }
 
@@ -73,6 +75,13 @@ function findNode(nodes: unknown, type: string): Record<string, unknown> | undef
 /** The Make page's lists, each from its one source: lengths from the engine ceilings (quality.ts), Look and Camera cards (with each card's loop)
  * from recipes.ts, levels from tiers.ts. VIDEO-CREATE-02 (U3): Look and Camera are card grids; their options and each card's loop (a path in the
  * package's assets/ folder) come from the one list each (VIDEO_LOOKS, VIDEO_RECIPES); the page JSON holds neither. */
+/** The level segment reads the Stack's video status without waiting (`peekVideoEngineStatus`), which is empty on the first page after Home starts and
+ * left Max out of the segment until a reload. The page awaits one real read first, for at most this long, so a slow Stack costs the page a moment, never the page. */
+export const VIDEO_STATUS_WARM_MS = 1500;
+registerAppPageWarm("videos", "make-video", async () => {
+  await Promise.race([videoEngineStatus().then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, VIDEO_STATUS_WARM_MS))]);
+});
+
 registerAppPageFill("videos", "make-video", (person, page) => {
   // A card whose loop is not in the package (not made yet, or removed) is a plain tile with its label, never a broken video.
   const media = (loop: string): { media?: string } => (packageAssetFile("videos", loop) ? { media: loop } : {});
@@ -100,7 +109,7 @@ registerMediaAppData("videos", (person, dataId, params) => {
       const newest = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), isNull(videoJobs.conversationId))).orderBy(desc(videoJobs.createdAt)).get();
       const job = newest ? getVideoJobFor(person, newest.id) : null;
       if (!job || job.state === "done" || job.state === "cancelled") return [];
-      return [{ id: job.id, title: job.prompt, status: statusLine(job.state, job.percent, job.error, job.request.create?.note), state: job.state, percent: job.percent }];
+      return [{ id: job.id, title: job.prompt, status: statusLine(job.state, job.percent, job.error, job.request.create?.note, job.phase), state: job.state, percent: job.percent }];
     }
     // The newest Create clip once it has finished or stopped, so the person can ask for Another take (same words, new seed).
     case "last": {

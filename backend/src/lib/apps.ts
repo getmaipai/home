@@ -489,6 +489,15 @@ export type AppPageFill = (person: PersonRow, page: Record<string, unknown>) => 
 const appPageFills = new Map<string, AppPageFill>();
 export function registerAppPageFill(packageId: string, pageId: string, fill: AppPageFill): void { appPageFills.set(`${packageId}/${pageId}`, fill); }
 
+/** A page whose fill reads something that may be cold (the Stack's video status) can register a warm-up: the route awaits it once before the
+ * fill, so the first page after Home starts is as complete as the next one. A warm-up never fails the page and never holds it past its own timeout. */
+const appPageWarmers = new Map<string, () => Promise<void>>();
+export function registerAppPageWarm(packageId: string, pageId: string, warm: () => Promise<void>): void { appPageWarmers.set(`${packageId}/${pageId}`, warm); }
+export async function warmAppPage(packageId: string, pageId: string): Promise<void> {
+  const warm = appPageWarmers.get(`${packageId}/${pageId}`);
+  if (warm) await warm().catch(() => undefined);
+}
+
 export function getAppPage(person: PersonRow, packageId: string, pageId: string): AppResult<unknown> {
   const app = visibleApp(person, packageId);
   if (!app) return NOT_FOUND;

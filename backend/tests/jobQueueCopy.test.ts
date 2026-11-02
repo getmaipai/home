@@ -108,3 +108,18 @@ plainTest("MAX-LIVE-02: the Stack's 'Paused while chat is working' reaches a per
   plainExpect(plainStageLabel("Making the motion and the sound, step 2 of 11")).toBe("Making the motion and the sound, step 2 of 11");
   plainExpect(plainStageLabel(null)).toBeNull();
 });
+
+// MAX-WAIT-REASON-01: the Stack holds a Max clip at its start and says why in the job's phase; Home turns each phase into words, on the card
+// (phaseLabel) and on the Create stage, instead of "Making your video". No resource words for people.
+test("a Max clip the Stack holds says why, on the card and the Create stage, with no resource words", async () => {
+  const { phaseLabel } = await import("@/routes/videos");
+  const { videoWaitLine } = await import("@/lib/videos/waitLine");
+  const computer = { state: "running", phase: "waiting for the computer", position: null, riseReason: undefined, estimateSeconds: null } as never;
+  const running = { state: "running", phase: "waiting for running jobs", position: null, riseReason: undefined, estimateSeconds: null } as never;
+  expect(phaseLabel(computer, "adult")).toBe(JOB_QUEUE_COPY.max_hold.adult);
+  expect(phaseLabel(computer, "child")).toBe(JOB_QUEUE_COPY.max_hold.child);
+  expect(phaseLabel(running, "adult")).toBe("Max starts when the jobs ahead finish. New jobs wait behind it.");
+  expect(videoWaitLine("waiting for the computer", "adult")).toBe(JOB_QUEUE_COPY.max_hold.adult);
+  expect(videoWaitLine("rendering", "adult")).toBeNull();
+  for (const line of [JOB_QUEUE_COPY.max_hold.adult, JOB_QUEUE_COPY.max_hold.child, phaseLabel(running, "adult")]) expect(line).not.toMatch(/\b(RAM|memory|room|GB|gigabyte)/i);
+});
