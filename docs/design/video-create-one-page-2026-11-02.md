@@ -1,6 +1,6 @@
 # Videos Create: a two-pane workspace (control panel and results feed) and a My clips library (design draft, 2026-11-02)
 
-Status (2026-11-02): proposed; architect ruling pending on revision 4 (revision 3 was REJECTED on two narrow points, G1 and G2, fixed here). Revision 1 (a single page with a stage, a clips column and a
+Status (2026-11-02): proposed; architect ruling pending on revision 5 (revision 3 was REJECTED on G1 and G2, revision 4 on three kit facts R1 to R3, all fixed here). Revision 1 (a single page with a stage, a clips column and a
 bottom dock) landed as f9009fc78; revision 2 (two panes, built on the generic `player`) was REJECTED because the kit already ships `VideoPlayer`;
 this text, revision 3, builds the feed entry on `VideoPlayer` and replaces both. Nothing should be built from revision 1's or 2's slices.
 No code. Item: VIDEO-UI-01. Amends [video-create-ui-2026-11-02.md](video-create-ui-2026-11-02.md). Mockup, opened and judged at 1440 and
@@ -61,7 +61,7 @@ Owner's five screenshots, read 2026-11-02. Each pattern is named, with what we d
 What a person does: describe a clip, choose how it looks, press Generate, watch it appear, act on it, find it again. One page,
 two panes, nothing that navigates away while a clip is made.
 
-At 1024 px content width and up (1440 shown):
+At 1024 px window width and up (1440 shown):
 
 1. **Left: the control panel** (about 370 px, its own rounded pane; `prompt_bar` with `placement: "panel"`, K2a). Top to bottom: the
    prompt box (large; the Start frame attaches inside it as a named thumbnail; three idea chips show only while it is empty); References
@@ -78,8 +78,8 @@ At 1024 px content width and up (1440 shown):
    sidebar has no count field; a count would be a new kit gap and is not needed). The manifest holds the two real destinations; Favorites and Uploaded are tabs of My clips, because a sidebar entry is a page and carries no filter state, while the kit
    `tabs` node does.
 
-Below 1024 px content width (the phone and a narrow window; the same breakpoint at which `split_view` stacks, so the two agree, and the
-page's content width decides, never the aside's own width): the panel becomes a bottom dock (`placement: "panel"` follows the enclosing
+Below 1024 px window width (the phone and a narrow window; `split_view` switches at the window-width `lg` breakpoint, and the panel takes its
+mode from the enclosing `split_view`, never from its own width or query): the panel becomes a bottom dock (`placement: "panel"` follows the enclosing
 `split_view`):
 one line with the words, an **Options** round button and a round **Generate**. Options opens a bottom sheet (the kit Drawer) with References,
 Level, Shape and Length, and the Look and Camera pickers as three-column thumbnails, Generate fixed at its foot. The feed fills the width; its
@@ -97,7 +97,7 @@ the newest clip with its actions, and the top of the next.
    where the person acts, read from `useMakingAvailability` on the `["health"]` query. `prompt_bar` has a `disabledReason` prop, but
    the package-page renderer does not pass it and Home gives package pages no availability, and `player.actions` cannot be disabled
    today. K8 closes that; until it lands the page is not built. The round Generate of the phone dock and the Generate in the sheet take the
-   same `disabledReason`. A disabled icon-only action row shows the one line as visible text on the entry (VideoPlayer's `hint`), not only a
+   same `disabledReason`. A disabled icon-only action row shows the one line as visible text on the entry (VideoPlayer's `hint`, shown in every status by K1), not only a
    tooltip. The existing one-time recovery toast of that S6 row is the only toast; nothing new is added.
 3. **The Level segment shows only what the person may use.** Standard alone is no segment (today's fill). Max appears when the Stack
    reports it ready and the person holds it, greyed with its reason when the engine has it but not its pack (`videoMaxNotReadyReason`).
@@ -157,8 +157,8 @@ Element is written (rule 9b), and ships under a new tag; Home pins it in VIDEO-U
 
 | # | Node | Addition | Default | Why existing props cannot do it |
 |---|---|---|---|---|
-| K1 | `VideoPlayer` (the Element) | additive props, each default unchanged: a `draft` status with its still and three actions; per-action `when` (statuses) and `disabledReason`; `actionsVariant: "icons"` (icon buttons, label as accessible name and tooltip); `actionsInline` N with a More menu; a Favorite toggle; the K8 `starts` marker. `VideoPlayer`'s built-in Stop, Retry and Make another (`onStop`, `onRetry`, `onMakeAnother`) also take `disabledReason` and the `starts` marker (Retry and Make another start a clip; Stop does not). The generic `player` is not changed and stays the Browse player | | the Element has Stop, Retry, Download, Share, Make another and an `actions` slot; it lacks these |
-| K2a | `prompt_bar` | `placement: "panel"`: a left panel at the enclosing `split_view`'s side-by-side breakpoint, 1024 px content width (scrolls inside, Generate pinned at its foot); below that a bottom dock (field, Options, round Generate) with the controls in a bottom sheet | `inline` | the bar is a block in the flow |
+| K1 | `VideoPlayer` (the Element) | additive props, each default unchanged: a `draft` status with its still and three actions; per-action `when` (statuses) and `disabledReason`; `actionsVariant: "icons"` (icon buttons, label as accessible name and tooltip); `actionsInline` N with a More menu; a Favorite toggle; a `size` prop if an entry must be wider than the Element's maximum (about 576 px); the K8 `starts` marker. `hint` shows in every status (draft, ready, failed, cancelled, not only while queued or generating, where it shows today); K8 fills it with the `makingNotice` when any `starts` action on the entry is disabled. `VideoPlayer`'s built-in Stop, Retry and Make another (`onStop`, `onRetry`, `onMakeAnother`) also take `disabledReason` and the `starts` marker (Retry and Make another start a clip; Stop does not). The generic `player` is not changed and stays the Browse player | | the Element has Stop, Retry, Download, Share, Make another and an `actions` slot; it lacks these |
+| K2a | `prompt_bar` | `placement: "panel"`: a left panel at the enclosing `split_view`'s side-by-side breakpoint, 1024 px window width (`lg`; scrolls inside, Generate pinned at its foot); below that a bottom dock (field, Options, round Generate) with the controls in a bottom sheet | `inline` | the bar is a block in the flow |
 | K2b | `prompt_bar` | `suggestions`: up to 4 `{label, text}`, shown while the field is empty | none | idea chips |
 | K2c | `prompt_bar` | `submit_detail`: `{state, labels}`, the small line under the submit label chosen by a chip or tier state | none | the time under Generate |
 | K3a | `prompt_bar.chips[]` | `presentation: "popover"` on a `cards` chip and `group`: chips with the same group share one trigger with two thumbnails and open one popover (sheet on a phone); a text chip (Voices) may be in the group | inline | Look, Camera and Sound are one control |
@@ -171,7 +171,7 @@ Element is written (rule 9b), and ships under a new tag; Home pins it in VIDEO-U
 | K9 | `result_feed` | `poll_while`: statuses in which the feed re-reads only those jobs' own records every few seconds and stops once every row is settled, like the chat card's `VIDEO_POLL_MS` query | none | the newest entry follows a running job; the job record read S6 allows, not a new polling loop; only if the refresh check fails |
 | K10 | new node `result_feed` | bound rows (newest first); per row one `VideoPlayer` (a draft is the same Element in `draft`) plus the words, tags and reference chips `{label, thumb}`; `filters` (toggle, select) that write page state the binding reads as `$state.<name>`; `group_by` (day through `DayDivider`, or the words); the entry's Stop, Try again and Another take are `VideoPlayer`'s own `onStop`, `onRetry` and `onMakeAnother`, mapped from a `handlers` prop (Cancel, Try again and Another take are not declared again as extra actions); only Remix, Make it Max, the draft actions and Favorite are extra `actions`, and an extra action with no `when` shows in `ready`; K1 and K8 | | the Dreamina feed: no existing node holds an entry with words, tags, a player and actions |
 | K11 | `split_view` | `aside_side: "start"` | `end` | the panel is the left pane |
-| K12 | `media_shelf` | `group_by_field` (a date field, `DayDivider` headings), `size_control` (`CardSizeSlider` writing tile density), `favorite` (`{field, action}` heart toggle) | none | the library of reference 9 |
+| K12 | `media_shelf` | `group_by_field` (a date field, `DayDivider` headings built as shipped: a centred label between hairlines such as "Today, 5 clips"; the mockup's left-aligned heading is not built unless a `DayDivider` variant is added here, never a className), `size_control` (`CardSizeSlider` writing tile density), `favorite` (`{field, action}` heart toggle) | none | the library of reference 9 |
 
 Not verified: whether a package data binding refreshes while a job runs. VIDEO-UI-02's first step reads the host code and measures on a dev
 hub; if it does not refresh, K9 is built.
