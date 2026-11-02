@@ -4,7 +4,7 @@
 // Picking a song opens it above the rows with every action as a visible button; one the engine cannot do is turned off with its plain reason.
 // The same tiles serve the Studio, Stems and Remix pages (`SongGallery`).
 // Every change made here has its edit card in chat (the edit_* actions), so a change is one change to one record.
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -144,13 +144,16 @@ function GlassBar({ styles, onStyles, onMade }: { styles: string[]; onStyles: (n
       .finally(() => setMaking(false));
   };
   const hint = engineMissing ? NO_MUSIC_ENGINE_LINE : problem || (idea.trim().length < 3 ? "Say what the song is about to start." : "It takes about a minute. It shows up in your songs.");
-  return <div className="bg-background/60 mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-3xl p-4 shadow-2xl backdrop-blur-xl" data-testid="music-docked-bar">
-    {make !== "song" ? <div className="max-h-96 min-h-0 overflow-y-auto"><CreatePage kind={make} adult /></div> : <>
-      <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
-        className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
-      {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."
-        className="placeholder:text-muted-foreground bg-muted/40 w-full resize-none rounded-xl p-3 text-sm outline-none" /> : null}
-    </>}
+  return <div className="bg-background/70 mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 shadow-2xl backdrop-blur-xl sm:p-4" data-testid="music-docked-bar">
+    {make !== "song" ? <div className="max-h-96 min-h-0 overflow-y-auto"><CreatePage kind={make} adult /></div> : <div className="flex items-end gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
+          className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
+        {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."
+          className="placeholder:text-muted-foreground bg-muted/40 w-full resize-none rounded-xl p-3 text-sm outline-none" /> : null}
+      </div>
+      <Button type="button" size="lg" disabled={!ready} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
+    </div>}
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="What to make">
       {MAKES.map((one) => <Chip key={one.id} selected={make === one.id} onClick={() => setMake(one.id)}>{one.label}</Chip>)}
       {make === "song" ? <>
@@ -158,30 +161,27 @@ function GlassBar({ styles, onStyles, onMade }: { styles: string[]; onStyles: (n
         <Chip selected={instrumental} onClick={() => setInstrumental(!instrumental)}>Instrumental</Chip>
         <Chip selected={length === "quick"} onClick={() => setLength(length === "quick" ? "" : "quick")}>Quick</Chip>
         <Chip selected={length === "full"} onClick={() => setLength(length === "full" ? "" : "full")}>Full</Chip>
-        <span className="text-muted-foreground bg-muted/60 rounded-full px-3 py-1 text-xs" data-testid="music-engine-chip">{status.data?.engine_ready ? "Music model: ready" : "Music model: not running"}</span>
-        <div className="ml-auto shadow-primary/40 rounded-lg shadow-lg"><Button type="button" size="lg" disabled={!ready} onClick={create}>{making ? "Starting" : "Generate"}</Button></div>
+        {styles.map((name) => <Chip key={name} selected onClick={() => toggleStyle(name)}>{name}</Chip>)}
+        <span className="text-muted-foreground bg-muted/60 ml-auto rounded-full px-3 py-1 text-xs" title={hint} data-testid="music-engine-chip">{status.data?.engine_ready ? "Music model: ready" : "Music model: not running"}</span>
       </> : null}
     </div>
-    {make === "song" ? <>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Styles">{STARTER_STYLES.map((name) => <Chip key={name} selected={styles.includes(name)} onClick={() => toggleStyle(name)}>{name}</Chip>)}</div>
-      <p role={engineMissing || problem ? "alert" : undefined} data-testid={engineMissing ? "music-no-engine" : undefined} className="text-muted-foreground text-xs">{hint}</p>
-    </> : null}
+    {problem || engineMissing ? <p role="alert" data-testid={engineMissing ? "music-no-engine" : undefined} className="text-muted-foreground text-xs">{hint}</p> : null}
   </div>;
 }
 
-/** The hero: a wall of covers (yours, or drawn ones) under a bold headline, with the glass prompt bar docked at its bottom. */
+/** The hero: a tall wall of covers (yours, or drawn ones) under a bold headline, fading into the glass prompt bar docked at the bottom centre. */
 function Hero({ styles, onStyles, onMade }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void }) {
   const { list } = useShown("");
   const mine = (list.data ?? []).filter((card) => card.state === "done").slice(0, 12);
   const wall = Array.from({ length: 12 }, (_, index) => mine[index] ?? null);
-  return <div className="relative isolate flex min-h-144 shrink-0 flex-col justify-between gap-8 overflow-hidden rounded-3xl p-4 sm:p-8" data-testid="music-hero">
-    <div aria-hidden="true" className="absolute inset-0 -z-10 grid grid-cols-3 gap-1 sm:grid-cols-4 lg:grid-cols-6">
+  return <div className="relative isolate flex min-h-176 shrink-0 flex-col justify-between gap-8 overflow-hidden rounded-3xl p-4 sm:p-8" data-testid="music-hero">
+    <div aria-hidden="true" className="absolute inset-x-0 top-0 -z-10 grid h-4/5 grid-cols-3 grid-rows-2 gap-1 sm:grid-cols-4 lg:grid-cols-6">
       {wall.map((card, index) => <div key={card?.id ?? index} className="overflow-hidden"><Cover id={card?.id ?? STARTER_STYLES[index % STARTER_STYLES.length] ?? `wall-${index}`} title={card?.title ?? STARTER_STYLES[index % STARTER_STYLES.length] ?? ""} url={card?.cover_url ?? null} bare /></div>)}
     </div>
-    <div aria-hidden="true" className="from-background/30 via-background/50 to-background absolute inset-0 -z-10 bg-linear-to-b" />
-    <div className="flex flex-col gap-3 pt-6 sm:pt-12">
-      <h1 className="max-w-3xl text-5xl leading-none font-black tracking-tight uppercase sm:text-7xl">Make any song</h1>
-      <p className="text-foreground/80 max-w-xl text-base sm:text-lg">Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.</p>
+    <div aria-hidden="true" className="from-background/10 via-background/20 to-background absolute inset-0 -z-10 bg-linear-to-b" />
+    <div className="flex flex-col gap-3 pt-4 sm:pt-10">
+      <h1 className="max-w-3xl text-5xl leading-none font-black tracking-tight uppercase drop-shadow-lg sm:text-7xl">Make any song</h1>
+      <p className="text-foreground/90 max-w-xl text-base drop-shadow-lg sm:text-lg">Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.</p>
     </div>
     <GlassBar styles={styles} onStyles={onStyles} onMade={onMade} />
   </div>;
@@ -195,13 +195,15 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   const song = new URLSearchParams(search).get("song");
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
-  const lime = { "--accent-lime": "var(--hue-yellow)", "--primary": "var(--hue-yellow)", "--primary-foreground": "var(--background)" } as CSSProperties;
-  return <section className="dark bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" style={lime} data-testid="music-workspace">
+  return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
     {song ? <SongDetail key={song} id={song} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} />
-    {shown.length > 0 ? <MediaCarousel title="Your songs" line="Open one to play it and see everything you can do." label="Your songs">
-      {shown.map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
-    </MediaCarousel> : null}
+    {shown.length > 0 ? <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
+      <div className="flex flex-col gap-1"><h2 className="text-2xl font-black tracking-wide uppercase">Your songs</h2><p className="text-muted-foreground text-sm">Open one to play it and see everything you can do.</p></div>
+      <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label="Your songs">
+        {shown.slice(0, 12).map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
+      </ul>
+    </div> : null}
     <MediaCarousel title="Start from a sound" line="Pick one and it goes into the bar above." label="Starter sounds">
       {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? "Remove" : "Use"} selected={styles.includes(name)} onOpen={() => setStyles(styles.includes(name) ? styles.filter((one) => one !== name) : [...styles, name].slice(0, 8))} />)}
     </MediaCarousel>
@@ -211,5 +213,5 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
       <span className="block aspect-video w-full overflow-hidden rounded-2xl transition duration-200 motion-safe:group-hover:-translate-y-1"><Cover id={`tool-${tool.label}`} title={tool.label} url={null} /></span>
       <span className="text-muted-foreground text-sm">{tool.line}</span></Link></li>)}
   </MediaCarousel>
-  </section>;
+  </section></div>;
 }

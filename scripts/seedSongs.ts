@@ -83,6 +83,25 @@ for (const song of SONGS) {
     fileId: made.value.id, parentFileId: null, coverJobId: null, coverFileId, seed: provenance.seed, durationS: seconds,
     lrc: song.lines.map((line, i) => `${lrcStamp(2 + i * 5)} ${line}`).join("\n") + "\n", chosenAt: null, createdAt: created, updatedAt: created, temporary: false,
   });
+  if (index === 0) {
+    // The first song also has a finished split (vocals, drums, bass, other), so the Studio shows its track rows without waiting on the engine.
+    const splitId = newMusicJobId();
+    const splitTurn = newConversationTurnId();
+    logTurn(sage, "chat", "Split into stems", { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversationId, turn_id: splitTurn });
+    for (const stem of ["vocals", "drums", "bass", "other"]) {
+      const stemJobId = stem === "vocals" ? splitId : newMusicJobId();
+      const stemAudio = toM4a(wavWithId3(synthTune(`${song.title}-${stem}`, seconds), Buffer.alloc(0)));
+      const stemFile = createAttachment(sage, { conversationId, turnId: splitTurn, mediaType: stemAudio.mediaType, bytes: stemAudio.bytes, provenance: MUSIC_NOTE + JSON.stringify({ ...provenance, job_id: stemJobId, task: "stems", parent_file_id: made.value.id }), deduplicate: false, retention: "conversation" });
+      if (!stemFile.ok) throw new Error(`saving the ${stem} stem failed: ${stemFile.error}`);
+      saveMusicJob({
+        id: stemJobId, personId: sage.id, conversationId, turnId: splitTurn, companionId: null, task: "stems",
+        request: { description: "", lyrics: null, title: `${song.title} (${stem.replace(/^./, (c) => c.toUpperCase())})`, instrumental: false, seconds, length: "quick", quality: "quick", stemsOf: splitId },
+        stackJob: null, state: "done", stage: "ready", progress: 1, etaSeconds: 0, position: null, errorCode: null, errorLine: null,
+        fileId: stemFile.value.id, parentFileId: made.value.id, coverJobId: null, coverFileId: null, seed: provenance.seed, durationS: seconds,
+        lrc: null, chosenAt: null, createdAt: created, updatedAt: created, temporary: false,
+      });
+    }
+  }
   index++;
 }
 console.log(`seeded ${index} demo songs`);
