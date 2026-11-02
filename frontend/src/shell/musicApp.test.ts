@@ -55,3 +55,21 @@ test("every data id a Music page binds is declared by the manifest, and the mani
     }
   }
 });
+
+test("the shipped page schema accepts the music block nodes and shelf props", () => {
+  const fixture = resolve(import.meta.dir, "../../node_modules/@maipai/spec/ui/pages/music-listen.json");
+  const doc = JSON.parse(readFileSync(fixture, "utf8"));
+  const parsed = PageNodeSchema.safeParse(doc);
+  expect({ errors: parsed.success ? [] : parsed.error.issues }).toEqual({ errors: [] });
+  const types = new Set<string>();
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach(walk);
+    else if (value && typeof value === "object") {
+      const node = value as Record<string, unknown>;
+      if (typeof node.type === "string") types.add(node.type);
+      Object.values(node).forEach(walk);
+    }
+  };
+  walk(doc);
+  for (const type of ["quick_tiles", "top_result", "category_tiles", "track_rows"]) expect(types.has(type)).toBe(true);
+});
