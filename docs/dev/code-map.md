@@ -241,10 +241,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
+| `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
-| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress, editInChatAddress |
+| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress, remixAddress |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |

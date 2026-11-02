@@ -12,7 +12,7 @@ import { Band, type BandPatch } from "@maipai/ui/src/elements/band";
 import { SongStyleCard, type SongStylePatch } from "@maipai/ui/src/elements/song-style";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { MusicWorkspace, SongGallery, studioAddress, stemsAddress, editInChatAddress } from "./MusicWorkspacePage";
+import { MusicWorkspace, SongGallery, studioAddress, stemsAddress, remixAddress } from "./MusicWorkspacePage";
 import type { MusicCard } from "@/lib/musicApi";
 import { MusicStudioView } from "./MusicStudioView";
 import { request } from "@/lib/api";
@@ -200,7 +200,7 @@ export function MusicStudioPage({ pageId, search, adult }: { pageId: string; sea
   if (pageId === "make-song" || pageId === "make-band" || pageId === "make-album" || pageId === "make-style") return <Navigate to={`/apps/music/create${search}`} replace />;
   if (pageId === "studio") return new URLSearchParams(search).get("song") ? <MusicStudioView adult={adult} search={search} /> : <PickSong adult={adult} title="Studio" line="Pick a song to open its tracks." go={(card) => studioAddress(card.id)} />;
   if (pageId === "stems") return <PickSong adult={adult} title="Stems" line="Pick a song to split into vocals, drums, bass and other. The rows open in the Studio." go={(card) => stemsAddress(card.id)} />;
-  if (pageId === "remix") return <PickSong adult={adult} title="Remix and edit" line="Pick a song, then say in chat what to change: the words, the style, the length or the cover." go={(card) => editInChatAddress(card, "Remix")} />;
+  if (pageId === "remix") return <PickSong adult={adult} title="Remix and edit" line="Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made." go={(card) => remixAddress(card.id)} />;
   if (pageId === "creations") return <CreationsPage adult={adult} />;
   const params = new URLSearchParams(search);
   const kind = toKind(params.get("kind"));

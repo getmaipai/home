@@ -15,6 +15,7 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { SongResult, MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody } from "./MakeSongPage";
 import { CreatePage } from "./MusicStudioPages";
 import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/media-tiles";
+import { RemixSong } from "./MusicRemix";
 import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 
@@ -30,8 +31,8 @@ export const COVER_SONG_LINE = "Covering a song in a new voice needs an uploaded
 export const songAddress = (id: string | null): string => (id ? `/apps/music/create?song=${encodeURIComponent(id)}` : "/apps/music/create");
 export const studioAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}`;
 export const stemsAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}&split=1`;
-/** The chat that edits a song: the same edit_* actions the card uses, started with the song's name. */
-export const editInChatAddress = (card: MusicCard, what: string): string => `/chat?ask=${encodeURIComponent(`${what} my song "${card.title ?? "Untitled song"}" (maipai://music/track/${card.id}).`)}`;
+/** Opens the song with the Remix panel showing. Nothing is made until the panel's confirm button is pressed. */
+export const remixAddress = (id: string): string => `/apps/music/create?song=${encodeURIComponent(id)}&remix=1`;
 
 /** What a tile says under the title: how far along it is, or its sound. */
 export function songLine(card: MusicCard): string {
@@ -60,7 +61,7 @@ function songTile({ card, selected, onOpen, actions }: { card: MusicCard; select
 }
 
 const TILE_ACTIONS = (card: MusicCard): Array<{ label: string; to: string }> => [
-  { label: "Studio", to: studioAddress(card.id) }, { label: "Stems", to: stemsAddress(card.id) }, { label: "Remix", to: editInChatAddress(card, "Remix") },
+  { label: "Studio", to: studioAddress(card.id) }, { label: "Stems", to: stemsAddress(card.id) }, { label: "Remix", to: remixAddress(card.id) },
 ];
 
 function useShown(filter: string) {
@@ -85,13 +86,14 @@ export function SongGallery({ selected, onOpen, actionsFor = TILE_ACTIONS, empty
 const TOOLS = [
   { label: "Studio", line: "Tracks, waveforms, mute and solo for any song.", to: "/apps/music/studio" },
   { label: "Stems", line: "Split a song into vocals, drums, bass and the rest.", to: "/apps/music/stems" },
-  { label: "Remix", line: "Describe a change and Home makes it, in chat.", to: "/apps/music/remix" },
+  { label: "Remix", line: "Say what to change, review it, then Home makes it.", to: "/apps/music/remix" },
   { label: "Extend", line: "Turn a quick song into a full one, or back.", to: "/apps/music/remix" },
-  { label: "Cover art", line: "Ask for a new picture for any song.", to: "/apps/music/remix" },
+  { label: "Cover art", line: "Make a new picture for any song.", to: "/apps/music/remix" },
 ];
 
 /** The song opened above the rows: its cover blurred into the background, the kit player, and every action as a button, each off with its reason. */
-function SongDetail({ id, onClose }: { id: string; onClose: () => void }) {
+function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; remix: boolean }) {
+  const [remixing, setRemixing] = useState(remix);
   const { push } = useToast();
   const queryClient = useQueryClient();
   const card = useQuery({ queryKey: ["music-song", id], queryFn: ({ signal }) => musicApi.card(id, signal), staleTime: 0 });
@@ -113,20 +115,20 @@ function SongDetail({ id, onClose }: { id: string; onClose: () => void }) {
       <div className="flex flex-wrap gap-2">
         <Button asChild disabled={!ready}><Link to={studioAddress(id)} aria-disabled={!ready}>Open in Studio</Link></Button>
         <Button asChild variant="secondary" disabled={!ready}><Link to={stemsAddress(id)} aria-disabled={!ready}>Extract stems</Link></Button>
-        {song ? <Button asChild variant="secondary" disabled={!ready}><Link to={editInChatAddress(song, "Remix")} aria-disabled={!ready}>Remix or edit</Link></Button> : null}
+        <Button type="button" variant="secondary" disabled={!ready} onClick={() => setRemixing(true)}>Remix</Button>
         <Button type="button" variant="secondary" disabled={!ready} onClick={() => again(song?.length === "full" ? "quick" : "full")}>{song?.length === "full" ? "Make it quick" : "Extend to full"}</Button>
         <Button type="button" variant="secondary" disabled={!ready} onClick={newCover}>New cover art</Button>
-        {song ? <Button asChild variant="secondary" disabled={!ready}><Link to={editInChatAddress(song, "Change the lyrics of")} aria-disabled={!ready}>Edit lyrics</Link></Button> : null}
         {version ? <Button asChild variant="secondary"><a href={version.url} download>Download</a></Button> : <Button type="button" variant="secondary" disabled>Download</Button>}
         <Button type="button" variant="secondary" disabled>Cover with a new voice</Button>
       </div>
+      {remixing && song && ready ? <RemixSong card={song} onClose={() => setRemixing(false)} /> : null}
       <p className="text-muted-foreground text-xs">{reasonOff || `Stems: ${STEMS_LINE.replace("is not available", "may not be available")} ${COVER_SONG_LINE}`}</p>
     </div>
   </section>;
 }
 
-/** The floating glass prompt bar: the idea, then chips for what to make, its sound, the engine, lyrics, length and instrumental, and one big Generate. */
-function GlassBar({ styles, onStyles, onMade }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void }) {
+/** The prompt bar: the idea, one row of chips (what to make, lyrics, length, instrumental, styles) and one big Generate. Every chip shows its state; a control that cannot work says why. */
+function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void; stylesOpen: boolean; onStylesOpen: (open: boolean) => void }) {
   const { push } = useToast();
   const [make, setMake] = useState<Make>("song");
   const [idea, setIdea] = useState(""); const [lyrics, setLyrics] = useState(""); const [withLyrics, setWithLyrics] = useState(false);
@@ -143,69 +145,74 @@ function GlassBar({ styles, onStyles, onMade }: { styles: string[]; onStyles: (n
       .catch((error: unknown) => { const line = text(error, "Home could not start the song. Check the request and try again."); setProblem(line); push(line); })
       .finally(() => setMaking(false));
   };
-  const hint = engineMissing ? NO_MUSIC_ENGINE_LINE : problem || (idea.trim().length < 3 ? "Say what the song is about to start." : "It takes about a minute. It shows up in your songs.");
-  return <div className="bg-background/70 mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 shadow-2xl backdrop-blur-xl sm:p-4" data-testid="music-docked-bar">
-    {make !== "song" ? <div className="max-h-96 min-h-0 overflow-y-auto"><CreatePage kind={make} adult /></div> : <div className="flex items-end gap-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
-          className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
-        {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."
-          className="placeholder:text-muted-foreground bg-muted/40 w-full resize-none rounded-xl p-3 text-sm outline-none" /> : null}
-      </div>
-      <Button type="button" size="lg" disabled={!ready} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
+  const hint = engineMissing ? NO_MUSIC_ENGINE_LINE : problem || (idea.trim().length < 3 ? "Say what the song is about to turn Generate on." : "It takes about a minute. It shows up in your songs.");
+  return <div className="bg-card mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 sm:p-4" data-testid="music-docked-bar" id="music-bar">
+    {make !== "song" ? <div className="max-h-96 min-h-0 overflow-y-auto"><CreatePage kind={make} adult /></div> : <div className="flex flex-col gap-2">
+      <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
+        className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
+      {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."
+        className="placeholder:text-muted-foreground bg-muted/40 w-full resize-none rounded-xl p-3 text-sm outline-none" /> : null}
     </div>}
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="What to make">
+    <div className="flex items-center gap-2 overflow-x-auto" role="group" aria-label="What to make">
       {MAKES.map((one) => <Chip key={one.id} selected={make === one.id} onClick={() => setMake(one.id)}>{one.label}</Chip>)}
       {make === "song" ? <>
         <Chip selected={withLyrics && !instrumental} onClick={() => { if (!instrumental) setWithLyrics(!withLyrics); }}>Lyrics</Chip>
         <Chip selected={instrumental} onClick={() => setInstrumental(!instrumental)}>Instrumental</Chip>
         <Chip selected={length === "quick"} onClick={() => setLength(length === "quick" ? "" : "quick")}>Quick</Chip>
         <Chip selected={length === "full"} onClick={() => setLength(length === "full" ? "" : "full")}>Full</Chip>
-        {styles.map((name) => <Chip key={name} selected onClick={() => toggleStyle(name)}>{name}</Chip>)}
-        <span className="text-muted-foreground bg-muted/60 ml-auto rounded-full px-3 py-1 text-xs" title={hint} data-testid="music-engine-chip">{status.data?.engine_ready ? "Music model: ready" : "Music model: not running"}</span>
+        <Chip selected={stylesOpen || styles.length > 0} onClick={() => onStylesOpen(!stylesOpen)}>{styles.length ? `Styles (${styles.length})` : "Styles"}</Chip>
       </> : null}
     </div>
-    {problem || engineMissing ? <p role="alert" data-testid={engineMissing ? "music-no-engine" : undefined} className="text-muted-foreground text-xs">{hint}</p> : null}
+    {make === "song" && stylesOpen ? <div className="flex flex-wrap gap-2" role="group" aria-label="Styles" data-testid="music-styles-panel">
+      {STARTER_STYLES.map((name) => <Chip key={name} selected={styles.includes(name)} onClick={() => toggleStyle(name)}>{name}</Chip>)}
+    </div> : null}
+    {make === "song" ? <div className="flex flex-wrap items-center justify-between gap-3">
+      <p role={problem || engineMissing ? "alert" : "status"} data-testid={engineMissing ? "music-no-engine" : "music-hint"} className="text-muted-foreground w-full text-xs sm:w-auto sm:min-w-0 sm:flex-1">{hint}</p>
+      <span className="text-muted-foreground text-xs sm:ml-auto" data-testid="music-engine-chip">{status.data?.engine_ready ? "Music model: ready" : "Music model: not running"}</span>
+      <Button type="button" size="lg" disabled={!ready} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
+    </div> : null}
   </div>;
 }
 
-/** The hero: a tall wall of covers (yours, or drawn ones) under a bold headline, fading into the glass prompt bar docked at the bottom centre. */
-function Hero({ styles, onStyles, onMade }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void }) {
-  const { list } = useShown("");
-  const mine = (list.data ?? []).filter((card) => card.state === "done").slice(0, 12);
-  const wall = Array.from({ length: 12 }, (_, index) => mine[index] ?? null);
-  return <div className="relative isolate flex min-h-176 shrink-0 flex-col justify-between gap-8 overflow-hidden rounded-3xl p-4 sm:p-8" data-testid="music-hero">
-    <div aria-hidden="true" className="absolute inset-x-0 top-0 -z-10 grid h-4/5 grid-cols-3 grid-rows-2 gap-1 sm:grid-cols-4 lg:grid-cols-6">
-      {wall.map((card, index) => <div key={card?.id ?? index} className="overflow-hidden"><Cover id={card?.id ?? STARTER_STYLES[index % STARTER_STYLES.length] ?? `wall-${index}`} title={card?.title ?? STARTER_STYLES[index % STARTER_STYLES.length] ?? ""} url={card?.cover_url ?? null} bare /></div>)}
+/** The top of Create: a readable headline, the prompt bar, and nothing drawn behind the text. */
+function Hero({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void; stylesOpen: boolean; onStylesOpen: (open: boolean) => void }) {
+  return <div className="flex shrink-0 flex-col gap-6 pt-4 sm:pt-8" data-testid="music-hero">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+      <h1 className="text-3xl leading-none font-black tracking-tight uppercase sm:text-5xl">Make any song</h1>
+      <p className="text-muted-foreground max-w-xl text-base">Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.</p>
     </div>
-    <div aria-hidden="true" className="from-background/10 via-background/20 to-background absolute inset-0 -z-10 bg-linear-to-b" />
-    <div className="flex flex-col gap-3 pt-4 sm:pt-10">
-      <h1 className="max-w-3xl text-5xl leading-none font-black tracking-tight uppercase drop-shadow-lg sm:text-7xl">Make any song</h1>
-      <p className="text-foreground/90 max-w-xl text-base drop-shadow-lg sm:text-lg">Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.</p>
-    </div>
-    <GlassBar styles={styles} onStyles={onStyles} onMade={onMade} />
+    <GlassBar styles={styles} onStyles={onStyles} onMade={onMade} stylesOpen={stylesOpen} onStylesOpen={onStylesOpen} />
   </div>;
 }
 
 /** The Create home. `search` is the address's query string: `song` opens a song. */
 export function MusicWorkspace({ adult, search }: { adult: boolean; search: string }) {
   const navigate = useNavigate();
+  const { push } = useToast();
   const [styles, setStyles] = useState<string[]>([]);
-  const { shown } = useShown("");
+  const [stylesOpen, setStylesOpen] = useState(false);
+  const { shown, list } = useShown("");
+  const pickSound = (name: string) => {
+    const on = styles.includes(name);
+    setStyles(on ? styles.filter((one) => one !== name) : [...styles, name].slice(0, 8));
+    setStylesOpen(true);
+    push(on ? `${name} taken out of the bar.` : `${name} added to the bar. Describe your song, then press Generate.`);
+    document.getElementById("music-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const song = new URLSearchParams(search).get("song");
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
   return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
-    {song ? <SongDetail key={song} id={song} onClose={() => open(null)} /> : null}
-    <Hero styles={styles} onStyles={setStyles} onMade={open} />
-    {shown.length > 0 ? <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
+    {song ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
+    <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
+    <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
       <div className="flex flex-col gap-1"><h2 className="text-2xl font-black tracking-wide uppercase">Your songs</h2><p className="text-muted-foreground text-sm">Open one to play it and see everything you can do.</p></div>
-      <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label="Your songs">
-        {shown.slice(0, 12).map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
-      </ul>
-    </div> : null}
+      {shown.length > 0 ? <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label="Your songs">
+        {shown.map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
+      </ul> : <p className="text-muted-foreground bg-card rounded-2xl p-6 text-sm" data-testid="music-songs-empty">{list.isPending ? "Loading your songs." : list.isError ? "Your songs could not be loaded. Check your connection and open this page again." : "No songs yet. Describe one in the bar above and press Generate. It shows up here."}</p>}
+    </div>
     <MediaCarousel title="Start from a sound" line="Pick one and it goes into the bar above." label="Starter sounds">
-      {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? "Remove" : "Use"} selected={styles.includes(name)} onOpen={() => setStyles(styles.includes(name) ? styles.filter((one) => one !== name) : [...styles, name].slice(0, 8))} />)}
+      {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? "Remove" : "Use"} selected={styles.includes(name)} onOpen={() => pickSound(name)} />)}
     </MediaCarousel>
     {/* The tools as feature cards: a picture on top, two lines under it. */}
     <MediaCarousel title="Tools" line="Everything you can do with a song." label="Tools">

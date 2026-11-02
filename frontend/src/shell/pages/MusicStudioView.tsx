@@ -29,7 +29,7 @@ export interface StudioTrack { id: string; name: string; url: string; hue: strin
 
 const HUES = ["var(--hue-pink)", "var(--hue-violet)", "var(--hue-blue)", "var(--hue-yellow)", "var(--hue-green)", "var(--hue-teal)", "var(--hue-orange)"];
 const STEM_HUE: Record<string, string> = { vocals: "var(--hue-violet)", drums: "var(--hue-blue)", bass: "var(--hue-orange)", other: "var(--hue-yellow)" };
-export const STEMS_UNAVAILABLE_LINE = "Splitting into stems is not available on this Home yet. The full song still plays and you can listen to it here.";
+export const STEMS_UNAVAILABLE_LINE = "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here.";
 
 /** The rows to show: the full song first, then one row per stem. */
 export function studioTracks(song: MusicCard | undefined, stems: MusicCard | undefined): StudioTrack[] {
@@ -196,6 +196,8 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
         <Button type="button" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy || splitting ? "Splitting into stems" : tracks.length > 1 ? "Split into stems (done)" : "Split into stems"}</Button>
       </div>
     </div>
+    {stemsBusy || splitting ? <p role="status" data-testid="music-stems-progress" className="bg-card rounded-xl p-3 text-sm">Splitting the song into vocals, drums, bass and other{stems.data && stems.data.progress > 0 ? `: ${Math.round(stems.data.progress * 100)} percent` : ""}. This takes a minute or two. The rows appear here when it is done.</p> : null}
+    {stems.data?.state === "failed" ? <p role="alert" data-testid="music-stems-failed" className="bg-card rounded-xl p-3 text-sm">{stems.data.error_line || STEMS_UNAVAILABLE_LINE}</p> : null}
     {stemsProblem ? <p role="alert" className="text-muted-foreground bg-card rounded-xl p-3 text-sm">{stemsProblem}</p> : null}
     {tracks.length === 0 ? <p role="status" className="text-muted-foreground text-sm">{song.data?.state === "failed" ? "This song could not be made, so there is nothing to open." : "Opening your song. The Studio shows it as soon as it is made."}</p> : <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3">
