@@ -772,6 +772,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/referenceReader.ts` | REFERENCE_MAX_ROWS, __resetReferenceReaderCachesForTests, renderReferenceText, lookupReference, librarySnapshotDate, readReferencePage |
 | `backend/src/lib/retrieval/referenceSources.ts` | REFERENCE_SOURCES, BAND_SOURCE_IDS, sourceById, sourceForBook, readableBooks, canonicalPageUrl |
 | `backend/src/lib/retrieval/rrf.ts` | RRF_K, reciprocalRankFusion |
+| `backend/src/lib/retrieval/searchBackends.ts` | reportBackendOutcome, backendAvailable, rowsRelevant, rotateSearch, pageCacheGet, pageCachePut |
 | `backend/src/lib/retrieval/sourceMode.ts` | SOURCE_MODES, SOURCE_MODE_KEY, SOURCE_MODE_OVERRIDE_KEYS, DEFAULT_SOURCE_MODE, WEB_OFF_NOTE, LISTS_LOADING_NOTE |
 | `backend/src/lib/retrieval/sourceModeMigration.ts` | RETIRED_WIKIPEDIA_FALLBACK_KEY, migrateWikipediaFallbackToSourceMode |
 | `backend/src/lib/retrieval/wayback.ts` | WAYBACK_FALLBACK_KEY, WAYBACK_AVAILABILITY_URL, WAYBACK_HOST, waybackAllowed, waybackCopy |
