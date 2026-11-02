@@ -1,7 +1,5 @@
 # Image engine: the pick, the runtime, LoRAs and generative edits (2026-10-17)
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limits stated here (no non-consensual imagery of a real, identifiable person, and an uploaded photo is never undressed or sexualised; for an adult the model decides); the minor line and every child and teen floor stand.
-
 Status: decision record for the engine half, written from a real bench on the Studio. The person-facing half (who may make what, the
 gallery, provenance, settings keys, the architect's earlier verdict) is [image-generation-2026-10-17.md](image-generation-2026-10-17.md); where the two
 meet, that note's names win (`adapter` records with `audience`, `generation.enabled`), and this note's slices are its engine side. Nothing is built yet; the rows are in `docs/BACKLOG.md` under
@@ -213,7 +211,7 @@ rule 10 intact: nothing here loosens a protection for a child or a spoken turn.
 my pixel style"); the tool lists only enabled LoRAs the person's band allows, with their trigger words added by Home, not by reading the
 prompt (rule 1: no wording rule decides a tool). Settings pages never render a LoRA's example images for a person who cannot use it.
 
-**The two absolute lines (no household setting reaches them):**
+**The absolute line (no household setting reaches it), plus a retired second line:**
 
 1. **No sexual content depicting a minor or anyone who looks like one.** Enforced at three points: the prompt passes the existing
    deterministic `detectCsam` floor in `@maipai/spec` (`spec/safety/ts/signals.ts`) before the job is queued, for everyone; the LoRA add step refuses
@@ -222,10 +220,8 @@ prompt (rule 1: no wording rule decides a tool). Settings pages never render a L
    or a minor-looking person, so the prompt floor treats bare girl, boy, woman and man as ordinary words and this second, independent check
    on the pixels is what catches a phrasing the word list does not know. It is built (IMGGEN-SAFE-01, section 15); it is a learned
    component under `docs/RULES-AND-LEARNED-COMPONENTS.md`.
-2. **No non-consensual imagery of a real, identifiable person.** SAFETY.md already says no feature has the purpose of generating imagery of
-   identifiable real people, and MEDIA-HOST-01 puts identifiable non-members out of scope. A LoRA of a real person's likeness (CivitAI
-   labels these "person" or "celebrity") is refused at the add step, for adults too. RULES.md is silent on one case, flagged as a
-   design question in section 9: a likeness LoRA of a consenting household member of their own face.
+2. **Real people (retired for adults, 2026-10-26).** Home refuses nothing for an adult because the subject is a real person; the model decides.
+   A child's and a teen's lane keep the no-real-people rules.
 
 **Unchanged:** child profiles restricted by default; teen gate by the admin's choice; the output gate; crisis resources; the marketing rule
 (never pitch generation as "uncensored" or "unfiltered").
@@ -341,8 +337,8 @@ The Home half of the slices above is built against the Stack's real API. What ex
 Known limits, stated so nobody assumes more than is there:
 
 1. **The prompt line is a word list plus the model's flag.** `promptViolatesMinorLine` pairs a sexual or nudity word with a real minor marker (an age under 18, child, kid, teen, baby, toddler, little or young girl or boy, schoolgirl, loli and the like) and refuses; the bare words girl, boy, woman, man and bikini are not markers, so adult wording passes (owner's ruling, 2026-10-17; one list in `backend/src/lib/pictures/minorLine.ts`); `depicts_real_person` is the model's own statement. A phrasing neither knows reaches the Stack, whose LoRA import refuses styles of minors and real people but does not look at a prompt. The second, independent check on the finished picture (section 15) is built; it is what covers a phrasing the list does not know.
-2. **Uploaded photos.** A Comment on a photo the person did not generate here refuses requests that undress or sexualize it (`asksToUndress`), also a word list. Ordinary changes ("change her sweater to blue") go through.
-3. **Likeness styles.** Home asks for a tick that a style is not a likeness of a real person and the Stack refuses what its metadata names. Neither can see a face in the weights. A consenting household member's own likeness stays refused until the owner rules (section 10).
+2. **Uploaded photos.** For a child or a teen a Comment on a photo refuses requests that undress or sexualize it (`asksToUndress`); for an adult only the minor line applies.
+3. **Likeness styles.** For an adult Home asks nothing; the model decides. The Stack's metadata refusal is tracked in the Stack's own backlog.
 4. **Children and teens.** The settings page shows them locked off; no key turns them on. The finished-picture check now exists (section 15), but turning pictures on for a minor is the owner's decision, not part of that slice.
 
 ## 15. The finished-output check (IMGGEN-SAFE-01, built 2026-10-17)
@@ -407,7 +403,7 @@ may be labeled `possibly_minor`; on an ordinary job that costs nothing, on an ad
 ## 16. The default picture model, decided on CivitAI as well as Hugging Face (2026-10-17)
 
 Owner ask (Jesse, 2026-10-17): the default picture model should be fast, high quality, have a very large community LoRA ecosystem (CivitAI,
-not only Hugging Face) and ideally carry no baked-in filter, so adults get adult output while rule 0's age gates and the two absolute lines
+not only Hugging Face) and ideally carry no baked-in filter, so adults get adult output while rule 0's age gates and the minor line
 (section 6) still apply in our own code. **Measured** below means a number taken today by a request or a run; **read** means taken from a
 card or page; **not tested** means neither.
 
@@ -464,7 +460,7 @@ that, and what a LoRA made for it selects.
 - **Why Z-Image-Turbo is still the advanced choice.** It is the only candidate that clears the owner's four tests at once (section 16.1): a
   CivitAI library of 8,913, Apache-2.0 and not gated, no filter stated on its card, and the best texture of the benched set. It gives up speed (about
   three times slower than Klein), edits, and its folded-hands anatomy was worse in the bench.
-- **Licence.** Z-Image-Turbo is Apache-2.0 with no use restriction on the card, so no licence reason stops adult output; the two absolute lines are
+- **Licence.** Z-Image-Turbo is Apache-2.0 with no use restriction on the card, so no licence reason stops adult output; the minor line are
   enforced in our code and unchanged (sections 6 and 15), and the marketing rule (never pitch generation as "uncensored") is unchanged.
 - **p64 stays Quick only for now.** The only Z-Image memory numbers are 8-bit: 30.1 GB MLX peak (bf16 33.7 GB), so most of the peak is probably the
   load. With the chat model at 18 to 20 GB resident and the other roles, a 34 GB admission does not fit a 64 GB computer. Row IMGGEN-ZIT-P64 holds the measurement.
@@ -508,7 +504,7 @@ decision to every message. The two moments a person cares (before, in words; aft
 **Why the setting is household and not per person.** The cost is the computer's (30 s of the one GPU and 34 GB of memory), so the admin sets the default;
 anyone still gets Detailed for one picture by asking or pressing the button.
 
-**Rules held.** Age and surface gates and the two absolute lines run first and unchanged (rule 0); Edit always uses Quick (only Klein edits); a failed
+**Rules held.** Age and surface gates and the minor line run first and unchanged (rule 0); Edit always uses Quick (only Klein edits); a failed
 tool never fails the answer (rule 6); status reaches the person through the install job and strip, the Pictures settings view and the card (S6).
 
 **Unverified.** A real Detailed picture end to end through Home on the live Studio (no render was made without the bench lock; the Stack was a stub in the

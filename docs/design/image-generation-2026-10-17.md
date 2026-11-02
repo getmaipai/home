@@ -1,7 +1,5 @@
 # Pictures people make: image generation and editing in Home (2026-10-17)
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
-
 Design note, written in the 2026-10-17 design audit. The engine side (runtimes, candidate models, the licence bar, the
 ComfyUI sidecar, consent for household people) is decided in [the hub on Apple silicon](../plans/hub-on-apple-silicon-2026-09-17.md)
 sections 2, 6 and 7 and the MEDIA-HOST and CHAT-MEDIA rows. The image editor tools (background removal, inpainting,
@@ -18,14 +16,12 @@ they made and the settings an admin sets.
 
 ## Policy, stated once
 
-- **Adults are adults.** An adult's generation runs with no content filter beyond the absolute lines, and adult-only
+- **Adults are adults.** An adult's generation runs with no content filter beyond the minor line, and adult-only
   adapters (LoRAs) are available to adults by default. There is no off-by-default adult switch and no "unfiltered mode"
   wording anywhere (SAFETY.md's copy rule); the one-time adult acknowledgment SAFETY.md already requires covers it.
-- **The absolute lines, for everyone, no setting:** nothing sexual involving a minor or a minor-looking subject; and, as
-  SAFETY.md states it, no feature whose purpose is generating imagery of identifiable real people. The household-people edit
-  path with a consent record that [the Apple silicon plan](../plans/hub-on-apple-silicon-2026-09-17.md) section 6 sketches
-  is a plan, not the rule: it is **not in this note** and is not built until Jesse amends SAFETY.md to name that exception.
-  These lines are architecture, checked by the same classifier rule the plan names, never a word list (rule 1's spirit).
+- **The one line, for everyone, no setting:** nothing sexual involving a minor or a minor-looking subject (CSAM, checked by the
+  direct detector). For an adult the model decides everything else (rule 0,
+  [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md)); there is no real-person or consent rule.
 - **Adapters are classified, not trusted.** Every LoRA in the catalog carries `audience: all_ages | adult_only`; uncertain
   means `adult_only`. A minor's turn can only load `all_ages` adapters. The catalog lint refuses an adapter without the field.
 - **Minors.** Generation is off for a child or a teen until a parent turns it on for that person (`generation.enabled`, a
@@ -35,8 +31,6 @@ they made and the settings an admin sets.
 - **Surfaces.** A shared screen with a child possibly present (a TV, a pod) never shows an adult's generation; the result waits
   in the adult's gallery with a notification (rule 0's surface gate, SAFETY.md's reasoning rule applied to pictures).
 
-> **Superseded in part (owner, 2026-10-17):** an adult may make a picture, video or style of a consenting household adult, and edit an uploaded photo of one. The design is [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md); the absolute lines below otherwise stand.
-
 > **Superseded in part (owner, 2026-10-17: "Teens can edit and create picture and video without annoying messages"):** a teen may make pictures and videos and edit pictures, on their own written screen, with nothing adult or sexual (the prompt gate and the finished-picture check refuse it in one short line), all-ages styles only, another person's likeness never (an adult's agreement is for other adults), their own photo for non-sexual edits, and no extra questions or warnings whatever the household setting. The design is the teen lane in [image-editing-2026-10-17.md](image-editing-2026-10-17.md); a child may make cartoon pictures and videos of safe things in a strict lane (owner, 2026-10-17: "Kids can make cartoon images and videos of safe content."), designed in the same note, section 9.
 
 ## Users and gates
@@ -45,7 +39,7 @@ they made and the settings an admin sets.
 |---|---|---|---|---|
 | Child | off until a parent turns it on; then within the band ceiling | same | never | `all_ages` only |
 | Teen | off until a parent turns it on; then within the teen ceiling | same | never | `all_ages` only |
-| Adult | yes, no filter beyond the absolute lines | yes | not in this note (SAFETY.md) | all, adult-only by default |
+| Adult | yes, no filter beyond the minor line | yes | not in this note (SAFETY.md) | all, adult-only by default |
 | Admin | the above; sets the models and the adapter catalog | | | |
 
 ## Screens and IA
@@ -123,12 +117,10 @@ CHAT-MEDIA-01).
 The open backlog line "Image generation (L): the design and model/licence bar now live in hub-on-apple-silicon" for the
 person-facing half only; the engine half stays with that plan and MEDIA-HOST-01. IMAGE-02's acceptance (a child cannot
 invoke it until an adult unlocks it per person) is kept and restated here, not changed. It does not change CHAT-MEDIA-01's
-wire decisions. The Apple silicon plan's section 6 "household people and consent" is **not adopted** here; it waits on the
-owner (SAFETY.md).
+wire decisions. The Apple silicon plan's section 6 "household people and consent" is not adopted; Home keeps no per-person agreement.
 
 ## Architect verdict
 
 See the record `DESIGN-PICTURES-2026-10-17` in `data-scratch/architect/` (rules 0, 1, 6, 6a, 8, 9, 9b, 10, 13, S4; SAFETY.md).
 First round REJECTED (child default, parent gallery view, the real-people line, overlap with IMAGE-02); this revision applies
-all four edits. **Decision for Jesse:** whether SAFETY.md gains the household-people-with-consent exception the Apple silicon
-plan sketches; until he says so, no such feature is designed or built.
+all four edits. The household-people consent question was closed by the 2026-10-26 ruling: there is no per-person agreement.

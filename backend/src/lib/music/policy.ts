@@ -1,4 +1,4 @@
-// MUSIC-GEN-03: one age and surface gate, inherited from pictures. No setting lifts either absolute line.
+// MUSIC-GEN-03: one age and surface gate, inherited from pictures. No setting lifts the minor line.
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { pictureDenial, promptViolatesMinorLine, type PictureAudience } from "@/lib/pictures/policy";
 import { laneOf } from "@/lib/pictures/lane";

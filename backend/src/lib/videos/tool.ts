@@ -46,7 +46,7 @@ export type VideoCallRefusal = { kind: "denied"; why: VideoDenial; line: string 
 export const ATTACHED_PHOTO = "attached";
 const isAttached = (value: unknown): boolean => typeof value === "string" && value.trim().toLowerCase() === ATTACHED_PHOTO;
 
-/** The refusal for this call, or null: the surface and age gate first, then the two absolute lines on the prompt. */
+/** The refusal for this call, or null: the surface and age gate first, then the minor line on the prompt. */
 export function videoRefusalFor(audience: VideoAudience, args: Record<string, unknown>): VideoCallRefusal | null {
   const denial = videoDenial(audience);
   if (denial) return { kind: "denied", why: denial, line: VIDEO_DENIAL_LINE[denial] };

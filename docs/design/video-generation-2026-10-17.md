@@ -1,7 +1,5 @@
 # Video generation: the model, the runtime, the policy (2026-10-17)
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
-
 Owner approval, 2026-10-17: "make your owner decisions, you have all approvals from me. Determine what video gen we should use and add it
 to the app and chat. Fast generation with high quality. Ideally LoRA support from the community." Correction the same night: adults get
 adult-only LoRAs; only the absolute lines no setting can lift stay (section 7). This note is part 1 of the pipeline (research, bench,
@@ -133,11 +131,10 @@ never overrides the metadata when the metadata says adult.
   adult-only output, and the job is refused before it starts.
 - The community path is the point: a LoRA the household downloads works the same as one we list. Nothing is bundled.
 
-**Absolute lines (no setting, role or flag lifts them):** no sexual content depicting a minor or anyone who looks like a minor, and no
-non-consensual imagery of a real, identifiable person. SAFETY.md already states "no feature is built whose purpose is generating imagery of identifiable
-real people"; the video pipeline inherits it as written. **Closed by Jesse on 2026-10-17: yes, an adult may make a video or a likeness style of a consenting household adult**, with the design and
-limits in [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) (consent switch per person, signed proof, photo check, notification and log).
-A text-only prompt naming a household member passes the household-name gate the chat already uses and produces an invented person.
+**The one line (no setting, role or flag lifts it):** no sexual content depicting a minor or anyone who looks like a minor. For an adult the model decides
+everything else (rule 0); an adult may make a video or a likeness style of any person, with no per-person agreement
+([likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) keeps what still holds). A text-only prompt naming a household member passes the
+household-name gate the chat already uses.
 
 **How the lines are enforced without a filter in the model.** The Wan weights and mlx-video carry no safety filter (checked in source: no
 checker, no classifier, no word list). Enforcement lives in Home, where the person is known: the age and surface gate before the job exists, the

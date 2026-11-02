@@ -1,15 +1,11 @@
 # One content-protection definition per person
 > Status (2026-10-31): superseded in part by [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md): the adult path; child and teen protections stand.
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limits described here: the adult absolute lines for real people and the real-voice song limit; the child and teen floors stand.
-
 Design only, 2026-10-18. Owner goal: set protections once for chat, search, pictures, videos and songs.
 Architect verdict: proposed: APPROVED-WITH-CONDITIONS; architect agent has not ruled.
 All six slices require independent review because they touch minors. No lane opens on this note alone.
 
 ## Supersedes
-
-Owner ruling 2026-10-25 (Jesse, chat): RULES.md rule 0's absolute line "no real person outside the household, no public figure" no longer binds an adult for non-sexual pictures and videos (and, where the `real_person` content check runs, writing); it still binds teens and children, and sexual content that shows a real person outside the household or a public or historical figure stays blocked for everyone. The `real_person` row below is read that way.
 
 [RULES.md rule 0](RULES.md), owner-approved 2026-10-18 in `9ae5698a`, wins. Rule 6 keeps fixed policy lines;
 rule 6a limits logs; rules 9 and S4 require shipped kit parts and the Settings shell.
@@ -42,7 +38,7 @@ Commons references explicitly name the installed package, which differs from the
 | `backend/src/lib/contentCeiling.ts:51`, `:54`, `:82`, `:109`, `:143` | Eight dials: profanity, sexual, violence, substances, crime, hate, self_harm, privacy. Band records are frozen; topics are read, dial values have no enforcement reader | Derive ceiling projection from policy; keep existing classifier floors |
 | `backend/src/lib/safety.ts:33`; `backend/src/lib/turnMachine/nodes/outputGate.ts:109`, `:310`, `:327`, `:596`, `:641` | Safety evaluation takes speaker band, not person's filters; whole answer, stream and reasoning use it | Thread resolved person/audience policy through every output path |
 | `backend/src/lib/news/childGate.ts:37`; `backend/src/lib/newsMinorFloor.ts:29`; `backend/src/lib/retrieval/minorFloor.ts:28`; `backend/src/lib/retrieval/minorRowFloor.ts:11`; `backend/src/lib/packageHost.ts:2421` | News sentence gate and fetched-page, row and package text floors use band/minor checks | News and retrieval must consume the same resolved policy as chat/search |
-| `backend/src/lib/music/policy.ts:25`, `:40`, `:45`; music design section 18.7 | Music view blocks minors; prompt checks reuse minor line and real-voice flag. Planned seam covers prompt, lyrics, title, transcript | CONTENT-POLICY-04 wires that seam, with no song word list |
+| `backend/src/lib/music/policy.ts:25`, `:40`, `:45`; music design section 18.7 | Music view blocks minors; prompt checks reuse the minor line. Planned seam covers prompt, lyrics, title, transcript | CONTENT-POLICY-04 wires that seam, with no song word list |
 | `backend/src/lib/pictures/lane.ts:62`, `:63`, `:66`; `backend/src/lib/pictures/policy.ts:138`; `backend/src/lib/turnMachine/nodes/outputGate.ts:79` | Fixed teen/child redirect and no-photo lines, plus absolute refusal lines recognized by output gate | Policy owns reviewed fixed lines; preserve safe handling of those lines |
 
 There is no swearing setting or deterministic swearing filter today. The profanity dial is guidance data, not enforcement.
@@ -78,12 +74,11 @@ Freeze policy data and expose a set that cannot be mutated at runtime, not merel
 | `gore` | On | On | Own opt-in | Data terms and finished-item checks |
 | `sexual` | On, fixed | On, fixed | Own opt-in; adult lane only | Shared adult-content detection and generation checks |
 | `minor_line` | Always | Always | Always | Commons detector plus existing wider minor floor |
-| `real_person` | Outside-household/public figure line always | Same | Adults: only sexual content that shows a real person is blocked (owner, 2026-10-25); non-sexual pictures, videos and writing about public, historical and outside people are allowed | Trusted household identity context, not a names word list |
+| `real_person` | Outside-household/public figure line always | Same | None; the model decides (RULES.md rule 0) | Trusted household identity context, not a names word list |
 
-Adult defaults are only the absolute lines. Adult acknowledgment, crisis resources, privacy floors and other existing safety
+Adult defaults are only the minor line. Adult acknowledgment, crisis resources, privacy floors and other existing safety
 architecture still apply. Teen defaults also keep every teen protection, not just these seven labels. An optional filter's
-absence is never permission to cross a hard line. Real-voice imitation remains independently gated until its existing safety
-contract permits a use; family songs about people do not automatically authorize voice cloning.
+absence is never permission to cross a hard line.
 
 Store terms as versioned, schema-checked data under `backend/src/lib/contentPolicy/data/`, with kinds, severity, fixed lines,
 and reviewed boundary exceptions. Move child terms and teen terms there; move the wider minor-line data only where it is
@@ -177,10 +172,8 @@ This is its own migration slice, not an implication of adding the module. Curren
 | Decision and queued work | Replace adult-requester, adult-subject and consent branches in `backend/src/lib/likeness/decide.ts:53`, `apply.ts`, `guard.ts`, `resolve.ts`, `importStyle.ts`; remove agreement wording and consent-dependent negative prompt logic. Jobs recheck household membership, option, requester policy and subject age at run/release; household option off withholds waiting jobs |
 | Saved styles | Keep `likeness_adapters` subject binding as safety metadata, not agreement history. Remove agreement-only revocation state and deletion triggers in `adapters.ts`/`revoke.ts`; do not revive already deleted assets. Revalidate remaining styles against household identity and policy |
 
-Keep `inspector.ts`, real-photo adult-content prohibition (`apply.ts`'s `PHOTO_ADULT_LINE`), absolute lines, surface limits,
-finished-item checks, and subject identity binding. Adult content about a real person stays adults-only and may never involve
-a minor. Household family content does not authorize outside people or public figures. Remove the old one-person-only restriction
-where it exists only for agreement bookkeeping; every depicted household subject must still be resolved and checked.
+Keep `inspector.ts`, the minor line, surface limits, finished-item checks, and subject identity binding. A minor is never a
+subject of sexual content. Remove the old one-person-only restriction where it exists only for agreement bookkeeping.
 
 Keep `backend/src/lib/likeness/proof.ts:37` signed proofs only if the Stack still needs a signed authorization boundary for
 photo/style use. If retained, version the proof as household/policy authorization bound to subject, requester, asset and expiry,

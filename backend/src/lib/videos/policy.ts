@@ -1,8 +1,8 @@
-// VIDEO-GEN-04: who may make a video, on which surface, with which LoRAs, and the absolute lines checked before
+// VIDEO-GEN-04: who may make a video, on which surface, with which LoRAs, and the minor line checked before
 // any job starts. Rule 0 of docs/design/RULES.md: age and surface gates outrank every other rule. The age and
 // surface half is the picture policy's (pictures/policy.ts: one definition), minus the picture household switch;
 // the video household switch (`generation.video.enabled`) is this file's. Nothing in a household setting reaches
-// the absolute lines.
+// the minor line.
 //
 // Who may make a video (docs/design/video-generation-2026-10-17.md, section 10):
 //   - an owner, admin or adult on their own written chat screen, when the household has video on for adults
@@ -82,7 +82,7 @@ export function stackAudienceFor(input: VideoAudience): "all-ages" | "adult" {
   return videoAdapterAudiencesFor(input).includes("adult-only") ? "adult" : "all-ages";
 }
 
-// ---------------------------------------------------------------- absolute lines
+// ---------------------------------------------------------------- the minor line
 
 export const VIDEO_REFUSAL_LINE: Record<PromptRefusal, string> = {
   minor_sexual: "I can't make that. Videos of children in sexual situations are never allowed.",

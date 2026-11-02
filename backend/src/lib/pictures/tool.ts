@@ -44,7 +44,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
 
 export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string };
 
-/** The refusal for this call, or null: the surface and age gate first, then the two absolute lines on the prompt. */
+/** The refusal for this call, or null: the surface and age gate first, then the minor line on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
   const denial = pictureDenial(audience);
   if (denial) return { kind: "denied", why: denial, line: PICTURE_DENIAL_LINE[denial] };

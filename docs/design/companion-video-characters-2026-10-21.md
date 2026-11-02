@@ -1,8 +1,6 @@
 # Companion characters as pregenerated video (2026-10-21)
 > Status (2026-10-31): superseded in part by [companion-three-screens-2026-10-28.md](companion-three-screens-2026-10-28.md): section 12.2 (three tabs, teen editor later).
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
-
 Owner ask (Jesse, chat, 2026-10-21): companions become animated characters shown as **pregenerated video**, not animated live. Our own video
 tool makes the clips. Every screen state of the companion (thinking, speaking and so on) needs a **template**. The background should be
 transparent if that is practical. The character must be **the same character in every clip** (same species, colour, nose, build). A
@@ -97,9 +95,8 @@ segmentation can shimmer at the edge between frames; if it is used for video, th
 All three end in the same record and the same approval; nothing downstream knows which path was used.
 
 1. **The person brings a picture** (a drawing, a mascot they own, a photo of a toy). Normalised by the spec: scaled to 1024 x 1024, the
-   background removed with IS-Net (Remove BG, already built), composited on the key colour, centred with the margin. A consent and
-   rights line is shown on the card ("you made this or have the right to use it"); a picture of a real person goes through the
-   likeness consent path ([likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md)) or is refused.
+   background removed with IS-Net (Remove BG, already built), composited on the key colour, centred with the margin. A rights
+   line is shown on the card ("you made this or have the right to use it").
 2. **Our image tool makes it from words** (FLUX.2 Klein 4B, the default image model): a prompt template that always asks for the spec
    (one character, full body, rest pose, facing the viewer, flat key-colour background, no shadow, no text), four candidates
    at about 4 s each.
@@ -253,10 +250,9 @@ rendered once by us and ship as files, so a Mac that cannot generate video still
 
 - **Rule 9 and principle 6:** the player is the kit `Avatar` slot; the missing video mode is added in `commons` first, never forked.
 - **Principle 4:** one `CompanionMediaSpec`, one manifest field. **Principle 1:** the video and image workers are reused; no new engine.
-- **Privacy:** clips play from the hub; authoring uses local models; a rights line gates uploaded pictures; a real person's picture
-  goes through likeness consent; nothing leaves the home.
-- **Safety:** clips are package art, reviewed and kid-safe flagged; the band comes from the robot controls, not the art. Absolute lines
-  for generated content apply to the character picture (no sexual content, no minors in adult content); the post-render check gap
+- **Privacy:** clips play from the hub; authoring uses local models; a rights line gates uploaded pictures; nothing leaves the home.
+- **Safety:** clips are package art, reviewed and kid-safe flagged; the band comes from the robot controls, not the art. The minor line
+  applies to the character picture (no sexual content involving a minor); the post-render check gap
   (VIDEO-GEN-12) is unchanged.
 - **Errors:** a failed state render says what failed and offers "Try again" (next seeds); a package that misses the spec says which file and which number.
 - **Needs the architect:** this supersedes a decided Q1 of the assistant-layer plan (Rive). It is Jesse's call (his ask), not a rule change.
@@ -326,9 +322,7 @@ This is the design pass that COMPANIONS-STUDIO-01 was waiting for; it replaces t
 - **Checks:** the same drift checks of section 5 compare an uploaded clip with the approved rest picture. A clip that fails one is
   shown with the reason ("the colours are far from the approved character; use Generate, or replace the clip") and the person can still
   override it with a confirm, because they own the character.
-- **Rights and likeness:** an upload carries the line "you made this or have the right to use it". A picture or clip of a real
-  person goes through the likeness consent path ([likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md)) or is refused with the
-  reason. Nothing is uploaded anywhere outside the hub.
+- **Rights:** an upload carries the line "you made this or have the right to use it". Nothing is uploaded anywhere outside the hub.
 
 ### 12.5 Safety of an authored companion
 
@@ -339,8 +333,7 @@ This is the design pass that COMPANIONS-STUDIO-01 was waiting for; it replaces t
   persona, the look is suitable for children) that the admin confirms; the confirmation, who and when are stored with the companion.
   The word lists and the review live in Home, not in a learned classifier (RULES-AND-LEARNED-COMPONENTS).
 - **Prompts and pictures** pass the content policy and the household-name gate the image and video tools already use before any job
-  is queued; the absolute lines (no sexual content involving a minor or anyone who looks like one, no non-consensual imagery of a real
-  person) are enforced before render. The post-render check gap (VIDEO-GEN-12) stays open and is named on the Look tab's review.
+  is queued; the minor line (no sexual content involving a minor or anyone who looks like one) is enforced before render. The post-render check gap (VIDEO-GEN-12) stays open and is named on the Look tab's review.
 - **Provenance** (tool, model hash, prompt, seed, who approved, when) is saved with every picture and clip.
 
 ### 12.6 Rows (each one to three files per task, spec first)

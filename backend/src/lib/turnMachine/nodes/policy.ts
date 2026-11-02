@@ -362,7 +362,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     }
 
     // IMGGEN-HOME-01 / IMGGEN-SAFE-01: the picture tool's gates run first and are not a grounding or a consent question.
-    // A person who may not make a picture here, or a prompt over one of the two absolute lines, is refused with a fixed
+    // A person who may not make a picture here, or a prompt over the minor line, is refused with a fixed
     // reply before any job exists; the Stack is never asked.
     if (call.tool === GENERATE_IMAGE_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
@@ -395,7 +395,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       continue;
     }
 
-    // MUSIC-GEN-03: the music offer and both absolute lines bind forged calls too.
+    // MUSIC-GEN-03: the music offer and the minor line bind forged calls too.
     if (call.tool === GENERATE_MUSIC_TOOL_ID || call.tool === EDIT_MUSIC_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const musicProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };

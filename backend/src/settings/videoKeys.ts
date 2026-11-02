@@ -1,7 +1,7 @@
 // VIDEO-GEN-04: the household's video controls (docs/design/video-generation-2026-10-17.md, section 7 and 10).
 // Declared here like the picture keys (pictureKeys.ts) and shown on the same Settings card, Pictures and videos.
 // Children and teens never make videos whatever these say (lib/videos/policy.ts): they are controls for adults only,
-// and the absolute lines have no key.
+// and the minor line has no key.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [

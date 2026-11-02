@@ -1,6 +1,6 @@
 // CODE-API-01: the deterministic safety floor (SAFETY.md, rule 1 and 10) as the coding door uses it. It is the same floor every door uses
 // (lib/safety.ts evaluateSafety), with one scoping decision: an ADULT's coding traffic is checked for the non-removable categories only
-// (self-harm, harmful requests, credible threats, csam, grooming). The prompt-injection, jailbreak and personal-information detectors guard a
+// (self-harm, csam, grooming; rule 0, 2026-10-26: Home adds no other content refusal for an adult). The prompt-injection, jailbreak and personal-information detectors guard a
 // chat against being steered; an agent's prompts and a repository's text trip them as a matter of course and would refuse ordinary adult work.
 // A child or teen is checked for every category. The floor never reads code for style.
 import { evaluateSafety, forOutput } from "@/lib/safety";
@@ -11,7 +11,8 @@ import { REFUSE_CATEGORIES } from "@maipai/spec/safety/ts/classifier.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { PersonRow } from "@/types";
 
-const ADULT_CATEGORIES = new Set<string>(["self_harm", "harmful_request", "credible_threat", "csam", "grooming"]);
+// Rule 0 (2026-10-26): for an adult Home keeps crisis resources and the CSAM line; the model decides every other content question.
+const ADULT_CATEGORIES = new Set<string>(["self_harm", "csam", "grooming"]);
 
 export type FloorVerdict = { action: SafetyResult["action"]; crisis: boolean; result: SafetyResult };
 

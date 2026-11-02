@@ -1,8 +1,8 @@
 // IMGGEN-HOME-01 / IMGGEN-SAFE-01: who may make a picture, on which surface,
-// with which adapters, and the two absolute lines checked before any job
+// with which adapters, and the minor line checked before any job
 // starts. Rule 0 of docs/design/RULES.md: age and surface gates outrank every
 // other rule. Everything here is deterministic and runs before the Stack is
-// asked; nothing in a household setting reaches the absolute lines.
+// asked; nothing in a household setting reaches the minor line.
 //
 // Who may make a picture (docs/design/image-generation-2026-10-17.md):
 //   - an owner, admin or adult on their own written chat screen, when the
@@ -128,7 +128,7 @@ export function adapterAudiencesFor(input: PictureAudience): Array<"all-ages" | 
   return adultAdaptersAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
 }
 
-// ---------------------------------------------------------------- absolute lines
+// ---------------------------------------------------------------- the minor line
 
 export type PromptRefusal = "minor_sexual" | "teen_content" | "child_content";
 

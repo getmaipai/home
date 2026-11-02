@@ -1,7 +1,5 @@
 # Music generation: songs made and edited in chat (2026-10-17)
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (the real-voice song clause); the minor line and every child and teen floor stand.
-
 Owner scope, 2026-10-17 (relayed by the coordinator): "build it into chat first, the same way image generation and editing work. A
 person asks in chat to create a song (words or lyrics, style, mood, length) and can then edit it conversationally (make it slower,
 change the chorus lyrics, swap the vocals for instrumental, extend it, make a version in a different genre, cut or trim, fade,
@@ -204,19 +202,15 @@ A failed job is the kit `ErrorState` with Try again; the model says in its own w
 ## 9. Who may make music, and the lines no setting lifts
 
 - **Adults**: owner, admin or adult, on their own written chat screen, when `generation.music.enabled` (household, default on) is on and the
-  Stack has the music component installed. The absolute lines always apply, and since rule 0's 2026-10-18 text an adult's own per-person
-  filters apply too, through `musicProtections` (18.7).
+  Stack has the music component installed. The minor line always applies, and an adult's own opt-in filters apply too, through `musicProtections` (18.7).
 - **Children and teens: replaced by section 18.7 (owner, 2026-10-18).** Originally: off. A parent's per-child switch is a later row (MUSIC-GEN-13) that needs the
   band's lyric ceiling designed first. (The old state, until 18.7: the tool was not offered, the policy node refused a call that arrived anyway, and every route refused.)
 - **Never** a guest, a spoken turn, a glance or shared screen, a TV, a robot or a pod (rule 0's surface gate). Playing a finished song on a
   speaker is the media apps' audio session, not generation.
 - **Absolute lines, for everyone**: (1) no lyrics or description with sexual content involving a minor: the picture policy's one list
   (`promptViolatesMinorLine`) runs on the description, the lyrics and the title of every request and every edit, before a job exists;
-  (2) **no voice cloning of a real, identifiable person.** v1 accepts no uploaded audio at all: a source or reference track must be one this
-  Stack made (provenance `music-gen:`, bytes unchanged), the same rule as the video reference pictures. A request to sound like a named real
-  singer is refused through the model's `imitates_real_voice` flag (no word list of names, as `depicts_real_person`). Using a person's own
-  recording, or a consenting household adult's voice, waits on Jesse (**Decision for Jesse**, MUSIC-GEN-14); until he rules, no feature takes
-  an uploaded voice.
+  (2) Home adds no real-voice refusal for an adult: the model decides (rule 0, 2026-10-26). v1 accepts no uploaded audio at all: a source or
+  reference track must be one this Stack made (provenance `music-gen:`, bytes unchanged), the same rule as the video reference pictures.
 - **Rule 6a**: no description, lyrics, title or audio is logged; the worker reports stage, seconds and bytes only.
 - **Status (rule S6)**: install progress is the install strip (the Stack's component job), a failed install is a Repairs item, a job's
   progress is its own card. No new status surface.
@@ -303,7 +297,7 @@ A failed job is the kit `ErrorState` with Try again; the model says in its own w
 | MUSIC-GEN-11 | Later: Stable Audio 3.0 for beds and effects behind the licence gate, measured on Apple silicon |
 | MUSIC-GEN-12 | Later: stems (ACE-Step base `extract`, or Demucs with its licence read) |
 | MUSIC-GEN-13 | Later: a parent's per-child music switch with a lyric ceiling (design first) |
-| MUSIC-GEN-14 | Decision for Jesse: uploaded audio as a source (a person's own recording, a consenting household adult's voice) |
+| MUSIC-GEN-14 | Uploaded audio as a source (a person's own recording; no consent step, the model decides for an adult) |
 | MUSIC-GEN-15 | The sung-words check: the household's speech-to-text on a finished sung song, against the minor line |
 | MUSIC-STUDIO-01 | Later: the music studio app (design stub in section 10) |
 

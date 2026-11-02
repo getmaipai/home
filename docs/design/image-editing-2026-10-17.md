@@ -1,12 +1,9 @@
 # Editing pictures in chat and in the editor (2026-10-17)
 
-> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (sexual content of a real person and a photo of a real person becoming adult content); the minor line and every child and teen floor stand.
-
 Owner request (Jesse, 2026-10-17): real picture editing, in chat and in the editor. "Remove person X from the picture", "add this person
 to the picture", "make the sky not cloudy", and the like (another background, the colour of an object, add or remove an object, fix the
 light). This note records what existed, what was measured, the method picked for each task and the safety rules. It builds on
-[image-tools-2026-10-17.md](image-tools-2026-10-17.md), [image-engine-2026-10-17.md](image-engine-2026-10-17.md) and
-[likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md); it changes none of [RULES.md](RULES.md).
+[image-tools-2026-10-17.md](image-tools-2026-10-17.md), [image-engine-2026-10-17.md](image-engine-2026-10-17.md); it changes none of [RULES.md](RULES.md).
 
 ## 1. What existed
 
@@ -17,7 +14,7 @@ light). This note records what existed, what was measured, the method picked for
 | Upscale, resize | Real-ESRGAN, Lanczos (Stack) |
 | Editor **Comment** | A described change: Stack `edit` or `edit_masked` on FLUX.2 Klein 4B at bf16, one picture, optional pointed-at box, 4 steps, 5 to 8 s; the result is a preview the person applies as a new version (Original and Undo in the editor) |
 | Chat | `generate_image` could only make new pictures; its description told the model to refuse edits and point at the Edit button |
-| Safety | Age and surface gate, the two absolute lines, the likeness rules (a photo of a person is changed only for one consenting household adult), the finished-picture age check |
+| Safety | Age and surface gate, the minor line, the finished-picture age check |
 
 The gaps: no instruction edit from chat; no second picture (a person to add); no brush mask on Comment; no way to take out one chosen
 person without touching the others.
@@ -69,17 +66,14 @@ Vision's raw instance masks carry stray bits (a chair, a far-off figure), so the
 
 One chat tool, `generate_image`: `change` set means "change a picture I have" (`attached`, `attached_2`, `latest`); `kind` says remove_people,
 remove_background, upscale or change; `who` names the people to remove by position or clothes; `reference` is the second picture;
-`photo_subject` is the household adult a photo shows. The model decides that an edit is wanted and fills these; Home never reads the words to
+The model decides that an edit is wanted and fills these; Home never reads the words to
 decide (rule 1). In the editor, **Comment** now also takes a painted `mask` and a `reference_id`.
 
-## 4. Safety (SAFETY.md, likeness-consent note; nothing weakened)
+## 4. Safety (SAFETY.md; nothing weakened for a child or a teen)
 
-- The age and surface gate and the two absolute lines run first, on the instruction, exactly as for a new picture.
-- A picture this home made is its own. A photo someone brought is changed in words only if it shows no one (checked by the household's own model) or exactly one household adult
-  who agreed, named by the person, with a signed proof (`editSources.ts`, shared with Comment). A photo of a child, of anyone else, or of a person the model cannot count is refused.
-- A reference photo of a person is a photo of a consenting household adult with its own proof bound to that photo, `audience: adult`, one person at a time. The Stack checks each proof
-  again when the job starts, and a proof is used once.
-- A photo of a real person is never changed into something sexual (`asksToUndress`, the existing rule).
+- The age and surface gate and the minor line run first, on the instruction, exactly as for a new picture.
+- A picture this home made is its own. A photo someone brought is screened before it is sent (`editSources.ts`): a photo that may show a
+  child beside a sexual or nude ask is refused, and a teen or a child never edits a photo. For an adult the model decides every other content question.
 - The finished picture goes through the finished-picture age check before it is stored or shown.
 - Removing people (Vision plus LaMa) generates no person, so it is allowed on a photo that shows several people (the editor's Erase is already allowed on any picture).
 - **Freezing the people (IMGEDIT-05, owner's ruling 2026-10-17):** a change that is not about a person (sky, colour, background, an object, the light) is allowed on a photo that shows people.
@@ -104,15 +98,9 @@ The result renders in the kit gallery with Edit, as shipped (rule 9).
 - The Vision person finder needs macOS 14 and the Swift tools; elsewhere the answer is "paint over the person with Erase".
 - Klein can redraw small unrelated parts of a picture on a whole-picture edit (tree shapes after "clear the sky"); a box or brush limits it to that area bit for bit.
 
-## 7. Fewer questions about people (PEOPLE-PROMPTS-01, owner ruling 2026-10-17: "it's annoying")
+## 7. Questions about people
 
-One household setting, `generation.people_prompts`, default off, on Settings, Pictures and videos: "Ask me before making pictures and videos of people". Inventory of what the picture, video, edit and likeness flows say about people:
-
-- **A, hard lines that never become optional (17):** the guest, child, spoken-turn, shared-screen and household-off gates; nothing sexual involving a minor; a real person's likeness without their agreement (the model's flag and the missing proof); an uploaded photo is never undressed or sexualised; the subject has not agreed; adult content not agreed; a photo that may show a child; the subject must be an adult who lives here; a removed style; the signed proof; the fail-closed freeze; the finished-picture age check. No key reaches them (tested with the setting flipped both ways).
-- **B, consent attestation (5):** "Who is in this photo?" for a picture and for a video, the one-adult photo count, the editor's picker, the style tick. Kept, made frictionless while the setting is off: a subject is attested only by the person's own message (the model never attests), and it is asked at most once for a person and a photo, then remembered (`attestedAdult`, process memory). While the setting is on there is no memory.
-- **C, soft friction (3, removed while off):** the model's hedging and lecturing about people (its tool description says to make what was asked), the same sentence in each tool answer, and the repeated "who is in this photo" question. No code-level soft refusal for an ordinary adult request was found: every refusal there is an A line.
-
-Teens and children are out of this setting: the extra questions are always off for them (see the teen and kid lanes when they land).
+Home asks nothing about the people in a picture or a video. The consent attestations were retired with the per-person agreement and `generation.people_prompts` is no longer read for an adult; an adult's request goes to the model.
 
 ## 8. The teen lane (owner ruling 2026-10-17: "Teens can edit and create picture and video without annoying messages")
 
