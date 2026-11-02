@@ -81,6 +81,13 @@ export function markResearch(state: { turnId: string; startedAt: number }, what:
   markSink?.(state.turnId, Date.now() - state.startedAt, what);
 }
 
+/** The text a research turn gave its writer (the backbone article, the notes ledger), for the bench's fabrication check only. Never read in
+ * production: nothing is stored or logged from it (rule 6a). */
+export type ResearchTextSink = (turnId: string, label: string, text: string) => void;
+let textSink: ResearchTextSink | undefined;
+export function __setResearchTextSinkForTests(sink: ResearchTextSink | undefined): void { textSink = sink; }
+export function noteResearchText(state: { turnId: string }, label: string, text: string): void { textSink?.(state.turnId, label, text); }
+
 /** Whether this turn may take more than one tool round (the first-round note and the later nudges apply). */
 export const isResearchStyle = (style: AnswerStyle | undefined, budget: TurnBudget): boolean => style !== undefined && style !== "instant" && budget.rounds > 1;
 

@@ -3,7 +3,7 @@ import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, type Backbone } from "../backbone";
 import { analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, planData, replyBrief, shouldAsk, understand, type Brief } from "../researchPipeline";
-import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
+import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -969,6 +969,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       markResearch(state, "backbone wait start");
       backbone = await Promise.race([state.backbonePromise, new Promise<null>((resolve) => setTimeout(() => resolve(null), BACKBONE_WAIT_MS))]);
       state.backbone = backbone;
+      if (backbone) noteResearchText(state, "backbone", backbone.text);
       markResearch(state, `backbone wait end (${backbone ? `${backbone.chars} chars, ${backbone.headings.length} sections` : "none"})`);
     }
     const backboneNumber = state.outcomes.flatMap((o) => o.sources ?? []).length + 1;
@@ -984,6 +985,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       state.outcomes.flatMap((o) => o.sources ?? []).forEach((source, index) => { if (!numberOf.has(source.url)) numberOf.set(source.url, index + 1); });
       const findings = filterFindings(state.pageNotes, numberOf, Math.min(searchEvidenceMaxChars(state.budget.context_tokens), backbone ? LEDGER_WITH_BACKBONE_CHARS : Infinity));
       haveLedger = findings.ledger.notes > 0;
+      noteResearchText(state, "ledger", findings.ledger.text);
       const stats = state.researchBudget.noteStats;
       markResearch(state, `stage 3 ledger: ${findings.ledger.notes} notes kept of ${state.pageNotes.length} written (${findings.ledger.text.length} chars) from ${findings.read} pages; note calls ${stats?.calls ?? 0} (${Math.round((stats?.ms ?? 0) / 100) / 10} s of light-model time), quotes dropped ${stats?.droppedQuotes ?? 0}`);
       if ((haveLedger || backbone) && !researchPastCut(state, Date.now() - ANALYSIS_GRACE_MS)) {
@@ -1003,6 +1005,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     if (backboneText) replyExtra = [replyExtra, backboneText].filter(Boolean).join("\n\n");
     const rawChars = researchEvidenceChars(state.budget.context_tokens, phrasedOutcomes.filter((o) => o.packageId === "websearch").length);
     const evidenceChars = haveLedger || backbone ? Math.min(rawChars, RAW_EVIDENCE_WITH_LEDGER_CHARS) : rawChars;
+    if (researching) markResearch(state, `writing round: window ${state.budget.context_tokens} tokens, raw evidence ${evidenceChars} chars, backbone ${backbone?.chars ?? 0} chars, extra block ${replyExtra.length} chars`);
     const resultMessages = toolResultMessages(phrasedOutcomes, evidenceChars, surfaceClass === "spoken", certaintyGate, sourceNumbers);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,

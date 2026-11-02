@@ -8,7 +8,7 @@ import allow from "./researchNoTopicWords.allow.json";
 
 const ROOT = join(import.meta.dir, "../../src/lib/turnMachine");
 const files = [
-  ...readdirSync(ROOT).filter((f) => /^(research|pageNotes|entityPin|backbone|contract)[A-Za-z]*\.ts$/.test(f)),
+  ...readdirSync(ROOT).filter((f) => /^(research|pageNotes|entityPin|backbone|fabrication|contract)[A-Za-z]*\.ts$/.test(f)),
   ...readdirSync(join(ROOT, "nodes")).filter((f) => f.endsWith(".ts")).map((f) => `nodes/${f}`),
 ];
 
@@ -37,6 +37,7 @@ describe("no topic words in the research source", () => {
     expect(files).toContain("pageNotes.ts");
     expect(files).toContain("entityPin.ts");
     expect(files).toContain("backbone.ts");
+    expect(files).toContain("fabrication.ts");
     expect(files).toContain("nodes/model.ts");
     expect(files).toContain("nodes/tool.ts");
     expect(files).toContain("nodes/answer.ts");
