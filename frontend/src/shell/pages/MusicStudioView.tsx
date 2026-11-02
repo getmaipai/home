@@ -13,7 +13,7 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { Waveform, usePeaks } from "./MusicWaveform";
 import { MAKE_SONG_ADULT_LINE } from "./MakeSongPage";
-import { Cover } from "./MusicCreateUi";
+import { Cover } from "@maipai/ui/src/ui/media-tiles";
 
 /** One audio row of the Studio. */
 export interface StudioTrack { id: string; name: string; url: string; hue: string }

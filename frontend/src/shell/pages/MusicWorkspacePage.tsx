@@ -14,7 +14,7 @@ import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { SongResult, MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody } from "./MakeSongPage";
 import { CreatePage } from "./MusicStudioPages";
-import { Carousel, Cover, GlassPill, MediaTile } from "./MusicCreateUi";
+import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/media-tiles";
 import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 
@@ -50,10 +50,10 @@ function useSongs() {
 
 
 /** One song as a tile: its cover, glass pills for length and state, and the quick actions as visible buttons. */
-function SongTile({ card, selected, onOpen, actions }: { card: MusicCard; selected: boolean; onOpen: () => void; actions: Array<{ label: string; to: string }> }) {
+function songTile({ card, selected, onOpen, actions }: { card: MusicCard; selected: boolean; onOpen: () => void; actions: Array<{ label: string; to: string }> }) {
   const title = card.title ?? (active(card) ? "Making your song" : "Untitled song");
   const length = card.state === "done" ? clock(card.duration_s) : "";
-  return <MediaTile id={card.id} title={title} line={songLine(card)} coverUrl={card.cover_url} selected={selected} busy={active(card)} playable={card.state === "done"} onOpen={onOpen}
+  return <MediaTile key={card.id} id={card.id} title={title} line={songLine(card)} coverUrl={card.cover_url} selected={selected} busy={active(card)} playable={card.state === "done"} onOpen={onOpen}
     progress={active(card) ? card.progress : undefined} pills={<>{length ? <GlassPill>{length}</GlassPill> : null}{active(card) ? <GlassPill>Making</GlassPill> : null}</>}>
     {card.state === "done" ? <div className="flex flex-wrap gap-1">{actions.map((one) => <Button key={one.label} asChild size="sm" variant="secondary"><Link to={one.to}>{one.label}</Link></Button>)}</div> : null}
   </MediaTile>;
@@ -78,7 +78,7 @@ export function SongGallery({ selected, onOpen, actionsFor = TILE_ACTIONS, empty
     {list.isPending ? <p role="status" className="text-muted-foreground text-sm">Loading your songs</p>
       : list.isError ? <p role="alert" className="text-muted-foreground text-sm">Your songs could not be loaded. Check your connection and open this page again.</p>
         : shown.length === 0 ? <EmptyState icon="music" text={filter.trim() ? "No song matches that." : (empty ?? "No songs yet. Describe one in the bar below and press Create.")} />
-          : <ul className="flex list-none flex-wrap gap-4 p-0" aria-label="Your songs">{shown.map((card) => <SongTile key={card.id} card={card} selected={card.id === selected} onOpen={() => onOpen(card)} actions={actionsFor(card)} />)}</ul>}
+          : <ul className="flex list-none flex-wrap gap-4 p-0" aria-label="Your songs">{shown.map((card) => songTile({ card, selected: card.id === selected, onOpen: () => onOpen(card), actions: actionsFor(card) }))}</ul>}
   </div>;
 }
 
@@ -89,15 +89,6 @@ const TOOLS = [
   { label: "Extend", line: "Turn a quick song into a full one, or back.", to: "/apps/music/remix" },
   { label: "Cover art", line: "Ask for a new picture for any song.", to: "/apps/music/remix" },
 ];
-
-/** The tools as feature cards: a picture on top, two lines under it. */
-function ToolCards() {
-  return <Carousel title="Tools" line="Everything you can do with a song." label="Tools">
-    {TOOLS.map((tool) => <li key={tool.label} className="group w-64 shrink-0 snap-start sm:w-72"><Link to={tool.to} className="flex flex-col gap-3">
-      <span className="block aspect-video w-full overflow-hidden rounded-2xl transition duration-200 motion-safe:group-hover:-translate-y-1"><Cover id={`tool-${tool.label}`} title={tool.label} url={null} /></span>
-      <span className="text-muted-foreground text-sm">{tool.line}</span></Link></li>)}
-  </Carousel>;
-}
 
 /** The song opened above the rows: its cover blurred into the background, the kit player, and every action as a button, each off with its reason. */
 function SongDetail({ id, onClose }: { id: string; onClose: () => void }) {
@@ -208,12 +199,17 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   return <section className="dark bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" style={lime} data-testid="music-workspace">
     {song ? <SongDetail key={song} id={song} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} />
-    {shown.length > 0 ? <Carousel title="Your songs" line="Open one to play it and see everything you can do." label="Your songs">
-      {shown.map((card) => <SongTile key={card.id} card={card} selected={card.id === song} onOpen={() => open(card.id)} actions={TILE_ACTIONS(card)} />)}
-    </Carousel> : null}
-    <Carousel title="Start from a sound" line="Pick one and it goes into the bar above." label="Starter sounds">
+    {shown.length > 0 ? <MediaCarousel title="Your songs" line="Open one to play it and see everything you can do." label="Your songs">
+      {shown.map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
+    </MediaCarousel> : null}
+    <MediaCarousel title="Start from a sound" line="Pick one and it goes into the bar above." label="Starter sounds">
       {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? "Remove" : "Use"} selected={styles.includes(name)} onOpen={() => setStyles(styles.includes(name) ? styles.filter((one) => one !== name) : [...styles, name].slice(0, 8))} />)}
-    </Carousel>
-    <ToolCards />
+    </MediaCarousel>
+    {/* The tools as feature cards: a picture on top, two lines under it. */}
+    <MediaCarousel title="Tools" line="Everything you can do with a song." label="Tools">
+    {TOOLS.map((tool) => <li key={tool.label} className="group w-64 shrink-0 snap-start sm:w-72"><Link to={tool.to} className="flex flex-col gap-3">
+      <span className="block aspect-video w-full overflow-hidden rounded-2xl transition duration-200 motion-safe:group-hover:-translate-y-1"><Cover id={`tool-${tool.label}`} title={tool.label} url={null} /></span>
+      <span className="text-muted-foreground text-sm">{tool.line}</span></Link></li>)}
+  </MediaCarousel>
   </section>;
 }
