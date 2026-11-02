@@ -53,6 +53,8 @@
       },
       "shuffle": {
         "label": "Shuffle",
+        "icon": "shuffle",
+        "labeled": true,
         "action": {
           "play": {
             "media_id": "{shuffle_id}"
@@ -61,8 +63,8 @@
       }
     },
     {
-      "type": "media_shelf",
-      "heading": "Songs",
+      "type": "track_rows",
+      "label": "Songs",
       "bind": {
         "source": "package",
         "path": "playlist",
@@ -73,14 +75,11 @@
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "orientation": "vertical",
-      "density": "compact",
+      "item_number_field": "track_number",
       "item_meta_field": "duration_s",
       "item_highlight_field": "playing",
-      "on_select": {
+      "play_label": "Play {title}",
+      "on_play": {
         "play": {
           "media_id": "{id}"
         }
@@ -101,7 +100,6 @@
           }
         }
       ],
-      "item_index_field": "track_number",
       "empty_state": {
         "type": "empty_state",
         "icon": "music",

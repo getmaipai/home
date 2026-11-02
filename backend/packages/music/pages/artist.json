@@ -53,6 +53,8 @@
       },
       "shuffle": {
         "label": "Start radio",
+        "icon": "audio-waveform",
+        "labeled": true,
         "action": {
           "play": {
             "media_id": "{radio_id}"

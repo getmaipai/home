@@ -53,6 +53,8 @@
       },
       "shuffle": {
         "label": "Shuffle",
+        "icon": "shuffle",
+        "labeled": true,
         "action": {
           "play": {
             "media_id": "{shuffle_id}"
