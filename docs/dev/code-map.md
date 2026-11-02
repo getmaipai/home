@@ -978,6 +978,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, PENDING, allVideoAdapters, videoAdaptersFor, setVideoAdapterEnabled |
+| `backend/src/lib/videos/editPlan.ts` | MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL, MIN_JOIN_CLIPS, MAX_JOIN_CLIPS |
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_PICTURE_LINE, ALREADY_MAX_LINE |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob, conversationHasVideo |
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
@@ -989,6 +990,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
+| `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, isVisionAssetInstalled, areVisionAssetsInstalled, ensureVisionAssets |
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |

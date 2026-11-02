@@ -60333,7 +60333,8 @@
                             "type": "string",
                             "enum": [
                               "generate",
-                              "animate"
+                              "animate",
+                              "edit"
                             ]
                           },
                           "error": {
@@ -60803,7 +60804,8 @@
                             "type": "string",
                             "enum": [
                               "generate",
-                              "animate"
+                              "animate",
+                              "edit"
                             ]
                           },
                           "error": {
@@ -61132,7 +61134,8 @@
                             "type": "string",
                             "enum": [
                               "generate",
-                              "animate"
+                              "animate",
+                              "edit"
                             ]
                           },
                           "error": {
@@ -61480,7 +61483,8 @@
                             "type": "string",
                             "enum": [
                               "generate",
-                              "animate"
+                              "animate",
+                              "edit"
                             ]
                           },
                           "error": {
@@ -61803,7 +61807,8 @@
                             "type": "string",
                             "enum": [
                               "generate",
-                              "animate"
+                              "animate",
+                              "edit"
                             ]
                           },
                           "error": {
