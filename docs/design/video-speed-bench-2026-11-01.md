@@ -390,6 +390,43 @@ Reading:
 Verdict: **skip as a runner** (slower and 8 times the memory of Argus INT8 + Turbo). Argus remains the reference at 182 s and 13.4 GB, with h3.c (162 s, 20.1 GB) as the one faster candidate to study. PipeNetwork's builds are useful only as a check that the picture holds at 6 and 8 bits; a Turbo LoRA loader for this port was not found.
 
 
+## H3 parked (owner decision 2026-11-02)
+
+**MiniMax-H3 is parked.** Reasons, with numbers from this record: the best Mac runner (Argus INT8 + Turbo 4-step) takes 182 s for a 5 s 768x448 clip at 13.4 GB; the faster candidates do not beat it (Sol-Attn 184 s and 56.5 GB, PipeNetwork 8-bit 434 s and 6-bit 323 s at 113 GB, h3.c 162 s with partly wrong speech); the owner judged the first MiniMax speech clips as gibberish with voices not the characters' and the Golden Girls clip "awful"; the Argus path supports only text-to-video in its low-memory mode (the videos session had to use another mode for picture-to-video, and reported crashes with pictures); no fast picture-capable Mac runner exists. The 109 GB set and the other builds stay in scratch.
+**What would reopen it:** a Mac runner that does picture-to-video and keeps a 5 s 768x448 clip with sound under about 90 s and under 40 GB, with voices judged acceptable by the owner. Until then the video ladder is LTX.
+
+## LTX-2.5 q8 Standard ladder, with sound (2026-11-02)
+
+Runtime: the `dgrauet/ltx-2-mlx` fork in `~/video-bench/ltx25-runtime`, `ltx-2-mlx generate --distilled` (8 stage-1 steps, then 3 refine steps), MrMofer LTX-2.5 q8 weights, seed 7, 24 fps, one run per cell, one at a time under the gate lock at normal priority, load 12 to 16 from the live hub. Every run is a fresh process, so each includes loading Gemma (3 to 6.5 s) and the weights; a warm worker would save most of that.
+Memory, one method for every run: **`/usr/bin/time -l` "peak memory footprint" for the whole process** (the tool prints no memory counter of its own). Maximum resident was 22.2 to 22.5 GB in every run. Time: **"tool" is the time the tool prints; "process" is `/usr/bin/time` real time**; stage times come from the tool's own log (text encoder, prompt encoding, decode and mux). Clips: `~/video-bench/clips/ltx25-std-<size>-<slug>.mp4` (97-frame ones carry `-f97`).
+
+| Size, frames | Prompt | Tool | Process | Peak footprint | Gemma load + prompt encode | Decode and mux | Loudness | Quiet floor |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 512x288, 121 | Marie | 51.9 s | 53.1 s | 25.3 GB | 6.5 + 5.4 s (cold first run) | 5.6 s | -19.7 LUFS | -81.7 dB |
+| 512x288, 121 | Smurfs | 27.0 s | 28.0 s | 25.2 GB | 3.4 + 1.2 s | 5.6 s | -12.2 | -17.8 |
+| 512x288, 121 | rain | 30.5 s | 31.6 s | 25.3 GB | 3.2 + 1.3 s | 5.3 s | -46.6 | -55.5 |
+| 512x288, 97 | Marie | 41.1 s | 42.1 s | 24.3 GB | 4.0 + 2.4 s | 6.4 s | -24.3 | -73.3 |
+| 512x288, 97 | Smurfs | 29.2 s | 30.0 s | 24.3 GB | 3.1 + 2.4 s | 4.5 s | -51.9 | -68.7 |
+| 512x288, 97 | rain | 30.3 s | 31.1 s | 24.3 GB | 3.3 + 1.4 s | 3.8 s | -55.1 | -66.5 |
+| 640x352, 121 | Marie | 41.6 s | 42.7 s | 32.4 GB | 3.1 + 1.2 s | 10.5 s | -16.8 | -74.1 |
+| 640x352, 121 | Smurfs | 48.7 s | 49.8 s | 32.4 GB | 3.5 + 2.1 s | 7.7 s | -38.4 | -48.5 |
+| 640x352, 121 | rain | 42.0 s | 43.0 s | 32.5 GB | 3.3 + 1.5 s | 7.6 s | -51.6 | -60.8 |
+| 768x448, 121 | Marie | 74.2 s | 75.1 s | 45.8 GB | 3.5 + 1.2 s | 15.2 s | -21.8 | -57.4 |
+| 768x448, 121 | Smurfs | 70.8 s | 71.9 s | 45.9 GB | 3.3 + 2.5 s | 12.0 s | -10.2 | -16.6 |
+| 768x448, 121 | rain | 63.5 s | 64.5 s | 45.8 GB | 3.7 + 2.8 s | 11.8 s | -55.1 | -61.3 |
+
+The three refine steps take 7 to 12 s at 512x288 (Smurfs 7, rain 10, Marie 11), 12 to 18 s at 640x352 and 21 to 32 s at 768x448 (stage 1 and the rest are the remainder). Dialogue clips (Marie) run longer than the same size without speech, by 10 to 25 s in these runs, and the first run paid cold-cache costs. The SpongeBob and Patrick turn-by-turn prompt was not run: its exact text was not available to me.
+
+**Words (Whisper):** the Marie line came out exact in all four Marie clips (512x288 at 121 and 97 frames, 640x352 and 768x448): "Poor naive Sarkis. I kind of feel bad for him." The Smurfs and rain clips have no words asked; Whisper's filler there is not evidence.
+**Picture (frames opened at 512x288 and 768x448; the 640x352 and 97-frame clips were not opened):**
+- Marie: a convincing multi-camera sitcom kitchen with an older white-haired woman, sharp even at 512x288; at 768x448 she wears a red plaid shirt, speaks to the plate and the kitchen detail is richer.
+- **Smurfs: not Smurfs at either size.** LTX-2.5 draws live-action village dancers in straw hats and bright costumes in front of thatched huts; the IP knowledge LTX-2.3 had is gone.
+- Rain: a man in profile beside a rainy window with a candle; the rain on the glass is faint.
+**Sound:** Marie has speech at -17 to -24 LUFS. The Smurfs clips range from -10 LUFS (loud, likely music or crowd) to -52 LUFS (nearly silent in the 97-frame and 640 runs): the sound is inconsistent from run to run. The rain clips sit at -47 to -55 LUFS with a quiet floor of -55 to -67 dB: close to silence, no convincing rain bed. I did not listen; owner to judge.
+
+**Against the Wan FastWan Quick floor** (`capability/wan.log`, 8 clips, 832x480, silent, tiny decoder, no mux): 22.3 to 42.1 s, median 25.0 s. LTX-2.5 q8 with sound is within about 2x of that floor at 512x288 (27 to 52 s per process, warm runs 27 to 31 s) and at 640x352 (42 to 49 s, 1.7 to 2.0 times the median); 768x448 (64 to 74 s) is 2.5 to 3 times it. So **sound plus video at Wan's speed is reachable at 512x288, and at about twice Wan's time at 640x352**, with 25 to 32 GB peak against Wan's 25.5 GB at 832x480. The price is smaller pictures (512x288 and 640x352 against 832x480).
+
+
 ## Not run, and why
 
 Wan base bf16 at 20 steps (weights not approved); `realesrgan-mlx` pixel upscale (not approved); stage-1-only LTX picture for the upscale pair (needs engine edits); LTX speech check; more than one
