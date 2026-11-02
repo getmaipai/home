@@ -60,6 +60,8 @@ export interface VideoRequest {
   /** VIDEO-CREATE-01 (V1b): what the Create page added to the words (ids from recipes.ts) and the one plain line it showed, so Another take repeats the choices. */
   create?: { recipe?: string; look?: string; voices?: string; note?: string };
   /** VIDEO-CHAT-01 (C3, C4): set on a clip made by editing others (trim, join, mix): the job it came from (the first clip of a join) and what was done. The old clips stay. */
+  /** Set when the clip is stored: it is adult-only (its words, style or sources), so an edit of it never goes lower. */
+  adultOnly?: boolean;
   edit?: { from: string; change: "trim" | "join" | "mix"; with?: string[] };
 }
 
@@ -501,7 +503,9 @@ function saveFailureLine(status: number): string {
 async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, posterIn: Uint8Array | null, clip: StackClip, signal: AbortSignal, writer: "video-gen" | "video-edit"): Promise<void> {
   // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
   // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
-  const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
+  // An edit is adult-only when any clip it is made from is (`request.adultOnly`, set when the edit starts), never lower than its sources.
+  const adult = job.request.adultOnly === true || await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
+  job.request.adultOnly = adult;
   const keyframes = await extractKeyframes(video, clip.seconds ?? job.request.seconds);
   // An edit has no poster from the Stack: frame 0 of the new clip is its poster, and a clip no frame can be taken from is not stored.
   const poster = posterIn ?? keyframes?.[0] ?? null;
@@ -577,7 +581,7 @@ export type EditRun = (signal: AbortSignal) => Promise<{ ok: true; clip: EditedC
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun }
+export interface StartEditInput { actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -588,7 +592,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
     percent: 5, phase: "editing", position: null, prompt: input.source.prompt,
-    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit },
+    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

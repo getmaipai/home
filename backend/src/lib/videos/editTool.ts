@@ -26,6 +26,9 @@ import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
 import { readVideoFile, sourceVideoJob, startVideoEditJob, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, MAX_JOIN_CLIPS, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, joinOps, mixOps, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, type EditFile } from "./stackEdit";
+import { isAdultOnlyJob } from "@/lib/pictures/ageCheck";
+import { fileAudience } from "@/lib/access";
+import { allVideoAdapters } from "./adapters";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
 import { videoAudienceOf, videoRefusalFor, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
@@ -166,8 +169,22 @@ function ownClip(actor: PersonRow, state: GenerateVideoState, clip: string, temp
 
 function clipFile(actor: PersonRow, job: VideoJob): EditFile | null {
   const file = job.files[0];
+  // A clip in Trash or gone from the Library is not edited.
+  if (file && !job.temporary) { const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get(); if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id) return null; }
   const read = file ? readVideoFile(actor, job, file.id) : null;
   return read ? { bytes: read.bytes, ext: "mp4" } : null;
+}
+
+/** Whether a source clip is adult-only: flagged when it was stored, else by its Library note; a saved clip whose note does not say all-ages counts as adult-only. */
+async function clipAdultOnly(job: VideoJob): Promise<boolean> {
+  if (job.request.adultOnly === true) return true;
+  const file = job.files[0];
+  if (job.request.adultOnly === undefined && !job.temporary && file) {
+    const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
+    return !row || fileAudience(row.provenance) !== "all-ages";
+  }
+  if (job.request.adultOnly === undefined) return isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
+  return false;
 }
 
 /** A song or sound file of this person for a mix: their own music job (a temporary chat's only in that chat) or a file in their own Library. */
@@ -232,6 +249,8 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   let inputs: EditFile[];
   let ops;
   let spoken: { line: string; voice: string } | null = null;
+  // Never lower than the sources: any adult-only clip, an adult-only track or an adult line makes the edit adult-only.
+  let adultOnly = (await Promise.all(sources.map(clipAdultOnly))).some(Boolean);
   let describe: string;
   if (value.change === "trim") {
     const range = trimRange({ from_s: value.from_s, to_s: value.to_s }, seconds);
@@ -249,6 +268,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       const voice = await voiceChoice(actor, value.voice);
       if (!voice.ok) return refused(callId, args, NO_VOICE_LINE, "no_voice");
       spoken = { line: value.line, voice: voice.voice };
+      if (await isAdultOnlyJob(value.line, [], async () => undefined)) adultOnly = true;
       inputs = [clipFiles[0]!]; // the spoken line joins in the run, so the answer does not wait for the speech
       ops = mixOps(value.level ?? DEFAULT_VOICE_LEVEL, start, true);
       describe = "your line laid over it";
@@ -256,6 +276,8 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
       const track = ownTrack(actor, state, value.track, temporary);
       if (!track) return refused(callId, args, NO_TRACK_LINE, "no_track");
+      const trackRow = db.select().from(attachments).where(eq(attachments.id, value.track)).get();
+      if (trackRow && fileAudience(trackRow.provenance) === "adult-only") adultOnly = true;
       inputs = [clipFiles[0]!, track];
       ops = mixOps(value.level ?? DEFAULT_MUSIC_LEVEL, start, false);
       describe = "your song laid under it";
@@ -273,7 +295,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const made = await runStackEdit({ inputs: files, ops: ops!, name: "edited.mp4", signal });
     return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
   };
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,

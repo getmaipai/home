@@ -245,6 +245,7 @@ registerAllPackageProjectTypes();
 resumePictureJobs();
 // VIDEO-GEN-05: and a clip a restart interrupted.
 resumeVideoJobs();
+try { (await import("@/lib/videos/stackEdit")).sweepStaleEditFolders(); } catch { /* maintenance sweep is disposable */ }
 resumeMusicJobs();
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.

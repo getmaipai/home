@@ -16,6 +16,9 @@ import { newConversationTurnId } from "@/lib/id";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { getVideoJobFor, readVideoFile, type VideoJob } from "@/lib/videos/jobs";
 import { libraryProvenance } from "@/lib/libraryProvenance";
+import { canReadFileAudience } from "@/lib/access";
+import { sweepStaleEditFolders } from "@/lib/videos/stackEdit";
+import { mkdirSync, statSync, utimesSync } from "node:fs";
 import { NO_CLIPS_LINE, NO_TRACK_LINE, NO_VOICE_LINE, START_PAST_END_LINE, JOIN_CLIPS_LINE, SPEECH_FAILED_LINE, runEditVideo } from "@/lib/videos/editTool";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { MINOR_MAKE_LINE } from "@/lib/videos/make";
@@ -59,9 +62,9 @@ function chatState(actor: PersonRow, conversationId?: string, temporary = false)
 }
 const BOAT = "A paper boat floats down a rainy street, soft evening light";
 
-async function makeClip(actor: PersonRow, conversationId?: string, temporary = false): Promise<{ job: VideoJob; state: TurnState }> {
+async function makeClip(actor: PersonRow, conversationId?: string, temporary = false, prompt = BOAT): Promise<{ job: VideoJob; state: TurnState }> {
   const state = chatState(actor, conversationId, temporary);
-  const outcome = await runGenerateVideo({ state, args: { prompt: BOAT }, callId: "make", spoken: false });
+  const outcome = await runGenerateVideo({ state, args: { prompt }, callId: "make", spoken: false });
   const id = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
   if (!id) throw new Error(`no job: ${outcome.result?.reply?.text ?? outcome.detail}`);
   await until(() => getVideoJobFor(actor, id)?.state === "done");
@@ -324,5 +327,78 @@ describe("a Stack that fails never fails the answer", () => {
     expect(getVideoJobFor(owner, id)?.state).toBe("cancelled");
     await until(() => stack.jobs[0]!.cancelled);
     await until(() => leftovers().length === 0);
+  });
+});
+
+const SPICY = "A sexy dance in a dim nightclub, slow camera";
+const audienceOf = (job: VideoJob) => libraryProvenance(db.select().from(attachments).where(eq(attachments.id, job.files[0]!.id)).get()!.provenance).audience;
+const nova = () => (db.select().from(people).where(eq(people.id, "person-novaxyz")).get() as PersonRow | undefined) ?? person("teen", "nova");
+const teenReads = (job: VideoJob) => canReadFileAudience(nova(), { ownerPersonId: job.personId, provenance: db.select().from(attachments).where(eq(attachments.id, job.files[0]!.id)).get()!.provenance });
+
+describe("an edit is never lower than its sources", () => {
+  test("a clean source stays all-ages and a teen can read it; an adult-only source stays adult-only in trim and a teen cannot read it", async () => {
+    const owner = person("owner");
+    const clean = await makeClip(owner);
+    const cleanEdit = await finished(owner, await edit(clean.state, { clip: clean.job.id, change: "trim", to_s: 3 }));
+    expect(audienceOf(cleanEdit)).toBe("all-ages");
+    expect(teenReads(cleanEdit)).toBe(true);
+    const spicy = await makeClip(owner, undefined, false, SPICY);
+    expect(audienceOf(spicy.job)).toBe("adult-only");
+    const next = await finished(owner, await edit(spicy.state, { clip: spicy.job.id, change: "trim", to_s: 3 }));
+    expect(next.state).toBe("done");
+    expect(audienceOf(next)).toBe("adult-only");
+    expect(teenReads(next)).toBe(false);
+  });
+
+  test("a join of one adult-only and one all-ages clip is adult-only, in either order", async () => {
+    const owner = person("owner");
+    const clean = await makeClip(owner);
+    const spicy = await makeClip(owner, clean.state.conversationId!, false, SPICY);
+    const state = chatState(owner, clean.state.conversationId!);
+    for (const clips of [[clean.job.id, spicy.job.id], [spicy.job.id, clean.job.id]]) {
+      const next = await finished(owner, await edit(state, { clip: "latest", change: "join", clips }));
+      expect(audienceOf(next)).toBe("adult-only");
+      expect(teenReads(next)).toBe(false);
+    }
+  });
+
+  test("a voice line that is adult-only over a clean clip makes an adult-only video", async () => {
+    const owner = person("owner");
+    const { job, state } = await makeClip(owner);
+    const next = await finished(owner, await edit(state, { clip: job.id, change: "mix", sound: "voice", line: "Come here, you sexy thing." }));
+    expect(next.state).toBe("done");
+    expect(audienceOf(next)).toBe("adult-only");
+    const plain = await finished(owner, await edit(state, { clip: job.id, change: "mix", sound: "voice", line: "Look at the boat." }));
+    expect(audienceOf(plain)).toBe("all-ages");
+  });
+});
+
+describe("a source that is in Trash or gone, and the staging folder", () => {
+  test("trim, join and mix refuse a clip whose Library file is in Trash or deleted", async () => {
+    const owner = person("owner");
+    const a = await makeClip(owner);
+    const b = await makeClip(owner, a.state.conversationId!);
+    const state = chatState(owner, a.state.conversationId!);
+    db.update(attachments).set({ deletedAt: new Date().toISOString() }).where(eq(attachments.id, a.job.files[0]!.id)).run();
+    expect((await edit(state, { clip: a.job.id, change: "trim", to_s: 2 })).result?.data).toEqual({ refused: "no_clip" });
+    expect((await edit(state, { clip: "latest", change: "join", clips: [b.job.id, a.job.id] })).result?.data).toEqual({ refused: "no_clip" });
+    expect((await edit(state, { clip: a.job.id, change: "mix", sound: "voice", line: "Hello there." })).result?.data).toEqual({ refused: "no_clip" });
+    db.update(attachments).set({ deletedAt: new Date().toISOString() }).where(eq(attachments.id, b.job.files[0]!.id)).run();
+    expect((await edit(state, { clip: b.job.id, change: "trim", to_s: 2 })).result?.data).toEqual({ refused: "no_clip" });
+    expect(stack.jobs).toHaveLength(0);
+    expect(stack.speech).toHaveLength(0);
+  });
+
+  test("the staging folder is private (0700) and the startup sweep removes only folders older than an hour", async () => {
+    const owner = person("owner");
+    const { state } = await makeClip(owner);
+    await finished(owner, await edit(state, { clip: "latest", change: "trim", to_s: 2 }));
+    expect(stack.jobs[0]!.dirMode).toBe(0o700);
+    mkdirSync(join(editRoot(), "old-one"), { recursive: true });
+    mkdirSync(join(editRoot(), "new-one"), { recursive: true });
+    const old = new Date(Date.now() - 2 * 3600_000);
+    utimesSync(join(editRoot(), "old-one"), old, old);
+    expect(sweepStaleEditFolders()).toBe(1);
+    expect(leftovers()).toEqual(["new-one"]);
   });
 });

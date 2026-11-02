@@ -1,13 +1,13 @@
 // VIDEO-CHAT-01 (C3, C4): a fake Stack for the `media.edit` job and for speech. It stands in for the StackClient methods lib/videos/stackEdit.ts and
 // lib/tts.ts call (media roots, submit, poll, cancel, speak), records what Home sent, checks the staged input files exist while the job runs, and
 // writes a finished mp4 where the job's `output` says, like the real Stack. No network.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { __setStackClientForTests, getStackClient } from "@/lib/stackEngine";
 import { __setStackEditTimingForTests } from "@/lib/videos/stackEdit";
 import { testMp4 } from "./videoFixture";
 
-export interface FakeEditJob { id: string; input: { inputs: string[]; ops: Array<Record<string, unknown>>; output: { dir: string; name: string } }; staged: Array<{ name: string; bytes: number }>; polls: number; state: string; cancelled: boolean }
+export interface FakeEditJob { id: string; input: { inputs: string[]; ops: Array<Record<string, unknown>>; output: { dir: string; name: string } }; staged: Array<{ name: string; bytes: number }>; dirMode: number; polls: number; state: string; cancelled: boolean }
 export interface FakeEditStack {
   jobs: FakeEditJob[];
   /** The speech requests (`text`, `voice_url`, ...) as the form fields the Stack got. */
@@ -41,7 +41,7 @@ export function installFakeEditStack(): FakeEditStack {
     submitJob: async (request: { kind: string; input?: Record<string, unknown> }) => {
       if (fake.refuseSubmit) throw new Error("connect ECONNREFUSED /secret/path/in/the/error");
       const input = request.input as FakeEditJob["input"];
-      const job: FakeEditJob = { id: `edit-${fake.jobs.length + 1}`, input, staged: input.inputs.map((path) => ({ name: path.split("/").pop()!, bytes: existsSync(path) ? readFileSync(path).byteLength : -1 })), polls: 0, state: "queued", cancelled: false };
+      const job: FakeEditJob = { id: `edit-${fake.jobs.length + 1}`, input, staged: input.inputs.map((path) => ({ name: path.split("/").pop()!, bytes: existsSync(path) ? readFileSync(path).byteLength : -1 })), dirMode: statSync(input.output.dir).mode & 0o777, polls: 0, state: "queued", cancelled: false };
       fake.jobs.push(job);
       return stamp(job);
     },

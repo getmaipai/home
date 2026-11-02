@@ -3,7 +3,7 @@
 // one job folder under its own data directory (declared to the Stack as a read and write media root, the way the companion clips are),
 // submits the job, polls it with a deadline, reads the finished file back and deletes the folder, whatever happened. Only the local Stack
 // is called; no file name, clip or line a person typed is logged or put in an error. A failure is one plain line, never a thrown error.
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { dataDir } from "@/lib/paths";
 import { newFileId } from "@/lib/id";
@@ -69,10 +69,9 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
   const dir = join(root, newFileId());
   let stackJob: string | null = null;
   try {
-    mkdirSync(root, { recursive: true });
-    mkdirSync(dir, { recursive: true });
-    // The Stack may run as another account on this computer; it has to write the result here.
-    try { chmodSync(dir, 0o777); } catch { /* the Stack reports it if it still cannot write */ }
+    // Private to this account: the Stack runs as the same user and needs no group or world access.
+    mkdirSync(root, { recursive: true, mode: 0o700 });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
     await openEditRoot(root);
     const paths = request.inputs.map((file, index) => {
       const path = join(dir, `in-${index + 1}.${file.ext.replace(/[^a-z0-9]/gi, "").toLowerCase() || "bin"}`);
@@ -109,4 +108,17 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** At startup: removes staging folders a crash or restart left behind (older than an hour). Returns how many went. */
+export function sweepStaleEditFolders(maxAgeMs = 60 * 60 * 1000, now = Date.now()): number {
+  const root = resolve(dataDir, "video-edit");
+  let removed = 0;
+  try {
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      const path = join(root, entry.name);
+      try { if (now - statSync(path).mtimeMs > maxAgeMs) { rmSync(path, { recursive: true, force: true }); removed += 1; } } catch { /* the next start tries again */ }
+    }
+  } catch { /* no folder yet */ }
+  return removed;
 }
