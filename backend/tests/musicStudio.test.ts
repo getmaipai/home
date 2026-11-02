@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaItems, mediaSources, people } from "@/db/schema";
+import { mediaItems, mediaSources, musicJobs, people } from "@/db/schema";
+import { __setPictureStatusForTests } from "@/lib/pictures/ready";
+import { bandSingles } from "@/lib/media/appHost";
+import { runBandAction } from "@/lib/music/bandActions";
 import { albumBlock, albumFieldsFromPatch, runAlbumAction, syncAlbumTracks } from "@/lib/music/album";
 import { runStyleAction, styleBlock, styleFieldsFromPatch } from "@/lib/music/styleCard";
 import { createMade, ensureStarterStyles, getMade, listRevisions, restoreRevision, updateMade } from "@/lib/music/madeRecords";
@@ -204,5 +207,68 @@ describe("the edit tools", () => {
     ensureStarterStyles();
     const out = await runStudioTool("edit_song_style", { state: stateFor(sage, "style", "sstyle-starterlullaby"), args: { title: "Mine" }, callId: "call-3", spoken: false });
     expect(((out.result as { reply: { text: string } }).reply.text)).toContain("starter");
+  });
+});
+
+describe("gaps closed after the first landing", () => {
+  const where = { conversationId: "conv-test000001", turnId: "turn-test000001" };
+  function job(id: string, request: Record<string, unknown>, offset: number) {
+    const at = new Date(Date.now() - offset * 1000).toISOString();
+    db.insert(musicJobs).values({ id, personId: sage.id, conversationId: null, turnId: null, task: "generate", request: JSON.stringify(request), state: "done", progress: 1, fileId: `file-${id}`, createdAt: at, updatedAt: at, hlc: stamp.hlc }).run();
+  }
+  test("a new cover with no picture engine says so and what to do", async () => {
+    __setPictureStatusForTests(null);
+    try {
+      const a = album(sage);
+      const r = await runAlbumAction(sage, a.id, "remake_cover", where);
+      expect(r.ok).toBe(false);
+      if (!r.ok) { expect(r.status).toBe(503); expect(r.error).toContain("picture engine"); expect(r.error).toContain("Settings"); }
+    } finally { __setPictureStatusForTests(undefined); }
+  });
+  test("an album reads only its own songs, and a band read names only band songs", () => {
+    const a = album(sage);
+    job("mjob-one", { description: "x", album: { id: a.id } }, 3);
+    job("mjob-two", { description: "x", album: { id: "malbum-other000001" } }, 2);
+    job("mjob-three", { description: "x" }, 1);
+    job("mjob-four", { description: "x", band: { id: "mband-test0000001", name: "Clover Lane" } }, 0);
+    track("media-track000001");
+    expect(bandSingles(sage).map((s) => s.fileId)).toEqual(["file-mjob-four"]);
+    expect(bandSingles(sage, "mband-nobody00001")).toEqual([]);
+  });
+  test("a remade band's earlier version is still reachable, from the new band and from the old one", async () => {
+    track("media-track000001");
+    const first = createMade("made_artist", sage, { name: "Clover Lane", style: { description: "soft folk" }, seed: { media_id: "media-track000001" } });
+    if (!first.ok) throw new Error(first.error);
+    const remade = await runBandAction(sage, first.value.id, "remake");
+    expect(remade.ok).toBe(true);
+    const old = listRevisions("made_artist", sage, first.value.id);
+    expect(old.ok && old.value.some((r) => r.reason === "remake")).toBe(true);
+    const second = createMade("made_artist", sage, { name: "Clover Lane Two", style: { description: "soft folk" }, seed: { media_id: "media-track000001" } });
+    if (!second.ok) throw new Error(second.error);
+    const fromNew = listRevisions("made_artist", sage, second.value.id);
+    expect(fromNew.ok && fromNew.value.some((r) => r.reason === "remake" && (r.record as { name?: string }).name === "Clover Lane")).toBe(true);
+  });
+  test("someone else cannot read a deleted band's versions", async () => {
+    track("media-track000001");
+    const first = createMade("made_artist", sage, { name: "Clover Lane", style: { description: "soft folk" }, seed: { media_id: "media-track000001" } });
+    if (!first.ok) throw new Error(first.error);
+    await runBandAction(sage, first.value.id, "remake");
+    expect(listRevisions("made_artist", marlow, first.value.id).ok).toBe(false);
+  });
+});
+
+describe("the tool cap with every music tool in play", () => {
+  test("no mix of gates and objects offers more than sixteen, and every music tool is offered somewhere", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    const seen = new Set<string>();
+    for (let mask = 0; mask < 512; mask++) {
+      const f = (bit: number) => (mask & (1 << bit)) !== 0;
+      for (const object of [null, "none", "track", "band", "album", "style"] as MusicObjectGate[]) {
+        const tools = withTurnToolGates(base, f(0), f(1), f(2), f(3), f(4), f(5), f(6), f(7), object).tools_offered;
+        expect(tools.length).toBeLessThanOrEqual(16);
+        for (const t of tools) seen.add(t);
+      }
+    }
+    for (const id of ["generate_music", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"]) expect(seen.has(id)).toBe(true);
   });
 });

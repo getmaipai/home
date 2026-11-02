@@ -3,7 +3,7 @@
 // (access.ts, progress.ts, collections.ts) so no app keeps a store of its own. Rows are shaped for the kit's `media_shelf`, `billboard`
 // and `player` nodes (docs/dev/media-library.md, "Media apps"). Every read goes through the person's band and each source's `visible_to`;
 // a child is allowlist-only (design section 11): the household's library plus channels an adult followed for them, and no discovery rows.
-import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -979,10 +979,14 @@ export function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaIt
 }
 /** MUSIC-LIKE-01: the finished single files of a made band, newest first (the music jobs that carry its id). */
 export function bandSingles(person: PersonRow, bandId?: string): Array<{ bandId: string; fileId: string }> {
-  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.state, "done"))).orderBy(desc(musicJobs.createdAt)).all();
+  // Only songs that name a band are read, and at most the newest 300: this runs on every Songs and Artists read.
+  const marker = bandId && /^mband-[a-z0-9]+$/.test(bandId) ? `%"band":{"id":"${bandId}"%` : '%"band":{"id":"%';
+  const rows = db.select({ fileId: musicJobs.fileId, request: musicJobs.request }).from(musicJobs)
+    .where(and(eq(musicJobs.personId, person.id), eq(musicJobs.state, "done"), like(musicJobs.request, marker)))
+    .orderBy(desc(musicJobs.createdAt)).limit(300).all();
   const out: Array<{ bandId: string; fileId: string }> = [];
   for (const row of rows) {
-    if (!row.fileId || !row.request.includes('"band"')) continue;
+    if (!row.fileId) continue;
     try {
       const id = (JSON.parse(row.request) as { band?: { id?: string } }).band?.id;
       if (id && (!bandId || id === bandId)) out.push({ bandId: id, fileId: row.fileId });

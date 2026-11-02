@@ -3,7 +3,7 @@
 // failed one never fails the album or the answer. More songs are made with generate_music (`album` argument) and join the album when
 // they finish (syncAlbumTracks). Adults only on a written screen, like make_band. Rule 6a: a title, a blurb, the look words and the
 // style words are a person's words. Nothing here logs any of them or an id.
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaItems, musicJobs, people } from "@/db/schema";
 import { complete, type LlmMessage } from "@/lib/llm";
@@ -95,16 +95,24 @@ export function finishAlbumPicture(picture: PictureJob): void {
   updateMade("made_album", owner as unknown as PersonRow, match[1]!, { cover_file_id: picture.files[0].id });
 }
 
-export async function startAlbumCover(state: { conversationId: string | null; turnId: string | null }, actor: PersonRow, albumId: string, prompt: string): Promise<void> {
+export type AlbumCoverStart = { ok: true } | { ok: false; error: string };
+export const NO_PICTURE_ENGINE_LINE = "There is no picture engine set up, so no cover can be made. Add one in Settings under AI and models, then try again.";
+
+/** Starts the album's cover. It says why when it could not, so a button can tell the person; a cover still never fails the album. */
+export async function startAlbumCover(state: { conversationId: string | null; turnId: string | null }, actor: PersonRow, albumId: string, prompt: string): Promise<AlbumCoverStart> {
   try {
     const audience = routeAudience(actor);
     const full = `${prompt} Album cover art, square, no text, no letters.`.slice(0, 578);
-    if (!prompt || pictureDenial(audience) || refusePrompt(full, { lane: laneOf(audience) }) || !(await pictureEngineReady())) return;
+    if (!prompt) return { ok: false, error: "There is no look to draw a cover from. Edit the album's look, then try again." };
+    if (pictureDenial(audience)) return { ok: false, error: "Pictures are not available for this person." };
+    if (refusePrompt(full, { lane: laneOf(audience) })) return { ok: false, error: "That cover idea is not allowed. Change the album's look and try again." };
+    if (!(await pictureEngineReady())) return { ok: false, error: NO_PICTURE_ENGINE_LINE };
     const picture = await startPictureJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false,
       purpose: `album:${albumId}:cover`, kind: "generate", prompt: full,
       body: { prompt: full, model: QUICK_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: adultAdaptersAllowed() ? "adult" : "all-ages" } });
     finishAlbumPicture(picture);
-  } catch { /* A cover never fails the album. */ }
+    return { ok: true };
+  } catch { return { ok: false, error: "The cover could not be started. Try again in a minute." }; }
 }
 
 /** `make_album:<album id>:<conversation id>:<turn id>`. The album id is what the card's buttons send back; the other two are where a new cover is filed. */
@@ -128,12 +136,15 @@ export function albumBlock(actor: PersonRow, album: AlbumBody, where: { conversa
   return blockEnvelope("album", MAKE_ALBUM_TOOL_ID, `The album ${album.title}, with ${tracks.length} ${tracks.length === 1 ? "song" : "songs"} so far.`, albumProvenance(album.id, where), props);
 }
 
-/** The finished songs made for an album, newest first (the music jobs that carry its id). */
+/** The finished songs made for an album, oldest first. The query names the album, so it reads only that album's songs (newest 100) and never every finished song. */
 function albumJobs(personId: string, albumId: string): Array<{ fileId: string }> {
-  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, personId), eq(musicJobs.state, "done"))).orderBy(desc(musicJobs.createdAt)).all();
+  if (!/^malbum-[a-z0-9]+$/.test(albumId)) return [];
+  const rows = db.select({ fileId: musicJobs.fileId, request: musicJobs.request }).from(musicJobs)
+    .where(and(eq(musicJobs.personId, personId), eq(musicJobs.state, "done"), like(musicJobs.request, `%"album":{"id":"${albumId}"%`)))
+    .orderBy(desc(musicJobs.createdAt)).limit(100).all();
   const out: Array<{ fileId: string }> = [];
   for (const row of rows) {
-    if (!row.fileId || !row.request.includes('"album"')) continue;
+    if (!row.fileId) continue;
     try { if ((JSON.parse(row.request) as { album?: { id?: string } }).album?.id === albumId) out.push({ fileId: row.fileId }); } catch { /* A job row that does not parse belongs to no album. */ }
   }
   return out.reverse();
@@ -180,7 +191,8 @@ export async function makeAlbum(input: { state: BandState; idea: string; bandId?
   });
   if (!made.ok) return { ok: false, line: ALBUM_MODEL_LINE };
   const albumId = made.value.id;
-  await startAlbumCover(state, actor, albumId, draft.cover_prompt || draft.look);
+  // The cover runs beside the first song, so neither waits for the other; a cover that cannot start leaves the album as it is.
+  const cover = startAlbumCover(state, actor, albumId, draft.cover_prompt || draft.look);
   let first = false; let musicJobId: string | null = null;
   try {
     const outcome = await runGenerateMusic({ state, callId: input.callId, spoken: input.spoken, album: { id: albumId }, ...(sound.value.band ? { band: sound.value.band } : {}),
@@ -188,6 +200,7 @@ export async function makeAlbum(input: { state: BandState; idea: string; bandId?
     first = outcome.status === "succeeded";
     musicJobId = (outcome.result?.data as { musicJobId?: string } | undefined)?.musicJobId ?? null;
   } catch { first = false; }
+  await cover;
   const saved = getMade("made_album", actor, albumId);
   const block = albumBlock(actor, saved.ok ? saved.value as unknown as AlbumBody : { id: albumId, title: draft.title }, state);
   const plan = draft.tracks.map((t, i) => `${i + 1}. ${t}`).join("; ");
@@ -210,7 +223,7 @@ export type AlbumActionName = (typeof ALBUM_ACTION_NAMES)[number];
 export interface AlbumPatchInput { title?: string; blurb?: string; look?: string; sound?: string; genres?: string[]; track_ids?: string[] }
 export type AlbumActionResult =
   | { ok: true; value: { action: AlbumActionName; done: string; album?: Record<string, unknown>; media_id?: string | null } }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+  | { ok: false; status: 400 | 403 | 404 | 503; error: string };
 
 /** The record fields a card edit changes. `sound` and `genres` live in the album's style; the track list keeps only ids already on it (a removed song stays in the library). */
 export function albumFieldsFromPatch(album: AlbumBody, patch: AlbumPatchInput): Record<string, unknown> {
@@ -246,8 +259,8 @@ export async function runAlbumAction(actor: PersonRow, albumId: string, action: 
   }
   if (action === "remake_cover") {
     if (!opts.turnId || !opts.conversationId) return { ok: false, status: 400, error: "A new cover can only be made from the chat where the album was made. Open that chat and try again." };
-    if (pictureDenial(routeAudience(actor))) return { ok: false, status: 403, error: "Pictures are not available for this person." };
-    await startAlbumCover({ conversationId: opts.conversationId, turnId: opts.turnId }, actor, albumId, album.look || `Cover art for an album called ${album.title}, ${(album.style?.genres ?? []).slice(0, 3).join(", ")}`);
+    const started = await startAlbumCover({ conversationId: opts.conversationId, turnId: opts.turnId }, actor, albumId, album.look || `Cover art for an album called ${album.title}, ${(album.style?.genres ?? []).slice(0, 3).join(", ")}`);
+    if (!started.ok) return { ok: false, status: started.error === NO_PICTURE_ENGINE_LINE ? 503 : 400, error: started.error };
     return { ok: true, value: { action, done: "Making a new cover. It shows here when it is ready.", album: view(album) } };
   }
   // edit: a revision with provenance, never a silent overwrite.

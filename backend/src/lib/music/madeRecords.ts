@@ -8,7 +8,7 @@
 // Who may do what: reading follows ownership (yourself, or an owner/admin for a child), plus what a record is shared to
 // (`household`, or a list of people), plus starter styles (no owner) for everyone. A teen's records stay private unless the teen
 // shares them. A child's records are made by a parent. Only the owner (or a parent for a child) changes or deletes a record.
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, ne } from "drizzle-orm";
 import { SongStyle } from "@maipai/spec/gen/ts/song-style.js";
 import { MadeArtist } from "@maipai/spec/gen/ts/made-artist.js";
 import { MadeAlbum } from "@maipai/spec/gen/ts/made-album.js";
@@ -289,11 +289,23 @@ export interface MadeRevision { id: string; reason: "edit" | "remake"; created_a
 export function listRevisions(kindName: MadeKind, actor: PersonRow, id: string): StoreResult<MadeRevision[]> {
   const kind = KINDS[kindName];
   const row = load(kind, id);
-  if (!row || !mayRead(actor, row)) return { ok: false, status: 404, error: `${kind.noun} not found` };
+  // A deleted record keeps its earlier versions for the person who could change it (a remade band is deleted, and its versions are how to get it back).
+  if (!row || (!row.deletedAt && !mayRead(actor, row)) || (row.deletedAt && !mayWrite(actor, row.personId))) return { ok: false, status: 404, error: `${kind.noun} not found` };
   if (!mayWrite(actor, row.personId)) return { ok: false, status: 403, error: `you can see this ${kind.noun}, not its earlier versions` };
   const rows = db.select().from(madeRevisions).where(and(eq(madeRevisions.kind, kindName), eq(madeRevisions.recordId, id))).orderBy(desc(madeRevisions.createdAt), desc(madeRevisions.id)).all();
-  return { ok: true, value: rows.map((r) => ({ id: r.id, reason: r.reason as "edit" | "remake", created_at: r.createdAt, provenance: r.provenance, record: JSON.parse(r.body) as Rec })) };
+  const mine = rows.map(revisionOf);
+  // A band made again from the same song replaces the one before it; the earlier bands' versions stay reachable from the new one.
+  const seed = kindName === "made_artist" && !row.deletedAt ? ((JSON.parse(row.body) as Rec).seed as { media_id?: string } | null | undefined)?.media_id : undefined;
+  if (seed && /^[A-Za-z0-9_-]+$/.test(seed) && row.personId) {
+    const earlier = db.select().from(madeRevisions)
+      .where(and(eq(madeRevisions.kind, "made_artist"), eq(madeRevisions.personId, row.personId), ne(madeRevisions.recordId, id), like(madeRevisions.body, `%"media_id":"${seed}"%`)))
+      .orderBy(desc(madeRevisions.createdAt)).limit(50).all();
+    mine.push(...earlier.filter((r) => r.reason === "remake").map(revisionOf));
+    mine.sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
+  }
+  return { ok: true, value: mine };
 }
+const revisionOf = (r: typeof madeRevisions.$inferSelect): MadeRevision => ({ id: r.id, reason: r.reason as "edit" | "remake", created_at: r.createdAt, provenance: r.provenance, record: JSON.parse(r.body) as Rec });
 
 /** Put an earlier version back. The version being replaced is kept too, so restoring is itself undoable. */
 export function restoreRevision(kindName: MadeKind, actor: PersonRow, id: string, revisionId: string): StoreResult<Rec> {
