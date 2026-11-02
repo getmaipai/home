@@ -31,6 +31,9 @@ export interface FakeVideoStack {
   /** LTX25-MAX-01: what the Stack says about LTX-2.5 Max (undefined: a Stack without it), and the seconds its profile allows. */
   ltx25max: "ready" | "not-installed" | "missing" | undefined;
   ltx25maxSeconds: number | undefined;
+  /** VIDEO-INPUTS-01: the Stack reports `image_to_video` (and `end_image`) true on LTX-2.5 Standard and Boost / on Max. */
+  ltx25Picture: boolean;
+  ltx25maxPicture: boolean;
   restore(): void;
 }
 
@@ -63,7 +66,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined,
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
@@ -105,7 +108,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       const liveFields = fake.live && job.state === "running" ? { progress_fraction: job.polls / 4, stage: "frames", stage_label: fake.live.stage_label, step: null, steps: null, eta_seconds: fake.live.eta_seconds, preview_url: job.polls >= 3 ? `/v1/videos/generations/${job.id}/preview.jpg?v=1` : null } : {};
       return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "waiting for memory" : "rendering", progress: job.polls * 25, phase_progress: null, position: job.state === "queued" ? 2 : null, error: null, code: null, data: [], ...liveFields });
     }
-    if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests({ ...(fake.detailed ? { detailed: fake.detailed } : {}), ...(fake.quickMissing ? { quickMissing: true } : {}), ...(fake.ltx25 ? { ltx25: fake.ltx25 } : {}), ...(fake.ltx25max ? { ltx25max: fake.ltx25max } : {}), ...(fake.ltx25maxSeconds ? { ltx25maxSeconds: fake.ltx25maxSeconds } : {}) }) });
+    if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests({ ...(fake.detailed ? { detailed: fake.detailed } : {}), ...(fake.quickMissing ? { quickMissing: true } : {}), ...(fake.ltx25 ? { ltx25: fake.ltx25 } : {}), ...(fake.ltx25max ? { ltx25max: fake.ltx25max } : {}), ...(fake.ltx25maxSeconds ? { ltx25maxSeconds: fake.ltx25maxSeconds } : {}), ...(fake.ltx25Picture ? { ltx25Picture: true } : {}), ...(fake.ltx25maxPicture ? { ltx25maxPicture: true } : {}) }) });
     if (method === "GET" && path === "/stack/v1/video/loras") return json({ loras: fake.loras });
     if (method === "POST" && path === "/stack/v1/video/loras") {
       const form = init?.body as FormData;

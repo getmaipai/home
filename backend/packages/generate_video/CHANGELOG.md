@@ -6,7 +6,8 @@ All notable changes to the Make a Video package, in [Keep a Changelog](https://k
 
 ### Changed
 
-- VIDEO-TIERS-01: on a computer whose Stack serves LTX-2.5, an adult's Standard video is up to 10 seconds with sound and Boost is up to 5 seconds with sound (made from words; a clip that starts from a picture is still the silent 5 second kind). The `seconds`, `tier` and `voices` descriptions say so. A teen or a child is unchanged.
+- VIDEO-INPUTS-01: when the Stack reports that LTX-2.5 can start from a picture (Standard, Boost and Max), an adult's picture video is made by it, with sound and the level's own length; Home no longer holds a picture back from Max. Older Stacks and every teen or child keep today's behaviour.
+- VIDEO-TIERS-01: on a computer whose Stack serves LTX-2.5, an adult's Standard video is up to 10 seconds with sound and Boost is up to 5 seconds with sound (made from words; a clip that starts from a picture is the silent 5 second kind unless the Stack reports that the newest model can start from a picture). The `seconds`, `tier` and `voices` descriptions say so. A teen or a child is unchanged.
 
 ## [0.3.0] - 2026-11-02
 

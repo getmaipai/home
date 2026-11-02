@@ -78,6 +78,9 @@ export interface StackLtx25Quality {
   available?: boolean;
   environment?: unknown;
   limits?: Record<string, number | string>;
+  /** VIDEO-INPUTS-01: a first picture can start a clip of this model, and a second picture can end it. Absent or false on a Stack older than 2026-11-02: words only. */
+  image_to_video?: boolean;
+  end_image?: boolean;
   profiles?: StackLtx25Profile[];
   /** The pieces to download (LTX25-MAX-01 reports them; `download_bytes` is the whole pack). */
   install?: { download_bytes?: number; remaining_bytes?: number };
@@ -129,9 +132,11 @@ export interface VideoBody {
   seed?: number;
   image?: string;
   image_source?: "generated" | "uploaded";
+  /** VIDEO-INPUTS-01: a last picture for an LTX-2.5 clip (needs `image`; the Stack refuses it on Quick and Detailed). Sent only when `qualities.<model>.end_image` is true. */
+  end_image?: string;
   loras?: Array<{ id: string; strength: number }>;
   audience: "all-ages" | "adult";
-  /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), "ltx25-q8" is LTX-2.5 with sound (VIDEO-TIERS-01, adults only, words only: the Stack answers 422 to a picture or a LoRA), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
+  /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), "ltx25-q8" is LTX-2.5 with sound (VIDEO-TIERS-01, adults only; the Stack answers 422 to a LoRA, and to a picture unless its `image_to_video` flag is true), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;
   /** TIER-HOME-04: the level the job runs at, from the slot (`lib/videos/slotBody.ts`); left out at Standard. */
   tier?: "boost" | "max";

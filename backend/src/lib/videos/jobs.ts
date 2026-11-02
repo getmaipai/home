@@ -367,6 +367,19 @@ export function loadLibraryPicture(actor: PersonRow, fileId: string): PhotoResul
   return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height };
 }
 
+/** VIDEO-CHAT-01 (continue): keeps the last frame of a clip as this chat's own picture (the same kind of file a clip's poster is), so the new clip starts from a stored file that Make another can load again. Memory only in a temporary chat. */
+export function storeContinueFrame(actor: PersonRow, input: { conversationId: string; turnId: string | null; temporary: boolean; jpeg: Uint8Array; width: number; height: number; adultOnly: boolean; sourceJobId: string }): { ok: true; id: string } | { ok: false; line: string } {
+  if (input.temporary) {
+    const id = newFileId();
+    storeTemporaryClip({ id, conversationId: input.conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: input.jpeg });
+    return { ok: true, id };
+  }
+  if (!input.turnId) return { ok: false, line: "A video can only be continued from a chat message. Ask again in a chat." };
+  const provenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: input.adultOnly ? "adult-only" : "all-ages", job: input.sourceJobId, width: input.width, height: input.height, frame: "last" })}`;
+  const made = createAttachment(actor, { conversationId: input.conversationId, turnId: input.turnId, mediaType: "image/jpeg", bytes: input.jpeg, provenance, deduplicate: false, retention: "conversation" });
+  return made.ok ? { ok: true, id: made.value.id } : { ok: false, line: saveFailureLine(made.status) };
+}
+
 /** How many of this person's clips are waiting or being made. */
 export function activeVideoJobsFor(actor: PersonRow): number {
   let count = 0;
@@ -392,6 +405,8 @@ export interface StartVideoInput {
   tier?: "standard" | "boost" | "max";
   /** VIDEO-CREATE-01 (V1b): kept on the request for Another take. */
   create?: VideoRequest["create"];
+  /** VIDEO-CHAT-01 (continue): the clip is adult-only whatever its words say (it starts from an adult-only clip's frame), so the finished-clip check never judges it lower. */
+  adultOnly?: boolean;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -404,7 +419,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.adultOnly ? { adultOnly: true } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

@@ -38,9 +38,46 @@ export function trimOps(from: number, to: number): EditOp[] {
   return [{ op: "trim", in_s: from, out_s: to }];
 }
 
-/** Clips in the order the person named them: the first is the working clip, `concat` joins every later file. */
-export function joinOps(): EditOp[] {
-  return [{ op: "concat" }];
+export const JOIN_TRANSITIONS = ["cut", "crossfade"] as const;
+export type JoinTransition = (typeof JOIN_TRANSITIONS)[number];
+export const MIN_CROSSFADE_S = 0.3;
+export const MAX_CROSSFADE_S = 1.0;
+export const DEFAULT_CROSSFADE_S = 0.5;
+/**
+ * Whether the Stack's `media.edit` has a `crossfade` op (2026-11-02: it has not; its ops are trim, concat, mute, frame, audio_overlay, fade, and
+ * none of them can lay one clip over another, so a real crossfade cannot be built from them). Home builds the op and the check behind this switch;
+ * flip it when the Stack lands the op described at `crossfadeOps`.
+ */
+export const CROSSFADE_IN_STACK = false;
+
+/** Clips in the order the person named them: the first is the working clip, `concat` joins every later file (a straight cut), `crossfade` blends each seam over `duration_s`. */
+export function joinOps(transition: JoinTransition = "cut", duration: number = DEFAULT_CROSSFADE_S): EditOp[] {
+  return transition === "crossfade" ? crossfadeOps(duration) : [{ op: "concat" }];
+}
+
+/**
+ * The Stack op a crossfade join needs, which does not exist yet: `{ op: "crossfade", duration_s, with? }`, run like `concat` (the working clip then
+ * the later files, or `with` by index), each seam blending the last `duration_s` of one clip into the first `duration_s` of the next (video `xfade`
+ * `fade`, sound `acrossfade`), re-encoded to the first clip's size and rate. `duration_s` is 0.3 to 1.0; every clip must be longer than twice it.
+ */
+export function crossfadeOps(duration: number): EditOp[] {
+  return [{ op: "crossfade", duration_s: Math.round(Math.min(MAX_CROSSFADE_S, Math.max(MIN_CROSSFADE_S, duration)) * 100) / 100 }];
+}
+
+/** The plain line when a clip is too short to blend into the next one (each seam eats the duration from both clips), or null. Unknown lengths pass. */
+export function crossfadeProblem(seconds: ReadonlyArray<number | null>, duration: number): string | null {
+  const short = seconds.some((length) => length !== null && length <= 2 * duration);
+  return short ? `One of those videos is too short for a ${duration} second crossfade. Use a shorter crossfade, or join them with a straight cut.` : null;
+}
+
+/** The last frame of a clip: a moment just before the end, since the very end holds no picture in many files. An unknown length reads the request's. */
+export function lastFrameAt(seconds: number | null): number {
+  if (seconds === null || seconds <= 0.2) return 0;
+  return Math.round((seconds - 0.1) * 1000) / 1000;
+}
+
+export function frameOps(atS: number): EditOp[] {
+  return [{ op: "frame", at_s: atS }];
 }
 
 export function mixOps(level: MixLevel, startS: number, duck: boolean): EditOp[] {

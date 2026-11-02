@@ -80,6 +80,8 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
     return { body, tier: run.tier, quality: level };
   }
   const shape = shapeOf(base.size);
+  // Only an LTX-2.5 clip can end on a picture (the Stack answers 422 to it on Wan and Detailed): any other model sends the start picture alone.
+  delete body.end_image;
   // A minor is never sent LTX-2.5 (rules 0, 8, 10): the model goes back to the lane's own and the size and ceiling follow Wan.
   if (base.model === LTX25_MODEL && lane !== "adult") body.model = videoModelForLane(lane, base.model);
   let quality: VideoQuality = body.model === LTX25_MODEL ? "detailed" : qualityOfSlotModel(body.model) ?? "quick";
