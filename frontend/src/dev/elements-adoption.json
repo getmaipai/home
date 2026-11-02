@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-02T09:38:40.308Z",
-  "kitTag": "ui-v0.5.461",
+  "generatedAt": "2026-11-02T10:17:16.981Z",
+  "kitTag": "ui-v0.5.463",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -221,6 +221,14 @@
       "verdictReason": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
       "implemented": false,
       "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
+    },
+    {
+      "file": "album.tsx",
+      "name": "album",
+      "group": "album",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "answer-block.tsx",
@@ -1042,6 +1050,14 @@
       "implemented": false
     },
     {
+      "file": "music-edit.tsx",
+      "name": "music-edit",
+      "group": "music",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "music-track.tsx",
       "name": "music-track",
       "group": "music",
@@ -1064,6 +1080,14 @@
       "group": "settings/onboarding",
       "verdict": "later",
       "verdictReason": "Deferred until SETUP-* backlog.",
+      "implemented": false
+    },
+    {
+      "file": "option-cards.tsx",
+      "name": "option-cards",
+      "group": "option",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -1339,6 +1363,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "song-style.tsx",
+      "name": "song-style",
+      "group": "song",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "sources.aui.tsx",
