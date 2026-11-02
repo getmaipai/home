@@ -78,6 +78,8 @@ Who may do what:
 
 The card (`GET /api/videos/jobs/{id}`, shown only when open) carries `adult: { made_audience, lock, can_clear, can_mark, line, history }` for the creator. The chat video card shows `line` as its notice, "Unmark as NSFW" when `can_clear` (the kit `AdultLockDialog` with the confirm's own title, words and button, from ui-v0.5.481) and "Mark as NSFW" when `can_mark`. A card that turns locked is the one lock tile. Tests: `tests/adultMark06.test.ts`, `tests/adultMark06Edit.test.ts` (the table row by row, then real trims and joins), `src/apps/chat/videoAdultMark.test.tsx`.
 
+Behaviors to know: the prompt word check no longer locks a clip by itself (design 3.10: it raises `made_audience` only); an adult spoken line or song mixed into a clip raises the audience and leaves the lock to the sources; a continued frame stored for a clip follows that clip's lock when it is cleared or marked, because it carries the clip's job id. An admin's re-mark is recorded for the creator's menu only and sends no notification.
+
 ## Known gaps (follow-ups)
 
 - (Closed 2026-11-02, see "Verification") the history list's `video.id`, trash, the `/api/videos` cancel, the artwork picker, an unresolvable style at job start, parallel unlock guesses and `/confirm` counting.
