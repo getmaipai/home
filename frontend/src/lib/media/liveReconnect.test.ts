@@ -19,6 +19,7 @@ function fakeTimers() {
 function setup() {
   const el = document.createElement("audio");
   el.play = () => Promise.resolve();
+  el.autoplay = true;
   const t = fakeTimers();
   let reloads = 0;
   let gaveUp = 0;
@@ -79,6 +80,27 @@ describe("watchLiveReconnect", () => {
     expect(s.reloads()).toBe(0);
     s.el.dispatchEvent(new Event("error"));
     expect(s.t.size()).toBe(0);
+  });
+
+  test("an element nobody asked to play never retries, so a closed station stays closed", () => {
+    const s = setup();
+    s.stop();
+    const idle = document.createElement("audio");
+    let played = 0;
+    idle.play = () => { played += 1; return Promise.resolve(); };
+    let reloads = 0;
+    const t = fakeTimers();
+    watchLiveReconnect(idle, () => { reloads += 1; }, () => {}, t.timers);
+    idle.dispatchEvent(new Event("stalled"));
+    idle.dispatchEvent(new Event("error"));
+    t.advance(20000);
+    expect(reloads).toBe(0);
+    expect(played).toBe(0);
+    // The person presses Play: from then on a drop is retried.
+    idle.dispatchEvent(new Event("play"));
+    idle.dispatchEvent(new Event("error"));
+    t.advance(1000);
+    expect(reloads).toBe(1);
   });
 
   test("cleanup cancels a pending retry", () => {

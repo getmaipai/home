@@ -24,6 +24,9 @@ export function watchLiveReconnect(
   let timer: Timer | null = null;
   let userPaused = false;
   let gaveUp = false;
+  // Only a stream the person asked for can drop. An element that was never asked to play (a closed station the page asked the host for
+  // again) loads, stalls and errors on its own; retrying it would call play() and restart the station that was just closed.
+  let asked = !el.paused || el.autoplay;
   const cancel = () => { if (timer !== null) { timers.clear(timer); timer = null; } };
   const retry = () => {
     timer = null;
@@ -33,7 +36,7 @@ export function watchLiveReconnect(
   };
   const drop = () => {
     // One pending retry at a time: error, stalled and ended often arrive together for the same drop.
-    if (userPaused || gaveUp || timer !== null) return;
+    if (!asked || userPaused || gaveUp || timer !== null) return;
     attempt += 1;
     const delay = reconnectDelayMs(attempt);
     if (delay === null) { gaveUp = true; giveUp(); return; }
@@ -41,7 +44,7 @@ export function watchLiveReconnect(
   };
   // A pause that is not the stream ending or failing is the person's own.
   const onPause = () => { if (!el.ended && !el.error) { userPaused = true; cancel(); } };
-  const onPlay = () => { userPaused = false; };
+  const onPlay = () => { userPaused = false; asked = true; };
   const onPlaying = () => { attempt = 0; gaveUp = false; cancel(); };
   const events: Array<[string, () => void]> = [["error", drop], ["stalled", drop], ["ended", drop], ["pause", onPause], ["play", onPlay], ["playing", onPlaying]];
   for (const [name, fn] of events) el.addEventListener(name, fn);

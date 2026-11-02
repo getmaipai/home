@@ -37,12 +37,18 @@ export interface MediaDock {
   clear(): void;
   /** Play the next song of the music queue (the mini bar's Next); does nothing when there is none. */
   next(): Promise<void>;
+  /** Start a live station's stream again after it failed to start (the bar's Retry). */
+  retry?(): void;
 }
 
 /** One element at a time: a new item replaces the old one (paused and unloaded first). Changes are published after the render
  * that asked for the element, since `mediaFor` runs during a page's render. */
 export function createMediaStore() {
   let current: HoistedMedia | null = null;
+  // The item the person closed. The page they closed it on may still show that same item and ask the host for its element again on
+  // the next render; that element must not start by itself (it would restart the station they just stopped). It plays only when the
+  // person presses Play (`allowAutoplay`, or the element's own play event), and the mark ends when another item is requested.
+  let closedId: string | null = null;
   const listeners = new Set<() => void>();
   const notify = () => queueMicrotask(() => listeners.forEach((listener) => listener()));
   const drop = (entry: HoistedMedia) => {
@@ -68,18 +74,23 @@ export function createMediaStore() {
         return current.el;
       }
       if (current) drop(current);
+      const wasClosed = closedId === ref.id;
+      if (!wasClosed) closedId = null;
       const el = document.createElement(ref.kind === "audio" ? "audio" : "video");
+      if (wasClosed) el.preload = "none";
       el.setAttribute("src", ref.src);
-      el.autoplay = appId === "music";
+      el.autoplay = appId === "music" && !wasClosed;
       // The Player that asked for it adopts it in the same commit, and parks it in the kit's hidden spot when it goes. This file does
       // not import the Player (it stays out of the shell's main chunk; PackageAppPage loads it on demand).
       el.addEventListener("play", () => {
+        if (current?.el === el) closedId = null;
         if (current?.el === el && !current.started) {
           current = { ...current, started: true };
           notify();
         }
       });
-      current = { ...ref, appId, el, started: false };
+      // A live station is asked for by the person's press on Play, so its bar opens at once and shows Connecting until sound arrives.
+      current = { ...ref, appId, el, started: el.autoplay && liveStationIdOf(ref.src) !== null };
       notify();
       return el;
     },
@@ -96,8 +107,13 @@ export function createMediaStore() {
       if (patch.src !== undefined) el.setAttribute("src", patch.src);
       notify();
     },
+    /** The person asked to play this item (a Play button): it may start by itself again. */
+    allowAutoplay(id: string) {
+      if (closedId === id) closedId = null;
+    },
     clear() {
       if (!current) return;
+      closedId = current.id;
       drop(current);
       current = null;
       notify();
@@ -144,6 +160,7 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
         const to = playRoute(kind, mediaId);
         if (!to) throw new Error("This item cannot be played from here. Open it from its app.");
         // A second press on what is already open resumes it; it never navigates again (that stacked history and re-ran the page).
+        store.allowAutoplay(mediaId);
         const held = store.get();
         if (held && playIsAlreadyOpen(held.id, pathRef.current, to, mediaId)) {
           if (held.el.paused) void held.el.play().catch(() => undefined);
@@ -241,7 +258,14 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     const every = setInterval(() => void look(), NOW_POLL_MS);
     return () => { stopRejoin(); element.removeEventListener("playing", onPlaying); clearInterval(every); if (first) clearTimeout(first); };
   }, [element, liveId, store]);
-  const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear, next: advance }), [current, store, advance]);
+  const retry = useCallback(() => {
+    const held = store.get();
+    if (!held) return;
+    store.allowAutoplay(held.id);
+    if (hlsRef.current) { hlsRef.current.stopLoad(); hlsRef.current.startLoad(-1); } else held.el.load();
+    void held.el.play().catch(() => undefined);
+  }, [store]);
+  const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear, next: advance, retry }), [current, store, advance, retry]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);
   return (
