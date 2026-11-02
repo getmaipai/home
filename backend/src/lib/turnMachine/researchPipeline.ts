@@ -10,6 +10,7 @@
 import { complete } from "@/lib/llm";
 import { notesLedger, squash, type Ledger, type PageKind, type PageNote } from "./pageNotes";
 import { namesIn, nameIsGiven, squashText } from "./fabrication";
+import { nodeSignal } from "./deadline";
 import { isRepeatQuery, queryWriterPrompt, researchProgress, shortKeywordQuery, type AnswerStyle, type QueryWriter } from "./research";
 
 /** One model call: a prompt in, text out, or null when the model is unavailable. */
@@ -181,6 +182,32 @@ export function briefBlock(brief: Brief): string {
 export const SUB_QUESTION_ANGLES = 'A good answer depends on more than the literal ask. Also fill "angles": {"why_it_stopped_or_changed": "", "what_was_planned_or_announced": "", "what_came_after": "", "who_said_what": ""}: for each key a sub-question worded from this question\'s subject when the question\'s answer rests on it, or "" when it does not.';
 /** Stage 2's rule against invented names in the plan (the code guard in `unnamedParts` backs it up). */
 export const SUB_QUESTION_NAMES = "A sub-question names only what the question, the pinned subject or the person's words name; a part about people or works not named there is worded without names.";
+
+/** The plan writer gets its own wall-clock deadline (default 10 s). When it is cut, its request is aborted and the plan falls back to the
+ * brief's must-contain parts as the sub-questions with no searches (no extra model call); the caller's model round then writes the searches.
+ * `cut` tells the caller to log a timeline line. */
+export const PLAN_DEADLINE_MS = 10_000;
+export async function planDataWithin(
+  makeWriter: (signal: AbortSignal) => QueryWriter,
+  parent: AbortSignal,
+  brief: Brief | null,
+  utterance: string,
+  count: number,
+  anchorNote = "",
+  given = "",
+  deadlineMs: number = PLAN_DEADLINE_MS,
+): Promise<{ plan: DataPlan; cut: boolean }> {
+  const { signal, clear } = nodeSignal(parent, deadlineMs);
+  const cutPromise = new Promise<"cut">((resolve) => {
+    if (signal.aborted) resolve("cut");
+    else signal.addEventListener("abort", () => resolve("cut"), { once: true });
+  });
+  try {
+    const winner = await Promise.race([planData(makeWriter(signal), brief, utterance, count, anchorNote, given), cutPromise]);
+    if (winner !== "cut") return { plan: winner, cut: false };
+    return { plan: { subQuestions: (brief?.mustContain ?? []).map((p) => p.trim()).filter(Boolean).slice(0, 6), queries: [] }, cut: true };
+  } finally { clear(); }
+}
 
 export async function planData(writer: QueryWriter, brief: Brief | null, utterance: string, count: number, anchorNote = "", given = ""): Promise<DataPlan> {
   const base = queryWriterPrompt(utterance, researchProgress([]), "", count, anchorNote);

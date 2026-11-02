@@ -20,7 +20,7 @@ export interface PageNote {
 }
 
 /** One model call: a prompt in, the model's text out, or null when the model is unavailable. */
-export type NoteWriter = (prompt: string) => Promise<string | null>;
+export type NoteWriter = (prompt: string, signal?: AbortSignal) => Promise<string | null>;
 
 /** RESEARCH-NOTES-02 (senior review, 2026-11-01): the light model took about 7 seconds per 7,000-character window (85 seconds for two pages),
  * the slowest stage per page. A page now gets ONE short call over its few most relevant passages, picked by code. */
@@ -34,13 +34,15 @@ export const NOTE_CONCURRENCY = 4;
 export const NOTES_WAIT_MS = 25_000;
 /** A research run starts no new note call this long after its first one: notes are written only while time allows. */
 export const NOTES_START_BUDGET_MS = 25_000;
+/** A note call that has not answered in this long is aborted (the Stack stops generating) and counts as a failed call. */
+export const NOTE_CALL_TIMEOUT_MS = 12_000;
 
 let writerOverride: NoteWriter | undefined;
 /** Tests: replaces the note writer (the Stack's light model by default); undefined restores it. */
 export function __setNoteWriterForTests(writer: NoteWriter | undefined): void { writerOverride = writer; }
 
-const lightNoteWriter: NoteWriter = async (prompt) => {
-  const result = await completeBackground([{ role: "user", content: prompt }], { max_tokens: 700 });
+const lightNoteWriter: NoteWriter = async (prompt, signal) => {
+  const result = await completeBackground([{ role: "user", content: prompt }], { max_tokens: 700, ...(signal ? { signal } : {}) });
   return result.ok ? result.text : null;
 };
 export const currentNoteWriter = (): NoteWriter => writerOverride ?? lightNoteWriter;
@@ -171,6 +173,23 @@ export function makeGate(max: number): <T>(fn: () => Promise<T>) => Promise<T> {
 export interface NoteStats { pages: number; calls: number; failedCalls: number; ms: number; kept: number; droppedQuotes: number }
 export const newNoteStats = (): NoteStats => ({ pages: 0, calls: 0, failedCalls: 0, ms: 0, kept: 0, droppedQuotes: 0 });
 
+export interface NoteCallOptions {
+  /** One call is aborted after this long and counts as failed (default NOTE_CALL_TIMEOUT_MS). */
+  callTimeoutMs?: number;
+  /** The research cut-off time (epoch ms): no call starts when less than `callTimeoutMs` remains before it. */
+  cutAt?: number;
+}
+
+/** The writer raced against a deadline: the request is aborted on the deadline and the promise settles with null either way. */
+async function callWithDeadline(writer: NoteWriter, prompt: string, timeoutMs: number): Promise<string | null> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const cut = new Promise<null>((resolve) => {
+    timer = setTimeout(() => { controller.abort(new DOMException("note call deadline exceeded", "TimeoutError")); resolve(null); }, timeoutMs);
+  });
+  try { return await Promise.race([writer(prompt, controller.signal).catch(() => null), cut]); } finally { clearTimeout(timer); }
+}
+
 /** The notes of one page: one call of the note writer (through the run's gate) over the page's most relevant passages, quotes checked
  * against the page's whole text. `focus` is the question and its parts; `startedAt` and `startBudgetMs` keep a late page from starting a call. */
 export async function writePageNotes(
@@ -181,6 +200,7 @@ export async function writePageNotes(
   stats: NoteStats = newNoteStats(),
   now: () => number = Date.now,
   focus: string = question,
+  options: NoteCallOptions = {},
 ): Promise<PageNote[]> {
   let host = "";
   try { host = new URL(page.url).hostname; } catch { host = ""; }
@@ -188,9 +208,11 @@ export async function writePageNotes(
   const excerpt = relevantExcerpt(page.text, focus);
   if (excerpt.trim() === "") return [];
   const result = await gate(async () => {
+    const timeoutMs = options.callTimeoutMs ?? NOTE_CALL_TIMEOUT_MS;
+    // No call starts when it could not finish before the research cut-off.
+    if (options.cutAt !== undefined && options.cutAt - now() < timeoutMs) return { kind: "unknown", notes: [], dropped: 0 } as ParsedNotes;
     const started = now();
-    let reply: string | null = null;
-    try { reply = await writer(notePrompt(question, page.title, host, excerpt)); } catch { reply = null; }
+    const reply = await callWithDeadline(writer, notePrompt(question, page.title, host, excerpt), timeoutMs);
     stats.calls += 1;
     stats.ms += now() - started;
     if (reply === null) stats.failedCalls += 1;

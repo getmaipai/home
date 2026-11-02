@@ -2,7 +2,7 @@ import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
-import { ANSWER_WORDS, stageTimeoutMs, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planData, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
+import { ANSWER_WORDS, stageTimeoutMs, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planDataWithin, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
 import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchEvidence, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
@@ -1165,7 +1165,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     state.entityAnchor = pinned.anchor;
     markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates${pinned.debug ? `: [${pinned.debug.titles.join(" | ")}], pick reply ${JSON.stringify((pinned.debug.reply ?? "").slice(0, 80))}` : ""})`);
     markResearch(state, "stage 2 plan start");
-    const plan = await planData(queryWriterOverride ?? chatQueryWriter(signal), brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor), pinned.anchor?.text ?? "");
+    const { plan, cut: planCut } = await planDataWithin((planSignal) => queryWriterOverride ?? chatQueryWriter(planSignal), signal, brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor), pinned.anchor?.text ?? "");
+    if (planCut) markResearch(state, "stage 2 plan cut at its deadline: the brief's must-contain parts are the sub-questions");
     markResearch(state, `stage 2 plan end (sub-questions: ${plan.subQuestions.join(" | ")})`);
     state.researchPlan = plan;
     // RESEARCH-PLAN-CARD-01: a grown-up sees the plan (the sub-questions) as steps of the existing activity row before the searches run.
