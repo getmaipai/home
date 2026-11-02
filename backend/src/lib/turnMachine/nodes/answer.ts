@@ -1,5 +1,4 @@
 import { markUnsourcedNames } from "../fabrication";
-import { repairOpening } from "../researchPipeline";
 import { checkClaims, dropUnknownCitations, dropUnsupportedCredits, evidenceBySource, researchEvidence, type ClaimJudge } from "../research";
 import { completeBackground } from "@/lib/llm";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -202,8 +201,7 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       const claims = research && sources.length > 0 && getHouseholdSettingValue("research.claim_check") !== false
         ? await checkClaims(marked.text, [...evidenceBySource(state.outcomes, state.pageNotes ?? []), ...(backboneSource ? [state.backbone?.text ?? ""] : [])], claimJudgeOverride ?? lightModelJudge, { uncitedPassages })
         : { text: marked.text };
-      const opened = research ? repairOpening(claims.text, state.entityAnchor, state.researchBrief) : claims.text;
-      return { outcome: { ok: true }, output: { text: `${opened}${note}`, sources } };
+      return { outcome: { ok: true }, output: { text: `${claims.text}${note}`, sources } };
     }
     case "from_outcomes": {
       // COMMAND-FAIL-01: this text is machine.ts's own last-resort

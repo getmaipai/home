@@ -306,19 +306,6 @@ export async function analyse(brief: Brief | null, question: string, findings: F
 
 // ---------------------------------------------------------------- stage 5: the reply
 
-/** RESEARCH-OPENING-01: a Thinking or Max answer's first lines name what the question is about. When the pinned subject's base name is
- * missing from the opening (a chatty lead-in, a heading), one plain sentence naming it goes first: the model's own reading of the question
- * (stage 1's assumption) when there is one, else the pinned article's title. Nothing is added when the name is already there. */
-export function repairOpening(text: string, anchor: { title: string; baseName: string } | null | undefined, brief: Brief | null | undefined): string {
-  if (!anchor || text.trim() === "") return text;
-  const flat = (t: string): string => t.toLowerCase().replace(/[*_`#]/g, "").replace(/\s+/g, " ");
-  const opening = flat(text.trim().split(/\n\s*\n/)[0]!.slice(0, 600));
-  if (opening.includes(flat(anchor.baseName))) return text;
-  const reading = brief?.assumption?.trim();
-  const sentence = reading && flat(reading).includes(flat(anchor.baseName)) ? (/[.!?]$/.test(reading) ? reading : `${reading}.`) : `This answers your question about ${anchor.title}.`;
-  return `${sentence}\n\n${text.trimStart()}`;
-}
-
 const cites = (sources: readonly number[]): string => sources.map((n) => `[${n}]`).join("");
 
 /** Words in the answer the writing round aims for, by style (a target in the prompt, never a cap: an adult's written answer has none). */
