@@ -560,7 +560,7 @@ From Loki Doki `adminImageLoras.ts` `POST /civitai-import` (802 to 1100), each i
 
 | Piece | Loki Doki | In `video.lora.install` |
 |---|---|---|
-| `.part` file, rename on completion | yes | yes; `.part` names are `lora-install-<job>.part`, removed on failure and swept at startup |
+| `.part` file, rename on completion | yes | yes (built, Stack `e983fb2`); the name is `lora-install-<hash of the address>.part` so Try again finds it; kept after an interrupted download, removed when the file is refused (header, hash, size, host) and when older than 24 hours (swept at the start of the next install) |
 | `Range` resume | yes | yes; a restart or a dropped link resumes from the `.part` length when the server answers 206 with a matching `Content-Range`; otherwise it restarts from zero |
 | Auth only for its host, stripped on a cross-origin redirect | yes (Civitai host) | yes: the Bearer header goes only to the token's own host, and every redirect hop is re-checked against the allow list; a hop to another host drops the header |
 | Safetensors header check (`validateSafetensorsFile`, 1029 to 1040) | yes | yes, before the file is accepted; an HTML error page or pickle is refused |
