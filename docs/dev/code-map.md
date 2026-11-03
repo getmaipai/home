@@ -571,9 +571,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
-| `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, TRASH_DAYS, patchLora, confirmLora, needsConfirmation |
+| `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
 | `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras |
+| `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
 | `backend/src/lib/mdns.ts` | mdnsHostLabel, advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising |
