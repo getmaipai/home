@@ -14,6 +14,8 @@ Status: proposed, design only. Item VIDEO-LORA-01 (this note). Nothing here is b
 
 Two designs in one note because the second is the first's gate: no slice that shows a LoRA or an adult item ships before the Adult lock (section 3).
 
+> **Revision 2 (2026-11-02, owner rulings): section 15** replaces the browse, adult-handling, duplicate and install-robustness parts of sections 2.1, 4.1 (`audience`), 5.2 and 5.3 where they differ. Where section 15 and an earlier section disagree, section 15 wins.
+
 > **Amended 2026-11-02 by [settings-media-2026-11-02.md](settings-media-2026-11-02.md):** the Settings parts (D2 and sections 4.4, 5.1, 5.2, 5.3 item 3, and the `adult_adapters` switch) now live in that note's Styles tab; its section 1 names each change. The lock, the record and the Create picker stand as written here.
 
 ## 0. Decisions in one list
@@ -490,3 +492,113 @@ Duplicates avoided: no second passcode store, no second audience flag for minors
 - Whether the Stack's fork runtime has the same LoRA code as 0.18.0, and whether NAG exists there.
 - Civitai Terms of Service text and whether a download works without a key.
 - Real LoRA key naming of community LTX files (read headers in VIDEO-LORA-04).
+
+## 15. Revision 2 (2026-11-02): browse like Loki Doki, three-state adult check, duplicates, install robustness
+
+Owner rulings (chat, 2026-11-02): the LoRA browser threw away what the Loki Doki one did well. (1) Browse with search, filters, sort, paging, a licence step and one-line reasons. (2) Adult handling has three states, `normal`, `unknown` and `adult`, decided from the source's own data only, in place of a keyword list. (3) Remove duplicates in results and refuse or flag a duplicate install. (4) Port the install robustness. Nothing here is built; the slices are in 15.8.
+
+**Rules check, up front.** RULES rule 0 forbids word lists and classifiers that block an adult, and the lock here hides and never blocks (section 8). This revision adds no word list: a state comes only from fields the source publishes (a flag and per-image levels), never from reading a name, description or tag for words. The old `lib/adultDetection.ts` keyword list stays dropped (table 2.1). No rule in `docs/design/RULES.md` changes, so no Owner-approved note is needed; the owner chose three states instead of a keyword list, and this section records that choice. The lock, availability and minor floors of sections 3 and 7 are unchanged.
+
+### 15.1 The three states (the `adult_check`)
+
+`adult_check` records what the source said, once, at browse or install time. It is evidence, never an access decision. The access decision stays the existing `audience` (`all-ages` or `adult-only`, default `adult-only`, `audience_set_by` for an explicit choice).
+
+| State | Meaning | Treated as |
+|---|---|---|
+| `normal` | The source's data says it is safe | Browse tile open; the confirm panel pre-sets "Adults only?" to No (an admin still presses Install; that click is the explicit choice, so `audience_set_by` is the admin) |
+| `unknown` | Missing, partial or conflicting data, or an unreadable response | Exactly like `adult`: locked tile, no title or thumbnail without an unlock proof; `audience` stays `adult-only` |
+| `adult` | The source says or shows adult | Locked tile; `audience` `adult-only`; lowering it needs the admin's explicit choice with a **fresh Adult unlock proof** |
+
+**Civitai** (documented REST API `GET /api/v1/models`; per-image `nsfwLevel` of the version's `images[]`; level values 1 = PG, 2 = PG-13, 4 = R, 8 = X, 16 = XXX, to be re-checked against the live API in the VIDEO-LORA-07 fixtures; unverified here):
+
+1. `adult` when the model's `nsfw` flag is true, **or** the model `nsfwLevel` is 4 or more, **or** any returned preview of the chosen version has `nsfwLevel` 4 or more. Any one of these wins even if the model's tags say safe.
+2. `normal` only when the flag is false, **and** at least one preview was returned, **and** every returned preview has `nsfwLevel` 1, **and** the model `nsfwLevel` is absent or 1.
+3. `unknown` in every other case: no previews, a preview with level 2 or a missing or non-numeric level, flag false against a model level of 2, a truncated or unparseable response, or a result set the source filtered for the viewer's region (the hub cannot know what was hidden).
+
+The check runs on the version the install will fetch (the version's previews), not the model's newest version.
+
+**Hugging Face** publishes no per-image level: `unknown`. One source field exists, the repo tag `not-for-all-audiences`; it raises to `adult` (a raise from the source's own data, never a lowering, and no word is read). Everything else on Hugging Face stays `unknown` until an admin decides. A file the admin adds is `unknown`.
+
+**Admin decisions** (Styles tab, behind the lock, as 3.2):
+
+- `unknown` to normal: an unlocked admin may choose All ages (no extra proof; they already unlocked to see it). Recorded in `audience`, `audience_set_by`, `audience_set_at`.
+- `adult` to normal: needs a fresh Adult unlock confirmation (the `/api/adult-lock/confirm` ticket of 3.10, single use, 30 s, bound to the LoRA). The record keeps `adult_check.state = adult` as evidence; only `audience` changes.
+- Any state to adult: always allowed, no proof (marking more is free, 3.10).
+- A re-run of the check (the Check again button) can raise a record's evidence; it never lowers `audience`.
+
+**In the browse results** (the one place hits are drawn before an install): an `adult` or `unknown` hit is a locked entry only, drawn by the kit as the one lock tile per list (3.8), with no title, creator, thumbnail, counts or reason line. Without an unlock proof the hub requests Civitai with `nsfw=false`, still classifies every returned model, and collapses the locked ones into the single tile (shown only when at least one exists, with no number; its place does not reveal a rank). With a proof and the **Show adult results** switch (off at each visit, the only thing that sends `nsfw=true`, 5.2) the full hit arrives. The hub fetches a hit's preview only for a hit it may show, and serves it from `/api/...` with the proof; without one the answer is 404 like a missing file. The 5-minute cache holds classified hits in hub memory only; redaction happens when a response is built, so a cache entry never leaks across a lock. Loki Doki blurred adult thumbnails (`LoraManager.tsx` 236 and 450, `blur-xl`); a blurred picture still leaks and is not kept.
+
+### 15.2 Spec impact (spec first, then Home)
+
+The `Lora` record in commons `spec` gets one additive optional field, **`adult_check`**: `{ state: "normal" | "unknown" | "adult", basis: "source_flag" | "source_levels" | "source_tag" | "none", flag: boolean | null, levels_seen: integer, adult_levels: integer, checked_at: date-time }`. Absent reads as `{ state: "unknown", basis: "none" }`, so every existing record validates unchanged. `audience` stays two-valued: `unknown` is a check state, not an audience, so Stack's `classification` mirror and every existing reader are untouched (one definition, one store). `validateLora` already requires `audience_set_by` for every `all-ages` record; 02b extends that one rule to require `audience_set_at` as well, and rewords the `audience` description (the admin's Install click is the explicit choice when the check says `normal`). The Stack is never sent a full `Lora` record carrying `adult_check` while pinned to an older spec. Whether an unlock proof backed a lowering is checked by the Home writer, since the record holds no proofs. The browse hit itself is a Home-internal shape in `lib/loras/source.ts`, not a spec record. Order: commons spec change and tag, then `bash scripts/pin.sh commons spec-vX.Y.Z` in Home.
+
+### 15.3 Browse (Loki Doki's, rebuilt from kit parts)
+
+Request `POST /api/loras/browse { source, q, media, kind, base, installed, sort, cursor, adult }` (settings-media 6, amended here).
+
+| Control | Values | Notes |
+|---|---|---|
+| Search | text | 300 ms debounce on the first page (as `LoraManager.tsx` 84); a pasted Hugging Face link opens the confirm panel |
+| Type | Any, Style, Character | Civitai: from the model's `tags` category data as a filter only (it decides nothing about content); Hugging Face has none, so such hits are Any and the admin sets the kind in the confirm panel |
+| Made for | LTX-2.5, LTX-2.3, Wan, All (default LTX-2.5 and LTX-2.3) | Civitai `baseModels` with the exact enum strings; Hugging Face from the repo's `base_model` metadata |
+| Installed | Any, Not installed, Installed | `installed` is by source version id, then sha256 where known, against live records; for a locked hit it is never shown |
+| Source | Hugging Face, Civitai (when on), Both | |
+| Sort | Most downloaded (default), Top rated, Newest | Civitai `Most Downloaded`, `Highest Rated`, `Newest`; Hugging Face `downloads`, `likes`, `createdAt`. Across sources the order is exact only within a source's page; the merged page is ordered by the chosen key, and the page says so under Details of the dialog rather than promising a global order |
+| Paging | Previous, numbered, Next | Cursor paging as Loki Doki (`cursorsRef`, 99 to 112): the client keeps the cursor of each visited page; at most 1,000 results (5.2) |
+| Licence | Once per admin: the plain licence notice before the first install, then a licence badge on each tile (open, non-commercial, custom, unknown) | Ported from the `Model licenses` dialog (`LoraManager.tsx` 327 to 336), recorded on the record as `licence.acknowledged_by` |
+
+**One-line reasons.** Every tile carries one fixed-template line built from fields, never written by a model: "Made for LTX 2.5, 412 MB, open licence, 8,300 downloads". A tile that cannot be installed says why in the same slot: "Made for Wan. This household's videos use LTX", "Already installed as Clay look" (locked hits say nothing), "Asks you to accept terms on Hugging Face first", "File is over 4 GB". The Install button is disabled only with such a line, never silently.
+
+### 15.4 Duplicates
+
+1. **In results.** A hit's identity is `(site, remote_id, version_id)`; repeated entries collapse. Across sources the only identity is the file's **sha256** when both sources publish it (Hugging Face `?blobs=true` LFS hash, fetched lazily and cached per shown repo; Civitai `files[].hashes.SHA256`). Names are never used as identity. When two hits share a sha256 the preferred source is kept: **Hugging Face first** (no key, stable hash, and the official Lightricks files), then Civitai. The kept tile lists the other source as "Also on Civitai". This replaces Loki Doki's first-wins merge, whose order was Civitai before its mirror (`adminImageLoras.ts` 473 to 475, 705 to 712 `byVersion`).
+2. **At install.** Home checks before calling the Stack: a live record with the same `source.site` and `version_id`, or the same `sha256_expected`, makes Install say, in plain words, "You already have this as <name>." with **Open it** (router state, never a URL id). For a locked record the line is "You already have this style." and **Open it** goes to the card behind the lock. A same version id with a **different** hash (the source replaced the file): "The source changed this file since you installed it." with **Install as a separate style** needing an explicit click. After the download the Stack's existing `duplicate_lora` (same sha256) is the second check and answers the existing record, so Home never stores two live records with one sha256 (the spec rule).
+
+### 15.5 Install robustness, ported (to the Stack job, VIDEO-LORA-06)
+
+From Loki Doki `adminImageLoras.ts` `POST /civitai-import` (802 to 1100), each item built or fixed in the Stack job:
+
+| Piece | Loki Doki | In `video.lora.install` |
+|---|---|---|
+| `.part` file, rename on completion | yes | yes; `.part` names are `lora-install-<job>.part`, removed on failure and swept at startup |
+| `Range` resume | yes | yes; a restart or a dropped link resumes from the `.part` length when the server answers 206 with a matching `Content-Range`; otherwise it restarts from zero |
+| Auth only for its host, stripped on a cross-origin redirect | yes (Civitai host) | yes: the Bearer header goes only to the token's own host, and every redirect hop is re-checked against the allow list; a hop to another host drops the header |
+| Safetensors header check (`validateSafetensorsFile`, 1029 to 1040) | yes | yes, before the file is accepted; an HTML error page or pickle is refused |
+| Hash | none | sha256 on receipt, compared with the source's hash when it gave one, recorded |
+| Size cap | none | 4 GB, checked from `Content-Length` before and from bytes received during |
+| Host allow list, HTTPS only | no | yes (design 5.3) |
+| Progress | private SSE stream | the Stack job list (RULES S6), named "Downloading a style" |
+| 5-minute search cache | yes | stays in Home `lib/loras/source.ts`, not in the Stack |
+
+### 15.6 Ported from Loki Doki, one table
+
+| Loki Doki (read only, under `loki-doki/`) | Port |
+|---|---|
+| `frontend/src/components/admin/LoraManager.tsx`: search with debounce, sort, cursor paging, licence dialog, Adult on or off | Kept as 15.3, with the Adult switch only after an unlock and a lock tile in place of blur |
+| `backend/src/routes/adminImageLoras.ts` search (460 to 588) | Civitai through the documented REST API only (the Meilisearch key is dropped, table 2.1); dedupe and source order as 15.4 |
+| same, 641 to 742 search cache and merge | 5-minute cache kept, in memory; merge by sort key kept |
+| same, `civitai-import` 802 to 1100 | 15.5 |
+| `backend/src/lib/adultDetection.ts` | Not ported: it is a word list. Replaced by 15.1 |
+| `backend/src/lib/loraTokens.ts` | Already kept at import (table 2.1) |
+
+### 15.7 What this changes in the earlier sections
+
+| Where | Change |
+|---|---|
+| Decision D4 and 5.3 step 1 | "Adults only?" is pre-set from `adult_check`: normal gives No, adult and unknown give Yes; the Hugging Face `not-for-all-audiences` tag raises to adult |
+| 4.1 `audience` row | Unchanged; `adult_check` (15.2) sits beside it |
+| 5.2 "results with `nsfwLevel` above 1 come back as locked" | Replaced by the exact rule of 15.1 (level 2 is `unknown`, level 4 or more is `adult`, both locked) |
+| settings-media 6, `POST /api/loras/browse` body | Gains `kind`, `base` and `installed`; the `adult` flag is unchanged |
+| settings-media 5.2, the paragraph on locked results and the sort list | Read with 15.1 and 15.3 |
+| 11, test 13 | Adds: a duplicate by version id and by sha256, a changed-file same-version case, a cross-origin redirect that strips the token, a resume from a `.part` file |
+| New test 14 | Adult check table: every row of 15.1 for Civitai (flag only, level only, tag safe but preview adult, all safe, no previews, level 2, malformed), Hugging Face with and without the tag, a locked hit carries no field in the response, no thumbnail request is made for it, a lowering from adult without a fresh ticket is refused |
+
+### 15.8 Slices
+
+| Id | Size, repo | Slice |
+|---|---|---|
+| VIDEO-LORA-02b | S, commons | Add the optional `adult_check` to the `Lora` spec, `validateLora` rule, fixtures, tag (done in this revision's work) |
+| VIDEO-LORA-DOC-01 | S, `.github` | Unchanged; it also states the sent fields and that nothing about the household is sent; it lists the lazy Hugging Face `?blobs=true` hash calls in the request budget |
+| VIDEO-LORA-06 | M, Stack | Unchanged scope plus 15.5; no `adult_check` in the Stack (it never decides access) |
+| VIDEO-LORA-07 | M, Home | Adds the three-state classifier, the dedupe, the filters and the `adult_check` write (15.1, 15.3, 15.4); test 14 |
+| VIDEO-LORA-08 | M, Home | Adds the filter row, reason lines, locked tiles, the duplicate "Open it" link and the lowering confirmation |
