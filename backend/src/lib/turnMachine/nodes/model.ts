@@ -848,7 +848,7 @@ async function thinEvidenceRound(state: TurnState, utterance: string, signal: Ab
   const earlier = researchProgress(state.outcomes).queries;
   const plan = fallbackPlan(state.researchBrief ?? null, rq, PLANNED_SEARCHES_PER_ROUND, state.entityAnchor?.text ?? "", state.entityAnchor?.phrase ?? "");
   const candidates = plan.queries.length > 0 ? plan.queries : [shortKeywordQuery(rq)];
-  const queries = candidates.filter((q) => q.split(/\s+/).length >= 2 && !isRepeatQuery(earlier, q)).slice(0, PLANNED_SEARCHES_PER_ROUND);
+  const queries = candidates.filter((q) => collapseSpaces(q).split(" ").length >= 2 && !isRepeatQuery(earlier, q)).slice(0, PLANNED_SEARCHES_PER_ROUND);
   if (queries.length === 0) return null;
   floorUsed.add(state);
   markResearch(state, `evidence floor: ${hosts} hosts, ${notes.length} notes, ${chars} chars of backbone and notes is thin and time remains; one more round of ${queries.length} searches`);
