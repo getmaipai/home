@@ -44,22 +44,17 @@ export const MIN_CROSSFADE_S = 0.3;
 export const MAX_CROSSFADE_S = 1.0;
 export const DEFAULT_CROSSFADE_S = 0.5;
 /**
- * Whether the Stack's `media.edit` has a `crossfade` op (2026-11-02: it has not; its ops are trim, concat, mute, frame, audio_overlay, fade, and
- * none of them can lay one clip over another, so a real crossfade cannot be built from them). Home builds the op and the check behind this switch;
- * flip it when the Stack lands the op described at `crossfadeOps`.
+ * Whether the Stack's `media.edit` has a `crossfade` op. It has since Stack a23ac89 (2026-11-02): `{ op: "crossfade", duration_s (0.3 to 1.0), with? }`, run like
+ * `concat`, blending each seam (video `xfade`, sound `acrossfade`), up to 6 clips, every clip longer than twice the duration.
  */
-export const CROSSFADE_IN_STACK = false;
+export const CROSSFADE_IN_STACK = true;
 
 /** Clips in the order the person named them: the first is the working clip, `concat` joins every later file (a straight cut), `crossfade` blends each seam over `duration_s`. */
 export function joinOps(transition: JoinTransition = "cut", duration: number = DEFAULT_CROSSFADE_S): EditOp[] {
   return transition === "crossfade" ? crossfadeOps(duration) : [{ op: "concat" }];
 }
 
-/**
- * The Stack op a crossfade join needs, which does not exist yet: `{ op: "crossfade", duration_s, with? }`, run like `concat` (the working clip then
- * the later files, or `with` by index), each seam blending the last `duration_s` of one clip into the first `duration_s` of the next (video `xfade`
- * `fade`, sound `acrossfade`), re-encoded to the first clip's size and rate. `duration_s` is 0.3 to 1.0; every clip must be longer than twice it.
- */
+/** The Stack's `crossfade` op: the working clip then the later files, each seam blending the last `duration_s` of one clip into the first `duration_s` of the next. */
 export function crossfadeOps(duration: number): EditOp[] {
   return [{ op: "crossfade", duration_s: Math.round(Math.min(MAX_CROSSFADE_S, Math.max(MIN_CROSSFADE_S, duration)) * 100) / 100 }];
 }
@@ -80,7 +75,33 @@ export function frameOps(atS: number): EditOp[] {
   return [{ op: "frame", at_s: atS }];
 }
 
-export function mixOps(level: MixLevel, startS: number, duck: boolean): EditOp[] {
+/** Where a laid-over sound sits and how it ends, beyond the five balances (the Studio's per-piece fades and cut). */
+export interface OverlayExtras { gain_db?: number; clip_gain_db?: number; fade_in_s?: number; fade_out_s?: number; end_s?: number }
+
+export function mixOps(level: MixLevel, startS: number, duck: boolean, extras: OverlayExtras = {}, input = 1): EditOp[] {
   const step = MIX_LEVELS.find((item) => item.id === level) ?? MIX_LEVELS[2]!;
-  return [{ op: "audio_overlay", input: 1, gain_db: step.gain_db, clip_gain_db: step.clip_gain_db, start_s: startS, duck }];
+  return [overlayOp(input, { gain_db: extras.gain_db ?? step.gain_db, clip_gain_db: extras.clip_gain_db ?? step.clip_gain_db, ...extras }, startS, duck)];
+}
+
+/** One `audio_overlay` step: the file at list position `input` over the working clip from `startS`. Fades and `end_s` are left out when they are zero or absent. */
+export function overlayOp(input: number, levels: OverlayExtras & { gain_db: number; clip_gain_db: number }, startS: number, duck: boolean): EditOp {
+  const op: Extract<EditOp, { op: "audio_overlay" }> = { op: "audio_overlay", input, gain_db: levels.gain_db, clip_gain_db: levels.clip_gain_db, start_s: startS, duck };
+  if (levels.fade_in_s && levels.fade_in_s > 0) op.fade_in_s = levels.fade_in_s;
+  if (levels.fade_out_s && levels.fade_out_s > 0) op.fade_out_s = levels.fade_out_s;
+  if (levels.end_s !== undefined) op.end_s = levels.end_s;
+  return op;
+}
+
+export const GAIN_DB_MIN = -60;
+export const GAIN_DB_MAX = 24;
+
+/** The level of the clip's own sound, or nothing when it does not change (a gain of less than a hundredth of a dB). */
+export function gainOps(db: number): EditOp[] {
+  const clean = Math.round(Math.min(GAIN_DB_MAX, Math.max(GAIN_DB_MIN, db)) * 100) / 100;
+  return Math.abs(clean) < 0.01 ? [] : [{ op: "gain", db: clean }];
+}
+
+/** A fade of picture and sound at the start and end of the working clip, or nothing when both are zero. */
+export function fadeOps(inS: number, outS: number): EditOp[] {
+  return inS > 0 || outS > 0 ? [{ op: "fade", in_s: Math.max(0, inS), out_s: Math.max(0, outS) }] : [];
 }

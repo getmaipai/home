@@ -18,23 +18,15 @@ import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
 import { MINOR_MAKE_LINE, bodyOfVideoJob, makeVideoFor, type MakeVideoBody } from "./make";
 import { laneOf } from "@/lib/pictures/lane";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
-import { readAttachment } from "@/lib/attachments";
-import { getMusicJobFor, readMusicFile } from "@/lib/music/jobs";
-import { synthesizeSpeech } from "@/lib/tts";
-import { listClonedVoices } from "@/lib/clonedVoices";
-import { getOfferedVoices } from "@/lib/voiceResolve";
-import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
-import { activeVideoJobsFor, readVideoFile, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
+import { activeVideoJobsFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, crossfadeProblem, frameOps, joinOps, lastFrameAt, mixOps, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, type EditFile } from "./stackEdit";
-import { isAdultOnlyJob } from "@/lib/pictures/ageCheck";
-import { fileAudience } from "@/lib/access";
-import { lockItemOfProvenance, newItemMark, type MarkSource } from "@/lib/adultLock";
-import { allVideoAdapters } from "./adapters";
+import { newItemMark, type MarkSource } from "@/lib/adultLock";
+import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
 import { videoAudienceOf, videoRefusalFor, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
@@ -227,7 +219,7 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
   const ready = body.tier === "max" ? ltx25MaxPictureReady(engine) || ltx25PictureReady(engine) : ltx25PictureReady(engine);
   if (!ready) return no(CONTINUE_NOT_READY_LINE, "picture_start_not_ready");
   if (activeVideoJobsFor(actor) > 0) return no(CONTINUE_BUSY_LINE, "already_making");
-  const clip = clipFile(actor, source);
+  const clip = clipFileOf(actor, source);
   if (!clip) return no(NO_CLIP_LINE, "no_clip");
   const framed = await runStackEdit({ inputs: [clip], ops: frameOps(lastFrameAt(file?.seconds ?? source.request.seconds)), name: "frame.png" });
   if (!framed.ok) return no(framed.line, framed.code);
@@ -244,7 +236,7 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
   const screened = await screenInputImage(jpeg, body.prompt, viewerOf(actor, audience.band));
   if (!screened.ok) return no(screened.line, screened.code);
   // Never lower than the source: an adult-only clip makes an adult-only continuation.
-  const mark = newItemMark([await clipMark(source)], false);
+  const mark = newItemMark([await clipMarkOf(source)], false);
   const adultOnly = mark.madeAudience === "adult-only";
   const stored = storeContinueFrame(actor, { conversationId: state.conversationId, turnId: state.turnId, temporary, jpeg, width, height, adultOnly, lock: mark.lock, sourceJobId: source.id });
   if (!stored.ok) return no(stored.line, "frame_not_saved");
@@ -254,81 +246,13 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
 // ---------------------------------------------------------------- trim, join and mix (the Stack's media.edit)
 
 type EditArgs = z.infer<typeof editVideoArgs>;
-const EXTENSION_OF: Record<string, string> = { "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "audio/flac": "flac", "audio/ogg": "ogg" };
 
 /** A finished clip of this person for an edit: "latest" or a video job id. A temporary chat uses only its own temporary clips and a saved chat never a temporary one. */
 function ownClip(actor: PersonRow, state: GenerateVideoState, clip: string, temporary: boolean): VideoJob | null {
   const job = sourceVideoJob(actor, state.conversationId, clip, temporary);
-  if (!job || job.personId !== actor.id) return null;
-  if (temporary && job.conversationId !== state.conversationId) return null;
-  if (videoJobLockState(actor, job) !== "open") return null;
-  return job;
+  if (job && temporary && job.conversationId !== state.conversationId) return null;
+  return editableClip(actor, job);
 }
-
-function clipFile(actor: PersonRow, job: VideoJob): EditFile | null {
-  const file = job.files[0];
-  // A clip in Trash or gone from the Library is not edited.
-  if (file && !job.temporary) { const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get(); if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id) return null; }
-  const read = file ? readVideoFile(actor, job, file.id) : null;
-  return read ? { bytes: read.bytes, ext: "mp4" } : null;
-}
-
-/** ADULT-LOCK-06: the flags a source clip carries right now (design 3.10): from its Library file when it has one (so a lock the creator cleared since the job
- * ran counts as cleared), else from what the job was marked at its start. A saved clip whose note does not say all-ages counts as adult-only with the lock on. */
-async function clipMark(job: VideoJob): Promise<MarkSource> {
-  const file = job.files[0];
-  if (file && !job.temporary) {
-    const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
-    const item = row ? lockItemOfProvenance(row.ownerPersonId, row.provenance) : null;
-    if (item) return { madeAudience: item.madeAudience, lock: item.lock };
-    if (!row || fileAudience(row.provenance) !== "all-ages") return { madeAudience: "adult-only", lock: "on" };
-    return { madeAudience: "all-ages", lock: "off" };
-  }
-  if (job.request.adultOnly === true) return { madeAudience: "adult-only", lock: job.request.adultLock ?? "on" };
-  if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification)) return { madeAudience: "adult-only", lock: "off" };
-  return { madeAudience: "all-ages", lock: "off" };
-}
-
-/** A song or sound file of this person for a mix: their own music job (a temporary chat's only in that chat) or a file in their own Library. */
-function ownTrack(actor: PersonRow, state: GenerateVideoState, track: string, temporary: boolean): EditFile | null {
-  const job = getMusicJobFor(actor, track);
-  let fileId = track;
-  if (job) {
-    if (job.state !== "done" || !job.fileId || job.temporary !== temporary) return null;
-    if (temporary && job.conversationId !== state.conversationId) return null;
-    const read = job.conversationId ? readMusicFile(actor, job, job.fileId) : null;
-    if (read) return { bytes: read.bytes, ext: "m4a" };
-    if (temporary) return null;
-    fileId = job.fileId;
-  }
-  // A temporary chat never uses a saved Library file.
-  if (temporary) return null;
-  const row = db.select().from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.ownerPersonId, actor.id))).get();
-  if (!row || row.deletedAt !== null || !row.mediaType.startsWith("audio/")) return null;
-  const read = readAttachment(actor, fileId);
-  return read.ok ? { bytes: read.value.bytes, ext: EXTENSION_OF[row.mediaType] ?? "m4a" } : null;
-}
-
-/** The voice a line is spoken in: the person's own choice, or a household voice they named by id or name. */
-async function voiceChoice(actor: PersonRow, named: string | undefined): Promise<{ ok: true; voice: string } | { ok: false }> {
-  if (!named) return { ok: true, voice: voiceForSpeech({ actor }) };
-  const wanted = named.trim().toLowerCase();
-  const household = listClonedVoices().find((voice) => voice.id.toLowerCase() === wanted || voice.label.trim().toLowerCase() === wanted);
-  if (household) return { ok: true, voice: household.id };
-  if (isPresetVoice(named)) return { ok: true, voice: named };
-  const offered = (await getOfferedVoices())?.find((voice) => voice.id.toLowerCase() === wanted || voice.name.trim().toLowerCase() === wanted);
-  return offered ? { ok: true, voice: offered.id } : { ok: false };
-}
-
-async function speakLine(line: string, voice: string): Promise<EditFile | null> {
-  const spoken = await synthesizeSpeech(line, voice);
-  if (!spoken.ok) return null;
-  try {
-    const bytes = new Uint8Array(await new Response(spoken.value.stream).arrayBuffer());
-    return bytes.byteLength > 0 ? { bytes, ext: "wav" } : null;
-  } catch { return null; }
-}
-
 async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, temporary: boolean): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   let sources: VideoJob[];
@@ -343,7 +267,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     sources = [one];
   }
   const first = sources[0]!;
-  const files = sources.map((job) => clipFile(actor, job));
+  const files = sources.map((job) => clipFileOf(actor, job));
   if (files.some((file) => file === null)) return refused(callId, args, NO_CLIP_LINE, "no_clip");
   const clipFiles = files as EditFile[];
   const seconds = first.files[0]?.seconds ?? null;
@@ -352,7 +276,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   let ops;
   let spoken: { line: string; voice: string } | null = null;
   // Never lower than the sources: any adult-only clip, an adult-only track or an adult line makes the edit adult-only.
-  const marks: MarkSource[] = await Promise.all(sources.map(clipMark));
+  const marks: MarkSource[] = await Promise.all(sources.map(clipMarkOf));
   let describe: string;
   if (value.change === "trim") {
     const range = trimRange({ from_s: value.from_s, to_s: value.to_s }, seconds);
@@ -376,17 +300,17 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       const voice = await voiceChoice(actor, value.voice);
       if (!voice.ok) return refused(callId, args, NO_VOICE_LINE, "no_voice");
       spoken = { line: value.line, voice: voice.voice };
-      if (await isAdultOnlyJob(value.line, [], async () => undefined)) marks.push({ madeAudience: "adult-only", lock: "off" });
+      const lined = await lineMark(value.line);
+      if (lined) marks.push(lined);
       inputs = [clipFiles[0]!]; // the spoken line joins in the run, so the answer does not wait for the speech
       ops = mixOps(value.level ?? DEFAULT_VOICE_LEVEL, start, true);
       describe = "your line laid over it";
     } else if (value.sound === "music") {
       if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
-      const track = ownTrack(actor, state, value.track, temporary);
+      const track = ownTrackFile(actor, value.track, temporary, state.conversationId);
       if (!track) return refused(callId, args, NO_TRACK_LINE, "no_track");
-      const trackRow = db.select().from(attachments).where(eq(attachments.id, value.track)).get();
-      if (trackRow && fileAudience(trackRow.provenance) === "adult-only") marks.push({ madeAudience: "adult-only", lock: lockItemOfProvenance(trackRow.ownerPersonId, trackRow.provenance)?.lock ?? "off" });
-      inputs = [clipFiles[0]!, track];
+      if (track.mark.madeAudience === "adult-only") marks.push(track.mark);
+      inputs = [clipFiles[0]!, track.file];
       ops = mixOps(value.level ?? DEFAULT_MUSIC_LEVEL, start, false);
       describe = "your song laid under it";
     } else return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");

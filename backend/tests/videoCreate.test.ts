@@ -294,11 +294,11 @@ describe("the Create page and the make action", () => {
 describe("Create is adult-only; Browse is unchanged", () => {
   const PAGES = ["create", "clips"];
   const appRow = async (client: TestClient) => ((await (await client.get("/api/apps")).json()) as Array<Record<string, any>>).find((row) => row.package === "videos")!;
-  test("the create group, the Create header mode and the two pages are gone below adult", async () => {
+  test("the create group, the Create header mode and the three pages are gone below adult", async () => {
     const { adult, teen, child } = await household();
     const adultApp = await appRow(adult.client);
     expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "create"]);
-    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "create").pages.map((p: { page: string }) => p.page)).toEqual(["create", "clips"]);
+    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "create").pages.map((p: { page: string }) => p.page)).toEqual(["create", "studio", "clips"]);
     expect(adultApp.header.modes.map((m: { id: string }) => m.id)).toEqual(["play", "create"]);
     for (const other of [teen, child]) {
       const row = await appRow(other.client);

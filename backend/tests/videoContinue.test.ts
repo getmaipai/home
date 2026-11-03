@@ -296,15 +296,15 @@ describe("C: join transition", () => {
     expect(crossfadeProblem([5, null, 0.9], 0.5)).toContain("too short");
   });
 
-  test("a crossfade is refused with the plain not-available line until the Stack has the step; nothing is read or started", async () => {
-    expect(CROSSFADE_IN_STACK).toBe(false);
+  test("a crossfade join is built and sent to the Stack now that it has the step (CROSSFADE_IN_STACK)", async () => {
+    expect(CROSSFADE_IN_STACK).toBe(true);
     const owner = person("owner");
     const a = await makeClip(owner);
     const b = await makeClip(owner, a.state.conversationId!);
     const outcome = await edit(chatState(owner, a.state.conversationId!), { clip: "latest", change: "join", clips: [a.job.id, b.job.id], transition: "crossfade", transition_s: 0.6 });
-    expect(refusedWith(outcome)).toBe("not_supported");
-    expect(outcome.result?.reply?.text).toContain(CROSSFADE_NOT_SUPPORTED_LINE);
-    expect(stack.jobs).toHaveLength(0);
+    expect(outcome.status).toBe("succeeded");
+    await finished(owner, outcome);
+    expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "crossfade", duration_s: 0.6 }]);
   });
 
   test("a join with transition cut, or none, is the same straight join as before", async () => {

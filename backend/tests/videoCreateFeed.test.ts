@@ -403,15 +403,15 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   });
 });
 
-describe("the manifest of two pages", () => {
-  test("Create and My clips are the whole Create group; the three old pages and their files are gone, the data list is still 16 ids", async () => {
+describe("the manifest of three pages", () => {
+  test("Create, Studio and My clips are the whole Create group; the three old pages and their files are gone, the data list is still 16 ids", async () => {
     const manifest = JSON.parse(await Bun.file(join(PACKAGES_DIR, "videos", "manifest.json")).text()) as { contributes: { sidebar: { groups: Array<{ id: string; pages: string[] }> }; pages: Array<{ id: string; module: string; min_role?: string }>; data: Array<{ id: string }>; header: { modes: Array<{ id: string; page: string }>; search: { label: string } } } };
     const create = manifest.contributes.sidebar.groups.find((group) => group.id === "create")!;
-    expect(create.pages).toEqual(["create", "clips"]);
+    expect(create.pages).toEqual(["create", "studio", "clips"]);
     const ids = manifest.contributes.pages.map((page) => page.id);
     expect(ids).not.toContain("make-video");
     expect(ids).not.toContain("creations");
-    for (const id of ["create", "clips"]) expect(manifest.contributes.pages.find((page) => page.id === id)).toMatchObject({ module: id, min_role: "adult" });
+    for (const id of ["create", "studio", "clips"]) expect(manifest.contributes.pages.find((page) => page.id === id)).toMatchObject({ module: id, min_role: "adult" });
     for (const page of manifest.contributes.pages) expect(await Bun.file(join(PACKAGES_DIR, "videos", "pages", `${page.module}.json`)).exists()).toBe(true);
     expect(await Bun.file(join(PACKAGES_DIR, "videos", "pages", "make-video.json")).exists()).toBe(false);
     expect(await Bun.file(join(PACKAGES_DIR, "videos", "pages", "creations.json")).exists()).toBe(false);

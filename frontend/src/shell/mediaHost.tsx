@@ -17,7 +17,7 @@ import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { createListenStatus, createStoryListener, type ListenStatus } from "@/shell/newsListen";
 import { watchLiveReconnect } from "@/lib/media/liveReconnect";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
-import { MediaPickerBody, type PickKind, type PickedMedia } from "@/shell/MediaPickerDialog";
+import { MediaPickerBody, StudioPickerBody, type PickKind, type PickedMedia } from "@/shell/MediaPickerDialog";
 import { makingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -158,14 +158,15 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   // NEWS-04: Listen on an article reads it into the host's element, which the global mini player then shows.
   const [status] = useState(createListenStatus);
   // VIDEO-CREATE-02 (U3): one picker at a time; a second request while one is open resolves the first with null.
-  const [pick, setPick] = useState<{ kind: PickKind; resolve: (picked: PickedMedia | null) => void } | null>(null);
+  const [pick, setPick] = useState<{ kind: PickKind | "audio" | "video"; start: "voice" | "music"; resolve: (picked: PickedMedia | null) => void } | null>(null);
   const pickRef = useRef(pick);
   pickRef.current = pick;
   const pickMedia = useCallback((kind: PickKind | "audio" | "video") => new Promise<PickedMedia | null>((resolve) => {
     pickRef.current?.resolve(null);
-    // Only pictures can be picked until a voice clip or a source clip has passed its bench (VIDEO-INPUTS-05, -06): the slots are not drawn, and a stray ask is refused.
-    if (kind === "audio" || kind === "video") { resolve(null); return; }
-    setPick({ kind, resolve });
+    // VIDEO-STUDIO-07: the Studio's Add a clip (`video`) and Add a voice or Add music (`audio`; the kit does not say which, so the button that was pressed
+    // chooses the side of the box that opens first). A prompt bar's reference slots still take pictures only.
+    const label = typeof document !== "undefined" ? document.activeElement?.textContent ?? "" : "";
+    setPick({ kind, start: /voice/i.test(label) ? "voice" : "music", resolve });
   }), []);
   // VIDEO-UI-06 (K8): the one line a Start button shows while pictures or video are not ready. Same ["health"] query and same words as `useMakingAvailability`.
   const health = useHealthQuery().data;
@@ -308,10 +309,12 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
           <Dialog open onOpenChange={(open) => { if (!open) { pick.resolve(null); setPick(null); } }}>
             <DialogContent scroll="viewport">
               <DialogHeader>
-                <DialogTitle>Choose a picture</DialogTitle>
-                <DialogDescription>The video starts from this picture. Choose one from your Library or add a new one.</DialogDescription>
+                <DialogTitle>{pick.kind === "video" ? "Choose a clip" : pick.kind === "audio" ? "Add a voice or music" : "Choose a picture"}</DialogTitle>
+                <DialogDescription>{pick.kind === "video" ? "Pick one of your own clips to put after this one." : pick.kind === "audio" ? "Type a line for Home to say, or pick one of your songs." : "The video starts from this picture. Choose one from your Library or add a new one."}</DialogDescription>
               </DialogHeader>
-              <MediaPickerBody kind={pick.kind} personId={personId} onDone={(picked) => { pick.resolve(picked); setPick(null); }} />
+              {pick.kind === "video" || pick.kind === "audio"
+                ? <StudioPickerBody kind={pick.kind} start={pick.start} personId={personId} onDone={(picked) => { pick.resolve(picked); setPick(null); }} />
+                : <MediaPickerBody kind={pick.kind} personId={personId} onDone={(picked) => { pick.resolve(picked); setPick(null); }} />}
             </DialogContent>
           </Dialog>
         ) : null}

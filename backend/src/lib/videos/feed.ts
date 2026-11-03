@@ -43,7 +43,8 @@ function fileIsLive(person: PersonRow, fileId: string): boolean {
 
 /** One job as a feed row, or null when it should not show (an edit, a chat clip, a finished clip whose file is gone). */
 export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlySet<string>): Record<string, unknown> | null {
-  if (job.personId !== person.id || job.conversationId !== null || job.kind === "edit") return null;
+  // A chat's clips are not on this page; a clip made by the Studio's Export (an edit with no chat behind it) is an entry like any other.
+  if (job.personId !== person.id || job.conversationId !== null) return null;
   // ADULT-LOCK-02: a locked job is the lock tile, built from nothing of the job (no prompt, tags, poster, clip, seed, size, level or favorite).
   if (videoJobLockState(person, job) !== "open") return lockedJobView(job);
   const file = job.state === "done" ? job.files[0] : undefined;
@@ -53,7 +54,8 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
   const level = levelOfJob(job);
   const look = create.look ? videoLookFor(create.look) : null;
   const camera = create.recipe ? videoRecipeFor(create.recipe) : null;
-  const tags = [look?.label, camera?.label, LEVEL_LABEL[level], `${file?.seconds ?? job.request.seconds ?? 0} s`, file?.audio === true ? "With sound" : undefined].filter((tag): tag is string => !!tag);
+  const edited = job.kind === "edit";
+  const tags = [edited ? "Edited" : look?.label, edited ? undefined : camera?.label, edited ? undefined : LEVEL_LABEL[level], `${file?.seconds ?? job.request.seconds ?? 0} s`, file?.audio === true ? "With sound" : undefined].filter((tag): tag is string => !!tag);
   const live = job.state === "running" ? liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`) : null;
   return {
     id: job.id,
@@ -88,7 +90,7 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
 
 /** The person's Create jobs, newest first (jobs made on this page: no chat behind them). */
 function createJobsOf(person: PersonRow, limit: number): VideoJob[] {
-  const ids = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), isNull(videoJobs.conversationId), inArray(videoJobs.kind, ["generate", "animate"]))).orderBy(desc(videoJobs.createdAt)).limit(limit).all();
+  const ids = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, person.id), isNull(videoJobs.conversationId), inArray(videoJobs.kind, ["generate", "animate", "edit"]))).orderBy(desc(videoJobs.createdAt)).limit(limit).all();
   return ids.flatMap(({ id }) => { const job = getVideoJobFor(person, id); return job ? [job] : []; });
 }
 

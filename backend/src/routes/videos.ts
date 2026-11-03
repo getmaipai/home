@@ -23,6 +23,7 @@ import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from 
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
+import { getStudioVoice } from "@/lib/videos/studioVoices";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { videoJobLockItem, videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
@@ -233,6 +234,36 @@ videosRoutes.openapi(fileRoute, (c) => {
   }
   headers["content-length"] = String(total);
   return new Response(file.bytes, { status: 200, headers }) as never;
+});
+
+const voiceParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
+const voiceRoute = createRoute({
+  method: "get", path: "/studio/voices/{id}", tags: ["Videos"], summary: "A spoken line made in the Studio this session, with Range support", middleware: [requireAuth] as const,
+  request: { params: voiceParams },
+  responses: { 200: { content: { "audio/wav": { schema: z.string() } }, description: "The line's sound." }, 206: { content: { "audio/wav": { schema: z.string() } }, description: "A Range slice." }, ...errorResponses({ 401: "Not signed in", 404: "No such line" }) },
+});
+videosRoutes.openapi(voiceRoute, (c) => {
+  const actor = c.get("person");
+  // The Studio is adult-only; a line is kept in memory for two hours and only its maker reads it.
+  const voice = laneOfPerson(actor) === "adult" ? getStudioVoice(actor.id, c.req.valid("param").id) : null;
+  if (!voice) return c.json({ error: "That voice line isn't available any more. Add it again." }, 404, NO_STORE) as never;
+  const total = voice.bytes.byteLength;
+  const headers: Record<string, string> = { "content-type": voice.mediaType, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
+  const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header("Range") ?? "");
+  if (range) {
+    const hasStart = range[1] !== "";
+    const start = hasStart ? Number(range[1]) : Math.max(total - Number(range[2] || 0), 0);
+    const end = hasStart && range[2] ? Math.min(Number(range[2]), total - 1) : total - 1;
+    if (Number.isInteger(start) && Number.isInteger(end) && start >= 0 && start <= end && end < total) {
+      const slice = voice.bytes.subarray(start, end + 1);
+      headers["content-range"] = `bytes ${start}-${end}/${total}`;
+      headers["content-length"] = String(slice.byteLength);
+      return new Response(slice, { status: 206, headers }) as never;
+    }
+    return new Response(null, { status: 416, headers: { "content-range": `bytes */${total}`, "cache-control": "private, no-store" } }) as never;
+  }
+  headers["content-length"] = String(total);
+  return new Response(voice.bytes, { status: 200, headers }) as never;
 });
 
 const messagesRoute = createRoute({

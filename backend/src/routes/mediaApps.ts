@@ -21,6 +21,8 @@ import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makeItMaxBody } from "@/lib/videos/editTool";
+import { studioAdd } from "@/lib/videos/studio";
+import { startStudioExport } from "@/lib/videos/studioExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
@@ -30,6 +32,9 @@ import { lookupLyricsFor } from "@/lib/media/lyricsAction";
 import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, madeFileFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
+
+/** VIDEO-STUDIO-07: Another take and Make it Max on a clip the Studio exported. */
+const EDITED_CLIP_LINE = "This clip was made by editing others, so it has no words to make again. Open the original clip and try there.";
 
 async function bodyOf(request: Request): Promise<Body> {
   const parsed = await request.json().catch(() => ({}));
@@ -164,10 +169,32 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await bodyOf(c.req.raw);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
+    // VIDEO-STUDIO-07: a clip made by editing others has no words of its own to make again; the original clip does.
+    if (source.kind === "edit") return c.json({ error: EDITED_CLIP_LINE, code: "edited" }, 422);
     // ADULT-LOCK-02: another take of a locked clip needs an unlock first; nothing starts.
     if (videoJobLockState(person, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423 as never);
     const made = await anotherTakeFor(person, source);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
+
+  // VIDEO-STUDIO-07: the Studio's Add a clip, Add a voice and Add music. What the person picked comes back as a piece (`{ ref, src, label, duration_s }`);
+  // a typed line is screened and spoken here, so no speech is made for a line the gate refuses. The rules are lib/videos/studio.ts.
+  routes.post("/actions/add", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "add")) return next();
+    const added = await studioAdd(person, await bodyOf(c.req.raw));
+    return added.ok ? c.json(added.piece as never, 200) : c.json({ error: added.line, code: added.code }, added.status);
+  });
+
+  // VIDEO-STUDIO-07: the Studio's Export. The plan the page posted becomes a NEW clip through the edit job trim, join and mix use (the old clip stays);
+  // the reply is the job's id, which the page's export card follows. The rules are lib/videos/studioExport.ts.
+  routes.post("/actions/export", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "export")) return next();
+    const started = await startStudioExport(person, await bodyOf(c.req.raw));
+    return started.ok ? c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200) : c.json({ error: started.line, code: started.code }, started.status);
   });
 
   // VIDEO-UI-06: the Create feed's Stop. Only the person's own Create clip (no chat behind it); a finished clip stays finished.
@@ -191,6 +218,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await bodyOf(c.req.raw);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state !== "done") return c.json({ error: "That video isn't available any more. Make a new one from the words on the left.", code: "gone" }, 404);
+    if (source.kind === "edit") return c.json({ error: EDITED_CLIP_LINE, code: "edited" }, 422);
     if (videoJobLockState(person, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423 as never);
     const audience = makeAudienceOf(person);
     // A clip that started from a Library picture keeps it (as Another take does); makeItMaxBody refuses it unless the Max model can start from a picture.

@@ -7,6 +7,9 @@ import { doneVideoJobsFor } from "@/lib/videos/jobs";
 import { lockedVideoTile } from "@/lib/videos/lock";
 import { feedRowById, feedRowOf, feedRows, levelOfJob } from "@/lib/videos/feed";
 import { favoriteFileIds } from "@/lib/videos/favorites";
+import { studioHeaderRows, studioLevelSteps, studioLimits, studioRows } from "@/lib/videos/studio";
+import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
+import { EDIT_REMOTE_LINE, EDIT_UNAVAILABLE_LINE } from "@/lib/videos/stackEdit";
 import { listLibrary } from "@/lib/library";
 import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_STARTERS, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -117,6 +120,17 @@ registerAppPageFill("videos", "create", (person, page) => {
   }
 });
 
+/** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
+ * where the person acts (the page shows it beside the button), never a raw error after a press. */
+registerAppPageFill("videos", "studio", (_person, page) => {
+  const studio = findNode(page.body, "studio");
+  if (!studio) return;
+  studio.limits = studioLimits;
+  studio.level_steps = studioLevelSteps;
+  if (!isStackConfigured()) studio.export_disabled_reason = EDIT_UNAVAILABLE_LINE.replace("I couldn't change that video. ", "");
+  else if (isRemoteStackSelected()) studio.export_disabled_reason = EDIT_REMOTE_LINE.replace("I couldn't change that video. ", "");
+});
+
 /** The My clips rows: Library clips made at home (the person's own and the ones shared with them, as the Library lists them), or the pictures the
  * person uploaded (what a Start frame can be). Each row carries its day and its Favorite mark. */
 function clipRows(person: PersonRow, view: string | undefined, limit: number): Array<Record<string, unknown>> {
@@ -170,6 +184,11 @@ registerMediaAppData("videos", (person, dataId, params) => {
     case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
     case "clips": return clipRows(person, params.view, Math.min(params.limit ?? 200, 200));
+    // VIDEO-STUDIO-07: the Studio page. `studio` is the opened clip as the TrackStudio's row, `studio-header` its header row, `studio-picker` the clips to
+    // pick from while none is open (no rows once one is, so the shelf under the Studio is not drawn).
+    case "studio": return studioRows(person, params.id);
+    case "studio-header": return studioHeaderRows(person, params.id);
+    case "studio-picker": return params.id && !params.id.startsWith("$") ? [] : clipRows(person, "all", 60);
     // A scope this page does not know (the three old pages' scopes are gone) answers nothing.
     default: return [];
   }

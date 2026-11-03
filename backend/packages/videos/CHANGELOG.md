@@ -4,6 +4,10 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
+- VIDEO-STUDIO-07: a Studio page between Create and My clips. Open a clip you made, cut it, put other clips of yours next to it with a cut or a crossfade, lay a voice line you type or a song of yours under it, set the levels and fades, then Export as a new clip. The old clip stays. Open in Studio is on every clip in the Create feed and on My clips tiles. Adults only.
+
 ## [0.2.0] - 2026-11-02
 
 - VIDEO-UI-06: Create is one page with two sides. Describe the video on the left (a Start frame inside the box, one Style button for Look and Camera, the level, the shape and length, and a Generate button that says about how long it takes). Your clips are on the right, newest first, and a new clip turns from waiting to a percent to a video by itself. Each clip has Download, Another take, Remix, Make it Max (when it is ready for you) and a star. A new My clips page shows every clip by day, with All, Favorites and Uploaded, a size slider and a heart. The pages Make a video and My creations are gone.

@@ -91,7 +91,8 @@ type Row = Record<string, unknown>;
 const isRow = (value: unknown): value is Row => typeof value === "object" && value !== null && !Array.isArray(value);
 
 function visit(value: unknown, depth: number, jobs: Array<Promise<void>>, flipped: string[]): void {
-  if (depth > 4) return;
+  // A Studio clip row is `[row] > lanes > lane > pieces > piece`: its pieces sit six levels down.
+  if (depth > 6) return;
   if (Array.isArray(value)) { for (const entry of value) visit(entry, depth + 1, jobs, flipped); return; }
   if (!isRow(value)) return;
   const id = typeof value.id === "string" ? value.id : null;

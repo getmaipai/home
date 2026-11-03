@@ -1,6 +1,6 @@
 {
   "id": "videos",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "app",
   "category": "Media",
   "display": "Videos",
@@ -64,6 +64,7 @@
           "mode": "create",
           "pages": [
             "create",
+            "studio",
             "clips"
           ]
         }
@@ -133,6 +134,15 @@
         "nav": true,
         "kind": "schema",
         "module": "create",
+        "min_role": "adult"
+      },
+      {
+        "id": "studio",
+        "label": "Studio",
+        "icon": "audio-waveform",
+        "nav": true,
+        "kind": "schema",
+        "module": "studio",
         "min_role": "adult"
       },
       {
