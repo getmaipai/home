@@ -9,17 +9,21 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
+import { videoAdaptersFor, dropVideoAdapterCache, adapterOfLora } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
 import { plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
-import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
+import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
 import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
-import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
+import { addVideoLora, StackVideoError } from "@/lib/videos/stack";
+import { readLora, readLoras } from "@/lib/loras/access";
+import { confirmLora, markAdultOnly, markAllAges, patchLora, removeLora } from "@/lib/loras/admin";
+import { LoraWriteError, getLoraRecord, saveLora } from "@/lib/loras/store";
+import { recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
@@ -166,7 +170,7 @@ videosRoutes.openapi(statusRoute, async (c) => {
   const denial = videoDenial(audience);
   const engine = await videoEngineStatus();
   const ready = videoStatusReady(engine, laneOf(audience) === "adult");
-  const styles = denial ? [] : (await videoAdaptersFor(videoAdapterAudiencesFor(audience))).map((a) => ({ id: a.id, name: a.name }));
+  const styles = denial ? [] : (await videoAdaptersFor(audience)).map((a) => ({ id: a.id, name: a.name }));
   return c.json({
     can_make: denial === null && ready,
     reason: denial ? VIDEO_DENIAL_LINE[denial] : ready ? null : videoNotReadyReason(engine),
@@ -373,7 +377,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   if (!source.conversationId) return c.json({ error: "That video isn't available any more." }, 404) as never;
   if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
   const audience = videoRouteAudience(actor);
-  const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
+  const adapters = await videoAdaptersFor(audience);
   // VIDEO-LTX-01: Quick or Detailed again. Left out, the video keeps its own kind; a style made for one model decides.
   const engine = await videoEngineStatus();
   const used = source.request.loras.flatMap((id) => { const found = adapters.find((a) => a.id === id); return found ? [found] : []; });
@@ -450,7 +454,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const fileId = body.file_id ?? latestGeneratedPictureId(actor, body.conversation_id);
   if (!fileId) return c.json({ error: "I can animate a picture made here or a photo you attach. Attach the photo, then try again.", code: "reference" }, 422) as never;
   const audience = videoRouteAudience(actor);
-  const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
+  const adapters = await videoAdaptersFor(audience);
   const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, adapters, styleIds: [] });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, 422) as never;
   const size = prep.width && prep.height && prep.height > prep.width ? VIDEO_SIZES_BY_QUALITY.quick.portrait : VIDEO_SIZES_BY_QUALITY.quick.landscape;
@@ -492,12 +496,15 @@ const settingsRoute = createRoute({
       lora_base_model: z.string(),
     }).describe("Detailed videos: sound and speech, up to 10 seconds."),
     enabled: z.boolean(), adult_adapters: z.boolean(), minors: z.string(), adapters: z.array(AdapterSchema),
+    locked_styles: z.boolean().describe("Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."),
   }) } }, description: "Additive." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) },
 });
 videosRoutes.openapi(settingsRoute, async (c) => {
   const engine = await videoEngineStatus();
-  let adapters: Awaited<ReturnType<typeof allVideoAdapters>> = [];
-  try { adapters = await allVideoAdapters(); } catch { adapters = []; }
+  // VIDEO-LORA-03: the library as this admin may read it now (lib/loras/access.ts): adult-only styles are one locked tile until their own unlock proof is valid.
+  let list: ReturnType<typeof readLoras> = { items: [], locked: false };
+  try { await syncLoras(); list = readLoras(c.get("person"), "own_written"); } catch { list = { items: [], locked: false }; }
+  const adapters = list.items.map(adapterOfLora);
   return c.json({
     state: engine?.state ?? "unavailable", available: engine?.available === true, reason: engine?.reason ?? (engine ? null : "Videos are not ready yet. Try again in a few minutes."), tier: engine?.tier ?? null,
     model_installed: engine?.qualities ? engine.qualities.quick.installed : engine?.model?.installed === true, limits: VIDEO_LIMITS_LINE,
@@ -512,50 +519,55 @@ videosRoutes.openapi(settingsRoute, async (c) => {
     })(),
     enabled: householdAllowsVideo(), adult_adapters: adultVideoAdaptersAllowed(),
     minors: "Videos are off for children and teens. No setting turns them on.",
-    adapters: adapters.map((a) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at })),
+    adapters: adapters.map(adapterWire),
+    locked_styles: list.locked,
   }, 200);
 });
 
 const adapterIdParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
+const NOT_IN_LIBRARY_LINE = "That style isn't in the library.";
+const adapterWire = (a: ReturnType<typeof adapterOfLora>) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at });
 const patchAdapterRoute = createRoute({
-  method: "patch", path: "/adapters/{id}", tags: ["Videos"], summary: "Switch a video LoRA on or off for chat, or change its class", middleware: [requireAuth, requireRole("owner", "admin")] as const,
+  method: "patch", path: "/adapters/{id}", tags: ["Videos"], summary: "Mark a video LoRA usable by adults (or admins only), change its class or name (kept for the Settings page; see /api/loras)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
   request: { params: adapterIdParams, body: { content: { "application/json": { schema: z.object({ enabled: z.boolean().optional(), classification: z.enum(["all-ages", "adult-only"]).optional(), name: z.string().trim().min(1).max(80).optional() }) } } } },
-  responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Updated." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such LoRA", 409: "That class is locked by the file's own description", 422: "A value is out of range" }) },
+  responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Updated." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such LoRA", 422: "A value is out of range" }) },
 });
 videosRoutes.openapi(patchAdapterRoute, async (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
+  await syncLoras();
+  // A style the admin cannot read (missing, or locked behind the Adult lock) answers like a missing one.
+  const found = readLora(actor, id, "own_written");
+  if (!found || found.state !== "open") return c.json({ error: NOT_IN_LIBRARY_LINE }, 404) as never;
   try {
-    // Only a LoRA that is in the library gets a switch: an unknown id never leaves a row behind.
-    if (!(await allVideoAdapters()).some((a) => a.id === id)) return c.json({ error: "That style isn't in the library." }, 404) as never;
-    if (body.classification || body.name) await updateVideoLora(id, { ...(body.classification ? { classification: body.classification } : {}), ...(body.name ? { name: body.name } : {}) });
-    if (typeof body.enabled === "boolean") setVideoAdapterEnabled(id, body.enabled, actor.id);
-    dropVideoAdapterCache();
-    const found = (await allVideoAdapters()).find((a) => a.id === id);
-    if (!found) return c.json({ error: "That style isn't in the library." }, 404) as never;
-    return c.json({ id: found.id, name: found.name, classification: found.classification, enabled: found.enabled, needs_confirmation: found.needs_confirmation, sha256: found.sha256, base_model: found.base_model, trigger_words: found.trigger_words, licence: found.licence, strength_default: found.strength_default, bytes: found.bytes, source_url: found.source_url, added_at: found.added_at }, 200);
+    if (body.name) patchLora(actor, id, { name: body.name });
+    if (body.classification === "adult-only") await markAdultOnly(actor, id);
+    if (body.classification === "all-ages") await markAllAges(actor, id);
+    if (typeof body.enabled === "boolean") {
+      if (body.enabled) confirmLora(actor, id);
+      patchLora(actor, id, { availability: { who: body.enabled ? "adults" : "admins" } });
+    }
   } catch (error) {
-    if (error instanceof StackVideoError) return c.json({ error: error.message, code: error.code }, (error.status === 404 || error.status === 409 || error.status === 422 ? error.status : 422) as 404 | 409 | 422) as never;
+    if (error instanceof LoraWriteError) return c.json({ error: error.message }, 422) as never;
     throw error;
   }
+  const after = getLoraRecord(id);
+  return after ? c.json(adapterWire(adapterOfLora(after)), 200) : c.json({ error: NOT_IN_LIBRARY_LINE }, 404) as never;
 });
 
 const deleteAdapterRoute = createRoute({
-  method: "delete", path: "/adapters/{id}", tags: ["Videos"], summary: "Remove a video LoRA and its file", middleware: [requireAuth, requireRole("owner", "admin")] as const,
+  method: "delete", path: "/adapters/{id}", tags: ["Videos"], summary: "Remove a video LoRA to the 30-day trash (kept for the Settings page; see /api/loras)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
   request: { params: adapterIdParams },
   responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } }, description: "Removed." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such LoRA" }) },
 });
 videosRoutes.openapi(deleteAdapterRoute, async (c) => {
+  const actor = c.get("person");
   const { id } = c.req.valid("param");
-  try {
-    await removeVideoLora(id);
-  } catch (error) {
-    if (error instanceof StackVideoError && error.status === 404) return c.json({ error: "That style isn't in the library." }, 404) as never;
-    throw error;
-  }
-  forgetVideoAdapterPref(id);
-  dropVideoAdapterCache();
+  await syncLoras();
+  const found = readLora(actor, id, "own_written");
+  if (!found || found.state !== "open") return c.json({ error: NOT_IN_LIBRARY_LINE }, 404) as never;
+  removeLora(actor, id);
   return c.json({ ok: true as const }, 200);
 });
 
@@ -583,10 +595,14 @@ videosRoutes.openapi(addAdapterRoute, async (c) => {
   out.set("added_by", "household");
   try {
     const lora = await addVideoLora(out);
-    // A new style is off, for everyone, until an admin has read its fingerprint and licence and turns it on.
-    setVideoAdapterEnabled(lora.id, false, PENDING);
+    // A new style is usable by admins only (the default of every record) and waits, unconfirmed, until an admin has read its fingerprint and licence.
+    const made = recordFromStack(lora, { enabled: false, updatedBy: "pending" }, adder.id);
+    if (made) {
+      try { saveLora({ ...made, added_by: adder.id, provenance: { origin: "file", job_id: null } }, adder.id); } catch { /* a record that cannot be saved stays unlisted and unusable: fail closed */ }
+    }
     dropVideoAdapterCache();
-    return c.json({ id: lora.id, name: lora.name, classification: lora.classification, enabled: false, needs_confirmation: true, sha256: lora.sha256, base_model: lora.base_model, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at }, 200);
+    const record = getLoraRecord(lora.id);
+    return c.json(record ? adapterWire(adapterOfLora(record)) : { id: lora.id, name: lora.name, classification: lora.classification, enabled: false, needs_confirmation: true, sha256: lora.sha256, base_model: lora.base_model, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at }, 200);
   } catch (error) {
     if (error instanceof StackVideoError) {
       const status = error.status === 403 || error.status === 409 || error.status === 413 || error.status === 422 ? error.status : 503;

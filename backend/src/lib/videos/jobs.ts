@@ -14,6 +14,7 @@ import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
 import { usesAdultOnlyStyle } from "./adultStyle";
+import { wireLoras } from "./loraWire";
 import { markFields, newItemMark } from "@/lib/adultLock";
 import { logAutoMark } from "@/lib/adultMarks";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
@@ -427,11 +428,14 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   // ADULT-LOCK-02: a clip made with an adult-only style is a locked item from the start, before the Stack is called, so a clip being made is already a lock tile.
   // ADULT-LOCK-06: the mark is decided here, from the one table (newItemMark): an adult-only style locks it on; a source's flags (`input.adultOnly`, `input.adultLock`) carry over.
   const adultStyle = await usesAdultOnlyStyle((input.body.loras ?? []).map((l) => l.id));
+  // VIDEO-LORA-03: the LoRAs go to the Stack only as it reports it can use them on this model; otherwise the clip fails now, with a plain line, before anything is queued.
+  const wired = await wireLoras(input.body.loras, model);
+  if (!wired.ok) throw new StackVideoError(422, "loras_unsupported", wired.line);
   const mark = newItemMark(input.adultOnly ? [{ madeAudience: "adult-only", lock: input.adultLock ?? "on" }] : [], adultStyle);
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -622,7 +626,7 @@ export type EditRun = (signal: AbortSignal) => Promise<{ ok: true; clip: EditedC
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
+export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -633,7 +637,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
     percent: 5, phase: "editing", position: null, prompt: input.source.prompt,
-    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
+    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

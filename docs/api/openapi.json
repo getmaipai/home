@@ -63047,6 +63047,10 @@
                           "added_at"
                         ]
                       }
+                    },
+                    "locked_styles": {
+                      "type": "boolean",
+                      "description": "Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."
                     }
                   },
                   "required": [
@@ -63061,7 +63065,8 @@
                     "enabled",
                     "adult_adapters",
                     "minors",
-                    "adapters"
+                    "adapters",
+                    "locked_styles"
                   ]
                 }
               }
@@ -63095,7 +63100,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Switch a video LoRA on or off for chat, or change its class",
+        "summary": "Mark a video LoRA usable by adults (or admins only), change its class or name (kept for the Settings page; see /api/loras)",
         "parameters": [
           {
             "schema": {
@@ -63239,16 +63244,6 @@
               }
             }
           },
-          "409": {
-            "description": "That class is locked by the file's own description",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "422": {
             "description": "A value is out of range",
             "content": {
@@ -63265,7 +63260,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Remove a video LoRA and its file",
+        "summary": "Remove a video LoRA to the 30-day trash (kept for the Settings page; see /api/loras)",
         "parameters": [
           {
             "schema": {
@@ -63749,6 +63744,2346 @@
           },
           "429": {
             "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "The household's styles an owner or admin may read now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "removed",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adult-only styles are one locked tile until the Adult lock is open.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "locked": {
+                      "type": "boolean",
+                      "description": "One tile for every locked style: no names, no count."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "style",
+                              "character",
+                              "motion",
+                              "other"
+                            ]
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "media": {
+                            "type": "string",
+                            "enum": [
+                              "video",
+                              "picture"
+                            ]
+                          },
+                          "base_model": {
+                            "type": "string"
+                          },
+                          "compatible_with": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "usable": {
+                            "type": "boolean"
+                          },
+                          "trigger_words": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "trigger_position": {
+                            "type": "string",
+                            "enum": [
+                              "start",
+                              "end"
+                            ]
+                          },
+                          "positive_addins": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "negative_addins": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "avoid_as_positive": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "strength": {
+                            "type": "object",
+                            "properties": {
+                              "default": {
+                                "type": "number"
+                              },
+                              "min": {
+                                "type": "number"
+                              },
+                              "max": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "default",
+                              "min",
+                              "max"
+                            ]
+                          },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "all-ages",
+                              "adult-only"
+                            ]
+                          },
+                          "availability": {
+                            "type": "object",
+                            "properties": {
+                              "who": {
+                                "type": "string",
+                                "enum": [
+                                  "admins",
+                                  "adults",
+                                  "people"
+                                ]
+                              },
+                              "people": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "who",
+                              "people"
+                            ]
+                          },
+                          "needs_confirmation": {
+                            "type": "boolean"
+                          },
+                          "licence": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "commercial_use": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "commercial_use"
+                            ]
+                          },
+                          "file": {
+                            "type": "object",
+                            "properties": {
+                              "sha256": {
+                                "type": "string"
+                              },
+                              "bytes": {
+                                "type": "number"
+                              },
+                              "rank": {
+                                "type": "number",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "sha256",
+                              "bytes",
+                              "rank"
+                            ]
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "site": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "site",
+                              "url"
+                            ]
+                          },
+                          "preview_file_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "added_at": {
+                            "type": "string"
+                          },
+                          "removed_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "trash_until": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "description",
+                          "media",
+                          "base_model",
+                          "compatible_with",
+                          "usable",
+                          "trigger_words",
+                          "trigger_position",
+                          "positive_addins",
+                          "negative_addins",
+                          "avoid_as_positive",
+                          "strength",
+                          "audience",
+                          "availability",
+                          "needs_confirmation",
+                          "licence",
+                          "file",
+                          "source",
+                          "preview_file_id",
+                          "added_at",
+                          "removed_at",
+                          "trash_until"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "locked",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/available": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "The styles this person may use in Create and Edit",
+        "responses": {
+          "200": {
+            "description": "Empty for a child, a teen, a guest or a shared screen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "locked": {
+                      "type": "boolean",
+                      "description": "One tile for every locked style: no names, no count."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "style",
+                              "character",
+                              "motion",
+                              "other"
+                            ]
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "base_model": {
+                            "type": "string"
+                          },
+                          "usable": {
+                            "type": "boolean"
+                          },
+                          "trigger_words": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "trigger_position": {
+                            "type": "string",
+                            "enum": [
+                              "start",
+                              "end"
+                            ]
+                          },
+                          "positive_addins": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "strength": {
+                            "type": "object",
+                            "properties": {
+                              "default": {
+                                "type": "number"
+                              },
+                              "min": {
+                                "type": "number"
+                              },
+                              "max": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "default",
+                              "min",
+                              "max"
+                            ]
+                          },
+                          "preview_file_id": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "description",
+                          "base_model",
+                          "usable",
+                          "trigger_words",
+                          "trigger_position",
+                          "positive_addins",
+                          "strength",
+                          "preview_file_id"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "locked",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/{id}": {
+      "patch": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Change a style's name, availability, strength, trigger words or add-ins",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 140
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "style",
+                      "character",
+                      "motion",
+                      "other"
+                    ]
+                  },
+                  "availability": {
+                    "type": "object",
+                    "properties": {
+                      "who": {
+                        "type": "string",
+                        "enum": [
+                          "admins",
+                          "adults",
+                          "people"
+                        ]
+                      },
+                      "people": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "maxItems": 64
+                      }
+                    },
+                    "required": [
+                      "who"
+                    ]
+                  },
+                  "strength": {
+                    "type": "object",
+                    "properties": {
+                      "default": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      "min": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      "max": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    }
+                  },
+                  "trigger_words": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "maxItems": 12
+                  },
+                  "trigger_position": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "end"
+                    ]
+                  },
+                  "positive_addins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "maxItems": 8
+                  },
+                  "negative_addins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "maxItems": 8
+                  },
+                  "avoid_as_positive": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "maxItems": 8
+                  },
+                  "base_model": {
+                    "type": "string",
+                    "enum": [
+                      "ltx-2.3",
+                      "ltx-2.5",
+                      "wan2.2-ti2v-5b",
+                      "unknown"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "style",
+                        "character",
+                        "motion",
+                        "other"
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "string",
+                      "enum": [
+                        "video",
+                        "picture"
+                      ]
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "compatible_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_position": {
+                      "type": "string",
+                      "enum": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "positive_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "negative_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "avoid_as_positive": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "strength": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "default",
+                        "min",
+                        "max"
+                      ]
+                    },
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "availability": {
+                      "type": "object",
+                      "properties": {
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "admins",
+                            "adults",
+                            "people"
+                          ]
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "who",
+                        "people"
+                      ]
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "licence": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "commercial_use": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "commercial_use"
+                      ]
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rank": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "sha256",
+                        "bytes",
+                        "rank"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "site": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "url"
+                      ]
+                    },
+                    "preview_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "removed_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "trash_until": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "description",
+                    "media",
+                    "base_model",
+                    "compatible_with",
+                    "usable",
+                    "trigger_words",
+                    "trigger_position",
+                    "positive_addins",
+                    "negative_addins",
+                    "avoid_as_positive",
+                    "strength",
+                    "audience",
+                    "availability",
+                    "needs_confirmation",
+                    "licence",
+                    "file",
+                    "source",
+                    "preview_file_id",
+                    "added_at",
+                    "removed_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That file is already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/{id}/nsfw": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Mark a style adult-only (always allowed for an admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "style",
+                        "character",
+                        "motion",
+                        "other"
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "string",
+                      "enum": [
+                        "video",
+                        "picture"
+                      ]
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "compatible_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_position": {
+                      "type": "string",
+                      "enum": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "positive_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "negative_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "avoid_as_positive": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "strength": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "default",
+                        "min",
+                        "max"
+                      ]
+                    },
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "availability": {
+                      "type": "object",
+                      "properties": {
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "admins",
+                            "adults",
+                            "people"
+                          ]
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "who",
+                        "people"
+                      ]
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "licence": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "commercial_use": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "commercial_use"
+                      ]
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rank": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "sha256",
+                        "bytes",
+                        "rank"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "site": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "url"
+                      ]
+                    },
+                    "preview_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "removed_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "trash_until": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "description",
+                    "media",
+                    "base_model",
+                    "compatible_with",
+                    "usable",
+                    "trigger_words",
+                    "trigger_position",
+                    "positive_addins",
+                    "negative_addins",
+                    "avoid_as_positive",
+                    "strength",
+                    "audience",
+                    "availability",
+                    "needs_confirmation",
+                    "licence",
+                    "file",
+                    "source",
+                    "preview_file_id",
+                    "added_at",
+                    "removed_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That file is already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/{id}/all-ages": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Mark a style all-ages (an admin's explicit choice; needs confirm: true)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "confirm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "style",
+                        "character",
+                        "motion",
+                        "other"
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "string",
+                      "enum": [
+                        "video",
+                        "picture"
+                      ]
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "compatible_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_position": {
+                      "type": "string",
+                      "enum": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "positive_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "negative_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "avoid_as_positive": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "strength": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "default",
+                        "min",
+                        "max"
+                      ]
+                    },
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "availability": {
+                      "type": "object",
+                      "properties": {
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "admins",
+                            "adults",
+                            "people"
+                          ]
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "who",
+                        "people"
+                      ]
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "licence": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "commercial_use": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "commercial_use"
+                      ]
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rank": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "sha256",
+                        "bytes",
+                        "rank"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "site": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "url"
+                      ]
+                    },
+                    "preview_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "removed_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "trash_until": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "description",
+                    "media",
+                    "base_model",
+                    "compatible_with",
+                    "usable",
+                    "trigger_words",
+                    "trigger_position",
+                    "positive_addins",
+                    "negative_addins",
+                    "avoid_as_positive",
+                    "strength",
+                    "audience",
+                    "availability",
+                    "needs_confirmation",
+                    "licence",
+                    "file",
+                    "source",
+                    "preview_file_id",
+                    "added_at",
+                    "removed_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That file is already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/{id}/confirm": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "An admin has read the fingerprint and licence",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "style",
+                        "character",
+                        "motion",
+                        "other"
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "string",
+                      "enum": [
+                        "video",
+                        "picture"
+                      ]
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "compatible_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_position": {
+                      "type": "string",
+                      "enum": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "positive_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "negative_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "avoid_as_positive": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "strength": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "default",
+                        "min",
+                        "max"
+                      ]
+                    },
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "availability": {
+                      "type": "object",
+                      "properties": {
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "admins",
+                            "adults",
+                            "people"
+                          ]
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "who",
+                        "people"
+                      ]
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "licence": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "commercial_use": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "commercial_use"
+                      ]
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rank": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "sha256",
+                        "bytes",
+                        "rank"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "site": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "url"
+                      ]
+                    },
+                    "preview_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "removed_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "trash_until": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "description",
+                    "media",
+                    "base_model",
+                    "compatible_with",
+                    "usable",
+                    "trigger_words",
+                    "trigger_position",
+                    "positive_addins",
+                    "negative_addins",
+                    "avoid_as_positive",
+                    "strength",
+                    "audience",
+                    "availability",
+                    "needs_confirmation",
+                    "licence",
+                    "file",
+                    "source",
+                    "preview_file_id",
+                    "added_at",
+                    "removed_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That file is already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/{id}/remove": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Remove a style to the 30-day trash",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "style",
+                        "character",
+                        "motion",
+                        "other"
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "string",
+                      "enum": [
+                        "video",
+                        "picture"
+                      ]
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "compatible_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_position": {
+                      "type": "string",
+                      "enum": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "positive_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "negative_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "avoid_as_positive": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "strength": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "default",
+                        "min",
+                        "max"
+                      ]
+                    },
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "availability": {
+                      "type": "object",
+                      "properties": {
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "admins",
+                            "adults",
+                            "people"
+                          ]
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "who",
+                        "people"
+                      ]
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "licence": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "commercial_use": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "commercial_use"
+                      ]
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rank": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "sha256",
+                        "bytes",
+                        "rank"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "site": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "url"
+                      ]
+                    },
+                    "preview_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "removed_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "trash_until": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "description",
+                    "media",
+                    "base_model",
+                    "compatible_with",
+                    "usable",
+                    "trigger_words",
+                    "trigger_position",
+                    "positive_addins",
+                    "negative_addins",
+                    "avoid_as_positive",
+                    "strength",
+                    "audience",
+                    "availability",
+                    "needs_confirmation",
+                    "licence",
+                    "file",
+                    "source",
+                    "preview_file_id",
+                    "added_at",
+                    "removed_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That file is already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/{id}/restore": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Bring a removed style back",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "style",
+                        "character",
+                        "motion",
+                        "other"
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "string",
+                      "enum": [
+                        "video",
+                        "picture"
+                      ]
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "compatible_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_position": {
+                      "type": "string",
+                      "enum": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "positive_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "negative_addins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "avoid_as_positive": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "strength": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "default",
+                        "min",
+                        "max"
+                      ]
+                    },
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "availability": {
+                      "type": "object",
+                      "properties": {
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "admins",
+                            "adults",
+                            "people"
+                          ]
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "who",
+                        "people"
+                      ]
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "licence": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "commercial_use": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "commercial_use"
+                      ]
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rank": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "sha256",
+                        "bytes",
+                        "rank"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "site": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "url"
+                      ]
+                    },
+                    "preview_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "removed_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "trash_until": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "description",
+                    "media",
+                    "base_model",
+                    "compatible_with",
+                    "usable",
+                    "trigger_words",
+                    "trigger_position",
+                    "positive_addins",
+                    "negative_addins",
+                    "avoid_as_positive",
+                    "strength",
+                    "audience",
+                    "availability",
+                    "needs_confirmation",
+                    "licence",
+                    "file",
+                    "source",
+                    "preview_file_id",
+                    "added_at",
+                    "removed_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That file is already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
             "content": {
               "application/json": {
                 "schema": {

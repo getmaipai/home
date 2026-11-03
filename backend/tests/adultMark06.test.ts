@@ -80,6 +80,7 @@ describe("auto-mark at job start", () => {
   });
 
   test("the adult-only style predicate is one function: an all-ages style, no style and an adult-only style", async () => {
+    await household(); // the records are made from the Stack's files and name the household owner (VIDEO-LORA-03)
     expect(await usesAdultOnlyStyle([])).toBe(false);
     expect(await usesAdultOnlyStyle(["lora-1111111111111111"])).toBe(false);
     expect(await usesAdultOnlyStyle(["lora-1111111111111111", ADULT_LORA])).toBe(true);

@@ -83,6 +83,8 @@ export interface StackLtx25Quality {
   image_to_video?: boolean;
   end_image?: boolean;
   profiles?: StackLtx25Profile[];
+  /** VIDEO-LORA-05 (Stack): LoRA support on this model. Absent or `supported` false on a Stack that lacks it: Home sends no LoRA to it. */
+  loras?: { supported: boolean; max?: number; mode?: "fused" | "unfused"; negative_prompt?: "none" | "nag" };
   /** The pieces to download (LTX25-MAX-01 reports them; `download_bytes` is the whole pack). */
   install?: { download_bytes?: number; remaining_bytes?: number };
   licence?: { id: string; name: string; url: string } | null;
@@ -135,7 +137,7 @@ export interface VideoBody {
   image_source?: "generated" | "uploaded";
   /** VIDEO-INPUTS-01: a last picture for an LTX-2.5 clip (needs `image`; the Stack refuses it on Quick and Detailed). Sent only when `qualities.<model>.end_image` is true. */
   end_image?: string;
-  loras?: Array<{ id: string; strength: number }>;
+  loras?: Array<{ id: string; strength: number; sha256?: string }>;
   audience: "all-ages" | "adult";
   /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), "ltx25-q8" is LTX-2.5 with sound (VIDEO-TIERS-01, adults only; the Stack answers 422 to a LoRA, and to a picture unless its `image_to_video` flag is true), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;

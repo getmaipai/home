@@ -1,64 +1,74 @@
-// VIDEO-GEN-04: the household's video LoRA library as chat sees it. The Stack owns the files and their metadata;
-// Home owns whether the household lets chat use each one (`video_adapter_prefs`) and who may reach which class
-// (policy.ts). A person who may not use a LoRA never sees it listed or matched, so the model never gets an id it
-// must not use. Same shape as lib/pictures/adapters.ts, over the video library.
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { videoAdapterPrefs } from "@/db/schema";
-import { listVideoLoras, type StackVideoLora } from "./stack";
+// VIDEO-GEN-04, rebuilt by VIDEO-LORA-03 (docs/dev/loras.md): the household's video LoRAs as chat, Create and the job code see them. The ONE store is the `loras`
+// table (lib/loras/store.ts, one spec `Lora` record each, kept in step with the Stack's files by lib/loras/sync.ts); the old `video_adapter_prefs` rows were
+// folded into records there. Who may see or use a LoRA is `loraAccess` (lib/loras/access.ts), the single read path: `videoAdaptersFor` returns only what the
+// person may use right now, so the model never gets an id it must not use, and `allVideoAdapters` (no filtering) is for internal lookups of a LoRA's own
+// facts (never a route's answer).
+import { loraAccess, loraUsable, type LoraSurface } from "@/lib/loras/access";
+import { deleteLoraRecord, listLoraRecords, getLoraRecord, type Lora } from "@/lib/loras/store";
+import { dropLoraSyncCache, syncLoras } from "@/lib/loras/sync";
+import { videosAllowed, type VideoAudience } from "./policy";
+import type { StackVideoLora } from "./stack";
 
 export type VideoAdapterAudience = "all-ages" | "adult-only";
 
 export interface VideoAdapter extends StackVideoLora {
+  /** An admin marked it usable beyond admins (`availability.who` is adults or people), and it is not in the trash. */
   enabled: boolean;
-  /** Added but not yet confirmed by an admin: off for everyone until they have read the fingerprint and licence. */
+  /** Added but not yet confirmed by an admin: they have not read the fingerprint and licence yet. */
   needs_confirmation: boolean;
+  /** The record this view was made from. */
+  lora: Lora;
 }
 
-let cache: { at: number; loras: StackVideoLora[] } | null = null;
-const CACHE_MS = 10_000;
-export function __resetVideoAdapterCacheForTests(): void { cache = null; }
+export function __resetVideoAdapterCacheForTests(): void { dropLoraSyncCache(); }
+export function dropVideoAdapterCache(): void { dropLoraSyncCache(); }
 
-async function stackLoras(): Promise<StackVideoLora[]> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.loras;
-  try {
-    const loras = await listVideoLoras();
-    cache = { at: Date.now(), loras };
-    return loras;
-  } catch {
-    return cache?.loras ?? [];
-  }
+export function adapterOfLora(lora: Lora): VideoAdapter {
+  return {
+    id: lora.id, name: lora.name, sha256: lora.file.sha256, bytes: lora.file.bytes, base_model: lora.base_model, licence: lora.licence.id ?? "unknown",
+    source_url: lora.source.url, classification: lora.audience, strength_default: lora.strength.default, trigger_words: lora.trigger_words, added_at: lora.added_at,
+    enabled: lora.removed_at === null && lora.availability.who !== "admins", needs_confirmation: lora.licence.acknowledged_by === null, lora,
+  };
 }
 
-export function dropVideoAdapterCache(): void { cache = null; }
-
-function prefMap(): Map<string, { enabled: boolean; pending: boolean }> {
-  return new Map(db.select().from(videoAdapterPrefs).all().map((row) => [row.adapterId, { enabled: row.enabled, pending: row.updatedBy === PENDING }]));
-}
-
-/** `updatedBy` on a LoRA that was just added and waits for an admin's confirmation. */
-export const PENDING = "pending";
-
-/** Every LoRA in the library with the household's switch (admin view; no audience filtering). */
+/** Every live video LoRA in the library, with no access filtering. Internal lookups only (a LoRA's own audience, hash, strength); a route never returns this. */
 export async function allVideoAdapters(): Promise<VideoAdapter[]> {
-  const [loras, prefs] = [await stackLoras(), prefMap()];
-  return loras.map((lora) => { const pref = prefs.get(lora.id); return { ...lora, enabled: pref?.enabled !== false, needs_confirmation: pref?.pending === true }; });
+  await syncLoras();
+  return listLoraRecords().filter((l) => l.media === "video" && l.removed_at === null).sort((a, b) => a.added_at.localeCompare(b.added_at) || a.id.localeCompare(b.id)).map(adapterOfLora);
 }
 
-/** The LoRAs a person may use now: enabled, and in a class they hold. */
-export async function videoAdaptersFor(audiences: readonly VideoAdapterAudience[]): Promise<VideoAdapter[]> {
-  if (audiences.length === 0) return [];
-  return (await allVideoAdapters()).filter((a) => a.enabled && audiences.includes(a.classification));
+/** The surface an audience is on, for `loraAccess`: only a written chat screen of the person's own is "own_written". */
+export function loraSurfaceOf(audience: VideoAudience): LoraSurface {
+  if (audience.spoken) return "spoken";
+  return audience.surfaceClass === "written" && audience.surface === "chat" ? "own_written" : "shared";
 }
 
-export function setVideoAdapterEnabled(id: string, enabled: boolean, by: string): void {
-  const now = new Date().toISOString();
-  db.insert(videoAdapterPrefs).values({ adapterId: id, enabled, updatedAt: now, updatedBy: by })
-    .onConflictDoUpdate({ target: videoAdapterPrefs.adapterId, set: { enabled, updatedAt: now, updatedBy: by } }).run();
+/**
+ * The LoRAs this person may use now: allowed to make videos, `open` for them, live, base known. `includeLocked` also returns an adult-only one that is only
+ * locked (the Adult lock is closed), for the chat tool and Another take: the person's own typed words can name it, and the caller answers with the lock tile
+ * instead of starting anything. A hidden LoRA (a minor, not marked for this adult, a shared screen) is never returned either way.
+ */
+export async function videoAdaptersFor(audience: VideoAudience, opts: { includeLocked?: boolean } = {}): Promise<VideoAdapter[]> {
+  if (!videosAllowed(audience)) return [];
+  await syncLoras();
+  const surface = loraSurfaceOf(audience);
+  const wanted: Array<"open" | "locked"> = opts.includeLocked ? ["open", "locked"] : ["open"];
+  return listLoraRecords()
+    .filter((l) => l.media === "video" && l.removed_at === null && loraUsable(l) && (wanted as string[]).includes(loraAccess(audience.actor, l, surface)))
+    .sort((a, b) => a.added_at.localeCompare(b.added_at) || a.id.localeCompare(b.id)).map(adapterOfLora);
 }
 
-export function forgetVideoAdapterPref(id: string): void {
-  db.delete(videoAdapterPrefs).where(eq(videoAdapterPrefs.adapterId, id)).run();
+/** A style leaves the household library with its file (the Models and storage uninstall): its record goes too. */
+export function forgetVideoAdapter(id: string): void {
+  deleteLoraRecord(id);
+  dropLoraSyncCache();
+}
+
+/** One LoRA by id if this person may use it now, else null (a hidden, locked, removed or unknown one all answer the same). */
+export async function videoAdapterFor(audience: VideoAudience, id: string): Promise<VideoAdapter | null> {
+  await syncLoras();
+  const lora = getLoraRecord(id);
+  return lora && lora.media === "video" && loraUsable(lora) && loraAccess(audience.actor, lora, loraSurfaceOf(audience)) === "open" ? adapterOfLora(lora) : null;
 }
 
 function norm(text: string): string {

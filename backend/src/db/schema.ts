@@ -1969,14 +1969,45 @@ export const adultMarkLog = sqliteTable(
   (table) => [index("adult_mark_log_item_idx").on(table.itemId, table.at), index("adult_mark_log_actor_idx").on(table.actorId, table.at)],
 );
 
-// VIDEO-GEN-04: the household's switch on one video LoRA in the Stack's library. The Stack owns the file and its
-// metadata; Home owns whether the household lets chat use it. A missing row reads as enabled.
+// VIDEO-GEN-04: the household's switch on one video LoRA in the Stack's library. LEGACY since VIDEO-LORA-03: the `loras` table is the one store now;
+// lib/loras/sync.ts reads these rows once, turns each into a `Lora` record and deletes it. Nothing writes here any more.
 export const videoAdapterPrefs = sqliteTable("video_adapter_prefs", {
   adapterId: text("adapter_id").primaryKey(),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   updatedAt: text("updated_at").notNull(),
   updatedBy: text("updated_by"),
 });
+
+// VIDEO-LORA-03 (docs/design/video-loras-2026-11-02.md 4.1, docs/dev/loras.md): the household's LoRA library, one spec `Lora` record per row. `record` is the
+// whole record JSON (the one definition, validated by lib/loras/store.ts on every write); the other columns are copies of its fields that queries filter or
+// join on, written only by that store from the record. The Stack owns the file bytes; Home owns who may use it, its add-ins and its trash state. Replaces
+// `video_adapter_prefs`, which stays only until lib/loras/sync.ts has turned its rows into records.
+export const loras = sqliteTable(
+  "loras",
+  {
+    id: text("id").primaryKey(), // lora-...
+    record: text("record").notNull(),
+    media: text("media", { enum: ["video", "picture"] }).notNull(),
+    kind: text("kind", { enum: ["style", "character", "motion", "other"] }).notNull(),
+    baseModel: text("base_model").notNull(),
+    audience: text("audience", { enum: ["all-ages", "adult-only"] }).notNull(),
+    availabilityWho: text("availability_who", { enum: ["admins", "adults", "people"] }).notNull(),
+    sha256: text("sha256").notNull(),
+    removedAt: text("removed_at"),
+    trashUntil: text("trash_until"),
+    addedAt: text("added_at").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [
+    index("loras_media_removed_idx").on(table.media, table.removedAt),
+    index("loras_audience_idx").on(table.audience, table.availabilityWho),
+    index("loras_sha256_idx").on(table.sha256),
+    index("loras_trash_idx").on(table.trashUntil),
+  ],
+);
 
 // MEDIA-LIB-01 / MEDIA-PROGRESS-01 (docs/design/media-apps-blend-2026-10-17.md, section 7): the four media records of
 // spec-v0.1.163 (MediaSource, MediaItem, MediaProgress, MediaCollection) in one migration so no later media slice needs

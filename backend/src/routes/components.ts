@@ -11,7 +11,7 @@ import { licenceCovered } from "@/lib/licenceAcceptance";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropAdapterCache, forgetAdapterPref } from "@/lib/pictures/adapters";
-import { dropVideoAdapterCache, forgetVideoAdapterPref } from "@/lib/videos/adapters";
+import { forgetVideoAdapter } from "@/lib/videos/adapters";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
 
@@ -85,7 +85,7 @@ componentsRoutes.openapi(removeRoute, async (c) => {
     // A style leaves Home's household switches with its file.
     const lora = /^lora\.(picture|video)\.(.+)$/.exec(id);
     if (lora && removed.removed) {
-      if (lora[1] === "picture") { forgetAdapterPref(lora[2]!); dropAdapterCache(); } else { forgetVideoAdapterPref(lora[2]!); dropVideoAdapterCache(); }
+      if (lora[1] === "picture") { forgetAdapterPref(lora[2]!); dropAdapterCache(); } else { forgetVideoAdapter(lora[2]!); }
     }
     // Picture and video readiness are read from the Stack; the next read sees the part gone.
     dropPictureStatusCache();

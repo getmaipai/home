@@ -2,7 +2,7 @@
 // everything. The matrix is band by surface by LoRA class, then the two absolute lines, then every entrance (the chat
 // tool, the card's routes, the status and settings routes): none of them reaches the Stack for a person or a surface
 // that may not, and no household setting reaches the absolute lines or turns video on for a minor.
-import { __unlockRestOfTest } from "@/lib/adultLock";
+import { __unlockRestOfTest, __unlockedForTests } from "@/lib/adultLock";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -125,10 +125,19 @@ describe("LoRA classes", () => {
       expect(stackAudienceFor(a)).toBe("all-ages");
     }
   });
-  test("the library lists only what the classes allow", async () => {
-    expect((await videoAdaptersFor(["all-ages", "adult-only"])).map((a) => a.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
-    expect((await videoAdaptersFor(["all-ages"])).map((a) => a.id)).toEqual(["lora-1111111111111111"]);
-    expect(await videoAdaptersFor([])).toEqual([]);
+  test("the library lists only what the person may use (VIDEO-LORA-03: loraAccess is the one read path)", async () => {
+    const owner = audience(people.owner);
+    // An owner holds every style, but an adult-only one is locked until their own unlock proof is valid.
+    expect((await videoAdaptersFor(owner)).map((a) => a.id)).toEqual(["lora-1111111111111111"]);
+    expect((await videoAdaptersFor(owner, { includeLocked: true })).map((a) => a.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
+    expect((await __unlockedForTests(people.owner.id, () => videoAdaptersFor(owner))).map((a) => a.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
+    // A household that restricts adult-only styles hides them from everyone, an unlocked owner included.
+    setHouseholdSettingValue("generation.video.adult_adapters", "restricted");
+    expect((await __unlockedForTests(people.owner.id, () => videoAdaptersFor(owner, { includeLocked: true }))).map((a) => a.id)).toEqual(["lora-1111111111111111"]);
+    setHouseholdSettingValue("generation.video.adult_adapters", "allowed");
+    // A teen, a child and a guest never get one (rule 8); an adult an admin has not marked gets none yet.
+    for (const role of ["teen", "child", "guest"] as const) expect(await videoAdaptersFor(audience(asRole(people.child.id, role)), { includeLocked: true })).toEqual([]);
+    expect(await videoAdaptersFor(audience(asRole(people.child.id, "adult")), { includeLocked: true })).toEqual([]);
   });
 });
 
@@ -290,7 +299,8 @@ describe("the routes", () => {
     const body = await res.json() as { can_make: boolean; limits: string; styles: Array<{ id: string }> };
     expect(body.can_make).toBe(true);
     expect(body.limits).toBe("Quick videos are 5 seconds at 480p with no sound and take about 2 minutes. Detailed videos have sound and speech, run up to 10 seconds and take a minute or two.");
-    expect(body.styles.map((s) => s.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
+    // The adult-only style is locked until the owner's own unlock proof is valid (VIDEO-LORA-03), so only the all-ages one is listed.
+    expect(body.styles.map((s) => s.id)).toEqual(["lora-1111111111111111"]);
     asRole(adult.actor.id, "child");
     invalidateSessionCacheForPerson(adult.actor.id);
     setHouseholdSettingValue("generation.kids", false);
@@ -356,8 +366,8 @@ describe("the routes", () => {
     const owner = await signedIn("Sage", "owner");
     const res = await owner.client.request("/api/videos/adapters/lora-ffffffffffffffff", { method: "PATCH", body: { enabled: false } });
     expect(res.status).toBe(404);
-    const { videoAdapterPrefs } = await import("@/db/schema");
-    expect(db.select().from(videoAdapterPrefs).all()).toHaveLength(0);
+    const { loras } = await import("@/db/schema");
+    expect(db.select().from(loras).all().map((r) => r.id)).not.toContain("lora-ffffffffffffffff");
   });
 
   test("a clip streams with Range for its owner only; a missing job and a stranger's job read the same", async () => {
@@ -428,13 +438,15 @@ describe("the routes", () => {
     expect(res.status).toBe(200);
     const added = await res.json() as { id: string; classification: string; enabled: boolean; needs_confirmation: boolean };
     expect(added).toMatchObject({ classification: "adult-only", enabled: false, needs_confirmation: true });
-    // Off for everyone: not in any person's list, an adult's included.
-    expect((await videoAdaptersFor(["all-ages", "adult-only"])).map((a) => a.id)).not.toContain(added.id);
-    const confirmed = await owner.client.request(`/api/videos/adapters/${added.id}`, { method: "PATCH", body: { enabled: true } });
+    // Usable by admins only, unconfirmed, and adult-only (so locked): an owner without an unlock proof does not get it either.
+    expect((await videoAdaptersFor(audience(owner.actor), { includeLocked: false })).map((a) => a.id)).not.toContain(added.id);
+    // An adult-only style is one locked tile to its own admin too: confirming it needs the unlock proof (a locked style answers like a missing one).
+    expect((await owner.client.request(`/api/videos/adapters/${added.id}`, { method: "PATCH", body: { enabled: true } })).status).toBe(404);
+    const proof = (await (await owner.client.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "v" })).json() as { proof: string }).proof;
+    const confirmed = await owner.client.request(`/api/videos/adapters/${added.id}`, { method: "PATCH", body: { enabled: true }, headers: { "x-adult-unlock": proof } });
     expect(confirmed.status).toBe(200);
     expect(await confirmed.json()).toMatchObject({ enabled: true, needs_confirmation: false });
-    expect((await videoAdaptersFor(["all-ages", "adult-only"])).map((a) => a.id)).toContain(added.id);
-    expect((await videoAdaptersFor(["all-ages"])).map((a) => a.id)).not.toContain(added.id);
+    expect((await __unlockedForTests(owner.actor.id, () => videoAdaptersFor(audience(owner.actor)))).map((a) => a.id)).toContain(added.id);
   });
 
   test("the settings routes are for owners and admins only", async () => {
@@ -444,10 +456,12 @@ describe("the routes", () => {
     const owner = await signedIn("Sage", "owner");
     const res = await owner.client.get("/api/videos/settings");
     expect(res.status).toBe(200);
-    const body = await res.json() as { enabled: boolean; minors: string; adapters: Array<{ id: string; classification: string }> };
+    const body = await res.json() as { enabled: boolean; minors: string; adapters: Array<{ id: string; classification: string }>; locked_styles: boolean };
     expect(body.enabled).toBe(true);
     expect(body.minors).toContain("off for children and teens");
-    expect(body.adapters.map((a) => a.classification).sort()).toEqual(["adult-only", "all-ages"]);
+    // The adult-only style is one locked tile, not a row with its name (the Adult lock).
+    expect(body.adapters.map((a) => a.classification)).toEqual(["all-ages"]);
+    expect(body.locked_styles).toBe(true);
   });
 });
 

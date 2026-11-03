@@ -294,3 +294,7 @@ export function newVideoFavoriteId(): string {
 export function newAdultMarkLogId(): string {
   return `amark-${randomSuffix(10)}`;
 }
+
+export function newLoraId(): string {
+  return `lora-${randomSuffix(10)}`;
+}

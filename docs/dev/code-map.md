@@ -570,6 +570,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/llmSupervisor.ts` | __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, setWarmupPrompt, sweepOrphanEngineProcesses, reportChatBackendUnreachable |
 | `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
+| `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
+| `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, TRASH_DAYS, patchLora, confirmLora, needsConfirmation |
+| `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
+| `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
 | `backend/src/lib/mdns.ts` | mdnsHostLabel, advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising |
@@ -993,7 +997,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/updates.ts` | isNewerVersion, checkForAppUpdate, checkForBotUpdate, checkForUpdates, cachedUpdateProjection, cachedRobotUpdates |
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
-| `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, PENDING, allVideoAdapters, videoAdaptersFor, setVideoAdapterEnabled |
+| `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, adapterOfLora, allVideoAdapters, loraSurfaceOf, videoAdaptersFor |
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
@@ -1003,6 +1007,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob, conversationHasVideo |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
+| `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |

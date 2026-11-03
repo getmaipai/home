@@ -18,7 +18,7 @@ import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures
 import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 
 const KID_MAX_SECONDS = 3;
-import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
+import { refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
@@ -162,7 +162,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   }
 
   // Only a LoRA this person may use right now can match; the model never sees the library.
-  const available = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
+  const available = await videoAdaptersFor(audience, { includeLocked: true });
   const named = typeof args.style === "string" ? args.style.trim() : "";
   const adapter = named && !kid ? matchVideoAdapter(available, named) : null;
   // ADULT-LOCK-02: an adult-only style from chat needs a live unlock proof on the turn request; without one nothing starts and the card is the lock tile.

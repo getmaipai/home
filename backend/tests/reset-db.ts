@@ -1,4 +1,5 @@
 import { __resetMusicJobsForTests } from "@/lib/music/store";
+import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { musicJobs } from "@/db/schema";
 import { tmpdir } from "node:os";
 import { db } from "@/db";
@@ -57,6 +58,7 @@ import {
   videoJobs,
   videoFavorites,
   adultMarkLog,
+  loras,
   mediaCollections,
   mediaProgress,
   mediaWatchDays,
@@ -227,6 +229,8 @@ export function resetDb(): void {
   db.delete(adultMarkLog).run(); // ADULT-LOCK-06
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(videoAdapterPrefs).run();
+  db.delete(loras).run(); // VIDEO-LORA-03: the library records (no foreign keys)
+  __resetLoraSyncForTests();
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
   db.delete(mediaProgress).run();
   db.delete(mediaWatchSessions).run();
