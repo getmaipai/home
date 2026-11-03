@@ -149,3 +149,17 @@ describe("names given in another form", () => {
     expect(nameIsGiven("Maria Holloway", hay("Maria lived there for many years, and so did a man named Marcus Holloway."))).toBe(false);
   });
 });
+
+describe("a sentence-opening ordinary word glued onto a name", () => {
+  const given = (name: string, text: string): boolean => nameIsGiven(name, squashText(text), text);
+  test("the name is judged without the ordinary first word", () => {
+    expect(given("Given Nathan Bates", "Nathan Bates led the team through a long and difficult season on the road.\nThe plan was given to the board in the spring.")).toBe(true);
+    expect(given("Key Soviet", "The soviet bloc signed the treaty in a quiet room in the capital.\nA key clause was added later.")).toBe(true);
+    expect(given("Opponents of Governor", "Some opponents of the plan called for a governor to step in.")).toBe(true);
+  });
+  test("a first word that never appears in lower case keeps the strict rule", () => {
+    expect(given("Zara Quill", "A quill pen was used.")).toBe(false);
+    expect(given("Victor Hale", "Nothing relevant here.")).toBe(false);
+    expect(given("Given Nathan Bates", "Nathan Bates led the team.")).toBe(false);
+  });
+});

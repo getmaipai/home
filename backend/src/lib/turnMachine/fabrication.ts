@@ -105,12 +105,19 @@ function abbreviationIsGiven(name: string, haystack: string): boolean {
 /** A name counts as given when the evidence holds it as written, or holds each pair of neighbouring words of it close together (a writer may
  * drop a connective or join a title to a surname). Words that each appear somewhere in the sources but never near one another do not make
  * a name given: an invented person assembled from known words is still marked. */
-export function nameIsGiven(name: string, haystack: string): boolean {
+export function nameIsGiven(name: string, haystack: string, raw?: string): boolean {
   if (haystack.includes(squashText(name))) return true;
   if (pluralFormIsGiven(name, haystack)) return true;
   if (givenAsHost(name, haystack)) return true;
   if (abbreviationIsGiven(name, haystack)) return true;
   const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
+  // `raw` is the evidence with its case (the squashed haystack has lost it); without it the strict rule applies.
+  // A first word that also appears in lower case in the sources is an ordinary word that was capitalized at a clause start ("Given Nathan
+  // Bates"), not part of the name: judge the rest. A first word never seen in lower case keeps the strict rule below.
+  if (words.length >= 2 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(raw ?? "")) {
+    const rest = name.replace(/^\S+\s+/, "");
+    if (rest !== name && nameIsGiven(rest, haystack, raw)) return true;
+  }
   if (words.length < 2) return words.length === 1 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(haystack);
   // A word that is not the last (a first name) may be a shortened form of the source's word: "Maria" for "Marian" (one letter shorter).
   const near = (a: string, b: string): boolean => {
@@ -133,13 +140,14 @@ const GUESS_CUE = /\b(?:guess(?:es|ed)?|infer(?:s|red)?|speculat\w*|presum\w*|su
 
 /** Marks each sentence that names someone or something no part of the evidence (nor the person's own question) contains. */
 export function markUnsourcedNames(text: string, evidence: string, question: string): MarkResult {
-  const haystack = squashText(`${evidence}\n${question}`);
+  const rawEvidence = `${evidence}\n${question}`;
+  const haystack = squashText(rawEvidence);
   let marked = 0;
   let dropped = 0;
   const parts = text.split(SENTENCE_OR_LINE_BREAK).filter((p): p is string => p !== undefined);
   const out = parts.map((part) => {
     if (part.trim() === "" || part.includes(NOT_IN_SOURCES)) return part;
-    const unknown = namesIn(part).filter((name) => !nameIsGiven(name, haystack));
+    const unknown = namesIn(part).filter((name) => !nameIsGiven(name, haystack, rawEvidence));
     if (unknown.length === 0) return part;
     if (GUESS_CUE.test(part)) { dropped += 1; return ""; }
     marked += 1;
