@@ -104,12 +104,26 @@ Ask chat to change a video you made. Home keeps the old video and makes a new on
 - **Make it Max.** "Make it Max." It keeps the same words and the same result, and makes the video again at Max. It works only when Max is installed and allowed for you, and only for a video made from words. Otherwise Home says what is missing and makes nothing.
 - **Trim.** "Cut the first two seconds." Say where it starts and ends, in seconds.
 - **Continue.** "Keep going from where it ended." Home takes the last picture of the video and makes a new video that starts from it. Say what happens next, or leave it out and Home uses your first words. It keeps the same level and look unless you change them. It needs a computer that can start a video from a picture. If yours cannot yet, Home says so and makes nothing. Only one video is made at a time.
-- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order. Home puts them one after another with a straight cut. A smooth blend from one video into the next (a crossfade) is not ready yet. If you ask for one, Home says so and offers the straight cut.
+- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order. Home puts them one after another with a straight cut, or with a smooth blend from one video into the next (a crossfade) if you ask for one. Each video has to be longer than twice the blend.
 - **Mix.** "Put my voice over it" or "add my song." Home lays a spoken line, one of your songs or a sound over the video. You can ask for it quieter or louder.
 
 Only videos you made can be changed. Changing, continuing, joining and mixing are for adults. A video in Trash cannot be continued: put it back first. A changed video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
 
 Trim, join and mix need the video editor on the AI engine. If your engine does not have it, Home says it cannot change the video.
+
+## Edit a video in the Studio
+
+The **Studio** is a page for people who want to cut and mix a video themselves. Open it from the **Studio** link in the Create menu, or press the **Open in Studio** button on a clip in your Create list. Only adults see it.
+
+1. **Pick a clip.** Choose one of your own videos. It shows in the preview and on the **Video** track.
+2. **Cut it.** Drag the handles at each end of a piece to trim it. Press **Split at playhead** to cut a piece in two, and **Delete piece** to take one out.
+3. **Add more.** **Add a clip** puts another of your videos after this one. **Add a voice** lets you type a line for Home to say. **Add music** puts one of your songs under the video.
+4. **Set the sound.** Each track has a level. Pick a piece to turn it up or down, fade it in or out, or lower a song while someone speaks. Pick a clip that has another clip after it to blend them (a crossfade).
+5. **Press Export as a new clip.** Home makes a new video and keeps the old one. A card shows it being made. When it is ready, press **Open in My clips**, or **Keep editing** to change it more.
+
+A film can have 6 clips, 2 voice lines, 2 songs and be up to 60 seconds long. What you hear in the Studio is a preview: it cuts where the export blends, and the final loudness is set when you export. If a video is locked, the Studio shows a lock instead. Unlock it with your passcode and it opens. When it locks again, edits you did not export are gone.
+
+The new video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
 
 ## Send a video in a text
 

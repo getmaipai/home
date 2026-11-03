@@ -82,3 +82,47 @@ describe("MediaHost.pickMedia", () => {
     expect(await picked).toBeNull();
   });
 });
+
+// VIDEO-STUDIO-07: the Studio's pickers. `video` lists the person's own made clips; `audio` is a typed line (handed back as `say:<line>`) or one of their songs.
+function media(id: string, owner: string, kind: "video" | "audio", extra: Record<string, unknown> = {}) {
+  return { ...item(id, owner, kind === "video" ? "video/mp4" : "audio/mp4"), kind, name: `${id}.${kind === "video" ? "mp4" : "m4a"}`, ...extra };
+}
+
+describe("MediaHost.pickMedia for the Studio", () => {
+  test("a clip pick lists only the person's own made clips and resolves with the chosen id", async () => {
+    stubLibrary([media("clip-1", "person-1", "video", { origin: "made" }), media("clip-2", "person-1", "video", { origin: "sent" }), media("clip-3", "person-2", "video", { origin: "made" })]);
+    const view = mount("person-1");
+    let picked!: Promise<unknown>;
+    act(() => { picked = host!.pickMedia!("video"); });
+    await waitFor(() => expect(view.getAllByRole("button", { name: /^Use / })).toHaveLength(1));
+    expect(view.getByText("Choose a clip")).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Use clip-1.mp4" }));
+    expect(await picked).toEqual({ id: "clip-1", thumb: "/api/files/clip-1/thumb?w=320" });
+  });
+
+  test("an audio pick can be a typed line (the id carries say:), and a line is needed first", async () => {
+    stubLibrary([]);
+    const view = mount("person-1");
+    let picked!: Promise<unknown>;
+    act(() => { picked = host!.pickMedia!("audio"); });
+    // Pressed from nowhere, the side that opens first is the songs; choose the line side.
+    expect(await view.findByRole("group", { name: "What to add" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Say a line" }));
+    const box = await view.findByRole("textbox", { name: "The line to say" });
+    const add = view.getByRole("button", { name: "Add this line" }) as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    fireEvent.change(box, { target: { value: "  The boat sails on.  " } });
+    fireEvent.click(add);
+    expect(await picked).toEqual({ id: "say:The boat sails on." });
+  });
+
+  test("an audio pick can be one of the person's own songs", async () => {
+    stubLibrary([media("song-1", "person-1", "audio"), media("song-2", "person-2", "audio")]);
+    const view = mount("person-1");
+    let picked!: Promise<unknown>;
+    act(() => { picked = host!.pickMedia!("audio"); });
+    await waitFor(() => expect(view.getAllByRole("button", { name: /^Use / })).toHaveLength(1));
+    fireEvent.click(view.getByRole("button", { name: "Use song-1.m4a" }));
+    expect((await picked as { id: string }).id).toBe("song-1");
+  });
+});
