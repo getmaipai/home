@@ -107,6 +107,12 @@ describe("every bundled package clears bronze", () => {
           expect(manifest.routing).toBeUndefined();
           return;
         }
+        // WRITING-FORMATS-01: a writing format is chosen by the model through the writing_format tool, by name and description,
+        // never by phrase matching, so it carries no routing examples (the catalog lint has the same exemption).
+        if (manifest.kind === "skill" && manifest.contributes?.writing_format === true) {
+          expect(manifest.routing).toBeUndefined();
+          return;
+        }
         expect(manifest.routing?.examples?.length ?? 0).toBeGreaterThanOrEqual(5);
       });
 

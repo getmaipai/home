@@ -297,7 +297,7 @@ describe("GET /api/plugins", () => {
     const childClient = await child(ownerClient);
     const childResponse = await childClient.get("/api/plugins");
     const childPackages = (await childResponse.json()) as Array<{ id: string }>;
-    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup", "generate_music", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style", "edit_video"].includes(id)));
+    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup", "generate_music", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style", "edit_video", "format-email"].includes(id)));
 
     const teenClient = await teen(ownerClient);
     const teenResponse = await teenClient.get("/api/plugins");
