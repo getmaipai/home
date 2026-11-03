@@ -8,9 +8,9 @@ export const BackupsIcon = getIcon("archive");
 export function BackupsPage({ person }: { person: Roster }) {
   useTabItem("Backups");
   return (
-    <main>
+    <div>
       <h1>Backups</h1>
       <BackupsSection person={person} />
-    </main>
+    </div>
   );
 }
