@@ -218,10 +218,13 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   const zimage = p.rows.find((row) => row.id === "pictures-zimage")!;
   const ltx = p.rows.find((row) => row.id === "video-detailed")!;
   const klein = p.rows.find((row) => row.id === "pictures")!;
-  const expectedIds = [...zimage.model_ids, ...ltx.model_ids];
+  const extras = ["music-boost", "video-ltx25", "video-ltx25-max"].map((id) => p.rows.find((row) => row.id === id)!);
+  const expectedIds = [...zimage.model_ids, ...ltx.model_ids, ...extras.flatMap((row) => row.model_ids)];
   expect(result.items.map((item) => item.id).sort()).toEqual([...expectedIds].sort());
-  expect(result.items.every((item) => item.name === "Detailed pictures" || item.name === "Detailed videos")).toBe(true);
-  expect(result.items.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Quick videos and no saved style needs this.")).toBe(true);
+  // Music Boost and LTX-2.5 are other choices on their cards, not chosen here, so they are unused too; with no group on these test parts they carry the generic name.
+  const named = result.items.filter((item) => !extras.some((row) => row.model_ids.includes(item.id)));
+  expect(named.every((item) => item.name === "Detailed pictures" || item.name === "Detailed videos")).toBe(true);
+  expect(named.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Quick videos and no saved style needs this.")).toBe(true);
   expect(result.totalBytes).toBe(result.items.reduce((total, item) => total + item.bytes, 0));
   for (const id of [...klein.model_ids, "judge", "embed", "stt", "search", "home"]) expect(result.items.map((item) => item.id)).not.toContain(id);
 });
