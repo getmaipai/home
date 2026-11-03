@@ -114,7 +114,8 @@ describe("Wikipedia app", () => {
     fireEvent.click(view.getByRole("link", { name: "Saved" }));
     expect(await view.findByRole("link", { name: /Aurora/ })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Remove Aurora from Saved" }));
-    fireEvent.click(await view.findByRole("button", { name: "Remove" }));
+    // The confirm is a modal dialog drawn outside the page, so it is found on the document.
+    fireEvent.click(await within(document.body).findByRole("button", { name: "Remove" }));
     expect(await view.findByText(/Nothing saved yet/)).toBeTruthy();
   });
 
