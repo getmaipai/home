@@ -172,6 +172,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/VideoLibrary.tsx` | videoStateLine, VideoLibrary |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
+| `frontend/src/apps/settings/styles/FreshConfirm.tsx` | useFreshConfirm |
+| `frontend/src/apps/settings/styles/StyleAddFile.tsx` | StyleAddFile |
+| `frontend/src/apps/settings/styles/StyleBrowser.tsx` | browseProblem, StyleBrowser |
+| `frontend/src/apps/settings/styles/StyleConfirm.tsx` | StyleConfirm, licenceIsOpen |
+| `frontend/src/apps/settings/styles/StyleEditor.tsx` | StyleEditor |
+| `frontend/src/apps/settings/styles/StylesTab.tsx` | StylesTab |
+| `frontend/src/apps/settings/styles/stylesShared.tsx` | STYLES_COPY_DEFAULTS, stylesCopy, messageOf, sizeWords, whatItIs, adultCheckLine |
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
 | `frontend/src/apps/setup/CloseAppsStep.tsx` | openStarterApps, useCloseAppsQuestion, CloseAppsStep |

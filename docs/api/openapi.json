@@ -65147,6 +65147,15 @@
                           "needs_confirmation": {
                             "type": "boolean"
                           },
+                          "adult_check": {
+                            "type": "string",
+                            "enum": [
+                              "normal",
+                              "unknown",
+                              "adult"
+                            ],
+                            "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                          },
                           "licence": {
                             "type": "object",
                             "properties": {
@@ -65233,6 +65242,7 @@
                           "audience",
                           "availability",
                           "needs_confirmation",
+                          "adult_check",
                           "licence",
                           "file",
                           "source",
@@ -65674,6 +65684,15 @@
                     "needs_confirmation": {
                       "type": "boolean"
                     },
+                    "adult_check": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "unknown",
+                        "adult"
+                      ],
+                      "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                    },
                     "licence": {
                       "type": "object",
                       "properties": {
@@ -65760,6 +65779,7 @@
                     "audience",
                     "availability",
                     "needs_confirmation",
+                    "adult_check",
                     "licence",
                     "file",
                     "source",
@@ -65971,6 +65991,15 @@
                     "needs_confirmation": {
                       "type": "boolean"
                     },
+                    "adult_check": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "unknown",
+                        "adult"
+                      ],
+                      "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                    },
                     "licence": {
                       "type": "object",
                       "properties": {
@@ -66057,6 +66086,7 @@
                     "audience",
                     "availability",
                     "needs_confirmation",
+                    "adult_check",
                     "licence",
                     "file",
                     "source",
@@ -66127,7 +66157,7 @@
         "tags": [
           "LoRAs"
         ],
-        "summary": "Mark a style all-ages (an admin's explicit choice; needs confirm: true)",
+        "summary": "Mark a style all-ages (an admin's explicit choice; needs confirm: true, and a fresh ticket when the source said adult)",
         "parameters": [
           {
             "schema": {
@@ -66151,6 +66181,10 @@
                     "enum": [
                       true
                     ]
+                  },
+                  "ticket": {
+                    "type": "string",
+                    "maxLength": 200
                   }
                 },
                 "required": [
@@ -66288,6 +66322,15 @@
                     "needs_confirmation": {
                       "type": "boolean"
                     },
+                    "adult_check": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "unknown",
+                        "adult"
+                      ],
+                      "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                    },
                     "licence": {
                       "type": "object",
                       "properties": {
@@ -66374,6 +66417,7 @@
                     "audience",
                     "availability",
                     "needs_confirmation",
+                    "adult_check",
                     "licence",
                     "file",
                     "source",
@@ -66585,6 +66629,15 @@
                     "needs_confirmation": {
                       "type": "boolean"
                     },
+                    "adult_check": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "unknown",
+                        "adult"
+                      ],
+                      "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                    },
                     "licence": {
                       "type": "object",
                       "properties": {
@@ -66671,6 +66724,7 @@
                     "audience",
                     "availability",
                     "needs_confirmation",
+                    "adult_check",
                     "licence",
                     "file",
                     "source",
@@ -66882,6 +66936,15 @@
                     "needs_confirmation": {
                       "type": "boolean"
                     },
+                    "adult_check": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "unknown",
+                        "adult"
+                      ],
+                      "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                    },
                     "licence": {
                       "type": "object",
                       "properties": {
@@ -66968,6 +67031,7 @@
                     "audience",
                     "availability",
                     "needs_confirmation",
+                    "adult_check",
                     "licence",
                     "file",
                     "source",
@@ -67179,6 +67243,15 @@
                     "needs_confirmation": {
                       "type": "boolean"
                     },
+                    "adult_check": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "unknown",
+                        "adult"
+                      ],
+                      "description": "What the source said about age, once: evidence only; `audience` is the decision."
+                    },
                     "licence": {
                       "type": "object",
                       "properties": {
@@ -67265,6 +67338,7 @@
                     "audience",
                     "availability",
                     "needs_confirmation",
+                    "adult_check",
                     "licence",
                     "file",
                     "source",
