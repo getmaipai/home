@@ -167,7 +167,7 @@ async function seedDemoMusic(baseUrl: string, dataDir: string, cookie: string): 
 
 /** MUSIC-DEMO-02: six finished AI-made songs for the owner (scripts/seedSongs.ts), run as its own process on the dev data directory. */
 function seedDemoSongs(dataDir: string): void {
-  const run = Bun.spawnSync(["bun", "run", join(import.meta.dir, "seedSongs.ts"), "--data-dir", dataDir], { stdout: "pipe", stderr: "pipe" });
+  const run = Bun.spawnSync(["bun", "run", join(import.meta.dir, "seedSongs.ts"), "--data-dir", dataDir], { stdout: "pipe", stderr: "pipe", env: { ...process.env, MAIPAI_SEED_SONGS_FORCE: "1" } }); // the seeder just made this directory itself; the dev-path guard in seedSongs.ts is for running it by hand
   if (run.exitCode !== 0) throw new Error(`seeding the demo songs failed: ${run.stderr.toString().trim() || run.stdout.toString().trim()}`);
 }
 
