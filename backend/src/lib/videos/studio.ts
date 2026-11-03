@@ -37,7 +37,8 @@ export function studioClip(person: PersonRow, id: string | undefined): { job: Vi
   const wanted = (id ?? "").trim();
   if (!wanted || wanted.startsWith("$") || !/^[A-Za-z0-9_-]{1,160}$/.test(wanted)) return null;
   const job = getVideoJobByFileFor(person, wanted) ?? getVideoJobFor(person, wanted);
-  if (!job || job.personId !== person.id || job.state !== "done" || job.files.length === 0) return null;
+  // A clip made in a temporary chat is meant to leave nothing in the Library, so it is never an input of an export.
+  if (!job || job.personId !== person.id || job.temporary || job.state !== "done" || job.files.length === 0) return null;
   const state = videoJobLockState(person, job);
   if (state === "hidden") return null;
   if (state === "locked") return { locked: true, job };
@@ -67,7 +68,7 @@ export function studioRows(person: PersonRow, id: string | undefined): Row[] {
     locked: false,
     ...mark,
     lanes: [
-      { id: "video", pieces: [{ id: "clip-1", ref: file.id, src: clipUrl(job, file), label: words(job, 40), poster: posterUrl(job, file), in_s: 0, out_s: length, source_s: length, ...mark }] },
+      { id: "video", pieces: [{ id: `clip-${file.id}`, ref: file.id, src: clipUrl(job, file), label: words(job, 40), poster: posterUrl(job, file), in_s: 0, out_s: length, source_s: length, ...mark }] },
       { id: "voice", pieces: [] },
       { id: "music", pieces: [] },
     ],

@@ -429,6 +429,23 @@ describe("the add action", () => {
   });
 });
 
+describe("a temporary chat's clip", () => {
+  test("is never opened, added or exported: it is meant to leave nothing in the Library", async () => {
+    const owner = person("owner");
+    const state = { ...chatState(owner), temporary: true } as TurnState;
+    const outcome = await runGenerateVideo({ state, args: { prompt: BOAT }, callId: "make", spoken: false });
+    const id = (outcome.result?.data as { videoJobId: string }).videoJobId;
+    await until(() => getVideoJobFor(owner, id)?.state === "done");
+    const temp = getVideoJobFor(owner, id)!;
+    expect(temp.temporary).toBe(true);
+    expect(studioRows(owner, temp.id)).toEqual([]);
+    expect(studioRows(owner, refOf(temp))).toEqual([]);
+    expect(await studioAdd(owner, { kind: "clip", ref: temp.id })).toMatchObject({ ok: false, code: "no_clip" });
+    expect(await startStudioExport(owner, { plan: planOf([vp(refOf(temp), { in_s: 1, out_s: 4 })]) })).toMatchObject({ ok: false, code: "no_clip" });
+    expect(stack.jobs).toHaveLength(0);
+  });
+});
+
 describe("the page's rows", () => {
   test("no clip, a missing clip or another person's clip is no row; the header reads the plain title then", async () => {
     const owner = person("owner");
