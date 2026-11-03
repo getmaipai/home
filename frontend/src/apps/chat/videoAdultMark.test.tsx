@@ -35,10 +35,10 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.fetch = realFetch; });
 
-function mount(pinDigits: number | null = 4) {
+function mount(pinDigits: number | null = 4, hasSecret = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Render = VideoToolRender as unknown as (props: { result: { id: string } }) => React.ReactElement;
-  const me = { id: "p1", pinDigits } as never;
+  const me = { id: "p1", pinDigits, hasSecret } as never;
   return render(<QueryClientProvider client={client}><WakeWordPersonContext.Provider value={me}><MemoryRouter><Render result={{ id: "vid-1" }} /></MemoryRouter></WakeWordPersonContext.Provider></QueryClientProvider>);
 }
 const typeCode = (code: string) => fireEvent.change(document.querySelector<HTMLInputElement>('[data-slot="adult-lock-dialog"] input')!, { target: { value: code } });
@@ -106,6 +106,14 @@ describe("a creator who signs in with a password (ADULT-LOCK-07)", () => {
     fireEvent.submit(field().closest("form")!);
     await waitFor(() => expect(calls.some((c) => c.url === "/api/videos/jobs/vid-1/adult-mark")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url === "/api/adult-lock/confirm")!.body!)).toEqual({ secret: "correct horse 9!", action: "unmark", item: "vid-1" });
+  });
+
+  test("a creator with no secret set is told where to set one, with no field", async () => {
+    const view = mount(null, false);
+    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-no-credential"]')).not.toBeNull());
+    expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).toBeNull();
   });
 
   test("a wrong password is the plain line with the word password, nothing is cleared", async () => {

@@ -187,9 +187,11 @@ function wrapFetch(): () => void {
   return () => { if (globalThis.fetch === wrapped) globalThis.fetch = real; };
 }
 
-/** The kind of secret the person signs in with, for the kit's adult-lock dialog (ADULT-LOCK-07): a digit PIN draws the digit boxes, anything else
- * (a password) draws the masked password field. The roster already carries `pinDigits` (null for a password), so no new field is needed. */
-export function adultCredential(person: { pinDigits?: number | null } | null | undefined): { credentialKind: "passcode" | "password"; credentialWord: "passcode" | "password"; digits: number } {
+/** The kind of secret the person signs in with, for the kit's adult-lock dialog (ADULT-LOCK-07): a digit PIN draws the digit boxes, a password draws the
+ * masked password field. The roster already carries `pinDigits` (null for a password), so no new field is needed. With no secret set (`hasSecret === false`)
+ * the dialog only says where to set one, in the default word. The kit derives its word ("passcode" or "password") from the kind. */
+export function adultCredential(person: { pinDigits?: number | null; hasSecret?: boolean } | null | undefined): { credentialKind: "passcode" | "password"; digits: number } {
   const digits = person?.pinDigits && person.pinDigits >= 1 ? person.pinDigits : null;
-  return digits ? { credentialKind: "passcode", credentialWord: "passcode", digits } : { credentialKind: "password", credentialWord: "password", digits: 6 };
+  if (digits || person?.hasSecret === false) return { credentialKind: "passcode", digits: digits ?? 6 };
+  return { credentialKind: "password", digits: 6 };
 }

@@ -9,8 +9,7 @@ import { adultCredential } from "@/lib/adultLock";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 
-/** What will change, in plain words (the confirm dialog). */
-/** `word` is the person's own word for their secret: "passcode" for a digit PIN, "password" for a password. */
+/** What will change, in plain words (the confirm dialog). `word` is the person's own word for their secret: "passcode" for a digit PIN, "password" for a password. */
 export const unmarkExplainer = (word: string) => `This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your ${word} to continue.`;
 export const UNMARK_EXPLAINER = unmarkExplainer("passcode");
 
@@ -53,8 +52,9 @@ export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): 
       unlock={check}
       onUnlocked={() => { setOpen(false); refresh(); }}
       {...credential}
+      hasCredential={me?.hasSecret !== false}
       title="Remove the adult lock?"
-      description={unmarkExplainer(credential.credentialWord)}
+      description={unmarkExplainer(credential.credentialKind)}
       actionLabel="Remove lock"
     />
   ) : null;

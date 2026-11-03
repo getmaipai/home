@@ -105,8 +105,7 @@ export function useAdultLockProps(person: Pick<Roster, "pinDigits" | "hasSecret"
     return () => { restoreFetch.current?.(); restoreFetch.current = null; };
   }, []);
   const visit = useMemo(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2)), []);
-  // With no secret set there is nothing to ask for: the dialog only says where to set one, in the default word.
-  const credential = person.hasSecret === false ? adultCredential({ pinDigits: 6 }) : adultCredential(person);
+  const credential = adultCredential(person);
   const unlock = useCallback((secret: string) => unlockRequest(secret, visit), [visit]);
   const onUnlocked = useCallback((proof: string | null) => {
     setAdultProof(proof);
