@@ -4,11 +4,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
 import { resetDb } from "./reset-db";
-import { createBenchPeople } from "../scripts/bench/conversationRunner";
+import { createBenchPeople, addBenchTeen } from "../scripts/bench/conversationRunner";
 import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, LYRICS, waitForMusic } from "./musicFixture";
 import { runGenerateMusic, runEditMusic, songSecondsFor, FULL_SONG, QUICK_SONG } from "@/lib/music/tool";
-import { getMusicJobFor, musicVersions } from "@/lib/music/jobs";
+import { getMusicJobFor, musicVersions, slotBodyFor } from "@/lib/music/jobs";
 import { musicForOutcomes } from "@/lib/composer";
 import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -35,6 +35,99 @@ describe("the typed tier of a new song (TIER-HOME-03)", () => {
     const out = await ask("max");
     expect(reply(out)).toContain("Max is not available on this computer yet");
     expect((fake.submitted.at(-1) as { quality?: string }).quality).toBe("detailed");
+  });
+});
+
+describe("Max music (MUSIC-MAX-01)", () => {
+  const MAX_ENGINE = { quality: ["quick", "detailed", "max"], max_model: { id: "ace-step-1-5-xl-sft-bf16", installed: true, models: [], remaining_bytes: 0 } };
+  const ask = (actor: typeof people.owner, tier: string) => runGenerateMusic({ state: musicState(actor), args: { description: "a folk song", lyrics: LYRICS, tier }, callId: tier, spoken: false });
+  const lastQuality = () => (fake.submitted.at(-1) as { quality?: string }).quality;
+  test("Max asks the Stack for its Max maker when it is offered and installed, and the queue records Max", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests(MAX_ENGINE));
+    const out = await ask(people.owner, "max");
+    expect(out.status).toBe("succeeded");
+    expect(reply(out)).not.toContain("Boost");
+    expect(lastQuality()).toBe("max");
+    const job = getMusicJobFor(people.owner, musicForOutcomes([out])!.id)!;
+    expect(job.request).toMatchObject({ quality: "max", tier: "max" });
+  });
+  test("Max offered but not installed runs as Boost and says so, in the request too", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests({ ...MAX_ENGINE, max_model: { id: "ace-step-1-5-xl-sft-bf16", installed: false, models: [], remaining_bytes: 18_000_000_000 } }));
+    const out = await ask(people.owner, "max");
+    expect(reply(out)).toContain("not installed on this computer yet, so this one is made at Boost");
+    expect(lastQuality()).toBe("detailed");
+    expect(getMusicJobFor(people.owner, musicForOutcomes([out])!.id)!.request).toMatchObject({ quality: "detailed", tier: "boost" });
+  });
+  test("an engine that does not list Max makes a Max request at Boost, as before", async () => {
+    const out = await ask(people.owner, "max");
+    expect(reply(out)).toContain("Max is not available on this computer yet");
+    expect(lastQuality()).toBe("detailed");
+  });
+  test("the Max level switched off makes a Max request at Boost without the Max maker", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests(MAX_ENGINE));
+    setHouseholdSettingValue("engines.music.tier.max", { model: "off", options: {}, who: "admins" });
+    await ask(people.owner, "max");
+    expect(lastQuality()).not.toBe("max");
+  });
+  test("a teen's Max request never reaches the Max maker", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests(MAX_ENGINE));
+    const teen = addBenchTeen(people);
+    const out = await ask(teen, "max");
+    // Whether the teen's song is made or refused at the door, the Max maker is never asked for.
+    const made = musicForOutcomes([out]);
+    if (made) { expect(getMusicJobFor(teen, made.id)!.request).toMatchObject({ quality: "quick", tier: "standard" }); await waitForMusic(() => getMusicJobFor(teen, made.id)?.state === "done"); }
+    expect(fake.submitted.some((body) => (body as { quality?: string }).quality === "max")).toBe(false);
+  });
+  test("a Max job whose level was switched off before it was sent goes to the Stack as Boost", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests(MAX_ENGINE));
+    const owner = people.owner;
+    const job = { personId: owner.id, request: { quality: "max", tier: "max" } } as never;
+    expect(slotBodyFor(job, { task: "text2music", caption: "x", duration_s: 30, quality: "max" } as never).quality).toBe("max");
+    setHouseholdSettingValue("engines.music.tier.max", { model: "off", options: {}, who: "admins" });
+    expect(slotBodyFor(job, { task: "text2music", caption: "x", duration_s: 30, quality: "max" } as never)).toMatchObject({ quality: "detailed", tier: "boost" });
+  });
+});
+
+describe("the card's Make it Max route (MUSIC-MAX-01)", () => {
+  async function aSong(engine: Parameters<typeof readyMusicStatusForTests>[0]) {
+    resetDb();
+    __setMusicStatusForTests(readyMusicStatusForTests(engine));
+    const client = new TestClient();
+    expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
+    const actor = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Sage")).get()!;
+    const out = await runGenerateMusic({ state: musicState(actor), args: { description: "an original folk song", lyrics: LYRICS, tier: "standard" }, callId: "g", spoken: false });
+    const id = musicForOutcomes([out])!.id;
+    await waitForMusic(() => getMusicJobFor(actor, id)?.state === "done");
+    return { client, actor, id };
+  }
+  const card = async (client: TestClient, id: string) => await (await client.get(`/api/music/jobs/${id}`)).json() as { quality: string; max_offered: boolean; max_installed: boolean };
+  const INSTALLED = { quality: ["quick", "detailed", "max"], max_model: { id: "ace-step-1-5-xl-sft-bf16", installed: true } };
+  test("an installed Max maker is offered, and Make it Max sends quality max and records Max", async () => {
+    const { client, actor, id } = await aSong(INSTALLED);
+    expect(await card(client, id)).toMatchObject({ quality: "quick", max_offered: true, max_installed: true });
+    expect((await client.post(`/api/music/jobs/${id}/quality`, { tier: "max" })).status).toBe(200);
+    expect(fake.submitted.at(-1)).toMatchObject({ quality: "max" });
+    await waitForMusic(() => musicVersions(actor, getMusicJobFor(actor, id)!).filter((j) => j.state === "done").length >= 2);
+    expect(musicVersions(actor, getMusicJobFor(actor, id)!).filter((j) => j.state === "done").at(-1)!.request).toMatchObject({ quality: "max", tier: "max" });
+    expect((await card(client, id)).quality).toBe("max");
+  });
+  test("offered but not installed: the card shows Max as not installed and the route refuses rather than running Boost under the Max name", async () => {
+    const { client, id } = await aSong({ quality: ["quick", "detailed", "max"], max_model: { id: "ace-step-1-5-xl-sft-bf16", installed: false } });
+    expect(await card(client, id)).toMatchObject({ max_offered: true, max_installed: false });
+    const res = await client.post(`/api/music/jobs/${id}/quality`, { tier: "max" });
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("not installed");
+  });
+  test("an engine that does not list Max shows no Max, and the route refuses it", async () => {
+    const { client, id } = await aSong({});
+    expect(await card(client, id)).toMatchObject({ max_offered: false, max_installed: false });
+    expect((await client.post(`/api/music/jobs/${id}/quality`, { tier: "max" })).status).toBe(422);
+  });
+  test("the Max level switched off hides Max and refuses it", async () => {
+    const { client, id } = await aSong(INSTALLED);
+    setHouseholdSettingValue("engines.music.tier.max", { model: "off", options: {}, who: "admins" });
+    expect((await card(client, id)).max_offered).toBe(false);
+    expect((await client.post(`/api/music/jobs/${id}/quality`, { tier: "max" })).status).toBe(422);
   });
 });
 

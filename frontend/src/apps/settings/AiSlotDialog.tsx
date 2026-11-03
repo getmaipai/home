@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import type { GlanceRow } from "@/apps/settings/aiGlanceRows";
 import type { TierPicks } from "@/lib/aiChoicesApi";
 import { sizeGb } from "../../../../shared/diskPlanMath";
+import { MAX_RECOMMENDED_LABEL } from "../../../../shared/tierSlotOptions";
 import { groupByFamily, FAMILY_NOTE, type PickGroup } from "@/apps/settings/aiTierSlots";
 import { TIERED_JOBS, configurableTiers, consequences, isOn, optionDefs, whoChoices, withOn, type SlotDraft, type SlotDrafts, type SlotTier, type SlotWho } from "@/apps/settings/aiTierSlots";
 
@@ -47,7 +48,7 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
   const level = (tier: SlotTier) => picks?.levels.find((candidate) => candidate.tier === tier) ?? null;
   const recommendedLabel = (tier: SlotTier) => {
     const id = level(tier)?.recommended;
-    const named = id ? level(tier)?.candidates.find((candidate) => candidate.id === id)?.label : row.recommended?.label;
+    const named = id ? level(tier)?.candidates.find((candidate) => candidate.id === id)?.label : tier === "max" ? MAX_RECOMMENDED_LABEL[spec.category] : row.recommended?.label;
     return `${named ? `${named}. ` : ""}Follows catalog updates.`;
   };
   const groupsFor = (tier: SlotTier): PickGroup[] => {

@@ -333,11 +333,36 @@ describe("Standard and Boost songs on the card (TIER-HOME-03)", () => {
     fireEvent.click(view.getByRole("radio", { name: /Boost/ }));
     await waitFor(() => expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/quality" && c.method === "POST" && c.body?.includes('"boost"'))).toBe(true));
   });
-  test("no Quality tab when Boost is not offered, and no Max choice ever", async () => {
+  test("no Quality tab when neither Boost nor Max is offered", async () => {
     card = done({ boost_offered: false });
     const view = mount();
     fireEvent.click(await view.findByRole("button", { name: "Edit" }));
     expect(view.queryByRole("tab", { name: "Quality" })).toBeNull();
+  });
+  test("Max is shown only when the engine offers it, asks once, and Max asks for a Max version (MUSIC-MAX-01)", async () => {
+    card = done({ boost_offered: true, max_offered: true, max_installed: true });
+    const view = await openQuality();
+    fireEvent.click(view.getByRole("radio", { name: /Max/ }));
+    fireEvent.click(await view.findByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/quality" && c.method === "POST" && c.body?.includes('"max"'))).toBe(true));
+  });
+  test("a Max song shows Max as the chosen quality", async () => {
+    card = done({ boost_offered: true, max_offered: true, max_installed: true, quality: "max" });
+    const view = await openQuality();
+    expect(view.getByRole("radio", { name: /Max/ }).getAttribute("aria-checked")).toBe("true");
+  });
+  test("Max not installed is shown but cannot be chosen, and says why", async () => {
+    card = done({ boost_offered: true, max_offered: true, max_installed: false });
+    const view = await openQuality();
+    const max = view.getByRole("radio", { name: /Max/ });
+    expect(max.hasAttribute("disabled") || max.getAttribute("aria-disabled") === "true").toBe(true);
+    fireEvent.click(max);
+    expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/quality")).toBe(false);
+  });
+  test("no Max choice when the engine does not offer it", async () => {
+    card = done({ boost_offered: true, max_offered: false });
+    const view = await openQuality();
+    expect(view.queryByRole("radio", { name: /Max/ })).toBeNull();
   });
 });
 

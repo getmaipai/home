@@ -8,7 +8,8 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle }
 import { getIcon } from "@maipai/ui/src/icons";
 import type { GlanceRow } from "@/apps/settings/aiGlanceRows";
 import type { TierPicks } from "@/lib/aiChoicesApi";
-import { configurableTiers, isOn, type SlotDraft, type SlotDrafts, type SlotTier } from "@/apps/settings/aiTierSlots";
+import { MAX_RECOMMENDED_LABEL } from "../../../../shared/tierSlotOptions";
+import { TIERED_JOBS, configurableTiers, isOn, type SlotDraft, type SlotDrafts, type SlotTier } from "@/apps/settings/aiTierSlots";
 
 const LEVEL_TITLE: Record<SlotTier, string> = { standard: "Standard", boost: "Boost", max: "Max", reduced: "Simplified chat for big jobs" };
 const LEVEL_LINE: Record<SlotTier, string> = {
@@ -35,7 +36,9 @@ export function summarize(row: GlanceRow, drafts: SlotDrafts, picks: TierPicks |
     const draft = drafts[tier];
     if (!isOn(draft)) return { tier, model: "Off", kind: "off", note: null };
     if (tier === "max" && draft.model === "recommended" && !(picks?.levels.find((candidate) => candidate.tier === "max")?.recommended)) {
-      return { tier, model: "No model of its own on this computer yet", kind: "recommended", note: null };
+      // MUSIC-MAX-01: music's Max is the engine's own maker, named here; every other kind has no Max model until an admin picks one.
+      const own = MAX_RECOMMENDED_LABEL[TIERED_JOBS[row.job]?.category ?? ""];
+      return { tier, model: own ?? "No model of its own on this computer yet", kind: "recommended", note: null };
     }
     return { tier, model: labelOf(tier, draft), kind: draft.model === "recommended" ? "recommended" : "custom", note: null };
   });

@@ -7,7 +7,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
-import { musicEngineStatus, musicStatusReady } from "./ready";
+import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "./ready";
 import { plainMusicFailure, prepareStemsJob, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
 import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsForWords, hookOf } from "./sections";
 import { StackMusicError, musicBody, type MusicBody } from "./stack";
@@ -52,8 +52,8 @@ export type MusicToolInput = {
   album?: { id: string };
 };
 const newSeed = (prior?: number | null): number => { const seed = Math.floor(Math.random() * 2_147_483_646) + 1; return seed === prior ? seed + 1 : seed; };
-/** The Stack's own default (detailed on a big computer, quick on a small one); quick when it names none. */
-export function defaultQualityOf(engine: { default_quality?: string }): "quick" | "detailed" { return engine.default_quality === "detailed" ? "detailed" : "quick"; }
+/** The Stack's own default (detailed on a big computer, quick on a small one); quick when it names none. A default of Max is read as Boost: Max is only ever chosen, never a default (a person's grant decides it). */
+export function defaultQualityOf(engine: { default_quality?: string }): "quick" | "detailed" { return engine.default_quality === "detailed" || engine.default_quality === "max" ? "detailed" : "quick"; }
 /** Instrumentals retain their usual lengths; songs with words follow those words. */
 export const QUICK_SONG = { min: 10, default: 45, max: 60 } as const;
 export const FULL_SONG = { min: 150, default: 180, max: 240 } as const;
@@ -230,10 +230,13 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   // A request stored before the Stack named a default (or an edit of an older song) takes the Stack's default now.
   request.max_seconds = engine!.limits.max_seconds;
   // TIER-HOME-03: the typed tier argument of a new song. Boost is the engine's Detailed maker when it has one; a lowered request says why in one line.
-  const tierAsked = editing ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band });
-  if (tierAsked?.quality && (tierAsked.quality === "quick" || engine!.quality.includes("detailed"))) request.quality = tierAsked.quality;
+  // MUSIC-MAX-01: Max is the engine's XL SFT maker, granted exactly as Boost is (authorizeTier inside tierArgument); asked while the models are not installed it runs, and says it ran, as Boost.
+  const tierAsked = editing ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band, maxAvailable: musicMaxOffered(engine) });
+  if (tierAsked?.tier) request.quality = musicQualityFor(engine, tierAsked.tier);
   request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
-  request.tier = request.quality === "detailed" ? "boost" : "standard";
+  request.tier = musicTierOf(request.quality);
+  const maxNotInstalled = tierAsked?.tier === "max" && musicMaxOffered(engine) && !musicMaxInstalled(engine);
+  const tierLine = [tierAsked?.line, maxNotInstalled ? MUSIC_MAX_NOT_INSTALLED_LINE : null].filter(Boolean).join(" ");
   // Check the effective request, including inherited words and a section replacement, before any job exists.
   const inherited = refuseMusicPrompt([request.description, request.lyrics, request.written_lyrics, request.title, request.key, request.language].join(" "));
   if (inherited) return refused(MUSIC_REFUSAL_LINE[inherited], inherited);
@@ -242,7 +245,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   try {
     const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId });
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: {
-      reply: { text: `${songOnItsWay(request)}${tierAsked?.line ? ` ${tierAsked.line}` : ""}` },
+      reply: { text: `${songOnItsWay(request)}${tierLine ? ` ${tierLine}` : ""}` },
       data: { musicJobId: job.id }, actions: [],
     } });
   } catch (error) {

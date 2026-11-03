@@ -3,7 +3,9 @@
 // offer). A read failure is "not ready"; the answer is cached briefly so a chat turn pays for it at most once every
 // 20 seconds.
 import { isStackConfigured } from "@/lib/stackEngine";
+import { slotIsOff, type Tier } from "@/lib/tiers";
 import { musicStatus, type StackMusicStatus } from "./stack";
+import type { MusicRequest } from "./types";
 
 let cached: { at: number; status: StackMusicStatus | null } | null = null;
 // The last status that named a ready engine. A read that fails (the Stack is busy loading a model, a 5 s timeout) must not
@@ -44,6 +46,26 @@ export function musicStatusReady(status: StackMusicStatus | null): boolean {
 export async function musicEngineReady(): Promise<boolean> {
   return musicStatusReady(await musicEngineStatus());
 }
+
+/**
+ * MUSIC-MAX-01: whether a Max choice is offered at all. The Stack lists `max` in `quality` and an admin has not switched the Max music level off.
+ * The slot's model `recommended` counts: the engine has one maker per level, so Max's recommended model is the Stack's XL SFT maker (`maxAvailable`
+ * in lib/tiers.ts is for categories whose Max needs a model of its own).
+ */
+export function musicMaxOffered(status: StackMusicStatus | null): boolean {
+  return !!status && Array.isArray(status.quality) && status.quality.includes("max") && !slotIsOff("music", "max");
+}
+/** Whether the Max models are installed. The Stack runs a Max song as Boost when they are not, so Home never assumes it from the offer alone. */
+export function musicMaxInstalled(status: StackMusicStatus | null): boolean { return status?.max_model?.installed === true; }
+export const MUSIC_MAX_NOT_INSTALLED_LINE = "The Max music model is not installed on this computer yet, so this one is made at Boost.";
+/** The maker a granted level really runs at on this engine: Max only when offered and installed, else Boost (Detailed) when the engine has it, else Quick. */
+export function musicQualityFor(status: StackMusicStatus | null, tier: Tier): NonNullable<MusicRequest["quality"]> {
+  if (tier === "standard") return "quick";
+  if (tier === "max" && musicMaxOffered(status) && musicMaxInstalled(status)) return "max";
+  return status?.quality.includes("detailed") ? "detailed" : "quick";
+}
+/** The level a maker belongs to, for the household queue and the card (Quick is Standard, Detailed is Boost). */
+export const musicTierOf = (quality: MusicRequest["quality"]): "standard" | "boost" | "max" => quality === "max" ? "max" : quality === "detailed" ? "boost" : "standard";
 
 /** A ready status for tests. */
 export function readyMusicStatusForTests(overrides: Partial<StackMusicStatus> = {}): StackMusicStatus {

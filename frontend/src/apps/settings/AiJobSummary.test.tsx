@@ -21,6 +21,13 @@ describe("summarize", () => {
     expect(max).toMatchObject({ tier: "max", model: "Off", kind: "off" });
   });
 
+  test("music Max is named for the engine's own maker, while video Max still has no model of its own (MUSIC-MAX-01)", () => {
+    const music = summarize({ ...row, job: "music", options: [], recommended: { label: "ACE-Step 1.5" }, shown: { label: "ACE-Step 1.5" } } as unknown as GlanceRow, drafts(), null);
+    expect(music.map((l) => l.tier)).toEqual(["standard", "boost", "max"]);
+    expect(music[2]).toMatchObject({ tier: "max", model: "Best songs (ACE-Step XL SFT)", kind: "recommended" });
+    expect(summarize(row, drafts(), null)[2]).toMatchObject({ model: "No model of its own on this computer yet" });
+  });
+
   test("chat lists Standard and the simplify level (nothing reads a chat Boost or Max pick), and simplify starts off", () => {
     const levels = summarize({ ...row, job: "chat" } as GlanceRow, drafts(), null);
     expect(levels.map((l) => l.tier)).toEqual(["standard", "reduced"]);

@@ -56,7 +56,8 @@ export function slotBodyFor(job: MusicJob, base: Omit<MusicBody, "timeout_ms">):
   if (body.task === "edit") return body;
   const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
   const run = slotRun("music", requestTier(job.request), owner ? speakerAgeBand(owner, new Date()) : "child");
-  if (run.lowered) { body.quality = "quick"; const request = job.request as { quality?: string; tier?: string }; request.quality = "quick"; request.tier = "standard"; }
+  // A level switched off since the song was queued is made at the level below it (Max to Boost, then Standard); the request records what it really ran as.
+  if (run.lowered) { const quality = run.tier === "standard" ? "quick" : "detailed"; body.quality = quality; const request = job.request as { quality?: string; tier?: string }; request.quality = quality; request.tier = run.tier; }
   if (run.tier === "boost" || run.tier === "max") body.tier = run.tier;
   return body;
 }

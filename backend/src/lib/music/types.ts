@@ -7,7 +7,7 @@ export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake"
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; /** On a split of an audio file the person owns: the source is theirs, not a made song. */ ownedFile?: boolean; max_seconds?: number; retried?: boolean;
-  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; /** TIER-HOME-03: read by the household queue. Music has no Max maker yet. */ tier?: "standard" | "boost"; seed?: number; length?: SongLength;
+  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed" | "max"; /** TIER-HOME-03: read by the household queue. MUSIC-MAX-01: Max is the engine's XL SFT maker. */ tier?: "standard" | "boost" | "max"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
   /** MUSIC-LIKE-01: a made band's first single. The song saved from this job is filed under the band (artist text and made_artist_id). */

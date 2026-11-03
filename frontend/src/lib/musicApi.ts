@@ -31,10 +31,14 @@ export interface MusicCard {
   current_id: string | null;
   /** The kind of the version on show: quick (the hook) or full (every part). */
   length: "quick" | "full";
-  /** The maker the shown version used: quick is Standard, detailed is Boost. */
-  quality: "quick" | "detailed";
+  /** The maker the shown version really used: quick is Standard, detailed is Boost, max is Max. A Max song made without the Max models says detailed. */
+  quality: "quick" | "detailed" | "max";
   /** Whether this person may make the song again at Boost here. */
   boost_offered: boolean;
+  /** Whether this person is shown Max on the Quality control (the engine offers a Max maker and they hold Max). */
+  max_offered?: boolean;
+  /** Whether the Max music models are installed; Max is shown but not selectable until they are. */
+  max_installed?: boolean;
   cut: "asked" | "ceiling" | null;
   max_seconds: number | null;
   title: string | null;
@@ -59,7 +63,7 @@ export const musicApi = {
   /** Make it full / Make it quick: the same song made again at the other length, as a new version on this card. */
   setLength: (id: string, length: "quick" | "full", fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/length`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ length, ...(fileId ? { file_id: fileId } : {}) }) }),
   /** Make it Boost / Make it Standard: the same song made again with the other maker, as a new version on this card. */
-  setTier: (id: string, tier: "standard" | "boost", fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/quality`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { tier, file_id: fileId } : { tier }) }),
+  setTier: (id: string, tier: "standard" | "boost" | "max", fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/quality`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { tier, file_id: fileId } : { tier }) }),
   /** Delete a song: it, its versions and its covers move to Trash together. */
   remove: (id: string) => requestJson<{ deleted: number; trash_until: string | null }>(`/api/music/jobs/${encodeURIComponent(id)}/delete`, { method: "POST" }),
   revise: (id: string, change: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/revise`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ change, ...(fileId ? { file_id: fileId } : {}) }) }),

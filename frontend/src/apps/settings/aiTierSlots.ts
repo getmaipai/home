@@ -4,7 +4,7 @@
 // Max switches live here and nowhere else (RULES.md S4).
 import vocab from "@maipai/spec/vocab/resource-tiers.json";
 import type { AiJobId } from "../../../../shared/aiChoices";
-import { SLOT_LEVELS_READ, SLOT_OPTIONS_READ } from "../../../../shared/tierSlotOptions";
+import { MAX_RECOMMENDED_LABEL, SLOT_LEVELS_READ, SLOT_OPTIONS_READ } from "../../../../shared/tierSlotOptions";
 
 export type SlotTier = "reduced" | "standard" | "boost" | "max";
 export type SlotWho = "everyone" | "assigned" | "admins";
@@ -83,7 +83,7 @@ export function levelsLine(drafts: SlotDrafts, job: AiJobId, models: ReadonlyArr
   const levels = configurableTiers(job);
   const parts = [`Standard: ${name(drafts.standard)}`];
   if (levels.includes("boost")) parts.push(`Boost: ${name(drafts.boost)}`);
-  if (levels.includes("max")) parts.push(!isOn(drafts.max) ? "Max: off" : drafts.max.model === "recommended" ? "Max: no model of its own yet" : `Max: ${name(drafts.max)}`);
+  if (levels.includes("max")) parts.push(!isOn(drafts.max) ? "Max: off" : drafts.max.model === "recommended" ? (MAX_RECOMMENDED_LABEL[TIERED_JOBS[job]?.category ?? ""] ? "Max: recommended" : "Max: no model of its own yet") : `Max: ${name(drafts.max)}`);
   if (job === "chat") parts.push(`Simplify chat for big jobs: ${isOn(drafts.reduced) ? "on" : "off"}`);
   return `${parts.join(" · ")}.${levels.includes("max") ? " Max is for admins and anyone an admin assigns." : ""}`;
 }

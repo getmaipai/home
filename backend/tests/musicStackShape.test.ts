@@ -23,3 +23,11 @@ test("a flat status still reads, and a body with neither shape is not ready", as
   __setMusicFetchForTests((async () => Response.json({ video: {} })) as unknown as typeof fetch);
   expect(await musicStatus()).toBeNull();
 });
+
+test("a Stack that offers Max lists it in quality with its max_model, and the status keeps both (MUSIC-MAX-01)", async () => {
+  const max = { ...REAL.music, quality: ["quick", "detailed", "max"], max_model: { id: "ace-step-1-5-xl-sft-bf16", installed: false, models: [], remaining_bytes: 18_404_641_890 } };
+  __setMusicFetchForTests((async () => Response.json({ music: max })) as unknown as typeof fetch);
+  const status = await musicStatus();
+  expect(status?.quality).toEqual(["quick", "detailed", "max"]);
+  expect(status?.max_model).toMatchObject({ id: "ace-step-1-5-xl-sft-bf16", installed: false });
+});

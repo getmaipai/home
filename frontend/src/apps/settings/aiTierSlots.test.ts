@@ -29,10 +29,16 @@ describe("slot drafts", () => {
     expect(configurableTiers("videos")).toEqual(["standard", "boost", "max"]);
   });
 
-  test("only levels something reads are offered: chat and voice have Standard alone (chat adds Reduced), music has no Max", () => {
+  test("music Max is the Stack's own recommended maker, so it never reads as having no model yet (MUSIC-MAX-01)", () => {
+    expect(levelsLine(drafts(), "music", [])).toBe("Standard: recommended · Boost: recommended · Max: recommended. Max is for admins and anyone an admin assigns.");
+    expect(levelsLine(drafts({ max: withOn(draftOf(undefined, "max"), false) }), "music", [])).toContain("Max: off");
+    expect(consequences(drafts({ max: withOn(draftOf(undefined, "max"), false) }), "music", "Music")).toContain("Max is off for music. Nobody can start a Max window for it, including admins. A Max job already running finishes.");
+  });
+
+  test("only levels something reads are offered: chat and voice have Standard alone (chat adds Reduced), music has Standard, Boost and Max (MUSIC-MAX-01)", () => {
     expect(configurableTiers("chat")).toEqual(["standard", "reduced"]);
     expect(configurableTiers("voice")).toEqual(["standard"]);
-    expect(configurableTiers("music")).toEqual(["standard", "boost"]);
+    expect(configurableTiers("music")).toEqual(["standard", "boost", "max"]);
     expect(consequences(drafts({ max: withOn(draftOf(undefined, "max"), false), boost: withOn(draftOf(undefined, "boost"), false) }), "voice", "Voice")).toEqual([]);
     expect(levelsLine(drafts(), "chat", [])).toBe("Standard: recommended · Simplify chat for big jobs: off.");
   });

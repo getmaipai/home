@@ -56,6 +56,18 @@ describe("Models and storage", () => {
     v.restore();
   });
 
+  test("the Max music model is listed under Music as optional, with its size and an Install action (MUSIC-MAX-01)", async () => {
+    const v = mount(overview([
+      row({ id: "ace-step-1-5-xl-sft-bf16", label: "Music: Max (ACE-Step XL SFT)", summary: "The best song model and its larger planning model.", group: "music", download_bytes: 18_404_641_890, plan_need: "optional" }),
+    ]));
+    await waitFor(() => expect(v.getByRole("heading", { name: "Music" })).toBeTruthy());
+    const item = v.getByTestId("component-ace-step-1-5-xl-sft-bf16");
+    expect(item.textContent).toContain("Music: Max (ACE-Step XL SFT)");
+    expect(item.textContent).toContain("Download about 18 GB");
+    expect(v.getByLabelText("Install Music: Max (ACE-Step XL SFT)")).toBeTruthy();
+    v.restore();
+  });
+
   test("stem splitting is its own Stems category, recommended and not installed on an upgraded hub", async () => {
     const v = mount(overview([
       row({ id: "htdemucs", label: "Music: HTDemucs stem splitter", summary: "Separates a song into vocals, drums, bass and other.", group: "stems", plan_need: "recommended", requirement: "optional", state: "notInstalled", download_bytes: 300_000_000, can_install: true }),

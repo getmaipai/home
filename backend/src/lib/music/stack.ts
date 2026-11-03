@@ -8,12 +8,14 @@ export interface StackStem { url: string; stem: "vocals" | "drums" | "bass" | "o
 export interface StackStemsStatus { available: boolean; state: string; install?: unknown }
 export interface StackMusicStatus {
   available: boolean; state: string; limits: { min_seconds: number; max_seconds: number };
-  quality: string[]; default_quality?: "quick" | "detailed"; install?: unknown;
+  quality: string[]; default_quality?: "quick" | "detailed" | "max"; install?: unknown;
+  /** MUSIC-MAX-01: the Max maker (XL SFT). The Stack lists `max` in `quality` as soon as it offers it; without the models installed it runs the song as Boost. */
+  max_model?: { id: string; installed: boolean; models?: unknown[]; remaining_bytes?: number | null } | null;
 }
 export interface MusicBody {
   task: "text2music" | "cover" | "repaint" | "extend" | "edit";
   caption: string; lyrics?: string; instrumental?: boolean; duration_s: number;
-  bpm?: number; key?: string; language?: string; seed?: number; quality?: "quick" | "detailed";
+  bpm?: number; key?: string; language?: string; seed?: number; quality?: "quick" | "detailed" | "max";
   /** TIER-HOME-04: the level the song runs at, from the slot (`slotBodyFor` in lib/music/jobs.ts); left out at Standard. */ tier?: "boost" | "max";
   source?: string; source_sha256?: string; from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end";
   strength?: number; edit?: { op: "trim" | "fade" | "loudness"; from_s?: number; to_s?: number; seconds?: number; where?: "in" | "out" | "both"; lufs?: number };

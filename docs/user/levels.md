@@ -9,7 +9,7 @@ Pictures, videos and songs can be made at more than one level. A higher level lo
 
 - **Standard** is the everyday level. It is on for everyone the age rules allow.
 - **Boost** is a bigger, slower maker. Pictures and videos made at Boost are the ones the older pages called Detailed.
-- **Max** is the biggest maker, for one big job at a time. Everything else big waits while a Max job runs. Max shows up only when an owner or admin has picked a Max model for that kind of job. Home does not pick one for you. Today there is a Max model for pictures, on a computer with lots of memory. There is none for video or songs, so those two never offer Max.
+- **Max** is the biggest maker, for one big job at a time. Everything else big waits while a Max job runs. Max shows up only when an owner or admin has picked a Max model for that kind of job, or, for songs, has left the Max level on. Today there is a Max model for pictures, on a computer with lots of memory. For songs, Max is the best song maker: it takes about three times as long as Standard (about 2.5 minutes for a 40 second song on a big computer) and needs an extra download of about 18 GB, which an admin adds under Settings, Models and storage. Until it is installed, a song asked at Max is made at Boost, and the card says Boost. There is no Max for video.
 
 Home also has a level called **Reduced**. You never pick it. Only a Max job can bring it in, and only when that job needs more room than a Standard job gets. When that happens:
 

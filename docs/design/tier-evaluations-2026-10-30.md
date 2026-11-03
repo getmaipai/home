@@ -13,7 +13,7 @@ before quoting them as a promise.
 
 - **Voice:** Chatterbox Nano is close enough to Turbo that users will not tell; confirmed by ear as the Reduced voice on p64 and p128.
 - **Music:** he preferred the shipped turbo to XL SFT (possibly style rather than quality) and found them too close to call. XL SFT does not earn a Max slot: it costs 2 to 3 times the time and more memory for no audible gain.
-  Max music stays empty.
+  Max music stayed empty then; superseded 2026-11-02 by MUSIC-MAX-01 (Max music is the Stack's XL SFT maker, owner request).
 - **Pictures:** no verdict on the sheets; Qwen-Image 20B stays the Max picture slot as already ruled.
 
 ## Owner rulings (2026-10-30, after the first pass)

@@ -91161,11 +91161,20 @@
                         "type": "string",
                         "enum": [
                           "quick",
-                          "detailed"
+                          "detailed",
+                          "max"
                         ]
                       },
                       "boost_offered": {
                         "type": "boolean"
+                      },
+                      "max_offered": {
+                        "type": "boolean",
+                        "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                      },
+                      "max_installed": {
+                        "type": "boolean",
+                        "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                       },
                       "title": {
                         "type": "string",
@@ -91210,6 +91219,8 @@
                       "length",
                       "quality",
                       "boost_offered",
+                      "max_offered",
+                      "max_installed",
                       "title",
                       "description",
                       "lyrics",
@@ -91507,11 +91518,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -91556,6 +91576,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -91850,11 +91872,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -91899,6 +91930,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -92211,11 +92244,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -92260,6 +92302,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -92580,11 +92624,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -92629,6 +92682,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -92973,11 +93028,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -93022,6 +93086,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -93371,11 +93437,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -93420,6 +93495,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -93735,11 +93812,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -93784,6 +93870,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -94103,11 +94191,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -94152,6 +94249,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -94568,11 +94667,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -94617,6 +94725,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -94939,11 +95049,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -94988,6 +95107,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",
@@ -95048,7 +95169,7 @@
         "tags": [
           "Music"
         ],
-        "summary": "Make the shown song again at Standard or Boost",
+        "summary": "Make the shown song again at Standard, Boost or Max",
         "parameters": [
           {
             "schema": {
@@ -95071,7 +95192,8 @@
                     "type": "string",
                     "enum": [
                       "standard",
-                      "boost"
+                      "boost",
+                      "max"
                     ]
                   },
                   "file_id": {
@@ -95313,11 +95435,20 @@
                       "type": "string",
                       "enum": [
                         "quick",
-                        "detailed"
+                        "detailed",
+                        "max"
                       ]
                     },
                     "boost_offered": {
                       "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
                     },
                     "title": {
                       "type": "string",
@@ -95362,6 +95493,8 @@
                     "length",
                     "quality",
                     "boost_offered",
+                    "max_offered",
+                    "max_installed",
                     "title",
                     "description",
                     "lyrics",

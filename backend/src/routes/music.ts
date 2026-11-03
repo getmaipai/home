@@ -20,9 +20,9 @@ import type { AppEnv } from "@/types";
 import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOf } from "@/lib/pictures/lane";
-import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
+import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "@/lib/music/ready";
 import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
-import { authorizeTier } from "@/lib/tiers";
+import { authorizeTier, maxOffered } from "@/lib/tiers";
 import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, runGenerateMusic, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
@@ -64,7 +64,7 @@ const cardSchema = z.object({
   making_version: z.object({ stage_label: z.string(), progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable() }).nullable(),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(),
-  versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed"]), boost_offered: z.boolean(), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
+  versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed", "max"]), boost_offered: z.boolean(), max_offered: z.boolean().describe("Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."), max_installed: z.boolean().describe("Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 const MUSIC_STAGE_LABELS: Record<string, string> = {
@@ -150,6 +150,8 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   // TIER-HOME-03: the song card offers Boost when the engine has a Detailed maker and this person may use Boost (music has no Max maker yet).
   const engine = await musicEngineStatus();
   const boostOffered = !!engine?.quality.includes("detailed") && authorizeTier({ person: actor, category: "music", requested: "boost" }).tier === "boost";
+  // MUSIC-MAX-01: Max follows Boost's gate (grant, age band, level switch) and is shown only when the engine lists a Max maker.
+  const maxShown = maxOffered(actor, "music", undefined, musicMaxOffered(engine));
   return {
     stages: stages.map((label, index) => ({ id: ["queued", "model", "planning", "making", "mixing", "finishing"][index]!, label })),
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
@@ -163,7 +165,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
     versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job) })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS),
-    quality: (current ?? root).request.quality === "detailed" ? "detailed" as const : "quick" as const, boost_offered: boostOffered, title: current?.request.title ?? root.request.title ?? null,
+    quality: (current ?? root).request.quality === "max" ? "max" as const : (current ?? root).request.quality === "detailed" ? "detailed" as const : "quick" as const, boost_offered: boostOffered, max_offered: maxShown, max_installed: musicMaxInstalled(engine), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null,
     timed_lyrics: shown.lrc && !shown.request.instrumental ? sungLyricsFromLrc(shown.lrc, shown.durationS).map(({ t, line, section }) => ({ t, line, section })) : null,
     lyrics: cardLyricsOf(shown), duration_s: current?.durationS ?? root.durationS,
@@ -380,8 +382,8 @@ musicRoutes.openapi(lengthRoute, async (c) => {
   return c.json(await musicCardView(actor, root), 200);
 });
 // Make it Boost / Make it Standard (TIER-HOME-03): the same song made again with the engine's Detailed or Quick maker, as a new version on the same card.
-const qualityRoute = createRoute({ method: "post", path: "/jobs/{id}/quality", tags: ["Music"], summary: "Make the shown song again at Standard or Boost", middleware,
-  request: { params, body: { content: { "application/json": { schema: z.object({ tier: z.enum(["standard", "boost"]), file_id: z.string().min(1).max(80).optional() }) } } } },
+const qualityRoute = createRoute({ method: "post", path: "/jobs/{id}/quality", tags: ["Music"], summary: "Make the shown song again at Standard, Boost or Max", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({ tier: z.enum(["standard", "boost", "max"]), file_id: z.string().min(1).max(80).optional() }) } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(qualityRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { tier, file_id } = c.req.valid("json");
@@ -396,7 +398,9 @@ musicRoutes.openapi(qualityRoute, async (c) => {
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
   const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
-  plan.request.quality = tier === "boost" ? "detailed" : "quick"; plan.request.tier = tier; plan.body.quality = plan.request.quality;
+  if (tier === "max" && (granted !== "max" || !musicMaxOffered(engine))) return c.json({ error: "Max is not available for this song. Make it again at Boost or Standard." }, 422) as never;
+  if (tier === "max" && !musicMaxInstalled(engine)) return c.json({ error: MUSIC_MAX_NOT_INSTALLED_LINE }, 422) as never;
+  plan.request.quality = musicQualityFor(engine, tier); plan.request.tier = musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
   plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
   try {
     await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId });
