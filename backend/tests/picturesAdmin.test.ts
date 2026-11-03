@@ -10,6 +10,7 @@ import { adaptersFor, dropAdapterCache } from "@/lib/pictures/adapters";
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { TestClient } from "./client";
+import { unlock, unlockHeader } from "./fixtures/adultLock";
 import { resetDb } from "./reset-db";
 import { installFakeImageStack, type FakeImageStack } from "./pictureFixture";
 
@@ -34,7 +35,8 @@ const GOOD = { name: "Ink Wash", licence: "apache-2.0", all_ages: "yes", trigger
 describe("overview", () => {
   test("lists the engine, every style with its switch and the three bands", async () => {
     const { client } = await owner();
-    const body = (await (await client.get("/api/pictures/admin")).json()) as { stack: string; engine: { default_model: string; edit_ready: boolean }; adapters: Array<{ id: string; enabled: boolean; classification: string; licence: string }>; bands: Array<{ band: string; on: boolean; locked: boolean }>; adult_adapters: string };
+    const proof = unlockHeader(await unlock(client, "correcthorse"));
+    const body = (await (await client.get("/api/pictures/admin", proof)).json()) as { stack: string; engine: { default_model: string; edit_ready: boolean }; adapters: Array<{ id: string; enabled: boolean; classification: string; licence: string }>; bands: Array<{ band: string; on: boolean; locked: boolean }>; adult_adapters: string };
     expect(body.stack).toBe("ok");
     expect(body.engine).toMatchObject({ default_model: "flux2-klein-4b", edit_ready: true });
     expect(body.adapters.map((a) => a.id)).toEqual(["lora-aaaaaaaaaaaaaaaa", "lora-bbbbbbbbbbbbbbbb"]);
@@ -141,16 +143,18 @@ describe("switching, restricting and removing", () => {
 
   test("removing a style asks the Stack to delete the file and forgets the household's switch", async () => {
     const { client } = await owner();
-    const res = await client.request("/api/pictures/admin/adapters/lora-bbbbbbbbbbbbbbbb", { method: "DELETE" });
+    const proof = unlockHeader(await unlock(client, "correcthorse"));
+    const res = await client.request("/api/pictures/admin/adapters/lora-bbbbbbbbbbbbbbbb", { method: "DELETE", headers: proof });
     expect(res.status).toBe(200);
     expect(fake.loras.map((l) => l.id)).toEqual(["lora-aaaaaaaaaaaaaaaa"]);
-    const missing = await client.request("/api/pictures/admin/adapters/lora-bbbbbbbbbbbbbbbb", { method: "DELETE" });
+    const missing = await client.request("/api/pictures/admin/adapters/lora-bbbbbbbbbbbbbbbb", { method: "DELETE", headers: proof });
     expect(missing.status).toBe(404);
   });
 
   test("changing a style to all-ages is the Stack's to refuse when its own description names adult content", async () => {
     const { client } = await owner();
-    const res = await client.request("/api/pictures/admin/adapters/lora-bbbbbbbbbbbbbbbb", { method: "PATCH", body: { classification: "all-ages" } });
+    const proof = unlockHeader(await unlock(client, "correcthorse"));
+    const res = await client.request("/api/pictures/admin/adapters/lora-bbbbbbbbbbbbbbbb", { method: "PATCH", body: { classification: "all-ages" }, headers: proof });
     expect(res.status).toBe(200);
     expect(fake.loras.find((l) => l.id === "lora-bbbbbbbbbbbbbbbb")!.classification).toBe("all-ages");
   });

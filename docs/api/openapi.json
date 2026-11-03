@@ -28421,6 +28421,10 @@
                           "uninstall_block"
                         ]
                       }
+                    },
+                    "locked_styles": {
+                      "type": "boolean",
+                      "description": "Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."
                     }
                   },
                   "required": [
@@ -28430,7 +28434,8 @@
                     "free_disk_bytes",
                     "disk_margin_bytes",
                     "installed_bytes",
-                    "components"
+                    "components",
+                    "locked_styles"
                   ]
                 }
               }
@@ -57838,6 +57843,10 @@
                         ]
                       }
                     },
+                    "locked_styles": {
+                      "type": "boolean",
+                      "description": "Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."
+                    },
                     "bands": {
                       "type": "array",
                       "items": {
@@ -57897,6 +57906,7 @@
                     "stack",
                     "engine",
                     "adapters",
+                    "locked_styles",
                     "bands",
                     "adult_adapters",
                     "quality",

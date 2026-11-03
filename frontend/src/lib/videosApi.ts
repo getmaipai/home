@@ -49,6 +49,8 @@ export interface VideoSettings {
   detailed?: DetailedVideoSettings;
   state: string; available: boolean; reason: string | null; tier: string | null; model_installed: boolean; limits: string;
   enabled: boolean; adult_adapters: boolean; minors: string; adapters: VideoAdapterRow[];
+  /** VIDEO-SETTINGS-02: some adult-only styles are locked; one tile stands for them, never a count. */
+  locked_styles?: boolean;
 }
 
 const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });

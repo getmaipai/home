@@ -14,6 +14,8 @@ import { dropAdapterCache, forgetAdapterPref } from "@/lib/pictures/adapters";
 import { forgetVideoAdapter } from "@/lib/videos/adapters";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
+import { componentStyleAccess, styleOfComponent } from "@/lib/styleLock";
+import type { PersonRow } from "@/types";
 
 export const componentsRoutes = apiRouter();
 
@@ -30,6 +32,7 @@ const ComponentSchema = z.object({
 const ListSchema = z.object({
   stack: z.enum(["ok", "unreachable"]), message: z.string().nullable(),
   tier: z.string().nullable(), free_disk_bytes: z.number().nullable(), disk_margin_bytes: z.number(), installed_bytes: z.number(), components: z.array(ComponentSchema),
+  locked_styles: z.boolean().describe("Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."),
 });
 const idParams = z.object({ id: z.string().min(1).max(200) });
 const refusals = errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such component", 409: "It cannot be installed or removed right now (the message says why)", 503: "The engine is not answering" });
@@ -50,10 +53,21 @@ componentsRoutes.openapi(listRoute, async (c) => {
   try {
     const list = await listStackComponents();
     // LICENCE-ACK-01: a licence the household's acknowledgement covers is information, not a gate.
-    const components = list.components.map((part) => part.licence ? { ...part, licence: { ...part.licence, covered: licenceCovered(part.licence.id) } } : part);
-    return c.json({ stack: "ok" as const, message: null, ...list, components }, 200);
+    const withLicence = list.components.map((part) => part.licence ? { ...part, licence: { ...part.licence, covered: licenceCovered(part.licence.id) } } : part);
+    // VIDEO-SETTINGS-02: an adult-only style is not a row until the person's own unlock proof is valid; one flag stands for all of them (never a count).
+    const person = c.get("person") as PersonRow;
+    const components: typeof withLicence = [];
+    let locked = false;
+    for (const part of withLicence) {
+      const style = part.kind === "lora" || part.group === "loras" || part.id.startsWith("lora.");
+      // A style whose id Home cannot place is locked too (fail closed).
+      const access = !style ? "open" : styleOfComponent(part.id) ? await componentStyleAccess(person, part.id) : "locked";
+      if (access === "open") components.push(part);
+      else if (access === "locked") locked = true;
+    }
+    return c.json({ stack: "ok" as const, message: null, ...list, components, locked_styles: locked }, 200);
   } catch (error) {
-    if (error instanceof StackComponentError) return c.json({ stack: "unreachable" as const, message: error.message, tier: null, free_disk_bytes: null, disk_margin_bytes: 0, installed_bytes: 0, components: [] }, 200);
+    if (error instanceof StackComponentError) return c.json({ stack: "unreachable" as const, message: error.message, tier: null, free_disk_bytes: null, disk_margin_bytes: 0, installed_bytes: 0, components: [], locked_styles: false }, 200);
     throw error;
   }
 });
@@ -63,7 +77,10 @@ const installRoute = createRoute({
   request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ accepted_licence: z.string().max(120).optional().describe("The id of the licence notice the admin read and accepted (the component's `licence.id`). Needed once, for a part that has one.") }) } } } },
   responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string(), component: z.string() }) } }, description: "Started, or already running." }, 200: { content: { "application/json": { schema: z.object({ job: z.null(), component: z.string() }) } }, description: "Already installed." }, ...refusals },
 });
+const NO_SUCH_PART = "That part isn't on this computer.";
 componentsRoutes.openapi(installRoute, async (c) => {
+  // A style the person cannot read (locked behind the Adult lock, or hidden) answers like a missing one.
+  if ((await componentStyleAccess(c.get("person") as PersonRow, c.req.valid("param").id)) !== "open") return c.json({ error: NO_SUCH_PART, code: "unknown_component" }, 404) as never;
   try {
     const consent = (await c.req.json().catch(() => ({}))) as { accepted_licence?: unknown };
     const person = c.get("person") as { id?: string } | undefined;
@@ -80,6 +97,7 @@ const removeRoute = createRoute({
 });
 componentsRoutes.openapi(removeRoute, async (c) => {
   const { id } = c.req.valid("param");
+  if ((await componentStyleAccess(c.get("person") as PersonRow, id)) !== "open") return c.json({ error: NO_SUCH_PART, code: "unknown_component" }, 404) as never;
   try {
     const removed = await uninstallStackComponent(id);
     // A style leaves Home's household switches with its file.

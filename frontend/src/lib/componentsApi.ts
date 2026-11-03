@@ -23,6 +23,8 @@ export interface LicenceOverview {
 export interface ComponentsOverview {
   stack: "ok" | "unreachable"; message: string | null; tier: string | null;
   free_disk_bytes: number | null; disk_margin_bytes: number; installed_bytes: number; components: ComponentRow[];
+  /** VIDEO-SETTINGS-02: some adult-only styles are locked; one tile stands for them, never a count. */
+  locked_styles?: boolean;
 }
 
 

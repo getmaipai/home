@@ -21,6 +21,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
+import { useRelockOnLeave } from "@/lib/useRelockOnLeave";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -324,6 +326,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
 }
 
 export function PicturesLibrary() {
+  useRelockOnLeave();
   const client = useQueryClient();
   const overview = useQuery({ queryKey: OVERVIEW_KEY, queryFn: picturesAdminApi.overview, refetchInterval: 15_000 });
   const [error, setError] = useState<string | null>(null);
@@ -338,11 +341,12 @@ export function PicturesLibrary() {
         <h2 className="text-sm font-medium">Styles</h2>
         <p className="text-sm text-muted-foreground">A style gives pictures a look, like pixel art or ink wash. {data.adult_adapters === "restricted" ? "Styles marked adults only are switched off for everyone while the setting above restricts them." : "Styles marked adults only can be used by adults on their own screen."}</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        {data.adapters.length === 0 ? (
+        {data.adapters.length === 0 && !data.locked_styles ? (
           <p className="text-sm text-muted-foreground">No styles yet. Add one below.</p>
         ) : (
           <ItemGroup variant="card" aria-label="Styles in the library">
             {data.adapters.map((a) => <StyleRow key={a.id} a={a} refresh={refresh} setError={setError} />)}
+            {data.locked_styles ? <LockedSettingRow /> : null}
           </ItemGroup>
         )}
       </section>

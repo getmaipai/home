@@ -56,6 +56,8 @@ export interface AdminOverview {
     remaining_bytes: number;
   };
   adapters: AdminAdapter[];
+  /** VIDEO-SETTINGS-02: some adult-only styles are locked; one tile stands for them, never a count. */
+  locked_styles?: boolean;
   bands: Array<{ band: "children" | "teens" | "adults"; label: string; on: boolean; locked: boolean; note: string }>;
   adult_adapters: "allowed" | "restricted";
   /** IMGGEN-QUALITY-01: the household's Picture quality setting, and whether Detailed can be made now. */

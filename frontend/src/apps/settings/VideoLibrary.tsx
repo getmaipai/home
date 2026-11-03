@@ -24,6 +24,8 @@ import { formatBytes } from "@maipai/ui/src/format";
 import { videosApi, type VideoAdapterRow, type VideoSettings } from "@/lib/videosApi";
 import { componentsApi } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
+import { useRelockOnLeave } from "@/lib/useRelockOnLeave";
 
 const KEY = ["video-settings"] as const;
 const size = (n: number) => (formatBytes(n), n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -288,6 +290,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
 }
 
 export function VideoLibrary() {
+  useRelockOnLeave();
   const client = useQueryClient();
   const settings = useQuery({ queryKey: KEY, queryFn: videosApi.settings, refetchInterval: 15_000 });
   const [error, setError] = useState<string | null>(null);
@@ -302,11 +305,12 @@ export function VideoLibrary() {
         <h2 className="text-sm font-medium">Video styles</h2>
         <p className="text-sm text-muted-foreground">A video style gives clips a look, like old colour film. {data.adult_adapters ? "Styles marked adults only can be used by adults on their own screen." : "Styles marked adults only are switched off for everyone while the setting above restricts them."}</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        {data.adapters.length === 0 ? (
+        {data.adapters.length === 0 && !data.locked_styles ? (
           <p className="text-sm text-muted-foreground">No video styles yet. Add one below.</p>
         ) : (
           <ItemGroup variant="card" aria-label="Video styles in the library">
             {data.adapters.map((a) => <StyleRow key={a.id} a={a} refresh={refresh} setError={setError} />)}
+            {data.locked_styles ? <LockedSettingRow /> : null}
           </ItemGroup>
         )}
       </section>

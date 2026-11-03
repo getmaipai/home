@@ -12,6 +12,8 @@ import { CHILD_CONTENT_LINE, kidsDailyPictures, kidsDailyVideos, kidsHomeOn } fr
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { detailedReady } from "@/lib/pictures/quality";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
+import { pictureStyleAccess } from "@/lib/styleLock";
+import type { PersonRow } from "@/types";
 import { db } from "@/db";
 import { kidUsage, people, pictureAdapterPrefs, pictureJobs, videoJobs } from "@/db/schema";
 import { and, eq, gte, ne } from "drizzle-orm";
@@ -31,6 +33,7 @@ const OverviewSchema = z.object({
     remaining_bytes: z.number(),
   }),
   adapters: z.array(AdapterSchema),
+  locked_styles: z.boolean().describe("Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."),
   bands: z.array(z.object({ band: z.enum(["children", "teens", "adults"]), label: z.string(), on: z.boolean(), locked: z.boolean(), note: z.string() })),
   adult_adapters: z.enum(["allowed", "restricted"]),
   quality: z.enum(["quick", "detailed"]).describe("The household's Picture quality setting."),
@@ -61,6 +64,12 @@ function pendingIds(): Set<string> {
   return new Set(db.select().from(pictureAdapterPrefs).all().filter((row) => !row.enabled && (row.updatedBy ?? "").startsWith("added:")).map((row) => row.adapterId));
 }
 
+/** A style the person cannot read (locked behind the Adult lock, or hidden) answers like a missing one. A style the Stack does not list is left to the Stack's own 404. */
+async function styleReadable(person: PersonRow, id: string): Promise<boolean> {
+  const found = (await allAdapters()).find((a) => a.id === id);
+  return !found || pictureStyleAccess(person, found.classification) === "open";
+}
+
 function stackFailure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
   if (error instanceof StackPicturesError) {
     const status = error.status === 403 ? 403 : error.status === 409 ? 409 : error.status === 413 ? 413 : error.status === 422 ? 422 : error.status === 404 ? 404 : error.status === 503 ? 503 : 502;
@@ -78,6 +87,10 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
   let adapters: Awaited<ReturnType<typeof allAdapters>> = [];
   try { dropAdapterCache(); adapters = await allAdapters(); } catch { adapters = []; }
   const pending = pendingIds();
+  // VIDEO-SETTINGS-02: an adult-only style is not a row until the person's own unlock proof is valid; one flag stands for all of them (never a count).
+  const person = c.get("person") as PersonRow;
+  let lockedStyles = false;
+  adapters = adapters.filter((a) => { const access = pictureStyleAccess(person, a.classification); if (access === "locked") lockedStyles = true; return access === "open"; });
   const adultsOn = householdAllowsAdults();
   return c.json({
     stack: status ? "ok" as const : "unreachable" as const,
@@ -89,6 +102,7 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
       remaining_bytes: status?.install?.remaining_bytes ?? 0,
     },
     adapters: adapters.map((a) => present(a, pending)),
+    locked_styles: lockedStyles,
     bands: [
       { band: "children" as const, label: "Children", on: kidsHomeOn(), locked: true, note: kidsHomeOn() ? BAND_NOTES.childrenOn : BAND_NOTES.childrenOff },
       { band: "teens" as const, label: "Teens", on: true, locked: true, note: BAND_NOTES.teens },
@@ -202,6 +216,7 @@ picturesAdminRoutes.openapi(patchRoute, async (c) => {
   const adminId = c.get("person").id;
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
+  if (!(await styleReadable(c.get("person") as PersonRow, id))) return c.json({ error: "That style isn't in the library.", code: "unknown_lora" }, 404) as never;
   try {
     if (body.classification !== undefined || body.name !== undefined || body.trigger_words !== undefined) {
       await patchLora(id, { ...(body.classification ? { classification: body.classification } : {}), ...(body.name ? { name: body.name } : {}), ...(body.trigger_words ? { trigger_words: body.trigger_words } : {}) });
@@ -221,6 +236,7 @@ const removeRoute = createRoute({
 });
 picturesAdminRoutes.openapi(removeRoute, async (c) => {
   const { id } = c.req.valid("param");
+  if (!(await styleReadable(c.get("person") as PersonRow, id))) return c.json({ error: "That style isn't in the library.", code: "unknown_lora" }, 404) as never;
   try {
     await removeLora(id);
     forgetAdapterPref(id);

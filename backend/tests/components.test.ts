@@ -12,6 +12,7 @@ import { installGate } from "@/middleware/installGate";
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { installFakeImageStack } from "./pictureFixture";
 
 const row = (over: Partial<StackComponent>): StackComponent => ({
   id: "z-image-turbo", label: "Pictures: Z-Image-Turbo", summary: "A higher-detail picture model.", group: "pictures", kind: "model", state: "notInstalled",
@@ -98,6 +99,7 @@ describe("install and uninstall", () => {
     expect(await removal.json()).toMatchObject({ code: "only_chat_model" });
   });
   test("uninstall reports the space freed; a style also leaves Home's switches", async () => {
+    const fakeImages = installFakeImageStack();
     const { client } = await owner();
     answers["DELETE /stack/v1/components/z-image-turbo"] = () => Response.json({ component: "z-image-turbo", freed_bytes: 33_948_304_893, removed: true });
     expect(await (await client.request("/api/components/z-image-turbo", { method: "DELETE" })).json()).toEqual({ component: "z-image-turbo", freed_bytes: 33_948_304_893, removed: true });
@@ -105,6 +107,7 @@ describe("install and uninstall", () => {
     const res = await client.request("/api/components/lora.picture.lora-aaaaaaaaaaaaaaaa", { method: "DELETE" });
     expect(res.status).toBe(200);
     expect(calls.at(-1)).toEqual({ method: "DELETE", path: "/stack/v1/components/lora.picture.lora-aaaaaaaaaaaaaaaa" });
+    fakeImages.restore();
   });
 });
 

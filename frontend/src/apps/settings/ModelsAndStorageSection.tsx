@@ -15,6 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ApiError } from "@/lib/api";
 import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
+import { useRelockOnLeave } from "@/lib/useRelockOnLeave";
 
 const KEY = ["components"] as const;
 const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
@@ -192,6 +194,7 @@ function LicencePrompt({ refresh, setError, installing }: { refresh: () => void;
 }
 
 export function ModelsAndStorageSection() {
+  useRelockOnLeave();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const query = useQuery({
@@ -214,12 +217,15 @@ export function ModelsAndStorageSection() {
       {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       {data?.stack === "ok" ? GROUPS.map((group) => {
         const rows = (data.components ?? []).filter((row) => row.group === group.id);
-        if (rows.length === 0) return null;
+        // VIDEO-SETTINGS-02: the adult-only styles are one locked row, whatever their number; it opens the shell's unlock dialog.
+        const lockedRow = group.id === "loras" && data.locked_styles === true;
+        if (rows.length === 0 && !lockedRow) return null;
         return (
           <section key={group.id} aria-label={group.title} className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">{group.title}</h3>
             <ItemGroup variant="card" aria-label={group.title}>
               {rows.map((row) => <Row key={row.id} row={row} refresh={refresh} setError={setError} />)}
+              {lockedRow ? <LockedSettingRow /> : null}
             </ItemGroup>
           </section>
         );
