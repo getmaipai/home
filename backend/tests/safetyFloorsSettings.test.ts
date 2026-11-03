@@ -42,7 +42,7 @@ beforeEach(() => resetDb());
 describe("no setting reaches the minor-protection floors", () => {
   test("the registry has household keys, among them the picture settings", () => {
     const keys = getRegistry().filter((k) => k.scope === "household").map((k) => k.key);
-    for (const key of ["generation.people_prompts", "generation.adults", "generation.adult_adapters"]) expect(keys).toContain(key);
+    for (const key of ["generation.people_prompts", "generation.adults", "generation.styles.adult_only", "generation.household_likeness"]) expect(keys).toContain(key);
   });
 
   test("every household setting flipped to each of its other choices, one at a time and then all together", () => {

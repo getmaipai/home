@@ -1,6 +1,7 @@
 // IMGGEN-QUALITY-01 (owner ruling 2026-10-17): plain pictures stay fast (Quick); Detailed is the slower, richer maker. The
 // person-facing choice is the household setting, the chat tool's `quality` argument, a style's own maker, and the card's switch.
 // No model name reaches the model's tool result or the card.
+import { writeChoiceSetting } from "@/lib/aiChoicesState";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -93,11 +94,11 @@ describe("chooseQuality", () => {
     expect(chooseQuality({ engine: { models: [{ ...ERNIE, installed: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
   });
   test("a household that picked Klein as the Quick model leaves Quick unnamed even when ERNIE is ready", () => {
-    setHouseholdSettingValue("generation.picture_quick_model", "klein");
+    writeChoiceSetting("engines.image.tier.standard", "klein");
     expect(chooseQuality({ engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
   });
   test("Detailed switched off answers Quick with the detailed_off note even when Z-Image is ready", () => {
-    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    writeChoiceSetting("engines.image.tier.boost", false);
     expect(chooseQuality({ engine: withZ, household: "detailed" })).toEqual({ quality: "quick", note: "detailed_off", announce: false });
     expect(chooseQuality({ requested: "detailed", engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: "detailed_off", announce: false });
   });
@@ -147,7 +148,7 @@ describe("the chat tool", () => {
   });
 
   test("the household's Detailed setting applies when nothing is asked", async () => {
-    setHouseholdSettingValue("generation.picture_quality", "detailed");
+    setHouseholdSettingValue("generation.picture_tier", "boost");
     await run({});
     expect(fake.submitted[0]!.model).toBe("z-image-turbo");
   });

@@ -105,7 +105,7 @@ describe("band by surface", () => {
 describe("adapter audiences", () => {
   test("an adult gets all-ages and adult-only by default; the household can restrict adult-only", () => {
     expect(adapterAudiencesFor(audience(people.owner))).toEqual(["all-ages", "adult-only"]);
-    setHouseholdSettingValue("generation.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     expect(adapterAudiencesFor(audience(people.owner))).toEqual(["all-ages"]);
   });
 
@@ -113,7 +113,7 @@ describe("adapter audiences", () => {
     expect(adapterAudiencesFor(audience(asRole(people.child.id, "child")))).toEqual(["all-ages"]);
     // A teen is offered exactly the all-ages styles, and the adult-only household setting is never read for them.
     for (const value of ["allowed", "restricted"]) {
-      setHouseholdSettingValue("generation.adult_adapters", value);
+      setHouseholdSettingValue("generation.styles.adult_only", value);
       expect(adapterAudiencesFor(audience(asRole(people.child.id, "teen")))).toEqual(["all-ages"]);
     }
     expect(adapterAudiencesFor(audience(asRole(people.child.id, "guest"), { band: "adult" }))).toEqual([]);
@@ -167,10 +167,10 @@ describe("the two absolute lines", () => {
 
   test("no household setting reaches either line", () => {
     setHouseholdSettingValue("generation.adults", true);
-    setHouseholdSettingValue("generation.adult_adapters", "allowed");
+    setHouseholdSettingValue("generation.styles.adult_only", "allowed");
     expect(refusePrompt("naked child")).toBe("minor_sexual");
     // PEOPLE-PROMPTS-01: every generation key, the new one included, flipped both ways: the two absolute lines hold either way.
-    for (const [key, values] of [["generation.adults", [true, false]], ["generation.adult_adapters", ["allowed", "restricted"]], ["generation.people_prompts", [true, false]], ["generation.picture_quality", ["quick", "detailed"]], ["generation.kids", [true, false]], ["generation.kids_daily_pictures", [0, 20]], ["generation.kids_daily_videos", [0, 5]]] as const) {
+    for (const [key, values] of [["generation.adults", [true, false]], ["generation.styles.adult_only", ["allowed", "restricted"]], ["generation.people_prompts", [true, false]], ["generation.picture_tier", ["standard", "boost"]], ["generation.household_likeness", [true, false]], ["generation.kids", [true, false]], ["generation.kids_daily_pictures", [0, 20]], ["generation.kids_daily_videos", [0, 5]]] as const) {
       for (const value of values) {
         setHouseholdSettingValue(key, value);
         expect(refusePrompt("naked child")).toBe("minor_sexual");
@@ -247,7 +247,7 @@ describe("the chat tool, even when a model calls it without being offered it", (
   });
 
   test("an adult-only style is not matched for an adult when the household restricted them, and the model never sees the library", async () => {
-    setHouseholdSettingValue("generation.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a woman by a window", style: "boudoir film" })]), reply: () => "On its way." }, async (seen) => {
       await turn(people.owner, "a woman by a window in boudoir film style");
       expect(fake.submitted[0]!.loras).toBeUndefined();

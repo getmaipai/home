@@ -165,7 +165,7 @@ describe("the tool", () => {
     });
   });
   test("the household setting makes Detailed the default, and a request can still ask for Quick", async () => {
-    setHouseholdSettingValue("generation.video_quality", "detailed");
+    setHouseholdSettingValue("generation.video_tier", "boost");
     await withStub(script({}), async () => {
       await streamValue(people.owner, "make a video of a hero");
       expect(fake.submitted[0]!.model).toBe("detailed");

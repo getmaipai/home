@@ -202,7 +202,7 @@ test("does not mutate its input", () => {
   expect(restAfter).toEqual(before);
 });
 
-test("real p128 plan with everything installed and Quick chosen: Detailed pictures and Detailed videos are unused, Klein and Always on are not", () => {
+test("real p128 plan with everything installed and Quick chosen: Detailed pictures and Boost videos are unused, Klein and Always on are not", () => {
   const p: DiskPlan = structuredClone((table as unknown as { tiers: Record<string, DiskPlan> }).tiers["p128"]!);
   const components: UnusedComponent[] = [];
   for (const row of p.rows) {
@@ -223,8 +223,8 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   expect(result.items.map((item) => item.id).sort()).toEqual([...expectedIds].sort());
   // Music Boost and LTX-2.5 are other choices on their cards, not chosen here, so they are unused too; with no group on these test parts they carry the generic name.
   const named = result.items.filter((item) => !extras.some((row) => row.model_ids.includes(item.id)));
-  expect(named.every((item) => item.name === "Detailed pictures" || item.name === "Detailed videos")).toBe(true);
-  expect(named.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Quick videos and no saved style needs this.")).toBe(true);
+  expect(named.every((item) => item.name === "Detailed pictures" || item.name === "Boost videos")).toBe(true);
+  expect(named.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Standard videos and no saved style needs this.")).toBe(true);
   expect(result.totalBytes).toBe(result.items.reduce((total, item) => total + item.bytes, 0));
   for (const id of [...klein.model_ids, "judge", "embed", "stt", "search", "home"]) expect(result.items.map((item) => item.id)).not.toContain(id);
 });

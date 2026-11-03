@@ -82,7 +82,7 @@ describe("a teen makes pictures", () => {
   });
 
   test("adult-only styles are never offered or used", async () => {
-    setHouseholdSettingValue("generation.adult_adapters", "allowed");
+    setHouseholdSettingValue("generation.styles.adult_only", "allowed");
     const teenAudience = { actor: teen, band: "teen" as const, surface: "chat" as never, surfaceClass: "written" as never, spoken: false };
     expect(adapterAudiencesFor(teenAudience)).toEqual(["all-ages"]);
     expect(videoAdapterAudiencesFor(teenAudience)).toEqual(["all-ages"]);

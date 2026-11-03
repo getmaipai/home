@@ -29,7 +29,7 @@ beforeEach(() => {
   fake = installFakeVideoStack();
   fake.loras = []; // the tests below make their own records unless they say otherwise
 });
-afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); setHouseholdSettingValue("generation.video.adult_adapters", "allowed"); });
+afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); setHouseholdSettingValue("generation.styles.adult_only", "allowed"); });
 
 const proofFor = (person: PersonRow): AdultProof => ({ token: issueProof(person.id, "test-session", "t").proof, sessionKey: "test-session" });
 const NONE: AdultProof = { token: null, sessionKey: null };
@@ -64,7 +64,7 @@ describe("loraAccess: the table of section 7, cell by cell", () => {
     const guest = { ...row("Marlow"), role: "guest" } as PersonRow;
     expect(loraAccess(guest, open, "own_written", proofFor(guest))).toBe("hidden");
     expect(loraAccess(admin, adultOnly, "own_written", proofFor(admin))).toBe("open");
-    setHouseholdSettingValue("generation.video.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     expect(loraAccess(admin, adultOnly, "own_written", proofFor(admin))).toBe("hidden");
     expect(loraAccess(admin, open, "own_written", proofFor(admin))).toBe("open");
   });

@@ -1,5 +1,7 @@
 // AIMODELS-ROUTES-01: /api/ai. The cards, the unused list, one choice (install first, then the setting), set everything to
 // recommended (never removes, safe twice) and Free up space (per-id guard, partial results). Owner and admin only.
+import { writeChoiceSetting } from "@/lib/aiChoicesState";
+import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { eq } from "drizzle-orm";
@@ -155,7 +157,7 @@ describe("the Status line for closed apps (TIER-PRIO-05)", () => {
 describe("the cards", () => {
   test("GET /api/ai/choices returns ten cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();
-    setHouseholdSettingValue("generation.picture_quick_model", "klein");
+    writeChoiceSetting("engines.image.tier.standard", "klein");
     const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { bytes: number; rowIds: string[] }; recommended: { changes: Array<{ job: string }> } | null };
     expect(body.stack).toBe("ok");
     const reading = (body as unknown as { memory_available_bytes: number | null }).memory_available_bytes;
@@ -182,15 +184,15 @@ describe("the cards", () => {
 });
 
 describe("choosing", () => {
-  test("choosing Detailed pictures installs first and then writes generation.picture_detailed.enabled", async () => {
+  test("choosing Detailed pictures installs first and then writes the Boost picture slot", async () => {
     const { client } = await owner();
     let seenAtInstall: unknown = "unset";
     const base = globalThis.fetch;
     components = everything(["pictures-ernie"]);
-    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    writeChoiceSetting("engines.image.tier.boost", false);
     __setComponentsFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
       const path = new URL(String(input)).pathname;
-      if ((init?.method ?? "GET") === "POST") { seenAtInstall = getHouseholdSettingValue("generation.picture_detailed.enabled"); calls.push({ method: "POST", path }); return Response.json({ job: "j", component: "z" }, { status: 202 }); }
+      if ((init?.method ?? "GET") === "POST") { seenAtInstall = householdDetailedEnabled(); calls.push({ method: "POST", path }); return Response.json({ job: "j", component: "z" }, { status: 202 }); }
       calls.push({ method: "GET", path });
       return Response.json({ tier: "p128", free_disk_bytes: 800 * GIB, disk_margin_bytes: 5 * GIB, installed_bytes: 1, components });
     }) as never);
@@ -198,29 +200,29 @@ describe("choosing", () => {
     expect(res.status).toBe(200);
     expect(installs()).toContain(idOf("pictures-zimage"));
     expect(seenAtInstall).toBe(false);
-    expect(getHouseholdSettingValue("generation.picture_detailed.enabled")).toBe(true);
+    expect(householdDetailedEnabled()).toBe(true);
     void base;
   });
 
   test("choosing a picture style whose install cannot start does not write the setting", async () => {
     const { client } = await owner();
     components = everything(["pictures-ernie"]);
-    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    writeChoiceSetting("engines.image.tier.boost", false);
     failInstall.add(idOf("pictures-zimage"));
     const res = await client.post("/api/ai/choices/picturesdetailed", { choice: "picturesdetailed.zimage" });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toMatch(/not enough room/);
-    expect(getHouseholdSettingValue("generation.picture_detailed.enabled")).toBe(false);
+    expect(householdDetailedEnabled()).toBe(false);
   });
 
   test("using an installed choice writes the setting only", async () => {
     const { client } = await owner();
     components = everything(["pictures-ernie", "pictures-zimage"]);
-    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    writeChoiceSetting("engines.image.tier.boost", false);
     const res = await client.post("/api/ai/choices/picturesdetailed", { choice: "picturesdetailed.zimage" });
     expect(res.status).toBe(200);
     expect(installs()).toEqual([]);
-    expect(getHouseholdSettingValue("generation.picture_detailed.enabled")).toBe(true);
+    expect(householdDetailedEnabled()).toBe(true);
   });
 
   test("picking Klein as the Quick model writes the setting and installs nothing extra", async () => {
@@ -229,7 +231,7 @@ describe("choosing", () => {
     const res = await client.post("/api/ai/choices/pictures", { choice: "pictures.klein" });
     expect(res.status).toBe(200);
     expect(installs()).toEqual([]);
-    expect(getHouseholdSettingValue("generation.picture_quick_model")).toBe("klein");
+    expect(householdQuickModel()).toBe("klein");
   });
 
   test("the wake word row lists the stock detector and its two feature files, and removing it deletes them", async () => {
@@ -282,12 +284,12 @@ describe("choosing", () => {
 describe("set everything to recommended", () => {
   test("changes Klein back to ERNIE, starts only the missing installs, never calls DELETE", async () => {
     const { client } = await owner();
-    setHouseholdSettingValue("generation.picture_quick_model", "klein");
+    writeChoiceSetting("engines.image.tier.standard", "klein");
     const res = await client.post("/api/ai/recommended", {});
     expect(res.status).toBe(200);
     const body = await res.json() as { changed: string[]; started: string[] };
     expect(body.changed.some((line) => line.startsWith("Quick pictures:"))).toBe(true);
-    expect(getHouseholdSettingValue("generation.picture_quick_model")).toBe("ernie");
+    expect(householdQuickModel()).toBe("ernie");
     expect(installs()).toContain(idOf("video"));
     expect(installs()).not.toContain(idOf("pictures-ernie"));
     expect(installs()).not.toContain(idOf("video-detailed"));
@@ -319,13 +321,13 @@ describe("set everything to recommended", () => {
 });
 
 describe("free up space", () => {
-  const withUnused = () => { setHouseholdSettingValue("generation.picture_detailed.enabled", false); components = everything(["pictures-ernie", "pictures-zimage", "video", "video-detailed"]); };
+  const withUnused = () => { writeChoiceSetting("engines.image.tier.boost", false); components = everything(["pictures-ernie", "pictures-zimage", "video", "video-detailed"]); };
 
   test("GET /api/ai/unused lists unused parts largest first by plain name", async () => {
     const { client } = await owner();
     withUnused();
     const body = await (await client.get("/api/ai/unused")).json() as { items: Array<{ id: string; name: string }>; total_bytes: number };
-    expect(body.items.map((item) => item.name)).toEqual(expect.arrayContaining(["Detailed pictures", "Detailed videos"]));
+    expect(body.items.map((item) => item.name)).toEqual(expect.arrayContaining(["Detailed pictures", "Boost videos"]));
     expect(body.items.map((item) => item.id)).not.toContain(idOf("pictures"));
     expect(body.total_bytes).toBeGreaterThan(0);
   });
@@ -343,7 +345,7 @@ describe("free up space", () => {
   test("keeps an id that became used between the list and the confirm", async () => {
     const { client } = await owner();
     withUnused();
-    setHouseholdSettingValue("generation.picture_detailed.enabled", true);
+    writeChoiceSetting("engines.image.tier.boost", true);
     const res = await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage")] });
     const body = await res.json() as { results: Array<{ status: string; message: string }>; kept: number };
     expect(body.results[0]).toMatchObject({ status: "kept" });

@@ -107,7 +107,7 @@ describe("LoRA classes", () => {
   test("an adult gets all-ages and adult-only by default (audience adult); the household can restrict adult-only", () => {
     expect(videoAdapterAudiencesFor(audience(people.owner))).toEqual(["all-ages", "adult-only"]);
     expect(stackAudienceFor(audience(people.owner))).toBe("adult");
-    setHouseholdSettingValue("generation.video.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     expect(videoAdapterAudiencesFor(audience(people.owner))).toEqual(["all-ages"]);
     expect(stackAudienceFor(audience(people.owner))).toBe("all-ages");
   });
@@ -119,7 +119,7 @@ describe("LoRA classes", () => {
   });
   test("a teen is offered exactly the all-ages LoRAs and the Stack is told all-ages, whatever the household says about adult-only ones", () => {
     for (const value of ["allowed", "restricted"]) {
-      setHouseholdSettingValue("generation.video.adult_adapters", value);
+      setHouseholdSettingValue("generation.styles.adult_only", value);
       const a = audience(asRole(people.child.id, "teen"));
       expect(videoAdapterAudiencesFor(a)).toEqual(["all-ages"]);
       expect(stackAudienceFor(a)).toBe("all-ages");
@@ -132,9 +132,9 @@ describe("LoRA classes", () => {
     expect((await videoAdaptersFor(owner, { includeLocked: true })).map((a) => a.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
     expect((await __unlockedForTests(people.owner.id, () => videoAdaptersFor(owner))).map((a) => a.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
     // A household that restricts adult-only styles hides them from everyone, an unlocked owner included.
-    setHouseholdSettingValue("generation.video.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     expect((await __unlockedForTests(people.owner.id, () => videoAdaptersFor(owner, { includeLocked: true }))).map((a) => a.id)).toEqual(["lora-1111111111111111"]);
-    setHouseholdSettingValue("generation.video.adult_adapters", "allowed");
+    setHouseholdSettingValue("generation.styles.adult_only", "allowed");
     // A teen, a child and a guest never get one (rule 8); an adult an admin has not marked gets none yet.
     for (const role of ["teen", "child", "guest"] as const) expect(await videoAdaptersFor(audience(asRole(people.child.id, role)), { includeLocked: true })).toEqual([]);
     expect(await videoAdaptersFor(audience(asRole(people.child.id, "adult")), { includeLocked: true })).toEqual([]);
@@ -160,7 +160,7 @@ describe("the two absolute lines", () => {
     expect(refuseVideoPrompt("the mayor waving", { lane: "teen" })).toBeNull();
     expect(refuseVideoPrompt("the mayor waving", { lane: "child" })).toBeNull();
     setHouseholdSettingValue("generation.video.enabled", true);
-    setHouseholdSettingValue("generation.video.adult_adapters", "allowed");
+    setHouseholdSettingValue("generation.styles.adult_only", "allowed");
     expect(refuseVideoPrompt("naked child")).toBe("minor_sexual");
   });
 });
@@ -231,7 +231,7 @@ describe("the chat tool, even when a model calls it without being offered it", (
     });
   });
   test("an adult-only style is dropped for an adult when the household restricted them, and the model never sees the library", async () => {
-    setHouseholdSettingValue("generation.video.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     await withStub(calling({ prompt: "a woman by a window", style: "boudoir motion" }, "On its way."), async (seen) => {
       await turn(people.owner, "a clip of a woman by a window in boudoir motion style");
       expect(fake.submitted[0]!.loras).toBeUndefined();

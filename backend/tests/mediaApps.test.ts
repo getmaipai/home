@@ -68,7 +68,7 @@ describe("the media-app host: data ids", () => {
 
   test("Music item views gate lyrics and expose lookup eligibility", async () => {
     const { adult, child } = await setup();
-    expect(getRegistryKey("music.lyrics_online")).toMatchObject({ default: true, label: "Look up song lyrics online", lives_in: "household.pictures", honoured_by: ["home"] });
+    expect(getRegistryKey("music.lyrics_online")).toMatchObject({ default: true, label: "Look up song lyrics online", lives_in: "household.media_lookups", honoured_by: ["home"] });
     expect(getHouseholdSettingValue("music.lyrics_online")).toBe(true);
     const row = db.select().from(mediaItems).all().find((item) => item.title === "Morning Light")!;
     db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "file", text: "First line", timed: [{ t: 1, line: "First line", section: "Verse" }] }) }).where(eq(mediaItems.id, row.id)).run();

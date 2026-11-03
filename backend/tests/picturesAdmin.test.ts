@@ -48,7 +48,7 @@ describe("overview", () => {
   test("the adults switch and the adult-style restriction show as the household set them", async () => {
     const { client } = await owner();
     setHouseholdSettingValue("generation.adults", false);
-    setHouseholdSettingValue("generation.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     const body = (await (await client.get("/api/pictures/admin")).json()) as { bands: Array<{ band: string; on: boolean }>; adult_adapters: string };
     expect(body.bands.find((b) => b.band === "adults")!.on).toBe(false);
     expect(body.adult_adapters).toBe("restricted");
@@ -136,7 +136,7 @@ describe("switching, restricting and removing", () => {
     expect((await adaptersFor(["all-ages", "adult-only"])).map((a) => a.id)).toEqual(["lora-bbbbbbbbbbbbbbbb"]);
     await client.request("/api/pictures/admin/adapters/lora-aaaaaaaaaaaaaaaa", { method: "PATCH", body: { enabled: true } });
     // With adult-only styles restricted, the audiences a person gets leave the adult-only one out.
-    setHouseholdSettingValue("generation.adult_adapters", "restricted");
+    setHouseholdSettingValue("generation.styles.adult_only", "restricted");
     expect(adapterAudiencesFor({ actor: (await owner()).actor, band: "adult", surface: "chat", surfaceClass: "written", spoken: false })).toEqual(["all-ages"]);
     expect((await adaptersFor(["all-ages"])).map((a) => a.id)).toEqual(["lora-aaaaaaaaaaaaaaaa"]);
   });

@@ -370,12 +370,12 @@ describe("VIDEO-LTX-01: Detailed (LTX, sound and speech) is unreachable for a te
   const sentModel = (i = -1) => (video.submitted.at(i) as { model?: string; size?: string; seconds?: number });
   test("the tool: asking for Detailed, a long clip or the household's Detailed default still sends a child the Quick model at the Quick size and the child's length", async () => {
     video.detailed = "installed";
-    setHouseholdSettingValue("generation.video_quality", "detailed");
+    setHouseholdSettingValue("generation.video_tier", "boost");
     const o = await vid(kid, { prompt: "a friendly dragon waving", quality: "detailed", seconds: 10 });
     expect(o.status).toBe("succeeded");
     expect(sentModel()).toMatchObject({ model: WAN_QUICK_VIDEO_MODEL, size: "832x480", seconds: 3 });
     expect(text(o)).not.toContain("Detailed video");
-    setHouseholdSettingValue("generation.video_quality", "quick");
+    setHouseholdSettingValue("generation.video_tier", "standard");
   });
   test("the job starter: a teen or a child asking for detailed (or the model's own id) is sent the Quick model; an adult's choice stands", async () => {
     video.detailed = "installed";

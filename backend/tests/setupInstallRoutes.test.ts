@@ -81,7 +81,7 @@ describe("setup install routes", () => {
     const before = readAiSettings();
     expect(before.musicEnabled).toBe(true);
     expect(before.videoQuality).toBe("quick");
-    const saved = await client.post("/api/setup/install", { settings: { "generation.music.enabled": false, "generation.video_quality": "detailed" } });
+    const saved = await client.post("/api/setup/install", { settings: { "generation.music.enabled": false, "generation.video_tier": "boost" } });
     expect(saved.status).toBe(202);
     const after = readAiSettings();
     expect(after.musicEnabled).toBe(false);
