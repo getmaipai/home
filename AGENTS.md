@@ -4,6 +4,11 @@ The self-hosted family AI hub: the platform and the household's master (identity
 the package host, the credentials center, backups, updates, the shell). Every feature ships as a catalog package from
 `getmaipai/catalog`; this repo ships the default set. Org standards load from the parent directory CLAUDE.md.
 
+**You run the commands, never Jesse (owner rule, 2026-11-02).** Sudo, git, installs, ships, releases, scripts and Settings clicks on the
+hub are yours to do and verify. Need approval: ask through the wizard, then act on the yes. Only a true inability (a password you may not
+type, a physical device, a third-party sign-in, a `RULES.md` change) is reported as a blocker, once. Where a doc below says Jesse runs,
+installs or presses something, you do it instead. Standing approvals for the trip are in memory (`vacation-authorization-2026-11-02`).
+
 Fresh rebuild started 2026-09-03: [docs/dev.md](docs/dev.md) is the design record, [docs/BACKLOG.md](docs/BACKLOG.md) is what is built
 and missing. The pre-rebuild hub is `legacy-backups/home-legacy.git`: reference for hard-won logic only, never a requirement.
 
