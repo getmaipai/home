@@ -42,10 +42,15 @@ const OPENERS = new Set(["the", "a", "an", "in", "on", "at", "it", "he", "she", 
 /** The names in a text: runs of two or more capitalized words (a calendar word alone is not a name, and a sentence-opening function word is
  * not part of one) and short quoted titles. */
 export function namesIn(text: string): string[] {
-  const found = new Set<string>();
+  return namesWithStart(text).map((n) => n.name);
+}
+
+/** Like `namesIn`, and says for each name whether it opens its clause (its first word is capitalized for being first, so it may be an ordinary word). */
+export function namesWithStart(text: string): { name: string; atStart: boolean }[] {
+  const found = new Map<string, boolean>();
   for (const sentence of withoutLabels(text).split(SENTENCE_OR_LINE_BREAK)) {
     if (!sentence) continue;
-    for (const m of sentence.matchAll(QUOTED)) found.add(m[1]!);
+    for (const m of sentence.matchAll(QUOTED)) found.set(m[1]!, false);
     for (const clause of sentence.split(CLAUSE_SPLIT)) {
       const body = clause.replace(LIST_MARK, "");
       for (const m of body.matchAll(NAME_RUN)) {
@@ -56,11 +61,12 @@ export function namesIn(text: string): string[] {
         const words = run.split(/\s+/).filter((w) => /^[A-Z]/.test(w));
         if (words.length < 2 || !/^[A-Z]/.test(run)) continue;
         if (words.every((w) => CALENDAR.has(w.toLowerCase()))) continue;
-        found.add(run);
+        // A name seen both at a clause start and elsewhere is judged by the stricter (mid-sentence) reading.
+        found.set(run, (found.get(run) ?? true) && atStart);
       }
     }
   }
-  return [...found];
+  return [...found].map(([name, atStart]) => ({ name, atStart }));
 }
 
 /** How far apart (characters) two neighbouring words of a name may sit in the evidence and still count as the same mention: room for a
@@ -105,18 +111,24 @@ function abbreviationIsGiven(name: string, haystack: string): boolean {
 /** A name counts as given when the evidence holds it as written, or holds each pair of neighbouring words of it close together (a writer may
  * drop a connective or join a title to a surname). Words that each appear somewhere in the sources but never near one another do not make
  * a name given: an invented person assembled from known words is still marked. */
-export function nameIsGiven(name: string, haystack: string, raw?: string): boolean {
+export function nameIsGiven(name: string, haystack: string, raw?: string, atClauseStart = false): boolean {
   if (haystack.includes(squashText(name))) return true;
   if (pluralFormIsGiven(name, haystack)) return true;
   if (givenAsHost(name, haystack)) return true;
   if (abbreviationIsGiven(name, haystack)) return true;
   const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
   // `raw` is the evidence with its case (the squashed haystack has lost it); without it the strict rule applies.
-  // A first word that also appears in lower case in the sources is an ordinary word that was capitalized at a clause start ("Given Nathan
-  // Bates"), not part of the name: judge the rest. A first word never seen in lower case keeps the strict rule below.
-  if (words.length >= 2 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(raw ?? "")) {
-    const rest = name.replace(/^\S+\s+/, "");
-    if (rest !== name && nameIsGiven(rest, haystack, raw)) return true;
+  // A first word is an ordinary word capitalized for opening a clause ("Given Nathan Bates", "Key Soviet") when the sources also hold it in
+  // lower case, or when the name opens its clause and the sources never capitalize that word in mid-sentence. Then judge the rest. A first
+  // word that is a name in the sources keeps the strict rule below.
+  if (words.length >= 2 && raw !== undefined) {
+    const first = escapeRe(name.split(/\s+/)[0]!.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, ""));
+    const inLower = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(raw);
+    const midSentence = new RegExp(`(?<=[\\p{L}\\p{N},)]\\s+)${first}(?![\\p{L}\\p{N}])`, "u").test(raw);
+    if (inLower || (atClauseStart && !midSentence)) {
+      const rest = name.replace(/^\S+\s+/, "");
+      if (rest !== name && nameIsGiven(rest, haystack, raw)) return true;
+    }
   }
   if (words.length < 2) return words.length === 1 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(haystack);
   // A word that is not the last (a first name) may be a shortened form of the source's word: "Maria" for "Marian" (one letter shorter).
@@ -147,7 +159,7 @@ export function markUnsourcedNames(text: string, evidence: string, question: str
   const parts = text.split(SENTENCE_OR_LINE_BREAK).filter((p): p is string => p !== undefined);
   const out = parts.map((part) => {
     if (part.trim() === "" || part.includes(NOT_IN_SOURCES)) return part;
-    const unknown = namesIn(part).filter((name) => !nameIsGiven(name, haystack, rawEvidence));
+    const unknown = namesWithStart(part).filter(({ name, atStart }) => !nameIsGiven(name, haystack, rawEvidence, atStart)).map((n) => n.name);
     if (unknown.length === 0) return part;
     if (GUESS_CUE.test(part)) { dropped += 1; return ""; }
     marked += 1;

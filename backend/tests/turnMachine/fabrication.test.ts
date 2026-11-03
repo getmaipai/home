@@ -177,3 +177,24 @@ describe("a long capitalized term is read whole, so its abbreviation in the sour
     expect(markUnsourcedNames("Limits use Quarterly Estimated Payment Schedule here.", "The limit applies to your MAGI.", "").marked).toBe(1);
   });
 });
+
+// A capitalized ordinary word at the start of a clause is not part of a name unless the sources also capitalize it in mid-sentence.
+describe("a clause-initial capitalized word is judged without the evidence needing it in lower case", () => {
+  const marks = (text: string, evidence: string): number => markUnsourcedNames(text, evidence, "").marked;
+  test("the ordinary first word is dropped at a clause start", () => {
+    expect(marks("Given Mara Voss led the team.", "Mara Voss ran the team for a decade.")).toBe(0);
+    expect(marks("Key Harbor opened in May.", "The Harbor opened in May.")).toBe(0);
+    expect(marks("Opponents of Governor Hale objected.", "Governor Hale spoke on Monday.")).toBe(0);
+    expect(marks("Visitors came. Any Visitors Center opened.", "The Visitors Center opened.")).toBe(0);
+    expect(marks("Results held; Key Soviet leaders met.", "Soviet leaders met in the capital.")).toBe(0);
+  });
+  test("an invented name, or one the sources capitalize mid-sentence, is still marked", () => {
+    expect(marks("Zara Quill signed it.", "Nothing relevant here.")).toBe(1);
+    expect(marks("Given Zara Quill signed it.", "Nothing relevant here.")).toBe(1);
+    expect(marks("Victor Quill signed it.", "Aunt Victor lived in a small town by the sea for many years. Later a quill pen was used.")).toBe(1);
+    expect(marks("Key Harbor opened in May.", "The Bay opened in May.")).toBe(1);
+  });
+  test("the same words in the middle of a sentence keep the strict rule", () => {
+    expect(marks("The plan named Key Harbor in May.", "The Harbor opened in May.")).toBe(1);
+  });
+});
