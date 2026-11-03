@@ -2,7 +2,9 @@
 // who is not an owner or admin lands on Account; the five household sections
 // that had no entry draw inside it as trail views; and the area holds
 // household scope only.
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { picturesAdminApi } from "@/lib/picturesApi";
+import { videosApi } from "@/lib/videosApi";
 import { cleanup, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
@@ -78,7 +80,9 @@ describe("the sections that had no entry draw inside Home settings", () => {
   test("tab views retain the old household page content", () => {
     const tabViews = Object.fromEntries(homeArea().sections.map((section) => [section.id, Object.fromEntries((section.tabs ?? []).filter((tab) => tab.view).map((tab) => [tab.id, tab.view]))]));
     expect(tabViews.ai).toMatchObject({ overview: "home.engine_admin" });
-    expect(tabViews.media).toMatchObject({ pictures: "home.pictures_library", "media-library": "home.media_library" });
+    // VIDEO-SETTINGS-04: the four tabs of Pictures, videos and music have no tab view; their cards carry the views (see the next test).
+    expect(Object.keys(tabViews.media ?? {})).toEqual([]);
+    expect(homeArea().sections.find((section) => section.id === "media")?.tabs?.map((tab) => tab.id)).toEqual(["pictures", "videos", "music", "styles"]);
     expect(tabViews.apps).toMatchObject({ robot: "home.devices_admin" });
     expect(homeArea().sections.find((section) => section.id === "apps")?.tabs?.[0]?.id).toBe("robot");
     expect(tabViews.advanced).toMatchObject({ developer: "home.routing_stats" });
@@ -147,5 +151,42 @@ describe("Home settings holds household scope only", () => {
       fixture!.restore();
       fixture = null;
     }
+  });
+});
+
+describe("Pictures, videos and music cards (VIDEO-SETTINGS-04)", () => {
+  // The style libraries under the Pictures and Videos cards have their own tests; here they wait on a request that never answers.
+  const originalOverview = picturesAdminApi.overview;
+  const originalSettings = videosApi.settings;
+  beforeEach(() => { picturesAdminApi.overview = (() => new Promise(() => {})) as never; videosApi.settings = (() => new Promise(() => {})) as never; });
+  afterEach(() => { picturesAdminApi.overview = originalOverview; videosApi.settings = originalSettings; });
+  const specCards = () => homeArea().sections.find((section) => section.id === "media")!.cards ?? [];
+
+  test("every card the spec names by view has a view that draws, and none is left blank", () => {
+    const named = specCards().filter((card) => card.view).map((card) => card.view);
+    expect(named).toEqual(["home.media_pictures", "home.media_kids", "home.media_videos", "home.media_music", "home.media_styles"]);
+  });
+
+  test("the Pictures tab draws the picture keys and the Children and teens card with its four keys", async () => {
+    const view = open(makePerson("owner"), "/settings/media?tab=pictures");
+    expect(await view.findByText("Adults can make pictures")).toBeTruthy();
+    expect(await view.findByText("Level when nobody says")).toBeTruthy();
+    expect(await view.findByText("Children and teens")).toBeTruthy();
+    for (const label of ["Let children make cartoon pictures and videos", "Cartoon pictures a child can make each day", "Cartoon videos a child can make each day", "Family can make pictures, videos and songs of each other"]) {
+      expect(await view.findByText(label)).toBeTruthy();
+    }
+  });
+
+  test("the Videos, Music and Styles tabs draw their keys", async () => {
+    const videos = open(makePerson("owner"), "/settings/media?tab=videos");
+    expect(await videos.findByText("Video making")).toBeTruthy();
+    cleanup();
+    const music = open(makePerson("owner"), "/settings/media?tab=music");
+    expect(await music.findByText("Adults can make songs")).toBeTruthy();
+    expect(await music.findByText("Song length")).toBeTruthy();
+    cleanup();
+    const styles = open(makePerson("owner"), "/settings/media?tab=styles");
+    expect(await styles.findByText("Adult-only styles")).toBeTruthy();
+    expect(styles.queryByText("Use Civitai")).toBeNull();
   });
 });

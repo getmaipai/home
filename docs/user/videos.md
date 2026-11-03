@@ -176,7 +176,7 @@ Home blocks CSAM. The model decides whether to make other adult content, includi
 
 Open **Settings**, **Pictures, videos and music**.
 
-- **Adults can make videos.** Turn it off to stop all video making.
+- **Video making.** Turn it off to stop all video making, for children too.
 - **Adult-only video styles.** Choose whether styles marked adults only can be used.
 - **Video quality.** The level chat uses when nobody asks for one. Adults can ask chat for another level for one video. Teens and children always get Standard.
 - **Videos with sound.** Shows whether the sound models are on this computer. The download button shows its size and the maker's licence in plain points. You accept once. **Details** names the models. Some Settings labels still use the older words Quick (no sound) and Detailed (sound).
