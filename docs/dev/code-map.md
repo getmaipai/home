@@ -1005,7 +1005,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_PICTURE_LINE, ALREADY_MAX_LINE |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
-| `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob, conversationHasVideo |
+| `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
