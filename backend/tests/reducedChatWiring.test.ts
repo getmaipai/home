@@ -22,7 +22,7 @@ beforeEach(() => {
   restoreProviders = isolateQueueProvidersForTests();
   mode = "ok"; reduced = false; calls = [];
   server = Bun.serve({
-    port: 0,
+    hostname: "127.0.0.1", port: 0,
     async fetch(req) {
       const path = new URL(req.url).pathname;
       if (path === "/stack/v1/memory") return Response.json({ reduced_chat: reduced });

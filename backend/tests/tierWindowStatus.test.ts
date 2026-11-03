@@ -16,7 +16,7 @@ let stops = 0;
 
 beforeEach(() => {
   resetDb(); resetTierStateForTests(); stops = 0; memoryBody = { reduced_chat: false, max_window: { state: "none", owner: null, since: null } };
-  server = Bun.serve({ port: 0, fetch(req) {
+  server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(req) {
     if (new URL(req.url).pathname === "/stack/v1/memory") return memoryBody === "down" ? new Response("no", { status: 503 }) : Response.json(memoryBody);
     return new Response("not found", { status: 404 });
   } });

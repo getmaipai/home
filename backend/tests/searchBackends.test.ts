@@ -37,7 +37,7 @@ function fake(id: BackendId, behaviour: Behaviour, over: { sharedUrls?: boolean 
   const hits: number[] = [];
   const state = { behaviour };
   const server = Bun.serve({
-    port: 0,
+    hostname: "127.0.0.1", port: 0,
     fetch(req) {
       hits.push(Date.now());
       const q = new URL(req.url).searchParams.get("q") ?? "";
