@@ -48,6 +48,29 @@ describe("the anchor", () => {
     expect(long).toContain("1984");
   });
 
+  test("a long article title does not crowd the question out of the search", () => {
+    const anchor = anchorFor("Comparison of Northfield and Eastgate savings accounts (2019 reference list)", null);
+    expect(anchor.phrase.split(/\s+/).length).toBeGreaterThan(4);
+    const q = anchorQuery("which option has lower fees and better yield for retirement savers", anchor);
+    const words = q.split(/\s+/);
+    expect(words.length).toBeLessThanOrEqual(8);
+    expect(q).toContain("Comparison of");
+    expect(q).toContain("2019");
+    const question = new Set("which option has lower fees and better yield for retirement savers".split(" "));
+    expect(words.filter((w) => question.has(w)).length).toBeGreaterThanOrEqual(4);
+    // the same words are never repeated in the final search
+    const dup = anchorQuery("Comparison Comparison of savings savings accounts fees fees", anchor);
+    const lower = dup.toLowerCase().split(/\s+/);
+    expect(new Set(lower).size).toBe(lower.length);
+  });
+
+  test("a short anchor keeps its whole phrase and the question's words as before", () => {
+    const anchor = anchorFor("Quiet Harbor (2011 film)", null);
+    expect(anchor.phrase.split(/\s+/).length).toBeLessThanOrEqual(4);
+    expect(anchorQuery("ending explained", anchor)).toBe("Quiet Harbor 2011 film ending explained");
+    expect(anchorQuery("Meridian smartphone battery", anchorFor("Meridian (smartphone)", null))).toBe("Meridian smartphone battery");
+  });
+
   test("quotes, OR, minus signs and site: operators are taken out, and no anchor means only that cleaning", () => {
     expect(plainQuery('"season two" OR "third season" -fan site:example.com plans')).toBe("season two third season fan plans");
     expect(anchorQuery('"a b" OR c', null)).toBe("a b c");

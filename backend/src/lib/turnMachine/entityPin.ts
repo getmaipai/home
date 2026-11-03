@@ -337,17 +337,26 @@ export function plainQuery(query: string): string {
 }
 
 /** A search carrying its subject's name: when an anchor is pinned, the search names its base name and its years (added when missing), and
- * a query of more than eight words is cut back to eight, the anchor's words kept. Without an anchor only the plain-keyword cleaning applies. */
+ * a query of more than eight words is cut back to eight, the anchor's words kept. A long anchor phrase (more than half the budget) is
+ * shortened to the first words of its base name (two at least) plus its years, never more than four protected words, so the question keeps the rest
+ * of the budget. Words repeated in the result are dropped. Without an anchor only the plain-keyword cleaning applies. */
 export function anchorQuery(query: string, anchor: EntityAnchor | null): string {
   const cleaned = plainQuery(query);
   if (!anchor || cleaned === "") return cleaned;
-  const hasBase = anchor.baseName === "" || hasWord(cleaned, anchor.baseName);
+  const long = anchor.phrase.split(/\s+/).filter(Boolean).length > MAX_QUERY_WORDS / 2;
+  // The base name's first words (at least two) plus the years, four words in all.
+  const half = MAX_QUERY_WORDS / 2;
+  const baseHead = anchor.baseName.split(/\s+/).filter(Boolean).slice(0, Math.max(2, half - anchor.years.length)).join(" ");
+  const head = long ? [baseHead, ...anchor.years].join(" ").split(/\s+/).filter(Boolean).slice(0, half).join(" ") : anchor.phrase;
+  const checkName = long ? baseHead : anchor.baseName;
+  const hasBase = checkName === "" || hasWord(cleaned, checkName);
   const missingYears = anchor.years.filter((y) => !hasWord(cleaned, y));
-  const protectedWords = new Set([...anchor.phrase.split(/\s+/), ...anchor.years].map((w) => w.toLowerCase()));
-  const body = hasBase ? cleaned : `${anchor.phrase} ${cleaned}`;
+  const protectedWords = new Set(long ? head.split(/\s+/).map((w) => w.toLowerCase()) : [...anchor.phrase.split(/\s+/), ...anchor.years].map((w) => w.toLowerCase()));
+  const body = hasBase ? cleaned : `${head} ${cleaned}`;
   const withYears = hasBase && missingYears.length > 0 ? `${body} ${missingYears.join(" ")}` : body;
-  const words = withYears.split(/\s+/);
-  if (words.length <= MAX_QUERY_WORDS) return withYears;
+  const seen = new Set<string>();
+  const words = withYears.split(/\s+/).filter((w) => { const k = w.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  if (words.length <= MAX_QUERY_WORDS) return words.join(" ");
   // Keep the anchor's words and fill the rest from the front of the query.
   const keep = words.map((w, i) => ({ w, i, anchor: protectedWords.has(w.toLowerCase()) }));
   const room = MAX_QUERY_WORDS - keep.filter((k) => k.anchor).length;
