@@ -83,8 +83,8 @@ test("pictures: Quick offers ERNIE and Klein as radios, and Klein alone when ERN
   const klein = picturesA.choices.find((choice) => choice.id === "pictures.klein")!;
   expect(ernie.rowIds[0]).toBe("pictures-ernie");
   expect(klein.rowIds[0]).toBe("pictures");
-  expect(ernie.setting).toEqual({ key: "generation.picture_quick_model", value: "ernie" });
-  expect(klein.setting).toEqual({ key: "generation.picture_quick_model", value: "klein" });
+  expect(ernie.setting).toEqual({ key: "engines.image.tier.standard", value: "ernie" });
+  expect(klein.setting).toEqual({ key: "engines.image.tier.standard", value: "klein" });
   expect(ernie.current).toBe(true);
   expect(klein.current).toBe(false);
   expect(picturesA.choices.some((choice) => choice.id === "pictures.edit")).toBe(true);
@@ -96,7 +96,7 @@ test("pictures: Quick offers ERNIE and Klein as radios, and Klein alone when ERN
   expect(picturesB.choices.some((choice) => choice.id === "pictures.edit")).toBe(false);
 });
 
-test("pictures: the Quick model current follows generation.picture_quick_model", () => {
+test("pictures: the Quick model current follows the Standard picture slot", () => {
   const klein = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuickModel: "klein" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
   expect(klein.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
   expect(klein.choices.find((choice) => choice.id === "pictures.ernie")!.current).toBe(false);
@@ -107,7 +107,7 @@ test("Detailed pictures is its own switch row, on only when enabled and installe
   const on = card(SETTINGS, null).choices[0]!;
   expect(on.id).toBe("picturesdetailed.zimage");
   expect(on.kind).toBe("switch");
-  expect(on.setting).toEqual({ key: "generation.picture_detailed.enabled", value: true });
+  expect(on.setting).toEqual({ key: "engines.image.tier.boost", value: true });
   const installed = TIERS.p128.rows.find((candidate) => candidate.id === "pictures-zimage")!.model_ids.map((id) => component({ id, state: "installed" }));
   expect(card(SETTINGS, installed).choices[0]!.current).toBe(true);
   expect(card({ ...SETTINGS, pictureDetailedEnabled: false }, installed).choices[0]!.current).toBe(false);
@@ -261,7 +261,7 @@ test("recommendedPlan changes Detailed to Quick, lists changes, never removes, s
   const plan = planOf(base);
   const result = recommendedPlan({ copy, plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: 90 * GIB });
 
-  expect(result.changes).toEqual([{ job: "videos", from: "Detailed", to: "Quick", setting: { key: "generation.video_quality", value: "quick" } }]);
+  expect(result.changes).toEqual([{ job: "videos", from: "Boost", to: "Standard", setting: { key: "generation.video_tier", value: "standard" } }]);
   expect(result.installRowIds).toContain("pictures");
   expect(result.installRowIds).toContain("pictures-ernie");
   expect(result.installRowIds).toContain("video");

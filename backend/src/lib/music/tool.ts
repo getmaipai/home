@@ -15,6 +15,7 @@ import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 import { provenanceFor } from "./commercial";
 import { resolveSound } from "./sound";
+import { likenessCallRefusal } from "@/lib/likeness";
 /** What a refused song's reply starts with; the Make a song page strips it to show the person the plain line. */
 export const REFUSED_PREFIX = "No song was made. Say this to the person and keep its meaning: ";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
@@ -180,7 +181,8 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   const { state, args, callId } = input; const packageId = editing ? EDIT_MUSIC_TOOL_ID : GENERATE_MUSIC_TOOL_ID;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
-  const refusal = musicRefusalFor(musicAudienceOf(state, input.spoken), args);
+  const musicAudience = musicAudienceOf(state, input.spoken);
+  const refusal = musicRefusalFor(musicAudience, args) ?? likenessCallRefusal(musicAudience.actor, args);
   if (refusal) return refused(refusal.line, refusal.why);
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;

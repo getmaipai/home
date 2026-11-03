@@ -38,7 +38,7 @@ import { InstallStatusSchema } from "@/routes/install";
 import { adoptLicenceAck } from "@/lib/licenceAcceptance";
 import { acceptLicences, licenceOverview, widenLicenceAck } from "@/lib/licenceFlow";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { SETUP_CHOICE_KEYS, setupCards } from "@/lib/aiChoicesState";
+import { SETUP_CHOICE_KEYS, setupCards, writeChoiceSetting } from "@/lib/aiChoicesState";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
 import { REMOTE_ALLOW_TAILNET_KEY, refreshConfiguredEngineLink, validateRemoteEngineSetting } from "@/lib/remoteStackSettings";
 import { codingModeReadiness } from "@/lib/codingMode";
@@ -186,7 +186,7 @@ setupRoutes.openapi(installStartRoute, async (c) => {
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   // The choice is saved only once the download can start, so a refused install leaves the settings as they were.
   for (const [key, value] of Object.entries(settings ?? {})) {
-    const written = setHouseholdSettingValue(key, value);
+    const written = writeChoiceSetting(key, value);
     if (!written.ok) return c.json({ error: written.error, next: "Change it later under AI and models in Settings." }, 409);
   }
   return c.json({ started: true as const, models: result.models, ...(result.leftOut?.length ? { left_out: result.leftOut } : {}) }, 202);

@@ -92,7 +92,7 @@ describe("the plan step's job cards", () => {
     const call = start.mock.calls[0] as unknown[];
     expect(call[1]).not.toContain("coding");
     expect(call[1]).toContain("pictures-ernie");
-    expect(call[3]).toMatchObject({ "generation.picture_quick_model": "ernie" });
+    expect(call[3]).toMatchObject({ "engines.image.tier.standard": "ernie" });
   });
 
   test("a tight disk warns and still installs", async () => {
@@ -135,7 +135,7 @@ describe("the plan step's job cards", () => {
     expect(call[1]).toContain("video-detailed");
     expect(call[1]).not.toContain("video");
     expect(call[2]).toEqual([licence.id]);
-    expect(call[3]).toMatchObject({ "generation.video_quality": "detailed" });
+    expect(call[3]).toMatchObject({ "generation.video_tier": "boost" });
   });
 
   test("a covered licence is information: no accept is needed", async () => {

@@ -21,13 +21,13 @@ import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { slotKey } from "@/lib/tiers";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { addedChatChoiceStates, startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
 import { activeProfileLine, answerFitAsk, currentMaxWindow, endMaxWindow, pendingFitAsk } from "@/lib/jobs/householdQueue";
 import { closedAppsLines } from "@/lib/jobs/closeApps";
-import { readAiSettings } from "@/lib/aiChoicesState";
+import { readAiSettings, writeChoiceSetting } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
@@ -91,7 +91,7 @@ function dropModelCaches(): void {
 }
 
 function writeSetting(key: string, value: unknown): { status: 400 | 403; error: string } | null {
-  const written = setHouseholdSettingValue(key, value);
+  const written = writeChoiceSetting(key, value);
   return written.ok ? null : { status: written.status, error: written.error };
 }
 
@@ -149,7 +149,7 @@ function standardChatModelId(state: AiState): string | null {
   const ids = (row?.model_ids ?? []).filter((id) => catalogEntries().some((model) => model.id === id && model.role === "chat" && model.implemented && !model.tags?.includes("uncensored")));
   return ids.at(-1) ?? null;
 }
-const SETTING_ONLY_SWITCHES: Record<string, string> = { "music.make": "generation.music.enabled", "picturesdetailed.zimage": "generation.picture_detailed.enabled" };
+const SETTING_ONLY_SWITCHES: Record<string, string> = { "music.make": "generation.music.enabled", "picturesdetailed.zimage": slotKey("image", "boost") };
 
 const SettingRefSchema = z.object({ key: z.string(), value: z.unknown() }).nullable();
 const ChoiceSchema = z.object({

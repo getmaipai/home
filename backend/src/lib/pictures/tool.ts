@@ -10,11 +10,12 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
-import { adapterAudiencesFor, adultAdaptersAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
+import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from "./quality";
 import { StackPicturesError } from "./stack";
+import { likenessCallRefusal } from "@/lib/likeness";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
@@ -42,7 +43,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
   };
 }
 
-export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string };
+export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | NonNullable<ReturnType<typeof likenessCallRefusal>>;
 
 /** The refusal for this call, or null: the surface and age gate first, then the minor line on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
@@ -82,7 +83,8 @@ function refused(callId: string, args: Record<string, unknown>, refusal: Picture
 export async function runGenerateImage(input: RunGenerateImageInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   const audience = audienceOf(state, input.spoken);
-  const refusal = refusalFor(audience, args);
+  // The household's likeness option (lib/likeness.ts) is checked here, after the policy gate: its refusal is not a minor-line reason.
+  const refusal = refusalFor(audience, args) ?? likenessCallRefusal(audience.actor, args);
   if (refusal) return refused(callId, args, refusal);
 
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
@@ -137,7 +139,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         n: kid ? Math.min(count, KID_MAX_COUNT) : count,
         ...(choice.model ? { model: choice.model } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
-        audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages",
+        audience: lane === "adult" && adultStylesAllowed() ? "adult" : "all-ages",
         ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },

@@ -16,6 +16,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { db } from "@/db";
 import { settingsValues } from "@/db/schema";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { writeChoiceSetting } from "@/lib/aiChoicesState";
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 
@@ -30,13 +31,13 @@ afterEach(() => { rmSync(root, { recursive: true, force: true }); db.delete(sett
 describe("companion art model resolution", () => {
   test("still honors household quality and refuses unavailable Detailed", () => {
     const set = (key: string, value: unknown) => setHouseholdSettingValue(key, value);
-    set("generation.picture_quick_model", "ernie");
+    writeChoiceSetting("engines.image.tier.standard", "ernie");
     const ernie = readyStatusForTests({ models: [{ id: "flux2-klein-4b", installed: true }, { id: "ernie-image-turbo", installed: true }] as never });
     expect(resolveCompanionStillFromStatus(ernie)).toEqual({ model: "ernie-image-turbo", quality: "quick" });
-    set("generation.picture_quick_model", "klein");
+    writeChoiceSetting("engines.image.tier.standard", "klein");
     const klein = resolveCompanionStillFromStatus(readyStatusForTests());
     expect(klein.model).toBe("flux2-klein-4b");
-    set("generation.picture_quality", "detailed"); set("generation.picture_quick_model", "ernie");
+    set("generation.picture_tier", "boost"); writeChoiceSetting("engines.image.tier.standard", "ernie");
     const detailed = readyStatusForTests({ models: [{ id: "z-image-turbo", installed: true, available: true }] as never });
     expect(resolveCompanionStillFromStatus(detailed)).toEqual({ model: "z-image-turbo", quality: "detailed" });
     try { resolveCompanionStillFromStatus(readyStatusForTests({ models: [{ id: "z-image-turbo", installed: false, available: false }] as never })); throw new Error("expected refusal"); }
@@ -49,9 +50,9 @@ describe("companion art model resolution", () => {
   });
 
   test("clip selects only picture-capable models and edit stays on Klein", () => {
-    setHouseholdSettingValue("generation.video_quality", "quick");
+    setHouseholdSettingValue("generation.video_tier", "standard");
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests())).toEqual({ model: "wan2.2-ti2v-5b-fastwan-mlx", quality: "quick" });
-    setHouseholdSettingValue("generation.video_quality", "detailed");
+    setHouseholdSettingValue("generation.video_tier", "boost");
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed", detailedPicture: true }), "detailed")).toEqual({ model: "ltx-2-3-distilled-mlx", quality: "detailed" });
     // Teens and children are never sent to Detailed, even when the household default is Detailed.
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ detailed: "installed", detailedPicture: true }))).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
@@ -86,7 +87,7 @@ describe("companion art model resolution", () => {
     if (!result.ok) throw new Error(result.error);
     const id = result.value.id, image = new Uint8Array(await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer());
     const v = addVersion(id, image, { source: "upload", label: "Source", width: 16, height: 16, from: null });
-    setHouseholdSettingValue("generation.picture_quality", "quick"); setHouseholdSettingValue("generation.picture_quick_model", "ernie");
+    setHouseholdSettingValue("generation.picture_tier", "standard"); writeChoiceSetting("engines.image.tier.standard", "ernie");
     const imageStatus = readyStatusForTests({ models: [{ id: "flux2-klein-4b", installed: true, available: true }, { id: "ernie-image-turbo", installed: true, available: true }] as never });
     __setPictureStatusForTests(imageStatus); __setCompanionArtStatusReadersForTests({ picture: async () => imageStatus, video: async () => readyVideoStatusForTests() }); __setPictureStatusForTests(imageStatus);
     const calls: Array<{ kind: string; model?: string }> = [];
@@ -114,7 +115,7 @@ describe("companion art model resolution", () => {
     }) as typeof fetch);
     const videoStatus = readyVideoStatusForTests();
     __setCompanionArtStatusReadersForTests({ picture: async () => imageStatus, video: async () => videoStatus });
-    setHouseholdSettingValue("generation.video_quality", "quick");
+    setHouseholdSettingValue("generation.video_tier", "standard");
     const runId = await startStateTakes({ actor, companionId: id, states: ["idle"], count: 1 });
     expect(runId).toBeTruthy();
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -132,7 +133,7 @@ describe("companion art model resolution", () => {
     const home = join(dataRoot, "companions");
     __setStackClientForTests({ mediaRoots: async () => ({ read: [home], write: [home] }), setMediaRoots: async () => ({ read: [home], write: [home] }), submitJob: async () => { throw new Error("unexpected finish should not run"); } } as never);
     __setVideosFetchForTests((async (_input, init) => init?.method === "POST" ? Response.json({ job: "mismatch-job", data: [] }, { status: 202 }) : Response.json({ job: "mismatch-job", state: "done", data: [{ model: "wrong-model" }] })) as typeof fetch);
-    setHouseholdSettingValue("generation.video_quality", "quick");
+    setHouseholdSettingValue("generation.video_tier", "standard");
     await startStateTakes({ actor: { id: "art-test", role: "admin" } as never, companionId: id, states: ["idle"], count: 1 });
     await new Promise((resolve) => setTimeout(resolve, 30));
     const take = readStates(id).states.idle?.takes[0];

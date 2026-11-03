@@ -11,12 +11,11 @@
 //     them and every route refuses them;
 //   - never a guest, a spoken turn, a glance or shared screen (a TV), a robot or a pod.
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { pictureDenial, promptViolatesMinorLine, refusePrompt, type PictureAudience, type PromptRefusal } from "@/lib/pictures/policy";
+import { adultStylesAllowed, pictureDenial, promptViolatesMinorLine, refusePrompt, type PictureAudience, type PromptRefusal } from "@/lib/pictures/policy";
 import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, laneOf, type Lane } from "@/lib/pictures/lane";
 
 export const VIDEO_ENABLED_KEY = "generation.video.enabled";
-export const VIDEO_ADULT_ADAPTERS_KEY = "generation.video.adult_adapters";
-export const VIDEO_QUALITY_KEY = "generation.video_quality";
+export const VIDEO_TIER_KEY = "generation.video_tier";
 
 export type VideoAudience = PictureAudience;
 export type VideoDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off";
@@ -41,21 +40,12 @@ export function householdAllowsVideo(): boolean {
   }
 }
 
-/** `generation.video_quality`: "quick" (default) or "detailed". A read failure reads as quick, the fast one. */
+/** `generation.video_tier`: "standard" (default) or "boost". The makers still say quick and detailed inside, so Standard reads as "quick" and Boost as "detailed". An unreadable value reads as Standard, the fast one. */
 export function householdVideoQuality(): "quick" | "detailed" {
   try {
-    return getHouseholdSettingValue(VIDEO_QUALITY_KEY) === "detailed" ? "detailed" : "quick";
+    return getHouseholdSettingValue(VIDEO_TIER_KEY) === "boost" ? "detailed" : "quick";
   } catch {
     return "quick";
-  }
-}
-
-/** `generation.video.adult_adapters`: "allowed" (default) or "restricted". */
-export function adultVideoAdaptersAllowed(): boolean {
-  try {
-    return getHouseholdSettingValue(VIDEO_ADULT_ADAPTERS_KEY) !== "restricted";
-  } catch {
-    return true;
   }
 }
 
@@ -74,7 +64,7 @@ export function videosAllowed(input: VideoAudience): boolean {
 export function videoAdapterAudiencesFor(input: VideoAudience): Array<"all-ages" | "adult-only"> {
   if (!videosAllowed(input)) return [];
   if (laneOf(input) !== "adult") return ["all-ages"];
-  return adultVideoAdaptersAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
+  return adultStylesAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
 }
 
 /** The audience the Stack is told: `adult` only for an allowed adult whose household lets adults use adult-only LoRAs, else `all-ages` (the Stack's second lock). */

@@ -275,7 +275,8 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const hasErnie = has("pictures-ernie");
         const hasKlein = has("pictures");
         const ernieChosen = hasErnie && settings.pictureQuickModel === "ernie";
-        const quickKey = "generation.picture_quick_model";
+        // The Standard picture slot (docs/design/settings-media-2026-11-02.md section 8): the card writes the slot, the backend turns the choice name into a model id.
+        const quickKey = "engines.image.tier.standard";
         if (hasErnie) specs.push({ id: "pictures.ernie", job: "pictures", kind: "radio", row: rows.get("pictures-ernie")!, current: ernieChosen, recommended: true, setting: { key: quickKey, value: "ernie" } });
         if (hasKlein) specs.push({ id: "pictures.klein", job: "pictures", kind: "radio", row: rows.get("pictures")!, current: !ernieChosen, recommended: !hasErnie, setting: { key: quickKey, value: "klein" } });
         if (hasKlein && hasErnie) specs.push({ id: "pictures.edit", job: "pictures", kind: "fixed", row: rows.get("pictures")!, current: true, recommended: false, setting: null });
@@ -284,7 +285,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         break;
       }
       case "picturesdetailed": {
-        if (has("pictures-zimage")) specs.push({ id: "picturesdetailed.zimage", job: "picturesdetailed", kind: "switch", row: rows.get("pictures-zimage")!, current: settings.pictureDetailedEnabled && rowIsInstalled(rows.get("pictures-zimage")!, components), recommended: need("pictures-zimage") === "recommended", setting: { key: "generation.picture_detailed.enabled", value: true } });
+        if (has("pictures-zimage")) specs.push({ id: "picturesdetailed.zimage", job: "picturesdetailed", kind: "switch", row: rows.get("pictures-zimage")!, current: settings.pictureDetailedEnabled && rowIsInstalled(rows.get("pictures-zimage")!, components), recommended: need("pictures-zimage") === "recommended", setting: { key: "engines.image.tier.boost", value: true } });
         break;
       }
       case "wakeword": {
@@ -295,8 +296,8 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const hasQuick = has("video");
         const hasDetailed = has("video-detailed");
         const preferDetailed = settings.videoQuality === "detailed" && hasDetailed;
-        if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: true, setting: { key: "generation.video_quality", value: "quick" } });
-        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-detailed")!, current: preferDetailed, recommended: !hasQuick, setting: { key: "generation.video_quality", value: "detailed" } });
+        if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: true, setting: { key: "generation.video_tier", value: "standard" } });
+        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-detailed")!, current: preferDetailed, recommended: !hasQuick, setting: { key: "generation.video_tier", value: "boost" } });
         break;
       }
       case "music": {

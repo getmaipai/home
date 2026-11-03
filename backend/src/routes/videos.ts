@@ -14,7 +14,7 @@ import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, 
 import { plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
-import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
+import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
@@ -41,6 +41,8 @@ import { db } from "@/db";
 import { conversationTurns, videoJobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
+import { likenessRefusal } from "@/lib/likeness";
+import { adultStylesAllowed } from "@/lib/pictures/policy";
 
 export const videosRoutes = apiRouter();
 /** A locked item's media routes never let a cache keep a 404 or a body (ADULT-LOCK-02). */
@@ -176,7 +178,7 @@ videosRoutes.openapi(statusRoute, async (c) => {
     reason: denial ? VIDEO_DENIAL_LINE[denial] : ready ? null : videoNotReadyReason(engine),
     engine_ready: ready,
     tiers: videoTiersStatus(engine, denial === null && laneOf(audience) === "adult"),
-    adult_styles: denial === null && laneOf(audience) === "adult" && adultVideoAdaptersAllowed(),
+    adult_styles: denial === null && laneOf(audience) === "adult" && adultStylesAllowed(),
     limits: VIDEO_LIMITS_LINE,
     styles,
   }, 200);
@@ -348,6 +350,7 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
   if (denial) return { status: 403, body: { error: VIDEO_DENIAL_LINE[denial], code: denial } };
   const refused = refuseVideoPrompt(prompt, { lane: laneOf(audience) });
   if (refused) return { status: 422, body: { error: promptRefusalLineFor(refused, "video", actor, audience.band, prompt, VIDEO_REFUSAL_LINE[refused]), code: refused } };
+  { const likeness = likenessRefusal(actor, prompt); if (likeness) return { status: 422, body: { error: likeness, code: "household_likeness_off" } }; }
   if (laneOf(audience) === "child" && videosMadeToday(actor) + 1 > kidsDailyVideos()) return { status: 422, body: { error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" } };
   { const engine = await videoEngineStatus(); if (!videoStatusReady(engine, laneOf(audience) === "adult")) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
   return null;
@@ -517,7 +520,7 @@ videosRoutes.openapi(settingsRoute, async (c) => {
         download_bytes: detailed?.install.remaining_bytes ?? 0, component: "ltx-2-3-distilled-mlx", licence: detailed?.licence ?? null, lora_base_model: detailed?.lora_base_model ?? "ltx-2.3",
       };
     })(),
-    enabled: householdAllowsVideo(), adult_adapters: adultVideoAdaptersAllowed(),
+    enabled: householdAllowsVideo(), adult_adapters: adultStylesAllowed(),
     minors: "Videos are off for children and teens. No setting turns them on.",
     adapters: adapters.map(adapterWire),
     locked_styles: list.locked,

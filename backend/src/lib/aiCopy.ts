@@ -12,7 +12,9 @@ const GROUPS: Record<AiJobId, string> = {
   chat: "household.ai_chat", pictures: "household.ai_pictures", picturesdetailed: "household.ai_pictures", videos: "household.ai_videos",
   music: "household.ai_music", stems: "household.ai_stems", voice: "household.ai_voice", wakeword: "household.ai_wakeword", vision: "household.ai_vision", coding: "household.ai_coding",
 };
-const QUALITY_KEYS: Record<string, string> = { pictures: "generation.picture_quality", videos: "generation.video_quality" };
+// VIDEO-SETTINGS-04: the words come from the tier keys. The choice ids keep their old names (quick, detailed); the words say Standard and Boost.
+const QUALITY_KEYS: Record<string, string> = { pictures: "generation.picture_tier", videos: "generation.video_tier" };
+const TIER_OF_CHOICE: Record<string, string> = { quick: "standard", detailed: "boost" };
 
 const aiCards = (areasFile.areas as unknown as Array<{ sections: Array<{ id: string; cards?: SpecCard[] }> }>)
   .flatMap((area) => area.sections).filter((section) => section.id === "ai").flatMap((section) => section.cards ?? []);
@@ -37,7 +39,7 @@ export const aiCopy: AiCopy = {
       ?? glance?.choices?.find((choice) => choice.id === `${job}-${name}`);
     if (listed) return { label: listed.label, description: listed.description };
     const quality = QUALITY_KEYS[job] ? specKeys.find((key) => key.key === QUALITY_KEYS[job]) : undefined;
-    if (quality) return { label: name.charAt(0).toUpperCase() + name.slice(1), description: quality.copy?.options?.[name] ?? "" };
+    if (quality) { const tier = TIER_OF_CHOICE[name] ?? name; return { label: tier.charAt(0).toUpperCase() + tier.slice(1), description: quality.copy?.options?.[tier] ?? "" }; }
     const music = job === "music" ? specKeys.find((key) => key.key === "generation.music.enabled") : undefined;
     if (music) return { label: music.label, description: music.copy?.does ?? "" };
     return { label: id, description: "" };

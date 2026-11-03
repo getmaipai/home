@@ -112,7 +112,11 @@ export function AiGlance({ card }: SettingsViewProps) {
         const role = ENGINE_ROLE[row.job];
         const single = row.options.length === 1 && row.options[0]!.kind === "switch" ? row.options[0]! : null;
         if (!row.shownEnabled) {
-          if (single?.setting) await api.setSetting("household", single.setting.key, false, true);
+          if (single?.setting) {
+            // A picture slot (Boost) is not a plain on/off key: the hub's choose route turns the switch off and keeps the slot's options.
+            if (single.setting.key.includes(".tier.")) { if (row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
+            else await api.setSetting("household", single.setting.key, false, true);
+          }
           else if (row.job === "stems") { /* Stems has no On/Off setting: the parts are installed or not, and nothing else to turn off. */ }
           else if (row.job === "wakeword") { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
           else await api.setSetting("household", `engines.${role}.choice`, "off", true);

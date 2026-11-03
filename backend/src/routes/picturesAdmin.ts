@@ -7,7 +7,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
 import { addLoraFile, addLoraUrl, getStackJob, imageStatus, installPictureModel, patchLora, removeLora, StackPicturesError } from "@/lib/pictures/stack";
-import { adultAdaptersAllowed, householdAllowsAdults, householdPictureQuality } from "@/lib/pictures/policy";
+import { adultStylesAllowed, householdAllowsAdults, householdPictureQuality } from "@/lib/pictures/policy";
 import { CHILD_CONTENT_LINE, kidsDailyPictures, kidsDailyVideos, kidsHomeOn } from "@/lib/pictures/lane";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { detailedReady } from "@/lib/pictures/quality";
@@ -42,8 +42,8 @@ const OverviewSchema = z.object({
 const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Admins only", 404: "No such style or job", 409: "Already added", 413: "Too big", 422: "That cannot be added", 502: "The picture engine refused it", 503: "The picture engine is not available" });
 
 const BAND_NOTES = {
-  childrenOn: "Children can make cartoon pictures and videos of safe things, within a daily limit. No photos or grown-up content. Turn it off with Let kids make cartoon pictures and videos above, or for one child on their page.",
-  childrenOff: "Children cannot make pictures or videos while Let kids make cartoon pictures and videos is off.",
+  childrenOn: "Children can make cartoon pictures and videos of safe things, within a daily limit. No photos or grown-up content. Turn it off with Let children make cartoon pictures and videos under Children and teens, or for one child on their page.",
+  childrenOff: "Children cannot make pictures or videos while Let children make cartoon pictures and videos is off.",
   teens: "Teens can make pictures, videos and edits. Nothing adult or sexual is made for them, and they only get all-ages styles.",
   adultsOn: "Adults can ask chat for pictures on their own screen.",
   adultsOff: "Adults cannot make pictures while this is off.",
@@ -108,7 +108,7 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
       { band: "teens" as const, label: "Teens", on: true, locked: true, note: BAND_NOTES.teens },
       { band: "adults" as const, label: "Adults", on: adultsOn, locked: false, note: adultsOn ? BAND_NOTES.adultsOn : BAND_NOTES.adultsOff },
     ],
-    adult_adapters: adultAdaptersAllowed() ? "allowed" as const : "restricted" as const,
+    adult_adapters: adultStylesAllowed() ? "allowed" as const : "restricted" as const,
     quality: householdPictureQuality(),
     detailed_ready: detailedReady(status),
   }, 200);

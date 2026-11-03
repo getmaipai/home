@@ -8,7 +8,7 @@ import { optionsForBand, checkTierSlotOptions, type TierOptionValue } from "@mai
 import type { AgeBand } from "@/lib/ageBand";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { personIsGranted } from "@/lib/grants";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingSource, getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 
 export type Tier = "standard" | "boost" | "max";
@@ -35,6 +35,14 @@ export function readSlot(category: TierCategory, tier: Tier | "reduced"): SlotRe
   } catch {
     return fallback;
   }
+}
+
+/** Set one slot's model (a catalog id, `recommended` or `off`), keeping its options and Who can use it. The one writer of a slot's model: the AI card, the setup wizard and the one-time copy of the old picture keys (tierSlotMigration.ts) all come here. */
+export function writeSlotModel(category: TierCategory, tier: Tier, model: string): { ok: true } | { ok: false; status: 400 | 403; error: string } {
+  const slot = readSlot(category, tier);
+  if (slot.model === model && getHouseholdSettingSource(slotKey(category, tier)) !== undefined) return { ok: true };
+  const written = setHouseholdSettingValue(slotKey(category, tier), { model, options: slot.options, ...(getHouseholdSettingSource(slotKey(category, tier)) ? { who: slot.who } : {}) });
+  return written.ok ? { ok: true } : { ok: false, status: written.status, error: written.error };
 }
 
 export const slotIsOff = (category: TierCategory, tier: Tier): boolean => tier !== "standard" && readSlot(category, tier).model === "off";

@@ -64,6 +64,7 @@ import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
 import { migrateRobotsSwitch } from "@/lib/robotsSwitchMigration";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
+import { migrateMediaSettings } from "@/lib/settingsMediaMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
 import { ensureSetupState } from "@/lib/setupState";
@@ -252,6 +253,7 @@ migratePendingAsksThroughGate();
 migrateWikipediaFallbackToSourceMode();
 migrateRobotsSwitch();
 migrateTierSlots();
+migrateMediaSettings();
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

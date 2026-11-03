@@ -7,7 +7,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { routeAudience } from "@/lib/pictures/audience";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
-import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
+import { adapterAudiencesFor, adultStylesAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
@@ -19,6 +19,7 @@ import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPicture
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
 import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
+import { likenessRefusal } from "@/lib/likeness";
 
 export const picturesRoutes = apiRouter();
 
@@ -124,7 +125,7 @@ picturesRoutes.openapi(statusRoute, async (c) => {
     can_make: denial === null && ready,
     reason: denial ? PICTURE_DENIAL_LINE[denial] : ready ? null : pictureNotReadyReason(engine),
     engine_ready: ready,
-    adult_styles: denial === null && laneOf(routeAudience(actor)) === "adult" && adultAdaptersAllowed(),
+    adult_styles: denial === null && laneOf(routeAudience(actor)) === "adult" && adultStylesAllowed(),
     styles,
   }, 200);
 });
@@ -190,6 +191,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const kid = lane === "child";
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
   if (refused) return c.json({ error: promptRefusalLineFor(refused, "picture", actor, routeAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), code: refused }, 422) as never;
+  { const likeness = likenessRefusal(actor, prompt); if (likeness) return c.json({ error: likeness, code: "household_likeness_off" }, 422) as never; }
   // KIDS-CREATE-01: a child's another-one is also a cartoon, Quick, within the daily limit, and never with a style.
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
@@ -202,7 +204,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: words,
       tier: jobTier("image", tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).tier, choice.quality),
-      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultStylesAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
     });
     void job;
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);

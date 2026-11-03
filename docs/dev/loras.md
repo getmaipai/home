@@ -32,7 +32,7 @@ off is admins-only like every migrated record; the record has no separate "off" 
 | owner or admin, own written screen | open | locked, open with a valid unlock proof |
 | other adult marked in `availability` (`adults`, or named in `people`) | open | locked, open with a proof |
 | other adult not marked | hidden | hidden |
-| `generation.video.adult_adapters` is "restricted" | open | hidden for everyone |
+| `generation.styles.adult_only` is "restricted" | open | hidden for everyone |
 
 A removed style is hidden from everyone but an admin's Recently removed. A locked style is one tile (`locked: true`) for the whole list: no name, trigger
 words, add-ins, preview, hash, id or count. An id route answers a hidden, locked or missing style the same (404). Because an admin cannot reach an adult-only

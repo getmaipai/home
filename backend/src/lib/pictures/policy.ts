@@ -21,19 +21,17 @@ import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readSlot, slotIsOff } from "@/lib/tiers";
 import { QUICK_MODEL } from "@/lib/pictures/quality";
-// Registers the mirror from the legacy Quick and Detailed keys into the slots this file reads.
-import "@/lib/tierSlotMigration";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { mentionsSexualWord, minorSexualMatch, mixedScriptMinorCue, normalise } from "@/lib/pictures/minorLine";
 import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, childPromptUnsafe, kidLaneOn, laneOf, teenPromptUnsafe, type Lane } from "@/lib/pictures/lane";
 
 
 export const GENERATION_ADULTS_KEY = "generation.adults";
-export const GENERATION_ADULT_ADAPTERS_KEY = "generation.adult_adapters";
+export const GENERATION_ADULT_STYLES_KEY = "generation.styles.adult_only";
 /** REALPEOPLE-MODEL-2026-10-25: ends the tool result of a started picture job. The job is already running, so the answering round must confirm it and not refuse in prose after the fact (measured: the tool was called, then the reply said it could not). */
 export const PICTURE_STARTED_CONFIRM_NOTE = "The request is allowed and the picture is already being made: confirm that and do not refuse, warn or suggest something else.";
 
-export const GENERATION_PICTURE_QUALITY_KEY = "generation.picture_quality";
+export const GENERATION_PICTURE_TIER_KEY = "generation.picture_tier";
 
 export type PictureDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off" | "temporary_unsupported";
 
@@ -84,25 +82,25 @@ export function householdAllowsAdults(): boolean {
   }
 }
 
-/** `generation.adult_adapters`: "allowed" (default) or "restricted". */
-export function adultAdaptersAllowed(): boolean {
+/** `generation.styles.adult_only`: "allowed" (default) or "restricted". The one reader for pictures, videos and the covers of songs; the two old per-medium keys are only read by the migration (lib/settingsMediaMigration.ts). */
+export function adultStylesAllowed(): boolean {
   try {
-    return getHouseholdSettingValue(GENERATION_ADULT_ADAPTERS_KEY) !== "restricted";
+    return getHouseholdSettingValue(GENERATION_ADULT_STYLES_KEY) !== "restricted";
   } catch {
     return true;
   }
 }
 
-/** `generation.picture_quality`: "quick" (default) or "detailed". Read failures read as quick, the fast one. */
+/** `generation.picture_tier`: "standard" (default) or "boost". The makers still say quick and detailed inside, so Standard reads as "quick" and Boost as "detailed". An unreadable value reads as Standard, the fast one. */
 export function householdPictureQuality(): "quick" | "detailed" {
   try {
-    return getHouseholdSettingValue(GENERATION_PICTURE_QUALITY_KEY) === "detailed" ? "detailed" : "quick";
+    return getHouseholdSettingValue(GENERATION_PICTURE_TIER_KEY) === "boost" ? "detailed" : "quick";
   } catch {
     return "quick";
   }
 }
 
-/** The picture Standard slot (`engines.image.tier.standard`; migrated from `generation.picture_quick_model`): "ernie" (default) or "klein", the model behind Quick pictures. */
+/** The picture Standard slot (`engines.image.tier.standard`; the AI card writes it directly): "ernie" (default) or "klein", the model behind Quick pictures. */
 export function householdQuickModel(): "ernie" | "klein" {
   try {
     return readSlot("image", "standard").model === QUICK_MODEL ? "klein" : "ernie";
@@ -111,7 +109,7 @@ export function householdQuickModel(): "ernie" | "klein" {
   }
 }
 
-/** The picture Boost slot is on (`engines.image.tier.boost`; migrated from `generation.picture_detailed.enabled`): the Detailed pictures switch on the AI and models page. On unless turned off. */
+/** The picture Boost slot is on (`engines.image.tier.boost`; the AI card writes it directly): the Detailed pictures switch on the AI and models page. On unless turned off. */
 export function householdDetailedEnabled(): boolean {
   try {
     return !slotIsOff("image", "boost");
@@ -125,7 +123,7 @@ export function adapterAudiencesFor(input: PictureAudience): Array<"all-ages" | 
   if (!picturesAllowed(input)) return [];
   // A teen or a child is only ever offered all-ages styles, whatever the household says about adult-only ones.
   if (laneOf(input) !== "adult") return ["all-ages"];
-  return adultAdaptersAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
+  return adultStylesAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
 }
 
 // ---------------------------------------------------------------- the minor line

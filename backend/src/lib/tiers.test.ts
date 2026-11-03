@@ -6,6 +6,7 @@ import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settin
 import { maxOffered, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE, tierArgument, authorizeTier, allowedQuality, clampTier, readSlot, slotKey, slotOptionsFor, type TierCategory, type TierDeps } from "@/lib/tiers";
 import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
+import { writeChoiceSetting } from "@/lib/aiChoicesState";
 import type { AgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { resetDb } from "../../tests/reset-db";
@@ -113,16 +114,28 @@ describe("Quick and Detailed migrate into the slots", () => {
     expect(migrateTierSlots()).toBe("already_ran");
   });
 
-  test("an explicit legacy write is mirrored into its slot at once", () => {
-    setHouseholdSettingValue("generation.picture_quick_model", "klein");
-    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+  test("the AI card writes the slots directly, and a write to an old key no longer touches them (VIDEO-SETTINGS-04)", () => {
+    expect(writeChoiceSetting("engines.image.tier.standard", "klein")).toEqual({ ok: true });
+    expect(writeChoiceSetting("engines.image.tier.boost", false)).toEqual({ ok: true });
     expect(readSlot("image", "standard").model).toBe("flux2-klein-4b");
     expect(readSlot("image", "boost").model).toBe("off");
     expect(householdQuickModel()).toBe("klein");
     expect(householdDetailedEnabled()).toBe(false);
-    setHouseholdSettingValue("generation.picture_detailed.enabled", true);
+    expect(writeChoiceSetting("engines.image.tier.boost", true)).toEqual({ ok: true });
     expect(householdDetailedEnabled()).toBe(true);
     expect(getHouseholdSettingValue(slotKey("image", "boost"))).toMatchObject({ model: "recommended" });
+    // The old keys are still storable and readable, and no longer move a slot.
+    setHouseholdSettingValue("generation.picture_quick_model", "ernie");
+    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    expect(readSlot("image", "standard").model).toBe("flux2-klein-4b");
+    expect(householdDetailedEnabled()).toBe(true);
+    expect(getHouseholdSettingValue("generation.picture_quick_model")).toBe("ernie");
+  });
+
+  test("a slot write keeps the slot's options", () => {
+    setHouseholdSettingValue(slotKey("image", "standard"), { model: "ernie-image-turbo", options: { steps: 12 } });
+    writeChoiceSetting("engines.image.tier.standard", "klein");
+    expect(getHouseholdSettingValue(slotKey("image", "standard"))).toMatchObject({ model: "flux2-klein-4b", options: { steps: 12 } });
   });
 });
 

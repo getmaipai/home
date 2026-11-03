@@ -6,13 +6,13 @@
 //   owner or admin on their own written screen                  all-ages: open; adult-only: locked until their unlock proof is valid
 //   other adult marked in `availability` (`adults` or `people`)  the same
 //   other adult not marked                                       hidden
-//   `generation.video.adult_adapters` is "restricted"            every adult-only video LoRA hidden for everyone, admins included
+//   `generation.styles.adult_only` is "restricted"               every adult-only style (picture or video) hidden for everyone, admins included
 //
 // A locked LoRA is one tile for the whole list (`lockedView`): no name, trigger words, add-ins, preview, hash, counts or ids.
 import { speakerAgeBand } from "@/lib/ageBand";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { lockState, lockedView, requestProof, type AdultProof } from "@/lib/adultLock";
-import { adultVideoAdaptersAllowed } from "@/lib/videos/policy";
+import { adultStylesAllowed } from "@/lib/pictures/policy";
 import { getLoraRecord, listLoraRecords, type Lora } from "@/lib/loras/store";
 import type { PersonRow } from "@/types";
 
@@ -36,7 +36,7 @@ export function loraAccess(person: PersonRow, lora: Lora, surface: LoraSurface =
   const admin = isOwnerOrAdmin(person);
   if (!admin && (lora.removed_at !== null || !availableTo(person, lora))) return "hidden";
   if (lora.audience === "all-ages") return "open";
-  if (lora.media === "video" && !adultVideoAdaptersAllowed()) return "hidden";
+  if (!adultStylesAllowed()) return "hidden";
   // The Adult lock decides locked or open (and hidden for a minor, which the first line already returned).
   return lockState({ ownerPersonId: person.id, madeAudience: "adult-only", lock: "on" }, person, proof);
 }

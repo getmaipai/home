@@ -42,9 +42,9 @@ describe("setup jobs", () => {
     const jobs = setupJobs(cardsFor(plan).cards, plan);
     const picks = defaultPicks(jobs, plan);
     const base = settingsFor(jobs, picks);
-    expect(base["generation.picture_quick_model"]).toBe("ernie");
+    expect(base["engines.image.tier.standard"]).toBe("ernie");
     expect(base["generation.music.enabled"]).toBe(false);
     expect(settingsFor(jobs, { ...picks, music: { on: true, choiceId: "music.make" } })["generation.music.enabled"]).toBe(true);
-    expect(settingsFor(jobs, { ...picks, videos: { on: true, choiceId: "videos.detailed" } })["generation.video_quality"]).toBe("detailed");
+    expect(settingsFor(jobs, { ...picks, videos: { on: true, choiceId: "videos.detailed" } })["generation.video_tier"]).toBe("boost");
   });
 });
