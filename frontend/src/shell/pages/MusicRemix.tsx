@@ -3,6 +3,7 @@
 // earlier version. Nothing is sent from a tile or a button on its own.
 import { useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
@@ -28,12 +29,10 @@ export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose:
       .catch((error: unknown) => setProblem(error instanceof Error && error.message ? error.message : "The remix could not start. Check your connection and try again."))
       .finally(() => setSending(false));
   };
-  return <div className="bg-card flex flex-col gap-4 rounded-2xl p-4" data-testid="music-remix-panel" role="region" aria-label="Remix this song">
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex flex-col gap-1"><h3 className="text-lg font-black tracking-wide uppercase">Remix {card.title ?? "this song"}</h3>
-        <p className="text-muted-foreground text-sm">Say what to change. You see the request before anything is made, and the earlier version is kept.</p></div>
-      <Button type="button" size="sm" variant="secondary" onClick={onClose}>Close</Button>
-    </div>
+  // A dialog, like every other edit form: wide enough to read the request, with room for the lyrics, and Escape or the X closes it.
+  return <Dialog open onOpenChange={(open) => { if (!open && !sending) onClose(); }}><DialogContent size="xl" scroll="viewport" data-testid="music-remix-panel" aria-label="Remix this song">
+    <DialogHeader><DialogTitle>Remix {card.title ?? "this song"}</DialogTitle>
+      <DialogDescription>Say what to change. You see the request before anything is made, and the earlier version is kept.</DialogDescription></DialogHeader>
     {reviewing ? <div className="flex flex-col gap-3" data-testid="music-remix-review">
       <p className="text-sm font-semibold">This is what will be made:</p>
       <p className="bg-muted/50 rounded-xl p-3 text-sm whitespace-pre-wrap">{change}</p>
@@ -48,12 +47,12 @@ export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose:
       <div className="flex flex-col gap-2" role="group" aria-label="Vocals"><span className="text-sm font-medium">Vocals</span>
         <div className="flex flex-wrap gap-2">{VOICES.map((one) => <Chip key={one.label} selected={voice === one.id} onClick={() => setVoice(one.id)}>{one.label}</Chip>)}</div></div>
       <div className="flex flex-col gap-1"><label htmlFor="remix-lyrics" className="text-sm font-medium">New lyrics (optional)</label>
-        <textarea id="remix-lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write the new words with [Verse] and [Chorus] tags, or leave this empty."
+        <textarea id="remix-lyrics" rows={8} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write the new words with [Verse] and [Chorus] tags, or leave this empty."
           className="bg-muted/40 placeholder:text-muted-foreground w-full resize-none rounded-xl p-3 text-sm font-normal outline-none" /></div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" disabled={!change} onClick={() => setReviewing(true)}>Review the remix</Button>
         {change ? null : <span className="text-muted-foreground text-xs">Fill in at least one thing to change.</span>}
       </div>
     </div>}
-  </div>;
+  </DialogContent></Dialog>;
 }

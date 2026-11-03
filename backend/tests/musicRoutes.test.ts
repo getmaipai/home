@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, people } from "@/db/schema";
+import { attachments, musicJobs, people } from "@/db/schema";
+import { nextHlc } from "@/lib/hlc";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, waitForMusic, LYRICS, testM4a } from "./musicFixture";
@@ -66,6 +67,17 @@ describe("music routes", () => {
     expect(await (await client.get("/api/music/jobs")).json()).toEqual([]);
     const row = db.select().from(attachments).where(eq(attachments.id, job.fileId!)).get()!;
     expect(row.deletedAt).not.toBeNull();
+  });
+  test("deleting a failed or stopped song, which has no file, removes it from the list", async () => {
+    const { actor, client } = await owner();
+    const now = new Date().toISOString();
+    for (const [id, state] of [["failed-song", "failed"], ["stopped-song", "cancelled"]] as const) {
+      db.insert(musicJobs).values({ id, personId: actor.id, conversationId: null, turnId: null, task: "text2music", request: JSON.stringify({ title: "Never made" }), state, progress: 0, createdAt: now, updatedAt: now, hlc: nextHlc() }).run();
+    }
+    expect((await (await client.get("/api/music/jobs")).json() as { id: string }[]).map((card) => card.id).sort()).toEqual(["failed-song", "stopped-song"]);
+    for (const id of ["failed-song", "stopped-song"]) expect((await client.post(`/api/music/jobs/${id}/delete`, {})).status).toBe(200);
+    expect(await (await client.get("/api/music/jobs")).json()).toEqual([]);
+    expect((await client.get("/api/music/jobs/failed-song")).status).toBe(404);
   });
   test("splits the shown song and shows its stems as one card that steps through them in order", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor);

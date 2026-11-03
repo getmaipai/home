@@ -349,7 +349,9 @@ musicRoutes.openapi(deleteSongRoute, async (c) => {
     const result = trashFile(actor, version.fileId);
     if (result.ok) { deleted += 1; trashUntil = result.value.trash_until; }
   }
-  if (deleted === 0) dropMusicJob(root);
+  // A song with no file (stopped or failed) has nothing for Trash to hold: remove its record, or it stays in the list after "Deleted".
+  if (deleted === 0 && !root.fileId) { dropMusicJob(root); db.delete(musicJobs).where(and(eq(musicJobs.id, root.id), eq(musicJobs.personId, actor.id))).run(); }
+  else if (deleted === 0 && !db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, root.fileId!), isNotNull(attachments.deletedAt))).get()) return c.json({ error: "That song could not be moved to Trash. Refresh the page and try again." }, 409) as never;
   return c.json({ deleted, trash_until: trashUntil }, 200);
 });
 const useRoute = createRoute({ method: "post", path: "/jobs/{id}/use", tags: ["Music"], summary: "Use a version for the next edit", middleware: viewMiddleware,
