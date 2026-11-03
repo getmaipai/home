@@ -292,7 +292,7 @@ describe("the Create page and the make action", () => {
 });
 
 describe("Create is adult-only; Browse is unchanged", () => {
-  const PAGES = ["create", "clips"];
+  const PAGES = ["create", "studio", "clips"];
   const appRow = async (client: TestClient) => ((await (await client.get("/api/apps")).json()) as Array<Record<string, any>>).find((row) => row.package === "videos")!;
   test("the create group, the Create header mode and the three pages are gone below adult", async () => {
     const { adult, teen, child } = await household();
