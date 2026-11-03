@@ -3,7 +3,7 @@
 // tokens through the `--track` custom property, so a track's color is one token and the bars carry no raw color.
 import { useEffect, useState, type CSSProperties } from "react";
 
-/** The peaks (0 to 1) of an audio file, `count` of them, or null while it decodes. `failed` is true when the file could not be read. */
+/** The peaks (0 to 1) of an audio file, `count` of them, or null while it decodes. `failed` is true when the file could not be decoded. */
 export function usePeaks(url: string | null, count = 160): { peaks: number[] | null; failed: boolean; seconds: number | null } {
   const [state, setState] = useState<{ url: string | null; peaks: number[] | null; failed: boolean; seconds: number | null }>({ url: null, peaks: null, failed: false, seconds: null });
   useEffect(() => {
