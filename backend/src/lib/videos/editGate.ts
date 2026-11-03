@@ -17,7 +17,7 @@ import { laneOf } from "@/lib/pictures/lane";
 import { isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { videoJobLockState } from "./lock";
 import { readVideoFile, type VideoJob } from "./jobs";
-import { allVideoAdapters } from "./adapters";
+import { getLoraRecord } from "@/lib/loras/store";
 import { videoRefusalFor, type VideoCallRefusal } from "./tool";
 import type { VideoAudience } from "./policy";
 import type { EditFile } from "./stackEdit";
@@ -64,7 +64,7 @@ export async function clipMarkOf(job: VideoJob): Promise<MarkSource> {
     return { madeAudience: "all-ages", lock: "off" };
   }
   if (job.request.adultOnly === true) return { madeAudience: "adult-only", lock: job.request.adultLock ?? "on" };
-  if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification)) return { madeAudience: "adult-only", lock: "off" };
+  if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => getLoraRecord(id)?.audience)) return { madeAudience: "adult-only", lock: "off" };
   return { madeAudience: "all-ages", lock: "off" };
 }
 

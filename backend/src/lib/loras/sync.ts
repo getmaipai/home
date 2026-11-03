@@ -8,7 +8,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people, videoAdapterPrefs } from "@/db/schema";
-import { deleteLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
+import { deleteLoraRecord, getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
+import { clipsUsingStyle } from "@/lib/loras/usage";
 import { StackVideoError, listVideoLoras, removeVideoLora, updateVideoLora, type StackVideoLora } from "@/lib/videos/stack";
 
 const SYNC_MS = 10_000;
@@ -110,10 +111,12 @@ async function run(): Promise<void> {
       } catch { /* a file that cannot be made a valid record stays unlisted, and so unusable: fail closed */ }
       continue;
     }
-    // The Stack owns the facts read from the bytes.
+    // The Stack owns the facts read from the bytes. Written from the record as it is NOW, not the snapshot above: an admin's edit made while an earlier file was
+    // being mirrored must not be written back over.
     const sha = String(s.sha256 ?? "").toLowerCase();
-    if (/^[a-f0-9]{64}$/.test(sha) && (sha !== have.file.sha256 || s.bytes !== have.file.bytes)) {
-      try { saveLora({ ...have, file: { ...have.file, sha256: sha, bytes: Math.min(4_294_967_296, Math.max(1, Math.floor(s.bytes || 1))) } }, "migration"); } catch { /* keep the old facts */ }
+    const current = getLoraRecord(s.id) ?? have;
+    if (/^[a-f0-9]{64}$/.test(sha) && (sha !== current.file.sha256 || s.bytes !== current.file.bytes)) {
+      try { saveLora({ ...current, file: { ...current.file, sha256: sha, bytes: Math.min(4_294_967_296, Math.max(1, Math.floor(s.bytes || 1))) } }, "migration"); } catch { /* keep the old facts */ }
     }
     // The Stack's own classification is the second lock, written by Home: a record that is adult-only is never all-ages there.
     if (have.audience === "adult-only" && s.classification === "all-ages") await updateVideoLora(s.id, { classification: "adult-only" }).catch(() => undefined);
@@ -122,6 +125,11 @@ async function run(): Promise<void> {
   const now = new Date().toISOString();
   for (const r of records.values()) {
     if (r.trash_until !== null && r.trash_until <= now) {
+      // Re-read: an admin may have restored it while an earlier file was being removed (a snapshot taken before the awaits would delete a restored style).
+      const live = getLoraRecord(r.id);
+      if (!live || live.trash_until === null || live.trash_until > now) continue;
+      // A clip being made with it right now keeps the style: the purge tries again on a later sync.
+      if (clipsUsingStyle(r.id, ["queued", "running"]).length > 0) continue;
       // The record goes only when the file is gone (or was already): a Stack that could not delete it keeps the record, and the purge tries again.
       const gone = await removeVideoLora(r.id).then(() => true, (error: unknown) => error instanceof StackVideoError && error.status === 404);
       if (gone) deleteLoraRecord(r.id);

@@ -2,17 +2,19 @@
 // writes through `saveLora` (validated, hlc and updated_at advanced) and, where the design note asks, writes an audit row with no content (`adult_mark_log`, item
 // id = the LoRA id). A source can only RAISE the audience; lowering it is `markAllAges`, an admin's explicit act.
 import { and, eq, like } from "drizzle-orm";
-import { db, sqlite } from "@/db";
+import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { lockItemOfProvenance } from "@/lib/adultLock";
 import { logMark, setItemLock } from "@/lib/adultMarks";
 import { getLoraRecord, saveLora, LoraWriteError, type Lora } from "@/lib/loras/store";
+import { clipsUsingStyle } from "@/lib/loras/usage";
 import { updateVideoLora } from "@/lib/videos/stack";
 import type { PersonRow } from "@/types";
 
 export const NOT_ADMIN_LINE = "Only an owner or admin can change styles.";
 export const NOT_HERE_LINE = "That style isn't in the library.";
+export const NOT_CONFIRMED_LINE = "Read the licence and confirm it first, then choose who can use this style.";
 export const TRASH_DAYS = 30;
 
 function must(admin: PersonRow): void {
@@ -43,6 +45,8 @@ export function patchLora(admin: PersonRow, id: string, patch: LoraPatch): Lora 
   if (patch.kind !== undefined) next.kind = patch.kind;
   if (patch.availability) {
     const who = patch.availability.who;
+    // The licence is read before anyone else may use the style (the old pending state kept it off for everyone until an admin had).
+    if (who !== "admins" && needsConfirmation(lora)) throw new LoraWriteError("invalid", NOT_CONFIRMED_LINE);
     next.availability = { who, people: who === "people" ? [...new Set(patch.availability.people ?? [])] : [] };
   }
   if (patch.strength) {
@@ -77,7 +81,7 @@ async function mirror(id: string, audience: Lora["audience"]): Promise<void> {
 
 /** Items already made with this LoRA that are not adult-only get the lock now (the creator's own cleared items are untouched, as the note says). */
 function lockItemsMadeWith(admin: PersonRow, loraId: string): void {
-  const rows = sqlite.query("SELECT files FROM video_jobs WHERE request LIKE ?").all(`%"${loraId}"%`) as Array<{ files: string }>;
+  const rows = clipsUsingStyle(loraId);
   for (const row of rows) {
     let files: Array<{ id?: unknown }> = [];
     try { files = JSON.parse(row.files) as Array<{ id?: unknown }>; } catch { continue; }

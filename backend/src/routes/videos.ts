@@ -20,9 +20,9 @@ import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
 import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, StackVideoError } from "@/lib/videos/stack";
-import { readLora, readLoras } from "@/lib/loras/access";
+import { loraAccess, readLora, readLoras } from "@/lib/loras/access";
 import { confirmLora, markAdultOnly, markAllAges, patchLora, removeLora } from "@/lib/loras/admin";
-import { LoraWriteError, getLoraRecord, saveLora } from "@/lib/loras/store";
+import { LoraWriteError, getLoraRecord, saveLora, type Lora } from "@/lib/loras/store";
 import { recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
@@ -525,6 +525,8 @@ videosRoutes.openapi(settingsRoute, async (c) => {
 });
 
 const adapterIdParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
+const LOCKED_STYLE_NAME = "Locked style";
+const adultOnlyHidden = (person: PersonRow, record: Lora): boolean => record.audience === "adult-only" && loraAccess(person, record, "own_written") !== "open";
 const NOT_IN_LIBRARY_LINE = "That style isn't in the library.";
 const adapterWire = (a: ReturnType<typeof adapterOfLora>) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at });
 const patchAdapterRoute = createRoute({
@@ -602,6 +604,9 @@ videosRoutes.openapi(addAdapterRoute, async (c) => {
     }
     dropVideoAdapterCache();
     const record = getLoraRecord(lora.id);
+    // An adult-only style is not described to an admin whose unlock proof is not valid (the id stays, so the page can refresh its list): no name, words, hash or link.
+    const shown = record && adultOnlyHidden(adder, record) ? { ...adapterWire(adapterOfLora(record)), name: LOCKED_STYLE_NAME, trigger_words: [], sha256: "", source_url: null } : null;
+    if (shown) return c.json(shown, 200);
     return c.json(record ? adapterWire(adapterOfLora(record)) : { id: lora.id, name: lora.name, classification: lora.classification, enabled: false, needs_confirmation: true, sha256: lora.sha256, base_model: lora.base_model, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at }, 200);
   } catch (error) {
     if (error instanceof StackVideoError) {

@@ -63,7 +63,10 @@ export function saveLora(lora: Lora, by: string): Lora {
   if (!shape.success) throw new LoraWriteError("invalid", `That style can't be saved: ${shape.error.issues[0]?.path.join(".") || "a value"} is not valid.`);
   const problems = validateLora(shape.data);
   if (problems.length > 0) throw new LoraWriteError("invalid", `That style can't be saved: ${problems[0]}.`);
-  const bad = notAdults(shape.data.availability.people);
+  // Only people NEWLY chosen are checked: someone already listed who has since been deleted or changed role must not block every later write (removing,
+  // marking, confirming). Readers still gate on the person's own age (access.ts), so a stale id grants nothing.
+  const already = new Set(getLoraRecord(shape.data.id)?.availability.people ?? []);
+  const bad = notAdults(shape.data.availability.people.filter((id) => !already.has(id)));
   if (bad.length > 0) throw new LoraWriteError("minor_in_people", MINOR_IN_PEOPLE_LINE);
   if (shape.data.removed_at === null) {
     const clash = db.select({ id: loras.id }).from(loras).where(eq(loras.sha256, shape.data.file.sha256)).all().find((row) => row.id !== shape.data.id && getLoraRecord(row.id)?.removed_at === null);
