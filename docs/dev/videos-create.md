@@ -145,6 +145,10 @@ The Videos package has a third Create page, `studio` (`pages/studio.json`, adult
 
 **Not built.** Extend and Redo from here (Max) are not drawn (VIDEO-STUDIO-11). Another take is drawn and greyed while the video engine is not ready.
 
+## Styles (VIDEO-LORA-09)
+
+The Style popover has two more sections after Look and Camera, **Styles** and **Characters**, and a **Strength** control (Less, Normal, More), built by `lib/videos/createStyles.ts` for the signed-in person (the page JSON holds none of it). The pieces, the rules and the limits are in [loras.md](loras.md), "Styles in Create and chat". In short: only styles the person may use are drawn; adult-only ones are one lock tile that opens the passcode dialog; at a level the Stack does not report LoRA-capable the controls are disabled with one plain line (Max for now); the make action takes `style`, `character` and `strength`; the prompt is built by `lib/videos/promptPlan.ts`.
+
 ## Audience floor
 
 An edit is never lower in audience than its sources. `clipAdultOnly` marks a source adult-only from its job flag, else from its Library note (a saved clip whose note does not say all-ages counts as adult-only). A song marked adult-only, or a voice line that screens as adult-only, also makes the edit adult-only. `startVideoEditJob` stores `request.adultOnly`, and the stored file's provenance carries `audience: "adult-only"`.

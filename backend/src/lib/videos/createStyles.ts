@@ -56,7 +56,8 @@ export function styleChips({ person, engine, offered }: StyleChipsInput): Array<
   const supported = styleTiersOf(engine);
   const reachable = supported.filter((t) => offered.includes(t));
   const gate = reachable.length > 0 ? { enabled_tiers: reachable, disabled_reason: styleDisabledLine(supported, offered) } : { disabled_reason: styleDisabledLine(supported, offered) };
-  const group = { variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", ...gate };
+  // `private`: the id of a style (an adult-only one included) never reaches the address, a link or the history.
+  const group = { variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", private: true, ...gate };
   const option = (lora: Lora) => ({ value: lora.id, label: cut(lora.name, 40), note: styleNote(lora) });
   const chips: Array<Record<string, unknown>> = [];
   if (styles.length > 0 || locked) chips.push({ state: "style", label: "Styles", ...group, ...(locked ? { locked: true } : {}), options: [{ value: "none", label: "No style" }, ...styles.slice(0, 23).map(option)] });

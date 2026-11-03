@@ -17,6 +17,7 @@ import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { household, unlock, unlockHeader } from "./fixtures/adultLock";
 import { putLora, secretLora } from "./fixtures/lora";
+import { editVideoArgs } from "@/lib/videos/editTool";
 import type { StackVideoLora } from "@/lib/videos/stack";
 import type { Lora } from "@/lib/loras/store";
 import type { PersonRow } from "@/types";
@@ -206,6 +207,17 @@ describe("chat tools: names, never ids", () => {
   });
 });
 
+describe("edit_video arguments", () => {
+  test("styles and strength are names and a word; three styles, an empty name and a made-up strength are refused", () => {
+    const ok = { clip: "latest", change: "remix" as const };
+    expect(editVideoArgs.safeParse({ ...ok, styles: ["Clay look"], strength: "more" }).success).toBe(true);
+    expect(editVideoArgs.safeParse({ ...ok, styles: [] }).success).toBe(true);
+    expect(editVideoArgs.safeParse({ ...ok, styles: ["a", "b", "c"] }).success).toBe(false);
+    expect(editVideoArgs.safeParse({ ...ok, styles: [""] }).success).toBe(false);
+    expect(editVideoArgs.safeParse({ ...ok, strength: "extreme" }).success).toBe(false);
+  });
+});
+
 describe("the Create page's style picker (served chips)", () => {
   type Chip = { state: string; label: string; options: Array<{ value: string; label: string; note?: string }>; locked?: boolean; enabled_tiers?: string[]; disabled_reason?: string; group?: string };
   function barOf(body: Array<Record<string, any>>): Record<string, any> | undefined {
@@ -234,6 +246,7 @@ describe("the Create page's style picker (served chips)", () => {
     expect(style.options.map((o) => o.label)).toEqual(["No style", "Clay look"]);
     expect(style.options[1]!.note).toBe("Looks like clay stop motion. Added for Clay look (2 phrases): claymation, soft studio light.");
     expect(style.locked).toBeUndefined();
+    expect((style as unknown as { private?: boolean }).private).toBe(true);
     const hero = putLora(row("Sage").id, { ...STYLE, name: "Rover the dog", kind: "character", availability: { who: "adults", people: [] } });
     stackHas(clay, hero);
     chips = await chipsOf(owner);
