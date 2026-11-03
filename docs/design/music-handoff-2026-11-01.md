@@ -7,7 +7,7 @@ what was found, decided, landed and left open so the next session starts where t
 
 | Thing | State |
 |---|---|
-| Radio fix (a station from any shelf plays) | On GitHub `main`, commit 8e8d5f024. Not in a release tag. Not on the live hub (the hub lacks it). Needs Jesse's word to ship. |
+| Radio and player fixes (2026-11-01, all on GitHub `main` and **live on the hub as sha-bf5027f**, no release tag) | (1) a station from any shelf plays (preview list merged, 8e8d5f024); (2) a station that cannot be found shows an Open Radio button; (3) a dropped live stream retries at 1, 2, 4 and 8 seconds and tells the person only after the fourth failure (`frontend/src/lib/media/liveReconnect.ts`); (4) stations from the Radio page (preview route) now count as live, so they get the retry, the error line, the song title and the live-edge rejoin (`radioLive.ts`); (5) pressing Play on the open station resumes it instead of navigating again (`playIsAlreadyOpen` in `mediaApps.ts`); (6) the per-host request pace was 6 then one per 5 s, which refused the hub's own HLS player after about ten seconds and caused minute-long starts and stalls; it is now about 2 a second for HLS and 1 connect a second for plain streams (`radioHls.ts`, `radioStream.ts`). Not measured on the live hub: ask Jesse how long a slow station takes now. |
 | Music design note (Listen and Create, bands and albums, own lyrics, chat tools and cards, leader benchmark, slices P1 and C1 to C10) | On GitHub `main` (latest d7de9ead5). Docs only, so nothing changed on the hub. |
 | Stem note section 10.7 (no age gate on stems) | On GitHub `main`, same landing. |
 | Proposed platform rule S7 (what an app can make, chat can ask for; creative apps split into Listen/Watch/View and Create) | NOT on `main`. On branch `wt/fair-heron-music-chat-cards-note` (commits c485fa2d1, e1bc56b28 and later), owner-approved 2026-11-01 in his words. It edits `RULES.md`, a safety surface, so the lander runs the sharded backend tests, and `main` has a failing test (`STT-SMARTTURN-01B`, `backend/tests/sttReopenNoSideEffects.test.ts`, "a cancelled first turn leaves no judge-eligible row", fails on a docs-only branch). Land S7 when `main` is green again. `chatTurn.test.ts` and `wyoming.test.ts` also failed in the lander but pass alone (load). |
@@ -105,6 +105,18 @@ Verdict: mostly the same plan, plus three useful additions. Details:
 
 Stations that write their own songs while the previous one plays, with save, previous, and a unique title, band and cover for every song:
 designed in [music-made-radio-2026-11-01.md](music-made-radio-2026-11-01.md) (architect APPROVED 2026-11-01, slice G1 after P1 and C1 to C5; verdict record `data-scratch/architect/MUSIC-STUDIO-01-G1.verdict`).
+
+## 5d. Standing rules from this session (memory files shared by sessions in this project)
+
+Ship every landed change to the live hub yourself (ship-home steps, `--before-green` when the watcher has no run) and never ask Jesse to approve a ship; no licence questions, waits or rejections; no age gates on features that make no content; no music scraping; benchmark the leaders before designing an app; chat can ask for anything Create makes (proposed rule S7, still on branch `wt/fair-heron-music-chat-cards-note`, waiting for a green `main`). A repeat `Play` or reconnect must never open extra streams.
+
+## 5e. Open items at the end of the session
+
+- Rule S7 not on `main` yet (see section 1).
+- Station start can still wait on a slow station server; the planned fix is a "Connecting..." state in the kit `Player` (commons first), and spending no hub pace budget when the same person re-requests the same station.
+- Player work left in P1: the Player's own "Reconnecting..." line, crossfade and gapless (spec key `audio.crossfade` first, then the shell), and a queue saved per person on the device.
+- R1 describe-what-you-want station search and G1 made radio (approved) come after P1 and C1 to C5.
+- `STT-SMARTTURN-01B` (`backend/tests/sttReopenNoSideEffects.test.ts`) was failing on `main`; not fixed here.
 
 ## 6. Practical notes for the next session
 
