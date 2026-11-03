@@ -69,6 +69,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/videos/pages/index.json` | videos | Videos |
 | `backend/packages/videos/pages/library.json` | videos | Library |
 | `backend/packages/videos/pages/search.json` | videos | Search |
+| `backend/packages/videos/pages/studio.json` | videos | Studio |
 | `backend/packages/videos/pages/watch-later.json` | videos | Watch later |
 | `backend/packages/videos/pages/watch.json` | videos | Watch |
 | `backend/packages/weather/pages/index.json` | weather | Weather |
@@ -193,7 +194,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
 | `frontend/src/shell/InstallStrip.tsx` | installTitle, InstallStrip |
 | `frontend/src/shell/MediaHubFrame.tsx` | MediaHubFrame |
-| `frontend/src/shell/MediaPickerDialog.tsx` | thumbUrlFor, MediaPickerBody |
+| `frontend/src/shell/MediaPickerDialog.tsx` | SAY_PREFIX, SAY_MAX_LENGTH, thumbUrlFor, MediaPickerBody, StudioPickerBody |
 | `frontend/src/shell/MediaPlayerRegistration.tsx` | chaptersWithEnds, audioKindOfApp, MediaPlayerRegistration |
 | `frontend/src/shell/MemoriesRedirect.tsx` | MemoriesRedirect, LegacyProfileMemoriesRedirect |
 | `frontend/src/shell/NotificationBell.tsx` | POLL_MS, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, useNotificationsQuery, usePendingNotificationCount, NotificationToaster |
@@ -994,6 +995,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, PENDING, allVideoAdapters, videoAdaptersFor, setVideoAdapterEnabled |
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
+| `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
+| `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
 | `backend/src/lib/videos/editPlan.ts` | MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL, MIN_JOIN_CLIPS, MAX_JOIN_CLIPS |
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_PICTURE_LINE, ALREADY_MAX_LINE |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
@@ -1011,6 +1014,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
+| `backend/src/lib/videos/studio.ts` | STUDIO_TITLE, STUDIO_NO_CLIP_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_SONG_LINE, STUDIO_SPEECH_LINE, STUDIO_SAY_LINE |
+| `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, STUDIO_EXPORT_LINE, studioRun, startStudioExport |
+| `backend/src/lib/videos/studioPlan.ts` | STUDIO_VIDEO_PIECES, STUDIO_AUDIO_PIECES, STUDIO_FILM_S, STUDIO_MIN_PIECE_S, studioPlanSchema, STUDIO_PLAN_LINE |
+| `backend/src/lib/videos/studioVoices.ts` | VOICE_TTL_MS, VOICES_PER_PERSON, estimatedSpeechSeconds, putStudioVoice, getStudioVoice, VOICE_REF_PREFIX |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
 | `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, isVisionAssetInstalled, areVisionAssetsInstalled, ensureVisionAssets |
