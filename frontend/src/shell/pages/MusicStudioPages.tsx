@@ -4,12 +4,13 @@
 // they save through the same routes as the edit tools, so a change made here or in chat is one change to one record.
 // A page cannot be a schema page: the schema has no node for an editor card, so (like the Now playing page) it is drawn here, inside
 // the app's own sidebar chrome. Pictures are made in chat, songs on the Make a song page; each page says so and opens chat with the right ask.
-import { useMemo, type ComponentProps, type ReactNode } from "react";
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Album, type AlbumPatch } from "@maipai/ui/src/elements/album";
 import { Band, type BandPatch } from "@maipai/ui/src/elements/band";
 import { SongStyleCard, type SongStylePatch } from "@maipai/ui/src/elements/song-style";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { MusicWorkspace, SongGallery, studioAddress, stemsAddress, remixAddress } from "./MusicWorkspacePage";
@@ -161,6 +162,7 @@ function PickSong({ adult, title, line, go }: { adult: boolean; title: string; l
 function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const card = useQuery({ queryKey: ["music-card", kind, id], queryFn: () => request<{ block: { props: Record<string, unknown> } }>(`/api/music/${COLLECTION[kind]}/${encodeURIComponent(id)}/card`), staleTime: 0 });
   const block = useMemo(() => ({ kind, provenance: `${PRODUCER[kind]}:${id}:-:-`, props: card.data?.block.props ?? {} }), [kind, id, card.data]);
   const band = useBandCard(block);
@@ -175,16 +177,19 @@ function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const PICTURE_ASK: Record<string, string> = { remake_portrait: "Draw a new picture of this band.", remake_logo: "Draw a new logo for this band.", remake_cover: "Make a new cover for this album." };
   const act = (action: string, detail?: Record<string, unknown>) => {
     const ask = PICTURE_ASK[action];
+    if (action === "discard" && !detail) { setConfirmingDiscard(true); return; }
     if (ask) navigate(`/chat?ask=${encodeURIComponent(`${ask}\n\nmaipai://music/${kind === "song_style" ? "style" : kind}/${id}`)}`);
     else { onAction("", action, detail); void queryClient.invalidateQueries({ queryKey: ["music-made"] }); }
   };
   const actions = kind === "band" ? ["make_album", "discard"] : kind === "album" ? ["play_all", "remake_cover", "discard"] : ["make_song", "discard"];
   const shared = { editable: props.editable !== false, defaultEditing: props.editable !== false };
   const footer = <p className="text-muted-foreground px-4 text-sm lg:px-0">Pictures are made in chat; songs are made on <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/create">Create</Link>. <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/creations">Back to My creations</Link></p>;
+  const discard = () => { setConfirmingDiscard(false); act("discard", {}); };
   return <Frame testId="music-edit" title={`Edit your ${NOUN[kind]}`} line="Every change keeps the earlier version, so nothing is lost." footer={footer}>
     {kind === "band" ? <Band {...(props as unknown as ComponentProps<typeof Band>)} actions={actions as never} {...shared} resolveImageSrc={bandImageSrc} onAction={(action) => act(action)} onEdit={(patch) => act("edit_band", { ...patch })} />
         : kind === "album" ? <Album {...(props as unknown as ComponentProps<typeof Album>)} actions={actions as never} {...shared} resolveImageSrc={bandImageSrc} onAction={(action) => act(action)} onPlayTrack={(mediaId) => act("play_track", { media_id: mediaId })} onEdit={(patch) => act("edit_album", { ...patch })} />
           : <SongStyleCard {...songStyleProps(props)} actions={actions as never} {...shared} onAction={(action) => act(action)} onEdit={(patch) => act("edit_song_style", { ...patch })} />}
+    {confirmingDiscard ? <DestructiveConfirm message={`Delete this ${NOUN[kind]}?`} detail="Every earlier version is kept, so it can be brought back." confirmLabel="Delete" busyLabel="Deleting" cancelLabel="Keep it" onConfirm={discard} onCancel={() => setConfirmingDiscard(false)} /> : null}
   </Frame>;
 }
 

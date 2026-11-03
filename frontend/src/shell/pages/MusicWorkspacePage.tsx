@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
@@ -137,7 +138,10 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
         <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(true)}>Delete song</Button>
       </div>
       {confirmingDelete ? <DestructiveConfirm message={`Delete ${song?.title ? `'${song.title}'` : "this song"}?`} detail="The song and all its versions move to Trash. You can bring them back from the Library for 30 days." confirmLabel="Delete song" busyLabel="Deleting" busy={deleting} cancelLabel="Keep it" onConfirm={removeSong} onCancel={() => setConfirmingDelete(false)} /> : null}
-      {remixing && song && ready ? <RemixSong card={song} onClose={() => setRemixing(false)} onSent={() => { void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); }} /> : null}
+      {remixing && song && ready ? <Dialog open onOpenChange={(open) => { if (!open) setRemixing(false); }}><DialogContent size="xl" scroll="viewport">
+        <DialogHeader><DialogTitle>Remix {song.title ?? "this song"}</DialogTitle><DialogDescription>Say what to change. You see the request before anything is made, and the earlier version is kept.</DialogDescription></DialogHeader>
+        <RemixSong card={song} onClose={() => setRemixing(false)} onSent={() => { void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); }} />
+      </DialogContent></Dialog> : null}
       <p className="text-muted-foreground text-xs">{reasonOff || `Stems: ${STEMS_LINE.replace("is not available", "may not be available")} ${COVER_SONG_LINE}`}</p>
     </div>
   </section>;

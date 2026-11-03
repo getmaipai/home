@@ -21,6 +21,8 @@ beforeEach(() => {
     if (url.startsWith("/api/music/status")) return Promise.resolve(Response.json({ can_make: engine, engine_ready: engine, limits: {} }));
     if (url.startsWith("/api/music/songs")) return Promise.resolve(Response.json({ ...song, id: "mus-new" }));
     if (url.includes("/revise")) return Promise.resolve(Response.json({ ...song, id: "mus-rev" }));
+    if (url.endsWith("/delete")) return Promise.resolve(Response.json({ deleted: 1, trash_until: null }));
+    if (url.startsWith("/api/music/jobs/mus-1")) return Promise.resolve(Response.json(song));
     if (url.startsWith("/api/music/jobs")) return Promise.resolve(Response.json([song]));
     return Promise.resolve(Response.json({}));
   }) as typeof fetch;
@@ -78,6 +80,22 @@ describe("Create controls", () => {
     const remix = await view.findByRole("link", { name: "Remix" });
     expect(remix.getAttribute("href")).toContain("remix=1");
     expect(remix.getAttribute("href")).not.toContain("/chat");
+  });
+});
+
+describe("Delete song", () => {
+  test("asks in a modal dialog first, and only the confirm button deletes", async () => {
+    const view = open("?song=mus-1");
+    fireEvent.click(await view.findByRole("button", { name: "Delete song" }));
+    const dialog = await view.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Neon Rain");
+    expect(calls.some((call) => call.url.endsWith("/delete"))).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
+    await waitFor(() => expect(view.queryByRole("alertdialog")).toBeNull());
+    expect(calls.some((call) => call.url.endsWith("/delete"))).toBe(false);
+    fireEvent.click(view.getByRole("button", { name: "Delete song" }));
+    fireEvent.click(within(await view.findByRole("alertdialog")).getByRole("button", { name: "Delete song" }));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/jobs/mus-1/delete" && call.method === "POST")).toBe(true));
   });
 });
 

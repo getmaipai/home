@@ -3,7 +3,6 @@
 // earlier version. Nothing is sent from a tile or a button on its own.
 import { useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
@@ -29,10 +28,8 @@ export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose:
       .catch((error: unknown) => setProblem(error instanceof Error && error.message ? error.message : "The remix could not start. Check your connection and try again."))
       .finally(() => setSending(false));
   };
-  // A dialog, like every other edit form: wide enough to read the request, with room for the lyrics, and Escape or the X closes it.
-  return <Dialog open onOpenChange={(open) => { if (!open && !sending) onClose(); }}><DialogContent size="xl" scroll="viewport" data-testid="music-remix-panel" aria-label="Remix this song">
-    <DialogHeader><DialogTitle>Remix {card.title ?? "this song"}</DialogTitle>
-      <DialogDescription>Say what to change. You see the request before anything is made, and the earlier version is kept.</DialogDescription></DialogHeader>
+  // The body of the Remix dialog (the dialog itself is drawn by the song page): wide, with room for the lyrics.
+  return <div className="flex flex-col gap-4" data-testid="music-remix-panel" role="region" aria-label="Remix this song">
     {reviewing ? <div className="flex flex-col gap-3" data-testid="music-remix-review">
       <p className="text-sm font-semibold">This is what will be made:</p>
       <p className="bg-muted/50 rounded-xl p-3 text-sm whitespace-pre-wrap">{change}</p>
@@ -54,5 +51,5 @@ export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose:
         {change ? null : <span className="text-muted-foreground text-xs">Fill in at least one thing to change.</span>}
       </div>
     </div>}
-  </DialogContent></Dialog>;
+  </div>;
 }
