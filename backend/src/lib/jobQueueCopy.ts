@@ -48,15 +48,15 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
   },
   // MEM-RETRY-01: the computer's watchdog stopped the job to keep chat working; Home starts it again by itself. No resource words for people.
   requeued_memory: {
-    adult: "The computer got too busy, so your video stopped. It will start again by itself.",
-    child: "The computer got busy. Your video will start again by itself.",
+    adult: "Your video stopped for a moment so chat could keep going. It will start again by itself.",
+    child: "Your video will start again by itself.",
   },
   low_memory_failure: {
     adult: "The job stopped before it finished. Try again in a few minutes.",
     child: "The job stopped. Try again later.",
   },
   memory_stopped_failure: {
-    adult: "The computer stayed too busy, so your video could not finish. Try again in a few minutes.",
+    adult: "Your video could not finish. Try again in a few minutes.",
     child: "The video could not finish. Try again later.",
   },
   started: { adult: "Starting.", child: "Starting now." },
