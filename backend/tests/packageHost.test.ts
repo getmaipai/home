@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
+import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __setEmptyRetryDelayForTests, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests, __setRateLimiterClockForTests, tryConsume } from "@/lib/rateLimiter";
 import { cachedFetch, getCacheEnvelope, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -44,6 +44,8 @@ beforeEach(() => {
   __resetPackageQuietWindowsForTests();
   __resetSearchCacheForTests();
   __resetSearchRotationForTests();
+  // SEARCH-EMPTY-FAST-01: an empty answer now waits 0.4 to 1.5 s (jittered) before its one retry; no test here wants that wait.
+  __setEmptyRetryDelayForTests(0);
 });
 
 const testWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
@@ -55,6 +57,7 @@ const testWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
 afterEach(async () => {
   if (testWikipediaBaseUrl !== undefined) process.env.MAIPAI_WIKIPEDIA_BASE_URL = testWikipediaBaseUrl;
   await __drainBackgroundWorkForTests();
+  __setEmptyRetryDelayForTests(null);
 });
 
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
@@ -2721,7 +2724,8 @@ describe("search engine choice: three engines ranked by recent health (THIN-GROU
     const fake = fakeSearxng(() => ({ results: [], unresponsive_engines: ["alpha", "bravo", "charlie", "delta"].map((e) => [e, "Suspended: too many requests"]) }));
     try {
       const result = await searxngSearch({ query: "juniper" }, { speakerBand: "adult" });
-      expect(fake.asked).toHaveLength(1);
+      // The first ask benches all four; SEARCH-EMPTY-FAST-01 then asks once more, bench ignored, before the Wikipedia fallback answers.
+      expect(fake.asked).toHaveLength(2);
       expect(result.rows[0]!.title).toBe("Juniper (topic)");
     } finally {
       if (previous === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
