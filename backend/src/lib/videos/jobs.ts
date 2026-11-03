@@ -63,7 +63,7 @@ export interface VideoRequest {
   /** TIER-WIRE-01: the resource tier the job is queued at (absent: Standard). The household queue reads it with `requestTier`. */
   tier?: "boost" | "max";
   /** VIDEO-CREATE-01 (V1b): what the Create page added to the words (ids from recipes.ts) and the one plain line it showed, so Another take repeats the choices. */
-  create?: { recipe?: string; look?: string; voices?: string; note?: string };
+  create?: { recipe?: string; look?: string; voices?: string; /** VIDEO-LORA-09: Less, Normal or More, kept so a new take of the clip uses the same strength. */ strength?: "less" | "normal" | "more"; note?: string };
   /** VIDEO-CHAT-01 (C3, C4): set on a clip made by editing others (trim, join, mix): the job it came from (the first clip of a join) and what was done. The old clips stay. */
   /** Set when the clip is stored: it is adult-only (its words, style or sources), so an edit of it never goes lower. */
   adultOnly?: boolean;

@@ -106,11 +106,26 @@
         "grounded": false,
         "description": "Optional level: standard, boost or max. Leave it out for almost every request; Home then uses the household's setting. Use boost when the person wants a better one, or, on a computer where Standard has no sound, wants people to speak, wants sound or music, or wants more than 5 seconds. Use max only when they ask for max quality or the biggest model; it is for people an admin allowed, and if it is not allowed the tool says so and you tell the person in your own words. Use standard for \"just a quick one\", for a longer clip with sound when the tool allows it, or when they want it to start from a picture. Do not use it for age or content reasons."
       },
-      "style": {
-        "type": "string",
-        "maxLength": 80,
+      "styles": {
+        "type": "array",
+        "maxItems": 2,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
         "grounded": false,
-        "description": "Optional. The name of one of the household's saved video styles, only when the person names it. Leave it out otherwise; never invent one."
+        "description": "Optional. The names of up to two of the person's saved video styles, only when the person names one or asks for that look in a way a listed style matches. Leave it out otherwise; never invent a name."
+      },
+      "strength": {
+        "type": "string",
+        "enum": [
+          "less",
+          "normal",
+          "more"
+        ],
+        "grounded": false,
+        "description": "Optional. How strongly the styles apply: less, normal or more. Set it only when the person asks for a lighter or stronger style."
       }
     }
   },

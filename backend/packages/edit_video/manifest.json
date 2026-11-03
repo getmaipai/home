@@ -210,6 +210,27 @@
         "maximum": 1.0,
         "grounded": false,
         "description": "For join with crossfade: how long each blend lasts in seconds, 0.3 to 1. Leave it out for half a second."
+      },
+      "styles": {
+        "type": "array",
+        "maxItems": 2,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "grounded": false,
+        "description": "Optional, for another_take, remix and continue. The names of up to two of the person's saved video styles, only when the person names one; an empty list takes the style off. Left out, the new video keeps the first one's style. Never invent a name."
+      },
+      "strength": {
+        "type": "string",
+        "enum": [
+          "less",
+          "normal",
+          "more"
+        ],
+        "grounded": false,
+        "description": "Optional. How strongly the styles apply: less, normal or more. Set it only when the person asks for a lighter or stronger style."
       }
     }
   },

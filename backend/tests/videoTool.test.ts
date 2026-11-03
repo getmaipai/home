@@ -175,7 +175,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const sent = fake.submitted[0]!;
       expect(sent.size).toBe("480x832");
       expect(sent.seconds).toBe(3);
-      expect(sent.prompt).toBe("a street fair, HST style");
+      expect(sent.prompt).toBe("HST style, a street fair");
       expect(sent.loras).toEqual([{ id: "lora-1111111111111111", strength: 1 }]);
     });
   });

@@ -10,12 +10,15 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { laneOf } from "@/lib/pictures/lane";
 import { videoDenial, VIDEO_DENIAL_LINE, type VideoAudience } from "./policy";
 import { loadLibraryPicture } from "./jobs";
+import { LOCKED_START_LINE } from "./lock";
+import { resolveStyles, strengthWord } from "./styleChoice";
+import type { StyleStrength } from "./promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
 
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
 export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off" }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
@@ -70,6 +73,16 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     if (!videoRecipeFor(camera)) return { ok: false, error: "That camera move is not in the list. Use a name from the list on this page, or leave it empty." };
     body.recipe = camera;
   }
+  // VIDEO-LORA-09: the picker sends style ids (a list, or a comma-separated text from a plain form) and Less, Normal or More. Which ids are real and allowed is decided later, never here.
+  const styleList = Array.isArray(raw.styles) ? raw.styles : typeof raw.styles === "string" ? raw.styles.split(",") : [];
+  const styles = [...new Set(styleList.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter((v) => v !== "" && !/^\{[a-z_]+\}$/.test(v)))];
+  if (styles.length > 2) return { ok: false, error: "Two styles at a time is the most. Pick one or two, then try again." };
+  if (styles.some((id) => id.length > 80)) return { ok: false, error: "That style isn't available any more. Choose another style, or make the video without one." };
+  if (styles.length > 0) {
+    body.styles = styles;
+    const strength = strengthWord(raw.strength);
+    if (strength) body.strength = strength;
+  }
   // An empty Picture slot leaves `{start_frame}` in place, which `notGiven` already turned into "".
   const startFrame = typeof raw.start_frame === "string" ? raw.start_frame.trim() : "";
   if (startFrame) {
@@ -103,9 +116,15 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
     }
     startFrame = { id: photo.id, base64: photo.base64, width, height };
   }
+  // VIDEO-LORA-09: a style the person may not use, a locked one and a missing one each stop the clip here with one plain line, before anything is read or started.
+  if (body.styles && body.styles.length > 0) {
+    const styled = await resolveStyles({ audience, ids: body.styles });
+    if (!styled.ok) return styled.locked ? { ok: false, status: 403, error: LOCKED_START_LINE, code: "locked" } : { ok: false, status: 422, error: styled.line, code: styled.code };
+  }
   const outcome = await runGenerateVideo({
+    ...(body.styles && body.styles.length > 0 ? { styleIds: body.styles } : {}),
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.prompt, ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}) },
+    args: { prompt: body.prompt, ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}) },
     callId: context.callId ?? "make", spoken: false, audience, ...(context.adultOnly ? { adultOnly: true, ...(context.adultLock ? { adultLock: context.adultLock } : {}) } : {}), ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
@@ -140,6 +159,8 @@ export function bodyOfVideoJob(source: VideoJob): MakeVideoBody {
     ...(kept.recipe ? { recipe: kept.recipe } : {}),
     ...(kept.look ? { look: kept.look } : {}),
     ...(kept.voices ? { voices: kept.voices } : {}),
+    // VIDEO-LORA-09: Another take, Remix, Make it Max and continue keep the clip's styles ("Continuing in the same style"); a style that is gone stops the new clip with a plain line.
+    ...(source.request.loras.length > 0 ? { styles: [...source.request.loras], ...(kept.strength ? { strength: kept.strength } : {}) } : {}),
   };
 }
 
