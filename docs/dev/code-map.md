@@ -174,7 +174,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/styles/StyleAddFile.tsx` | StyleAddFile |
 | `frontend/src/apps/settings/styles/StyleBrowser.tsx` | browseProblem, StyleBrowser |
 | `frontend/src/apps/settings/styles/StyleConfirm.tsx` | StyleConfirm, licenceIsOpen |
-| `frontend/src/apps/settings/styles/StyleEditor.tsx` | StyleEditor |
+| `frontend/src/apps/settings/styles/StyleEditor.tsx` | tryStyleState, StyleEditor |
 | `frontend/src/apps/settings/styles/StylesTab.tsx` | StylesTab |
 | `frontend/src/apps/settings/styles/stylesShared.tsx` | STYLES_COPY_DEFAULTS, stylesCopy, messageOf, sizeWords, whatItIs, adultCheckLine |
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
@@ -1013,9 +1013,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, adapterOfLora, allVideoAdapters, loraSurfaceOf, videoAdaptersFor |
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
+| `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
 | `backend/src/lib/videos/editPlan.ts` | MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL, MIN_JOIN_CLIPS, MAX_JOIN_CLIPS |
-| `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_PICTURE_LINE, ALREADY_MAX_LINE |
+| `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_STYLE_LINE, NO_PICTURE_LINE |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob |
@@ -1025,6 +1026,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
+| `backend/src/lib/videos/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
@@ -1036,6 +1038,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, STUDIO_EXPORT_LINE, studioRun, startStudioExport |
 | `backend/src/lib/videos/studioPlan.ts` | STUDIO_VIDEO_PIECES, STUDIO_AUDIO_PIECES, STUDIO_FILM_S, STUDIO_MIN_PIECE_S, studioPlanSchema, STUDIO_PLAN_LINE |
 | `backend/src/lib/videos/studioVoices.ts` | VOICE_TTL_MS, VOICES_PER_PERSON, estimatedSpeechSeconds, putStudioVoice, getStudioVoice, VOICE_REF_PREFIX |
+| `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, STYLES_NEED_MAX_LINE, strengthWord, styleNamesOf |
+| `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
 | `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, isVisionAssetInstalled, areVisionAssetsInstalled, ensureVisionAssets |

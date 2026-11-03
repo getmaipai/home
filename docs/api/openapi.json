@@ -62058,6 +62058,25 @@
                     "minLength": 1,
                     "maxLength": 200,
                     "description": "The id of a picture in your own Library; the video starts from it (404 when it is not yours)."
+                  },
+                  "styles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "maxItems": 2,
+                    "description": "The ids of up to two styles from `/api/loras/available`, at most one character. Each is checked against what you may use; a style that is locked, gone or not yours stops the clip with one plain line."
+                  },
+                  "strength": {
+                    "type": "string",
+                    "enum": [
+                      "less",
+                      "normal",
+                      "more"
+                    ],
+                    "description": "How strongly the styles apply (0.75, 1 or 1.25 of each style's own default, held to its range)."
                   }
                 },
                 "required": [
