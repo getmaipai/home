@@ -18,6 +18,7 @@ import { attachments, conversations } from "@/db/schema";
 import { musicJobs, people } from "@/db/schema";
 import { musicVersions, getMusicJobFor } from "@/lib/music/jobs";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
+import { timedLyricsFor, type TimedWordLine } from "@/lib/music/timedWords";
 import { canAccessFile } from "@/lib/access";
 
 export const filesRoutes = apiRouter();
@@ -70,7 +71,7 @@ const getRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { params: idParamSchema("id", "file-a1b2c3") },
   responses: {
-    200: { content: { "application/json": { schema: FileSchema.extend({ chat_id: z.string().nullable().optional(), turn_id: z.string().nullable().optional(), chat_title: z.string().nullable().optional(), chat_deleted: z.boolean().optional(), music: z.object({ id: z.string(), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(), cover_url: z.string().nullable(), versions: z.array(z.object({ id: z.string(), label: z.string(), url: z.string() })), current_id: z.string().nullable(), owner: z.boolean() }).optional() }) } }, description: "Found. Chat provenance is included only for the file owner. Home-made song player data follows file access." },
+    200: { content: { "application/json": { schema: FileSchema.extend({ chat_id: z.string().nullable().optional(), turn_id: z.string().nullable().optional(), chat_title: z.string().nullable().optional(), chat_deleted: z.boolean().optional(), music: z.object({ id: z.string(), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable(), words: z.array(z.object({ t: z.number(), end: z.number(), text: z.string() })).optional() })).nullable(), cover_url: z.string().nullable(), versions: z.array(z.object({ id: z.string(), label: z.string(), url: z.string() })), current_id: z.string().nullable(), owner: z.boolean() }).optional() }) } }, description: "Found. Chat provenance is included only for the file owner. Home-made song player data follows file access." },
     ...errorResponses({ 401: "Not signed in", 404: "No such file, or not shared with you" }),
   },
 });
@@ -79,7 +80,7 @@ filesRoutes.openapi(getRoute, (c) => {
   const result = getAttachment(actor, c.req.valid("param").id);
   if (!result.ok) return c.json({ error: result.error }, 404);
   const songRow = db.select().from(musicJobs).where(eq(musicJobs.fileId, c.req.valid("param").id)).get();
-  let music: { id: string; title: string | null; description: string | null; lyrics: string | null; timed_lyrics: { t: number; line: string; section: string | null }[] | null; cover_url: string | null; versions: { id: string; label: string; url: string }[]; current_id: string | null; owner: boolean } | undefined;
+  let music: { id: string; title: string | null; description: string | null; lyrics: string | null; timed_lyrics: TimedWordLine[] | null; cover_url: string | null; versions: { id: string; label: string; url: string }[]; current_id: string | null; owner: boolean } | undefined;
   if (songRow && songRow.state === "done") {
     const ownerPerson = db.select().from(people).where(eq(people.id, songRow.personId)).get();
     const root = ownerPerson ? getMusicJobFor(ownerPerson, songRow.id) : null;
@@ -96,7 +97,7 @@ filesRoutes.openapi(getRoute, (c) => {
       music = {
         id: root.id, title: (current?.request.title ?? request.title) ?? null, description: (current?.request.description ?? request.description) ?? null,
         lyrics,
-        timed_lyrics: current?.lrc && !current.request.instrumental ? sungLyricsFromLrc(current.lrc, current.durationS).map(({ t, line, section }) => ({ t, line, section })) : null,
+        timed_lyrics: current ? timedLyricsFor(current) : null,
         cover_url: (current?.coverFileId ?? root.coverFileId) ? `/api/files/${songRow.fileId}/thumb?w=640` : null,
         versions: versions.map((version, index) => ({ id: version.fileId!, label: `Version ${index + 1}`, url: `/api/files/${version.fileId}/content` })),
         current_id: current?.fileId ?? songRow.fileId, owner: actor.id === ownerPerson.id,

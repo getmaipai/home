@@ -234,6 +234,22 @@ describe("MusicToolRender", () => {
     expect(view.container.querySelector("audio")!.currentTime).toBe(5);
   });
 
+  test("timed lines that carry words reach the kit, which wipes the highlight word by word (MUSIC-GEN-20b)", async () => {
+    card = done({ timed_lyrics: [
+      { t: 1, line: "Morning light", section: "Verse", words: [{ t: 1, end: 1.4, text: "Morning" }, { t: 1.5, end: 2, text: "light" }] },
+      { t: 5, line: "Pancakes rise", section: "Chorus" },
+    ] });
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    const audio = view.container.querySelector("audio")!;
+    Object.defineProperty(audio, "duration", { configurable: true, value: 10 });
+    fireEvent.click(view.getByRole("button", { name: "Lyrics" }));
+    await view.findByRole("button", { name: "Morning light" });
+    audio.currentTime = 1.2; fireEvent.timeUpdate(audio);
+    await waitFor(() => expect([...view.container.querySelectorAll("[data-word]")].map(span => span.textContent)).toEqual(["Morning", "light"]));
+    expect(view.getByRole("button", { name: "Pancakes rise" }).querySelector("[data-word]")).toBeNull();
+  });
+
   test("an instrumental has no lyrics disclosure", async () => {
     card = done({ lyrics: "[Instrumental]" });
     const view = mount();

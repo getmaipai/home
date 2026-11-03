@@ -98,3 +98,45 @@ export async function fetchStem(url: string): Promise<Uint8Array> {
   const path = `${parsed.pathname}${parsed.search}`;
   return new Uint8Array(await (await checked(await request(path, {}, 120_000))).arrayBuffer());
 }
+
+/** MUSIC-GEN-20b: per-word lyric timing (`POST /v1/audio/align`). Lyrics and source bytes travel only in bodies; errors carry a code and counts, never words. */
+export interface StackAlignWord { t: number; end: number; text: string }
+export interface StackAlignData { words: StackAlignWord[]; aligned_words: number; total_words: number; line_starts: number[] }
+export interface StackAlignJob { state: MusicState; code?: string | null; data?: StackAlignData | null }
+/** The Stack's longest alignable song. */
+export const ALIGN_MAX_SECONDS = 240;
+function alignData(value: unknown): StackAlignData | null {
+  const data = value as Partial<StackAlignData> | null | undefined;
+  if (!data || !Array.isArray(data.words) || !Array.isArray(data.line_starts)) return null;
+  const words = data.words.filter((w): w is StackAlignWord => !!w && Number.isFinite(w.t) && Number.isFinite(w.end) && typeof w.text === "string");
+  if (words.length !== data.words.length) return null;
+  return { words, aligned_words: Number(data.aligned_words) || words.length, total_words: Number(data.total_words) || words.length, line_starts: data.line_starts.map((n) => Number.isInteger(n) ? n : -1) };
+}
+export async function submitAlign(source: string, source_sha256: string, lyrics: string, origin: "made_here" | "owned_file" = "made_here", waitMs = 1): Promise<{ job: string; done: StackAlignData | null }> {
+  const res = await checked(await request("/v1/audio/align", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, lyrics, origin, timeout_ms: waitMs }) }, 120_000));
+  const parsed = await res.json() as { job?: string; data?: unknown };
+  if (!parsed.job) throw new StackMusicError(502, "bad_reply");
+  return { job: parsed.job, done: res.status === 200 ? alignData(parsed.data) : null };
+}
+export async function getAlignJob(job: string): Promise<StackAlignJob> {
+  const body = await (await checked(await request(`/v1/audio/align/${encodeURIComponent(job)}`))).json() as { state?: string; code?: string | null; data?: unknown };
+  return { state: (body.state ?? "failed") as MusicState, code: body.code ?? null, data: alignData(body.data) };
+}
+export async function deleteAlign(job: string): Promise<void> {
+  try { await (await request(`/v1/audio/align/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* the Stack holds the newest twelve only */ }
+}
+/** Submit, then poll until done: the timed words, or null when the Stack finished with none. Throws StackMusicError (code only) on a refusal or failure. */
+export async function alignSong(source: string, source_sha256: string, lyrics: string, opts: { pollMs?: number; maxMs?: number; signal?: AbortSignal } = {}): Promise<StackAlignData | null> {
+  const { job, done } = await submitAlign(source, source_sha256, lyrics);
+  if (done) { await deleteAlign(job); return done; }
+  const deadline = Date.now() + (opts.maxMs ?? 15 * 60_000);
+  try {
+    while (Date.now() < deadline && !opts.signal?.aborted) {
+      await new Promise((resolve) => setTimeout(resolve, opts.pollMs ?? 2000));
+      const status = await getAlignJob(job);
+      if (status.state === "done") return status.data ?? null;
+      if (status.state === "failed" || status.state === "cancelled") throw new StackMusicError(500, status.code ?? "failed");
+    }
+    throw new StackMusicError(504, "timeout");
+  } finally { await deleteAlign(job); }
+}

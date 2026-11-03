@@ -631,7 +631,7 @@ export interface LibraryItem {
 }
 export interface LibrarySongDetails {
   id: string; title: string | null; description: string | null; lyrics: string | null;
-  timed_lyrics: { t: number; line: string; section: string | null }[] | null; cover_url: string | null;
+  timed_lyrics: { t: number; line: string; section: string | null; words?: { t: number; end: number; text: string }[] }[] | null; cover_url: string | null;
   versions: { id: string; label: string; url: string }[]; current_id: string | null; owner: boolean;
 }
 export type FileRecordWithChat = FileRecord & { chat_id?: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean; music?: LibrarySongDetails };

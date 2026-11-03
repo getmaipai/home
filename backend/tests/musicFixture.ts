@@ -1,6 +1,7 @@
 // A fetch-only Stack stand-in. No music service, audio encoder or model is started.
 import { __setMusicFetchForTests, type MusicBody, type StackMusicJob } from "@/lib/music/stack";
 import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
+import { __resetWordTimingForTests, __setAlignPollMsForTests } from "@/lib/music/timedWords";
 import { __resetMusicJobsForTests, __setMusicPollMsForTests } from "@/lib/music/jobs";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
@@ -20,9 +21,14 @@ export function installFakeMusicStack() {
     lrc: LRC as string | ((seconds: number) => string),
     immediate: false, queued: false, model: "ace-step-1-5-turbo" as string | undefined, beforeSubmit: undefined as (() => Promise<void>) | undefined,
     stems: false,
-    restore() { __setMusicFetchForTests(null); __setMusicStatusForTests(undefined); __setMusicPollMsForTests(null); __resetMusicJobsForTests(); },
+    /** MUSIC-GEN-20b: the Stack's `align` task. `installed` false answers 503 not_installed; `mode` "async" answers 202 and finishes on the second poll; `reply` builds the data from the sent lyrics. */
+    align: { installed: true, mode: "sync" as "sync" | "async" | "fail", submitted: [] as { lyrics: string; origin?: string; bytes: number }[], deleted: 0,
+      reply: ((lyrics: string) => { const lines = lyrics.split("\n"); const words: { t: number; end: number; text: string }[] = []; const line_starts: number[] = [];
+        lines.forEach((line, i) => { line_starts.push(words.length); line.split(/\s+/).forEach((text, k) => words.push({ t: 1 + i * 5 + k * 0.5, end: 1 + i * 5 + k * 0.5 + 0.4, text })); });
+        return { words, aligned_words: words.length, total_words: words.length, line_starts }; }) as (lyrics: string) => unknown, polls: 0 },
+    restore() { __resetWordTimingForTests(); __setAlignPollMsForTests(null); __setMusicFetchForTests(null); __setMusicStatusForTests(undefined); __setMusicPollMsForTests(null); __resetMusicJobsForTests(); },
   };
-  __resetMusicJobsForTests(); __setMusicPollMsForTests(2); __setMusicStatusForTests(readyMusicStatusForTests());
+  __resetMusicJobsForTests(); __resetWordTimingForTests(); __setAlignPollMsForTests(2); __setMusicPollMsForTests(2); __setMusicStatusForTests(readyMusicStatusForTests());
   __setMusicFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url).pathname;
     const method = init?.method ?? "GET";
@@ -33,6 +39,18 @@ export function installFakeMusicStack() {
     if (path === "/v1/audio/stems/stems-job") {
       const polls = (fake.polls.get("stems-job") ?? 0) + 1; fake.polls.set("stems-job", polls);
       return json(polls >= fake.pollsToFinish ? { state: "done", data: [{ url: "/v1/audio/stems/vocals.m4a", stem: "vocals" }, { url: "/v1/audio/stems/drums.m4a", stem: "drums" }] } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
+    }
+    if (path === "/v1/audio/align" && method === "POST") {
+      const body = JSON.parse(String(init?.body)) as { source: string; lyrics: string; origin?: string };
+      if (!fake.align.installed) return json({ error: "Install the lyric timing model.", code: "not_installed" }, 503);
+      fake.align.submitted.push({ lyrics: body.lyrics, origin: body.origin, bytes: Buffer.from(body.source, "base64").length }); fake.align.polls = 0;
+      return fake.align.mode === "async" || fake.align.mode === "fail" ? json({ created: 1, job: "align-job", data: null }, 202) : json({ created: 1, job: "align-job", data: fake.align.reply(body.lyrics) });
+    }
+    if (path === "/v1/audio/align/align-job") {
+      if (method === "DELETE") { fake.align.deleted++; return json({ job: "align-job", state: "deleted" }); }
+      fake.align.polls++;
+      if (fake.align.mode === "fail") return json({ job: "align-job", state: "failed", code: "failed", data: null });
+      return json({ job: "align-job", state: fake.align.polls >= 2 ? "done" : "running", data: fake.align.polls >= 2 ? fake.align.reply(fake.align.submitted.at(-1)!.lyrics) : null });
     }
     if (path === "/v1/audio/music" && method === "POST") {
       const body = JSON.parse(String(init?.body)) as MusicBody;

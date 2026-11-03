@@ -14,6 +14,7 @@ import { musicEngineStatus } from "./ready";
 import { prepareMusicEdit } from "./tool";
 import { sungLyricsFromLrc } from "./sections";
 import { startSongCover } from "./cover";
+import { startWordTiming } from "./timedWords";
 import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { m4aSeconds } from "./m4a";
@@ -153,7 +154,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
     id: newMusicJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, task: input.task, request: input.request,
     stackJob: null, state: "queued", stage: "queued", progress: 0, etaSeconds: null, position: null,
     coverJobId: null, coverFileId: null, errorCode: null, errorLine: null, fileId: null, parentFileId: input.parentFileId ?? null,
-    seed: null, durationS: null, lrc: null, chosenAt: null, createdAt: now, updatedAt: now, temporary: input.temporary,
+    seed: null, durationS: null, lrc: null, timedWords: null, chosenAt: null, createdAt: now, updatedAt: now, temporary: input.temporary,
   };
   (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody = input.body;
   // Reserve before the network await: forgetting the turn during submit can abort admission too.
@@ -267,6 +268,8 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
   void startSongCover(actor, job).catch(() => {});
+  // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
+  void startWordTiming(job, bytes).catch(() => {});
 }
 async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
   if (!stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "bad_reply"); return; }

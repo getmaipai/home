@@ -8,6 +8,8 @@ keep it in Liked.
 
 On Now playing, you can see the song title, creator and date. Songs made at home can be shared with people in your home. Choose **Private** or **Shared** to change who can listen. Only the owner or an admin can change sharing. Children cannot share songs.
 
+When Home makes a song with words, it listens to the finished song and times every word. The highlight follows each word as it is sung, not only each line. This happens on your own home server a moment after the song is ready. Until then, and for any song it cannot time, the highlight follows each line.
+
 A song made in chat can be split into its parts. Open the song card and choose **Stems**, or ask in chat to split it. You get four tracks: Vocals, Drums, Bass and Other. Use Next to step through them. It takes about a minute and happens on your own home server. You can also split an audio file of your own. Open it in Library, then choose **Split into stems**. Stems stay on this home server, and splitting does not make a voice. Adults only.
 
 Radio uses songs from your library only. It looks for the same artist, album artist, kind of music and decade. It does not

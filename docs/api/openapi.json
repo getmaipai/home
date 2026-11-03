@@ -53913,6 +53913,28 @@
                               "section": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "words": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "t": {
+                                      "type": "number"
+                                    },
+                                    "end": {
+                                      "type": "number"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "t",
+                                    "end",
+                                    "text"
+                                  ]
+                                }
                               }
                             },
                             "required": [
@@ -92443,6 +92465,29 @@
                             "section": {
                               "type": "string",
                               "nullable": true
+                            },
+                            "words": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "t": {
+                                    "type": "number"
+                                  },
+                                  "end": {
+                                    "type": "number"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "t",
+                                  "end",
+                                  "text"
+                                ]
+                              },
+                              "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                             }
                           },
                           "required": [
@@ -92800,6 +92845,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -93154,6 +93222,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -93526,6 +93617,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -93906,6 +94020,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -94310,6 +94447,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -94719,6 +94879,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -95094,6 +95277,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -95473,6 +95679,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -95949,6 +96178,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -96331,6 +96583,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [
@@ -96717,6 +96992,29 @@
                           "section": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
                           }
                         },
                         "required": [

@@ -26,8 +26,9 @@ export function saveMusicJob(job: MusicJob): void {
   if (job.state !== "cancelled" && storedMusicState(job) === "cancelled") { job.state = "cancelled"; return; }
   job.updatedAt = new Date().toISOString();
   if (job.temporary) { memory.set(job.id, job); return; }
-  const { temporary: _temporary, ...rest } = job;
-  const values = { ...rest, request: JSON.stringify(job.request), hlc: nextHlc() };
+  // A stale copy of a job never wipes word timing the aligner stored after it was read (MUSIC-GEN-20b): the column is written only when this copy has one.
+  const { temporary: _temporary, timedWords, ...rest } = job;
+  const values = { ...rest, ...(timedWords ? { timedWords } : {}), request: JSON.stringify(job.request), hlc: nextHlc() };
   db.insert(musicJobs).values(values).onConflictDoUpdate({ target: musicJobs.id, set: values }).run();
 }
 /** Called once nothing can write the job any more (its watcher finished or its submit failed). */

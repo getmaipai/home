@@ -20,7 +20,7 @@ export interface MusicJob {
   stackJob: string | null; state: import("./stack").MusicState; stage: string | null; progress: number; etaSeconds: number | null;
   position: number | null; errorCode: string | null; errorLine: string | null; fileId: string | null; parentFileId: string | null;
   coverJobId: string | null; coverFileId: string | null;
-  seed: number | null; durationS: number | null; lrc: string | null; chosenAt: string | null;
+  seed: number | null; durationS: number | null; lrc: string | null; /** MUSIC-GEN-20b: JSON of the aligned lines `[{t, text, words:[{t,end,text}]}]` for this version; null until the aligner has run (or when it cannot). */ timedWords?: string | null; chosenAt: string | null;
   createdAt: string; updatedAt: string; temporary: boolean;
 }
 export const MUSIC_NOTE = "music-gen:";
