@@ -83,7 +83,7 @@ describe("stage 2: what data is needed", () => {
     const plan = await planData(async (prompt) => { prompts.push(prompt); return '{"sub_questions":["why it ended","what came next"],"queries":["the show ended why","Jane Smith show interview"]}'; }, brief, "why did the show end", 4);
     expect(prompts[0]).toContain(briefBlock(brief));
     expect(prompts[0]).toContain("sub_questions");
-    expect(plan.subQuestions).toEqual(["why it ended", "what came next"]);
+    expect(plan.subQuestions.slice(0, 2)).toEqual(["why it ended", "what came next"]);
     expect(plan.queries).toEqual(["the show ended why", "Jane Smith show interview"]);
   });
   test("a writer that is down gives an empty plan", async () => {
@@ -390,7 +390,7 @@ describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angl
     const onlyNamed = parseBrief('{"subject":"a show","must_contain":["the cast (such as Alpha Beta)"]}')!;
     expect(partsFor(onlyNamed, undefined, "q")).toEqual(["the cast"]);
     const planned = await planData(async () => '{"sub_questions":["what Delta Epsilon said","who is Zeta Omega","what came next"],"queries":["the show ended why"]}', parsed, "why did the show end", 3, "", "Zeta Omega is a series");
-    expect(planned.subQuestions).toEqual(["who is Zeta Omega", "what came next"]);
+    expect(planned.subQuestions.slice(0, 2)).toEqual(["who is Zeta Omega", "what came next"]);
     expect(briefPrompt("q", "")).toContain('add no detail of your own to "subject", "assumption" or "must_contain": name there no person, work, place or year the question does not name');
     let seen = "";
     await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, parsed, "q", 3);
@@ -401,6 +401,28 @@ describe("RESEARCH-PIN-05 and RESEARCH-PLAN-02: which one was read, and the angl
     await planData(async (prompt) => { seen = prompt; return '{"sub_questions": [], "queries": []}'; }, { subject: "s", answerType: "", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" }, "what would have happened", 3);
     expect(seen).toContain("why_it_stopped_or_changed");
     expect(seen).toContain("what_was_planned_or_announced");
+  });
+});
+
+describe("an open question always gets the generic angles (ANGLE-FLOOR)", () => {
+  const brief: Brief = { subject: "the show", answerType: "an explanation", mustContain: [], ambiguous: false, options: [], question: "", assumption: "" };
+  const reply = JSON.stringify({ sub_questions: ["who made it"], angles: {}, queries: ["the show ended why"] });
+
+  test("an empty angles reply for an open question still yields a what-came-after part", async () => {
+    const plan = await planData(async () => reply, brief, "what happened to the show", 3);
+    expect(plan.subQuestions.some((p) => /what came after/.test(p))).toBe(true);
+    expect(plan.angleParts?.some((p) => /what came after/.test(p))).toBe(true);
+    expect(plan.subQuestions.length).toBeLessThanOrEqual(8);
+  });
+  test("a closed how-to question gets none", async () => {
+    const plan = await planData(async () => reply, brief, "how do I turn on subtitles", 3);
+    expect(plan.subQuestions).toEqual(["who made it"]);
+    expect(plan.angleParts).toEqual([]);
+  });
+  test("an equivalent part the model already wrote is not duplicated", async () => {
+    const own = JSON.stringify({ sub_questions: ["what came after the show: follow-ups, revivals, later work"], angles: {}, queries: [] });
+    const plan = await planData(async () => own, brief, "what happened to the show", 3);
+    expect(plan.subQuestions.filter((p) => /what came after/.test(p))).toHaveLength(1);
   });
 });
 
@@ -445,7 +467,7 @@ describe("plan angles and the pick-retry (RESEARCH-ANGLES-01)", () => {
   test("a non-empty angle joins the sub-questions after the model's own list; a repeat, an empty one and one naming an unknown name do not", async () => {
     const reply = JSON.stringify({ sub_questions: ["x"], angles: { what_came_after: "what came after it", why_it_stopped_or_changed: "", who_said_what: "what Delta Epsilon said", what_planned: "what came after it" }, queries: ["the show ended why"] });
     const plan = await planData(async () => reply, brief, "why did the show end", 3);
-    expect(plan.subQuestions).toEqual(["x", "what came after it"]);
+    expect(plan.subQuestions.slice(0, 2)).toEqual(["x", "what came after it"]);
     expect((await planData(async () => '{"sub_questions":["x"],"queries":[]}', brief, "q", 3)).subQuestions).toEqual(["x"]);
     expect((await planData(async () => '{"sub_questions":["x"],"angles":"none","queries":[]}', brief, "q", 3)).subQuestions).toEqual(["x"]);
   });

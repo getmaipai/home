@@ -201,7 +201,7 @@ describe("research rounds follow the answer style", () => {
         for await (const _ of started.tokens) { /* run the turn to its end */ }
         const events = started.status.drain();
         const planned = events.find((e) => e.type === "research_plan");
-        if (who === "owner") expect(planned && planned.type === "research_plan" ? planned.steps : []).toEqual(["why the series ended", "what its makers planned next"]);
+        if (who === "owner") expect(planned && planned.type === "research_plan" ? planned.steps : []).toEqual(expect.arrayContaining(["why the series ended", "what its makers planned next"]));
         else expect(planned).toBeUndefined();
       } finally {
         proxy.stop();

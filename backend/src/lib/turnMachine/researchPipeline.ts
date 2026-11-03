@@ -205,6 +205,19 @@ const FALLBACK_ANGLES: { part: (s: string) => string; search: string }[] = [
   { part: (s) => `why ${s} changed or stopped`, search: "reason changed stopped why" },
 ];
 
+/** The generic angles whose bare words (the subject's own words removed, which every part about the subject shares) match no part in `existing`. */
+function missingAngles(subject: string, briefSubject: string | undefined, existing: readonly string[]): { part: string; search: string }[] {
+  const subjectWords = new Set(`${subject} ${briefSubject ?? ""}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const bare = (x: string): string => x.toLowerCase().split(/[^a-z0-9]+/).filter((w) => !subjectWords.has(w)).join(" ");
+  const out: { part: string; search: string }[] = [];
+  for (const angle of FALLBACK_ANGLES) {
+    const part = angle.part(briefSubject?.trim() || subject).slice(0, 160);
+    if ([...existing, ...out.map((o) => o.part)].some((o) => samePart(bare(o), bare(part)))) continue;
+    out.push({ part, search: angle.search });
+  }
+  return out;
+}
+
 /** The plan when the writer is cut: the brief's must-contain parts, then each clause of the question that asks for something, then (for an
  * open question, or any pinned subject) the generic angles about the subject; and a handful of keyword searches built from the pinned
  * title (or the brief's subject) and the same parts. Every word comes from the question, the brief or the pin, so no name is added. */
@@ -223,17 +236,12 @@ export function fallbackPlan(brief: Brief | null, utterance: string, count: numb
   const clauses = utterance.replace(/\([^)]*\)/g, " ").replace(/[ \t]+/g, " ").split(/(?<=[.?!])\s+|;\s+|\n+/).map((c) => c.trim()).filter((c) => c.split(/\s+/).length >= 4);
   for (const c of clauses) add(c.replace(/^(?:tell me|please|can you|could you)\s+/i, ""));
   const open = anchorPhrase.trim() !== "" || OPEN_CUES.test(utterance);
-  const subjectWords = new Set(`${subject} ${brief?.subject ?? ""}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
   const angleParts: string[] = [];
   const angleSearches: string[] = [];
   if (open && subject) {
-    for (const angle of FALLBACK_ANGLES) {
-      const part = angle.part(brief?.subject?.trim() || subject).slice(0, 160);
-      // Compared without the subject's own words, which every part about the subject shares.
-      const bare = (x: string): string => x.toLowerCase().split(/[^a-z0-9]+/).filter((w) => !subjectWords.has(w)).join(" ");
-      if (parts.some((o) => samePart(bare(o), bare(part)))) continue;
-      parts.push(part);
-      angleParts.push(part);
+    for (const angle of missingAngles(subject, brief?.subject, parts)) {
+      parts.push(angle.part);
+      angleParts.push(angle.part);
       angleSearches.push(`${subject} ${angle.search}`);
     }
   }
@@ -300,6 +308,11 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
     const part = raw.replace(EXAMPLE_LIST, "").trim().slice(0, 160);
     const given = squashText(haystack);
     if (part && namesIn(part).every((name) => nameIsGiven(name, given)) && !subQuestions.some((o) => samePart(o, part))) { subQuestions.push(part); angleParts.push(part); }
+  }
+  // An open question always gets the generic angles (what came after, what was planned, how it ended) the model's own angles did not cover.
+  const subject = (brief.subject ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
+  if (subject && OPEN_CUES.test(utterance)) {
+    for (const angle of missingAngles(subject, brief.subject, subQuestions)) { subQuestions.push(angle.part); angleParts.push(angle.part); }
   }
   return { subQuestions, queries: kept.slice(0, count), angleParts };
 }
