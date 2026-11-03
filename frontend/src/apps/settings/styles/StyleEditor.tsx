@@ -23,6 +23,11 @@ import { adultCheckLine, filePath, messageOf, sizeWords, StylePicture } from "@/
 
 const pairsOf = (row: StyleRow): PhrasePair[] => row.negative_addins.map((avoid, i) => ({ avoid, say: row.avoid_as_positive[i] ?? "" }));
 
+/** VIDEO-LORA-09: "Try this style" opens Create with the style chosen, as router state the page reads into its own state (never the address). A character goes to the Characters choice, any other kind to Styles. */
+export function tryStyleState(row: Pick<StyleRow, "id" | "kind">): { pageState: Record<string, string> } {
+  return { pageState: { [row.kind === "character" ? "character" : "style"]: row.id } };
+}
+
 export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow; person: Roster; onClose: () => void; onChanged: () => void }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -87,7 +92,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                   </Select>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" disabled={!row.usable} onClick={() => navigate("/apps/videos/create", { state: { styleId: row.id } })}>Try this style</Button>
+                  <Button type="button" disabled={!row.usable} onClick={() => navigate("/apps/videos/create", { state: tryStyleState(row) })}>Try this style</Button>
                   <Button type="button" variant="outline" onClick={() => setAskRemove(true)}>Remove</Button>
                 </div>
               </DialogSection>
