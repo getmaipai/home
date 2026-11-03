@@ -526,7 +526,7 @@ Every finished song gets a cover made with the Quick picture model (`flux2-klein
 
 ### 18.5 Karaoke (MUSIC-GEN-20)
 
-ACE-Step already returns timed lyrics, and Home stores them in `music_jobs.lrc`, so no alignment model is needed.
+ACE-Step already returns timed lyrics, and Home stores them in `music_jobs.lrc`, so no alignment model is needed for line timing. (Word timing: replaced by 18.5a.)
 
 - **Home** parses `lrc` into `timed_lyrics: [{ t, line, section }]` on the card route: sung lines only, per 18.1.
 - **Kit (commons first, rule 9).** `MusicTrack` takes `timedLyrics`. Its existing Lyrics toggle shows the lines as buttons. The line being
@@ -535,9 +535,77 @@ ACE-Step already returns timed lyrics, and Home stores them in `music_jobs.lrc`,
   Without timed lyrics it shows the plain words, as now. One tag through the tag agent, then one Home pin.
 - **Reuse check.** `react-lrc` and `liricle` parse LRC and scroll a lyric list, but each draws its own list and styling outside the kit
   (rule 9). The kit `Player`'s `captions` (WebVTT) show one cue over the media, not a lyric list you can tap. ACE-Step's timing removes the
-  need for whisper or a forced aligner. So the kit Element adds the list from its own primitives, and Home parses LRC (one timestamp and one
+  need for whisper or a forced aligner for lines (word timing: replaced by 18.5a). So the kit Element adds the list from its own primitives, and Home parses LRC (one timestamp and one
   line per row) in a few lines. Cover art reuses `startPictureJob`, the picture version chain and the `ImageEditor` pane unchanged. Fitting
   the lyrics reuses the tool's measured estimate (`secondsFromLyrics`).
+
+### 18.5a Word timing from a forced aligner (MUSIC-GEN-20b, owner ask 2026-11-03: reuse the pre-migration karaoke code)
+
+The pre-migration hub timed every word by forced alignment and wiped the highlight word by word. Review verdict (platform principle 8): rebuild small,
+keep the three ideas that fixed real bugs, drop the rest (LRCLIB offset repair, per-track alignment UI, the global offset).
+
+- **Why 18.5 is not enough.** ACE-Step's `lrc` is one time per line, and 18.1 shows it squeezes the last lines onto one stamp. A line wipe
+  cannot show which word is being sung, and a squeezed line has no honest time.
+- **Stack.** One `align` task: known lyrics plus a song (or its vocals stem) in, per-word `{start, end, text}` out. The aligner is
+  torchaudio's MMS_FA bundle (a wav2vec2 CTC model) run in the existing Stack uv environment that already carries torch and torchaudio for
+  stems. The checkpoint is a pinned optional download with a sha256 and a `/stack/v1/privacy` row, never vendored, no network at run time.
+  The Stack `align` task and the Home job hook log counts and timings only, never lyric words (rule 6a).
+  Words that do not fold to the aligner's Latin set (punctuation, non-Latin scripts, section tags) are left out and timed by step 3.
+- **Three rules carried from the old code (done in TypeScript, in Home, so they are tested without the model).**
+  1. Keep the longest run of line anchors that never goes backwards in time; null the rest (a misfired anchor made a line flash and vanish).
+  2. Space unanchored lines evenly between the surrounding good anchors, never equal stamps (equal stamps hid lines).
+  3. Trust measured onsets. The aligner's per-token score does not separate good from bad on sung vocals, so no score threshold.
+  The engine's own `lrc` stays the fallback when alignment is missing, fails or finds no words (a failed tool never fails the answer, rule 6).
+- **Home.** After a song finishes, an alignment runs as a background tool-class job (never ahead of chat, pictures or video by the resource
+  order) on the mixed song, or on the vocals stem when the song already has one. The result is stored as `timed_words` beside `lrc` on the job
+  version (nullable column, additive) and returned on the card as `timed_lyrics[].words`. Library files with lyrics but no timings use the
+  same path later; not in this slice. Age and surface gates are unchanged (the lyrics are the person's own words already on the card).
+- **Kit (commons first, rule 9).** `LyricsList` and `MusicTrack` take optional `words` on each timed line and wipe the highlight word by word
+  with a token-coloured clip (no fixed colours); without `words` the line behaviour of 18.5 is unchanged; reduced motion shows the current
+  word with no wipe. One tag through the tag agent, then one Home pin.
+- **Reuse check.** The Stack already has the Python environment, the job queue, provenance and the privacy page; Whisper word timestamps
+  (the sung-words check, MUSIC-GEN-15) transcribe rather than align known words and drift on invented words, so they are not used for timing.
+- **Slices.** (a) commons `LyricsList` words prop and tag; (b) Stack `align` task, pin, privacy row, endpoint; (c) Home `lyricsAlign.ts`
+  (the three rules, tests with fixtures), migration, job hook, card field, pin of (a) and (b); (d) a real run: make a song, align it, open it
+  in the browser and watch the wipe. Backlog row MUSIC-GEN-20b. MUSIC-STUDIO-01 does not absorb it: it is its own row, and the Studio's Whisper fallback for karaoke timing is replaced by it.
+
+### 18.5b The rest of the pre-migration lyrics experience (MUSIC-GEN-20c, owner ask 2026-11-03: "not only timing, how it got lyrics, how it displayed it")
+
+Review verdict (platform principle 8) of the old hub's lyrics code, each item rebuilt small or dropped. Home already has the LRCLIB `/api/get`
+lookup with its gates, receipts, band re-check and one-per-second bucket (`lib/media/lyricsLookup.ts`, `lyricsAction.ts`); none of that changes.
+
+- **Reuse check.** Considered and rejected: `react-lrc` / `liricle` (draw their own list outside the kit, rule 9); a hosted translation or
+  lyrics-sync API (phone-home, `docs/PRIVACY.md`); the shipped `translate` package, a chat recipe for one phrase (`recipe.json`, two
+  `llm_complete` steps) with no line batching, no pronunciation and no stored result. Reused: the same household chat model through the same
+  `llm_complete` seam the package uses, LRCLIB `/api/get` as it is, the kit `LyricsList`, the Stack job queue, the picture/stems patterns.
+- **Sourcing (Home backend, rebuild).** One request per song stays (MEDIA-DETAIL-03, `THIRD-PARTY-SERVICES.md`; the owner's exception is
+  unchanged): no `/api/search` fallback. `lyricsLookup.ts` keeps `/api/get` and gains only the old checks on the one response: the hit's
+  duration must be within 8 s of the file's, a hit within 3 s of a known instrumental copy's duration is distrusted, and synced beats plain
+  when the response carries both. A response that fails a check counts as a miss and is recorded by the existing receipt. No new host.
+- **Version mismatch (rebuild with 18.5a).** LRCLIB times a different upload than the file the person plays. The old hub fixed this by
+  forced alignment (18.5a) cross-checked against LRCLIB: keep the aligner's per-word times, use LRCLIB only to repair outlier lines, never adopt
+  it wholesale. (18.5a dropped the old LRCLIB offset repair as a global shift; this keeps only the per-line outlier check from
+  `reconcileLyrics.ts`, and the two do not overlap.) Home ports that as `lyricsAlign.ts` `reconcile` (pure TypeScript, fixture tests). A library track with LRCLIB lyrics and no
+  alignment is aligned on demand by the same Stack `align` task (this replaces 18.5a's "not in this slice" for Library files). The old vocal
+  onset offset is dropped: forced alignment makes it unnecessary.
+- **Display (kit first, rule 9c).** `LyricsList` and `MusicTrack` gain: a jitter guard (the active line never steps back except on a seek over
+  0.75 s); a read-ahead lead of 0.55 s on the line with the word wipe on the true clock; a count-in bar over the last 3 s of a gap of 2 s or
+  more; the word wipe of 18.5a; and an optional second line under each line (translation or pronunciation). Every colour is a theme token;
+  the old accent-from-album colours and the white literals are not carried. The user-tunable lead setting (0 to 3 s) is dropped: one fixed
+  lead, no new setting.
+- **Translation and pronunciation (Home, rebuild on the existing seam).** A person can show each line translated into one of the household's
+  languages and, for non-Latin lines, a pronunciation line. The same local chat model, through the `translate` package's `llm_complete` seam
+  (the package itself stays the chat recipe), does it in batches of 18 lines (the old `lyricsTranslate.ts` batching), the
+  result is cached per track, language and a hash of the source lines, and the cache is dropped when the lyrics change. The words are
+  checked through the reader's band like any lyrics before they are shown; the model's output is never stored as the song's lyrics; a
+  failed translation leaves the original lines (rule 6). No outbound call.
+- **Dropped on purpose.** The LLM explicit-lyrics advisory scan and badge (Home's band check on the stored words already gates lyrics,
+  and the scan was a second classifier, rule 0); the old iTunes, Wikipedia, MusicBrainz and Deezer calls in `musicInfo.ts` (other rows own them);
+  the album-colour UltraBlur backdrop (fixed-colour rule); a per-track offset slider.
+- **Slices.** (a) commons kit: words, jitter guard, lead, count-in, second line, tag; (b) Stack `align` task (18.5a); (c) Home sourcing
+  checks on the one `/api/get` response (small, backend only); (d) Home `lyricsAlign.ts`, migration, job hook, Library on-demand align, card fields;
+  (e) Home translation route, cache table, UI toggle in the song and Library lyrics view; (f) a real run through the browser: a made song and a
+  scanned track, both with the wipe, a translation and a count-in.
 
 ### 18.7 Teens and children make songs; a child's request is rewritten, not refused (owner, 2026-10-18; MUSIC-GEN-22)
 
@@ -622,4 +690,7 @@ needs the rule text named in 18.7's escalation, Owner-approved by Jesse). Rule 6
   new setting.
 - **Section 9's "Children and teens: off" is replaced by 18.7** (owner, 2026-10-18): teens and children make songs in the picture lanes; a
   child's request is rewritten into a kid-friendly song, not refused; every minor's song is transcribed and checked as sung before it is shown.
+- **18.5's "no alignment model is needed" and its reuse-check line about a forced aligner are replaced by 18.5a for word timing**; the engine `lrc` stays the line timing and the fallback.
+- **`music-studio-2026-10-31.md`'s Whisper alignment fallback (component table, slice S10) is replaced by 18.5a's MMS_FA alignment.** Slice (b) first confirms torchaudio 2.10 still ships `forced_align` and `MMS_FA`.
+- **18.5a's "Library files with lyrics but no timings ... not in this slice" is replaced by 18.5b** (Library tracks align on demand).
 - Nothing in `RULES.md` changes.
