@@ -6,6 +6,7 @@
 // somebody brought is screened for CSAM and the age-specific media rules; the finished picture goes
 // through the same finished-picture check as every picture (jobs.ts finish). The original is never touched: the result
 // is the next version of the picture, so the editor shows the Original and Undo. Logs carry no picture and no words.
+import { likenessRefusal } from "@/lib/likeness";
 import { and, desc, eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
@@ -101,6 +102,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const temporary = state.temporary === true || state.ephemeral === true;
   const refused = refusePrompt(instruction, { lane: laneOf(audience) });
   if (refused) return line(callId, args, PROMPT_REFUSAL_LINE[refused], { refused });
+  { const likeness = likenessRefusal(actor, instruction); if (likeness) return line(callId, args, likeness, { refused: "household_likeness_off" }); }
   const kind = args.kind === "remove_background" || args.kind === "upscale" ? args.kind : "change";
   const kid = laneOf(audience) === "child";
   // KIDS-CREATE-01: a child changes only the cartoons made for them: no photo or second picture.

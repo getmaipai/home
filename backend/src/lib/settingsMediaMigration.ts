@@ -33,6 +33,10 @@ export function mappedMediaSettings(old: { pictureAdult: unknown; videoAdult: un
 
 /** One time, at boot. `failed` leaves the marker unset (the next boot runs it again). */
 export function migrateMediaSettings(): "already_ran" | "migrated" | "failed" {
+  try { return runMigration(); } catch (error) { console.warn(`[settings-media] the media settings step failed and will run again at the next start: ${error instanceof Error ? error.message : String(error)}`); return "failed"; }
+}
+
+function runMigration(): "already_ran" | "migrated" | "failed" {
   const marker = db.select({ key: settingsValues.key }).from(settingsValues)
     .where(and(eq(settingsValues.scope, "system"), eq(settingsValues.key, MARKER_KEY))).get();
   if (marker) return "already_ran";

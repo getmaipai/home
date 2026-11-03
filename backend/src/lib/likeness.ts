@@ -47,7 +47,7 @@ export function likenessRefusal(actor: { id: string }, text: string): string | n
 
 /** The refusal a picture, video or song tool call gets when the option is off and its words name another member (kind "likeness"), else null. */
 export function likenessCallRefusal(actor: { id: string }, args: Record<string, unknown>): { kind: "likeness"; why: "household_likeness_off"; line: string } | null {
-  const text = ["prompt", "style", "description", "lyrics", "title", "change"].map((name) => args[name]).filter((value): value is string => typeof value === "string").join(" ");
+  const text = Object.values(args).filter((value): value is string => typeof value === "string").join(" ");
   const line = likenessRefusal(actor, text);
   return line ? { kind: "likeness", why: "household_likeness_off", line } : null;
 }

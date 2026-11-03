@@ -6,7 +6,7 @@ import { aiCopy } from "@/lib/aiCopy";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
 import { householdVideoQuality, VIDEO_TIER_KEY } from "@/lib/videos/policy";
-import { slotKey, writeSlotModel } from "@/lib/tiers";
+import { slotIsOff, slotKey, writeSlotModel } from "@/lib/tiers";
 import { MODEL_OF_CHOICE } from "@/lib/tierSlotMigration";
 import { listStackComponents } from "@/lib/stackComponents";
 
@@ -26,10 +26,17 @@ export const SETUP_CHOICE_KEYS: ReadonlySet<string> = new Set([
   slotKey("image", "standard"), slotKey("image", "boost"), VIDEO_TIER_KEY, "generation.music.enabled",
 ]);
 
-/** Write one card or setup setting. A picture slot key takes the model as text (a catalog id), or true and false for the Boost switch (`recommended` and `off`), and keeps the slot's options; every other key is an ordinary household write. */
+/** Write one card or setup setting. The Standard picture slot takes a choice name (`ernie` or `klein`) and the Boost slot takes the switch (true or false); both keep the slot's options. Turning Boost on keeps a model an admin already chose and only replaces `off`. Anything else for a slot is refused; every other key is an ordinary household write. */
 export function writeChoiceSetting(key: string, value: unknown): { ok: true } | { ok: false; status: 400 | 403; error: string } {
-  if (key === slotKey("image", "standard") && typeof value === "string") return writeSlotModel("image", "standard", MODEL_OF_CHOICE[value] ?? value);
-  if (key === slotKey("image", "boost") && (typeof value === "boolean" || typeof value === "string")) return writeSlotModel("image", "boost", value === true ? "recommended" : value === false ? "off" : value);
+  if (key === slotKey("image", "standard")) {
+    const model = typeof value === "string" ? MODEL_OF_CHOICE[value] : undefined;
+    return model ? writeSlotModel("image", "standard", model) : { ok: false, status: 400, error: "That is not a picture model Home can use for Standard. Choose one of the listed models." };
+  }
+  if (key === slotKey("image", "boost")) {
+    if (typeof value !== "boolean") return { ok: false, status: 400, error: "Boost pictures are switched on or off here. Use the models list to choose another model." };
+    if (value) return slotIsOff("image", "boost") ? writeSlotModel("image", "boost", "recommended") : { ok: true };
+    return writeSlotModel("image", "boost", "off");
+  }
   const written = setHouseholdSettingValue(key, value);
   return written.ok ? { ok: true } : { ok: false, status: written.status, error: written.error };
 }

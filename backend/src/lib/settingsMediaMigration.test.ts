@@ -7,6 +7,7 @@ import { adultStylesAllowed, householdPictureQuality } from "@/lib/pictures/poli
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { householdVideoQuality, videoAdapterAudiencesFor } from "@/lib/videos/policy";
 import { householdLikenessAllowed, likenessCallRefusal, likenessRefusal, LIKENESS_OFF_LINE, otherMembersNamed } from "@/lib/likeness";
+import { writeChoiceSetting } from "@/lib/aiChoicesState";
 import { resetDb } from "../../tests/reset-db";
 
 const OLD = ["generation.adult_adapters", "generation.video.adult_adapters", "generation.picture_quality", "generation.video_quality"] as const;
@@ -130,5 +131,33 @@ describe("the household likeness reader (LIKENESS-01, rule 0)", () => {
     expect(likenessCallRefusal({ id: "p-sage" }, { prompt: "a quiet lake" })).toBeNull();
     setHouseholdSettingValue("generation.household_likeness", true);
     expect(likenessRefusal({ id: "p-sage" }, "a picture of Nova on a bike")).toBeNull();
+  });
+});
+
+describe("writeChoiceSetting on the picture slots", () => {
+  beforeEach(() => resetDb());
+
+  test("turning Boost on keeps a model an admin chose and only replaces off", () => {
+    setHouseholdSettingValue("engines.image.tier.boost", { model: "z-image-turbo", options: {} });
+    expect(writeChoiceSetting("engines.image.tier.boost", true)).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.image.tier.boost")).toMatchObject({ model: "z-image-turbo" });
+    expect(writeChoiceSetting("engines.image.tier.boost", false)).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.image.tier.boost")).toMatchObject({ model: "off" });
+    expect(writeChoiceSetting("engines.image.tier.boost", true)).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.image.tier.boost")).toMatchObject({ model: "recommended" });
+  });
+
+  test("a slot takes only the choices the card offers", () => {
+    expect(writeChoiceSetting("engines.image.tier.standard", "off")).toMatchObject({ ok: false, status: 400 });
+    expect(writeChoiceSetting("engines.image.tier.standard", "no-such-model")).toMatchObject({ ok: false, status: 400 });
+    expect(writeChoiceSetting("engines.image.tier.boost", "klein")).toMatchObject({ ok: false, status: 400 });
+    expect(writeChoiceSetting("engines.image.tier.standard", "klein")).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.image.tier.standard")).toMatchObject({ model: "flux2-klein-4b" });
+  });
+
+  test("a video level and the music switch are ordinary writes", () => {
+    expect(writeChoiceSetting("generation.video_tier", "boost")).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("generation.video_tier")).toBe("boost");
+    expect(writeChoiceSetting("generation.video_tier", "detailed")).toMatchObject({ ok: false });
   });
 });

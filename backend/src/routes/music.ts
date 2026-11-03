@@ -26,6 +26,7 @@ import { authorizeTier, maxOffered } from "@/lib/tiers";
 import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, runGenerateMusic, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
+import { likenessRefusal } from "@/lib/likeness";
 import { StackMusicError } from "@/lib/music/stack";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
@@ -222,6 +223,7 @@ musicRoutes.openapi(reviseRoute, async (c) => {
   plan.body.caption = description;
   const refusal = refuseMusicPrompt([description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  { const likeness = likenessRefusal(actor, [description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
   plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
   try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
@@ -284,6 +286,7 @@ musicRoutes.openapi(detailsRoute, async (c) => {
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
   const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  { const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
   plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
   try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
@@ -373,6 +376,7 @@ musicRoutes.openapi(lengthRoute, async (c) => {
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
   const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  { const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
   plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
   try {
     await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId });
@@ -398,6 +402,7 @@ musicRoutes.openapi(qualityRoute, async (c) => {
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
   const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  { const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
   if (tier === "max" && (granted !== "max" || !musicMaxOffered(engine))) return c.json({ error: "Max is not available for this song. Make it again at Boost or Standard." }, 422) as never;
   if (tier === "max" && !musicMaxInstalled(engine)) return c.json({ error: MUSIC_MAX_NOT_INSTALLED_LINE }, 422) as never;
   plan.request.quality = musicQualityFor(engine, tier); plan.request.tier = musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
