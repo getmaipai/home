@@ -66,3 +66,36 @@ and the lock; an edit is a local cut and sends no LoRA to the Stack.
 
 `backend/tests/loras03.test.ts`: the access table cell by cell, the writer (validation, minors refused, hlc), the migration, the routes, the leak sweep
 while locked, the auto-mark and the Stack wiring. Fixtures: `backend/tests/fixtures/lora.ts`.
+
+## Verified (2026-11-02, risky-surface pass on 44a0d967c)
+
+Reviewed with `code-review` at medium on the commit's own diff, each finding checked against the code. Fixed, each with a test in `backend/tests/loras03Verify.test.ts`
+that fails without the fix:
+
+- The trash purge worked from a list read before its Stack calls, so an admin's Restore in that window was undone. It now re-reads each record, and keeps a style
+  while a clip made with it is queued or running (`lib/loras/usage.ts`, matched on the exact quoted id, never LIKE).
+- The Stack-facts update in the sync wrote from the same stale list and could revert an admin edit. It now writes from the current record.
+- A person listed in `availability.people` who later became a guest (or no longer exists) made every save of that style fail with "Only adults can be chosen",
+  Remove and Mark adult-only included. Only people newly added in a save are checked now; readers still gate on each person's own age, so a stale id grants nothing.
+- A finished clip or an edit looked a style's audience up in the live list only, so a style in the trash made an all-ages clip adult-only. Both read the record.
+- `PATCH /api/loras/{id}` could open an unconfirmed style to other adults. The licence is confirmed first (plain sentence otherwise), as the old pending state kept it off.
+- `POST /api/videos/adapters` described a just-added adult-only style (name, words, hash, link) to an admin without a valid unlock proof. It answers "Locked style".
+- Marking adult-only found a style's clips with `LIKE`, so an id with `_` or `%` could lock other styles' clips. Same exact match as above.
+
+Checked and held: the access table (the cell-by-cell test), 404 for a locked, hidden or missing style (same body; non-admins get 403 for every id before any lookup),
+the unlock proof on every admin route for an adult-only style, `HLC_BEARING_TABLES` (the schema-sync test), parametrised SQL, plain error sentences.
+Left as designed or noted: a file the Stack lists with no `video_adapter_prefs` row becomes an all-ages record with the licence acknowledged by the owner when the
+Stack says all-ages (the migration rule of the design note, section 6.4; a new file with no row was never "pending" before either); a failed mirror of an
+all-ages mark to the Stack leaves the Stack adult-only (the stricter side) and is not retried; the legacy `PATCH /api/videos/adapters/{id}` applies its steps one
+by one, so a failing later step leaves the earlier ones saved.
+
+Migration 0161 on a copy of a dev household (pre-0161 copy, schema 113): a migration that fails after `CREATE TABLE` rolls back whole (no table, no index, journal
+unchanged); the real migration then applies, and reopening applies nothing. The pref fold-in, run twice and after a simulated crash (record saved, row not yet
+deleted): every file got one record, an adult-only file that was switched on stays adult-only, a pending row stays unacknowledged, a file with a malformed hash
+and a row for a file the Stack no longer lists keep their rows, and a second sync changes no record. Rows left behind by a crash stay in `video_adapter_prefs`
+(read by nothing) until a later migration drops the table.
+
+HTTP proof on a dev hub (8877, `--no-stack`; styles seeded through the store): a child and a teen got `{"items":[],"locked":false}` from `/available` and 403 from
+every admin route; an adult not marked saw only the all-ages style and no locked tile; the marked adult saw a locked tile, and the style only with their own proof;
+the owner saw one locked tile without a proof and the style with it; PATCH, nsfw, all-ages, remove and restore on the adult-only style answered 404 (the missing
+id's body) without a proof and 200 with it; no response without a proof held its name, trigger word, hash or id.
