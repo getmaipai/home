@@ -23,15 +23,20 @@ export function styleOfComponent(componentId: string): { media: "picture" | "vid
   return m ? { media: m[1] as "picture" | "video", id: m[2]! } : null;
 }
 
-/** What `actor` may see of the style behind a component id right now. A style Home cannot place (no record, not in the Stack's list) counts as locked: fail closed. */
-export async function componentStyleAccess(actor: PersonRow, componentId: string, proof: AdultProof = requestProof()): Promise<StyleAccess> {
-  const style = styleOfComponent(componentId);
-  if (!style) return "open";
-  if (style.media === "picture") {
-    const found = (await allAdapters()).find((a) => a.id === style.id);
-    return found ? pictureStyleAccess(actor, found.classification, proof) : pictureStyleAccess(actor, "unknown", proof);
-  }
+/** What `actor` may see of the style behind each component id right now: the Stack's picture styles and Home's video records are read once, then each id is answered
+ * from them. A style Home cannot place (no record, not in the Stack's list) counts as locked: fail closed. */
+export async function styleAccessResolver(actor: PersonRow, proof: AdultProof = requestProof()): Promise<(componentId: string) => StyleAccess> {
+  const pictures = new Map((await allAdapters()).map((a) => [a.id, a.classification]));
   await syncLoras().catch(() => undefined);
-  const record = getLoraRecord(style.id);
-  return record ? loraAccess(actor, record, "own_written", proof) : pictureStyleAccess(actor, "unknown", proof);
+  return (componentId) => {
+    const style = styleOfComponent(componentId);
+    if (!style) return "open";
+    if (style.media === "picture") return pictureStyleAccess(actor, pictures.get(style.id) ?? "unknown", proof);
+    const record = getLoraRecord(style.id);
+    return record ? loraAccess(actor, record, "own_written", proof) : pictureStyleAccess(actor, "unknown", proof);
+  };
+}
+
+export async function componentStyleAccess(actor: PersonRow, componentId: string, proof: AdultProof = requestProof()): Promise<StyleAccess> {
+  return (await styleAccessResolver(actor, proof))(componentId);
 }

@@ -64,10 +64,10 @@ function pendingIds(): Set<string> {
   return new Set(db.select().from(pictureAdapterPrefs).all().filter((row) => !row.enabled && (row.updatedBy ?? "").startsWith("added:")).map((row) => row.adapterId));
 }
 
-/** A style the person cannot read (locked behind the Adult lock, or hidden) answers like a missing one. A style the Stack does not list is left to the Stack's own 404. */
+/** A style the person cannot read (locked behind the Adult lock, or hidden) answers like a missing one; so does one the library does not list (fail closed). */
 async function styleReadable(person: PersonRow, id: string): Promise<boolean> {
   const found = (await allAdapters()).find((a) => a.id === id);
-  return !found || pictureStyleAccess(person, found.classification) === "open";
+  return found !== undefined && pictureStyleAccess(person, found.classification) === "open";
 }
 
 function stackFailure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {

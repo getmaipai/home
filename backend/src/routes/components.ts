@@ -14,7 +14,7 @@ import { dropAdapterCache, forgetAdapterPref } from "@/lib/pictures/adapters";
 import { forgetVideoAdapter } from "@/lib/videos/adapters";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
-import { componentStyleAccess, styleOfComponent } from "@/lib/styleLock";
+import { componentStyleAccess, styleAccessResolver, styleOfComponent } from "@/lib/styleLock";
 import type { PersonRow } from "@/types";
 
 export const componentsRoutes = apiRouter();
@@ -57,11 +57,12 @@ componentsRoutes.openapi(listRoute, async (c) => {
     // VIDEO-SETTINGS-02: an adult-only style is not a row until the person's own unlock proof is valid; one flag stands for all of them (never a count).
     const person = c.get("person") as PersonRow;
     const components: typeof withLicence = [];
+    const accessOf = await styleAccessResolver(person);
     let locked = false;
     for (const part of withLicence) {
       const style = part.kind === "lora" || part.group === "loras" || part.id.startsWith("lora.");
       // A style whose id Home cannot place is locked too (fail closed).
-      const access = !style ? "open" : styleOfComponent(part.id) ? await componentStyleAccess(person, part.id) : "locked";
+      const access = !style ? "open" : styleOfComponent(part.id) ? accessOf(part.id) : "locked";
       if (access === "open") components.push(part);
       else if (access === "locked") locked = true;
     }
