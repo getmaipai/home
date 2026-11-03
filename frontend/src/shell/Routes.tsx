@@ -158,7 +158,8 @@ function PageHeaderLayout() {
   useHeaderExtra(PageHeaderTitle, PageHeaderActions);
   // Issue 187: a page in the app catalog takes its title from there (one definition); only pages outside the catalog name themselves here.
   const path = pathname.replace(/\/$/, "") || "/";
-  const title = PAGE_ONLY_TITLES[path] ?? routeTitle(path);
+  // A turn trace has one page per turn id, so its title is matched by prefix; without it the page has no level-1 heading (AUDIT-FE-STATES-01 dropped the page's own).
+  const title = PAGE_ONLY_TITLES[path] ?? (path.startsWith("/trace/") ? "Turn trace" : routeTitle(path));
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}

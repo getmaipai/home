@@ -271,6 +271,29 @@ describe("Routes status indicator", () => {
     }
   });
 
+  test("a turn trace page has a level-1 heading even while the trace loads (a11y capture waits for it)", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist") || url.includes("/api/notifications") || url.includes("/api/status/apps") || url.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
+      if (url.includes("/api/trace/")) return new Promise<Response>(() => {});
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <TooltipProvider>
+          <MemoryRouter initialEntries={["/trace/turn-abc123"]}>
+            <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
+          </MemoryRouter>
+        </TooltipProvider>,
+      );
+      expect(await view.findByRole("heading", { level: 1, name: "Turn trace" })).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test.each(["/", "/chat"])("shows the shared status link in the profile menu on %s", async (path) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
