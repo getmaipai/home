@@ -63765,6 +63765,1231 @@
         }
       }
     },
+    "/api/loras/browse": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Search the style sources (owner or admin)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "huggingface",
+                      "civitai",
+                      "both"
+                    ],
+                    "default": "huggingface"
+                  },
+                  "q": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "media": {
+                    "type": "string",
+                    "enum": [
+                      "video"
+                    ],
+                    "default": "video"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "style",
+                      "character"
+                    ],
+                    "default": "any"
+                  },
+                  "base": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "ltx-2.5",
+                      "ltx-2.3",
+                      "wan",
+                      "all"
+                    ],
+                    "default": "default"
+                  },
+                  "installed": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "not_installed",
+                      "installed"
+                    ],
+                    "default": "any"
+                  },
+                  "sort": {
+                    "type": "string",
+                    "enum": [
+                      "downloads",
+                      "rating",
+                      "newest"
+                    ],
+                    "default": "downloads"
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 2000,
+                    "default": null
+                  },
+                  "adult": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Adult and unknown hits are not in `items`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "locked": {
+                      "type": "boolean",
+                      "description": "One tile for every hit that is adult or unknown: no title, picture, id or count."
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "locked",
+                    "next_cursor",
+                    "notes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only, or Civitai is off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches this hour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The source did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The source asked us to slow down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/browse/{source}/{id}": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "One style from a source, with its file facts",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "huggingface",
+                "civitai"
+              ]
+            },
+            "required": true,
+            "name": "source",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "required": false,
+            "name": "version",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A hit the caller may see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only, or Civitai is off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not there, or locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The source did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Slow down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/browse/{source}/{id}/preview": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "A style's picture, fetched once by the hub",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "huggingface",
+                "civitai"
+              ]
+            },
+            "required": true,
+            "name": "source",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "required": false,
+            "name": "version",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The picture.",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not there, or locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The source did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Slow down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/install": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Download a style into the library (an admin's click, after the licence step)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "huggingface",
+                      "civitai"
+                    ]
+                  },
+                  "remote_id": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "version_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 200
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "file": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 500
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "style",
+                      "character"
+                    ]
+                  },
+                  "audience": {
+                    "type": "string",
+                    "enum": [
+                      "all-ages",
+                      "adult-only"
+                    ]
+                  },
+                  "licence_confirmed": {
+                    "type": "boolean"
+                  },
+                  "base_model": {
+                    "type": "string",
+                    "enum": [
+                      "ltx-2.3",
+                      "ltx-2.5"
+                    ]
+                  },
+                  "confirm_ticket": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "as_separate": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "source",
+                  "audience",
+                  "licence_confirmed"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "A download job started; it shows in the job list as \"Downloading a style\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only, own screen only, Civitai off, or an unlock is needed to choose All ages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not there",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already installed (duplicate) or the source changed the file (changed_file)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The licence step is missing, or the style cannot be used here",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Slow down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The source did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Another download is running, or the source is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Style downloads, running and finished (no names)",
+        "responses": {
+          "200": {
+            "description": "Names are never listed, so an adult-only style is not named.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "job": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "job",
+                          "state",
+                          "title",
+                          "percent"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/sources": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Where styles come from",
+        "responses": {
+          "200": {
+            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "huggingface": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "token_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "token_saved"
+                      ]
+                    },
+                    "civitai": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean"
+                        },
+                        "key_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "key_saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "huggingface",
+                    "civitai"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/sources/civitai": {
+      "put": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Turn Civitai on or off (off by default)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "on": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "on"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "huggingface": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "token_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "token_saved"
+                      ]
+                    },
+                    "civitai": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean"
+                        },
+                        "key_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "key_saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "huggingface",
+                    "civitai"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/sources/civitai-key": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Save the Civitai key (write only)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "huggingface": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "token_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "token_saved"
+                      ]
+                    },
+                    "civitai": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean"
+                        },
+                        "key_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "key_saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "huggingface",
+                    "civitai"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/sources/civitai-key/remove": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Remove the saved Civitai key",
+        "responses": {
+          "200": {
+            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "huggingface": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "token_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "token_saved"
+                      ]
+                    },
+                    "civitai": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean"
+                        },
+                        "key_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "key_saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "huggingface",
+                    "civitai"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/sources/huggingface-token": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Save the Hugging Face token (write only)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "huggingface": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "token_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "token_saved"
+                      ]
+                    },
+                    "civitai": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean"
+                        },
+                        "key_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "key_saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "huggingface",
+                    "civitai"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/sources/huggingface-token/remove": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Remove the saved Hugging Face token",
+        "responses": {
+          "200": {
+            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "huggingface": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "token_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "token_saved"
+                      ]
+                    },
+                    "civitai": {
+                      "type": "object",
+                      "properties": {
+                        "on": {
+                          "type": "boolean"
+                        },
+                        "key_saved": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "on",
+                        "key_saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "huggingface",
+                    "civitai"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/loras": {
       "get": {
         "tags": [
