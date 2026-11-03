@@ -275,6 +275,18 @@
                       }
                     }
                   }
+                },
+                {
+                  "label": "Open in Studio",
+                  "icon": "audio-waveform",
+                  "action": {
+                    "navigate": {
+                      "to": "/apps/videos/studio",
+                      "state": {
+                        "clip": "{id}"
+                      }
+                    }
+                  }
                 }
               ],
               "poll_while": {

@@ -4,12 +4,18 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
 import { api, ApiError } from "@/lib/api";
 import { uploadLibraryFile } from "@/lib/libraryUpload";
 
 export interface PickedMedia { id: string; thumb?: string }
 export type PickKind = "picture" | "character" | "place";
+/** VIDEO-STUDIO-07: the Studio's Add a clip (`video`) and Add a voice or Add music (`audio`). */
+export type StudioPickKind = "video" | "audio";
+/** The id an audio pick returns for a typed line (the Studio's Add a voice); anything else is the Library id of a song. */
+export const SAY_PREFIX = "say:";
+export const SAY_MAX_LENGTH = 600;
 
 const PICTURE_TYPES = "image/png,image/jpeg,image/webp";
 export const thumbUrlFor = (id: string): string => `/api/files/${encodeURIComponent(id)}/thumb?w=320`;
@@ -59,6 +65,55 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
             ))}
           </ul>
         ) : null}
+    </div>
+  );
+}
+
+/** VIDEO-STUDIO-07: the body of the Studio's picker. `video` lists the person's own made clips. `audio` is one box for the two sounds the Studio lays
+ * under a film: a typed line for Home to say (handed back as `say:<line>`) and the person's own songs (their Library id). The kit asks for `audio` in both
+ * cases, so `start` (which button was pressed) only chooses the side that opens first; the page's add action answers a wrong pick with one plain line. */
+export function StudioPickerBody({ kind, start, personId, onDone }: { kind: StudioPickKind; start: "voice" | "music"; personId: string | undefined; onDone: (picked: PickedMedia | null) => void }) {
+  const [side, setSide] = useState<"voice" | "music">(start);
+  const [line, setLine] = useState("");
+  const library = useQuery({
+    queryKey: ["studio-picker", kind, personId],
+    queryFn: async () => (await api.library(kind === "video" ? { type: "video", owner: "me", sort: "newest", limit: 60 } : { type: "audio", owner: "me", sort: "newest", limit: 60 })).items.filter((item) => item.owner.id === personId && (kind === "audio" || item.origin === "made")),
+    enabled: kind === "video" || side === "music",
+  });
+  const items = library.data ?? [];
+  const noun = kind === "video" ? "clips" : "songs";
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {kind === "audio" ? (
+        <div className="flex gap-2" role="group" aria-label="What to add">
+          <Button type="button" variant={side === "voice" ? "default" : "secondary"} aria-pressed={side === "voice"} onClick={() => setSide("voice")}>Say a line</Button>
+          <Button type="button" variant={side === "music" ? "default" : "secondary"} aria-pressed={side === "music"} onClick={() => setSide("music")}>Your songs</Button>
+        </div>
+      ) : null}
+      {kind === "audio" && side === "voice" ? (
+        <div className="flex flex-col gap-2">
+          <Textarea aria-label="The line to say" value={line} maxLength={SAY_MAX_LENGTH} showCount placeholder="Type what the voice should say." onChange={(event) => setLine(event.target.value)} />
+          <div><Button type="button" disabled={line.trim().length === 0} onClick={() => onDone({ id: `${SAY_PREFIX}${line.trim()}` })}>Add this line</Button></div>
+        </div>
+      ) : (
+        <>
+          {library.isPending ? <p className="text-sm text-muted-foreground">Loading your {noun}.</p> : null}
+          {library.isError ? <p role="alert" className="text-sm text-destructive">Your {noun} did not load. Close this and try again.</p> : null}
+          {library.data && items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? "You have no clips yet. Make one on the Create page." : "You have no songs in your Library yet. Make one in Music."}</p> : null}
+          {items.length > 0 ? (
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={`Your ${noun}`}>
+              {items.map((item) => (
+                <li key={item.id}>
+                  <button type="button" className="block w-full overflow-hidden rounded-md border border-border text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>
+                    {kind === "video" && item.audience !== "adult-only" ? <SafeImage src={item.thumb_url} alt="" draggable={false} className="aspect-video w-full object-cover" /> : null}
+                    <span className="block truncate px-2 py-1 text-sm">{item.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

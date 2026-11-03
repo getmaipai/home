@@ -60936,6 +60936,68 @@
         }
       }
     },
+    "/api/videos/studio/voices/{id}": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "A spoken line made in the Studio this session, with Range support",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The line's sound.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "A Range slice.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such line",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/jobs/{id}/messages.mp4": {
       "get": {
         "tags": [

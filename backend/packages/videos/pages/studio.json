@@ -1,0 +1,210 @@
+{
+  "type": "page",
+  "id": "videos-studio",
+  "title": "Studio",
+  "surface": "studio",
+  "body": [
+    {
+      "type": "creation_header",
+      "variant": "studio",
+      "eyebrow": "Studio",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "studio-header",
+          "id": "$state.clip"
+        }
+      },
+      "fields": {
+        "art": "thumbnail"
+      },
+      "secondary": {
+        "label": "Back to My clips",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/clips"
+          }
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "studio",
+      "kind": "video",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "studio",
+          "id": "$state.clip"
+        }
+      },
+      "handlers": {
+        "export": {
+          "call": {
+            "target": "/api/plugins/videos/actions/export",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}",
+              "plan": "{plan}"
+            }
+          }
+        },
+        "add": {
+          "call": {
+            "target": "/api/plugins/videos/actions/add",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}",
+              "kind": "{kind}",
+              "ref": "{ref}"
+            }
+          }
+        }
+      },
+      "make_more": [
+        {
+          "label": "Another take",
+          "starts": "video",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/actions/another",
+              "method": "POST",
+              "args": {
+                "id": "{clip}"
+              },
+              "then": {
+                "navigate": {
+                  "to": "/apps/videos/create"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "export_result": {
+        "bind": {
+          "source": "package",
+          "path": "recipes",
+          "params": {
+            "scope": "job",
+            "id": "$state.export_id"
+          }
+        },
+        "fields": {
+          "key": "id",
+          "status": "status",
+          "progress": "percent",
+          "phase": "phase",
+          "queue_position": "queue_position",
+          "started_at": "started_at",
+          "error": "error",
+          "poster": "still",
+          "src": "src",
+          "words": "prompt",
+          "locked": "locked",
+          "making": "making"
+        },
+        "handlers": {
+          "stop": {
+            "call": {
+              "target": "/api/plugins/videos/actions/cancel",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        },
+        "actions": [
+          {
+            "label": "Open in My clips",
+            "action": {
+              "navigate": {
+                "to": "/apps/videos/clips"
+              }
+            }
+          }
+        ],
+        "poll_while": {
+          "statuses": [
+            "queued",
+            "generating"
+          ],
+          "record": {
+            "path": "recipes",
+            "params": {
+              "scope": "job",
+              "id": "{id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Pick a clip to open",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "studio-picker",
+          "id": "$state.clip"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "locked_field": "locked",
+      "making_field": "making",
+      "aspect": "wide",
+      "variant": "plain",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/studio",
+          "state": {
+            "clip": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Your clips will show up here. Choose Create to make one."
+      }
+    }
+  ]
+}
