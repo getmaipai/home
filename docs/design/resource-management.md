@@ -2,7 +2,7 @@
 
 Status: current as of 2026-10-31 (Home v0.2.162, Stack 3e7b65a). This page says what the memory, load and safeguard system
 does today and where each rule lives, so a session builds from one place. [RULES.md](RULES.md) is the authority; this page
-adds no rule and changes none. The eight older notes below stay as history. Where the code and a hard rule or an
+adds no rule and changes none, except where a dated note named in section 7 changes one (R6, R14, R15: [memory-ladder-2026-11-03.md](memory-ladder-2026-11-03.md)). The eight older notes below stay as history. Where the code and a hard rule or an
 owner-decided note differ, the code is the defect, not a supersession, and the difference is listed under "Open".
 
 The goal, in the owner's words: the system keeps running without crashing and does the best it can with the resources it has,
@@ -37,7 +37,7 @@ for memory; the admin pause in `middleware/chatPauseGate.ts` is a separate switc
 | R3 | A reserved engine load queues ahead of generator jobs and is never refused for a full queue | governor queue |
 | R4 | Every engine stop, unload and restart names a cause from one list (`RetireCause`); the log never says unspecified | supervisor |
 | R5 | A temporary memory refusal (the 15 s start wait, a full queue, an unreadable reading) waits and retries; it does not count toward the self-heal breaker | selfHeal, admission |
-| R6 | Chat is never shrunk or restarted for another program's memory; CRITICAL restarts chat only when the Stack's own processes hold more than the rest of the computer, and a restart is followed by a start | watchdog |
+| R6 | Chat is never restarted for another program's memory, and a person who is chatting never loses the full model (R14 may put an idle chat on Reduced, which is a model swap, not a restart); CRITICAL restarts chat only when the Stack's own processes hold more than the rest of the computer, and a restart is followed by a start | watchdog |
 | R7 | Voice and the judge are kept five minutes after a conversation at WARN; CRITICAL may still evict the judge, never chat standing in for it | watchdog |
 | R8 | The video context shrink of chat happens only after the reclaim ladder is empty and chat, voice and listening have been quiet (the request's `quiet_seconds`, 60 s when absent), restores at the next quiet moment, warms chat after both, and is counted on the memory report | governor, supervisor |
 | R9 | A finished job leaves no child process: workers stop as process trees, an idle worker stays on the ledger until it exits so a waiting job can evict it | worker modules, governor |
@@ -45,6 +45,8 @@ for memory; the admin pause in `middleware/chatPauseGate.ts` is a separate switc
 | R11 | Temp files and caches a job wrote are removed on done, fail and cancel, and swept again on a timer and when the temp folder passes 2 GB | sweeps, watchdog |
 | R12 | Home's live fit reads its hardware table from the Stack; a slot without a verified peak is not fitted | `profileSource.ts` |
 | R13 | A held or waiting job shows its own reason on its card; a full Stack line leaves the job queued, never failed | household queue, copy table |
+| R14 | The running generative job is the last thing the watchdog gives up (MEM-LADDER-01, Owner's ruling 2026-11-03). At CRITICAL, one step per round and in this order: unload idle workers and the idle voice engine; evict the idle judge; put chat on Reduced only when nobody has used chat, speech or voice for 2 minutes and the newest raw reading is still critical; wait 10 s after any step that freed memory and re-read; only if the raw reading is still critical cancel the running job (video first). A chat turn in flight always wins: Reduced is not entered, or its swap answers `waiting` and is tried once more, and the job is the one that yields. Reduced that the watchdog entered is left when the level has been `normal` for a minute and no turn is running; a leave or lease cap drops only its own holder. Memory held by other programs is named and never touched; the Stack still gives back its own idle memory first. A video it stops ends with `memory_cancelled` (pictures and songs keep `no_memory`) and Home starts it again by itself, at most twice (R15). Reduced has holders (Home, the Max window, the watchdog); chat returns to the full model when none is left. Decision: [memory-ladder-2026-11-03.md](memory-ladder-2026-11-03.md) | watchdog `criticalStep` |
+| R15 | A video the watchdog stopped is started again by Home with the same body, up to two times; the refusal the Stack gives while it recovers keeps the job waiting, never failed; a person's Stop is never retried; the card says "The computer got too busy, so your video stopped. It will start again by itself." and after the third stop shows the plain failure with Try again | `lib/videos/jobs.ts`, `householdQueue.ts`, copy table |
 
 Minors: the clamp of a child or teen to Standard and the Max grant live in [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) (rule 0 of RULES.md applies); no rule here raises a ceiling.
 
@@ -54,7 +56,7 @@ Minors: the clamp of a child or teen to Standard and the Max grant live in [reso
 |---|---|---|
 | Sample interval | 5 s | memory reader |
 | WARN | kernel pressure 2, or available memory under the reserve plus 4 GB; chat paged-out needs two rising swapout samples | watchdog |
-| CRITICAL | kernel pressure 4, swap growing 1 GB in 30 s, or under 3 GB available; chat restart after 60 s | watchdog |
+| CRITICAL | kernel pressure 4, swap growing 1 GB in 30 s, or under 3 GB available; the steps of R14, then chat restart after 60 s | watchdog |
 | Steps to enter and clear | 2 and 6 samples | watchdog |
 | Tier margin on 128 GB | 20 GB | governor |
 | Budget | the memory cap the Stack reports on `GET /stack/v1/hardware/budget` | governor |
@@ -102,7 +104,7 @@ The per-slot peaks come from the Stack's tier catalog and are published on the b
 
 ## 7. Supersedes
 
-Nothing. This page restates, in one place, what the code does; it replaces no passage of the notes above. Where a note and
+The 2026-11-03 decision [memory-ladder-2026-11-03.md](memory-ladder-2026-11-03.md) supersedes the old R6 text, the CRITICAL order of the isolation note, and parts of the tier and memory notes; its "Supersedes" section lists each. Beyond that, nothing. This page restates, in one place, what the code does; it replaces no passage of the notes above. Where a note and
 the code disagree (the `no_memory` deadline of the isolation note's inventory, the fixed class order of the memory note
 against the scoring of the profiles note, the 4-per-kind "queue full" against "no cap on the line"), the code is the current
 behaviour and the disagreement is recorded here and in the review, not decided here.

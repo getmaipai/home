@@ -97,6 +97,8 @@ export interface VideoJob {
 
 /** The plain line a failed video starts with. It says what happened and what to do; the Stack's own sentence is used when it has one. */
 export const VIDEO_FAILED_PREFIX = "I couldn't make that video.";
+/** The Stack's code for a clip its memory watchdog stopped (queued or running; a Max clip ends `failed` with it). Older Stacks said `no_memory` on a `cancelled` clip. */
+export const MEMORY_CANCELLED_CODE = "memory_cancelled";
 
 export function plainVideoFailure(error: unknown): string {
   if (error instanceof StackVideoError) {
@@ -105,6 +107,7 @@ export function plainVideoFailure(error: unknown): string {
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;
+      case MEMORY_CANCELLED_CODE: return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "memory_stopped_failure", null, null, "adult")}`;
       case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.`;
       case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Try a picture instead.`;
       case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} Videos are not ready yet. Try again in a few minutes.`;
@@ -188,7 +191,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (actor) void watch(job, actor as PersonRow, submitted.done);
   } catch (error) {
-    if (error instanceof StackVideoError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.phase = "queued"; persistVideoJob(job); return; }
+    if (error instanceof StackVideoError && (error.code === "queue_full" || ((error.code === "no_memory" || error.code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request)))) { job.phase = "queued"; persistVideoJob(job); return; }
     job.state = "failed"; job.error = plainVideoFailure(error); persistVideoJob(job); refreshHouseholdQueue();
   }
 }
@@ -485,13 +488,15 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       }
       if (controller.signal.aborted) return;
       if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
-      if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); return; }
-      if (status.state === "cancelled" && status.code === "no_memory") {
+      // MEM-RETRY-01: the Stack's memory watchdog stopped the clip (a Max clip ends `failed` with the same code; an older Stack said `no_memory` on a `cancelled` clip). Never a person's Stop: that is code `cancelled` and ends the clip.
+      if ((status.state === "cancelled" || status.state === "failed") && (status.code === MEMORY_CANCELLED_CODE || (status.state === "cancelled" && status.code === "no_memory"))) {
+        if (controller.signal.aborted || job.state === "cancelled") return;
         const request = job.request as VideoRequest & { memoryRequeues?: number };
         const retries = request.memoryRequeues ?? 0;
         if (requeueAfterCritical({ requeues: retries }) === "requeue_head") { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; saveVideoJob(job); return; }
-        job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`; saveVideoJob(job); return;
+        job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "memory_stopped_failure", null, null, laneOfPerson(actor) === "child" ? "child" : "adult")}`; saveVideoJob(job); return;
       }
+      if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; saveVideoJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));

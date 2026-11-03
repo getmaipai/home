@@ -13,7 +13,7 @@ export function plainEngineLine(message: string): string {
 /** ENGINE-STATUS-MEDIA-01: a Stack refusal that is a state Home knows in advance (low memory, a restart, coding mode), read from
  * the Stack's own code, never from its wording; null for any other refusal. */
 export function makingStateOf(code: string | null | undefined): MakingCause | null {
-  if (code === "no_memory" || code === "out_of_memory") return "memory";
+  if (code === "no_memory" || code === "out_of_memory" || code === "memory_cancelled") return "memory";
   if (code === "stack_restarting") return "restarting";
   if (code === "coding_mode") return "mode_change";
   return null;

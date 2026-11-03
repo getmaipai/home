@@ -328,10 +328,12 @@ function scheduleNoRoomRecheck(): void {
   noRoomRecheck = setTimeout(() => { noRoomRecheck = null; void releaseHouseholdQueue(); }, noRoomRecheckMs);
   noRoomRecheck.unref?.();
 }
-/** MAX-LIVE-02: the Stack refused a Max job at submit with `no_memory` (its watchdog is not at normal). Home keeps the job queued and looks again in a few seconds instead of failing it, for about five minutes; a Standard or Boost job keeps the stored refusal (rule 6). Returns false when the job is not Max or the time is used up. */
+/** MAX-LIVE-02 and MEM-RETRY-01: the Stack refused a Max job, or a job it stopped for memory that Home started again, at submit with `no_memory` (its watchdog is not at normal). Home keeps the job queued and looks again in a few seconds instead of failing it, for about five minutes; a Standard or Boost job keeps the stored refusal (rule 6) unless Home restarted it after the watchdog stopped it. Returns false when the job is not Max or the time is used up. */
 export const MAX_SUBMIT_MEMORY_HOLDS = 60;
 export function holdMaxAfterMemoryRefusal(request: object | null | undefined): boolean {
-  if (requestTier(request) !== "max") return false;
+  // A job the Stack's watchdog stopped is started again by Home, and the Stack refuses new work until it has recovered (about a minute after the pressure ends): that refusal is part of the same wait, for any level, never a failure.
+  const restarted = ((request as { memoryRequeues?: number } | null | undefined)?.memoryRequeues ?? 0) > 0;
+  if (requestTier(request) !== "max" && !restarted) return false;
   const state = request as { submitMemoryHolds?: number };
   state.submitMemoryHolds = (state.submitMemoryHolds ?? 0) + 1;
   if (state.submitMemoryHolds > MAX_SUBMIT_MEMORY_HOLDS) return false;

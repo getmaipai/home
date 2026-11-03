@@ -92,8 +92,8 @@ Rules:
    `roleHealth` and `healthSnapshot` to the composer line exactly as `mode_change` is (rule S6: no new surface, banner or poll). Every signed-in
    person sees one line under the chat input for the job's length: "Chat is simpler while a big job runs (about 12 minutes). Answers are shorter and some extras may be paused." Going back is the reverse and
    waits for in-flight turns the same way. The Max job restarts from the beginning only in the watchdog case of T5.
-7. **Pressure ladder reuse.** The Stack's watchdog today restarts chat and evicts the judge at CRITICAL. Falling to Reduced is a gentler first step on the
-   same ladder (a candidate, not part of this note's scope).
+7. **Pressure ladder reuse.** Decided 2026-11-03 (MEM-LADDER-01, `resource-management.md` R14): at CRITICAL the Stack gives back its idle parts, then puts an idle
+   chat on Reduced, re-reads the pressure and only then stops the running job; a person chatting keeps the full model.
 8. **To measure before it ships:** the swap time on the Studio (the 4B is already resident as the judge in the standard profile, so it may be
    near zero), whether the Max job needs to pause at all for Reduced chat turns (the heavy gate pauses for chat today), and how plain Qwen3-4B
    chat feels to the household. If Reduced chat is judged too poor, Reduced stays off and Max stays at 72 GB.
@@ -350,7 +350,7 @@ Everything below rides the job record and queue that exist. A tier adds a `tier`
    what happens next: nobody new is held beyond it for a job that has not started, and the card tells the admin the estimate before it starts. If a
    job runs past its estimate, others keep waiting with the honest line "Still running, about N minutes more".
 7. **T5. What can lose work, and what happens.** The only forced stop is the watchdog at CRITICAL (the computer is about to fall over). A video,
-   song or picture then restarts from the beginning at the head of its class (up to two re-queues, then the existing low-memory failure line);
+   song or picture then restarts from the beginning at the head of its class (up to two re-queues, then a plain failure line; a video says "The computer stayed too busy, so your video could not finish"); the watchdog stops it only after the idle parts and an idle chat have been given back (R14);
    this is the one case where minutes of generation are lost, and the card says so in plain words. A pause for chat is not a loss: the job holds its
    memory and resumes (heavy gate). An admin pressing Stop on a window is a cancel the admin chose, with a confirm that names the job.
 8. **T6. Chat Max, no mode switch.** Chat Max is a lease on the machine for one thread (or one coding client's session), taken when a holder picks

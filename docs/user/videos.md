@@ -200,6 +200,8 @@ The video engine checks the file and refuses any style that puts a child in an a
 - **A video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. Boost takes about a minute, and the first one after a restart a little more.
 - **Your video is waiting.** Why: picture, video and song jobs share a household queue. Fix: wait. Its card shows its place in line and it starts when its turn comes.
 - **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.
+- **"The computer got too busy, so your video stopped. It will start again by itself."** Why: the computer needed its power for something else, so it stopped your video. It stops a video last, after it has given back everything that was not in use. When no one is chatting, chat may be a bit simpler for a few minutes first, so your video can keep going. Fix: nothing. Home starts the same video again by itself, with the same words, level and picture, and tries up to two more times. If you press **Stop**, it never starts again.
+- **"The computer stayed too busy, so your video could not finish."** Why: Home started it again twice and the computer was still busy. Fix: wait a few minutes, then press **Try again**.
 - **Home cannot reach the engine.** Why: the AI engine is restarting. Fix: wait a minute and ask again. Still stuck? Open **Repairs**.
 - **"Something went wrong while making it".** Why: the job failed. Fix: press **Try again**.
 - **No Animate this picture button.** Why: Home did not make that picture, or a clip is running. Fix: ask for a new picture first.

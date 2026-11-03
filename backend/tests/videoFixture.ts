@@ -18,7 +18,15 @@ export interface FakeVideoStack {
   failWith: { code: string; error: string } | null;
   /** The Stack's memory watchdog stopped the job: cancelled, code no_memory, phase "paused: low memory". */
   pausedForMemory: boolean;
+  /** MEM-RETRY-01: the next N polls of a running job report the Stack's distinct stop (code memory_cancelled, state `memoryStopState`). */
+  memoryCancels: number;
+  memoryStopState: "cancelled" | "failed";
+  /** After each such stop the Stack keeps refusing new clips with 503 no_memory this many times (its watchdog level needs a while to clear). */
+  refusalsAfterCancel: number;
+  memoryRefusals: number;
   refuseSubmit: { status: number; code: string; error: string } | null;
+  /** Submits the fake refused with no_memory (MEM-RETRY-01). */
+  refused?: number;
   /** GENPREVIEW-01: when set, running polls carry the stage, ETA and a preview (the first-frame preview shows from the second running poll). */
   live: { stage_label: string; eta_seconds: number } | null;
   previewFetches: number;
@@ -68,7 +76,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -82,6 +90,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     if (method === "POST" && path === "/v1/videos/generations") {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.submitted.push(body);
+      if (fake.memoryRefusals > 0) { fake.memoryRefusals -= 1; fake.submitted.pop(); fake.refused = (fake.refused ?? 0) + 1; return json({ error: "Not enough free memory for video right now. Close other big jobs, or try again in a few minutes.", code: "no_memory" }, 503); }
       if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
       const job: FakeVideoJob = { id: `vjob-${fake.jobs.length + 1}`, body, polls: 0, state: "queued", deleted: false };
       fake.jobs.push(job);
@@ -101,6 +110,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       if (jobMatch[2] === "poster.jpg") return new Response(testJpeg(), { status: 200, headers: { "content-type": "image/jpeg" } });
       job.polls += 1;
       if (job.state === "cancelled") return json({ job: job.id, state: "cancelled", phase: null, progress: 0, phase_progress: null, position: null, error: null, code: null, data: [] });
+      if (fake.memoryCancels > 0 && job.state !== "queued") { fake.memoryCancels -= 1; fake.memoryRefusals = fake.refusalsAfterCancel; job.state = "cancelled"; return json({ job: job.id, state: fake.memoryStopState, phase: fake.memoryStopState === "failed" ? "failed" : "paused: low memory", progress: 0, phase_progress: null, position: null, error: "Stopped: this computer got too busy. It can start again when there is room.", code: "memory_cancelled", data: [] }); }
       if (fake.pausedForMemory) { job.state = "cancelled"; return json({ job: job.id, state: "cancelled", phase: "paused: low memory", progress: 0, phase_progress: null, position: null, error: "Paused: this computer is low on memory.", code: "no_memory", data: [] }); }
       if (fake.failWith) { job.state = "failed"; return json({ job: job.id, state: "failed", phase: null, progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: fake.failWith.code, data: [] }); }
       if (job.polls >= fake.pollsToFinish) {

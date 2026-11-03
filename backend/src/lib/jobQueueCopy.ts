@@ -3,7 +3,7 @@ export type JobQueueState = "queued" | "waiting_memory" | "started" | "paused_ch
 export type JobQueueKind = "picture" | "video" | "song";
 export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
-  | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
+  | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "memory_stopped_failure" | "started"
   | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
   | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
@@ -46,13 +46,18 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     adult: "Waiting for its turn. It starts by itself, or tap Cancel.",
     child: "Waiting for its turn. It starts by itself.",
   },
+  // MEM-RETRY-01: the computer's watchdog stopped the job to keep chat working; Home starts it again by itself. No resource words for people.
   requeued_memory: {
-    adult: "Your job hit a snag, so it will start again from the beginning soon. Nothing to do.",
-    child: "Your job will start again soon.",
+    adult: "The computer got too busy, so your video stopped. It will start again by itself.",
+    child: "The computer got busy. Your video will start again by itself.",
   },
   low_memory_failure: {
     adult: "The job stopped before it finished. Try again in a few minutes.",
     child: "The job stopped. Try again later.",
+  },
+  memory_stopped_failure: {
+    adult: "The computer stayed too busy, so your video could not finish. Try again in a few minutes.",
+    child: "The video could not finish. Try again later.",
   },
   started: { adult: "Starting.", child: "Starting now." },
   paused_chat: { adult: "Waiting for its turn.", child: "Waiting for its turn." },
