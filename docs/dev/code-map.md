@@ -1060,5 +1060,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, orderHomeCards, getWidgetData |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_ID, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
+| `backend/src/lib/writingFormats.ts` | WRITING_FORMAT_TOOL_ID, __setWritingFormatsForTests, installedWritingFormats, writingFormatsFor, writingFormatToolSpec, writingFormatForArgs |
 | `backend/src/lib/wyoming.ts` | encodeWyomingMessage, WyomingFramer, readWavPcm |
 | `backend/src/lib/wyomingServer.ts` | startWyomingServer |
