@@ -928,6 +928,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stt.ts` | transcribeUtterance |
 | `backend/src/lib/sttAssets.ts` | SILERO_VAD_ASSET, sileroVadPath, ensureSileroVadAsset |
 | `backend/src/lib/sttSession.ts` | getEndpointer, __setSileroLoaderForTests, __resetSileroLoaderForTests, isLikelySpeech, SttSession, encodeWav |
+| `backend/src/lib/styleLock.ts` | pictureStyleAccess, styleOfComponent, styleAccessResolver, componentStyleAccess |
 | `backend/src/lib/subjects.ts` | findEntityByName, ensureSubjectEntity, findSubjectByName, ensurePersonEntity, RELATION_PHRASES, writeRelation |
 | `backend/src/lib/summaryRefresh.ts` | scheduleSummaryRefresh, __setSummaryRefreshDelayForTests, __clearPendingSummaryRefreshesForTests |
 | `backend/src/lib/surfaceClass.ts` | surfaceClassOf, isWrittenAdultTurn, promptSurfaceClassFor |
