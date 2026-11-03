@@ -118,6 +118,20 @@ export function researchProgress(outcomes: readonly ToolExecutionOutcome[]): Res
   return { queries, sites: [...sites] };
 }
 
+/** RESEARCH-FLOOR-01: the least evidence a research turn must hold before the gap check may end the searching while time remains. */
+export const EVIDENCE_FLOOR = { hosts: 2, notes: 3, chars: 700 } as const;
+/** How long the gap check waits for page notes still being written before it counts them. */
+export const EVIDENCE_FLOOR_NOTES_WAIT_MS = 1_500;
+
+let floorOff = false;
+/** Tests: true switches the evidence floor off (the scripted harness never writes notes, so every turn there is thin); false restores it. */
+export function __setEvidenceFloorOffForTests(off: boolean): void { floorOff = off; }
+
+/** True when what the turn holds is thin: fewer than two distinct hosts, fewer than three notes, or the backbone and the notes together under the character floor. */
+export function evidenceThin(held: { hosts: number; notes: number; chars: number }): boolean {
+  return !floorOff && (held.hosts < EVIDENCE_FLOOR.hosts || held.notes < EVIDENCE_FLOOR.notes || held.chars < EVIDENCE_FLOOR.chars);
+}
+
 /** The user-role nudge before a later tool round: what was searched, what was read, what is left. */
 export function continuationInstruction(style: AnswerStyle, utterance: string, progress: ResearchProgress, roundsLeft: number): string {
   const searched = progress.queries.length > 0 ? `Searched so far: ${progress.queries.map((q) => `"${q.replace(/"/g, "'")}"`).join("; ")}.` : "Nothing has been searched yet.";

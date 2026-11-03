@@ -16,7 +16,7 @@ import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { PageDeclinedError, __setPageReaderForTests, __resetSearchCacheForTests } from "@/lib/packageHost";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { createChatLease, registerActiveChatLease } from "@/lib/chatLease";
-import { __setResearchCapForTests, rewordEmptyQuery, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
+import { __setEvidenceFloorOffForTests, __setResearchCapForTests, rewordEmptyQuery, researchCutAt, researchNoNewRound, budgetForStyle, dropUnknownCitations, dropUnsupportedCredits, isRepeatQuery, roundAddedNothing } from "@/lib/turnMachine/research";
 import { __setWebSearchToolDeadlineForTests } from "@/lib/webSearchBudget";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { RESEARCH_HOST_PAGES_MAX, RESEARCH_PAGES_MAX, newResearchBudget, noteDeclined, notePageRead, researchPageAllowed } from "@/lib/researchBudget";
@@ -74,6 +74,7 @@ beforeEach(() => {
   refillPace = false;
   __setClaimJudgeForTests(async () => '{"supported": true}');
   __setQueryWriterForTests(async () => null);
+  __setEvidenceFloorOffForTests(true); // the scripted harness writes no notes, so every turn is thin; the floor's own tests switch it on
   __setNoteWriterForTests(async () => null);
   __setStageWritersForTests({ brief: async () => null, analysis: async () => null });
   searx = Bun.serve({
@@ -571,6 +572,50 @@ describe("the gap check ends the searching only when the writer itself finds not
     const { result } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: "why was the television series Harbor Lights cancelled after one season" });
     expect(searxQueries).toEqual(["Harbor Lights television series cancelled"]);
     expect(result.value.reply.text).toContain("It ended after one season");
+  });
+});
+
+describe("the gap check holds the searching open while the evidence is thin (RESEARCH-FLOOR-01)", () => {
+  const ASK = "why was the television series Harbor Lights cancelled after one season";
+  const rich = async () => JSON.stringify({ kind: "reputable", notes: [1, 2, 3, 4].map((i) => ({ topic: `part ${i}`, note: `${"detail ".repeat(40)}${i}`.slice(0, 240), quote: "about the series", weight: 2 })) });
+  const BRIEF = JSON.stringify({ subject: "the series", answer_type: "an explanation", must_contain: ["why it ended"], ambiguous: false, options: [], question: "", assumption: "" });
+  const planThenNothing: Parameters<typeof __setQueryWriterForTests>[0] = async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["why it ended"], queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: [] }));
+  beforeEach(() => { refillPace = true; __setEvidenceFloorOffForTests(false); __setStageWritersForTests({ brief: async () => BRIEF, analysis: async () => null }); __setEntityPinForTests({ finder: async () => [], writer: async () => null }); });
+  afterEach(() => { __setEvidenceFloorOffForTests(true); __setResearchCapForTests(undefined); });
+
+  test("no queries left, thin evidence and time left: one more round of searches from the question", async () => {
+    await holdMax();
+    __setQueryWriterForTests(planThenNothing);
+    const { result } = await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: ASK });
+    expect(searxQueries.length).toBeGreaterThan(1);
+    expect(searxQueries.length).toBeLessThanOrEqual(4);
+    expect(searxQueries[1]).not.toBe(searxQueries[0]);
+    expect(result.value.reply.text).toContain("It ended after one season");
+  });
+
+  test("no queries left and thick evidence (3 hosts, 3 or more notes, enough text): the searching ends as before", async () => {
+    await holdMax();
+    __setNoteWriterForTests(rich);
+    __setQueryWriterForTests(planThenNothing);
+    await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: ASK });
+    expect(searxQueries.length).toBe(1);
+  });
+
+  test("thin evidence but no time left: no extra round", async () => {
+    await holdMax();
+    __setResearchCapForTests({ thinking: 1_000, max: 1_000 });
+    searxDelayMs = 800; // the first round alone passes 70% of the cap, so no new round may start
+    refillPace = false;
+    __setQueryWriterForTests(planThenNothing);
+    await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: ASK });
+    expect(searxQueries.length).toBe(1);
+  });
+
+  test("never more than one extra round, however thin the result stays", async () => {
+    await holdMax();
+    __setQueryWriterForTests(async (prompt) => (prompt.includes("Searches already run:\n(none yet)") ? JSON.stringify({ sub_questions: ["why it ended"], queries: ["Harbor Lights television series cancelled"] }) : JSON.stringify({ queries: [] })));
+    await turn("owner", 4, { max: true, thinking: true, queries: ["Harbor Lights series ratings one season"], utterance: ASK });
+    expect(searxQueries.length).toBe(4); // the plan's one search, then the floor's single extra round of three
   });
 });
 

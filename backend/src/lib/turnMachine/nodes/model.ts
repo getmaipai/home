@@ -2,8 +2,8 @@ import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
-import { ANSWER_WORDS, stageTimeoutMs, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planDataWithin, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
-import { NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isResearchStyle, markResearch, noteResearchText, researchEvidence, researchCutAt, researchPastCut, researchProgress, resultDigest, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
+import { ANSWER_WORDS, fallbackPlan, stageTimeoutMs, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planDataWithin, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
+import { EVIDENCE_FLOOR_NOTES_WAIT_MS, evidenceThin, researchNoNewRound, NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isRepeatQuery, isResearchStyle, markResearch, noteResearchText, researchEvidence, researchCutAt, researchPastCut, researchProgress, resultDigest, shortKeywordQuery, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
@@ -812,8 +812,12 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     if (proposed !== null) state.nextQueries = proposed.queries;
     // Done only when the writer itself sees nothing more to search; a list the filters emptied (repeats, names from memory) leaves the model to search.
     // Done when the writer has nothing more to search, or everything it wrote repeats an earlier search; a writer that is down leaves it to the model.
-    if (proposed !== null && proposed.queries.length === 0) effective = { ...input, toolsAllowed: false };
-    else if (proposed !== null && proposed.queries.length > 0) {
+    if (proposed !== null && proposed.queries.length === 0) {
+      // RESEARCH-FLOOR-01: nothing more to write is not enough while the evidence is thin and time remains: one more deterministic round, once.
+      const floor = await thinEvidenceRound(state, input.utterance, signal);
+      if (floor) return floor;
+      effective = { ...input, toolsAllowed: false };
+    } else if (proposed !== null && proposed.queries.length > 0) {
       markResearch(state, `model skipped: the plan issues ${Math.min(proposed.queries.length, PLANNED_SEARCHES_PER_ROUND)} searches`);
       return { outcome: { ok: true }, output: { kind: "tool_calls", calls: plannedSearchCalls(proposed.queries, state.outcomes.length) } };
     }
@@ -826,6 +830,30 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if (calls.length === 0) return modelRound(state, { ...input, toolsAllowed: false, retry: false }, signal);
   return { ...result, output: { ...result.output, calls } };
 };
+
+/** The turns that already had their one extra round from the evidence floor. */
+const floorUsed = new WeakSet<object>();
+/** RESEARCH-FLOOR-01: when the writer has nothing more to search but the evidence is thin (too few hosts or notes, or the backbone and notes under
+ * the character floor) and time remains, run ONE more round of the deterministic searches `fallbackPlan` builds from the question and the pin.
+ * The 70% new-round gate, the search ceiling and the per-round search limit still hold; a thin result after that round proceeds as before. */
+async function thinEvidenceRound(state: TurnState, utterance: string, signal: AbortSignal): Promise<{ outcome: NodeOutcome; output: ModelOutput } | null> {
+  if (floorUsed.has(state) || researchNoNewRound(state) || researchPastCut(state)) return null;
+  if (state.researchBudget && state.researchBudget.searches >= RESEARCH_SEARCHES_MAX) return null;
+  const hosts = researchProgress(state.outcomes).sites.length;
+  const notes = state.researchBudget && state.researchBudget.notes.size > 0 ? await settledNotes(state.researchBudget.notes, EVIDENCE_FLOOR_NOTES_WAIT_MS) : [];
+  const backbone = state.backbone ?? (state.backbonePromise ? await Promise.race([state.backbonePromise, new Promise<null>((resolve) => setTimeout(() => resolve(null), 0))]) : null);
+  const chars = (backbone?.text.length ?? 0) + notes.reduce((n, x) => n + x.note.length + x.quote.length, 0);
+  if (!evidenceThin({ hosts, notes: notes.length, chars })) return null;
+  const rq = researchQuestion(state.messages, utterance);
+  const earlier = researchProgress(state.outcomes).queries;
+  const plan = fallbackPlan(state.researchBrief ?? null, rq, PLANNED_SEARCHES_PER_ROUND, state.entityAnchor?.text ?? "", state.entityAnchor?.phrase ?? "");
+  const candidates = plan.queries.length > 0 ? plan.queries : [shortKeywordQuery(rq)];
+  const queries = candidates.filter((q) => q.split(/\s+/).length >= 2 && !isRepeatQuery(earlier, q)).slice(0, PLANNED_SEARCHES_PER_ROUND);
+  if (queries.length === 0) return null;
+  floorUsed.add(state);
+  markResearch(state, `evidence floor: ${hosts} hosts, ${notes.length} notes, ${chars} chars of backbone and notes is thin and time remains; one more round of ${queries.length} searches`);
+  return { outcome: { ok: true }, output: { kind: "tool_calls", calls: plannedSearchCalls(queries, state.outcomes.length) } };
+}
 
 /** RESEARCH-CLOCK-01: the searches a plan or a gap check wrote, issued by the code as the round's tool calls (up to this many at a time),
  * so the big model does not spend 5 to 20 seconds writing calls the plan already holds. The policy and the tool node treat them as any call. */
