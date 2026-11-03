@@ -96,6 +96,9 @@
                 "look": "{look}",
                 "camera": "{camera}",
                 "voices": "{voices}",
+                "style": "{style}",
+                "character": "{character}",
+                "strength": "{strength}",
                 "start_frame": "{start_frame}"
               }
             }

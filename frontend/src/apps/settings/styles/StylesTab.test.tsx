@@ -10,6 +10,7 @@ import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { StylesTab } from "@/apps/settings/styles/StylesTab";
 import { StyleConfirm } from "@/apps/settings/styles/StyleConfirm";
 import { StyleBrowser } from "@/apps/settings/styles/StyleBrowser";
+import { tryStyleState } from "@/apps/settings/styles/StyleEditor";
 import { stylesApi, type BrowseHit, type BrowseQuery, type InstallBody, type SourcesState, type StyleRow } from "@/apps/settings/styles/stylesApi";
 import { ApiError, type Roster } from "@/lib/api";
 import { STYLES_COPY_DEFAULTS } from "@/apps/settings/styles/stylesShared";
@@ -272,5 +273,13 @@ describe("the editor", () => {
     await waitFor(() => expect(stylesApi.patch).toHaveBeenCalledWith("lora-a", { name: "Faded Film" }));
     expect(await view.findByText("Saved.")).toBeTruthy();
     restore();
+  });
+});
+
+describe("Try this style (VIDEO-LORA-09)", () => {
+  test("the router state names the Create choice for the style's kind and holds no address", () => {
+    expect(tryStyleState(row({ id: "lora-a", kind: "style" }))).toEqual({ pageState: { style: "lora-a" } });
+    expect(tryStyleState(row({ id: "lora-b", kind: "motion" }))).toEqual({ pageState: { style: "lora-b" } });
+    expect(tryStyleState(row({ id: "lora-c", kind: "character" }))).toEqual({ pageState: { character: "lora-c" } });
   });
 });

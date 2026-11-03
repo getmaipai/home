@@ -74,7 +74,8 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     body.recipe = camera;
   }
   // VIDEO-LORA-09: the picker sends style ids (a list, or a comma-separated text from a plain form) and Less, Normal or More. Which ids are real and allowed is decided later, never here.
-  const styleList = Array.isArray(raw.styles) ? raw.styles : typeof raw.styles === "string" ? raw.styles.split(",") : [];
+  // The picker has one Styles choice and one Characters choice (`style`, `character`); `styles` is the plain list the route and the tools use.
+  const styleList = [...(Array.isArray(raw.styles) ? raw.styles : typeof raw.styles === "string" ? raw.styles.split(",") : []), raw.style, raw.character];
   const styles = [...new Set(styleList.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter((v) => v !== "" && !/^\{[a-z_]+\}$/.test(v)))];
   if (styles.length > 2) return { ok: false, error: "Two styles at a time is the most. Pick one or two, then try again." };
   if (styles.some((id) => id.length > 80)) return { ok: false, error: "That style isn't available any more. Choose another style, or make the video without one." };

@@ -205,3 +205,82 @@ describe("chat tools: names, never ids", () => {
     expect(JSON.stringify(none)).not.toContain("Clay look");
   });
 });
+
+describe("the Create page's style picker (served chips)", () => {
+  type Chip = { state: string; label: string; options: Array<{ value: string; label: string; note?: string }>; locked?: boolean; enabled_tiers?: string[]; disabled_reason?: string; group?: string };
+  function barOf(body: Array<Record<string, any>>): Record<string, any> | undefined {
+    for (const node of body) { if (node.type === "prompt_bar") return node; const hit = barOf([...(node.main ?? []), ...(node.aside ?? [])]); if (hit) return hit; }
+    return undefined;
+  }
+  const chipsOf = async (client: { get: (p: string, h?: Record<string, string>) => Promise<Response> }, headers?: Record<string, string>): Promise<Chip[]> => {
+    const page = (await (await client.get("/api/plugins/videos/pages/create", headers)).json()) as { body: Array<Record<string, any>> };
+    return barOf(page.body)!.chips as Chip[];
+  };
+
+  test("no styles and none locked: no style chips at all, and the other five chips are as before", async () => {
+    const { owner } = await household();
+    engine({ max: true });
+    expect((await chipsOf(owner)).map((c) => c.state)).toEqual(["orientation", "seconds", "look", "camera", "voices"]);
+  });
+
+  test("Styles and Characters are two groups in the Style popover; Characters is absent when empty; the note shows what a card adds", async () => {
+    const { owner, row } = await household();
+    const clay = putLora(row("Sage").id, { ...STYLE, name: "Clay look", description: "Looks like clay stop motion.", trigger_words: ["claymation"], positive_addins: ["soft studio light"] });
+    stackHas(clay); engine({ max: true });
+    let chips = await chipsOf(owner);
+    expect(chips.map((c) => c.state)).toEqual(["orientation", "seconds", "look", "camera", "voices", "style", "strength"]);
+    const style = chips.find((c) => c.state === "style")!;
+    expect(style.group).toBe("Style");
+    expect(style.options.map((o) => o.label)).toEqual(["No style", "Clay look"]);
+    expect(style.options[1]!.note).toBe("Looks like clay stop motion. Added for Clay look (2 phrases): claymation, soft studio light.");
+    expect(style.locked).toBeUndefined();
+    const hero = putLora(row("Sage").id, { ...STYLE, name: "Rover the dog", kind: "character", availability: { who: "adults", people: [] } });
+    stackHas(clay, hero);
+    chips = await chipsOf(owner);
+    expect(chips.map((c) => c.state)).toEqual(["orientation", "seconds", "look", "camera", "voices", "style", "character", "strength"]);
+    expect(chips.find((c) => c.state === "character")!.options.map((o) => o.label)).toEqual(["No character", "Rover the dog"]);
+  });
+
+  test("enabled only at the levels the Stack reports LoRA-capable, with one plain line elsewhere (never a raw error after a click)", async () => {
+    const { owner, row } = await household();
+    const clay = putLora(row("Sage").id, { ...STYLE });
+    stackHas(clay);
+    engine({ max: true });
+    let style = (await chipsOf(owner)).find((c) => c.state === "style")!;
+    expect(style.enabled_tiers).toEqual(["max"]);
+    expect(style.disabled_reason).toBe("Styles work at Max. Choose that level to use one.");
+    engine({ max: true, std: true });
+    style = (await chipsOf(owner)).find((c) => c.state === "style")!;
+    expect(style.enabled_tiers).toEqual(expect.arrayContaining(["standard", "max"]));
+    engine({});
+    style = (await chipsOf(owner)).find((c) => c.state === "style")!;
+    expect(style.enabled_tiers).toBeUndefined();
+    expect(style.disabled_reason).toBe("Styles can't be used on this computer yet.");
+  });
+
+  test("a person who is not offered Max sees why, in one line; an adult-only style is one lock tile with no name until the unlock", async () => {
+    const { adult, owner, row } = await household();
+    const open = putLora(row("Sage").id, { ...STYLE, name: "Clay look" });
+    const hidden = secretLora(row("Sage").id, { ...STYLE, availability: { who: "adults", people: [] }, audience: "adult-only" });
+    stackHas(open, hidden); engine({ max: true });
+    const forAdult = await chipsOf(adult.client);
+    const style = forAdult.find((c) => c.state === "style")!;
+    expect(style.enabled_tiers).toBeUndefined();
+    expect(style.disabled_reason).toContain("Styles are for Max for now.");
+    expect(style.locked).toBe(true);
+    expect(JSON.stringify(forAdult)).not.toContain("Zebraquill");
+    expect(JSON.stringify(forAdult)).not.toContain(hidden.id);
+    // Unlocked: the real card, no tile.
+    const proof = await unlock(owner, "correcthorse");
+    const open2 = (await chipsOf(owner, unlockHeader(proof))).find((c) => c.state === "style")!;
+    expect(open2.locked).toBeUndefined();
+    expect(open2.options.map((o) => o.label)).toContain("Zebraquill Cabaret Lace");
+  });
+
+  test("only the owner's own adult-only access draws it: a teen and a child get no style chips (the page is for adults)", async () => {
+    const { teen, child, row } = await household();
+    stackHas(putLora(row("Sage").id, { ...STYLE }));
+    engine({ max: true });
+    for (const who of [teen, child]) expect((await who.client.get("/api/plugins/videos/pages/create")).status).not.toBe(200);
+  });
+});
