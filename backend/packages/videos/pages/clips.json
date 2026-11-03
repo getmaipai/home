@@ -59,21 +59,7 @@
                 "type": "empty_state",
                 "icon": "film",
                 "text": "Your clips will show up here. Choose Create to make one."
-              },
-              "row_actions": [
-                {
-                  "icon": "audio-waveform",
-                  "label": "Open in Studio",
-                  "action": {
-                    "navigate": {
-                      "to": "/apps/videos/studio",
-                      "state": {
-                        "clip": "{id}"
-                      }
-                    }
-                  }
-                }
-              ]
+              }
             }
           ]
         },
@@ -127,21 +113,7 @@
                 "type": "empty_state",
                 "icon": "heart",
                 "text": "Press the heart on a clip and it shows up here."
-              },
-              "row_actions": [
-                {
-                  "icon": "audio-waveform",
-                  "label": "Open in Studio",
-                  "action": {
-                    "navigate": {
-                      "to": "/apps/videos/studio",
-                      "state": {
-                        "clip": "{id}"
-                      }
-                    }
-                  }
-                }
-              ]
+              }
             }
           ]
         },

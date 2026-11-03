@@ -105,6 +105,8 @@ function visit(value: unknown, depth: number, jobs: Array<Promise<void>>, flippe
         jobs.push(adultBlobUrl(raw).then((url) => { if (url) value[key] = url; else value[key] = null; }));
       }
     }
+    // An adult-only row can hold rows of its own (a Studio clip's lanes and pieces); each is read by its own flags.
+    for (const key of Object.keys(value)) { const inner = value[key]; if (typeof inner === "object" && inner !== null) visit(inner, depth + 1, jobs, flipped); }
     return;
   }
   if (id && value.locked !== true) { if (openIds.size >= OPEN_IDS_CAP) openIds.clear(); openIds.add(id); }

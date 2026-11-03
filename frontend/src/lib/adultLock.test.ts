@@ -41,6 +41,18 @@ describe("blob sources", () => {
     expect(isAdultBlobUrl(rows[0]!.src as string)).toBe(true);
   });
 
+  test("VIDEO-STUDIO-07: a Studio clip row's pieces, lanes down, are read by their own flags; an open piece in an adult-only row is left alone", async () => {
+    setAdultProof("p1");
+    const rows = [{ id: "c", adult_only: true, poster: "/api/videos/jobs/j/files/p", lanes: [{ id: "video", pieces: [{ id: "clip-1", adult_only: true, src: "/api/videos/jobs/j/files/c", poster: "/api/videos/jobs/j/files/p" }, { id: "clip-2", src: "/api/open/c2" }] }] }];
+    await adultResponse(rows);
+    const pieces = (rows[0]!.lanes[0] as { pieces: Array<{ src: string; poster?: string }> }).pieces;
+    expect(rows[0]!.poster).toStartWith("blob:test/");
+    expect(pieces[0]!.src).toStartWith("blob:test/");
+    expect(pieces[0]!.poster).toStartWith("blob:test/");
+    expect(pieces[1]!.src).toBe("/api/open/c2");
+    expect(seen.every((s) => s.proof === "p1")).toBe(true);
+  });
+
   test("without a proof nothing is fetched into a blob", async () => {
     const rows = [{ id: "a", adult_only: true, src: "/api/files/a/content" }];
     await adultResponse(rows);
