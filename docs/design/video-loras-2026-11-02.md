@@ -14,6 +14,8 @@ Status: proposed, design only. Item VIDEO-LORA-01 (this note). Nothing here is b
 
 Two designs in one note because the second is the first's gate: no slice that shows a LoRA or an adult item ships before the Adult lock (section 3).
 
+> **Amended 2026-11-02 by [settings-media-2026-11-02.md](settings-media-2026-11-02.md):** the Settings parts (D2 and sections 4.4, 5.1, 5.2, 5.3 item 3, and the `adult_adapters` switch) now live in that note's Styles tab; its section 1 names each change. The lock, the record and the Create picker stand as written here.
+
 ## 0. Decisions in one list
 
 | # | Decision |

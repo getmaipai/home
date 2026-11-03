@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Settings, Pictures, videos and music (mockup, VIDEO-SETTINGS-01)</title>
+<!--
+  Mockup of docs/design/settings-media-2026-11-02.md. Query: ?theme=light|dark  &state=pictures|videos|music|styles|unlock|styles-open|browse|confirm|detail  &phone=1
+  Every colour below is a stand-in for a kit theme token (--background, --card, --muted, --border, --primary, --foreground, --muted-foreground,
+  --destructive). Nothing here is a fixed brand colour: a person's own theme replaces all of them. The dim behind a dialog stands in for the kit's overlay token.
+  Pictures are the Videos package's own loop posters (docs/design/assets/video-create-feel-2026-11-02/posters). Names are made up.
+  Everything drawn is a kit part as shipped (SettingsShell tabs, Item and ItemGroup rows, Switch, Select, Dialog (flow variant), the lock tile and LockedSettingRow,
+  JobProgress); the one new part is the phrase list in the style editor (kit gap G1 in the note).
+-->
+<style>
+:root{--background:#f4f4f5;--foreground:#18181b;--card:#fff;--muted:#ececee;--muted-foreground:#62626b;--border:#dcdce0;--primary:#18181b;--primary-foreground:#fff;--destructive:#b42318;--ok:#1a7f4b;--dim:rgba(20,20,24,.45)}
+:root[data-theme=dark]{--background:#101012;--foreground:#f4f4f5;--card:#1a1a1d;--muted:#26262a;--muted-foreground:#a1a1aa;--border:#303036;--primary:#f4f4f5;--primary-foreground:#18181b;--destructive:#f1796d;--ok:#5fcf93;--dim:rgba(0,0,0,.6)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--background);color:var(--foreground);overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:56px 240px 1fr;height:100vh}
+.rail{border-right:1px solid var(--border);display:flex;flex-direction:column;gap:10px;align-items:center;padding:14px 0}
+.rail i{width:28px;height:28px;border-radius:8px;background:var(--muted)}
+.side{border-right:1px solid var(--border);padding:14px 10px;overflow:hidden}
+.side h6{margin:12px 10px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600}
+.side b{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;font-weight:500;color:var(--muted-foreground);font-size:13px}
+.side b.on{background:var(--muted);color:var(--foreground)}
+.main{overflow:auto;height:100vh}
+.page{max-width:820px;margin:0 auto;padding:28px 24px 80px}
+.crumb{color:var(--muted-foreground);font-size:13px;margin-bottom:6px}
+h1{font-size:26px;margin:0 0 14px;font-weight:650}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto;white-space:nowrap}
+.tabs span{padding:8px 12px;color:var(--muted-foreground);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs span.on{color:var(--foreground);border-color:var(--primary)}
+h2{font-size:15px;margin:22px 0 4px;font-weight:600}
+.sub{color:var(--muted-foreground);margin:0 0 10px;font-size:13px}
+.group{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.item{display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--border);min-height:56px}
+.item:first-child{border-top:0}
+.item .t{flex:1;min-width:0}
+.item .t b{display:block;font-weight:550}
+.item .t small{display:block;color:var(--muted-foreground);font-size:12.5px;margin-top:2px}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--muted);border:1px solid var(--border);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--muted-foreground)}
+.sw.on{background:var(--primary);border-color:var(--primary)}
+.sw.on::after{left:18px;background:var(--primary-foreground)}
+.sel{border:1px solid var(--border);border-radius:9px;padding:6px 10px;background:var(--background);white-space:nowrap;font-size:13px}
+.sel::after{content:" \25BE";color:var(--muted-foreground)}
+.btn{border:1px solid var(--border);border-radius:9px;padding:7px 14px;background:var(--card);font-weight:550;white-space:nowrap;font-size:13px}
+.btn.pri{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:1px 9px;font-size:11.5px;color:var(--muted-foreground);background:var(--background);margin-right:4px}
+.chip.ok{color:var(--ok);border-color:var(--ok)}
+.chip.adult{color:var(--destructive);border-color:var(--destructive)}
+.thumb{width:56px;height:40px;border-radius:8px;object-fit:cover;flex:none;background:var(--muted)}
+.lock{display:flex;align-items:center;gap:10px;color:var(--muted-foreground);font-weight:550;width:100%;border:0;background:none;text-align:left;padding:0}
+.lock .ic{width:34px;height:34px;border-radius:9px;background:var(--muted);display:grid;place-items:center;font-size:16px;flex:none}
+.bar{height:6px;border-radius:99px;background:var(--muted);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;width:42%;background:var(--primary)}
+.row2{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+.lockbtn{position:fixed;right:16px;bottom:16px;z-index:5}
+/* dialogs */
+.dim{position:fixed;inset:0;background:var(--dim);z-index:10;display:flex;align-items:center;justify-content:center}
+.dlg{background:var(--card);border:1px solid var(--border);border-radius:18px;width:min(760px,94vw);max-height:90vh;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.dlg.small{width:min(420px,94vw)}
+.dlg h3{margin:0;font-size:18px}
+.dlg p{margin:0;color:var(--muted-foreground)}
+.srch{border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:var(--background);color:var(--muted-foreground)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.seg span{padding:6px 12px;font-size:13px;color:var(--muted-foreground)}
+.seg span.on{background:var(--primary);color:var(--primary-foreground)}
+.seg span.off{opacity:.55}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tile{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--background);display:flex;flex-direction:column}
+.tile img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.tile div{padding:8px 10px;font-size:12.5px;color:var(--muted-foreground)}
+.tile b{display:block;color:var(--foreground);font-size:13.5px}
+.tile.lockt{align-items:center;justify-content:center;min-height:140px;color:var(--muted-foreground);font-weight:550;gap:8px}
+.tile.lockt .ic{width:40px;height:40px;border-radius:10px;background:var(--muted);display:grid;place-items:center;font-size:18px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-weight:550;font-size:13px}
+.inp{border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--background)}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px}
+.kv span:nth-child(odd){color:var(--muted-foreground)}
+.pass{display:flex;gap:8px;justify-content:center;margin:6px 0}
+.pass i{width:38px;height:46px;border:1px solid var(--border);border-radius:9px;background:var(--background)}
+.sheet{position:fixed;top:5vh;left:50%;transform:translateX(-50%);width:min(620px,94vw);max-height:90vh;background:var(--card);border:1px solid var(--border);border-radius:18px;z-index:11;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.phone .sheet{top:0;left:0;transform:none;width:100vw;max-height:100vh;height:100vh;border-radius:0;border:0}
+.sheet h3{margin:0;font-size:18px}
+.sheet h4{margin:8px 0 0;font-size:13px;color:var(--muted-foreground);letter-spacing:.04em;text-transform:uppercase}
+.rad{display:flex;flex-direction:column;gap:6px}
+.rad span{display:flex;align-items:center;gap:8px}
+.rad span::before{content:"";width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border);flex:none}
+.rad span.on::before{border-color:var(--primary);background:radial-gradient(var(--primary) 45%,transparent 50%)}
+.phr{display:flex;flex-wrap:wrap;gap:6px}
+.phr span{border:1px solid var(--border);border-radius:999px;padding:3px 6px 3px 10px;background:var(--background);font-size:12.5px}
+.phr span::after{content:"  \00D7";color:var(--muted-foreground)}
+.phr em{font-style:normal;border:1px dashed var(--border);border-radius:999px;padding:3px 10px;color:var(--muted-foreground);font-size:12.5px}
+.note{font-size:12.5px;color:var(--muted-foreground)}
+/* phone */
+.phone .app{grid-template-columns:1fr}
+.phone .rail,.phone .side{display:none}
+.phone .page{padding:14px 16px 80px}
+.phone h1{font-size:22px}
+.phone .grid{grid-template-columns:repeat(2,1fr)}
+.phone .dlg{width:100vw;max-height:100vh;height:100vh;border-radius:0;border:0}
+.phone .dlg.small{height:auto;border-radius:18px 18px 0 0;align-self:flex-end;width:100vw}
+.phone .dim:has(.dlg.small){align-items:flex-end}
+.phone .item{flex-wrap:wrap}
+.phone .kv{grid-template-columns:100px 1fr}
+.pback{display:none;color:var(--muted-foreground);font-size:13px;margin-bottom:8px}
+.phone .pback{display:block}
+.phone .crumb{display:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const theme = q.get("theme") || "light";
+const state = q.get("state") || "styles";
+if (theme === "dark") document.documentElement.dataset.theme = "dark";
+if (q.get("phone")) document.body.classList.add("phone");
+const P = "../video-create-feel-2026-11-02/posters/";
+const sw = (on) => `<span class="sw${on ? " on" : ""}"></span>`;
+const item = (title, help, right = "", pic = "") => `<div class="item">${pic}<div class="t"><b>${title}</b>${help ? `<small>${help}</small>` : ""}</div>${right}</div>`;
+const sel = (v) => `<span class="sel">${v}</span>`;
+const btn = (v, c = "") => `<span class="btn ${c}">${v}</span>`;
+const tabs = (on) => `<div class="tabs">${["Pictures", "Videos", "Music", "Styles"].map((t) => `<span class="${t === on ? "on" : ""}">${t}</span>`).join("")}</div>`;
+const lockRow = `<div class="item"><button class="lock"><span class="ic">&#128274;</span>Locked items</button></div>`;
+const styleRow = (name, pic, meta, who, adult = false) => item(`${name}${adult ? ' <span class="chip adult">Adults only</span>' : ""}`, meta, sel(who), `<img class="thumb" src="${P}${pic}.jpg" alt="">`);
+
+function pictures() {
+  return `${tabs("Pictures")}
+  <h2>Pictures</h2><p class="sub">Who can make pictures, and which models make them.</p>
+  <div class="group">
+    ${item("Adults can make pictures", "Turns picture making on or off for adults. Teens can always make pictures with nothing adult in them. Children are set below.", sw(true))}
+    ${item("Picture models", "Choose which models make Standard and Boost pictures.", btn("Choose models", "sm"))}
+  </div>
+  <h2>Children and teens</h2><p class="sub">Children make safe cartoons. Teens make pictures and videos with nothing adult in them. Neither sees styles.</p>
+  <div class="group">
+    ${item("Let children make cartoon pictures and videos", "Children get cartoons with no sound, up to the limits below. Photos, real people and anything scary or grown-up are never made for them.", sw(true))}
+    ${item("Cartoon pictures a child can make each day", "0 means none.", '<span class="sel" style="min-width:56px;text-align:right">20</span>')}
+    ${item("Cartoon videos a child can make each day", "0 means none.", '<span class="sel" style="min-width:56px;text-align:right">5</span>')}
+    ${item("Family can make pictures, videos and songs of each other", "Anyone in the home may make things with or of any household member. Turn it off to stop that.", sw(true))}
+  </div>`;
+}
+function videos() {
+  return `${tabs("Videos")}
+  <h2>Videos</h2><p class="sub">Who can make videos, and how.</p>
+  <div class="group">
+    ${item("Video making", "Turns video making on or off for everyone in the home, children and teens too. Children's daily limits are under Pictures.", sw(true))}
+    ${item("Level when nobody says", "Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video.", sel("Standard"))}
+    ${item("Video models", "Choose which models make Standard, Boost and Max videos.", btn("Choose models", "sm"))}
+    ${item("Styles", "Add, share and remove styles.", btn("Open Styles", "sm"))}
+  </div>
+  <p class="note" style="margin-top:10px">Max is for the people you allow. Videos are never made on a spoken turn, a shared screen or for a guest.</p>
+`;
+}
+function music() {
+  return `${tabs("Music")}
+  <h2>Songs</h2><p class="sub">Who can make songs, and how long they are.</p>
+  <div class="group">
+    ${item("Adults can make songs", "Turns song making on or off for adults.", sw(true))}
+    ${item("Song length", "What chat makes when nobody says. Anyone can ask for the other kind.", sel("Full"))}
+    ${item("Song models", "Choose which models make songs.", btn("Choose models", "sm"))}
+  </div>
+  <h2>Radio and podcasts</h2><p class="sub">Searching public directories on the internet.</p>
+  <div class="group">
+    ${item("Find radio stations online", "The station sees your home's address. Off keeps radio to stations an adult saved.", sw(true))}
+    ${item("Find podcasts online", "Lets adults search a public podcast directory to add shows.", sw(true))}
+    ${item("Let teens find podcasts", "Children never can.", sw(false))}
+  </div>
+  <h2>Looking up songs online</h2><p class="sub">Four optional lookups. Home sends only what each line says.</p>
+  <div class="group">${item("Show 4 more settings", "Lyrics, MusicBrainz, artist photos, album covers", '<span class="sel" style="border:0">&#9662;</span>')}</div>`;
+}
+function stylesList(open) {
+  const installing = `<div class="item"><span class="thumb" style="display:grid;place-items:center">&#8681;</span><div class="t"><b>Downloading a style</b><div class="bar"><i></i></div></div>${btn("Cancel", "sm")}</div>`;
+  return `${tabs("Styles")}
+  <p class="sub" style="margin-top:0">A style gives pictures and videos a look, like old film or clay. Only admins add styles. A new style is for admins only until you say who else can use it.</p>
+  <div class="row2">${btn("Browse styles", "pri")}${btn("Add from a file")}</div>
+  <div class="group">
+    ${installing}
+    ${styleRow("Old colour film", "film", "Style &middot; Videos &middot; Works at Standard, Boost and Max", "All adults")}
+    ${styleRow("Storybook", "classic-cartoon", "Style &middot; Videos &middot; 2 people", "Chosen people")}
+    ${styleRow("Clay look", "3d-animated", "Style &middot; Videos &middot; Made the older way, Boost only", "Only admins")}
+    ${open ? styleRow("Night neon", "aerial", "Style &middot; Videos &middot; Works at Standard, Boost and Max", "Only admins", true) : ""}
+    ${open ? "" : lockRow}
+  </div>
+  <p class="note" style="margin-top:8px">${open ? "Unlocked on this page only. It locks again when you leave or after 2 minutes without a touch." : "Adult-only styles stay locked until you enter your own passcode."}</p>
+  <h2>Where styles come from</h2>
+  <div class="group">
+    ${item("Hugging Face", "On. Search and download styles from Hugging Face. A token is only needed for styles that ask you to accept terms: add it in AI and models, Advanced.", '<span class="chip ok">On</span>')}
+    ${item("Civitai", "Off until you turn it on. This computer only contacts civitai.com when you search or install.", sw(false))}
+  </div>
+  <h2>Adult-only styles</h2>
+  <div class="group">${item("Adult-only styles", "Hidden removes every adult-only style for all adults, admins too, until you switch it back. Nothing is deleted.", sel("Allowed"))}</div>
+  <h2>Recently removed</h2>
+  <div class="group">${item("Retro cartoon", "Removed 3 days ago. Deleted for good in 27 days.", btn("Restore", "sm") + btn("Delete now", "sm"))}${lockRow}</div>
+  ${open ? '<div class="lockbtn"><span class="btn">&#128274; Lock now</span></div>' : ""}`;
+}
+function browse() {
+  const tile = (n, p, who, size, meta) => `<div class="tile"><img src="${P}${p}.jpg" alt=""><div><b>${n}</b>${who}<br>${meta} &middot; ${size}</div></div>`;
+  return `<div class="dim"><div class="dlg">
+    <h3>Browse styles</h3>
+    <div class="srch">Search styles, like clay or anime</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <span class="seg"><span class="on">Hugging Face</span><span class="off">Civitai (off)</span></span>
+      <span class="seg"><span class="on">Videos</span><span>Pictures</span></span>
+      ${sel("Most downloaded")}
+    </div>
+    <div class="grid">
+      ${tile("Painted storybook", "anime", "by example-lab", "410 MB", "12k downloads &middot; LTX-2.5")}
+      ${tile("Clay stop motion", "3d-animated", "by example-lab", "180 MB", "8k downloads &middot; LTX-2.5")}
+      ${tile("Old colour film", "film", "by example-lab", "520 MB", "5k downloads &middot; LTX-2.5")}
+      ${tile("Ink wash", "natural", "by example-lab", "300 MB", "3k downloads &middot; LTX-2.3")}
+      ${tile("Paper cut-outs", "classic-cartoon", "by example-lab", "240 MB", "2k downloads &middot; LTX-2.5")}
+      <div class="tile lockt"><span class="ic">&#128274;</span>Locked items</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><span class="note">Pictures come from the source. This computer saves them once and never links to the site.</span>${btn("More results")}</div>
+  </div></div>`;
+}
+function confirm() {
+  return `<div class="dim"><div class="dlg small" style="width:min(520px,94vw)">
+    <h3>Install this style</h3>
+    <div style="display:flex;gap:12px;align-items:center"><img class="thumb" style="width:96px;height:64px" src="${P}anime.jpg" alt=""><div><b>Painted storybook</b><br><span class="note">by example-lab on Hugging Face</span></div></div>
+    <div class="kv"><span>Size</span><span>410 MB</span><span>Made for</span><span>LTX-2.5 (the source says the same)</span><span>Licence</span><span>Apache-2.0, free to use at home</span></div>
+    <div class="field"><label>Name</label><span class="inp">Painted storybook</span></div>
+    <div class="field"><label>Is this style for adults only?</label>
+      <div class="rad"><span class="on">Yes, adults only (the source did not say)</span><span>No, all ages</span></div>
+      <span class="note">When we cannot tell, it starts as Yes. Only you can choose No.</span></div>
+    <p>It starts for admins only. You choose who else can use it after you try it.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">${btn("Not now")}${btn("Install style", "pri")}</div>
+  </div></div>`;
+}
+function unlock() {
+  return `<div class="dim"><div class="dlg small">
+    <h3>Enter your passcode</h3>
+    <p>This opens locked styles on this page. They lock again when you leave.</p>
+    <div class="pass"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">${btn("Cancel")}${btn("Unlock", "pri")}</div>
+  </div></div>`;
+}
+function detail() {
+  return `<div class="dim"></div><div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3>Night neon</h3>${btn("Close", "sm")}</div>
+    <img class="thumb" style="width:100%;height:150px;border-radius:12px" src="${P}aerial.jpg" alt="">
+    <div style="display:flex;gap:8px">${btn("Try this style", "pri")}${btn("Remove")}</div>
+    <h4>About</h4>
+    <div class="field"><label>Name</label><span class="inp">Night neon</span></div>
+    <div class="field"><label>What it does</label><span class="inp">City lights and glow after dark.</span><span class="note">140 characters at most.</span></div>
+    <div class="field"><label>Kind</label><span class="sel" style="align-self:flex-start">Style</span></div>
+    <h4>Who can use it</h4>
+    <div class="rad"><span class="on">Only admins</span><span>All adults</span><span>Chosen people</span></div>
+    <div class="item" style="padding:0;border:0"><div class="t"><b>Adults only</b><small>Clips made with it stay locked until the person who made each one unlocks them for good. People under 18 never see styles.</small></div>${sw(true)}</div>
+    <h4>Added to the prompt</h4>
+    <div class="field"><label>Words that switch it on</label><div class="phr"><span>nightneon</span><em>Add a word</em></div></div>
+    <div class="field"><label>Also add</label><div class="phr"><span>neon signs</span><span>wet streets</span><em>Add a phrase</em></div><span class="note">120 characters each, 400 in all.</span></div>
+    <div class="field"><label>Avoid</label><div class="phr"><span>daylight</span><em>Add a phrase</em></div><span class="note">Videos at Standard and Boost cannot use "avoid" words. Say the opposite instead.</span></div>
+    <div class="field"><label>Say instead</label><div class="phr"><span>dark night</span><em>Add a phrase</em></div></div>
+    <h4>Strength</h4>
+    <div class="kv"><span>Normal</span><span>1.0 (Less 0.75, More 1.25)</span><span>Lowest allowed</span><span>0</span><span>Highest allowed</span><span>2.0</span></div>
+    <h4>Details</h4>
+    <div class="kv"><span>Source</span><span>huggingface.co/example-lab/night-neon</span><span>Licence</span><span>Apache-2.0</span><span>Made for</span><span>LTX-2.5</span><span>Size</span><span>900 MB</span><span>Fingerprint</span><span>ab12cd34 ef56...</span></div>
+    ${btn("Check the file again", "sm")}
+  </div>`;
+}
+const phoneBack = `<div class="pback">&lsaquo; Settings</div>`;
+const sidebar = `<div class="side"><h6>Yours</h6><b>Profile and sign-in</b><b>Look and ease</b><b>Chat and AI</b><b>Voice and robot</b><b>Notifications</b><b>Your data and apps</b><h6>The home</h6><b>Household and people</b><b>Privacy and safety</b><b>AI and models</b><b class="on">Pictures, videos and music</b><b>Voice</b><b>Search and web</b><b>Backups, storage and updates</b><b>Advanced</b></div>`;
+const bodies = { pictures, videos, music, styles: () => stylesList(false), "styles-open": () => stylesList(true), unlock: () => stylesList(false) + unlock(), browse: () => stylesList(false) + browse(), confirm: () => stylesList(false) + browse() + confirm(), detail: () => stylesList(true) + detail() };
+document.getElementById("root").innerHTML = `<div class="app"><div class="rail"><i></i><i></i><i></i><i></i></div>${sidebar}<div class="main"><div class="page">${phoneBack}<div class="crumb">Settings &rsaquo; Pictures, videos and music</div><h1>Pictures, videos and music</h1>${(bodies[state] || bodies.styles)()}</div></div></div>`;
+</script>
+</body>
+</html>
