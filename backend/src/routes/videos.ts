@@ -428,6 +428,8 @@ const makeRoute = createRoute({
     look: z.string().trim().min(1).max(40).optional().describe("A look id (natural, classic-cartoon, anime, 3d-animated, film); its wording goes to the model before the prompt."),
     voices: z.string().trim().min(1).max(40).optional().describe("clean (the default: no laugh track, no music, one speaker at a time) or full (music and effects)."),
     start_frame: z.string().trim().min(1).max(200).optional().describe("The id of a picture in your own Library; the video starts from it (404 when it is not yours)."),
+    styles: z.array(z.string().trim().min(1).max(80)).max(2).optional().describe("The ids of up to two styles from `/api/loras/available`, at most one character. Each is checked against what you may use; a style that is locked, gone or not yours stops the clip with one plain line."),
+    strength: z.enum(["less", "normal", "more"]).optional().describe("How strongly the styles apply (0.75, 1 or 1.25 of each style's own default, held to its range)."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: z.union([CardSchema, LockedCardSchema]).and(z.object({ notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") })) } }, description: "The card for the new clip." }, ...refusals },
 });

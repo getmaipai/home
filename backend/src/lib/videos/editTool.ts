@@ -13,7 +13,7 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { MAX_NEEDS_ADMIN_LINE, jobTier, tierArgument } from "@/lib/tiers";
-import { etaWords, ltx25MaxPictureReady, ltx25MaxReady, ltx25PictureReady, makerOfModel } from "./quality";
+import { LTX25_MAX_MODEL, etaWords, ltx25MaxPictureReady, ltx25MaxReady, ltx25PictureReady, makerOfModel } from "./quality";
 import sharp from "sharp";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
@@ -30,6 +30,8 @@ import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
+import { resolveStyles } from "./styleChoice";
+import { ltx25LorasSupported } from "./loraWire";
 import { videoAudienceOf, videoRefusalFor, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
 
 export const EDIT_VIDEO_TOOL_ID = "edit_video";
@@ -43,6 +45,9 @@ export const editVideoArgs = z.object({
   look: z.enum(ids(VIDEO_LOOKS)).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
   voices: z.enum(ids(VIDEO_VOICES)).optional(),
+  /** VIDEO-LORA-10: style names (at most two) the new clip is made with; an empty list takes the style off. Left out, a remix, another take and a continue keep the clip's own. */
+  styles: z.array(z.string().trim().min(1).max(60)).max(2).optional(),
+  strength: z.enum(["less", "normal", "more"]).optional(),
   tier: z.enum(["standard", "boost", "max"]).optional(),
   seconds: z.number().int().min(1).max(10).optional(),
   keep_seed: z.boolean().optional(),
@@ -61,6 +66,7 @@ export const editVideoArgs = z.object({
 
 export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open the video you mean and try again.";
 export const WHAT_TO_CHANGE_LINE = "Tell me what to change: the words, the look, the camera move, the sound, the length or the level.";
+export const NO_STYLE_LINE = "I can't find a style by that name. Ask for one from the styles you can use, or make the video without a style.";
 export const NO_PICTURE_LINE = "The picture that video started from is not available any more, so I can't make it again. Ask for a new video.";
 export const ALREADY_MAX_LINE = "That video is already made at Max.";
 export const MAX_WORDS_ONLY_LINE = "Max cannot use a style, and a video that started from a picture cannot be made again at Max on this computer yet. I can make a new one from words at Max.";
@@ -99,7 +105,7 @@ export async function makeItMaxBody(actor: PersonRow, band: Parameters<typeof ti
   // Max runs only when the Stack says its model is ready; otherwise one plain status line, never a silent Boost copy and never a raw error.
   const engine = await videoEngineStatus();
   if (!ltx25MaxReady(engine)) return { ok: false, line: videoMaxNotReadyReason(engine), why: "max_not_ready" };
-  if ((source.request.source_file_id && !ltx25MaxPictureReady(engine)) || source.request.loras.length > 0) return { ok: false, line: MAX_WORDS_ONLY_LINE, why: "max_words_only" };
+  if ((source.request.source_file_id && !ltx25MaxPictureReady(engine)) || (source.request.loras.length > 0 && !ltx25LorasSupported(engine, LTX25_MAX_MODEL))) return { ok: false, line: MAX_WORDS_ONLY_LINE, why: "max_words_only" };
   body.tier = "max";
   // The same clip, made better: the same picture of the idea, so the seed stays.
   if (source.request.seed) body.seed = source.request.seed;
@@ -136,6 +142,20 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (videoJobLockState(actor, source) !== "open") return refused(callId, args, LOCKED_START_LINE, "locked");
 
   const body: MakeVideoBody = bodyOfVideoJob(source);
+  // VIDEO-LORA-10: names the person said (never an id) become the records they may use; a locked or unknown style stops the edit with one plain line, and a clip
+  // that kept its styles keeps them ("Continuing in the same style"). Make it Max, trim, join and mix take no new style.
+  const restyles = value.styles !== undefined || value.strength !== undefined;
+  if (restyles && value.change !== "remix" && value.change !== "another_take" && value.change !== "continue") return refused(callId, args, WHAT_TO_CHANGE_LINE, "nothing_to_change");
+  if (value.styles !== undefined) {
+    if (value.styles.length === 0) { delete body.styles; delete body.strength; }
+    else {
+      const picked = await resolveStyles({ audience, names: value.styles, ...(typeof state.utterance === "string" ? { utterance: state.utterance } : {}) });
+      if (!picked.ok) return picked.locked ? refused(callId, args, LOCKED_START_LINE, "locked") : refused(callId, args, picked.line, picked.code);
+      if (picked.unmatched.length > 0 || picked.adapters.length === 0) return refused(callId, args, NO_STYLE_LINE, "no_style");
+      body.styles = picked.adapters.map((a) => a.id);
+    }
+  }
+  if (value.strength !== undefined && body.styles?.length) body.strength = value.strength;
   // A clip that started from a picture (made here or an attached photo) starts from it again, through the same loader and input screening a Make another uses.
   let prepared: RunGenerateVideoInput["prepared"];
   let adultOnly = false;
@@ -162,7 +182,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     if (prep.image) prepared = { image: prep.image, imageSource: prep.imageSource ?? "generated", sourceFileId: source.request.source_file_id, width: prep.width, height: prep.height };
   }
   if (value.change === "remix") {
-    const changed = value.prompt !== undefined || value.look !== undefined || value.camera !== undefined || value.voices !== undefined || value.tier !== undefined || value.seconds !== undefined;
+    const changed = value.styles !== undefined || value.strength !== undefined || value.prompt !== undefined || value.look !== undefined || value.camera !== undefined || value.voices !== undefined || value.tier !== undefined || value.seconds !== undefined;
     if (!changed) return refused(callId, args, WHAT_TO_CHANGE_LINE, "nothing_to_change");
     if (value.prompt !== undefined) body.prompt = value.prompt;
     if (value.look !== undefined) body.look = value.look;
@@ -190,7 +210,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: `A new ${job.request.seconds} second ${continuing ? "video that starts where the first one ended" : "version of the video"} is being made at ${level === "max" ? "Max" : level === "boost" ? "Boost" : "Standard"}; the first one is kept. It takes ${etaWords(quality, job.request.seconds, makerOfModel((job.request as { stackBody?: { model?: string } }).stackBody?.model, quality))} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${note}` },
+      reply: { text: `A new ${job.request.seconds} second ${continuing ? "video that starts where the first one ended" : "version of the video"}${body.styles?.length ? (value.styles === undefined ? " in the same style" : " in the style they asked for") : ""} is being made at ${level === "max" ? "Max" : level === "boost" ? "Boost" : "Standard"}; the first one is kept. It takes ${etaWords(quality, job.request.seconds, makerOfModel((job.request as { stackBody?: { model?: string } }).stackBody?.model, quality))} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${note}` },
       data: { videoJobId: job.id },
       actions: [],
     },

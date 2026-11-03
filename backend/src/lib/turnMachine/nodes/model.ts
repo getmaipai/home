@@ -1,4 +1,5 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
+import { withStyleList } from "@/lib/videos/styleToolSpec";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
@@ -164,7 +165,7 @@ export type ModelOutput =
   // never empty text.
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
-export function toolSpecFor(id: string, lane: Lane = "adult"): ToolSpec | null {
+export function toolSpecFor(id: string, lane: Lane = "adult", state?: Parameters<typeof withStyleList>[1]): ToolSpec | null {
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json
   // for loadManifestOnly() to find below.
@@ -174,7 +175,9 @@ export function toolSpecFor(id: string, lane: Lane = "adult"): ToolSpec | null {
   if (!loaded.ok) return null;
   // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
   if (missingRequired(loaded.value).length > 0) return null;
-  return { id, description: loaded.value.description, args: loaded.value.args };
+  const spec: ToolSpec = { id, description: loaded.value.description, args: loaded.value.args };
+  // VIDEO-LORA-10: the video tools list the styles this person may name (none for a screen or a person that may not).
+  return id === "generate_video" || id === "edit_video" ? withStyleList(spec, state) : spec;
 }
 
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
@@ -1171,7 +1174,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     tools = state.budget.tools_offered
       .slice()
       .sort()
-      .map((id) => toolSpecFor(id, laneOfPerson(state.actor)))
+      .map((id) => toolSpecFor(id, laneOfPerson(state.actor), state))
       .filter((t): t is ToolSpec => t !== null);
     tool_choice = "auto";
   }

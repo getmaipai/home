@@ -12,7 +12,9 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { unlockedFor } from "@/lib/adultLock";
 import { lockedStyleOutcome } from "@/lib/videos/lock";
-import { videoAdaptersFor, matchVideoAdapter, withVideoTriggerWords } from "./adapters";
+import { buildPromptPlan } from "./promptPlan";
+import { STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, resolveStyles, strengthWord, styleNamesOf } from "./styleChoice";
+import { LORAS_UNSUPPORTED_LINE, ltx25LorasSupported } from "./loraWire";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
 import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
@@ -87,6 +89,8 @@ export interface RunGenerateVideoInput {
   audience?: VideoAudience;
   /** A picture already loaded and screened by the caller (an edit of a clip that started from one, via `prepareVideoRerun`). */
   prepared?: { image: string; imageSource: "generated" | "uploaded"; sourceFileId: string; width: number | null; height: number | null };
+  /** VIDEO-LORA-09: the styles chosen on the Create page or kept from a stored clip, as style ids. Each is read again through the person's own access (a client id is never trusted). A chat call sends names in `args.styles` instead. */
+  styleIds?: readonly string[];
   /** The new clip is adult-only whatever its words say (a continued clip's source is). */
   adultOnly?: boolean;
   /** The source clip's Adult lock (design 3.10); absent means on. */
@@ -103,6 +107,11 @@ function refused(callId: string, args: Record<string, unknown>, refusal: VideoCa
     callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${refusal.line}` }, data: { refused: refusal.why }, actions: [] },
   });
+}
+
+/** A style that cannot be applied: no video starts, and the person gets one plain line (never a clip that silently lacks the style). */
+function styleRefusal(callId: string, args: Record<string, unknown>, line: string, why: string): ToolExecutionOutcome {
+  return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${line}` }, data: { refused: why }, actions: [] } });
 }
 
 const PHOTO_ATTACH_LINE = "Attach one photo to your message.";
@@ -162,18 +171,23 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     if (ref.width && ref.height) portrait = ref.height > ref.width;
   }
 
-  // Only a LoRA this person may use right now can match; the model never sees the library.
-  const available = await videoAdaptersFor(audience, { includeLocked: true });
-  const named = typeof args.style === "string" ? args.style.trim() : "";
-  const adapter = named && !kid ? matchVideoAdapter(available, named) : null;
-  // ADULT-LOCK-02: an adult-only style from chat needs a live unlock proof on the turn request; without one nothing starts and the card is the lock tile.
-  if (adapter && adapter.classification === "adult-only" && !unlockedFor(state.actor as PersonRow)) return lockedStyleOutcome(callId, GENERATE_VIDEO_TOOL_ID, args);
-  const styleNote = named && !adapter ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
+  // Only a style this person may use right now can match; the model never sees the library. VIDEO-LORA-09: one resolver for names (chat) and ids (Create, a stored clip).
+  const picked = kid ? { ok: true as const, adapters: [], unmatched: [] } : await resolveStyles({ audience, names: styleNamesOf(args), ids: input.styleIds, ...(typeof state.utterance === "string" ? { utterance: state.utterance } : {}) });
+  // ADULT-LOCK-02: an adult-only style needs a live unlock proof on the turn request; without one nothing starts and the card is the lock tile.
+  if (!picked.ok && picked.locked) return lockedStyleOutcome(callId, GENERATE_VIDEO_TOOL_ID, args);
+  if (!picked.ok) return styleRefusal(callId, args, picked.line, picked.code);
+  const adapters = picked.adapters;
+  const adapter = adapters[0] ?? null;
+  const styleNote = picked.unmatched.length > 0 ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
   // VIDEO-LTX-01: Quick or Detailed. A style made for one model decides; a length past five seconds needs Detailed; else what was asked for, else the household's setting.
   // LTX25-MAX-01: Max is offered only when the Stack reports its pack ready (not the slot list) and only to an adult; the grant is `tierArgument`'s own check.
   const maxReady = lane === "adult" && ltx25MaxReady(engine);
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "video", arg: args.tier, band: audience.band, maxAvailable: maxReady });
-  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
+  // VIDEO-LORA-09: a style made for LTX-2.5 rides the LTX-2.5 levels once the Stack reports it can (Max, or Standard and Boost); the Stack's own report decides, nothing is assumed.
+  const ltx25Styles = lane === "adult" && adapters.length > 0 && adapters.every((a) => a.lora.compatible_with.includes("ltx-2.5"));
+  const asksMax = tierAsked.tier === "max" && maxReady;
+  const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
+  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
   // A style made for Detailed cannot be used without Detailed: say so rather than start a clip the Stack would refuse.
   if (adapter && qualityOfBase(adapter.base_model) === "detailed" && !detailedVideoReady(engine)) {
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, which are not on this computer yet. An admin can get them in Settings, Models and storage, or I can make the video without the style." }, data: { refused: "style_needs_detailed" }, actions: [] } });
@@ -181,12 +195,25 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (image !== undefined && adapter && qualityOfBase(adapter.base_model) === "detailed") {
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, and a Detailed video cannot start from a picture yet. I can animate the picture without the style, or make a Detailed video in that style from words." }, data: { refused: "style_needs_detailed" }, actions: [] } });
   }
+  // VIDEO-LORA-09: every chosen style must be made for the kind of video this clip is; a style is never dropped to make a clip start. (Design 6.4.)
+  const makerBase = ({ wan: "wan2.2-ti2v-5b", ltx23: "ltx-2.3", ltx25: "ltx-2.5", ltx25max: "ltx-2.5" } as const)[choice.maker];
+  if (adapters.length > 0) {
+    if (adapters.some((a) => !a.lora.compatible_with.includes(makerBase))) {
+      const mixed = adapters.length > 1 && adapters.some((a) => a.lora.compatible_with.includes(makerBase));
+      return styleRefusal(callId, args, mixed ? STYLE_MIXED_LEVELS_LINE : (ltx25Styles || choice.maker === "ltx25" || choice.maker === "ltx25max") ? LORAS_UNSUPPORTED_LINE : STYLE_NOT_AT_LEVEL_LINE, "style_not_at_level");
+    }
+    if ((choice.maker === "ltx25" || choice.maker === "ltx25max") && !ltx25LorasSupported(engine, choice.maker === "ltx25max" ? LTX25_MAX_MODEL : LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
+  }
+  const styleStrength = strengthWord(args.strength);
+  const loraOf = (m: typeof choice.maker) => (m === "ltx25max" ? engine?.qualities?.ltx25max : m === "ltx25" ? engine?.qualities?.ltx25 : undefined)?.loras;
+  const plan = buildPromptPlan({ words: prompt, styles: adapters.map((a) => a.lora), strength: styleStrength, negativePrompt: loraOf(choice.maker)?.negative_prompt });
+  if (!plan.ok) return styleRefusal(callId, args, plan.line, plan.code);
   const seconds = kid ? Math.min(choice.seconds, KID_MAX_SECONDS) : choice.seconds;
   const size = videoSizeFor(choice.maker, choice.quality, portrait, engine);
   const ltx25 = choice.maker === "ltx25" || choice.maker === "ltx25max";
   const maxMade = choice.maker === "ltx25max";
   // Max asked for and ready, but this clip uses a style, or starts from a picture this Stack cannot start a Max clip from (VIDEO-INPUTS-01): say it was not made at Max.
-  const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || adapter !== null) ? " Max cannot use a style, and cannot start from a picture on this computer yet, so this one was not made at Max; say so in one short sentence." : "";
+  const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || (adapters.length > 0 && !ltx25Route)) ? " Max cannot use a style, and cannot start from a picture on this computer yet, so this one was not made at Max; say so in one short sentence." : "";
   const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? (ltx25 ? " This one has sound and speech; say so in one short sentence." : " This one is a Detailed video, with sound and speech; say so in one short sentence.") : "";
   const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
   const longSpeechNote = choice.maker === "ltx23" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
@@ -201,7 +228,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const voices = choice.maker !== "wan" ? voicesChosen : null;
   const detailedOffered = !ltx25 && allowedQuality(actor, "video", "detailed", audience.band) === "detailed" && detailedVideoReady(engine);
   const note = choice.shortened ? `${choice.quality === "quick" ? "Standard" : "This level"} makes ${seconds} seconds at most, so this video is ${seconds} seconds.${choice.quality === "quick" && detailedOffered ? ` Choose Boost for up to ${DETAILED_MAX_SECONDS}.` : ""}` : undefined;
-  const create = !kid && (recipe || look || voicesChosen || note) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(note ? { note } : {}) } : undefined;
+  const create = !kid && (recipe || look || voicesChosen || note || (adapters.length > 0 && styleStrength)) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(adapters.length > 0 && styleStrength ? { strength: styleStrength } : {}), ...(note ? { note } : {}) } : undefined;
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
   if (kid && !slot) return refused(callId, args, { kind: "child", why: "daily_limit", line: CHILD_VIDEO_LIMIT_LINE });
   try {
@@ -218,7 +245,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       ...(create ? { create } : {}),
       ...(input.adultOnly ? { adultOnly: true, ...(input.adultLock ? { adultLock: input.adultLock } : {}) } : {}),
       body: {
-        prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(withVideoTriggerWords(prompt, adapter), look), recipe), voices),
+        prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(plan.prompt, look), recipe), voices),
         // A new seed for every clip (stored on the job); Another take rolls a different one.
         seed: typeof args.seed === "number" && Number.isInteger(args.seed) && args.seed > 0 && args.seed < 2_147_483_647 ? args.seed : Math.floor(Math.random() * 2_147_483_647),
         size,
@@ -227,7 +254,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         audience: stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
-        ...(adapter ? { loras: [{ id: adapter.id, strength: adapter.strength_default }] } : {}),
+        ...(adapters.length > 0 ? { loras: plan.loras } : {}),
+        ...(plan.negative ? { negative_prompt: plan.negative } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
     });
