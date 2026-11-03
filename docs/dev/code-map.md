@@ -295,6 +295,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/settings/ChatSkillsSection.tsx` | ChatSkillsSection |
 | `frontend/src/shell/pages/settings/ClockCardRenderer.tsx` | ClockCardRenderer |
 | `frontend/src/shell/pages/settings/DeviceAppearanceControl.tsx` | DeviceAppearanceControl |
+| `frontend/src/shell/pages/settings/MediaCardViews.tsx` | STYLES_CARD_KEYS, MediaKidsView, MediaPicturesView, MediaVideosView, MediaMusicView, MediaStylesView |
 | `frontend/src/shell/pages/settings/PersonMultiSelect.tsx` | PersonMultiSelect |
 | `frontend/src/shell/pages/settings/SettingField.tsx` | SettingField |
 | `frontend/src/shell/pages/settings/SettingsAreaPage.tsx` | SettingsAreaPage |
@@ -333,7 +334,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/adultLock.ts` | PROOF_IDLE_MS, PROOF_ABSOLUTE_MS, TICKET_MS, PROOF_HEADER, LOCKED_WRITERS, __setAdultLockClockForTests |
 | `backend/src/lib/adultMarks.ts` | SHARED_SCREEN_MARK_LINE, NEED_PASSCODE_LINE, NOT_FOUND_LINE, NOT_READY_LINE, TEMPORARY_LINE, NOT_MARKED_LINE |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
-| `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
+| `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, writeChoiceSetting, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
 | `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
 | `backend/src/lib/alarmActions.ts` | ALARM_ACTION_NAMES, resolveAlarm, runAlarmAction |
@@ -559,6 +560,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
+| `backend/src/lib/likeness.ts` | HOUSEHOLD_LIKENESS_KEY, LIKENESS_OFF_LINE, householdLikenessAllowed, otherMembersNamed, likenessRefusal, likenessCallRefusal |
 | `backend/src/lib/listActionNames.ts` | LIST_ACTIONS |
 | `backend/src/lib/listActions.ts` | PARENT_CAN_DO_THAT, runListAction |
 | `backend/src/lib/listContext.ts` | lastListContextFor |
@@ -738,7 +740,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
 | `backend/src/lib/pictures/people.ts` | __setPeopleRetryPauseForTests, runPictureTool |
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
-| `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_QUALITY_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
+| `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
@@ -866,6 +868,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, resolveForResponse, listValues, onHouseholdWrite |
 | `backend/src/lib/settingsAreas.ts` | getSettingsAreas, settingsViewerFor, placeSetting, settingHref |
 | `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
+| `backend/src/lib/settingsMediaMigration.ts` | OLD_PICTURE_ADULT_KEY, OLD_VIDEO_ADULT_KEY, NEW_ADULT_STYLES_KEY, OLD_PICTURE_QUALITY_KEY, OLD_VIDEO_QUALITY_KEY, NEW_PICTURE_TIER_KEY |
 | `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
 | `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, getRegistryKey, __reloadRegistryForTests |
 | `backend/src/lib/setupChecklist.ts` | SETUP_CHECKLIST_ITEMS, checklistFromFacts, getSetupChecklist |
@@ -941,8 +944,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
-| `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, mirrorLegacyIntoSlot, migrateTierSlots |
-| `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, slotIsOff |
+| `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, MODEL_OF_CHOICE, copyLegacyIntoSlot, migrateTierSlots |
+| `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, writeSlotModel |
 | `backend/src/lib/timerStatus.ts` | timerStatusReply |
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
@@ -1013,7 +1016,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
-| `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_ADULT_ADAPTERS_KEY, VIDEO_QUALITY_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo |
+| `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
