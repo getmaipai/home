@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { sqlite } from "@/db";
-import { getCeilingForBand } from "@/lib/contentCeiling";
+import { getMinorCeilingForBand } from "@/lib/contentCeiling";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { setValue } from "@/lib/settings";
 import { topicBlockFor, topicBlockForTurn, topicMessages, withTopicBlock } from "@/lib/topicPrompt";
@@ -139,7 +139,7 @@ describe("the token budget", () => {
 
   test("the largest reachable combination is bounded: no block ever exceeds the character ceiling", () => {
     for (const band of ["child", "teen"] as const) {
-      const record = getCeilingForBand(band);
+      const record = getMinorCeilingForBand(band);
       const families = Object.entries(record.topics!) as [(typeof TOPIC_FAMILIES)[number], { allowed: readonly string[] }][];
       let longest = 0;
       const walk = (i: number, cur: Record<string, TopicStance>) => {

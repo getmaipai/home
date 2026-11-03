@@ -4,7 +4,7 @@
 // A child's own keys apply only when the speaker really is that child: a
 // robot turn that heard a child on a parent's session gets the band defaults.
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
-import { getCeilingForBand } from "@/lib/contentCeiling";
+import { getMinorCeilingForBand } from "@/lib/contentCeiling";
 import { resolveTopicStances, topicStancesForPerson } from "@/lib/topicStances";
 import { renderTopicBlock, type TopicFamily, type TopicStance } from "@maipai/spec/interpreters/ts/topicBlock.js";
 import type { PersonRow } from "@/lib/memoryIngestion";
@@ -15,7 +15,7 @@ import type { LlmMessage } from "@/lib/llm";
 
 /** The band record's own default stances: what a minor gets when nothing can be read. */
 function defaultStances(band: "child" | "teen"): { stances: Record<TopicFamily, TopicStance>; familyStoryNames: string[] } {
-  const record = getCeilingForBand(band);
+  const record = getMinorCeilingForBand(band);
   const stances = {} as Record<TopicFamily, TopicStance>;
   for (const [family, entry] of Object.entries(record.topics ?? {}) as [TopicFamily, { stance: string }][]) stances[family] = entry.stance as TopicStance;
   return { stances, familyStoryNames: band === "child" ? [...(record.family_stories?.names ?? [])] : [] };
@@ -32,7 +32,7 @@ export function topicBlockFor(band: AgeBand, personId?: string): string {
     console.warn(`[topics] could not read the topic settings (${error instanceof Error ? error.message : String(error)}); using the ${band} defaults`);
     resolved = defaultStances(band);
   }
-  return renderTopicBlock({ band, record: getCeilingForBand(band), stances: resolved.stances, familyStoryNames: resolved.familyStoryNames });
+  return renderTopicBlock({ band, record: getMinorCeilingForBand(band), stances: resolved.stances, familyStoryNames: resolved.familyStoryNames });
 }
 
 /** The turn's block: the person's own keys when they are the band's person, the band defaults otherwise. */

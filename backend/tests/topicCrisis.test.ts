@@ -2,7 +2,7 @@
 // child's or teen's topic settings renders a block that still carries the fixed support sentence and
 // the hard lines; the self-harm check and the crisis support block do not depend on those settings.
 import { describe, expect, test } from "bun:test";
-import { getCeilingForBand } from "@/lib/contentCeiling";
+import { getMinorCeilingForBand } from "@/lib/contentCeiling";
 import { evaluateReply, evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import {
   CHILD_CRISIS_LINE,
@@ -14,7 +14,7 @@ import { renderTopicBlock, TOPIC_COPY, TOPIC_FAMILIES, type TopicBand, type Topi
 
 /** Every combination of the stances a parent can reach for this band (fixed families contribute one). */
 function combinations(band: TopicBand): Array<Record<TopicFamily, TopicStance>> {
-  const record = getCeilingForBand(band);
+  const record = getMinorCeilingForBand(band);
   let all: Array<Partial<Record<TopicFamily, TopicStance>>> = [{}];
   for (const family of TOPIC_FAMILIES) {
     const entry = record.topics[family];
@@ -32,7 +32,7 @@ const HARD_LINES: Record<TopicBand, string[]> = {
 describe("every reachable topic setting keeps the support sentence and the hard lines", () => {
   for (const band of ["child", "teen"] as const) {
     test(`${band}: all combinations`, () => {
-      const record = getCeilingForBand(band);
+      const record = getMinorCeilingForBand(band);
       const combos = combinations(band);
       expect(combos.length).toBeGreaterThan(1);
       const support = TOPIC_COPY.families.feelings[band].support as string;
@@ -54,7 +54,7 @@ describe("every reachable topic setting keeps the support sentence and the hard 
     });
 
     test(`${band}: a stale or tampered setting still yields the full block`, () => {
-      const record = getCeilingForBand(band);
+      const record = getMinorCeilingForBand(band);
       const block = renderTopicBlock({ band, record, stances: { feelings: "informative", people: "neutral", bodies: "support" } });
       expect(block).toContain(TOPIC_COPY.families.feelings[band].support as string);
       expect(block).toContain(TOPIC_COPY.families.people[band].protect as string);
@@ -63,7 +63,7 @@ describe("every reachable topic setting keeps the support sentence and the hard 
 
   test("no key reaches feelings or people: those families are fixed in both bands", () => {
     for (const band of ["child", "teen"] as const) {
-      const record = getCeilingForBand(band);
+      const record = getMinorCeilingForBand(band);
       expect(record.topics.feelings.fixed).toBe(true);
       expect(record.topics.people.fixed).toBe(true);
       expect(record.topics.feelings.stance).toBe("support");

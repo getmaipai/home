@@ -144,6 +144,14 @@ export function getCeilingForBand(band: AgeBand): ContentCeiling {
   return CONTENT_CEILINGS[band];
 }
 
+/** A child or teen record always carries `topics` (the spec leaves it optional because an adult has none): the one place that says so. */
+export type MinorCeiling = ContentCeiling & { topics: NonNullable<ContentCeiling["topics"]> };
+export function getMinorCeilingForBand(band: "child" | "teen"): MinorCeiling {
+  const record = CONTENT_CEILINGS[band];
+  if (!record.topics) throw new Error(`The ${band} content ceiling has no topics: the bundled ceiling records are incomplete; reinstall the app.`);
+  return record as MinorCeiling;
+}
+
 /** Always false until session-f-platform-and-trust.md step 7 ships a
  * real grants table this can query - see this file's own header for
  * why "no grant reachable yet" is the correct, safe state for that gap
