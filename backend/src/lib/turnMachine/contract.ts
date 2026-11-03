@@ -109,7 +109,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor" | "item_not_here";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor" | "item_not_here" | "format_not_here";
       ask?: PendingAskInfo;
     };
 
@@ -251,6 +251,8 @@ export interface TurnState {
   musicEditAllowed?: boolean;
   /** NEWS-DISCUSS-TOOL-2026-10-27: the person's own message holds a maipai:// reference they may read; `read_item` is offered only then. */
   itemReferenceAllowed?: boolean;
+  /** WRITING-FORMATS-03: a written, non-bare turn with an installed writing format the person's role may use; `writing_format` is offered only then. */
+  writingFormatAllowed?: boolean;
   /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;
   /** MUSIC-STUDIO-EDIT: the made-music object the turn follows ("none": the turn may make a song style but names no object). Decides the make/edit tools. */

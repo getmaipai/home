@@ -1,0 +1,33 @@
+{
+  "id": "format-birthday-card",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Family",
+  "display": "Birthday card format",
+  "description": "Write a warm birthday card message that fits the relationship.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "writing_format": true
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected"
+}

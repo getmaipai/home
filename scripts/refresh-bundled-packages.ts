@@ -31,6 +31,8 @@ const BUNDLED: { id: string; catalogPath: string }[] = [
   { id: "trivia", catalogPath: "plugins/fun/trivia" },
   { id: "weather", catalogPath: "plugins/utilities/weather" },
   { id: "storytime-style", catalogPath: "skills/family/storytime-style" },
+  { id: "format-email", catalogPath: "skills/family/format-email" },
+  { id: "format-birthday-card", catalogPath: "skills/family/format-birthday-card" },
 ];
 
 const HOME_ROOT = join(import.meta.dir, "..");

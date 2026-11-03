@@ -1,3 +1,4 @@
+import { writingFormatsFor } from "@/lib/writingFormats";
 import { join } from "node:path";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
@@ -91,6 +92,9 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
   const budget = withTurnToolGates(
     await resolveTurnBudgetWithStack(undefined, band),
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
+    false, false, false, false, false, false, false, null,
+    // WRITING-FORMATS-03: the same gate a real written turn applies, so the list matches what the chat sends.
+    writingFormatsFor(actor.role).length > 0,
   );
   return new Set(budget.tools_offered.filter((id) => toolSpecFor(id) !== null));
 }

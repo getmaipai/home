@@ -671,7 +671,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
-  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk, musicObject, musicObjectRef } = gated;
+  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -694,6 +694,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(musicEditOk ? { musicEditAllowed: true } : {}),
     ...(videoEditOk ? { videoEditAllowed: true } : {}),
     ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
+    ...(writingFormatOk ? { writingFormatAllowed: true } : {}),
     ...(musicBandOk ? { musicBandAllowed: true } : {}),
     ...(musicObject ? { musicObject: { kind: musicObject, ...(musicObjectRef ? { id: musicObjectRef.id } : {}) } } : {}),
     modelId: opts.model,

@@ -10,6 +10,7 @@ import { videosAllowed } from "@/lib/videos/policy";
 import { videoEngineReady } from "@/lib/videos/ready";
 import { laneOf } from "@/lib/pictures/lane";
 import { itemRefsIn } from "@/lib/items/tool";
+import { writingFormatsFor } from "@/lib/writingFormats";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { withTurnToolGates, type MusicObjectGate } from "./budget";
 import { isMusicObjectRef, musicObjectOf, type MusicObjectRef } from "@/lib/music/objects";
@@ -65,6 +66,8 @@ export interface TurnToolGateResult {
   /** The made-music object this turn follows: a gate value for the offers, and the object itself when one is named. */
   musicObject: MusicObjectGate;
   musicObjectRef: MusicObjectRef | null;
+  /** WRITING-FORMATS-03: a written, non-bare turn and at least one installed format the person's role may use. */
+  writingFormatOk: boolean;
 }
 
 /** Calculates the conditional offers for a real turn and for its cache warm-up. */
@@ -126,8 +129,10 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   if (latch && objectAllowed && musicObjectRef) { latch.musicObject = musicObjectRef; if (musicObjectRef.kind === "track") latch.musicBandOk = true; }
   const musicBandOk = objectAllowed && musicObjectRef?.kind === "track";
   const musicObject: MusicObjectGate = !objectAllowed ? null : (musicObjectRef?.kind ?? "none");
+  const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk),
+    writingFormatOk,
     answerImagesOk,
     picturesOk,
     videosOk,

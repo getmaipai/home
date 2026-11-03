@@ -41,6 +41,8 @@ import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import answerImageRows from "./datasets/answer-images.json";
 import bandToolRows from "./datasets/band-tool.json";
 import studioToolRows from "./datasets/music-studio-tool.json";
+import writingFormatRows from "./datasets/writing-format.json";
+import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingFormats";
 import routeDataset from "./datasets/chat-ab-01.json";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
@@ -133,6 +135,7 @@ function budgetOfferedTools(): ToolSpec[] {
     .sort()
     .map((id) => {
       if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
+      if (id === WRITING_FORMAT_TOOL_ID) return writingFormatToolSpec();
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`budget tool ${id} failed to load: ${loaded.error}`);
       return { id, description: loaded.value.description, args: loaded.value.args };
@@ -223,7 +226,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const imageExecuted = await answerImagesPass();
   const bandExecuted = await bandToolPass();
   const studioExecuted = await studioToolPass();
-  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted + studioExecuted, engine };
+  const writingExecuted = await writingFormatPass();
+  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted + studioExecuted + writingExecuted, engine };
 }
 
 interface RouteItem { id: string; prompt: string; kind: string; family?: string; split?: string; gold?: "must" | "must_not" | "may"; age_row?: string; acceptable_tools: string[]; expected_terms?: string[]; }
@@ -490,6 +494,36 @@ async function studioToolPass(): Promise<number> {
     console.log(`${row.label === "N" ? "N" : "T"} ${passed}/${REPEATS} ${row.label}  "${row.id}" -> ${outcomes.join(" | ")}`);
   }
   console.log(`\nStudio-tool pass: the expected tool on ${wantCalls}/${wantRuns} runs, a studio tool on ${otherCalls}/${otherRuns} other runs`);
+  return executed;
+}
+
+/** WRITING-FORMATS-03 (skeleton, unrun): the writing_format rows (datasets/writing-format.json, the offer's bench_row `writing-format`) as a bare
+ * `complete()` over the offered set: a W row passes when `writing_format` is among the calls, an N row when it is not. Measure with
+ * `MAIPAI_BENCH_OFFER=writing_format`. The held-out split, 3+ repeats and paired intervals of rule 13 are added before the row is claimed. */
+async function writingFormatPass(): Promise<number> {
+  const tools = budgetOfferedTools();
+  if (!tools.some((t) => t.id === WRITING_FORMAT_TOOL_ID)) {
+    console.log("\nWriting-format rows skipped: writing_format is not offered (set MAIPAI_BENCH_OFFER=writing_format to measure it before it ships).");
+    return 0;
+  }
+  const rows = writingFormatRows.rows as { id: string; label: "W" | "N"; text: string }[];
+  console.log(`\nWriting-format pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
+  let executed = 0, wantRuns = 0, wantCalls = 0, otherRuns = 0, otherCalls = 0;
+  for (const row of rows) {
+    const outcomes: string[] = [];
+    let called = 0;
+    for (let i = 0; i < REPEATS; i++) {
+      const result = await completeWithTimeout("chat", [{ role: "user", content: row.text }], { tools, tool_choice: "auto" });
+      if (!result.ok) { outcomes.push("no reply"); continue; }
+      executed++;
+      const ids = (result.value.tool_calls ?? []).map((c) => c.tool).sort();
+      if (ids.includes(WRITING_FORMAT_TOOL_ID)) called++;
+      outcomes.push(ids.length === 0 ? "[]" : `[${ids.join(", ")}]`);
+    }
+    if (row.label === "W") { wantRuns += REPEATS; wantCalls += called; } else { otherRuns += REPEATS; otherCalls += called; }
+    console.log(`${row.label} ${called}/${REPEATS} writing_format  "${row.id}" -> ${outcomes.join(" | ")}`);
+  }
+  console.log(`\nWriting-format pass: writing_format on ${wantCalls}/${wantRuns} writing runs, ${otherCalls}/${otherRuns} other runs`);
   return executed;
 }
 

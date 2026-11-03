@@ -22,6 +22,7 @@ import type { PersonRow } from "@/types";
 import { getProjectType, listProjectTypes, type ProjectType, type ProjectTypeParamsSchema } from "./projectTypes";
 import { start as startProject } from "./runner";
 import { READ_ITEM_TOOL_ID, readItemToolSpec } from "@/lib/items/tool";
+import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingFormats";
 
 export interface VirtualToolOffer {
   mode: "base" | "conditional" | "off";
@@ -41,6 +42,8 @@ export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
   { id: "start_project", offer: { mode: "base", priority: 6 }, spec: startProjectToolSpec },
   // NEWS-DISCUSS-TOOL-2026-10-27: offered only on a turn whose message holds a reference the person can read (items/tool.ts).
   { id: READ_ITEM_TOOL_ID, offer: { mode: "conditional", gate: "itemReferenceAllowed", bench_row: "read-item", priority: 3 }, spec: readItemToolSpec },
+  // WRITING-FORMATS-03: offered on a written, non-bare turn when an installed format fits the person's role (lib/writingFormats.ts).
+  { id: WRITING_FORMAT_TOOL_ID, offer: { mode: "conditional", gate: "writingFormatAllowed", bench_row: "writing-format", priority: 3 }, spec: writingFormatToolSpec },
 ];
 export const START_PROJECT_TOOL_ID = VIRTUAL_TOOL_REGISTRY[0]!.id;
 

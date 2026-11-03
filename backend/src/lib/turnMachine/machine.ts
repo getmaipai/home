@@ -234,7 +234,7 @@ export const turnMachine = setup({
       if (toRun.length > 0 || parkedAsk !== null || context.decorativeDropped || retryRound(context)) return false;
       if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
       const entries = (event as unknown as { output: PolicyOutput }).output.entries;
-      return entries.length > 0 && entries.every((e) => !e.decision.allow && e.decision.reason === "ungrounded_args" && isDecorativeTool(e.proposal.request.tool));
+      return entries.length > 0 && entries.every((e) => !e.decision.allow && ((e.decision.reason === "ungrounded_args" && isDecorativeTool(e.proposal.request.tool)) || e.decision.reason === "format_not_here"));
     },
     // RESEARCH-RETRY-01 (live run 2026-11-02): a Thinking or Max turn that had already gathered pages made a later search call policy found
     // ungrounded (a garbled query), and the person got the refusal line instead of the answer the notes could support. A failed tool never
@@ -624,7 +624,7 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     // dropped; the refusal line is for a generation that produced none. Every other reason
     // (age, surface, crisis, temporary, household, consent) keeps its line, and the text
     // still passes output_gate like any reply.
-    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool");
+    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool" || e.decision.reason === "format_not_here");
     if (onlyCallFaults && context.modelDraft && context.modelDraft.trim().length > 0) {
       return { kind: "model_text", text: context.modelDraft };
     }

@@ -15,6 +15,8 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, wordsOf, isBarePronoun } from "@/lib/text";
 import { READ_ITEM_TOOL_ID, itemRefsIn } from "@/lib/items/tool";
+import { WRITING_FORMAT_TOOL_ID, writingFormatForArgs } from "@/lib/writingFormats";
+import { meetsMinRole } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
@@ -395,6 +397,22 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         continue;
       }
       entries.push({ proposal: itemProposal, decision: { allow: true } });
+      continue;
+    }
+
+    // WRITING-FORMATS-03: `writing_format` is refused when the turn was not offered it or when the person's role is below the named
+    // format's min_role (a child's call for format-email); the model then writes without it (machine.ts drops the call, rule 6).
+    // A name that is no installed format is let through: the tool returns a plain error string and the turn continues.
+    if (call.tool === WRITING_FORMAT_TOOL_ID) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const formatProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const format = writingFormatForArgs(callArgs);
+      if (!state.writingFormatAllowed || (format && !meetsMinRole(state.actor.role, format.manifest.min_role))) {
+        noteRefusal("format_not_here");
+        entries.push({ proposal: formatProposal, decision: { allow: false, reason: "format_not_here" } });
+        continue;
+      }
+      entries.push({ proposal: formatProposal, decision: { allow: true } });
       continue;
     }
 

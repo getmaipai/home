@@ -94,6 +94,7 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "picture_not_here") return PICTURE_NOT_HERE_LINE;
   if (reason === "picture_refused_minor") return PROMPT_REFUSAL_LINE.minor_sexual;
   if (reason === "item_not_here") return "I can't open that one from here. Open it in its app and ask again from there.";
+  if (reason === "format_not_here") return "I can't use that writing format here, so I'll write it in my own words.";
   if (reason === "music_not_here") return MUSIC_NOT_HERE_LINE;
   if (reason === "music_refused_minor") return MUSIC_REFUSAL_LINE.minor_sexual;
   if (reason === "video_not_here") return VIDEO_NOT_HERE_LINE;

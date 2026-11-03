@@ -1,0 +1,33 @@
+{
+  "id": "format-email",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Family",
+  "display": "Email format",
+  "description": "Write an email with a clear greeting, purpose, ask and sign-off.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "teen",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "writing_format": true
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected"
+}

@@ -1,0 +1,19 @@
+{
+  "about": "WRITING-FORMATS-03: skeleton rows for the writing_format tool (bench_row writing-format). label W = a brief to write an email or a birthday card (writing_format expected); N = anything else, writing-adjacent or not (writing_format must not be called). SKELETON ONLY: the 10 fixed quality briefs and the CHAT-AB-01 held-out split rows are still to be added before the row is measured (3 or more repeats, paired 95% intervals, rule 13). Unrun. Persona names only.",
+  "rows": [
+    { "id": "w-card-aunt", "label": "W", "text": "Write a birthday card for my aunt Daisy. She loves gardening." },
+    { "id": "w-card-friend", "label": "W", "text": "Help me write a birthday message for my friend Marlow, he turns 40." },
+    { "id": "w-card-short", "label": "W", "text": "I need a birthday card message for my neighbor." },
+    { "id": "w-email-boss", "label": "W", "text": "Write an email to my manager asking for Friday off." },
+    { "id": "w-email-teacher", "label": "W", "text": "Draft an email to Ms. Sage about my son missing class on Tuesday." },
+    { "id": "w-email-landlord", "label": "W", "text": "Can you write an email to my landlord about the broken heater?" },
+    { "id": "n-weather", "label": "N", "text": "What is the weather in Chicago today?" },
+    { "id": "n-facts", "label": "N", "text": "How do airplanes stay in the air?" },
+    { "id": "n-story", "label": "N", "text": "Tell me a bedtime story about a dragon." },
+    { "id": "n-poem", "label": "N", "text": "Write a poem about autumn leaves." },
+    { "id": "n-about-email", "label": "N", "text": "When was email invented?" },
+    { "id": "n-gift", "label": "N", "text": "What is a good birthday gift for a ten year old?" },
+    { "id": "n-search", "label": "N", "text": "Who won the game last night?" },
+    { "id": "n-code", "label": "N", "text": "Write a function that reverses a string." }
+  ]
+}
