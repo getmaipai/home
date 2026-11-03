@@ -41,18 +41,6 @@ export interface VideoAdultState {
 export interface LockedVideoCard { locked: true; making: boolean }
 export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; limits: string }
 export interface VideoStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; limits: string; styles: Array<{ id: string; name: string }> }
-export interface VideoAdapterRow { id: string; name: string; classification: "all-ages" | "adult-only"; enabled: boolean; needs_confirmation: boolean; sha256: string; base_model: string; trigger_words: string[]; licence: string; strength_default: number; bytes: number; source_url: string | null; added_at: string }
-/** VIDEO-LTX-01: Detailed videos as Settings sees them. */
-export interface DetailedVideoSettings { installed: boolean; available: boolean; reason: string | null; download_bytes: number; component: string; licence: { id: string; name: string; url: string } | null; lora_base_model: string }
-export interface VideoSettings {
-  quality?: "quick" | "detailed";
-  detailed?: DetailedVideoSettings;
-  state: string; available: boolean; reason: string | null; tier: string | null; model_installed: boolean; limits: string;
-  enabled: boolean; adult_adapters: boolean; minors: string; adapters: VideoAdapterRow[];
-  /** VIDEO-SETTINGS-02: some adult-only styles are locked; one tile stands for them, never a count. */
-  locked_styles?: boolean;
-}
-
 const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
 export const videosApi = {
@@ -67,8 +55,4 @@ export const videosApi = {
   /** Clear the lock (with the ticket) or mark the clip NSFW again (no passcode). */
   adultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => requestJson<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/videos/jobs/${encodeURIComponent(id)}/adult-mark`, json(body)),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),
-  settings: () => requestJson<VideoSettings>("/api/videos/settings"),
-  setAdapter: (id: string, patch: { enabled?: boolean; classification?: "all-ages" | "adult-only" }) => requestJson<VideoAdapterRow>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),
-  removeAdapter: (id: string) => requestJson<{ ok: true }>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  addAdapter: (form: FormData) => requestJson<VideoAdapterRow>("/api/videos/adapters", { method: "POST", body: form }),
 };

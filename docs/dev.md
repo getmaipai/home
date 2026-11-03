@@ -37587,7 +37587,7 @@ a rollback restores a database the older release can read.
   tool again. The tool's prompt argument says it cannot change an existing picture and points to Edit.
 - **Card and menus.** Kit `ImageGeneration` (prompt shimmer card, bar, clock, Stop; ui-v0.5.249), kit `ImageGallery` (size large since ui-v0.5.246) with Edit, kit `ErrorState` with Try again.
   Make a variation is in the reply's More menu (`MakeVariationMenuItem`, `picturesApi.again`).
-- **Settings.** Home settings, Pictures and videos (`PicturesLibrary.tsx`, `VideoLibrary.tsx`; keys in `settings/pictureKeys.ts` and
+- **Settings.** Home settings, Pictures, videos and music (VIDEO-SETTINGS-05 deleted `PicturesLibrary.tsx` and `VideoLibrary.tsx`; the tabs are in `MediaCardViews.tsx`; keys in `settings/pictureKeys.ts` and
   `videoKeys.ts`: `generation.adults`, `generation.adult_adapters`, `generation.video.enabled`, `generation.video.adult_adapters`,
   `engines.image.choice`, `engines.video.choice`). Styles (LoRAs) are added by link or file (picture styles up to 120 MB, refused before the
   upload starts; Home takes request bodies up to 128 MiB), each with a licence tick, an all-ages answer (default adult-only) and a

@@ -156,7 +156,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
 | `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
-| `frontend/src/apps/settings/PicturesLibrary.tsx` | PicturesLibrary |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RobotBody.tsx` | bodyHealthText, didPutDownCountIncrease, RobotBody |
 | `frontend/src/apps/settings/RobotCards.tsx` | fetchFamilyBots, familyBotsQueryKey, RobotCards |
@@ -169,7 +168,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
 | `frontend/src/apps/settings/StagedApplyBar.tsx` | StagedApplyBar |
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
-| `frontend/src/apps/settings/VideoLibrary.tsx` | videoStateLine, VideoLibrary |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
 | `frontend/src/apps/settings/styles/FreshConfirm.tsx` | useFreshConfirm |

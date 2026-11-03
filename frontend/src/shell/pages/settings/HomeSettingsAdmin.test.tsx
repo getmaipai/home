@@ -2,9 +2,7 @@
 // who is not an owner or admin lands on Account; the five household sections
 // that had no entry draw inside it as trail views; and the area holds
 // household scope only.
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { picturesAdminApi } from "@/lib/picturesApi";
-import { videosApi } from "@/lib/videosApi";
+import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
@@ -155,11 +153,6 @@ describe("Home settings holds household scope only", () => {
 });
 
 describe("Pictures, videos and music cards (VIDEO-SETTINGS-04)", () => {
-  // The style libraries under the Pictures and Videos cards have their own tests; here they wait on a request that never answers.
-  const originalOverview = picturesAdminApi.overview;
-  const originalSettings = videosApi.settings;
-  beforeEach(() => { picturesAdminApi.overview = (() => new Promise(() => {})) as never; videosApi.settings = (() => new Promise(() => {})) as never; });
-  afterEach(() => { picturesAdminApi.overview = originalOverview; videosApi.settings = originalSettings; });
   const specCards = () => homeArea().sections.find((section) => section.id === "media")!.cards ?? [];
 
   test("every card the spec names by view has a view that draws, and none is left blank", () => {
@@ -188,5 +181,35 @@ describe("Pictures, videos and music cards (VIDEO-SETTINGS-04)", () => {
     const styles = open(makePerson("owner"), "/settings/media?tab=styles");
     expect(await styles.findByText("Adult-only styles")).toBeTruthy();
     expect(styles.queryByText("Use Civitai")).toBeNull();
+  });
+
+  test("each tab has its link rows from the spec copy, and no old style list or Quick and Detailed section", async () => {
+    const pictures = open(makePerson("owner"), "/settings/media?tab=pictures");
+    expect(await pictures.findByText("Picture models")).toBeTruthy();
+    expect(pictures.getByText("Choose which models make Standard and Boost pictures.")).toBeTruthy();
+    expect(pictures.queryByText("Quick and Detailed pictures")).toBeNull();
+    expect(pictures.queryByText("Add a style")).toBeNull();
+    cleanup();
+    const videos = open(makePerson("owner"), "/settings/media?tab=videos");
+    expect(await videos.findByText("Video models")).toBeTruthy();
+    expect(videos.getByText(/Max is for the people you allow/)).toBeTruthy();
+    expect(videos.getByRole("button", { name: "Open Styles" })).toBeTruthy();
+    expect(videos.queryByText("Quick and Detailed videos")).toBeNull();
+    expect(videos.queryByText("Video styles")).toBeNull();
+    cleanup();
+    const music = open(makePerson("owner"), "/settings/media?tab=music");
+    expect(await music.findByText("Song models")).toBeTruthy();
+  });
+
+  test("Open Styles on the Videos tab opens the Styles tab", async () => {
+    const videos = open(makePerson("owner"), "/settings/media?tab=videos");
+    (await videos.findByRole("button", { name: "Open Styles" })).click();
+    await waitFor(() => expect(where(videos)).toBe("/settings/media"));
+    expect(await videos.findByText("Adult-only styles")).toBeTruthy();
+  });
+
+  test("the retired Media library tab opens the first tab", async () => {
+    const view = open(makePerson("owner"), "/settings/media?tab=media-library");
+    expect(await view.findByText("Adults can make pictures")).toBeTruthy();
   });
 });

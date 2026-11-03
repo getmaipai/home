@@ -11,18 +11,18 @@ Type "make me a picture of a red fox in the snow" or "draw a lighthouse at dusk"
 
 You can ask for up to 4 pictures at once ("give me three options") and for a shape: square (the default), portrait, landscape, wide or tall ("a tall poster"). Say "another one", "one more" or "the same again" to make a new picture. If you leave the page, the picture keeps going.
 
-When it is done, the picture appears in the chat. Tap it to see it bigger. A **Quick** picture takes a few seconds on a fast computer and longer on a slower one.
+When it is done, the picture appears in the chat. Tap it to see it bigger. A Standard picture takes a few seconds on a fast computer and longer on a slower one.
 
 If someone is chatting or talking to Home while a picture is being made, the card says "Paused while chat is working". It carries on after the reply. The wait is not counted against the picture.
 
-## Quick or Detailed
+## Standard or Boost
 
-Home makes two kinds of picture. **Quick** is the usual one: a few seconds, clean and sharp, and good for words in a picture. **Detailed** takes about 15 to 30 seconds and has finer detail, skin and fur that look real, and many more styles to add. Detailed needs a bigger download and a computer with 128 GB of memory.
+Home makes pictures at two levels. **Standard** is the usual one: a few seconds, clean and sharp, and good for words in a picture. **Boost** takes about 15 to 30 seconds and has finer detail, and skin and fur that look real. Boost needs a bigger download and a computer with plenty of memory. See [Levels](levels.md).
 
-- **In chat,** just ask. Say "as detailed as you can" or "photoreal" and chat makes a Detailed picture and tells you so in one line. A style made for Detailed pictures uses Detailed on its own.
+- **In chat,** just ask. Say "as detailed as you can" or "photoreal" and chat makes a Boost picture and tells you so in one line.
 - **On a picture.** Press **Make it Boost** under a Standard picture, or **Make it Standard** under a Boost one, to make it again the other way. A picture made with a style has no button, because the style decides.
-- **For everyone.** An owner or admin can choose which kind chat makes when nobody asks (below). It starts as Quick.
-- **Edit** always uses Quick.
+- **For everyone.** An owner or admin can choose the level chat uses when nobody asks (below). It starts as Standard.
+- **Edit** always uses Standard.
 
 ## Change a picture you have
 
@@ -55,17 +55,21 @@ Open **Settings**, **Pictures, videos and music**.
 
 - **Adults can make pictures.** Turn it off to stop all picture making.
 - **Adult-only styles.** Choose whether styles marked adults only can be used.
-- **Picture quality.** Choose **Quick** (the default) or **Detailed** for the pictures chat makes when nobody asks for a kind. Under it, **Quick and Detailed pictures** shows what is on this computer. If Detailed is not there, press **Get Detailed pictures** (about 33 GB, once). **What is the difference?** compares the two, and **Details** names the models. If no picture model is installed, press **Install the picture model**. It downloads once.
-- **Styles.** A style gives pictures a look, like pixel art. Each has a switch, a note on who can use it, its licence and its size. Remove one to delete its file.
+- **Level when nobody says.** Choose **Standard** or **Boost** for the pictures chat makes when nobody names a level. Anyone can pick a level for one picture.
+- **Picture models.** Press **Choose models** to open **AI and models**, where you choose which models make Standard and Boost pictures. Installing a model happens there and in **Models and storage**, not on this page.
+- **Children and teens.** Choose whether children can make cartoons, and how many a day. See [cartoon controls](people.md#cartoon-pictures-and-videos).
+
+- **Styles.** A style gives pictures and videos a look, like old film or clay. Styles have their own tab, **Styles**. Only admins add them. A new style is for admins only until you choose **All adults** or **Chosen people** for it. Adult-only styles stay behind one **Locked items** row until you enter your own passcode. They lock again when you leave the tab.
 
 ### Add a style
 
-1. Open **Add a style**.
-2. Give it a name and paste a Hugging Face link to the file, choose a file from this computer, or type where a big file is saved on this computer. Styles from sites such as Civitai are files you download yourself first: Home never signs in to a site or fetches from one for you.
-3. Say what the licence is and tick the box to say you read it.
-4. Say if it is fine for all ages. If you are not sure, only adults can use it.
-5. Review the style details and confirm you have the rights and permission needed to use the file.
-6. Press **Add style**. Check the fingerprint and licence it shows, then press **Turn it on**.
+1. Open **Settings**, **Pictures, videos and music**, **Styles**.
+2. Press **Browse styles** to search Hugging Face, or **Add from a file** to use a file from this computer. Civitai is off until you turn it on under **Where styles come from**, and it asks you to read a short notice first.
+3. Open a style to read what it is, its licence and its size. Say if it is for adults only. If a source marks it adult, it stays locked until you unlock the tab.
+4. Press **Add**. The progress shows on the strip at the top of the page.
+5. Choose who can use it: **Only admins**, **All adults** or **Chosen people**. Children and teens never see styles.
+
+Remove a style and it waits 30 days under **Recently removed**. **Restore** brings it back. **Delete now** frees the space at once.
 
 The picture engine checks that the file is supported and safe to process. Content decisions for adults belong to the model; child protections remain in place.
 
@@ -74,7 +78,7 @@ The picture engine checks that the file is supported and safe to process. Conten
 | What you see | Why | What to do |
 |---|---|---|
 | Home says it cannot make pictures for you | You are a guest, or you are on a shared screen or a spoken chat, or a parent turned cartoon pictures off for you | Ask an adult, or use your own written chat |
-| "No picture model is installed" | The model is not on this computer | An owner or admin presses **Install the picture model** in Settings, Pictures, videos and music |
+| "No picture model is installed" | The model is not on this computer | An owner or admin chooses and installs a picture model in Settings, AI and models |
 | "The picture engine isn't answering", or Home says it cannot reach the engine | The AI engine is restarting or stopped | Wait a minute and ask again. If it stays, open **Repairs** |
 | "Waiting for memory to free up" | A video or another big job holds the memory | Wait. It starts by itself |
 | "Something went wrong while making it" | The job failed | Press **Try again**, or change the words |

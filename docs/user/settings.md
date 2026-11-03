@@ -68,9 +68,16 @@ Qwen3.6 35B A3B Uncensored is a second optional model, marked with an **Uncensor
 
 ## Pictures, videos and music
 
-An owner or admin opens **Settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).
+An owner or admin opens **Settings**, **Pictures, videos and music**. It has four tabs.
 
-**Picture quality** and **Video quality** choose Quick or Detailed when nobody asks for a kind. **Song length** chooses quick or full songs. Quick songs are about 45 seconds and take under a minute. Full songs are about 3 minutes and take a minute or two. See [Songs](songs.md).
+- **Pictures.** Adults can make pictures, the level when nobody says (**Standard** or **Boost**), a **Choose models** button, and the **Children and teens** card. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos).
+- **Videos.** Video making on or off, the level when nobody says, a **Choose models** button and an **Open Styles** button.
+- **Music.** Adults can make songs, **Song length** (**Short** or **Full**), a **Choose models** button, online radio and podcasts, and the song lookups.
+- **Styles.** The one list of styles for pictures and videos: browse, add from a file, who can use each, adult-only styles behind a lock, and recently removed.
+
+Choosing and installing models is done in **AI and models** and **Models and storage**. This area never shows a second control for that. See [Pictures](pictures.md), [Videos](videos.md), [Levels](levels.md) and [Songs](songs.md).
+
+**Song length** chooses short or full songs. Short songs are about 45 seconds and take under a minute. Full songs are about 3 minutes and take a minute or two. See [Songs](songs.md).
 
 ## Web search settings
 

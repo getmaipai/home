@@ -185,8 +185,7 @@ describe("the chat tool", () => {
 test("changed person-facing picture copy contains no model names", async () => {
   const settings = await Bun.file(new URL("../src/settings/pictureKeys.ts", import.meta.url)).text();
   const manifest = await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text();
-  const frontend = await Bun.file(new URL("../../frontend/src/apps/settings/PicturesLibrary.tsx", import.meta.url)).text();
-  const personFacing = [settings.match(/help: "Quick draws[^"]+"/)?.[0], settings.match(/quick: "Clear words[^"]+"/)?.[0], settings.match(/detailed: "About 30 to 45[^"]+"/)?.[0], QUALITY_NOTE_LINE.detailed_not_installed, QUALITY_NOTE_LINE.style_needs_detailed, QUALITY_NOTE_LINE.style_needs_quick, JSON.parse(manifest).args.properties.quality.description, frontend.match(/Clear words in about[^<]+/)?.[0], frontend.match(/About 15 to 25 seconds[^<]+/)?.[0]].join(" ");
+  const personFacing = [settings.match(/help: "Quick draws[^"]+"/)?.[0], settings.match(/quick: "Clear words[^"]+"/)?.[0], settings.match(/detailed: "About 30 to 45[^"]+"/)?.[0], QUALITY_NOTE_LINE.detailed_not_installed, QUALITY_NOTE_LINE.style_needs_detailed, QUALITY_NOTE_LINE.style_needs_quick, JSON.parse(manifest).args.properties.quality.description].join(" ");
   expect(personFacing).not.toMatch(/Klein|ERNIE|Z-Image/i);
 });
 

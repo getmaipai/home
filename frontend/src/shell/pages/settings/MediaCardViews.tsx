@@ -1,18 +1,21 @@
-// VIDEO-SETTINGS-04: the cards of Pictures, videos and music that the spec (spec-v0.1.316) names by view id. Each draws its registry group
-// through the kit renderer, the same way a plain keys card does, so every key shows with the spec's own label and help. The Pictures and
-// Videos cards still carry today's style libraries underneath until VIDEO-SETTINGS-05 builds the tab screens and VIDEO-LORA-08 the Styles screen.
+// VIDEO-SETTINGS-05: the Pictures, Videos and Music tab views and the Styles tab shell of Settings, Pictures, videos and music (settings-media-2026-11-02 sections 3 and 4).
+// Each card draws its registry group through the kit renderer, so every key shows with the spec's own label and help, then the card's link rows (text from the spec
+// card's `copy`, rule S5). The old style lists, the Quick and Detailed sections and the install buttons are gone: the one list of styles is the Styles tab, and which
+// model fills a level is chosen in AI and models, so this area holds no second control for either.
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
-import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
-import { VideoLibrary } from "@/apps/settings/VideoLibrary";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { StylesTab } from "@/apps/settings/styles/StylesTab";
 import { useTabItem } from "@/shell/tabIdentity";
 import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
+import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
 /** The keys of a Styles card the generic renderer draws: the Adult-only select. The Civitai switch and key have their own rows in the Styles view (VIDEO-LORA-08), because the key is write-only. */
 export const STYLES_CARD_KEYS = ["generation.styles.adult_only"];
 
-function MediaKeysCard({ person, card, includeKeys }: Pick<SettingsViewProps, "person" | "card"> & { includeKeys?: string[] }) {
+function MediaKeysList({ person, card, includeKeys }: Pick<SettingsViewProps, "person" | "card"> & { includeKeys?: string[] }) {
   const group = card?.group;
   if (!group) return null;
   return (
@@ -23,22 +26,62 @@ function MediaKeysCard({ person, card, includeKeys }: Pick<SettingsViewProps, "p
   );
 }
 
+type Copy = Record<string, string | undefined>;
+const copyOf = (card: SettingsViewProps["card"]): Copy => ((card as { copy?: Copy } | undefined)?.copy) ?? {};
+
+type LinkSpec = { title?: string; help?: string; button?: string; to: string };
+
+/** Link rows: a line of words and one button that opens another place. No state of its own, so it can never be a second control (S2). */
+function linkRows(rows: LinkSpec[], navigate: (to: string) => void) {
+  return rows.filter((row) => row.title && row.button).map((row) => (
+    <ItemGroup key={row.to + row.title}>
+      <Item variant="outline">
+        <ItemContent>
+          <ItemTitle>{row.title}</ItemTitle>
+          {row.help ? <ItemDescription clamp={false}>{row.help}</ItemDescription> : null}
+        </ItemContent>
+        <ItemActions><Button type="button" variant="outline" onClick={() => navigate(row.to)}>{row.button}</Button></ItemActions>
+      </Item>
+    </ItemGroup>
+  ));
+}
+
+const CHOOSE_MODELS = settingsPath("ai", "overview");
+
 /** Children and teens: the kids switch, the two daily limits and the household likeness option. Admin only (the area is). */
-export function MediaKidsView(props: SettingsViewProps) { return <MediaKeysCard person={props.person} card={props.card} />; }
+export function MediaKidsView(props: SettingsViewProps) { return <MediaKeysList person={props.person} card={props.card} />; }
 
 export function MediaPicturesView(props: SettingsViewProps) {
   useTabItem("Pictures");
-  return <><MediaKeysCard person={props.person} card={props.card} /><PicturesLibrary /></>;
+  const copy = copyOf(props.card);
+  const navigate = useNavigate();
+  return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
 }
 
 export function MediaVideosView(props: SettingsViewProps) {
   useTabItem("Videos");
-  return <><MediaKeysCard person={props.person} card={props.card} /><VideoLibrary /></>;
+  const copy = copyOf(props.card);
+  const navigate = useNavigate();
+  return (
+    <>
+      <MediaKeysList person={props.person} card={props.card} />
+      {copy.max_note ? <p className="text-sm text-muted-foreground">{copy.max_note}</p> : null}
+      {linkRows([
+        { title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS },
+        { title: copy.styles_label, help: copy.styles_help, button: copy.styles_button, to: settingsPath("media", "styles") },
+      ], navigate)}
+    </>
+  );
 }
 
-export function MediaMusicView(props: SettingsViewProps) { return <MediaKeysCard person={props.person} card={props.card} />; }
+export function MediaMusicView(props: SettingsViewProps) {
+  useTabItem("Music");
+  const copy = copyOf(props.card);
+  const navigate = useNavigate();
+  return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
+}
 
 export function MediaStylesView(props: SettingsViewProps) {
   useTabItem("Styles");
-  return <StylesTab person={props.person} card={props.card}><MediaKeysCard person={props.person} card={{ ...props.card!, description: undefined }} includeKeys={STYLES_CARD_KEYS} /></StylesTab>;
+  return <StylesTab person={props.person} card={props.card}><MediaKeysList person={props.person} card={{ ...props.card!, description: undefined }} includeKeys={STYLES_CARD_KEYS} /></StylesTab>;
 }

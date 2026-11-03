@@ -15,12 +15,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ApiError } from "@/lib/api";
 import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
-import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
 
 const KEY = ["components"] as const;
 const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
   { id: "chat", title: "Chat and thinking" }, { id: "voice", title: "Voice" }, { id: "pictures", title: "Pictures" },
-  { id: "video", title: "Video" }, { id: "music", title: "Music" }, { id: "stems", title: "Stems" }, { id: "tools", title: "Picture tools" }, { id: "loras", title: "Styles you added" },
+  { id: "video", title: "Video" }, { id: "music", title: "Music" }, { id: "stems", title: "Stems" }, { id: "tools", title: "Picture tools" },
 ];
 
 export const sizeWords = (n: number): string => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -215,15 +214,13 @@ export function ModelsAndStorageSection() {
       {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       {data?.stack === "ok" ? GROUPS.map((group) => {
         const rows = (data.components ?? []).filter((row) => row.group === group.id);
-        // VIDEO-SETTINGS-02: the adult-only styles are one locked row, whatever their number; it opens the shell's unlock dialog.
-        const lockedRow = group.id === "loras" && data.locked_styles === true;
-        if (rows.length === 0 && !lockedRow) return null;
+        // VIDEO-SETTINGS-05: styles are listed only on Settings, Pictures, videos and music, tab Styles (one list). Any style file the Stack reports has no group here.
+        if (rows.length === 0) return null;
         return (
           <section key={group.id} aria-label={group.title} className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">{group.title}</h3>
             <ItemGroup variant="card" aria-label={group.title}>
               {rows.map((row) => <Row key={row.id} row={row} refresh={refresh} setError={setError} />)}
-              {lockedRow ? <LockedSettingRow /> : null}
             </ItemGroup>
           </section>
         );

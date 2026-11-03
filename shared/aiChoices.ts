@@ -216,7 +216,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
       const current = choices.find((choice) => choice.kind === "radio" && choice.current);
       if (!current) return choices.some((choice) => choice.state === "installed") ? "On" : "Off";
       if (current.state !== "installed") return "Chosen, not ready";
-      return current.id === "videos.quick" ? "Using Quick" : "Using Detailed";
+      return current.id === "videos.quick" ? "Using Standard" : "Using Boost";
     }
     case "wakeword":
     case "vision":

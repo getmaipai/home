@@ -41,36 +41,3 @@ export const picturesApi = {
   stop: (id: string) => requestJson<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   again: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => requestJson<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality || prompt || tier ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
 };
-
-// IMGGEN-SET-01: the admin side (/api/pictures/admin), for the Pictures and videos settings view.
-export interface AdminAdapter {
-  id: string; name: string; base_model: string; classification: "all-ages" | "adult-only"; classification_note: string | null;
-  licence: string; licence_known: boolean; source_url: string | null; bytes: number; sha256: string; trigger_words: string[]; added_at: string;
-  enabled: boolean; needs_confirmation: boolean;
-}
-export interface AdminOverview {
-  stack: "ok" | "unreachable";
-  engine: {
-    state: string; available: boolean; reason: string | null; default_model: string | null; edit_ready: boolean;
-    models: Array<{ id: string; label: string; installed: boolean; available: boolean; licence: string; edit: boolean; peak_gb: number | null; remaining_bytes: number }>;
-    remaining_bytes: number;
-  };
-  adapters: AdminAdapter[];
-  /** VIDEO-SETTINGS-02: some adult-only styles are locked; one tile stands for them, never a count. */
-  locked_styles?: boolean;
-  bands: Array<{ band: "children" | "teens" | "adults"; label: string; on: boolean; locked: boolean; note: string }>;
-  adult_adapters: "allowed" | "restricted";
-  /** IMGGEN-QUALITY-01: the household's Picture quality setting, and whether Detailed can be made now. */
-  quality: "quick" | "detailed";
-  detailed_ready: boolean;
-}
-export interface AdminJob { state: "running" | "done" | "failed"; percent: number; label: string; error: string | null; code: string | null; adapter: AdminAdapter | null }
-
-export const picturesAdminApi = {
-  overview: () => requestJson<AdminOverview>("/api/pictures/admin"),
-  installModel: (family?: string) => requestJson<{ job: string; family: string }>("/api/pictures/admin/models/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(family ? { family } : {}) }),
-  job: (id: string) => requestJson<AdminJob>(`/api/pictures/admin/jobs/${encodeURIComponent(id)}`),
-  addAdapter: (form: FormData) => requestJson<{ job: string } | { adapter: AdminAdapter }>("/api/pictures/admin/adapters", { method: "POST", body: form }),
-  setEnabled: (id: string, enabled: boolean) => requestJson<AdminAdapter>(`/api/pictures/admin/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }),
-  remove: (id: string) => requestJson<{ ok: true }>(`/api/pictures/admin/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
-};

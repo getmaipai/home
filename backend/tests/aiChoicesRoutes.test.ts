@@ -288,7 +288,7 @@ describe("set everything to recommended", () => {
     const res = await client.post("/api/ai/recommended", {});
     expect(res.status).toBe(200);
     const body = await res.json() as { changed: string[]; started: string[] };
-    expect(body.changed.some((line) => line.startsWith("Quick pictures:"))).toBe(true);
+    expect(body.changed.some((line) => line.startsWith("Standard pictures:"))).toBe(true);
     expect(householdQuickModel()).toBe("ernie");
     expect(installs()).toContain(idOf("video"));
     expect(installs()).not.toContain(idOf("pictures-ernie"));

@@ -177,18 +177,15 @@ Home blocks CSAM. The model decides whether to make other adult content, includi
 Open **Settings**, **Pictures, videos and music**.
 
 - **Video making.** Turn it off to stop all video making, for children too.
-- **Adult-only video styles.** Choose whether styles marked adults only can be used.
-- **Video quality.** The level chat uses when nobody asks for one. Adults can ask chat for another level for one video. Teens and children always get Standard.
-- **Videos with sound.** Shows whether the sound models are on this computer. The download button shows its size and the maker's licence in plain points. You accept once. **Details** names the models. Some Settings labels still use the older words Quick (no sound) and Detailed (sound).
-- **Video styles.** A style gives videos a look, like old colour film. Each has a switch, a note on who can use it, its licence and its size. Remove one to delete its file.
+- **Level when nobody says.** The level chat uses when nobody asks for one: **Standard** or **Boost**. Adults can ask chat for another level for one video. Teens and children always get Standard.
+- **Video models.** Press **Choose models** to open **AI and models**, where you pick the models for Standard, Boost and Max videos and download them. Max is for the people you allow.
+- **Styles.** Press **Open Styles** to go to the **Styles** tab, the one place to add, share and remove styles for pictures and videos.
 
-### Add a video style
+### Add a style for videos
 
-1. Open **Add a video style**.
-2. Give it a name and choose the file from this computer. Home reads which video model it was made for from the file. A style made for the models with sound needs those models to be on this computer.
-3. Say what the licence is and tick the box to say you read it.
-4. Say if it is fine for all ages. If you are not sure, only adults can use it.
-5. Press **Add video style**. Check the fingerprint and licence it shows, then press **Turn it on**.
+1. Open **Settings**, **Pictures, videos and music**, **Styles**.
+2. Press **Browse styles** or **Add from a file**. Home reads which video model the file was made for. A style made for the older video maker works at Boost only, and the row says so.
+3. Press **Add**, then choose **Only admins**, **All adults** or **Chosen people** for it. Adult-only styles stay locked until you enter your own passcode.
 
 The video engine checks the file and refuses any style that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.
 
