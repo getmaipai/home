@@ -314,3 +314,37 @@ export async function removeVideoLora(id: string): Promise<void> {
   const res = await request(`/stack/v1/video/loras/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) return failure(res);
 }
+
+// VIDEO-LORA-07: the Stack's `video.lora.install` job (VIDEO-LORA-06). Home names the file; the Stack downloads it. The token rides in this one body only.
+export interface StackLoraInstallBody {
+  source: "huggingface" | "civitai"; url: string; name: string; licence: string; licence_acknowledged: boolean; audience: "all-ages" | "adult";
+  trigger_words?: string[]; added_by?: string; base_model?: "ltx-2.3" | "ltx-2.5"; sha256_expected?: string; token?: string; source_url?: string;
+}
+export class StackInstallRefused extends StackVideoError {
+  constructor(status: number, code: string, message: string, readonly existingId: string | null = null) { super(status, code, message); this.name = "StackInstallRefused"; }
+}
+
+async function refusal(res: Response): Promise<never> {
+  let body: { error?: unknown; code?: unknown; existing_id?: unknown } = {};
+  try { body = await res.json() as typeof body; } catch { /* no detail */ }
+  throw new StackInstallRefused(res.status, typeof body.code === "string" ? body.code : `http_${res.status}`, typeof body.error === "string" && body.error ? body.error : "The style could not be downloaded right now. Try again in a few minutes.", typeof body.existing_id === "string" ? body.existing_id : null);
+}
+
+/** Starts the install job and returns its id at once. The Stack answers 409 duplicate_lora (with `existing_id`) when the hash is already in its library. */
+export async function installVideoLora(body: StackLoraInstallBody): Promise<{ job: string }> {
+  const res = await request("/stack/v1/video/loras/install", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 30_000 });
+  if (res.status !== 202 && res.status !== 200) return refusal(res);
+  const parsed = await res.json() as { job?: string };
+  if (!parsed.job) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
+  return { job: parsed.job };
+}
+
+export interface StackInstallJob { state: string; percent: number | null; completedBytes: number | null; totalBytes: number | null; status: string | null; reason: string | null; result: unknown }
+export async function getStackInstallJob(job: string): Promise<StackInstallJob | null> {
+  const res = await request(`/stack/v1/jobs/${encodeURIComponent(job)}`, { method: "GET", timeoutMs: 8_000 });
+  if (res.status === 404) return null;
+  if (!res.ok) return failure(res);
+  const b = await res.json() as Record<string, unknown>;
+  const n = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return { state: typeof b.state === "string" ? b.state : "running", percent: n(b.percent), completedBytes: n(b.completedBytes), totalBytes: n(b.totalBytes), status: typeof b.status === "string" ? b.status : null, reason: typeof b.reason === "string" ? b.reason : null, result: b.result ?? null };
+}

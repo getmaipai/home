@@ -1,0 +1,413 @@
+// VIDEO-LORA-07 (docs/design/video-loras-2026-11-02.md sections 5.2, 15.1, 15.3, 15.4; docs/dev/lora-sources.md): ALL outbound traffic of the LoRA browser goes through this
+// module, admin-initiated only. Hugging Face Hub API (`/api/models`) and, when the household turned it on, the documented Civitai REST API (`/api/v1/models`).
+//
+// Courtesy (THIRD-PARTY-SERVICES, "LoRA sources"): one request per 2 seconds per host, at most 60 browse requests an hour for the household, a 5 minute response cache,
+// 24 hour preview cache, an exponential 1 to 30 minute stop on the first 429 or 5xx, honest client headers, a token only to its own host and never in a URL or a log.
+// Nothing here runs on its own: every call is an admin's click.
+//
+// What this module never does: decide who may SEE a hit (routes/lorasSources.ts redacts, from the classified hit), read any word for content (adultCheck.ts), or write a record.
+import { listLoraRecords, type Lora } from "@/lib/loras/store";
+import { classifyCivitai, classifyHuggingFace, cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
+import { getHouseholdSettingValue } from "@/lib/settings";
+
+export type LoraSite = "huggingface" | "civitai";
+export type SourceChoice = LoraSite | "both";
+export type HitBase = "ltx-2.3" | "ltx-2.5" | "wan2.2-ti2v-5b" | "unknown";
+export type LicenceClass = "open" | "non_commercial" | "custom" | "unknown";
+
+export const CIVITAI_ENABLED_KEY = "generation.styles.civitai";
+export const CIVITAI_KEY_KEY = "generation.styles.civitai_key";
+export const HF_TOKEN_KEY = "voice.hf_token";
+
+/** The exact Civitai `baseModels` strings. UNCONFIRMED: the live /enums list could not be read in the build (its sample stops before any LTX entry); confirm on the first real search. */
+export const CIVITAI_BASES = { "ltx-2.5": "LTXV 2.5", "ltx-2.3": "LTXV 2.3", wan: "Wan Video 2.2 TI2V-5B" } as const;
+export const MAX_RESULTS = 1000;
+export const PAGE_SIZE = 20;
+export const MAX_INSTALL_BYTES = 4 * 1024 ** 3;
+
+export class SourceError extends Error {
+  constructor(readonly code: "off" | "busy" | "budget" | "unreachable" | "bad_response" | "token_refused" | "not_found", message: string, readonly status: 400 | 403 | 404 | 429 | 502 | 503 = 502) {
+    super(message);
+    this.name = "SourceError";
+  }
+}
+
+/** One result, as the hub holds it BEFORE any redaction. Never sent to a client as is (routes/lorasSources.ts builds the view). */
+export interface Hit {
+  site: LoraSite;
+  remote_id: string;
+  /** Civitai: the version id. Hugging Face: the chosen file's path (known after the detail call). */
+  version_id: string | null;
+  adult_check: AdultCheck;
+  title: string;
+  creator: string | null;
+  page_url: string;
+  /** What the Stack is told to fetch: a Hugging Face file link or `https://civitai.com/api/download/models/<version id>`; null until a file is known. */
+  file_url: string | null;
+  file_name: string | null;
+  bytes: number | null;
+  sha256: string | null;
+  base_label: string | null;
+  base_model: HitBase;
+  kind: "style" | "character" | null;
+  licence_id: string | null;
+  licence_class: LicenceClass;
+  commercial_use: "yes" | "no" | "unknown";
+  downloads: number;
+  rating: number | null;
+  created_at: string | null;
+  trigger_words: string[];
+  gated: boolean;
+  /** Where the preview lives (never sent to a client). */
+  preview_url: string | null;
+  also_on: LoraSite[];
+}
+
+export const hitKey = (h: Pick<Hit, "site" | "remote_id" | "version_id">): string => `${h.site}:${h.remote_id}:${h.version_id ?? ""}`;
+
+// ---- settings -----------------------------------------------------------------------------------------------------------------------------------
+
+export const civitaiEnabled = (): boolean => getHouseholdSettingValue(CIVITAI_ENABLED_KEY) === true;
+const secretValue = (key: string): string | null => { const v = getHouseholdSettingValue(key); return typeof v === "string" && v.trim() ? v.trim() : null; };
+export const civitaiKey = (): string | null => secretValue(CIVITAI_KEY_KEY);
+export const huggingFaceToken = (): string | null => secretValue(HF_TOKEN_KEY);
+export const tokenFor = (site: LoraSite): string | null => (site === "civitai" ? civitaiKey() : huggingFaceToken());
+
+// ---- limiter, budget, cache ---------------------------------------------------------------------------------------------------------------------
+
+let clock: () => number = () => Date.now();
+let sleeper: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms));
+let gapMs = 2000;
+let fetchImpl: typeof fetch | null = null;
+export function __setSourceTestHooks(h: { now?: () => number; sleep?: (ms: number) => Promise<void>; gapMs?: number; fetch?: typeof fetch | null }): void {
+  if (h.now) clock = h.now;
+  if (h.sleep) sleeper = h.sleep;
+  if (h.gapMs !== undefined) gapMs = h.gapMs;
+  if (h.fetch !== undefined) fetchImpl = h.fetch;
+}
+
+interface HostState { lastAt: number; blockedUntil: number; failures: number; chain: Promise<unknown> }
+const hosts = new Map<string, HostState>();
+let hourly: number[] = [];
+const cache = new Map<string, { at: number; value: unknown }>();
+const previews = new Map<string, { at: number; url: string }>();
+const knownSha = new Map<string, string>();
+const CACHE_MS = 5 * 60_000;
+const PREVIEW_MS = 24 * 3_600_000;
+const HOURLY_BUDGET = 60;
+
+export function __resetSourceForTests(): void {
+  hosts.clear(); hourly = []; cache.clear(); previews.clear(); knownSha.clear();
+  clock = () => Date.now(); sleeper = (ms) => new Promise((r) => setTimeout(r, ms)); gapMs = 2000; fetchImpl = null;
+}
+/** Test-only: how many remote requests actually went out. */
+export const sourceRequestCount = (): number => requests;
+let requests = 0;
+
+const HOST_NAME: Record<LoraSite, string> = { huggingface: "huggingface.co", civitai: "civitai.com" };
+const SITE_LABEL: Record<LoraSite, string> = { huggingface: "Hugging Face", civitai: "Civitai" };
+
+function hostState(host: string): HostState {
+  let s = hosts.get(host);
+  if (!s) { s = { lastAt: 0, blockedUntil: 0, failures: 0, chain: Promise.resolve() }; hosts.set(host, s); }
+  return s;
+}
+
+/** One guarded GET: honours a stop, the hourly budget and the per-host gap (requests queue, one at a time per host), and starts the exponential stop on a 429 or 5xx. */
+async function guardedGet(site: LoraSite, url: string, opts: { accept?: string; budget?: boolean } = {}): Promise<Response> {
+  const host = HOST_NAME[site];
+  if (new URL(url).hostname !== host && !new URL(url).hostname.endsWith(`.${host}`) && !(site === "civitai" && new URL(url).hostname === "image.civitai.com")) throw new SourceError("bad_response", "That address is not on the source's own site.", 502);
+  const s = hostState(host);
+  const run = async (): Promise<Response> => {
+    const now = clock();
+    if (s.blockedUntil > now) throw new SourceError("busy", `${SITE_LABEL[site]} asked us to slow down. Try again in ${Math.max(1, Math.ceil((s.blockedUntil - now) / 60_000))} minutes.`, 503);
+    if (opts.budget !== false) {
+      hourly = hourly.filter((t) => now - t < 3_600_000);
+      if (hourly.length >= HOURLY_BUDGET) throw new SourceError("budget", "That is a lot of searching for one hour. Try again a little later.", 429);
+      hourly.push(now);
+    }
+    const wait = s.lastAt + gapMs - now;
+    if (wait > 0) await sleeper(wait);
+    s.lastAt = clock();
+    const headers: Record<string, string> = { accept: opts.accept ?? "application/json", "user-agent": "MaiPai-Home (self-hosted; admin-initiated)" };
+    const token = new URL(url).hostname === host ? tokenFor(site) : null;
+    if (token) headers.authorization = `Bearer ${token}`;
+    requests += 1;
+    let res: Response;
+    try { res = await (fetchImpl ?? fetch)(url, { headers, redirect: "manual", signal: AbortSignal.timeout(15_000) }); }
+    catch { throw new SourceError("unreachable", `Home could not reach ${SITE_LABEL[site]}. Check this computer's internet, then try again.`, 502); }
+    if (res.status === 429 || res.status >= 500) {
+      s.failures += 1;
+      s.blockedUntil = clock() + Math.min(30, 2 ** (s.failures - 1)) * 60_000;
+      throw new SourceError("busy", `${SITE_LABEL[site]} is busy right now. Home will wait a few minutes before asking again.`, 503);
+    }
+    s.failures = 0;
+    if (res.status === 401 || res.status === 403) throw new SourceError("token_refused", `${SITE_LABEL[site]} would not answer. Check the saved key or token in settings.`, 502);
+    if (res.status === 404) throw new SourceError("not_found", "That style isn't there any more.", 404);
+    if (res.status >= 300) throw new SourceError("bad_response", `${SITE_LABEL[site]} answered in a way Home can't read. Try again later.`, 502);
+    return res;
+  };
+  // Queue behind earlier calls for the same host so the gap holds under concurrent clicks.
+  const result = s.chain.then(run, run);
+  s.chain = result.catch(() => undefined);
+  return result;
+}
+
+async function getJson(site: LoraSite, url: string): Promise<{ body: unknown; headers: Headers }> {
+  const hit = cache.get(url);
+  if (hit && clock() - hit.at < CACHE_MS) return hit.value as { body: unknown; headers: Headers };
+  const res = await guardedGet(site, url);
+  let body: unknown;
+  try { body = await res.json(); } catch { throw new SourceError("bad_response", `${SITE_LABEL[site]} sent something Home can't read. Try again later.`, 502); }
+  const value = { body, headers: res.headers };
+  if (cache.size > 200) cache.delete(cache.keys().next().value as string);
+  cache.set(url, { at: clock(), value });
+  return value;
+}
+
+// ---- helpers ------------------------------------------------------------------------------------------------------------------------------------
+
+const rec = (v: unknown): Record<string, unknown> => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+const numOr = (v: unknown, d: number): number => (typeof v === "number" && Number.isFinite(v) ? v : d);
+
+export function ltxBaseFromText(text: string): HitBase {
+  const t = text.toLowerCase();
+  if (/ltx[\s_-]*(?:v|video)?[\s_-]*2[._-]?5/.test(t)) return "ltx-2.5";
+  if (/ltx[\s_-]*(?:v|video)?[\s_-]*2[._-]?3/.test(t)) return "ltx-2.3";
+  if (/\bwan/.test(t)) return "wan2.2-ti2v-5b";
+  return "unknown";
+}
+
+const OPEN_LICENCES = new Set(["apache-2.0", "mit", "cc0-1.0", "bsd-3-clause", "bsd-2-clause", "unlicense"]);
+export function licenceClassOf(id: string | null): LicenceClass {
+  if (!id) return "unknown";
+  const l = id.toLowerCase();
+  if (OPEN_LICENCES.has(l)) return "open";
+  if (/-nc(?:-|$)/.test(l) || l.includes("non-commercial")) return "non_commercial";
+  return "custom";
+}
+
+function civitaiLicence(allow: unknown): { id: string | null; cls: LicenceClass; commercial: "yes" | "no" | "unknown" } {
+  const list = Array.isArray(allow) ? allow.map(String) : typeof allow === "string" ? allow.replace(/[{}]/g, "").split(",").map((s) => s.trim()).filter(Boolean) : null;
+  if (list === null) return { id: null, cls: "unknown", commercial: "unknown" };
+  const sell = list.includes("Sell");
+  return { id: sell ? "Civitai (commercial use allowed)" : "Civitai (no selling)", cls: sell ? "custom" : "non_commercial", commercial: sell ? "yes" : "no" };
+}
+
+function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: string): Hit | null {
+  const m = rec(modelRaw);
+  const id = m.id;
+  if (typeof id !== "number" && typeof id !== "string") return null;
+  const versions = arr(m.modelVersions).map(rec);
+  const chosen = (wantVersion ? versions.find((v) => String(v.id) === wantVersion) : undefined) ?? (bases.length ? versions.find((v) => bases.includes(String(v.baseModel))) : undefined) ?? versions[0];
+  if (!chosen) return null;
+  const files = arr(chosen.files).map(rec);
+  const file = files.find((f) => f.primary === true && String(f.name ?? "").toLowerCase().endsWith(".safetensors")) ?? files.find((f) => String(f.name ?? "").toLowerCase().endsWith(".safetensors")) ?? null;
+  const images = arr(chosen.images).map(rec);
+  const sha = str(rec(file?.hashes).SHA256)?.toLowerCase() ?? null;
+  const lic = civitaiLicence(m.allowCommercialUse);
+  const stats = rec(m.stats);
+  const baseLabel = str(chosen.baseModel);
+  const tags = arr(m.tags).map((t) => (typeof t === "string" ? t : str(rec(t).name) ?? ""));
+  const preview = images.find((i) => typeof i.url === "string" && String(i.type ?? "image") === "image" && /^https:\/\/image\.civitai\.com\//.test(String(i.url)));
+  const versionId = String(chosen.id);
+  return {
+    site: "civitai", remote_id: String(id), version_id: versionId,
+    adult_check: classifyCivitai({ nsfw: m.nsfw, nsfwLevel: m.nsfwLevel, imageLevels: images.map((i) => i.nsfwLevel), malformed: !file && images.length === 0 && m.mode !== undefined }),
+    title: str(m.name) ?? `Model ${id}`, creator: str(rec(m.creator).username), page_url: `https://civitai.com/models/${id}?modelVersionId=${versionId}`,
+    file_url: file ? `https://civitai.com/api/download/models/${versionId}` : null, file_name: str(file?.name),
+    bytes: file && typeof file.sizeKB === "number" ? Math.round(file.sizeKB * 1024) : null, sha256: sha && /^[0-9a-f]{64}$/.test(sha) ? sha : null,
+    base_label: baseLabel, base_model: baseLabel ? ltxBaseFromText(baseLabel) : "unknown",
+    kind: tags.some((t) => t.toLowerCase() === "character") ? "character" : "style",
+    licence_id: lic.id, licence_class: lic.cls, commercial_use: lic.commercial,
+    downloads: numOr(stats.downloadCount, 0), rating: typeof stats.rating === "number" ? stats.rating : null, created_at: str(chosen.publishedAt),
+    trigger_words: cleanTriggerWords(arr(chosen.trainedWords).filter((w): w is string => typeof w === "string")), gated: false,
+    preview_url: typeof preview?.url === "string" ? String(preview.url) : null, also_on: [],
+  };
+}
+
+function hfHit(raw: unknown): Hit | null {
+  const m = rec(raw);
+  const id = str(m.id) ?? str(m.modelId);
+  if (!id || !/^[\w.-]+\/[\w.-]+$/.test(id)) return null;
+  const tags = arr(m.tags).filter((t): t is string => typeof t === "string");
+  const card = rec(m.cardData);
+  const baseText = [...tags.filter((t) => t.startsWith("base_model:")), ...arr(card.base_model).map(String), typeof card.base_model === "string" ? card.base_model : ""].join(" ");
+  const base = ltxBaseFromText(baseText);
+  const licenceId = str(card.license) ?? tags.find((t) => t.startsWith("license:"))?.slice(8) ?? null;
+  const lc = licenceClassOf(licenceId);
+  const hit: Hit = {
+    site: "huggingface", remote_id: id, version_id: null, adult_check: classifyHuggingFace(tags), title: id.split("/")[1]!, creator: id.split("/")[0]!,
+    page_url: `https://huggingface.co/${id}`, file_url: null, file_name: null, bytes: null, sha256: null,
+    base_label: base === "unknown" ? (baseText.replace(/base_model:(?:adapter:|finetune:|quantized:)?/g, "").trim().slice(0, 60) || null) : base, base_model: base, kind: null,
+    licence_id: licenceId, licence_class: lc, commercial_use: lc === "open" ? "yes" : lc === "non_commercial" ? "no" : "unknown",
+    downloads: numOr(m.downloads, 0), rating: typeof m.likes === "number" ? m.likes : null, created_at: str(m.createdAt), trigger_words: [], gated: m.gated === "auto" || m.gated === "manual" || m.gated === true,
+    preview_url: null, also_on: [],
+  };
+  const siblings = arr(m.siblings).map(rec);
+  if (siblings.length) {
+    const files = siblings.filter((s) => String(s.rfilename ?? "").toLowerCase().endsWith(".safetensors"));
+    const pick = (files.length === 1 ? files[0] : files.find((s) => /lora/i.test(String(s.rfilename))) ) ?? files.sort((a, b) => numOr(b.size, 0) - numOr(a.size, 0))[0];
+    if (pick) {
+      const path = String(pick.rfilename);
+      const sha = str(rec(pick.lfs).sha256)?.toLowerCase() ?? null;
+      hit.version_id = path; hit.file_name = path.split("/").pop() ?? path;
+      hit.file_url = `https://huggingface.co/${id}/resolve/main/${path.split("/").map(encodeURIComponent).join("/")}`;
+      hit.bytes = typeof pick.size === "number" ? pick.size : typeof rec(pick.lfs).size === "number" ? (rec(pick.lfs).size as number) : null;
+      hit.sha256 = sha && /^[0-9a-f]{64}$/.test(sha) ? sha : null;
+      if (hit.sha256) knownSha.set(`${id}`, hit.sha256);
+    }
+  } else if (knownSha.has(id)) hit.sha256 = knownSha.get(id)!;
+  return hit;
+}
+
+// ---- browse and detail --------------------------------------------------------------------------------------------------------------------------
+
+export interface BrowseParams {
+  source: SourceChoice; q: string; kind: "any" | "style" | "character"; base: "default" | "ltx-2.5" | "ltx-2.3" | "wan" | "all";
+  sort: "downloads" | "rating" | "newest"; cursor: string | null; /** Sent upstream as `nsfw=true` ONLY when the caller holds a valid unlock proof and asked for adult results. */ nsfw: boolean;
+}
+interface Cursor { h: string | null; c: string | null; n: number }
+const decodeCursor = (s: string | null): Cursor => { if (!s) return { h: null, c: null, n: 0 }; try { const v = rec(JSON.parse(Buffer.from(s, "base64url").toString())); return { h: str(v.h), c: str(v.c), n: Math.max(0, Math.floor(numOr(v.n, 0))) }; } catch { return { h: null, c: null, n: 0 }; } };
+const encodeCursor = (c: Cursor): string => Buffer.from(JSON.stringify(c)).toString("base64url");
+
+function basesFor(p: BrowseParams): string[] {
+  if (p.base === "all") return [];
+  if (p.base === "default") return [CIVITAI_BASES["ltx-2.5"], CIVITAI_BASES["ltx-2.3"]];
+  return [CIVITAI_BASES[p.base]];
+}
+const baseWanted = (p: BrowseParams, base: HitBase): boolean => p.base === "all" || (p.base === "default" ? base === "ltx-2.5" || base === "ltx-2.3" : base === (p.base === "wan" ? "wan2.2-ti2v-5b" : p.base));
+
+async function browseHf(p: BrowseParams, cursor: string | null): Promise<{ hits: Hit[]; next: string | null }> {
+  let url: string;
+  if (cursor) {
+    // The cursor is the `Link: rel=next` address HF gave us; only an address on its own host is followed.
+    const u = new URL(cursor);
+    if (u.protocol !== "https:" || u.hostname !== "huggingface.co" || !u.pathname.startsWith("/api/models")) throw new SourceError("bad_response", "That page is not available any more. Search again.", 400);
+    url = u.href;
+  } else {
+    const q = new URLSearchParams({ filter: "lora", limit: String(PAGE_SIZE), sort: p.sort === "downloads" ? "downloads" : p.sort === "rating" ? "likes" : "createdAt", direction: "-1" });
+    if (p.q.trim()) q.set("search", p.q.trim());
+    url = `https://huggingface.co/api/models?${q}`;
+  }
+  const { body, headers } = await getJson("huggingface", url);
+  if (!Array.isArray(body)) throw new SourceError("bad_response", "Hugging Face sent something Home can't read. Try again later.", 502);
+  const hits = body.map(hfHit).filter((h): h is Hit => h !== null).filter((h) => baseWanted(p, h.base_model));
+  const next = /<([^>]+)>;\s*rel="next"/.exec(headers.get("link") ?? "")?.[1] ?? null;
+  return { hits, next };
+}
+
+async function browseCivitai(p: BrowseParams, cursor: string | null): Promise<{ hits: Hit[]; next: string | null }> {
+  if (!civitaiEnabled()) throw new SourceError("off", "Civitai is off. An owner or admin can turn it on in settings.", 403);
+  const q = new URLSearchParams({ limit: String(PAGE_SIZE), types: "LORA", sort: p.sort === "downloads" ? "Most Downloaded" : p.sort === "rating" ? "Highest Rated" : "Newest", nsfw: p.nsfw ? "true" : "false" });
+  if (p.q.trim()) q.set("query", p.q.trim());
+  for (const b of basesFor(p)) q.append("baseModels", b);
+  if (cursor) q.set("cursor", cursor);
+  const { body } = await getJson("civitai", `https://civitai.com/api/v1/models?${q}`);
+  const b = rec(body);
+  if (!Array.isArray(b.items)) throw new SourceError("bad_response", "Civitai sent something Home can't read. Try again later.", 502);
+  const hits = b.items.map((m) => civitaiHit(m, basesFor(p))).filter((h): h is Hit => h !== null);
+  return { hits, next: str(rec(b.metadata).nextCursor) };
+}
+
+const sortKey = (p: BrowseParams) => (h: Hit): number => (p.sort === "downloads" ? h.downloads : p.sort === "rating" ? (h.rating ?? 0) : Date.parse(h.created_at ?? "") || 0);
+
+export interface Browsed { hits: Hit[]; next: string | null; remember: Array<{ key: string; url: string }> }
+
+export async function browseHits(p: BrowseParams): Promise<Browsed> {
+  const cur = decodeCursor(p.cursor);
+  const useHf = p.source !== "civitai", useCv = p.source !== "huggingface";
+  if (useCv && !civitaiEnabled()) { if (p.source === "civitai") throw new SourceError("off", "Civitai is off. An owner or admin can turn it on in settings.", 403); }
+  const [hf, cv] = await Promise.all([
+    useHf && (p.cursor === null || cur.h) ? browseHf(p, cur.h) : Promise.resolve({ hits: [] as Hit[], next: null }),
+    useCv && civitaiEnabled() && (p.cursor === null || cur.c) ? browseCivitai(p, cur.c) : Promise.resolve({ hits: [] as Hit[], next: null }),
+  ]);
+  let hits = dedupeHits([...hf.hits, ...cv.hits]);
+  if (p.kind !== "any") hits = hits.filter((h) => h.kind === null || h.kind === p.kind);
+  const key = sortKey(p);
+  hits = [...hits].sort((a, b) => key(b) - key(a));
+  const n = cur.n + hits.length;
+  const next = n >= MAX_RESULTS || (!hf.next && !cv.next) ? null : encodeCursor({ h: hf.next, c: cv.next, n });
+  const remember = hits.flatMap((h) => (h.preview_url ? [{ key: hitKey(h), url: h.preview_url }] : []));
+  for (const r of remember) previews.set(r.key, { at: clock(), url: r.url });
+  return { hits, next, remember };
+}
+
+/** One hit by id with its file facts (Hugging Face `?blobs=true`, Civitai `/models/{id}`). Used by the confirm panel and by install, which never trusts a client's file address. */
+export async function fetchHit(site: LoraSite, remoteId: string, versionId?: string | null): Promise<Hit> {
+  if (site === "civitai") {
+    if (!civitaiEnabled()) throw new SourceError("off", "Civitai is off. An owner or admin can turn it on in settings.", 403);
+    if (!/^\d{1,12}$/.test(remoteId)) throw new SourceError("not_found", "That style isn't there any more.", 404);
+    const { body } = await getJson("civitai", `https://civitai.com/api/v1/models/${remoteId}`);
+    const hit = civitaiHit(body, [], versionId ?? undefined);
+    if (!hit) throw new SourceError("bad_response", "Civitai sent something Home can't read. Try again later.", 502);
+    if (hit.preview_url) previews.set(hitKey(hit), { at: clock(), url: hit.preview_url });
+    return hit;
+  }
+  if (!/^[\w.-]+\/[\w.-]+$/.test(remoteId)) throw new SourceError("not_found", "That style isn't there any more.", 404);
+  const { body } = await getJson("huggingface", `https://huggingface.co/api/models/${remoteId}?blobs=true`);
+  const hit = hfHit(body);
+  if (!hit) throw new SourceError("bad_response", "Hugging Face sent something Home can't read. Try again later.", 502);
+  return hit;
+}
+
+/** A pasted Hugging Face link: `https://huggingface.co/<owner>/<repo>[/blob|resolve/<rev>/<file>]`. */
+export function parseHfLink(link: string): { repo: string; file: string | null } | null {
+  let u: URL;
+  try { u = new URL(link.trim()); } catch { return null; }
+  if (u.protocol !== "https:" || u.hostname !== "huggingface.co") return null;
+  const parts = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  if (parts.length < 2 || !/^[\w.-]+$/.test(parts[0]!) || !/^[\w.-]+$/.test(parts[1]!)) return null;
+  const file = (parts[2] === "blob" || parts[2] === "resolve") && parts.length > 4 ? parts.slice(4).join("/") : null;
+  return { repo: `${parts[0]}/${parts[1]}`, file };
+}
+
+/** The picture of a hit the caller may see, fetched once through the hub and kept 24 hours. Only the address the hub itself read from the source is ever fetched. */
+const pictureBytes = new Map<string, { at: number; type: string; bytes: Uint8Array }>();
+export async function previewOf(key: string): Promise<{ type: string; bytes: Uint8Array } | null> {
+  const held = pictureBytes.get(key);
+  if (held && clock() - held.at < PREVIEW_MS) return held;
+  const known = previews.get(key);
+  if (!known || clock() - known.at > PREVIEW_MS) return null;
+  const res = await guardedGet("civitai", known.url, { accept: "image/*", budget: false });
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.startsWith("image/")) return null;
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length > 5_000_000) return null;
+  if (pictureBytes.size > 100) pictureBytes.delete(pictureBytes.keys().next().value as string);
+  const value = { at: clock(), type, bytes };
+  pictureBytes.set(key, value);
+  return value;
+}
+
+// ---- dedupe and installed ----------------------------------------------------------------------------------------------------------------------
+
+/** Section 15.4: identity is (site, remote id, version id); across sources only the sha256 when both publish it. Hugging Face wins a tie (no key, stable hash). Names are never identity. */
+export function dedupeHits(hits: readonly Hit[]): Hit[] {
+  const seen = new Set<string>();
+  const first: Hit[] = [];
+  for (const h of hits) { const k = hitKey(h); if (seen.has(k)) continue; seen.add(k); first.push(h); }
+  const order = [...first].sort((a, b) => (a.site === b.site ? 0 : a.site === "huggingface" ? -1 : 1));
+  const bySha = new Map<string, Hit>();
+  const drop = new Set<Hit>();
+  for (const h of order) {
+    if (!h.sha256) continue;
+    const kept = bySha.get(h.sha256);
+    if (!kept) { bySha.set(h.sha256, h); continue; }
+    drop.add(h);
+    if (kept.site !== h.site && !kept.also_on.includes(h.site)) kept.also_on.push(h.site);
+  }
+  return first.filter((h) => !drop.has(h));
+}
+
+export interface InstalledMatch { lora: Lora; by: "version" | "sha" }
+/** The live record (not in the trash) this hit already is: same site and version id, then same sha256. */
+export function installedAs(hit: Pick<Hit, "site" | "remote_id" | "version_id" | "sha256">, records: readonly Lora[] = listLoraRecords()): InstalledMatch | null {
+  const live = records.filter((r) => r.removed_at === null);
+  const byVersion = hit.version_id ? live.find((r) => r.source.site === hit.site && r.source.version_id === hit.version_id && (hit.site === "civitai" || r.source.remote_id === hit.remote_id)) : undefined;
+  if (byVersion) return { lora: byVersion, by: "version" };
+  const bySha = hit.sha256 ? live.find((r) => r.file.sha256 === hit.sha256) : undefined;
+  return bySha ? { lora: bySha, by: "sha" } : null;
+}

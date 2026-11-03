@@ -39,6 +39,7 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
 import { embedPendingEpisodes } from "@/lib/episodes";
 import { pollActiveStackImageJobs } from "@/lib/jobProducers";
+import { reconcileLoraInstalls } from "@/lib/loras/install";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
@@ -335,7 +336,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     const sweep = await sweepStackStorage();
     console.log(sweep.ok ? `[stack-updates] storage sweep removed ${sweep.value.removed.length} blob(s)` : `[stack-updates] storage sweep failed: ${sweep.error}`);
   },
-  "stack.image_jobs": async () => { await pollActiveStackImageJobs(); },
+  "stack.image_jobs": async () => { await pollActiveStackImageJobs(); await reconcileLoraInstalls(); },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();
     await embedPendingEpisodes();
