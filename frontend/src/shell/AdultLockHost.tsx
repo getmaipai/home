@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AdultLockProvider, useLockProof, type UnlockResult } from "@maipai/ui/src/elements/adult-lock";
 import { Button } from "@maipai/ui/src/ui/button";
-import { ADULT_PROOF_HEADER, adultClocks, forgetOpenIds, installAdultFetch, getAdultProof, onAdultFlip, revokeAdultBlobs, setAdultProof, unloadAdultElements } from "@/lib/adultLock";
+import { ADULT_PROOF_HEADER, adultClocks, adultCredential, forgetOpenIds, installAdultFetch, getAdultProof, onAdultFlip, revokeAdultBlobs, setAdultProof, unloadAdultElements } from "@/lib/adultLock";
 import { installAdultPlaybackGuard } from "@/shell/adultPlaybackGuard";
 import { useMediaDock } from "@/shell/mediaHost";
 import type { Roster } from "@/lib/api";
@@ -105,7 +105,8 @@ export function useAdultLockProps(person: Pick<Roster, "pinDigits" | "hasSecret"
     return () => { restoreFetch.current?.(); restoreFetch.current = null; };
   }, []);
   const visit = useMemo(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2)), []);
-  const digits = person.pinDigits && person.pinDigits >= 1 ? person.pinDigits : null;
+  // With no secret set there is nothing to ask for: the dialog only says where to set one, in the default word.
+  const credential = person.hasSecret === false ? adultCredential({ pinDigits: 6 }) : adultCredential(person);
   const unlock = useCallback((secret: string) => unlockRequest(secret, visit), [visit]);
   const onUnlocked = useCallback((proof: string | null) => {
     setAdultProof(proof);
@@ -123,7 +124,7 @@ export function useAdultLockProps(person: Pick<Roster, "pinDigits" | "hasSecret"
     // Nothing unlocked may stay in the cache: reset, so a locked list shows the tile again.
     void queryClient.resetQueries();
   }, [queryClient]);
-  // The kit's dialog takes the digits of a passcode; without a digit passcode it says where to set one (design 3.2).
-  const hasCredential = person.hasSecret !== false && digits !== null;
-  return { unlock, digits: digits ?? 6, credentialWord: "passcode", hasCredential, onUnlocked, onRelock };
+  // The kit's dialog draws digit boxes for a PIN and a masked password field for a password (ADULT-LOCK-07); with no secret set it says where to set one.
+  const hasCredential = person.hasSecret !== false;
+  return { unlock, ...credential, hasCredential, onUnlocked, onRelock };
 }

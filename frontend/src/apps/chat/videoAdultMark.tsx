@@ -5,11 +5,14 @@ import { useContext, useState, type ReactNode } from "react";
 import { AdultLockDialog, type UnlockResult } from "@maipai/ui/src/elements/adult-lock";
 import { Button } from "@maipai/ui/src/ui/button";
 import { ApiError } from "@/lib/api";
+import { adultCredential } from "@/lib/adultLock";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 
 /** What will change, in plain words (the confirm dialog). */
-export const UNMARK_EXPLAINER = "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.";
+/** `word` is the person's own word for their secret: "passcode" for a digit PIN, "password" for a password. */
+export const unmarkExplainer = (word: string) => `This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your ${word} to continue.`;
+export const UNMARK_EXPLAINER = unmarkExplainer("passcode");
 
 export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): { actions: ReactNode[]; dialog: ReactNode; stateLine: string | null } {
   const me = useContext(WakeWordPersonContext);
@@ -17,6 +20,7 @@ export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): 
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const adult = item?.adult ?? null;
+  const credential = adultCredential(me);
   if (!item || !adult) return { actions: [], dialog: null, stateLine: null };
 
   const check = async (passcode: string): Promise<UnlockResult> => {
@@ -48,10 +52,9 @@ export function useVideoAdultMark(item: VideoItem | null, refresh: () => void): 
       onOpenChange={setOpen}
       unlock={check}
       onUnlocked={() => { setOpen(false); refresh(); }}
-      digits={me?.pinDigits && me.pinDigits >= 1 ? me.pinDigits : 6}
-      credentialWord={me?.pinDigits ? "passcode" : "password"}
+      {...credential}
       title="Remove the adult lock?"
-      description={UNMARK_EXPLAINER}
+      description={unmarkExplainer(credential.credentialWord)}
       actionLabel="Remove lock"
     />
   ) : null;

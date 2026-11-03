@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { VideoToolRender } from "@/apps/chat/chatToolUis";
-import { UNMARK_EXPLAINER } from "@/apps/chat/videoAdultMark";
+import { UNMARK_EXPLAINER, unmarkExplainer } from "@/apps/chat/videoAdultMark";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import type { VideoAdultState, VideoItem } from "@/lib/videosApi";
 
@@ -35,10 +35,10 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.fetch = realFetch; });
 
-function mount() {
+function mount(pinDigits: number | null = 4) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Render = VideoToolRender as unknown as (props: { result: { id: string } }) => React.ReactElement;
-  const me = { id: "p1", pinDigits: 4 } as never;
+  const me = { id: "p1", pinDigits } as never;
   return render(<QueryClientProvider client={client}><WakeWordPersonContext.Provider value={me}><MemoryRouter><Render result={{ id: "vid-1" }} /></MemoryRouter></WakeWordPersonContext.Provider></QueryClientProvider>);
 }
 const typeCode = (code: string) => fireEvent.change(document.querySelector<HTMLInputElement>('[data-slot="adult-lock-dialog"] input')!, { target: { value: code } });
@@ -84,6 +84,38 @@ describe("the creator's menu on a locked, shown clip", () => {
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-error"]')?.textContent).toContain("was not right"));
     expect(calls.some((c) => c.url.endsWith("/adult-mark"))).toBe(false);
     expect(document.querySelector('[data-slot="adult-lock-dialog"]')).not.toBeNull();
+  });
+});
+
+describe("a creator who signs in with a password (ADULT-LOCK-07)", () => {
+  const open = async (view: ReturnType<typeof mount>) => {
+    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).not.toBeNull());
+  };
+  const field = () => document.querySelector<HTMLInputElement>('[data-slot="adult-lock-dialog"] input')!;
+
+  test("the confirm draws a password field and the word password, and a right password clears with a fresh ticket", async () => {
+    const view = mount(null);
+    await open(view);
+    expect(field().type).toBe("password");
+    const dialog = document.querySelector('[data-slot="adult-lock-dialog"]')!.textContent!;
+    expect(dialog).toContain(unmarkExplainer("password"));
+    expect(dialog).not.toContain("Set a passcode");
+    fireEvent.change(field(), { target: { value: "correct horse 9!" } });
+    fireEvent.submit(field().closest("form")!);
+    await waitFor(() => expect(calls.some((c) => c.url === "/api/videos/jobs/vid-1/adult-mark")).toBe(true));
+    expect(JSON.parse(calls.find((c) => c.url === "/api/adult-lock/confirm")!.body!)).toEqual({ secret: "correct horse 9!", action: "unmark", item: "vid-1" });
+  });
+
+  test("a wrong password is the plain line with the word password, nothing is cleared", async () => {
+    confirmStatus = 401;
+    const view = mount(null);
+    await open(view);
+    fireEvent.change(field(), { target: { value: "nope" } });
+    fireEvent.submit(field().closest("form")!);
+    await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-error"]')?.textContent).toContain("That password was not right."));
+    expect(calls.some((c) => c.url.endsWith("/adult-mark"))).toBe(false);
   });
 });
 

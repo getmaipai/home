@@ -186,3 +186,10 @@ function wrapFetch(): () => void {
   globalThis.fetch = wrapped;
   return () => { if (globalThis.fetch === wrapped) globalThis.fetch = real; };
 }
+
+/** The kind of secret the person signs in with, for the kit's adult-lock dialog (ADULT-LOCK-07): a digit PIN draws the digit boxes, anything else
+ * (a password) draws the masked password field. The roster already carries `pinDigits` (null for a password), so no new field is needed. */
+export function adultCredential(person: { pinDigits?: number | null } | null | undefined): { credentialKind: "passcode" | "password"; credentialWord: "passcode" | "password"; digits: number } {
+  const digits = person?.pinDigits && person.pinDigits >= 1 ? person.pinDigits : null;
+  return digits ? { credentialKind: "passcode", credentialWord: "passcode", digits } : { credentialKind: "password", credentialWord: "password", digits: 6 };
+}

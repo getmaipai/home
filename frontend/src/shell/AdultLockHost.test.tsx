@@ -42,7 +42,7 @@ beforeEach(() => {
     calls.push({ url, method, proof });
     if (url === "/api/adult-lock/unlock") {
       const body = JSON.parse(String(init?.body)) as { secret: string };
-      return Promise.resolve(body.secret === "0000" ? Response.json({ proof: PROOF, idle_seconds: 120 }) : Response.json({ error: "Invalid PIN or password", attemptsLeft: 4 }, { status: 401 }));
+      return Promise.resolve(body.secret === "0000" || body.secret === "pw-correct" ? Response.json({ proof: PROOF, idle_seconds: 120 }) : Response.json({ error: "Invalid PIN or password", attemptsLeft: 4 }, { status: 401 }));
     }
     if (url === "/api/adult-lock/lock") return Promise.resolve(Response.json({ locked: true }));
     if (url.startsWith("/api/plugins/videos/data/")) {
@@ -73,15 +73,15 @@ function Nav() {
 }
 
 // The shell's own composition (Routes.tsx): the hook's props on the kit's provider, the controller inside it.
-function Shell({ children }: { children: ReactNode }) {
-  const props = useAdultLockProps(person);
+function Shell({ children, who = person }: { children: ReactNode; who?: Pick<Roster, "pinDigits" | "hasSecret"> }) {
+  const props = useAdultLockProps(who);
   return <AdultLockProvider {...props}><AdultLockController />{children}</AdultLockProvider>;
 }
 
-function mount() {
+function mount(who?: Pick<Roster, "pinDigits" | "hasSecret">) {
   return renderWithQueryClient(
     <MemoryRouter>
-      <Shell>
+      <Shell who={who}>
         <Nav />
         <PackageScopeContext.Provider value={{ packageId: "videos" }}>
           <PageStateContext.Provider value={{ merge: () => {} }}>
@@ -108,6 +108,49 @@ describe("while locked", () => {
     expect(document.documentElement.outerHTML.includes("Zebraquill")).toBe(false);
     expect(document.title.includes("Zebraquill")).toBe(false);
     expect(getAdultProof()).toBeNull();
+  });
+});
+
+describe("who signs in with a password (ADULT-LOCK-07)", () => {
+  const passwordPerson = { pinDigits: null, hasSecret: true } as Pick<Roster, "pinDigits" | "hasSecret">;
+  const field = () => document.querySelector<HTMLInputElement>('[data-slot="adult-lock-dialog"] input')!;
+  const submit = () => fireEvent.submit(field().closest("form")!);
+
+  test("the dialog asks for a password in a masked field, not digit boxes, and says nothing about setting a passcode", async () => {
+    const view = mount(passwordPerson);
+    fireEvent.click((await view.findAllByRole("button", { name: TILE }))[0]!);
+    await view.findByText("Enter your password");
+    expect(field().type).toBe("password");
+    expect(document.querySelector('[data-slot="adult-lock-dialog"]')!.textContent).not.toContain("Set a passcode");
+    expect(document.querySelectorAll('[data-slot="adult-lock-dialog"] input').length).toBe(1);
+  });
+
+  test("a wrong password shows the plain line and keeps the page locked; the right one unlocks and the content appears", async () => {
+    const view = mount(passwordPerson);
+    fireEvent.click((await view.findAllByRole("button", { name: TILE }))[0]!);
+    await view.findByText("Enter your password");
+    await act(async () => { fireEvent.change(field(), { target: { value: "nope" } }); });
+    await act(async () => { submit(); });
+    await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-error"]')?.textContent).toBe("That password was not right. Check it and try again."));
+    expect(getAdultProof()).toBeNull();
+    await act(async () => { fireEvent.change(field(), { target: { value: "pw-correct" } }); });
+    await act(async () => { submit(); });
+    await view.findByText(TITLE);
+    expect(getAdultProof()).toBe(PROOF);
+    const sent = calls.filter((c) => c.url === "/api/adult-lock/unlock").length;
+    expect(sent).toBe(2);
+  });
+
+  test("a person with no secret set still sees where to set one, and a PIN person still gets digits", async () => {
+    const none = mount({ pinDigits: null, hasSecret: false });
+    fireEvent.click((await none.findAllByRole("button", { name: TILE }))[0]!);
+    await none.findByText(/Set a passcode in Account/);
+    expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).toBeNull();
+    cleanup();
+    const pin = mount();
+    fireEvent.click((await pin.findAllByRole("button", { name: TILE }))[0]!);
+    await pin.findByText("Enter your passcode");
+    expect(field().type).not.toBe("password");
   });
 });
 
