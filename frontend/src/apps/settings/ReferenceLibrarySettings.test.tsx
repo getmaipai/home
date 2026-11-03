@@ -69,8 +69,8 @@ describe("Offline data settings", () => {
 
   test("Full, Moderate and Minimum set every row at once; nothing is written until Apply", async () => {
     const view = mount();
-    await view.findByRole("group", { name: "Library size" });
-    fireEvent.click(view.getByRole("button", { name: "Minimum" }));
+    await view.findByRole("radiogroup", { name: "Library size" });
+    fireEvent.click(view.getByRole("radio", { name: "Minimum" }));
     // Minimum keeps Vikidia and adds Simple English Wikipedia; nothing else is installed to remove.
     await waitFor(() => expect(view.getByRole("switch", { name: "Simple English Wikipedia: on" })).toBeTruthy());
     expect(view.calls).toEqual([]);

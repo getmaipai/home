@@ -7,11 +7,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
 import { Switch } from "@maipai/ui/src/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
@@ -175,7 +175,7 @@ export function ReferenceLibrarySettings() {
   const loadFailed = state.isError || catalog.isError;
 
   return (
-    <section aria-label="Offline data" className="flex flex-col gap-4" data-testid="offline-data">
+    <section className="flex flex-col gap-4" data-testid="offline-data">
       <p className="text-base text-muted-foreground">Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them.</p>
       {loadFailed ? <Alert variant="destructive"><AlertTitle>The page did not load</AlertTitle><AlertDescription>Home could not load the offline books. Check that Home is running, then reload this page.</AlertDescription></Alert> : null}
 
@@ -192,8 +192,10 @@ export function ReferenceLibrarySettings() {
 
       <section aria-label="Library size" className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">How much to keep</h2>
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Library size">
-          {presets.map((preset) => <Chip key={preset.id} selected={activePreset === preset.id} onClick={() => choosePreset(preset.id)}>{preset.label}</Chip>)}
+        <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup type="single" variant="chip" wrap value={activePreset ?? ""} onValueChange={(next) => { if (next) choosePreset(next); }} aria-label="Library size">
+            {presets.map((preset) => <ToggleGroupItem key={preset.id} value={preset.id}>{preset.label}</ToggleGroupItem>)}
+          </ToggleGroup>
           {activePreset === undefined && sets.length > 0 ? <Badge variant="secondary">Custom</Badge> : null}
         </div>
         <p className="text-base text-muted-foreground">{presets.find((preset) => preset.id === activePreset)?.copy ?? "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below."}</p>
