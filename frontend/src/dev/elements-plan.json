@@ -4523,6 +4523,23 @@
       "verdictReason": "Internal part of the kit's TrackStudio (VIDEO-STUDIO-04): timeline model, engine and media loading; not a Home adoption target on its own."
     },
     {
+      "file": "track-studio-edit.ts",
+      "name": "track-studio-edit",
+      "group": "track",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": null,
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Internal part of the kit's TrackStudio (VIDEO-STUDIO-05): the pure editing functions over the timeline model (split, trim, move, fades, history, export plan); not a Home adoption target on its own."
+    },
+    {
       "file": "track-studio-media.ts",
       "name": "track-studio-media",
       "group": "track",

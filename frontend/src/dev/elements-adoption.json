@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-03T01:22:51.114Z",
+  "generatedAt": "2026-11-03T02:12:01.132Z",
   "kitTag": "ui-v0.5.487",
   "items": [
     {
@@ -1675,8 +1675,8 @@
       "file": "track-studio-edit.ts",
       "name": "track-studio-edit",
       "group": "track",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "support",
+      "verdictReason": "Internal part of the kit's TrackStudio (VIDEO-STUDIO-05): the pure editing functions over the timeline model (split, trim, move, fades, history, export plan); not a Home adoption target on its own.",
       "implemented": false
     },
     {
