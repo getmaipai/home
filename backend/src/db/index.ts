@@ -41,6 +41,9 @@ const dbPath = join(dataDir, "hub.db");
 const sqlite = new Database(dbPath);
 sqlite.exec("PRAGMA journal_mode = WAL");
 sqlite.exec("PRAGMA foreign_keys = ON");
+// Other processes open this file too (the screenshot and seed scripts, the installer's checks) while the hub boots; without a wait a
+// writer that meets another's write lock fails at once with "database is locked", so a short wait lets it queue behind it.
+sqlite.exec("PRAGMA busy_timeout = 5000");
 
 // Guard first: a too-new database must never be touched, not even by the
 // migrator, or a rollback could half-apply a migration meant for a newer

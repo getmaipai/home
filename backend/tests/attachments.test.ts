@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { createHost } from "@/lib/packageHost";
 // Renamed to FileRecordSchema/FileRecord locally: `File` is a Bun/Fetch
 // global, so importing the spec's zod object under that bare name would
@@ -7,7 +8,7 @@ import { createHost } from "@/lib/packageHost";
 import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import { db } from "@/db";
 import { attachments, conversationTurns, conversations, people } from "@/db/schema";
-import { createAttachment, attachmentFilePath, deleteAttachmentsForPerson, getAttachment, readAttachment } from "@/lib/attachments";
+import { storeFile, createAttachment, attachmentFilePath, deleteAttachmentsForPerson, getAttachment, readAttachment } from "@/lib/attachments";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { dataDir } from "@/lib/paths";
@@ -194,5 +195,22 @@ describe("attachment retention and erasure", () => {
     expect(deleteAttachmentsForPerson(other.id)).toBe(0);
     expect(db.select().from(attachments).where(eq(attachments.ownerPersonId, other.id)).all()).toHaveLength(0);
     expect(db.select().from(attachments).where(eq(attachments.ownerPersonId, actor.id)).all()).toHaveLength(1);
+  });
+});
+
+// Another process (the screenshot and seed scripts) can hold the database's write lock while the hub stores a file. A deferred
+// transaction that had already read then failed at once with SQLITE_BUSY_SNAPSHOT ("database is locked"); an immediate one waits.
+describe("storing a file while another process holds the write lock", () => {
+  test("waits for the lock instead of failing with 'database is locked'", async () => {
+    const actor = await owner();
+    const holder = Bun.spawn({
+      cmd: ["bun", "-e", `const { Database } = require("bun:sqlite"); const d = new Database(process.argv[1]); d.exec("PRAGMA busy_timeout = 5000"); d.exec("BEGIN IMMEDIATE"); d.exec("UPDATE people SET display_name = display_name"); console.log("held"); await Bun.sleep(600); d.exec("COMMIT");`, join(dataDir, "hub.db")],
+      stdout: "pipe", stderr: "inherit",
+    });
+    const reader = holder.stdout.getReader();
+    await reader.read();
+    const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "text/plain", bytes: new TextEncoder().encode("held lock"), provenance: "library:upload", retention: "kept", name: "lock.txt" });
+    expect(stored.ok).toBe(true);
+    await holder.exited;
   });
 });

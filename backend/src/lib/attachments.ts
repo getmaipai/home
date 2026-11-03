@@ -249,7 +249,7 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
       ensureContent(sha256, storagePath, size);
       db.insert(attachments).values(row).run();
       syncFileReferences(id);
-    });
+    }, { behavior: "immediate" }); // read-then-write: an immediate transaction waits for another process's write (busy_timeout) instead of failing with SQLITE_BUSY_SNAPSHOT
   } catch (err) {
     if (!stored) {
       try {
