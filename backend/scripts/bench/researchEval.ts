@@ -142,10 +142,11 @@ export async function judgeIdentification(c: ResearchCase, run: ResearchRun, jud
 
 /** Fabrication: names and quoted titles of the answer that no passage, note, query or the question contains. */
 export function judgeFabrication(c: ResearchCase, run: ResearchRun): string[] {
-  const haystack = squashText(`${run.evidence ?? ""}\n${run.queries.join("\n")}\n${c.utterance}\n${run.sources.map((s) => `${s.site ?? ""} ${s.url}`).join("\n")}`);
+  const rawEvidence = `${run.evidence ?? ""}\n${run.queries.join("\n")}\n${c.utterance}\n${run.sources.map((s) => `${s.site ?? ""} ${s.url}`).join("\n")}`;
+  const haystack = squashText(rawEvidence);
   const unknown = new Set<string>();
   // Fixed criterion: a name no source gives fails even inside a sentence marked "(not in the sources)"; the mark helps users, not the bench.
-  for (const sentence of sentences(run.answer)) for (const name of namesIn(sentence)) if (!nameIsGiven(name, haystack)) unknown.add(name);
+  for (const sentence of sentences(run.answer)) for (const name of namesIn(sentence)) if (!nameIsGiven(name, haystack, rawEvidence)) unknown.add(name);
   return unknown.size > 0 ? [`names no source gives: ${[...unknown].slice(0, 8).join("; ")}`] : [];
 }
 

@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
-  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ANALYSIS_TOKENS, stageTimeoutMs, NAMES_FROM_SOURCES, ledgerForAnalysis, partsFor, repairJson, type Brief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ANALYSIS_TOKENS, stageTimeoutMs, NAMES_FROM_SOURCES, ledgerForAnalysis, partsFor, repairJson, unnamedParts, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
@@ -525,5 +525,13 @@ describe("the answer shape does not depend on the analysis", () => {
     expect(stageTimeoutMs(5_000)).toBe(60_000);
     expect(seen[0]).toBe(stageTimeoutMs(ANALYSIS_TOKENS.max));
     expect(seen[1]).toBe(stageTimeoutMs(ANALYSIS_TOKENS.thinking));
+  });
+});
+
+describe("the claim check judges names by the one matcher (raw evidence passed)", () => {
+  test("a part naming a person whose first word is an ordinary lower-case word in the sources is kept; an invented name is dropped", () => {
+    const given = "Nathan Bates wrote the book. The role was given to him in 1990.";
+    const parts = ["Why was the role given Nathan Bates", "What did Victor Hale say"];
+    expect(unnamedParts(parts, given)).toEqual([parts[0]!]);
   });
 });

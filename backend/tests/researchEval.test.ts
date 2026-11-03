@@ -91,6 +91,16 @@ describe("the research eval", () => {
     expect(judgeFabrication(CASE, { answer: `${GOOD} It was filmed at St. Jude Hall.`, sources, queries: [], evidence: `${EVIDENCE} Filmed at St. Jude Hall.` })).toEqual([]);
   });
 
+  test("fabrication: the bench uses the production matcher, so an ordinary first word seen in lower case does not fail a real name", () => {
+    const evidence = `${EVIDENCE} Nathan Bates was a story editor. The credit was given to him.`;
+    const ok = judgeFabrication(CASE, { answer: `${GOOD} Given Nathan Bates edited it.`, sources, queries: [], evidence });
+    expect(ok).toEqual([]);
+    const bad = judgeFabrication(CASE, { answer: `${GOOD} Given Victor Hale edited it.`, sources, queries: [], evidence });
+    expect(bad.length).toBe(1);
+    const marked = judgeFabrication(CASE, { answer: `${GOOD} Victor Hale edited it (not in the sources).`, sources, queries: [], evidence });
+    expect(marked.length).toBe(1);
+  });
+
   test("a wrong-subject answer fails the whole verdict even when it mentions every topic word", async () => {
     const wrong = "The earlier miniseries was cancelled; a second season was planned; a novel followed [1][2][3].";
     const verdict = await judgeResearch(CASE, { answer: wrong, sources, queries: [], evidence: EVIDENCE }, judge);

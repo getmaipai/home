@@ -307,7 +307,7 @@ export async function planData(writer: QueryWriter, brief: Brief | null, utteran
     // An angle is optional, so one that names what was never given is dropped outright (no fallback to the bracket-stripped text).
     const part = raw.replace(EXAMPLE_LIST, "").trim().slice(0, 160);
     const given = squashText(haystack);
-    if (part && namesIn(part).every((name) => nameIsGiven(name, given)) && !subQuestions.some((o) => samePart(o, part))) { subQuestions.push(part); angleParts.push(part); }
+    if (part && namesIn(part).every((name) => nameIsGiven(name, given, haystack)) && !subQuestions.some((o) => samePart(o, part))) { subQuestions.push(part); angleParts.push(part); }
   }
   // An open question always gets the generic angles (what came after, what was planned, how it ended) the model's own angles did not cover.
   const subject = (brief.subject ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
@@ -376,7 +376,7 @@ const EXAMPLE_LIST = /\s*\((?:e\.g\.|such as|like)[^)]*\)/i;
 export function unnamedParts(parts: readonly string[], given: string): string[] {
   const haystack = squashText(given);
   const stripped = parts.map((p) => p.replace(EXAMPLE_LIST, "").trim()).filter(Boolean);
-  const kept = stripped.filter((p) => namesIn(p).every((name) => nameIsGiven(name, haystack)));
+  const kept = stripped.filter((p) => namesIn(p).every((name) => nameIsGiven(name, haystack, given)));
   return kept.length > 0 || stripped.length === 0 ? kept : stripped;
 }
 
