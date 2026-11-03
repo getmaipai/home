@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CLARIFY_MARK, clarifyingQuestion, analyse, analysisPrompt, askedBefore, briefBlock, briefPrompt, filterFindings, parseAnalysis, parseBrief, planData, replyBrief,
-  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ANALYSIS_TOKENS, stageTimeoutMs, ledgerForAnalysis, partsFor, repairJson, type Brief,
+  researchQuestion, shouldAsk, understand, __setStageWritersForTests, ANSWER_WORDS, ANALYSIS_TOKENS, stageTimeoutMs, NAMES_FROM_SOURCES, ledgerForAnalysis, partsFor, repairJson, type Brief,
 } from "@/lib/turnMachine/researchPipeline";
 import { NOTE_EXCERPT_CHARS, notesLedger, pagePassages, parseNotes, quoteInPage, relevantExcerpt, settledNotes, writePageNotes, makeGate, type PageNote } from "@/lib/turnMachine/pageNotes";
 import { evidenceBySource, parsePlannedQueries, shortKeywordQuery } from "@/lib/turnMachine/research";
@@ -479,7 +479,7 @@ describe("the answer shape does not depend on the analysis", () => {
       "Analysis of the notes (write the answer from it):",
       "established:\n- c [1]",
       `The subject's name is shared: besides "Alpha" there are "Alpha B". The notes and the article are about "Alpha". Say in the first sentence which one you took the question to mean (its name and year), and when the question's own details did not settle it, say so there and name the other.`,
-      "Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version), covering p1; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each (only the guesses listed above, phrased freely: add no guess of your own, and name no person, company, place or title in it that the analysis or notes do not name); then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry. Aim for about 450 words, and use more only if the question truly needs it.",
+      "Write the answer like this: the direct answer first, in a first sentence that names what the question is about in full (the subject by its proper name, with what identifies it, such as its year, place or version), covering p1; then the established points with their [n]; then a section clearly labelled as your guesses, with the evidence behind each (only the guesses listed above, phrased freely: add no guess of your own, and name no person, company, place or title in it that the analysis or notes do not name); then what could not be found (only parts no source speaks to; a fact you stated above is never listed there). Add no fact the analysis and notes do not carry." + ` ${NAMES_FROM_SOURCES} ` + "Aim for about 450 words, and use more only if the question truly needs it.",
       "LEDGER",
     ].join("\n\n"));
   });

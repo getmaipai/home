@@ -129,3 +129,23 @@ describe("matching survives the writer's wording (held-out Max run, 2026-11-02)"
     expect(markUnsourcedNames(text, "robots and sticks", "").marked).toBe(0);
   });
 });
+
+// A source that gives a term only as its abbreviation, or a person's longer first name, gives the writer's expanded or shortened form too.
+describe("names given in another form", () => {
+  const hay = (s: string): string => squashText(s);
+  test("a term of three or more words is given when the sources hold its abbreviation", () => {
+    expect(nameIsGiven("Modified Adjusted Gross Income", hay("The limit applies to your MAGI, which is lower for joint filers."))).toBe(true);
+    expect(nameIsGiven("Required Minimum Distributions", hay("RMDs begin later. Withdrawals (RMD) are taxed."))).toBe(true);
+    expect(nameIsGiven("Quarterly Estimated Payment Schedule", hay("The limit applies to your MAGI."))).toBe(false);
+    expect(nameIsGiven("Quarterly Estimated Payment", hay("a magic number"))).toBe(false);
+  });
+  test("a two-word name is not given by initials alone", () => {
+    expect(nameIsGiven("Gold Rush", hay("the GR line opened in 1990"))).toBe(false);
+  });
+  test("a shortened first name is given when the sources hold the longer form beside the surname", () => {
+    expect(nameIsGiven("Maria Holloway", hay("The cell leader is Marian Holloway, a biologist."))).toBe(true);
+    expect(nameIsGiven("Maria Holloway", hay("Marian was in exile for many years in a distant country. The Holloway family stayed."))).toBe(false);
+    expect(nameIsGiven("Maria Holloway", hay("Marianne Holloway lived there."))).toBe(false);
+    expect(nameIsGiven("Maria Holloway", hay("Maria lived there for many years, and so did a man named Marcus Holloway."))).toBe(false);
+  });
+});

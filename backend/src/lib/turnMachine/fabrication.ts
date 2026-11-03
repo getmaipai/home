@@ -10,7 +10,7 @@ export const NOT_IN_SOURCES = " (not in the sources)";
 
 // A bare "the" does not join two capitalized runs ("New York City the Atlantic"); it joins only as "of the" ("Wedding of the Waters").
 // Side effect: a name with a bare "the" ("Jack the Ripper") splits into its capitalized parts and is not checked as one name.
-const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of(?:\s+the)?|de|von|van)){0,3}(?:\s+[A-Z][a-z]+)\b/g;
+const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of(?:\s+the)?|de|von|van)){0,1}(?:\s+[A-Z][a-z]+)\b/g;
 // A clause starts after a sentence end, a newline, or a colon, semicolon or opening bracket; a list marker is not part of the clause.
 const CLAUSE_SPLIT = /\n+|\s*[:;(]\s*/;
 const LIST_MARK = /^\s*(?:[-*•]|\d+[.)])\s+/;
@@ -92,6 +92,16 @@ function pluralFormIsGiven(name: string, haystack: string): boolean {
   return re.test(haystack);
 }
 
+/** A term of three or more capitalized words is given when the evidence holds its abbreviation, the initials of its words ("Modified
+ * Adjusted Gross Income" by "MAGI", "Required Minimum Distributions" by "RMDs"). The writer expanding a term the sources only abbreviate
+ * adds no fact; two-word names are never matched this way, so a person is not given by initials. */
+function abbreviationIsGiven(name: string, haystack: string): boolean {
+  const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/[^\p{L}]/gu, "")).filter(Boolean);
+  if (words.length < 3 || words.length > 6) return false;
+  const initials = words.map((w) => w[0]!.toLowerCase()).join("");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(initials)}s?(?![\\p{L}\\p{N}])`, "u").test(haystack);
+}
+
 /** A name counts as given when the evidence holds it as written, or holds each pair of neighbouring words of it close together (a writer may
  * drop a connective or join a title to a surname). Words that each appear somewhere in the sources but never near one another do not make
  * a name given: an invented person assembled from known words is still marked. */
@@ -99,10 +109,12 @@ export function nameIsGiven(name: string, haystack: string): boolean {
   if (haystack.includes(squashText(name))) return true;
   if (pluralFormIsGiven(name, haystack)) return true;
   if (givenAsHost(name, haystack)) return true;
+  if (abbreviationIsGiven(name, haystack)) return true;
   const words = name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w.replace(/['’]s$/, "").replace(/[^\p{L}\p{N}-]/gu, "").toLowerCase()).filter(Boolean);
   if (words.length < 2) return words.length === 1 && new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(words[0]!)}(?![\\p{L}\\p{N}])`, "u").test(haystack);
+  // A word that is not the last (a first name) may be a shortened form of the source's word: "Maria" for "Marian" (one letter shorter).
   const near = (a: string, b: string): boolean => {
-    const w = (x: string): string => `(?<![\\p{L}\\p{N}])${escapeRe(x)}(?![\\p{L}\\p{N}])`;
+    const w = (x: string): string => `(?<![\\p{L}\\p{N}])${escapeRe(x)}${x === a && x.length >= 4 ? "\\p{L}{0,1}" : ""}(?![\\p{L}\\p{N}])`;
     return new RegExp(`${w(a)}[^\\n]{0,${NAME_GAP_CHARS}}?${w(b)}|${w(b)}[^\\n]{0,${NAME_GAP_CHARS}}?${w(a)}`, "u").test(haystack);
   };
   return words.slice(1).every((w, i) => near(words[i]!, w));

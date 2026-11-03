@@ -44,3 +44,15 @@ describe("planDataWithin: the fallback when the plan is cut", () => {
     for (const p of plan.subQuestions) expect(p).not.toMatch(/Julie|Parrish/);
   });
 });
+
+describe("the writing brief on names and terms", () => {
+  test("both write forms tell the writer to name only what the sources name and to explain other terms in plain words", async () => {
+    const { replyBrief } = await import("@/lib/turnMachine/researchPipeline");
+    const analysis = { claims: [{ claim: "A fact", status: "established" as const, sources: [1] }], conflicts: [], gaps: [], guesses: [], uncovered: [] };
+    for (const a of [analysis, null]) {
+      const text = replyBrief(brief, a, "LEDGER", null, { parts: ["one part"] });
+      expect(text).toContain("exactly as the sources write it");
+      expect(text).toContain("in plain language");
+    }
+  });
+});
