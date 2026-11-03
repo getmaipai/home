@@ -163,3 +163,17 @@ describe("a sentence-opening ordinary word glued onto a name", () => {
     expect(given("Given Nathan Bates", "Nathan Bates led the team.")).toBe(false);
   });
 });
+
+describe("a long capitalized term is read whole, so its abbreviation in the sources gives it", () => {
+  test("namesIn keeps a four-word term in one piece", () => {
+    expect(namesIn("Limits use Modified Adjusted Gross Income here.")).toContain("Modified Adjusted Gross Income");
+    expect(namesIn("Withdrawals called Required Minimum Distributions start late.")).toContain("Required Minimum Distributions");
+  });
+  test("the expanded term is not marked when the sources hold the abbreviation", () => {
+    expect(markUnsourcedNames("Limits use Modified Adjusted Gross Income here.", "The limit applies to your MAGI.", "").marked).toBe(0);
+    expect(markUnsourcedNames("Withdrawals called Required Minimum Distributions start late.", "RMDs begin at 73.", "").marked).toBe(0);
+  });
+  test("an unrelated four-word title whose initials are absent is still marked", () => {
+    expect(markUnsourcedNames("Limits use Quarterly Estimated Payment Schedule here.", "The limit applies to your MAGI.", "").marked).toBe(1);
+  });
+});

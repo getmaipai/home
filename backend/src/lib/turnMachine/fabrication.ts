@@ -10,7 +10,7 @@ export const NOT_IN_SOURCES = " (not in the sources)";
 
 // A bare "the" does not join two capitalized runs ("New York City the Atlantic"); it joins only as "of the" ("Wedding of the Waters").
 // Side effect: a name with a bare "the" ("Jack the Ripper") splits into its capitalized parts and is not checked as one name.
-const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of(?:\s+the)?|de|von|van)){0,1}(?:\s+[A-Z][a-z]+)\b/g;
+const NAME_RUN = /\b[A-Z][a-z]{1,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]+|of(?:\s+the)?|de|von|van)){0,4}(?:\s+[A-Z][a-z]+)\b/g;
 // A clause starts after a sentence end, a newline, or a colon, semicolon or opening bracket; a list marker is not part of the clause.
 const CLAUSE_SPLIT = /\n+|\s*[:;(]\s*/;
 const LIST_MARK = /^\s*(?:[-*•]|\d+[.)])\s+/;
