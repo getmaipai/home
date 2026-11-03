@@ -2434,6 +2434,10 @@ clear it in full:
 
 ## Skills (Tier 0 catalog)
 
+- [ ] **WRITING-FORMATS-01: writing formats design note and architect ruling** (S, docs). One shared "how to write X" as `kind: "skill"` packages delivered by one conditional virtual tool, `writing_format`, model-chosen under rule 1. Exit: architect APPROVED. Design: `docs/design/writing-formats-2026-11-03.md`.
+- [ ] **WRITING-FORMATS-02: `format-email` and `format-birthday-card` in the catalog, bundled into Home** (S, catalog then Home). Structure and tone only, no reading level, no length hints, no `routing.examples`; manifest `contributes.writing_format: true`; min_role teen and child; bronze in catalog, then two `BUNDLED` entries in `scripts/refresh-bundled-packages.ts` and the refreshed `bundled-provenance.json`. Exit: catalog checks green, `tests/bundledPackages.test.ts` green. Design: `docs/design/writing-formats-2026-11-03.md`.
+- [ ] **WRITING-FORMATS-03: the `writing_format` virtual tool** (M, Home; after 02). Conditional offer (gate `writingFormatAllowed`, bench_row `writing-format`, first in `MUSIC_SHRINK_ORDER` and `STUDIO_SHRINK_ORDER`) in `VIRTUAL_TOOL_REGISTRY`, min_role enforced in `policy.ts`, three touch points. Exit: a cap test over every `withTurnToolGates` combination at or under 16; description at or under 600 tokens; absent with no format installed; a child never gets `format-email`; the `writing-format` bench row (held-out split, 3 repeats, paired intervals) recorded in the commit. Design: `docs/design/writing-formats-2026-11-03.md`.
+
 Design for the lists, reminders and timers app: [Household](design/household-lists-reminders-2026-10-17.md) (2026-10-17).
 
 Bundled today: `remember`, `recall`, `weather`, `define`, `joke`, `trivia`.
