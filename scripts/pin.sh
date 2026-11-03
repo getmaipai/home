@@ -85,12 +85,16 @@ PY
     disk_plan="$(git -C "$stack_dir" show "$full_sha:docs/disk-plan.json" 2>/dev/null)" || die "Stack commit $value has no docs/disk-plan.json; choose a complete Stack commit."
     for file in scripts/install.sh scripts/engine-computer/maipai-engine; do rg -q '^STACK_TAG=' "$file" || die "could not find STACK_TAG in $file; inspect it before retrying."; add_changed "$file"; done
     add_changed shared/diskPlan.json
+    disk_docs=(docs/user/install-upgrade-uninstall.md docs/site-fumadocs/content/docs/user/start-here/install-upgrade-uninstall.mdx)
+    for file in "${disk_docs[@]}"; do [[ -f "$file" ]] && add_changed "$file"; done
     if ((dry_run)); then
       printf 'Would change:\n'; printf '  %s\n' "${changed[@]}"
       print_cmd "replace STACK_TAG with $full_sha in both scripts"; print_cmd "git -C $stack_dir show $full_sha:docs/disk-plan.json > shared/diskPlan.json"
     else
       for file in scripts/install.sh scripts/engine-computer/maipai-engine; do sed -E "s/^STACK_TAG=?\"?[0-9a-fA-F]+\"?$/STACK_TAG=\"$full_sha\"/" "$file" > "$file.tmp" && chmod --reference="$file" "$file.tmp" 2>/dev/null || chmod "$(stat -f %Lp "$file" 2>/dev/null || stat -c %a "$file")" "$file.tmp"; mv "$file.tmp" "$file"; done
       printf '%s\n' "$disk_plan" > shared/diskPlan.json
+      # The install guides quote the Recommended plan with everything ticked ("about N GB"); backend/tests/diskPlanTable.test.ts holds them to the table, so a pin that moves the table moves the number.
+      bun -e 'const fs = require("fs"); const t = JSON.parse(fs.readFileSync("shared/diskPlan.json", "utf8")).tiers?.p128?.everything?.required_free_bytes; if (typeof t !== "number") process.exit(0); const n = Math.ceil((t + 2 * 1024 ** 3) / 1024 ** 3); for (const f of process.argv.slice(1)) if (fs.existsSync(f)) fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(/about \d+ GB\./, `about ${n} GB.`));' "${disk_docs[@]}" || die "could not update the plan total in the install guides; edit the 'about N GB' line by hand."
     fi
     message="Pin Stack ${full_sha:0:7}"
     ;;
