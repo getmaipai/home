@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-03T00:48:27.400Z",
-  "kitTag": "ui-v0.5.486",
+  "generatedAt": "2026-11-03T01:22:51.114Z",
+  "kitTag": "ui-v0.5.487",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1670,6 +1670,14 @@
       "verdict": "later",
       "verdictReason": "Deferred until TurnStats.nodes.",
       "implemented": true
+    },
+    {
+      "file": "track-studio-edit.ts",
+      "name": "track-studio-edit",
+      "group": "track",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "track-studio-engine.ts",
