@@ -24,6 +24,7 @@ import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
 import { getStudioVoice } from "@/lib/videos/studioVoices";
+import { appRouteAllowed } from "@/lib/apps";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { videoJobLockItem, videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
@@ -245,7 +246,7 @@ const voiceRoute = createRoute({
 videosRoutes.openapi(voiceRoute, (c) => {
   const actor = c.get("person");
   // The Studio is adult-only; a line is kept in memory for two hours and only its maker reads it.
-  const voice = laneOfPerson(actor) === "adult" ? getStudioVoice(actor.id, c.req.valid("param").id) : null;
+  const voice = laneOfPerson(actor) === "adult" && appRouteAllowed(actor, "videos", "actions", "add") ? getStudioVoice(actor.id, c.req.valid("param").id) : null;
   if (!voice) return c.json({ error: "That voice line isn't available any more. Add it again." }, 404, NO_STORE) as never;
   const total = voice.bytes.byteLength;
   const headers: Record<string, string> = { "content-type": voice.mediaType, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff" };

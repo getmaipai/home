@@ -67,10 +67,12 @@ describe("MediaHost.makingNotice", () => {
     expect(host!.makingNotice!("video")).toBeUndefined();
   });
 
-  test("the picker takes pictures only: a voice clip or a source clip is refused until their benches pass", async () => {
+  test("a clip or a sound can be picked now (the Studio's pickers), and a second ask closes the first with null", async () => {
     mount({ video: READY }, "adult");
     await waitFor(() => expect(host).not.toBeNull());
-    expect(await host!.pickMedia!("audio")).toBeNull();
-    expect(await host!.pickMedia!("video")).toBeNull();
+    let first!: Promise<unknown>;
+    act(() => { first = host!.pickMedia!("video"); });
+    act(() => { void host!.pickMedia!("audio"); });
+    expect(await first).toBeNull();
   });
 });
