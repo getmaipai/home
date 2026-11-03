@@ -71,9 +71,53 @@ describe("lookupLyrics", () => {
     const { doFetch } = makeFetch(200, { plainLyrics: "  hello world \n", syncedLyrics: "[01:23.45] some words" });
     await expect(lookupLyrics(Q, { fetch: doFetch })).resolves.toEqual({
       outcome: "hit",
-      text: "hello world",
+      text: "some words",
       timed: [{ t: 83.45, line: "some words" }],
     });
+  });
+
+  test("duration 3 s off the file's is accepted", async () => {
+    const { doFetch } = makeFetch(200, { plainLyrics: "ok", duration: 203 });
+    await expect(lookupLyrics({ ...Q, durationS: 200 }, { fetch: doFetch })).resolves.toEqual({ outcome: "hit", text: "ok" });
+  });
+
+  test("duration 20 s off the file's is a miss", async () => {
+    const { doFetch, calls } = makeFetch(200, { plainLyrics: "wrong cut", duration: 220 });
+    await expect(lookupLyrics({ ...Q, durationS: 200 }, { fetch: doFetch })).resolves.toEqual({ outcome: "miss" });
+    expect(calls.length).toBe(1);
+  });
+
+  test("duration check is skipped when the file has no duration", async () => {
+    const { doFetch } = makeFetch(200, { plainLyrics: "ok", duration: 999 });
+    await expect(lookupLyrics(Q, { fetch: doFetch })).resolves.toEqual({ outcome: "hit", text: "ok" });
+  });
+
+  test("an instrumental record is a miss and its text is never returned", async () => {
+    const { doFetch } = makeFetch(200, { instrumental: true, plainLyrics: "la la", duration: 200 });
+    await expect(lookupLyrics({ ...Q, durationS: 200 }, { fetch: doFetch })).resolves.toEqual({ outcome: "miss" });
+  });
+
+  test("a hit within 3 s of a known instrumental copy is distrusted", async () => {
+    const near = makeFetch(200, { plainLyrics: "x", duration: 201 });
+    await expect(lookupLyrics({ ...Q, durationS: 200, instrumentalDurationsS: [203] }, { fetch: near.doFetch })).resolves.toEqual({ outcome: "miss" });
+    const far = makeFetch(200, { plainLyrics: "x", duration: 201 });
+    await expect(lookupLyrics({ ...Q, durationS: 200, instrumentalDurationsS: [210] }, { fetch: far.doFetch })).resolves.toEqual({ outcome: "hit", text: "x" });
+  });
+
+  test("synced lyrics are preferred over plain when both are present", async () => {
+    const { doFetch } = makeFetch(200, { plainLyrics: "plain text", syncedLyrics: "[00:01.00] synced text" });
+    await expect(lookupLyrics(Q, { fetch: doFetch })).resolves.toEqual({
+      outcome: "hit",
+      text: "synced text",
+      timed: [{ t: 1, line: "synced text" }],
+    });
+  });
+
+  test("exactly one fetch call per lookup, even on a rejected hit", async () => {
+    const { doFetch, calls } = makeFetch(200, { plainLyrics: "x", duration: 500 });
+    await lookupLyrics({ ...Q, durationS: 200 }, { fetch: doFetch });
+    expect(calls.length).toBe(1);
+    expect(calls[0]!.url).not.toContain("/api/search");
   });
 
   test("200 with only plainLyrics returns a hit without timed", async () => {

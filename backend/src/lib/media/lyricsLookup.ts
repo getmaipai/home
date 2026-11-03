@@ -1,4 +1,4 @@
-export interface LyricsQuery { title: string; artist: string; album?: string | null; durationS?: number | null }
+export interface LyricsQuery { title: string; artist: string; album?: string | null; durationS?: number | null; instrumentalDurationsS?: number[] }
 export interface TimedLine { t: number; line: string; section?: string | null }
 export type LyricsOutcome =
   | { outcome: "hit"; text: string; timed?: TimedLine[] }
@@ -12,6 +12,8 @@ export function lrclibUrl(q: LyricsQuery): string {
   return `https://lrclib.net/api/get?${params.toString()}`;
 }
 
+const MAX_DURATION_GAP_S = 8;
+const INSTRUMENTAL_GAP_S = 3;
 const STAMP = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,2}))?\]/g;
 
 export function parseSyncedLyrics(synced: string): TimedLine[] {
@@ -60,7 +62,21 @@ export async function lookupLyrics(
   let plain = "";
   let synced = "";
   try {
-    const body = (await response.json()) as { plainLyrics?: unknown; syncedLyrics?: unknown };
+    const body = (await response.json()) as {
+      plainLyrics?: unknown;
+      syncedLyrics?: unknown;
+      instrumental?: unknown;
+      duration?: unknown;
+    };
+    if (body.instrumental === true) return { outcome: "miss" };
+    if (typeof body.duration === "number" && Number.isFinite(body.duration)) {
+      if (typeof q.durationS === "number" && q.durationS > 0 && Math.abs(body.duration - q.durationS) > MAX_DURATION_GAP_S) {
+        return { outcome: "miss" };
+      }
+      if ((q.instrumentalDurationsS ?? []).some((d) => Math.abs(body.duration as number - d) <= INSTRUMENTAL_GAP_S)) {
+        return { outcome: "miss" };
+      }
+    }
     if (typeof body.plainLyrics === "string") plain = body.plainLyrics;
     if (typeof body.syncedLyrics === "string") synced = body.syncedLyrics;
   } catch {
@@ -68,7 +84,7 @@ export async function lookupLyrics(
   }
   if (plain.trim() === "" && synced.trim() === "") return { outcome: "miss" };
   const timed = parseSyncedLyrics(synced);
-  const text = plain.trim() !== "" ? plain.trim() : timed.map((line) => line.line).join("\n");
+  const text = timed.length > 0 ? timed.map((line) => line.line).join("\n") : plain.trim();
   const hit: LyricsOutcome = { outcome: "hit", text };
   if (timed.length > 0) hit.timed = timed;
   return hit;

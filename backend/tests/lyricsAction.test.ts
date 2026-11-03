@@ -194,3 +194,27 @@ test("a hit whose text fails the band for a minor stores nothing but keeps the r
   expect(hasReceipt(id)).toBe(true);
   expect(storedLyrics(id)).toBeNull();
 });
+
+test("a hit 20 s off the file's duration is a miss with a receipt and nothing stored, in one fetch", async () => {
+  const { adultId } = await setup();
+  const id = trackId("Morning Light");
+  withArtist(id, "The Marlows");
+  db.update(mediaItems).set({ durationS: 100 }).where(eq(mediaItems.id, id)).run();
+  const fake = fakeFetch(200, { plainLyrics: "Wrong cut", duration: 120 });
+  const res = await lookupLyricsFor(person(adultId), id, { fetch: fake.fetch, nowMs: () => 1000 });
+  expect(res).toEqual({ ok: true, value: { lookup: "none" } });
+  expect(fake.calls()).toBe(1);
+  expect(hasReceipt(id)).toBe(true);
+  expect(storedLyrics(id)).toBeNull();
+});
+
+test("an instrumental record is a miss with a receipt and nothing stored", async () => {
+  const { adultId } = await setup();
+  const id = trackId("Morning Light");
+  withArtist(id, "The Marlows");
+  const fake = fakeFetch(200, { instrumental: true, plainLyrics: "la la" });
+  const res = await lookupLyricsFor(person(adultId), id, { fetch: fake.fetch, nowMs: () => 1000 });
+  expect(res).toEqual({ ok: true, value: { lookup: "none" } });
+  expect(hasReceipt(id)).toBe(true);
+  expect(storedLyrics(id)).toBeNull();
+});
