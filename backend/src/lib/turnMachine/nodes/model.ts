@@ -1171,8 +1171,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     state.entityAnchor = pinned.anchor;
     markResearch(state, `stage 1 pin end (${pinned.anchor ? "pinned" : "none"}, ${pinned.candidates} candidates${pinned.debug ? `: [${pinned.debug.titles.join(" | ")}], pick reply ${JSON.stringify((pinned.debug.reply ?? "").slice(0, 80))}` : ""})`);
     markResearch(state, "stage 2 plan start");
-    const { plan, cut: planCut } = await planDataWithin((planSignal) => queryWriterOverride ?? chatQueryWriter(planSignal), signal, brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor), pinned.anchor?.text ?? "");
-    if (planCut) markResearch(state, "stage 2 plan cut at its deadline: the brief's must-contain parts are the sub-questions");
+    const { plan, cut: planCut } = await planDataWithin((planSignal) => queryWriterOverride ?? chatQueryWriter(planSignal), signal, brief, rq, Math.min(WRITER_QUERIES_FIRST, state.budget.rounds), anchorBlock(pinned.anchor), pinned.anchor?.text ?? "", undefined, pinned.anchor?.phrase ?? "");
+    if (planCut) markResearch(state, `stage 2 plan cut at its deadline: parts and ${plan.queries.length} searches derived from the question and the pin`);
     markResearch(state, `stage 2 plan end (sub-questions: ${plan.subQuestions.join(" | ")})`);
     state.researchPlan = plan;
     // RESEARCH-PLAN-CARD-01: a grown-up sees the plan (the sub-questions) as steps of the existing activity row before the searches run.

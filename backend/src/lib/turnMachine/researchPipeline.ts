@@ -190,10 +190,68 @@ export const SUB_QUESTION_SPLIT = 'Give one sub-question for every distinct thin
 /** Stage 2's rule against invented names in the plan (the code guard in `unnamedParts` backs it up). */
 export const SUB_QUESTION_NAMES = "A sub-question names only what the question, the pinned subject or the person's words name; a part about people or works not named there is worded without names.";
 
-/** The plan writer gets its own wall-clock deadline (default 10 s). When it is cut, its request is aborted and the plan falls back to the
- * brief's must-contain parts as the sub-questions with no searches (no extra model call); the caller's model round then writes the searches.
- * `cut` tells the caller to log a timeline line. */
+/** The plan writer gets its own wall-clock deadline (default 10 s). When it is cut, its request is aborted and the plan falls back to
+ * `fallbackPlan` (parts and searches derived from the question and the pinned title, no model call). `cut` tells the caller to log a
+ * timeline line. */
 export const PLAN_DEADLINE_MS = 10_000;
+
+/** Words in a question that make it open-ended about a work, an event or a person (what happened, why, how it ended, a guess, a story). */
+const OPEN_CUES = /\b(?:what\s+(?:would|happened|if)|happened|guess|why|ended|ending|cancel+ed|history|story|tell me about|who (?:is|was)|what became|turned out)\b/i;
+/** The generic angles of an open question, worded from its subject. `as` is a clause that names the subject; `ask` is the search tail. */
+const FALLBACK_ANGLES: { part: (s: string) => string; search: string }[] = [
+  { part: (s) => `how ${s} ended or turned out`, search: "ending final outcome how it ended" },
+  { part: (s) => `what came after ${s}: follow-ups, revivals, later work`, search: "follow-up revival legacy later work" },
+  { part: (s) => `what was planned for ${s} but not done`, search: "planned next unmade plans announced" },
+  { part: (s) => `why ${s} changed or stopped`, search: "reason changed stopped why" },
+];
+
+/** The plan when the writer is cut: the brief's must-contain parts, then each clause of the question that asks for something, then (for an
+ * open question, or any pinned subject) the generic angles about the subject; and a handful of keyword searches built from the pinned
+ * title (or the brief's subject) and the same parts. Every word comes from the question, the brief or the pin, so no name is added. */
+export function fallbackPlan(brief: Brief | null, utterance: string, count: number, given = "", anchorPhrase = ""): DataPlan {
+  const subject = (anchorPhrase.trim() || brief?.subject || "").replace(/\s+/g, " ").trim().slice(0, 100);
+  const haystack = `${utterance} ${brief?.subject ?? ""} ${given} ${anchorPhrase}`;
+  const parts: string[] = [];
+  const add = (p: string): boolean => {
+    const t = p.trim().replace(/[.?!]+$/, "").slice(0, 160);
+    if (t.length < 4 || parts.some((o) => samePart(o, t))) return false;
+    parts.push(t);
+    return true;
+  };
+  for (const p of unnamedParts((brief?.mustContain ?? []).map((p) => p.trim()).filter(Boolean), haystack)) add(p);
+  // Each sentence of the question that is not a bare aside becomes a part; a bracketed aside is cut first.
+  const clauses = utterance.replace(/\([^)]*\)/g, " ").replace(/[ \t]+/g, " ").split(/(?<=[.?!])\s+|;\s+|\n+/).map((c) => c.trim()).filter((c) => c.split(/\s+/).length >= 4);
+  for (const c of clauses) add(c.replace(/^(?:tell me|please|can you|could you)\s+/i, ""));
+  const open = anchorPhrase.trim() !== "" || OPEN_CUES.test(utterance);
+  const subjectWords = new Set(`${subject} ${brief?.subject ?? ""}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const angleParts: string[] = [];
+  const angleSearches: string[] = [];
+  if (open && subject) {
+    for (const angle of FALLBACK_ANGLES) {
+      const part = angle.part(brief?.subject?.trim() || subject).slice(0, 160);
+      // Compared without the subject's own words, which every part about the subject shares.
+      const bare = (x: string): string => x.toLowerCase().split(/[^a-z0-9]+/).filter((w) => !subjectWords.has(w)).join(" ");
+      if (parts.some((o) => samePart(bare(o), bare(part)))) continue;
+      parts.push(part);
+      angleParts.push(part);
+      angleSearches.push(`${subject} ${angle.search}`);
+    }
+  }
+  const queries: string[] = [];
+  const addQuery = (q: string): void => {
+    const query = shortKeywordQuery(q);
+    if (query.length > 3 && query.split(/\s+/).length >= 2 && !isRepeatQuery(queries, query)) queries.push(query);
+  };
+  if (subject) {
+    // The question itself first (its own words with the subject), then the angles, then the brief's parts.
+    for (const c of clauses.slice(0, 1)) addQuery(`${subject} ${c}`);
+    for (const q of angleSearches) addQuery(q);
+    for (const p of (brief?.mustContain ?? []).slice(0, 3)) addQuery(`${subject} ${p}`);
+  }
+  const subQuestions = parts.slice(0, 8);
+  return { subQuestions, queries: queries.slice(0, count), ...(angleParts.length > 0 ? { angleParts } : { angleParts: [] }) };
+}
+
 export async function planDataWithin(
   makeWriter: (signal: AbortSignal) => QueryWriter,
   parent: AbortSignal,
@@ -203,6 +261,7 @@ export async function planDataWithin(
   anchorNote = "",
   given = "",
   deadlineMs: number = PLAN_DEADLINE_MS,
+  anchorPhrase = "",
 ): Promise<{ plan: DataPlan; cut: boolean }> {
   const { signal, clear } = nodeSignal(parent, deadlineMs);
   const cutPromise = new Promise<"cut">((resolve) => {
@@ -212,7 +271,7 @@ export async function planDataWithin(
   try {
     const winner = await Promise.race([planData(makeWriter(signal), brief, utterance, count, anchorNote, given), cutPromise]);
     if (winner !== "cut") return { plan: winner, cut: false };
-    return { plan: { subQuestions: (brief?.mustContain ?? []).map((p) => p.trim()).filter(Boolean).slice(0, 6), queries: [] }, cut: true };
+    return { plan: fallbackPlan(brief, utterance, count, given, anchorPhrase), cut: true };
   } finally { clear(); }
 }
 

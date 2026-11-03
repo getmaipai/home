@@ -33,12 +33,14 @@ describe("note call deadline", () => {
 });
 
 describe("plan writer deadline", () => {
-  test("a plan writer that never resolves falls back to the brief's must-contain parts, with no searches", async () => {
+  test("a plan writer that never resolves falls back to parts and searches derived from the brief and the question, with no model call", async () => {
     let seen: AbortSignal | undefined;
     const started = Date.now();
     const { plan, cut } = await planDataWithin((signal) => { seen = signal; return () => new Promise<string | null>(() => {}); }, new AbortController().signal, brief, "why did the show end", 4, "", "", 50);
     expect(cut).toBe(true);
-    expect(plan).toEqual({ subQuestions: ["why it ended", "what came next"], queries: [] });
+    expect(plan.subQuestions.slice(0, 2)).toEqual(["why it ended", "what came next"]);
+    expect(plan.subQuestions.length).toBeGreaterThan(2);
+    expect(plan.queries.length).toBeGreaterThan(0);
     expect(Date.now() - started).toBeLessThan(200);
     expect(seen?.aborted).toBe(true);
   });
