@@ -50,7 +50,9 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const title = card.task === "stems" && shown ? `${songTitle.replace(/ \([^)]*\)$/, "")} (${shown.label.toLowerCase()})` : songTitle;
   const ready = status === "ready" && shown !== undefined;
   const prepared = useQuery({ queryKey: ["music-share", shown?.url], queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: musicFileName(title) }), enabled: ready && !onShare, staleTime: Infinity, gcTime: 10 * 60_000, retry: false });
-  const refresh = () => onRefresh?.();
+  // The edit dialog covers the card, so it closes once a change is sent and the card shows the new version being made.
+  const [editOpen, setEditOpen] = useState(false);
+  const refresh = () => { setEditOpen(false); onRefresh?.(); };
   const editErrorText = (error: unknown) => `${error instanceof Error ? error.message : "Home could not make that change."} Check the request and try again.`;
   const makeFull = () => { if (editing) return; setEditing(true); setEditError(""); void musicApi.setLength(card.id, "full", shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
   const makeQuick = () => { if (editing) return; setEditing(true); setEditError(""); void musicApi.setLength(card.id, "quick", shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
@@ -79,7 +81,7 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const elapsedSeconds = Number.isFinite(cardStarted) ? Math.max(0, Math.floor((now - cardStarted) / 1000)) : undefined;
   const lyrics = card.lyrics?.trim() === "[Instrumental]" ? undefined : card.lyrics ?? undefined;
   const pendingActions = status === "queued" ? fitAskActions(card.fit_ask, refresh) : undefined;
-  return { status, width: "full", ...(pendingActions ? { pendingActions } : {}), ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,
+  return { status, width: "full", ...(pendingActions ? { pendingActions } : {}), ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song", editOpen, onEditOpenChange: setEditOpen } : {}), title,
     ...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {}), ...(descriptionOf(card) ? { description: descriptionOf(card) } : {}), ...(ready ? { src: shown.url } : {}),
     stages: card.stages, currentStage: card.stage_index, progress: card.progress, ...(generating && elapsedSeconds !== undefined ? { elapsedSeconds } : {}), ...(card.eta_seconds !== null ? { etaSeconds: card.eta_seconds } : {}),
     ...(card.stage_label ? { phaseLabel: card.stage_label } : {}), waitingForMemory: card.state === "queued" && card.stage !== "longer",
