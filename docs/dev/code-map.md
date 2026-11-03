@@ -428,7 +428,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
-| `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, hasUnrestrictedGrant |
+| `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant |
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, createContentPolicyResolver, contentPolicyFor, filtersFor |
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
