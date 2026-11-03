@@ -69,7 +69,7 @@ const person = { pinDigits: 4, hasSecret: true } as Pick<Roster, "pinDigits" | "
 
 function Nav() {
   const navigate = useNavigate();
-  return <button type="button" onClick={() => navigate("/elsewhere")}>go elsewhere</button>;
+  return <><button type="button" onClick={() => navigate("/elsewhere")}>go elsewhere</button><button type="button" onClick={() => navigate("/?tab=styles")}>go to another tab</button><button type="button" onClick={() => navigate("/?tab=styles&q=1")}>same tab, other query</button><button type="button" onClick={() => navigate("/?tab=pictures")}>go to a third tab</button></>;
 }
 
 // The shell's own composition (Routes.tsx): the hook's props on the kit's provider, the controller inside it.
@@ -185,6 +185,19 @@ describe("a page ends the unlock", () => {
     const view = mount();
     await unlock(view);
     fireEvent.click(view.getByText("go elsewhere"));
+    await view.findByRole("button", { name: TILE });
+    expect(getAdultProof()).toBeNull();
+    expect(calls.some((c) => c.url === "/api/adult-lock/lock" && c.proof === PROOF)).toBe(true);
+  });
+
+  test("VIDEO-SETTINGS-02: a Settings tab (?tab= on the same route) is a page: changing it relocks, a query that is not the tab does not", async () => {
+    const view = mount();
+    fireEvent.click(view.getByText("go to another tab"));
+    await unlock(view);
+    fireEvent.click(view.getByText("same tab, other query"));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(getAdultProof()).toBe(PROOF);
+    fireEvent.click(view.getByText("go to a third tab"));
     await view.findByRole("button", { name: TILE });
     expect(getAdultProof()).toBeNull();
     expect(calls.some((c) => c.url === "/api/adult-lock/lock" && c.proof === PROOF)).toBe(true);

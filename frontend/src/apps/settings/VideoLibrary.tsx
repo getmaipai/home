@@ -25,7 +25,6 @@ import { videosApi, type VideoAdapterRow, type VideoSettings } from "@/lib/video
 import { componentsApi } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
-import { useRelockOnLeave } from "@/lib/useRelockOnLeave";
 
 const KEY = ["video-settings"] as const;
 const size = (n: number) => (formatBytes(n), n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -290,7 +289,6 @@ function AddStyle({ refresh }: { refresh: () => void }) {
 }
 
 export function VideoLibrary() {
-  useRelockOnLeave();
   const client = useQueryClient();
   const settings = useQuery({ queryKey: KEY, queryFn: videosApi.settings, refetchInterval: 15_000 });
   const [error, setError] = useState<string | null>(null);

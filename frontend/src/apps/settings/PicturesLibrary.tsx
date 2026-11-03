@@ -22,7 +22,6 @@ import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
-import { useRelockOnLeave } from "@/lib/useRelockOnLeave";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -326,7 +325,6 @@ function AddStyle({ refresh }: { refresh: () => void }) {
 }
 
 export function PicturesLibrary() {
-  useRelockOnLeave();
   const client = useQueryClient();
   const overview = useQuery({ queryKey: OVERVIEW_KEY, queryFn: picturesAdminApi.overview, refetchInterval: 15_000 });
   const [error, setError] = useState<string | null>(null);

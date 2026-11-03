@@ -38,15 +38,17 @@ export function AdultLockController() {
   dockRef.current = dock;
   const relockRef = useRef(relock);
   relockRef.current = relock;
-  const { pathname } = useLocation();
-  const seenPath = useRef(pathname);
+  const { pathname, search } = useLocation();
+  // A page is a route and, inside the Settings areas, its tab (`?tab=`, the same route): VIDEO-SETTINGS-02 (settings-media-2026-11-02.md 5.1).
+  const page = `${pathname}?${new URLSearchParams(search).get("tab") ?? ""}`;
+  const seenPath = useRef(page);
 
-  // A page is a route: leaving it relocks (the settings areas and the chat pages are routes too).
+  // Leaving a page relocks (the settings areas and the chat pages are routes too; a Settings tab is a page of its own).
   useEffect(() => {
-    if (seenPath.current === pathname) return;
-    seenPath.current = pathname;
+    if (seenPath.current === page) return;
+    seenPath.current = page;
     relockRef.current();
-  }, [pathname]);
+  }, [page]);
 
   // Everything below runs only while unlocked.
   useEffect(() => {

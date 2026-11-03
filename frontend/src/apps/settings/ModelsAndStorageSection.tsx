@@ -16,7 +16,6 @@ import { ApiError } from "@/lib/api";
 import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { LockedSettingRow } from "@maipai/ui/src/settings/LockedSettingRow";
-import { useRelockOnLeave } from "@/lib/useRelockOnLeave";
 
 const KEY = ["components"] as const;
 const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
@@ -194,7 +193,6 @@ function LicencePrompt({ refresh, setError, installing }: { refresh: () => void;
 }
 
 export function ModelsAndStorageSection() {
-  useRelockOnLeave();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const query = useQuery({

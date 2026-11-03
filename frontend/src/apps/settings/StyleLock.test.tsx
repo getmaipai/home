@@ -35,17 +35,17 @@ const components = (unlocked: boolean) => ({
 });
 
 // The shell's composition in miniature: the kit provider over the page, a host that resets the queries on unlock and records every relock.
-let state = { unlocked: false, relocks: 0 };
-function Page({ show, children }: { show: boolean; children: ReactNode }) {
+let state = { unlocked: false };
+function Page({ children }: { children: ReactNode }) {
   return (
-    <AdultLockProvider digits={4} unlock={async () => ({ status: "ok", proof: "proof-1" })} onUnlocked={() => { state.unlocked = true; }} onRelock={() => { state.unlocked = false; state.relocks += 1; }}>
-      {show ? children : <p>elsewhere</p>}
+    <AdultLockProvider digits={4} unlock={async () => ({ status: "ok", proof: "proof-1" })} onUnlocked={() => { state.unlocked = true; }} onRelock={() => { state.unlocked = false; }}>
+      {children}
     </AdultLockProvider>
   );
 }
 
 function mock3() {
-  state = { unlocked: false, relocks: 0 };
+  state = { unlocked: false };
   const saved = [{ ...videosApi }, { ...picturesAdminApi }, { ...componentsApi }] as const;
   videosApi.settings = mock(async () => videoSettings(state.unlocked));
   picturesAdminApi.overview = mock(async () => pictureOverview(state.unlocked));
@@ -61,9 +61,9 @@ const views: Array<[string, () => ReactNode, string]> = [
 ];
 
 describe.each(views)("%s", (_label, view, openName) => {
-  test("locked: one lock row, no name, no trigger word, no Adults only badge anywhere in the tree; unlock shows it; leaving relocks and hides it again", async () => {
+  test("locked: one lock row, no name, no trigger word, no Adults only badge anywhere in the tree; unlock shows it (relock on leaving is the shell host's, AdultLockHost.test.tsx)", async () => {
     const restore = mock3();
-    const { queryClient, findAllByRole, findByText, rerender, container, queryByText } = renderWithQueryClient(<Page show>{view()}</Page>);
+    const { queryClient, findAllByRole, findByText, container } = renderWithQueryClient(<Page>{view()}</Page>);
     await findByText(openName);
     expect((await findAllByRole("button", { name: TILE })).length).toBe(1);
     expect(document.documentElement.outerHTML).not.toContain(NAME);
@@ -77,10 +77,6 @@ describe.each(views)("%s", (_label, view, openName) => {
     await act(async () => { await queryClient.resetQueries(); });
     await waitFor(() => expect(container.textContent).toContain(NAME));
 
-    // Leaving the view (its tab or its page) drops the proof.
-    await act(async () => { rerender(<Page show={false}>{view()}</Page>); });
-    await waitFor(() => expect(state.relocks).toBeGreaterThan(0));
-    expect(queryByText(NAME)).toBeNull();
     restore();
   });
 });
