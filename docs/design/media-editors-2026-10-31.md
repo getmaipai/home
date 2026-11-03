@@ -22,6 +22,8 @@ When this note is approved, these stop being the design (the chat editor itself 
   address a picture by its chat (`conversation_id`, "a new attachment of the same chat and turn"). A picture is addressed by its
   Library file id as well; versions become Library files. Everything else in both notes stands.
 
+> **Superseded in part (2026-11-03, [images-app-2026-11-03.md](images-app-2026-11-03.md)):** section 4's separate `photo-editor` rail app (entry point 1, EDITOR-06, EDITOR-23) is the Studio page of the Images app; EDITOR-07 and EDITOR-08 open that page; the per-operation code becomes registrations in the media operations registry. The tools table, versions, safety and routes in section 4 stand.
+
 ## 1. Verdict
 
 Yes, both should be apps, and the Photo editor first. The editing engine already exists and is good (IMGTOOLS-03..05,
