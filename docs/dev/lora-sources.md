@@ -1,7 +1,6 @@
 # LoRA sources and install (backend)
 
-Built 2026-11-03 for VIDEO-LORA-07. Design: [video-loras-2026-11-02.md](../design/video-loras-2026-11-02.md) sections 5 and 15. No screen uses these routes yet
-(VIDEO-LORA-08). Records and access are in [loras.md](loras.md); the lock is in [adult-lock.md](adult-lock.md).
+Built 2026-11-03 for VIDEO-LORA-07. Design: [video-loras-2026-11-02.md](../design/video-loras-2026-11-02.md) sections 5 and 15. The Styles tab (VIDEO-LORA-08, below) uses these routes. Records and access are in [loras.md](loras.md); the lock is in [adult-lock.md](adult-lock.md).
 
 ## Pieces
 
@@ -57,3 +56,20 @@ A result set filtered for the viewer's region cannot be detected from the respon
 
 `backend/tests/loras07.test.ts`: the classifier table, trigger words, dedupe, who may call, Civitai off, redaction while locked (route sweep of strings, proof alone, switch alone, another person's proof,
 cache after a reveal), the limiter, the credentials, and the install flow against a fake Stack (job list, record, lowering rules, duplicates, Repairs and Try again).
+
+## The Styles tab (VIDEO-LORA-08)
+
+Settings, Pictures, videos and music, tab Styles (`frontend/src/apps/settings/styles/`, registered as `home.media_styles` in `shell/pages/settings/MediaCardViews.tsx`). Words come from the spec card's `copy`; the fallbacks in `stylesShared.tsx` are the same sentences.
+
+| Piece | File | What it does |
+|---|---|---|
+| Tab | `StylesTab.tsx` | The list (one-click Only admins / All adults / Chosen people, the plain Adults only label and the three-state age check after the unlock), ONE kit `LockedSettingRow`, the running download as the kit `JobProgress` (never a name), where styles come from, Recently removed. Which dialog is open is kept in the router state (never the URL), because the unlock resets every query and reloads the page behind the tab. |
+| Sources | same file | Hugging Face token and Civitai key are write only (saved, Replace, Remove; no value is ever drawn). Civitai is off by default; turning it on shows the notice first. |
+| Browser | `StyleBrowser.tsx` | Search (300 ms pause), Type, Made for, Installed, Source, Sort, Previous / numbered / Next paging with each page's cursor kept, a licence badge and one reason line per tile, ONE lock tile for adult and unknown hits, Show adult results only while unlocked (off at each visit). A pasted Hugging Face link opens the confirm panel. An installed hit opens its style instead of starting a download. |
+| Confirm | `StyleConfirm.tsx` | Name, source link, made for, the licence line (a checkbox unless the licence is open), and Is this style for adults only?, pre-set from the source's check (safe: No; unknown or adult: Yes). All ages from an adult hit asks for a fresh passcode (`/api/adult-lock/confirm`, item = the hit's `confirm_item`) and sends the ticket. A changed file offers Install as a separate style. |
+| Editor | `StyleEditor.tsx` | About, Try this style (router state, no id in the URL), Remove, Who can use it, Adults only, Added to the prompt, Avoid with Say instead, Strength, Details. Every change saves at once. Adults only off asks, and asks for the passcode again when the check is `adult` (`POST /api/loras/{id}/all-ages` takes the ticket, item = the style id). |
+| Add from a file | `StyleAddFile.tsx` | The existing multipart add (`POST /api/videos/adapters`), the same licence and adults-only questions; choosing All ages needs the unlock. |
+| Fresh passcode | `FreshConfirm.tsx` | `useFreshConfirm`, the kit `AdultLockDialog` with the confirm's words. |
+
+Backend added for it: `GET /api/loras` rows carry `adult_check` (evidence), and `POST /api/loras/{id}/all-ages` refuses a style whose check is `adult` without a valid ticket (`tests/loras08.test.ts`). Not built yet: Delete now in Recently removed, Check the file again, adding a file by its path, and the once-per-admin licence notice (the panel's licence step covers each install).
+

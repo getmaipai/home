@@ -11,7 +11,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { getCookie } from "hono/cookie";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
-import { sessionKeyOf } from "@/lib/adultLock";
+import { consumeTicket, sessionKeyOf } from "@/lib/adultLock";
 import { loraUsable, readLora, readLoras, type LoraSurface } from "@/lib/loras/access";
 import { confirmLora, markAdultOnly, markAllAges, needsConfirmation, patchLora, removeLora, restoreLora } from "@/lib/loras/admin";
 import { LoraWriteError, type Lora } from "@/lib/loras/store";
@@ -32,7 +32,7 @@ const AdminLoraSchema = z.object({
   base_model: z.string(), compatible_with: z.array(z.string()), usable: z.boolean(),
   trigger_words: z.array(z.string()), trigger_position: z.enum(["start", "end"]), positive_addins: z.array(z.string()), negative_addins: z.array(z.string()), avoid_as_positive: z.array(z.string()),
   strength: Strength, audience: z.enum(["all-ages", "adult-only"]), availability: z.object({ who: z.enum(["admins", "adults", "people"]), people: z.array(z.string()) }),
-  needs_confirmation: z.boolean(), licence: z.object({ id: z.string().nullable(), commercial_use: z.string() }),
+  needs_confirmation: z.boolean(), adult_check: z.enum(["normal", "unknown", "adult"]).describe("What the source said about age, once: evidence only; `audience` is the decision."), licence: z.object({ id: z.string().nullable(), commercial_use: z.string() }),
   file: z.object({ sha256: z.string(), bytes: z.number(), rank: z.number().nullable() }), source: z.object({ site: z.string(), url: z.string().nullable() }),
   preview_file_id: z.string().nullable(), added_at: z.string(), removed_at: z.string().nullable(), trash_until: z.string().nullable(),
 });
@@ -46,7 +46,7 @@ export function adminLoraView(l: Lora): z.infer<typeof AdminLoraSchema> {
   return {
     id: l.id, name: l.name, kind: l.kind, description: l.description, media: l.media, base_model: l.base_model, compatible_with: l.compatible_with, usable: loraUsable(l),
     trigger_words: l.trigger_words, trigger_position: l.trigger_position, positive_addins: l.positive_addins, negative_addins: l.negative_addins, avoid_as_positive: l.avoid_as_positive,
-    strength: l.strength, audience: l.audience, availability: l.availability, needs_confirmation: needsConfirmation(l), licence: { id: l.licence.id, commercial_use: l.licence.commercial_use },
+    strength: l.strength, audience: l.audience, availability: l.availability, needs_confirmation: needsConfirmation(l), adult_check: l.adult_check?.state ?? "unknown", licence: { id: l.licence.id, commercial_use: l.licence.commercial_use },
     file: { sha256: l.file.sha256, bytes: l.file.bytes, rank: l.file.rank }, source: { site: l.source.site, url: l.source.url },
     preview_file_id: l.preview?.file_id ?? null, added_at: l.added_at, removed_at: l.removed_at, trash_until: l.trash_until,
   };
@@ -132,7 +132,15 @@ function actionRoute(path: string, summary: string, run: (c: Parameters<typeof a
 }
 
 actionRoute("/{id}/nsfw", "Mark a style adult-only (always allowed for an admin)", (c, id) => markAdultOnly(c.get("person"), id));
-actionRoute("/{id}/all-ages", "Mark a style all-ages (an admin's explicit choice; needs confirm: true)", (c, id) => markAllAges(c.get("person"), id), z.object({ confirm: z.literal(true) }));
+/** Lowering a style the source called adult needs a fresh passcode ticket for this style (`POST /api/adult-lock/confirm { action: "unmark", item: <style id> }`, design 15.1). From `unknown` the unlock the admin already holds is enough. */
+export const LOWER_ADULT_LINE = "This style was marked adult by its source. Enter your passcode again to make it all ages.";
+actionRoute("/{id}/all-ages", "Mark a style all-ages (an admin's explicit choice; needs confirm: true, and a fresh ticket when the source said adult)", (c, id) => {
+  const found = readLora(c.get("person"), id, surfaceOf(c));
+  const body = c.req.valid("json" as never) as { ticket?: string };
+  if (found && found.state === "open" && found.lora.audience === "adult-only" && found.lora.adult_check?.state === "adult"
+    && !consumeTicket(body.ticket, c.get("person").id, sessionKeyOf(getCookie(c, "session")), id)) throw new LoraWriteError("invalid", LOWER_ADULT_LINE);
+  return markAllAges(c.get("person"), id);
+}, z.object({ confirm: z.literal(true), ticket: z.string().max(200).optional() }));
 actionRoute("/{id}/confirm", "An admin has read the fingerprint and licence", (c, id) => confirmLora(c.get("person"), id));
 actionRoute("/{id}/remove", "Remove a style to the 30-day trash", (c, id) => removeLora(c.get("person"), id));
 actionRoute("/{id}/restore", "Bring a removed style back", (c, id) => restoreLora(c.get("person"), id));

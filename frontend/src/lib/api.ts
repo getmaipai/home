@@ -716,6 +716,8 @@ export class ApiError extends Error {
     public missingKeyframes?: string[],
     /** A companion save answered 409 or 422 with the screen that fixes it. */
     public goBackTo?: "look" | "animations",
+    /** A duplicate install answered 409: the id of the style the person already has (absent when that style is locked). */
+    public existingId?: string,
   ) {
     super(message);
   }
@@ -800,7 +802,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (isDeviceRevoked(res.status, body)) await removeAllOfflineMedia();
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined, Array.isArray(body.missing_keyframes) ? (body.missing_keyframes as unknown[]).filter((state): state is string => typeof state === "string") : undefined, body.go_back_to === "look" || body.go_back_to === "animations" ? body.go_back_to : undefined);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined, Array.isArray(body.missing_keyframes) ? (body.missing_keyframes as unknown[]).filter((state): state is string => typeof state === "string") : undefined, body.go_back_to === "look" || body.go_back_to === "animations" ? body.go_back_to : undefined, typeof body.existing_id === "string" ? body.existing_id : undefined);
     }
     return body as T;
   } catch (err) {

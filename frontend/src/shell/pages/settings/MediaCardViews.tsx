@@ -4,11 +4,12 @@
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
 import { VideoLibrary } from "@/apps/settings/VideoLibrary";
+import { StylesTab } from "@/apps/settings/styles/StylesTab";
 import { useTabItem } from "@/shell/tabIdentity";
 import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
-/** The keys of a Styles card that have a screen today. The Civitai switch and key come with the Styles screen (VIDEO-LORA-07 and 08). */
+/** The keys of a Styles card the generic renderer draws: the Adult-only select. The Civitai switch and key have their own rows in the Styles view (VIDEO-LORA-08), because the key is write-only. */
 export const STYLES_CARD_KEYS = ["generation.styles.adult_only"];
 
 function MediaKeysCard({ person, card, includeKeys }: Pick<SettingsViewProps, "person" | "card"> & { includeKeys?: string[] }) {
@@ -37,4 +38,7 @@ export function MediaVideosView(props: SettingsViewProps) {
 
 export function MediaMusicView(props: SettingsViewProps) { return <MediaKeysCard person={props.person} card={props.card} />; }
 
-export function MediaStylesView(props: SettingsViewProps) { return <MediaKeysCard person={props.person} card={props.card} includeKeys={STYLES_CARD_KEYS} />; }
+export function MediaStylesView(props: SettingsViewProps) {
+  useTabItem("Styles");
+  return <StylesTab person={props.person} card={props.card}><MediaKeysCard person={props.person} card={{ ...props.card!, description: undefined }} includeKeys={STYLES_CARD_KEYS} /></StylesTab>;
+}

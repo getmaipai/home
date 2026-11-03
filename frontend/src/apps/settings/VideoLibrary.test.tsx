@@ -27,32 +27,20 @@ function mount(data: VideoSettings, row: ComponentRow = detailedRow()) {
   componentsApi.list = mock(async () => ({ stack: "ok" as const, message: null, tier: "p128", free_disk_bytes: 1e12, disk_margin_bytes: 5e9, installed_bytes: 0, components: [row] }));
   componentsApi.install = mock(async (id: string) => ({ job: "job-1", component: id }));
   videosApi.settings = mock(async () => data);
-  videosApi.setAdapter = mock(async (id: string, patch: { enabled?: boolean }) => ({ ...style({ id }), ...patch }));
-  videosApi.removeAdapter = mock(async () => ({ ok: true as const }));
-  videosApi.addAdapter = mock(async () => style({ id: "lora-new", enabled: false, needs_confirmation: true }));
   const view = renderWithQueryClient(<VideoLibrary />);
   return { ...view, restore: () => { Object.assign(videosApi, original); Object.assign(componentsApi, componentsOriginal); } };
 }
 
 describe("video settings view", () => {
-  test("states the model in plain words with the tier limits, locks children and teens off, and badges each style", async () => {
+  test("states the model in plain words with the tier limits and locks children and teens off; the styles are not listed here (they live on the Styles tab)", async () => {
     const v = mount(settings());
     await waitFor(() => expect(v.getByText("Quick and Detailed videos")).toBeTruthy());
     expect(v.getByText(/5 seconds with no sound, in about 2 minutes\./)).toBeTruthy();
     expect(v.getByLabelText("Children can make videos")).toBeDisabled();
     expect(v.getByLabelText("Teens can make videos")).toBeDisabled();
     expect(v.getByLabelText("Adults can make videos").getAttribute("aria-checked")).toBe("true");
-    expect(v.getByText("Adults only")).toBeTruthy();
-    expect(v.getByText("All ages")).toBeTruthy();
-    v.restore();
-  });
-
-  test("MODELS-CENSOR-05: the add-style note says an adult is never refused and a real-person style is adult-only, with no refusal wording", async () => {
-    const v = mount(settings());
-    await waitFor(() => expect(v.getByText("Quick and Detailed videos")).toBeTruthy());
-    const note = v.getByText(/A style is never refused for an adult/);
-    expect(note.textContent).toContain("A style that names a real person is adult-only");
-    expect(note.textContent).not.toMatch(/real people (are|is) refused/i);
+    expect(v.queryByText("Adults only")).toBeNull();
+    expect(v.queryByText("Old Colour Film")).toBeNull();
     v.restore();
   });
 
@@ -61,31 +49,6 @@ describe("video settings view", () => {
     expect(videoStateLine(settings({ model_installed: false }))).toContain("No video model is installed");
     const v = mount(settings({ enabled: false }));
     await waitFor(() => expect(v.getByLabelText("Adults can make videos").getAttribute("aria-checked")).toBe("false"));
-    v.restore();
-  });
-
-  test("a new style waits for a confirmation showing its fingerprint, then Turn it on switches it on", async () => {
-    const v = mount(settings({ adapters: [style({ id: "lora-new", name: "Ink", enabled: false, needs_confirmation: true, sha256: "f".repeat(64) })] }));
-    await waitFor(() => expect(v.getByText("Check this before you turn it on")).toBeTruthy());
-    expect(v.getByText("f".repeat(64))).toBeTruthy();
-    fireEvent.click(v.getByRole("button", { name: "Turn it on" }));
-    await waitFor(() => expect(videosApi.setAdapter).toHaveBeenCalledWith("lora-new", { enabled: true }));
-    v.restore();
-  });
-
-  test("a style with no age claim is adults only by default", async () => {
-    const v = mount(settings({ adapters: [] }));
-    await waitFor(() => expect(v.getByText("Add a video style")).toBeTruthy());
-    fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink" } });
-    const input = v.getByLabelText(/The \.safetensors file/) as HTMLInputElement;
-    Object.defineProperty(input, "files", { value: [new File([new Uint8Array(8)], "ink.safetensors")], configurable: true });
-    fireEvent.change(input);
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(videosApi.addAdapter).toHaveBeenCalled());
-    const form = (videosApi.addAdapter as unknown as { mock: { calls: FormData[][] } }).mock.calls[0]![0]!;
-    expect(form.get("classification")).toBe("adult-only");
-    expect(form.get("name")).toBe("Ink");
-    expect(form.get("looks_like")).toBeNull();
     v.restore();
   });
 

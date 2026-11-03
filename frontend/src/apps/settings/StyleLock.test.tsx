@@ -1,11 +1,10 @@
-// VIDEO-SETTINGS-02: the three views that list styles (Pictures, Videos, Models and storage) draw ONE kit lock row for adult-only styles and nothing of them
+// VIDEO-SETTINGS-02: the views that list styles (Pictures, Videos, Models and storage) draw ONE kit lock row for adult-only styles and nothing of them
 // until the person unlocks; the lists reload after an unlock; leaving the view relocks. The server redacts (backend/tests/styleLock02.test.ts); this is the rendered tree.
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import { VideoLibrary } from "@/apps/settings/VideoLibrary";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { videosApi, type VideoAdapterRow, type VideoSettings } from "@/lib/videosApi";
@@ -55,7 +54,6 @@ function mock3() {
 }
 
 const views: Array<[string, () => ReactNode, string]> = [
-  ["videos", () => <VideoLibrary />, "Old Colour Film"],
   ["pictures", () => <PicturesLibrary />, "Pixel Art"],
   ["models and storage", () => <ModelsAndStorageSection />, "Pixel Art"],
 ];
