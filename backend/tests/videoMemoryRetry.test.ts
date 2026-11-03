@@ -31,7 +31,7 @@ async function owner(): Promise<{ actor: PersonRow; conversationId: string }> {
 }
 const start = (who: { actor: PersonRow; conversationId: string }, extra: Record<string, unknown> = {}) =>
   startVideoJob({ actor: who.actor, conversationId: who.conversationId, turnId: null, temporary: true, kind: "generate", prompt: "a paper boat", body: { prompt: "a paper boat", size: "832x480", seconds: 5, seed: 4242, audience: "adult" }, ...extra });
-const WAITING = "The computer got too busy, so your video stopped. It will start again by itself.";
+const WAITING = "Your video stopped for a moment so chat could keep going. It will start again by itself.";
 
 describe("a clip the Stack's memory watchdog stopped", () => {
   test("shows the waiting line, starts again by itself with the same body, and finishes", async () => {
@@ -65,7 +65,7 @@ describe("a clip the Stack's memory watchdog stopped", () => {
     await until(() => getVideoJobFor(who.actor, failing.id)?.state === "failed");
     expect(fake.submitted).toHaveLength(6);
     const error = getVideoJobFor(who.actor, failing.id)!.error!;
-    expect(error).toBe("I couldn't make that video. The computer stayed too busy, so your video could not finish. Try again in a few minutes.");
+    expect(error).toBe("I couldn't make that video. Your video could not finish. Try again in a few minutes.");
     expect(videoCardView(who.actor, getVideoJobFor(who.actor, failing.id)!, true).items[0]!.error).toBe(error);
   });
 
@@ -145,7 +145,7 @@ describe("the words", () => {
   test("no resource word is ever shown to a person, and the child lane gets the simpler line", () => {
     for (const line of lines) expect(line).not.toMatch(/memory|\bRAM\b|swap|\broom\b|\bGB\b|pressure|reserve/i);
     expect(JOB_QUEUE_COPY.requeued_memory.adult).toBe(WAITING);
-    expect(JOB_QUEUE_COPY.requeued_memory.child).toBe("The computer got busy. Your video will start again by itself.");
+    expect(JOB_QUEUE_COPY.requeued_memory.child).toBe("Your video will start again by itself.");
     expect(JOB_QUEUE_COPY.requeued_memory.child.length).toBeLessThan(JOB_QUEUE_COPY.requeued_memory.adult.length);
   });
   test("the card and the Create feed say the same waiting line for adult and child", async () => {

@@ -26,8 +26,8 @@ chatting and I would have expected it to put chat in reduced mode."
 5. Home restarts a stopped video by itself with the same stored body (seed, level, words, audience, styles, adult mark and lock), at most
    twice (`requeueAfterCritical`). While the Stack still refuses new work with `no_memory` the job waits (`holdMaxAfterMemoryRefusal`), it
    does not fail. A person's Stop is never retried. After the third stop the card shows the plain failure with Try again; a child's card shows the child line.
-6. What a person sees: the job card and the Create feed say "The computer got too busy, so your video stopped. It will start again by itself."
-   (child: "The computer got busy. Your video will start again by itself."); the composer shows its existing Reduced line, because
+6. What a person sees: the job card and the Create feed say "Your video stopped for a moment so chat could keep going. It will start again by itself."
+   (child: "Your video will start again by itself."); the composer shows its existing Reduced line, because
    `roleHealth` reads the Stack's own `reduced_chat`. No banner, toast or poll is added (S6). No line says memory, RAM, swap or room.
 7. A chat turn that arrives while the watchdog's swap runs waits for the chat role to start, the same path as a swap the Max window starts;
    a swap the watchdog starts shows through the Stack's role-state feed (cause `mode_change`), where a swap Home starts also shows "One moment" from `activeTransition`; both are existing composer lines. Not separately tested here (open item below).

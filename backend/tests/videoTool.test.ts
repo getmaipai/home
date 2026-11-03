@@ -198,7 +198,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
       expect(fake.submitted).toHaveLength(3);
       expect(getVideoJobFor(people.owner, value.video!.id)!.createdAt).toBe(createdAt);
-      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("The computer stayed too busy, so your video could not finish. Try again in a few minutes.");
+      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("Your video could not finish. Try again in a few minutes.");
     });
   });
 
