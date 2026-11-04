@@ -35,6 +35,12 @@ describe("setup host-tune routes", () => {
     expect((await argv()).slice(-1)).toEqual(["detect"]);
   });
 
+  test("host-guard is an allowed consent item", async () => {
+    stub(`echo '{"item":${JSON.stringify({ ...item, id: "host-guard", mode: "consent", state: "applied" })}}'`);
+    expect((await post("apply", { id: "host-guard" })).status).toBe(200);
+    expect((await argv()).slice(-3)).toEqual(["--yes", "apply", "host-guard"]);
+  });
+
   test("GET says supported=false off macOS without running the script", async () => {
     process.env.MAIPAI_HOST_TUNE_PLATFORM = "linux";
     stub("exit 9");

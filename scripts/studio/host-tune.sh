@@ -37,7 +37,7 @@ MEDIA_DIR="${MAIPAI_MEDIA_DIR:-}"
 CACHE_DIR="${MAIPAI_CACHE_DIR:-}"
 WOULD=()
 
-IDS="no-spotlight no-timemachine-models power display-awake wired-limit no-auto-major-upgrade remote-login advice-accounts advice-radios advice-network advice-toolchains advice-login advice-screensaver"
+IDS="no-spotlight no-timemachine-models power display-awake wired-limit host-guard no-auto-major-upgrade remote-login advice-accounts advice-radios advice-network advice-toolchains advice-login advice-screensaver"
 
 jstr() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'NR>1{printf "\\n"} {printf "%s",$0}')"; }
 
@@ -129,18 +129,28 @@ load_item() {
       else T_CURRENT="Could not ask the login service. Sign in at the Mac, then run detect again."; fi ;;
     wired-limit)
       T_TITLE="Let the GPU use more of the memory"; T_MODE=consent
-      T_WHY="Needed only for big AI models later. The Mac normally lets the graphics chip use about three quarters of its memory. This raises that, and always leaves at least 12 GB (or 15 percent) for macOS and Home. It is set again at every start."
+      T_WHY="Needed only for big AI models later. The Mac normally lets the graphics chip use about three quarters of its memory. This raises that, and always leaves at least 12 GB (or 30 percent) for macOS and Home. It is set again at every start."
       local bytes mb keep cur
       bytes="$(sysctl -n hw.memsize 2>/dev/null)"
       if [ -z "$bytes" ]; then T_CURRENT="Could not read the memory size. Run sysctl hw.memsize."; return; fi
       mb=$((bytes / 1048576))
       if [ "$mb" -lt 32768 ]; then T_STATE=ok; T_CURRENT="Default"; T_PROPOSED="Default (this change is only for Macs with 32 GB or more)"; return; fi
-      keep=$((mb * 15 / 100)); [ "$keep" -lt 12288 ] && keep=12288
+      keep=$(((mb * 30 + 99) / 100)); [ "$keep" -lt 12288 ] && keep=12288
       WIRED_MB=$((mb - keep))
       T_PROPOSED="${WIRED_MB} MB for the GPU, $((keep)) MB kept for macOS and Home"
       cur="$(sysctl -n iogpu.wired_limit_mb 2>/dev/null)"
       if [ -z "$cur" ]; then T_CURRENT="This Mac does not have this setting (it needs Apple silicon)"; return; fi
       if [ "$cur" = "$WIRED_MB" ]; then T_STATE=ok; T_CURRENT="${cur} MB"; else T_STATE=needs; T_CURRENT="$([ "$cur" = 0 ] && echo "Default (about three quarters of memory)" || echo "${cur} MB")"; fi ;;
+    host-guard)
+      T_TITLE="Let the Mac recover by itself"; T_MODE=consent
+      T_WHY="If the system stops answering, the Mac saves a report and restarts itself. An administrator must set it up once."
+      T_PROPOSED="A self-check saves a report before restarting the Mac if the system stops answering"
+      local guard_bin="${ROOT}/usr/local/libexec/maipai-host-guard" guard_status="${ROOT}/var/db/maipai-host-guard/status.json"
+      [ -n "$ROOT" ] || { guard_bin=/usr/local/libexec/maipai-host-guard; guard_status=/var/db/maipai-host-guard/status.json; }
+      if [ ! -x "$guard_bin" ]; then T_STATE=needs; T_CURRENT="The self-check is not installed"; return; fi
+      if ! launchctl print system/com.maipai.host-guard >/dev/null 2>&1; then T_STATE=needs; T_CURRENT="The self-check is not running"; return; fi
+      if [ ! -r "$guard_status" ]; then T_STATE=needs; T_CURRENT="The self-check report is not readable"; return; fi
+      T_STATE=ok; T_CURRENT="The self-check is running and its report can be read" ;;
     no-auto-major-upgrade)
       T_TITLE="No surprise macOS upgrades"; T_MODE=consent
       T_WHY="A big macOS upgrade can break the AI engine overnight. This stops automatic major upgrades. Security updates stay on."
@@ -267,6 +277,19 @@ do_apply() {
       run chmod 644 "$DAEMON_PLIST"
       [ "$DRY" = 1 ] || launchctl bootout "system/$DAEMON_LABEL" >/dev/null 2>&1
       run launchctl bootstrap system "$DAEMON_PLIST" ;;
+    host-guard)
+      need_root apply host-guard
+      local owner uid install_script guard_mode
+      owner="$(stat -f %Su /dev/console 2>/dev/null)"
+      case "$owner" in ''|loginwindow|_mbsetupuser) die 4 no-user "No one is signed in at the Mac. Sign in, then set up the self-check again." ;; esac
+      uid="$(id -u "$owner" 2>/dev/null)"
+      [ -n "$uid" ] || die 4 no-user "Could not find the signed-in account. Sign in at the Mac, then try again."
+      [ -n "$DATA_DIR" ] || die 2 no-folder "Home's data folder is not known. Run again with --data-dir."
+      install_script="$(dirname "$SELF")/host-guard/install.sh"
+      guard_mode="live"
+      if [ -f "$ROOT/var/db/maipai-host-guard/tuning.json" ] && grep -q '"mode"[[:space:]]*:[[:space:]]*"live"' "$ROOT/var/db/maipai-host-guard/tuning.json"; then guard_mode=live; fi
+      run bash "$install_script" --owner "$owner" --uid "$uid" --data-dir "$DATA_DIR"
+      run /usr/local/libexec/maipai-host-guard mode "$guard_mode" ;;
     no-auto-major-upgrade)
       need_root apply no-auto-major-upgrade
       run defaults write "$SU_PREFS" AutomaticallyInstallMacOSUpdates -bool false
@@ -315,6 +338,9 @@ do_revert() {
       run sysctl -w iogpu.wired_limit_mb=0
       [ "$DRY" = 1 ] || launchctl bootout "system/$DAEMON_LABEL" >/dev/null 2>&1
       run rm -f "$DAEMON_PLIST" ;;
+    host-guard)
+      need_root revert host-guard
+      run /usr/local/libexec/maipai-host-guard uninstall ;;
     no-auto-major-upgrade)
       need_root revert no-auto-major-upgrade
       run defaults write "$SU_PREFS" AutomaticallyInstallMacOSUpdates -bool true ;;

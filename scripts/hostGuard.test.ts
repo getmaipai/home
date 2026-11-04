@@ -115,8 +115,9 @@ describe.skipIf(!mac)("host guard daemon", () => {
 
   test("without MAIPAI_HG_TEST the seams are ignored, so a stray variable cannot steer the daemon", () => {
     const b = box();
+    writeFileSync(join(b.state, "status.json"), '{"note":"read-from-the-stray-folder"}');
     const out = Bun.spawnSync(["/bin/bash", SCRIPT, "status"], { env: { PATH: "/usr/bin:/bin", MAIPAI_HG_STATE: b.state }, stdout: "pipe", stderr: "pipe" });
-    expect(out.stdout.toString()).toContain("no run yet");
+    expect(out.stdout.toString()).not.toContain("read-from-the-stray-folder");
   });
 
   test("off and settling clear stale counters so an old streak cannot trigger a reboot later", () => {

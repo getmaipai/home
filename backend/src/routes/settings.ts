@@ -33,6 +33,7 @@ import { startRobotHosts, stopRobotHosts } from "@/lib/robotHost";
 import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning";
 
 export const settingsRoutes = apiRouter();
 
@@ -143,7 +144,7 @@ const putRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: ResolvedSettingSchema } }, description: "The value as stored." },
-    409: { content: { "application/json": { schema: z.object({ error: z.string(), readiness: z.unknown().optional() }) } }, description: "Coding mode is not ready or the Stack could not start the switch." },
+    409: { content: { "application/json": { schema: z.object({ error: z.string(), readiness: z.unknown().optional() }) } }, description: "Coding mode is not ready or the Stack could not start the switch; the host guard file could not be updated." },
     ...errorResponses({ 400: "Invalid scope/key/value, or a newer value already exists", 401: "Not signed in", 403: "A child needs a parent to choose a voice, or only the person may change their own voice" }),
   },
 });
@@ -219,6 +220,10 @@ settingsRoutes.openapi(putRoute, async (c) => {
     refreshSafetyAlarmSensors();
     refreshRobotClips(listDevicesByKind("robot").map((device) => device.id));
   }
+  if (body.scope === "household" && isHostGuardSetting(body.key)) {
+    try { writeHostGuardTuning((key) => key === body.key ? result.value.value : getHouseholdSettingValue(key)); }
+    catch (error) { return c.json({ error: error instanceof Error ? error.message : "Home could not update the Mac self-check settings." }, 409); }
+  }
   if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json(result.value, 200);
 });
@@ -244,6 +249,7 @@ const resetRoute = createRoute({
       content: { "application/json": { schema: ResolvedSettingSchema.extend({ success: z.literal(true) }) } },
       description: "Reset to default.",
     },
+    409: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "The Mac self-check settings file could not be updated." },
     ...errorResponses({ 400: "Invalid scope/key", 401: "Not signed in", 403: "Not allowed to write this scope" }),
   },
 });
@@ -277,6 +283,10 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   if (resetRobotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY)) refreshRobotClips([resetRobotVoiceScope[1]!]);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
+  if (body.scope === "household" && isHostGuardSetting(body.key)) {
+    try { writeHostGuardTuning((key) => key === body.key ? result.value.value : getHouseholdSettingValue(key)); }
+    catch (error) { return c.json({ error: error instanceof Error ? error.message : "Home could not update the Mac self-check settings." }, 409); }
+  }
   if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json({ ...result.value, success: true as const }, 200);
 });

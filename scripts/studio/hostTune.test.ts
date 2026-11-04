@@ -30,7 +30,8 @@ beforeEach(() => {
   writeFileSync(join(fake, "pmset"), "sleep 1\ndisksleep 10\ndisplaysleep 10\nautorestart 0\nwomp 0\npowernap 1\n");
   writeFileSync(join(fake, "wired"), "0\n");
   tool("uname", `echo "\${FAKE_OS:-Darwin}"`);
-  tool("id", `echo "\${FAKE_UID:-0}"`);
+  tool("id", `if [ "$1" = "-u" ] && [ $# -eq 2 ]; then echo "\${FAKE_USER_UID:-501}"; else echo "\${FAKE_UID:-0}"; fi`);
+  tool("stat", `if [ "$1" = "-f" ]; then echo "\${FAKE_CONSOLE_USER:-test-account}"; fi`);
   tool("pmset", `if [ "$1" = "-g" ]; then sed 's/ /  /' "$FAKE/pmset"; exit 0; fi
 shift
 while [ $# -gt 1 ]; do grep -v "^$1 " "$FAKE/pmset" > "$FAKE/pmset.n"; echo "$1 $2" >> "$FAKE/pmset.n"; mv "$FAKE/pmset.n" "$FAKE/pmset"; shift 2; done`);
@@ -81,7 +82,7 @@ describe("host-tune.sh detect", () => {
   test("lists every item with the contract fields, without root", async () => {
     const { supported, items } = await detect({ FAKE_UID: "501" });
     expect(supported).toBe(true);
-    expect(items.map((i) => i.id)).toEqual(expect.arrayContaining(["no-spotlight", "no-timemachine-models", "power", "display-awake", "wired-limit", "no-auto-major-upgrade", "remote-login", "advice-login"]));
+    expect(items.map((i) => i.id)).toEqual(expect.arrayContaining(["no-spotlight", "no-timemachine-models", "power", "display-awake", "wired-limit", "host-guard", "no-auto-major-upgrade", "remote-login", "advice-login"]));
     for (const item of items) {
       expect(Object.keys(item).sort()).toEqual(["current", "id", "mode", "proposed", "state", "title", "why"]);
       expect(["auto", "consent", "advice"]).toContain(item.mode);
@@ -93,15 +94,32 @@ describe("host-tune.sh detect", () => {
     expect(calls()).not.toContain("sudo");
   });
 
-  test("wired limit leaves max(12 GB, 15 percent) for macOS: 128 GB gives 111412 MB (15 percent is 19660)", async () => {
+  test("wired limit leaves max(12 GB, 30 percent) for macOS: 128 GB gives 91750 MB", async () => {
     const item = byId((await detect()).items, "wired-limit");
-    expect(item.proposed).toContain("111412 MB");
+    expect(item.proposed).toContain("91750 MB");
     expect(item.state).toBe("needs");
   });
 
   test("wired limit keeps a 12 GB floor on a 64 GB Mac and is not needed under 32 GB", async () => {
-    expect(byId((await detect({ FAKE_MEM: String(64 * 1024 ** 3) })).items, "wired-limit").proposed).toContain("53248 MB");
+    expect(byId((await detect({ FAKE_MEM: String(64 * 1024 ** 3) })).items, "wired-limit").proposed).toContain("45875 MB");
     expect(byId((await detect({ FAKE_MEM: String(16 * 1024 ** 3) })).items, "wired-limit").state).toBe("ok");
+  });
+
+  test("host-guard needs the binary, loaded daemon and readable status", async () => {
+    const item = byId((await detect()).items, "host-guard");
+    expect(item.mode).toBe("consent");
+    expect(item.state).toBe("needs");
+    expect(item.proposed.toLowerCase()).toContain("report");
+  });
+
+  test("host-guard detects only when binary, daemon and status are all present", async () => {
+    const state = join(sysroot, "var/db/maipai-host-guard"); mkdirSync(state, { recursive: true });
+    const binary = join(sysroot, "usr/local/libexec/maipai-host-guard"); mkdirSync(join(binary, ".."), { recursive: true }); writeFileSync(binary, "guard"); chmodSync(binary, 0o755);
+    writeFileSync(join(state, "status.json"), "{}");
+    const launch = join(bin, "launchctl"); writeFileSync(launch, `#!/usr/bin/env bash\necho "launchctl $*" >> "$FAKE/calls"\n[ "$1" = print ] && [ "$2" = system/com.maipai.host-guard ] && exit 0\nexit 1\n`); chmodSync(launch, 0o755);
+    expect(byId((await detect()).items, "host-guard").state).toBe("ok");
+    rmSync(join(state, "status.json"));
+    expect(byId((await detect()).items, "host-guard").state).toBe("needs");
   });
 
   test("reports supported=false off macOS", async () => {
@@ -180,13 +198,24 @@ describe("host-tune.sh apply and revert", () => {
   test("wired-limit sets the value, writes a boot daemon, and revert removes both", async () => {
     const applied = JSON.parse((await host(["--json", "--yes", "apply", "wired-limit"])).out);
     expect(applied.item.state).toBe("applied");
-    expect(readFileSync(join(fake, "wired"), "utf8").trim()).toBe("111412");
+    expect(readFileSync(join(fake, "wired"), "utf8").trim()).toBe("91750");
     const plist = join(sysroot, "Library/LaunchDaemons/com.maipai.wired-limit.plist");
-    expect(readFileSync(plist, "utf8")).toContain("iogpu.wired_limit_mb=111412");
+    expect(readFileSync(plist, "utf8")).toContain("iogpu.wired_limit_mb=91750");
     expect(calls()).toContain("launchctl bootstrap system");
     await host(["--json", "--yes", "revert", "wired-limit"]);
     expect(readFileSync(join(fake, "wired"), "utf8").trim()).toBe("0");
     expect(existsSync(plist)).toBe(false);
+  });
+
+  test("host-guard dry-run uses the signed-in console account and uid, then prints uninstall", async () => {
+    const installed = await host(["--json", "apply", "host-guard"], { FAKE_UID: "0", FAKE_CONSOLE_USER: "console-account", FAKE_USER_UID: "742" });
+    const body = JSON.parse(installed.out);
+    expect(body.would.join("\n")).toContain("install.sh --owner console-account --uid 742 --data-dir");
+    expect(body.would.join("\n")).toContain("maipai-host-guard mode live");
+    const reverted = await host(["--json", "revert", "host-guard"], { FAKE_UID: "0" });
+    expect(JSON.parse(reverted.out).would).toContain("/usr/local/libexec/maipai-host-guard uninstall");
+    const absent = await host(["--json", "apply", "host-guard"], { FAKE_UID: "0", FAKE_CONSOLE_USER: "loginwindow" });
+    expect(JSON.parse(absent.out).error).toContain("No one is signed in");
   });
 
   test("no-auto-major-upgrade turns major upgrades off and security updates on", async () => {

@@ -33,6 +33,10 @@ Home waits until nobody has chatted for a while before it makes chat simpler. Th
 
 Press **Free up memory** to unload models Home is not using. Chat and anything running are left alone. If nothing is idle, the button says so.
 
+## Keep the Mac ready
+
+In **Settings**, **AI and models**, then **Performance**, an admin can set how Home uses the Mac. The GPU memory limit keeps at least 12 GB or 30 percent of memory free for macOS and Home. The Mac self-check can save a report and restart the Mac if the system stops answering. It needs an admin to set up once.
+
 ## See what Home is doing
 
 On **AI and models**, a status line shows what each kind of job is doing during a big job, for example chat simpler and music waiting. While a Max job runs, an admin can press **Stop the Max job** on that page. Chat then goes back to normal.
