@@ -14972,6 +14972,45 @@
                         "date",
                         "text"
                       ]
+                    },
+                    "host_guard": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "watching",
+                            "failing",
+                            "stale",
+                            "off",
+                            "dry"
+                          ]
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "fix": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "label"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "title",
+                        "text"
+                      ],
+                      "description": "Admin-only status of this Mac's self-check, in plain words."
                     }
                   },
                   "required": [

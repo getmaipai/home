@@ -58,6 +58,7 @@ import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
 import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { warmStack } from "@/lib/stackWarmup";
+import { notifyHostGuardRestart } from "@/lib/hostGuardNotice";
 import { pushCodingSettings } from "@/lib/stackCodingSync";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
@@ -111,6 +112,7 @@ setWarmupPrompt(turnWarmupPrompt);
 // module-load seeding, still there - see lib/hlc.ts's own header on why
 // the wider seed lives here instead of scattered per-table).
 seedHlcFromDatabase();
+notifyHostGuardRestart();
 // LIBRARY-DEDUP-01: remove duplicate copies of identical files the migration folded into one stored file (off the boot path).
 reclaimQueuedBlobsInBackground();
 ensureSetupState(restoreWasApplied ? "restore" : "wizard");

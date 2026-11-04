@@ -1,4 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { raiseIssue, registerFixHandler, __resetFixHandlersForTests } from "@/lib/issues";
 import { owner, teen } from "./support/testAuth";
@@ -9,14 +12,36 @@ import { db } from "@/db";
 import { setupState } from "@/db/schema";
 import { TestClient } from "./client";
 import { ensureSetupState } from "@/lib/setupState";
+import { __setHostGuardStateDirForTests } from "@/lib/hostGuard";
+import { listIssues } from "@/lib/issues";
 import { __setRepairsSetupChecksRunnerForTests } from "@/routes/repairs";
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
   __setRepairsSetupChecksRunnerForTests(null);
+  __setHostGuardStateDirForTests(null);
 });
 
 describe("GET /api/repairs", () => {
+  test("syncs the host guard issue once and clears it when healthy or absent", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "host-guard-repairs-"));
+    __setHostGuardStateDirForTests(dir);
+    const { client } = await owner();
+    const write = (lookup: string) => writeFileSync(join(dir, "status.json"), JSON.stringify({ version: 1, owner: "sage", checked_at: Math.floor(Date.now() / 1000), mode: "live", lookup, spawn: "ok", metal: "ok", hard_fails: 1, metal_fails: 0, uptime_s: 999, note: "probe failed" }));
+    try {
+      write("fail");
+      await client.get("/api/repairs");
+      expect(listIssues().filter((issue) => issue.source === "host" && issue.key === "host-guard.failing")).toHaveLength(1);
+      await client.get("/api/repairs");
+      expect(listIssues().filter((issue) => issue.source === "host" && issue.key === "host-guard.failing")).toHaveLength(1);
+      write("ok");
+      await client.get("/api/repairs");
+      expect(listIssues({ includeResolved: true }).find((issue) => issue.source === "host")?.resolved_at).toBeTruthy();
+      writeFileSync(join(dir, "status.json"), "{}");
+      await client.get("/api/repairs");
+      expect(listIssues({ includeResolved: true }).find((issue) => issue.source === "host")?.resolved_at).toBeTruthy();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   test("requires owner/admin, not just any signed-in person", async () => {
     const { client } = await owner();
     const teenClient = await teen(client);

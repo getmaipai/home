@@ -78,6 +78,18 @@ function stubHealth(body: HealthStatus) {
 // our health page show bad health when these are down." Every state
 // below comes from the backend's real probe, never from a kind label.
 describe("StatusPartsBody", () => {
+  test("shows the host guard row to an admin and hides it from a child", async () => {
+    const restore = stubHealth(health());
+    const history = { generated_at: new Date().toISOString(), days: 90, components: [], incidents: [], host_guard: { state: "ok" as const, title: "This Mac's self-check", text: "The account lookup and graphics check are working." } };
+    try {
+      const admin = renderWithQuery(<StatusPartsBody person={makePerson("owner")} health={health()} history={history} />);
+      expect(admin.getByTestId("host-guard")).toHaveTextContent("This Mac's self-check");
+      admin.unmount();
+      const child = renderWithQuery(<StatusPartsBody person={makePerson("child")} health={health()} history={history} />);
+      expect(child.queryByTestId("host-guard")).toBeNull();
+    } finally { restore(); }
+  });
+
   test("the Element info tooltip button keeps its accessible name", async () => {
     const restore = stubHealth(health());
     try {

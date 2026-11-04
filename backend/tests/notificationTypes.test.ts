@@ -26,6 +26,13 @@ test("repairs.still_open is the declared adult reminder type", () => {
   });
 });
 
+test("host guard restart notice has the admin time-sensitive shape", () => {
+  expect(getNotificationType("host-guard-restarted")).toEqual({
+    id: "host-guard-restarted", level: "time_sensitive", audience: "admins", template: "{text}", configurable: true,
+    defaultChannels: ["in_app"], toast: true,
+  });
+});
+
 test("file.shared_with_you is a passive, configurable, person-audience notice matching memory.updated's posture", () => {
   const type = getNotificationType("file.shared_with_you");
   expect(type).toBeDefined();

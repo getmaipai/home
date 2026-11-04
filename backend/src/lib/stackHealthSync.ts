@@ -14,6 +14,7 @@
 import { isStackConfigured, getStackClient } from "@/lib/stackEngine";
 import { raiseIssue, resolveIssue, registerFixHandler, listIssues, type IssueSeverity } from "@/lib/issues";
 import type { HealthItem, StackMemoryLedger } from "@/lib/stack/types";
+import { readHostGuardStatus, hostGuardView } from "@/lib/hostGuard";
 
 const HEALTH_KEY_PREFIX = "health.";
 
@@ -91,4 +92,16 @@ export async function syncStackHealthIssues(): Promise<void> {
     const code = issue.key.slice(HEALTH_KEY_PREFIX.length);
     if (!seenCodes.has(code)) resolveIssue("stack", issue.key);
   }
+}
+
+export async function syncHostGuardIssue(): Promise<void> {
+  const status = readHostGuardStatus();
+  const key = "host-guard.failing";
+  const view = hostGuardView(status);
+  if (!status || view.state !== "failing") {
+    resolveIssue("host", key);
+    if (status && status.mode === "live" && status.lookup === "ok" && status.spawn === "ok" && status.metal === "ok") resolveIssue("canary", "gpu_metal");
+    return;
+  }
+  await raiseIssue({ source: "host", key, severity: "error", title: "This Mac's self-check found a problem", detail: view.text, fix: null });
 }

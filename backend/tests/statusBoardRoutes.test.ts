@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { app } from "@/app";
 import { db } from "@/db";
 import { maintenanceWindows, statusEvents, statusNotes } from "@/db/schema";
@@ -8,8 +11,10 @@ import { __resetServiceHealthForTests, recordServiceOutcome } from "@/lib/servic
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { startStackFixture } from "./stackFixture";
+import { __setHostGuardStateDirForTests } from "@/lib/hostGuard";
 
 beforeEach(() => { resetDb(); __resetServiceHealthForTests(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
+afterEach(() => __setHostGuardStateDirForTests(null));
 
 async function ownerClient(): Promise<TestClient> {
   const client = new TestClient();
@@ -128,6 +133,24 @@ describe("status routes", () => {
       __setStackClientForTests(null);
       fixture.stop();
     }
+  });
+
+  test("host guard history is admin-only and absent for a child", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "host-guard-history-"));
+    __setHostGuardStateDirForTests(dir);
+    writeFileSync(join(dir, "config.json"), "{}");
+    writeFileSync(join(dir, "status.json"), JSON.stringify({ version: 1, owner: "sage", checked_at: Math.floor(Date.now() / 1000), mode: "live", lookup: "ok", spawn: "ok", metal: "ok", hard_fails: 0, metal_fails: 0, uptime_s: 99, note: "healthy" }));
+    try {
+      const owner = await ownerClient();
+      const admin = await (await owner.get("/api/status/history")).json() as Record<string, unknown>;
+      expect(admin.host_guard).toMatchObject({ state: "ok", title: "This Mac's self-check" });
+      const created = await owner.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" });
+      const person = await created.json() as { id: string };
+      const child = new TestClient();
+      await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+      const childBody = await (await child.get("/api/status/history")).json() as Record<string, unknown>;
+      expect(childBody).not.toHaveProperty("host_guard");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   test("signed-out board is rejected", async () => {
