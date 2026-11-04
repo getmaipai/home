@@ -64259,8 +64259,8 @@
                   "base_model": {
                     "type": "string",
                     "enum": [
-                      "ltx-2.3",
-                      "ltx-2.5"
+                      "ltx-2.5",
+                      "ltx-2.3"
                     ]
                   },
                   "confirm_ticket": {
