@@ -492,6 +492,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/homeCardQueries.ts` | isFixedHomeCardQuery |
 | `backend/src/lib/homeListeners.ts` | startHomeListeners, attachHouseholdTlsRebind |
 | `backend/src/lib/homeSupervisorRoles.ts` | getHomeSupervisorRoles |
+| `backend/src/lib/hostGuard.ts` | HostGuardStatusSchema, hostGuardStateDir, __setHostGuardStateDirForTests, readHostGuardStatus, hostGuardStatusFromJson, hostGuardView |
+| `backend/src/lib/hostGuardNotice.ts` | __setHostGuardNotifierForTests, __resetHostGuardNoticeForTests, notifyHostGuardRestart |
 | `backend/src/lib/hostGuardTuning.ts` | HOST_GUARD_STATE_DIR, writeHostGuardTuning, isHostGuardSetting |
 | `backend/src/lib/hostTune.ts` | HOST_TUNE_IDS, HostTuneItemSchema, detectHostTune, changeHostTune |
 | `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_PROVIDER_NAME, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed |
@@ -926,7 +928,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
 | `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent, listTierCandidates |
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, STACK_ROLES, isStackRoleEnabled |
-| `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues |
+| `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues, syncHostGuardIssue |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
 | `backend/src/lib/stackRequirement.ts` | STACK_REQUIREMENT_ISSUE, syncStackRequirementIssue |
 | `backend/src/lib/stackRestart.ts` | STACK_BACK_MAX_MS, isStackRestart, waitForStackBack |
