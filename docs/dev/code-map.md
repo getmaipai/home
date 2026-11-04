@@ -658,6 +658,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, prepareOwnedStemsJob |
+| `backend/src/lib/music/libraryAlign.ts` | QUICK_WINDOW_S, QUICK_LEAD_S, INSTANT_MATCH_S, RETRY_AFTER_MS, LIBRARY_ALIGN_MAX_BYTES, __setLibraryAlignPollMsForTests |
 | `backend/src/lib/music/lyricsAlign.ts` | buildLines, keepOrdered, spaceUnanchored, reconcile |
 | `backend/src/lib/music/m4a.ts` | m4aSeconds |
 | `backend/src/lib/music/madeRecords.ts` | MADE_KINDS, listMade, getMade, createMade, updateMade, deleteMade |
@@ -667,11 +668,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
-| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic, getMusicJob |
+| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, musicStackConfigured, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/studioTools.ts` | EDIT_BAND_TOOL_ID, STUDIO_TOOL_IDS, isStudioTool, EDIT_TOOL_OBJECT, runStudioTool |
 | `backend/src/lib/music/styleCard.ts` | MAKE_SONG_STYLE_TOOL_ID, EDIT_SONG_STYLE_TOOL_ID, STYLE_NOT_HERE_LINE, STYLE_BAD_LINE, styleProvenance, styleBlock |
-| `backend/src/lib/music/timedWords.ts` | __setAlignPollMsForTests, __resetWordTimingForTests, sungLinesForTiming, startWordTiming, timedLyricsFor |
+| `backend/src/lib/music/timedWords.ts` | __setAlignPollMsForTests, __resetWordTimingForTests, alignPaused, pauseAlign, isAlignSkipCode, sungLinesForTiming |
 | `backend/src/lib/music/tool.ts` | REFUSED_PREFIX, GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs |
 | `backend/src/lib/music/trackItem.ts` | readMusicTrack |
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |

@@ -56,6 +56,19 @@
               }
             },
             {
+              "label": "Lyrics look off",
+              "icon": "refresh-cw",
+              "busy_label": "Lining up",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/music/actions/lyrics-realign",
+                  "args": {
+                    "media_id": "{id}"
+                  }
+                }
+              }
+            },
+            {
               "label": "Add to playlist",
               "icon": "plus",
               "action": {

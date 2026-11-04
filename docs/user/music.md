@@ -10,6 +10,8 @@ On Now playing, you can see the song title, creator and date. Songs made at home
 
 When Home makes a song with words, it listens to the finished song and times every word. The highlight follows each word as it is sung, not only each line. This happens on your own home server a moment after the song is ready. Until then, and for any song it cannot time, the highlight follows each line.
 
+Songs in your library that have timed lyrics get the same word-by-word highlight. After the lyrics are found, Home listens to your file on your own home server and times each word, first for the opening lines, then for the whole song (on songs over four minutes, only the opening lines get word timing). If the highlight looks off, open Now playing and choose **Lyrics look off**; Home lines the words up again. You can ask once a minute. Nothing leaves your home.
+
 A song made in chat can be split into its parts. Open the song card and choose **Stems**, or ask in chat to split it. You get four tracks: Vocals, Drums, Bass and Other. Use Next to step through them. It takes about a minute and happens on your own home server. You can also split an audio file of your own. Open it in Library, then choose **Split into stems**. Stems stay on this home server, and splitting does not make a voice. Adults only.
 
 Radio uses songs from your library only. It looks for the same artist, album artist, kind of music and decade. It does not

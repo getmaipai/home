@@ -29,6 +29,7 @@ import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/vide
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
+import { requestRealign } from "@/lib/music/libraryAlign";
 import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, madeFileFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
@@ -253,6 +254,17 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
     const result = await lookupLyricsFor(person, id);
     return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  // MUSIC-GEN-20c: the player's "Lyrics look off" action; the same function as POST /api/music/library/:id/lyrics-realign.
+  routes.post("/actions/lyrics-realign", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "music" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "lyrics-realign")) return next();
+    const body = await bodyOf(c.req.raw);
+    const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
+    const { result } = requestRealign(person, id);
+    return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/actions/edit", requireAuth, async (c, next) => {

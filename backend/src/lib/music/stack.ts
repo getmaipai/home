@@ -36,6 +36,8 @@ export class StackMusicError extends Error {
   constructor(readonly status: number, readonly code: string) { super("The song could not be made. Try again."); this.name = "StackMusicError"; }
 }
 let fetchForTests: typeof fetch | null = null;
+/** Whether a Stack address is set (or a test fake stands in), so a caller can skip reading a big file for a Stack that is not there. */
+export function musicStackConfigured(): boolean { return fetchForTests !== null || !!getStackUrl(); }
 export function __setMusicFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }
 export const __setStemsFetchForTests = __setMusicFetchForTests;
 async function request(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<Response> {
@@ -103,6 +105,8 @@ export async function fetchStem(url: string): Promise<Uint8Array> {
 export interface StackAlignWord { t: number; end: number; text: string }
 export interface StackAlignData { words: StackAlignWord[]; aligned_words: number; total_words: number; line_starts: number[] }
 export interface StackAlignJob { state: MusicState; code?: string | null; data?: StackAlignData | null }
+/** MUSIC-GEN-20c: align only this stretch of the song (seconds from its start); the reply's times stay on the song's own clock. */
+export interface AlignWindow { from_s: number; to_s: number }
 /** The Stack's longest alignable song. */
 export const ALIGN_MAX_SECONDS = 240;
 function alignData(value: unknown): StackAlignData | null {
@@ -112,8 +116,8 @@ function alignData(value: unknown): StackAlignData | null {
   if (words.length !== data.words.length) return null;
   return { words, aligned_words: Number(data.aligned_words) || words.length, total_words: Number(data.total_words) || words.length, line_starts: data.line_starts.map((n) => Number.isInteger(n) ? n : -1) };
 }
-export async function submitAlign(source: string, source_sha256: string, lyrics: string, origin: "made_here" | "owned_file" = "made_here", waitMs = 1): Promise<{ job: string; done: StackAlignData | null }> {
-  const res = await checked(await request("/v1/audio/align", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, lyrics, origin, timeout_ms: waitMs }) }, 120_000));
+export async function submitAlign(source: string, source_sha256: string, lyrics: string, origin: "made_here" | "owned_file" = "made_here", waitMs = 1, window?: AlignWindow): Promise<{ job: string; done: StackAlignData | null }> {
+  const res = await checked(await request("/v1/audio/align", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, lyrics, origin, timeout_ms: waitMs, ...(window ? { from_s: window.from_s, to_s: window.to_s } : {}) }) }, 120_000));
   const parsed = await res.json() as { job?: string; data?: unknown };
   if (!parsed.job) throw new StackMusicError(502, "bad_reply");
   return { job: parsed.job, done: res.status === 200 ? alignData(parsed.data) : null };
@@ -126,8 +130,8 @@ export async function deleteAlign(job: string): Promise<void> {
   try { await (await request(`/v1/audio/align/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* the Stack holds the newest twelve only */ }
 }
 /** Submit, then poll until done: the timed words, or null when the Stack finished with none. Throws StackMusicError (code only) on a refusal or failure. */
-export async function alignSong(source: string, source_sha256: string, lyrics: string, opts: { pollMs?: number; maxMs?: number; signal?: AbortSignal } = {}): Promise<StackAlignData | null> {
-  const { job, done } = await submitAlign(source, source_sha256, lyrics);
+export async function alignSong(source: string, source_sha256: string, lyrics: string, opts: { pollMs?: number; maxMs?: number; signal?: AbortSignal; origin?: "made_here" | "owned_file"; window?: AlignWindow } = {}): Promise<StackAlignData | null> {
+  const { job, done } = await submitAlign(source, source_sha256, lyrics, opts.origin ?? "made_here", 1, opts.window);
   if (done) { await deleteAlign(job); return done; }
   const deadline = Date.now() + (opts.maxMs ?? 15 * 60_000);
   try {

@@ -17,6 +17,10 @@ const running = new Set<string>();
 let skipUntil = 0;
 const SKIP_MS = 5 * 60_000;
 export function __resetWordTimingForTests(): void { skipUntil = 0; running.clear(); }
+/** MUSIC-GEN-20c: Library alignment shares the 5-minute "aligner not installed" pause with made songs. */
+export function alignPaused(now = Date.now()): boolean { return now < skipUntil; }
+export function pauseAlign(now = Date.now()): void { skipUntil = now + SKIP_MS; }
+export function isAlignSkipCode(code: string): boolean { return code === "not_installed" || code === "unsupported"; }
 
 export interface TimedWordLine { t: number; line: string; section: string | null; words?: { t: number; end: number; text: string }[] }
 

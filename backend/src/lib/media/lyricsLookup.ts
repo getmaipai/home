@@ -1,7 +1,7 @@
 export interface LyricsQuery { title: string; artist: string; album?: string | null; durationS?: number | null; instrumentalDurationsS?: number[] }
 export interface TimedLine { t: number; line: string; section?: string | null }
 export type LyricsOutcome =
-  | { outcome: "hit"; text: string; timed?: TimedLine[] }
+  | { outcome: "hit"; text: string; timed?: TimedLine[]; /** The duration LRCLIB reports for the recording it timed, when it says. */ durationS?: number }
   | { outcome: "miss" }
   | { outcome: "refused" };
 
@@ -61,6 +61,7 @@ export async function lookupLyrics(
   if (response.status !== 200) return { outcome: "refused" };
   let plain = "";
   let synced = "";
+  let theirDurationS: number | undefined;
   try {
     const body = (await response.json()) as {
       plainLyrics?: unknown;
@@ -70,6 +71,7 @@ export async function lookupLyrics(
     };
     if (body.instrumental === true) return { outcome: "miss" };
     if (typeof body.duration === "number" && Number.isFinite(body.duration)) {
+      theirDurationS = body.duration;
       if (typeof q.durationS === "number" && q.durationS > 0 && Math.abs(body.duration - q.durationS) > MAX_DURATION_GAP_S) {
         return { outcome: "miss" };
       }
@@ -87,5 +89,6 @@ export async function lookupLyrics(
   const text = timed.length > 0 ? timed.map((line) => line.line).join("\n") : plain.trim();
   const hit: LyricsOutcome = { outcome: "hit", text };
   if (timed.length > 0) hit.timed = timed;
+  if (theirDurationS !== undefined) hit.durationS = theirDurationS;
   return hit;
 }

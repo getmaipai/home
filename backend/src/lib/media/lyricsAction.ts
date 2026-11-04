@@ -14,6 +14,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { tryConsume } from "@/lib/rateLimiter";
 import { readableIn } from "./appHost";
 import { bandAllows, mediaBandOf } from "./band";
+import { startLibraryAlign } from "@/lib/music/libraryAlign";
 import { lookupLyrics } from "./lyricsLookup";
 import { hasReceipt, isPaused, recordReceipt, recordRefusal, recordSuccess } from "./lyricsReceipts";
 import type { MediaItem } from "./model";
@@ -81,6 +82,8 @@ export async function lookupLyricsFor(
   const newLyrics = { source: "lrclib", text: outcome.text, ...(outcome.timed ? { timed: outcome.timed } : {}) };
   if (!bandAllows(person, { ...item, lyrics: newLyrics })) return { ok: true, value: { lookup: "none" } };
   db.update(mediaItems).set({ lyrics: JSON.stringify(newLyrics) }).where(eq(mediaItems.id, item.id)).run();
+  // MUSIC-GEN-20c: word timing for the new synced lyrics runs in the background; the answer below does not wait for it.
+  void startLibraryAlign(person, { ...item, lyrics: newLyrics }, { lrclibDurationS: outcome.durationS });
   return {
     ok: true,
     value: { lookup: "found", lyrics: outcome.text, ...(outcome.timed ? { timed_lyrics: outcome.timed } : {}) },

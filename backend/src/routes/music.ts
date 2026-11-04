@@ -32,6 +32,7 @@ import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory"
 import { newConversationTurnId } from "@/lib/id";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { timedLyricsFor } from "@/lib/music/timedWords";
+import { requestRealign } from "@/lib/music/libraryAlign";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { refusePrompt } from "@/lib/pictures/policy";
 export const musicRoutes = apiRouter();
@@ -327,6 +328,14 @@ musicRoutes.openapi(stemsFromFileRoute, async (c) => {
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
   if (!temporary) logTurn(actor, "chat", `Split: ${prepared.name}`, { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
   return c.json(await musicCardView(actor, job), 200);
+});
+// MUSIC-GEN-20c: "Lyrics look off" on a scanned Library track: line the words up with the file again, ignoring the stored words. It reads the track
+// through the same Library and band gates as the lyrics themselves (no music-making gate: nothing is made), answers at once and works in the background.
+const lyricsRealignRoute = createRoute({ method: "post", path: "/library/{id}/lyrics-realign", tags: ["Music"], summary: "Line up a Library track's lyrics with the file again", middleware: [requireAuth] as [typeof requireAuth], request: { params },
+  responses: { 202: { content: { "application/json": { schema: z.object({ ok: z.literal(true), state: z.literal("queued") }) } }, description: "Lining the words up again; the lyrics improve in a moment." }, 422: { description: "These lyrics have no timing." }, 429: { description: "Asked again within a minute." }, ...errorResponses({ 401: "Not signed in", 404: "No such song" }) } });
+musicRoutes.openapi(lyricsRealignRoute, (c) => {
+  const { result } = requestRealign(c.get("person"), c.req.valid("param").id);
+  return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : c.json({ error: result.error }, result.status) as never;
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });
