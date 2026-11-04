@@ -15,9 +15,19 @@ function person(id: string, role: string) { const now = new Date().toISOString()
   resetDb(); __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: [], reason: null }, true);
   const adult = person("op-adult", "owner"), teen = person("op-teen", "teen"), child = person("op-child", "child"), guest = person("op-guest", "guest");
   const ids = (await listMediaOps(adult, { input: "picture" })).map(x => x.id);
-  expect(ids).toContain("picture.change"); expect((await listMediaOps(teen, { input: "picture" })).map(x => x.id)).toEqual(ids);
+  expect(ids).toContain("picture.change"); expect(ids).not.toContain("picture.locate");
+  expect((await listMediaOps(adult, { input: "picture", includeHelpers: true })).map(x => x.id)).toContain("picture.locate");
+  expect((await listMediaOps(teen, { input: "picture" })).map(x => x.id)).toEqual(ids);
   expect((await listMediaOps(child, { input: "picture" })).map(x => x.id)).toEqual(ids);
   expect(await listMediaOps(guest, { input: "picture" })).toEqual([]);
+ });
+ test("locate is helper-only and unavailable to children and guests", async () => {
+  resetDb(); __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: [], reason: null }, true);
+  const adult = person("locate-adult", "owner"), teen = person("locate-teen", "teen"), child = person("locate-child", "child"), guest = person("locate-guest", "guest");
+  expect((await listMediaOps(adult, { input: "picture", includeHelpers: true })).find((op) => op.id === "picture.locate")?.ready).toBe(true);
+  expect((await listMediaOps(teen, { input: "picture", includeHelpers: true })).find((op) => op.id === "picture.locate")?.ready).toBe(true);
+  await expect(runMediaOp(child, "picture.locate", { source: { kind: "picture", via: "chat", id: "x", conversationId: "c" }, args: {} })).rejects.toMatchObject({ status: 422, code: "child_cartoons_only" });
+  await expect(runMediaOp(guest, "picture.locate", { source: { kind: "picture", via: "chat", id: "x", conversationId: "c" }, args: {} })).rejects.toMatchObject({ status: 403 });
  });
  test("every op has descriptive copy and controls", () => { for (const op of registeredMediaOps()) { expect(op.label.length).toBeGreaterThan(0); expect(op.summary.length).toBeGreaterThan(0); expect(Array.isArray(op.controls)).toBe(true); } });
  test("unknown ids are refused and a Library ref has the explicit IMG-OPS-02 response", async () => {
