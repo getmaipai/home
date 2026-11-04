@@ -259,7 +259,7 @@ describe("the chat tool, even when a model calls it without being offered it", (
   });
 
   test("a style trigger that creates a CSAM match is refused after Home adds it", async () => {
-    fake.loras = [...fake.loras, { ...fake.loras[0]!, id: "lora-cccccccccccccccc", name: "Soft Light", trigger_words: ["child porn", "softlight"], classification: "all-ages" }];
+    fake.loras = [...fake.loras, { ...fake.loras[0]!, id: "lora-cccccccccccccccc", sha256: "c".repeat(64), name: "Soft Light", trigger_words: ["child porn", "softlight"], classification: "all-ages" }];
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a portrait", style: "soft light" })]), reply: () => "ignored" }, async (seen) => {
       const value = await turn(people.owner, "a portrait in soft light");
       expect(value.picture).toBeUndefined();

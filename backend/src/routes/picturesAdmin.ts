@@ -5,7 +5,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
+import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled, updatePictureRecord } from "@/lib/pictures/adapters";
+import { adoptPictureLoras } from "@/lib/loras/sync";
 import { addLoraFile, addLoraUrl, getStackJob, imageStatus, installPictureModel, patchLora, removeLora, StackPicturesError } from "@/lib/pictures/stack";
 import { adultStylesAllowed, householdAllowsAdults, householdPictureQuality } from "@/lib/pictures/policy";
 import { CHILD_CONTENT_LINE, kidsDailyPictures, kidsDailyVideos, kidsHomeOn } from "@/lib/pictures/lane";
@@ -15,7 +16,7 @@ import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { pictureStyleAccess } from "@/lib/styleLock";
 import type { PersonRow } from "@/types";
 import { db } from "@/db";
-import { kidUsage, people, pictureAdapterPrefs, pictureJobs, videoJobs } from "@/db/schema";
+import { kidUsage, people, pictureJobs, videoJobs } from "@/db/schema";
 import { and, eq, gte, ne } from "drizzle-orm";
 
 export const picturesAdminRoutes = apiRouter();
@@ -51,17 +52,13 @@ const BAND_NOTES = {
 
 const WELL_KNOWN_FREE = /^(apache|mit|cc0|bsd)/i;
 
-function present(a: Awaited<ReturnType<typeof allAdapters>>[number], pendingIds: Set<string>) {
+function present(a: Awaited<ReturnType<typeof allAdapters>>[number]) {
   const licence = (a.licence ?? "").trim();
   return {
     id: a.id, name: a.name, base_model: a.base_model, classification: a.classification, classification_note: a.classification_note ?? null,
     licence: licence || "No licence stated", licence_known: licence !== "" && licence.toLowerCase() !== "unknown", source_url: a.source_url ?? null, bytes: a.bytes, sha256: a.sha256,
-    trigger_words: a.trigger_words, added_at: a.added_at, enabled: a.enabled, needs_confirmation: pendingIds.has(a.id),
+    trigger_words: a.trigger_words, added_at: a.added_at, enabled: a.enabled, needs_confirmation: a.needs_confirmation,
   };
-}
-
-function pendingIds(): Set<string> {
-  return new Set(db.select().from(pictureAdapterPrefs).all().filter((row) => !row.enabled && (row.updatedBy ?? "").startsWith("added:")).map((row) => row.adapterId));
 }
 
 /** A style the person cannot read (locked behind the Adult lock, or hidden) answers like a missing one; so does one the library does not list (fail closed). */
@@ -86,7 +83,6 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
   const status = await imageStatus();
   let adapters: Awaited<ReturnType<typeof allAdapters>> = [];
   try { dropAdapterCache(); adapters = await allAdapters(); } catch { adapters = []; }
-  const pending = pendingIds();
   // VIDEO-SETTINGS-02: an adult-only style is not a row until the person's own unlock proof is valid; one flag stands for all of them (never a count).
   const person = c.get("person") as PersonRow;
   let lockedStyles = false;
@@ -101,7 +97,7 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
       models: (status?.models ?? []).map((m) => ({ id: m.id, label: m.label ?? m.id, installed: m.installed, available: m.available ?? true, licence: m.licence ?? "", edit: Boolean(m.edit), peak_gb: m.peak_gb ?? null, remaining_bytes: m.install?.remaining_bytes ?? 0 })),
       remaining_bytes: status?.install?.remaining_bytes ?? 0,
     },
-    adapters: adapters.map((a) => present(a, pending)),
+    adapters: adapters.map((a) => present(a)),
     locked_styles: lockedStyles,
     bands: [
       { band: "children" as const, label: "Children", on: kidsHomeOn(), locked: true, note: kidsHomeOn() ? BAND_NOTES.childrenOn : BAND_NOTES.childrenOff },
@@ -142,10 +138,10 @@ picturesAdminRoutes.openapi(jobRoute, async (c) => {
       const lora = job.result?.lora;
       let adapter = null;
       if (lora) {
-        if (!db.select().from(pictureAdapterPrefs).all().some((p) => p.adapterId === lora.id)) setAdapterEnabled(lora.id, false, `added:${adminId}`);
+        await adoptPictureLoras([lora], adminId);
         dropAdapterCache();
         const found = (await allAdapters()).find((a) => a.id === lora.id);
-        adapter = found ? present(found, pendingIds()) : null;
+        adapter = found ? present(found) : null;
       }
       return c.json({ state: "done" as const, percent: 100, label: "Done", error: null, code: null, adapter }, 200);
     }
@@ -194,10 +190,10 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       stack.append("trigger_words", JSON.stringify(trigger));
       stack.append("added_by", adminId);
       const lora = await addLoraFile(stack);
-      setAdapterEnabled(lora.id, false, `added:${adminId}`);
+      await adoptPictureLoras([lora], adminId);
       dropAdapterCache();
       const found = (await allAdapters()).find((a) => a.id === lora.id);
-      return c.json({ adapter: present(found ?? { ...lora, enabled: false }, pendingIds()) }, 200) as never;
+      return c.json({ adapter: present(found ?? { ...lora, enabled: false, needs_confirmation: true }) }, 200) as never;
     }
     const url = String(form.url ?? "").trim();
     if (!url) return c.json({ error: "Paste a Hugging Face link to the .safetensors file, choose the file, or type where it is saved on this computer.", code: "source_required" }, 422) as never;
@@ -219,13 +215,15 @@ picturesAdminRoutes.openapi(patchRoute, async (c) => {
   if (!(await styleReadable(c.get("person") as PersonRow, id))) return c.json({ error: "That style isn't in the library.", code: "unknown_lora" }, 404) as never;
   try {
     if (body.classification !== undefined || body.name !== undefined || body.trigger_words !== undefined) {
-      await patchLora(id, { ...(body.classification ? { classification: body.classification } : {}), ...(body.name ? { name: body.name } : {}), ...(body.trigger_words ? { trigger_words: body.trigger_words } : {}) });
+      const patch = { ...(body.classification ? { classification: body.classification } : {}), ...(body.name ? { name: body.name } : {}), ...(body.trigger_words ? { trigger_words: body.trigger_words } : {}) };
+      await patchLora(id, patch);
+      updatePictureRecord(id, patch, adminId);
     }
     if (body.enabled !== undefined) setAdapterEnabled(id, body.enabled, adminId);
     dropAdapterCache();
     const found = (await allAdapters()).find((a) => a.id === id);
     if (!found) return c.json({ error: "That style isn't in the library.", code: "unknown_lora" }, 404) as never;
-    return c.json(present(found, pendingIds()), 200);
+    return c.json(present(found), 200);
   } catch (error) { return stackFailure(c, error) as never; }
 });
 

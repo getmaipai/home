@@ -1,16 +1,18 @@
-// IMGGEN-LORA-01 (Home half): the household's style (LoRA) library as chat sees it. The Stack owns the files and
-// their metadata; Home owns whether the household lets chat use each one (`picture_adapter_prefs`) and who may
-// reach which audience (policy.ts). A person who may not use an adapter never sees it listed or matched, so the
-// model never gets an id it must not use.
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { pictureAdapterPrefs } from "@/db/schema";
+// IMGGEN-LORA-01 (Home half), moved onto the `Lora` record by VIDEO-LORA-12: the household's style (LoRA) library as chat sees it. The Stack owns the files and
+// their facts (hash, size, base model); Home owns the record (lib/loras/store.ts, `media: "picture"`): whether the household lets chat use each one
+// (`availability`), whether an admin has confirmed it (the licence acknowledgement) and its age setting. The old `picture_adapter_prefs` rows are folded into
+// records by lib/loras/sync.ts. A person who may not use an adapter never sees it listed or matched, so the model never gets an id it must not use.
+import { adoptPictureLoras } from "@/lib/loras/sync";
+import { deleteLoraRecord, getLoraRecord, saveLora, type Lora } from "@/lib/loras/store";
 import { listLoras, type StackLora } from "./stack";
 
 export type AdapterAudience = "all-ages" | "adult-only";
 
 export interface Adapter extends StackLora {
+  /** An admin made it usable beyond admins (`availability.who` is adults or people). */
   enabled: boolean;
+  /** Added but not yet confirmed by an admin. */
+  needs_confirmation: boolean;
 }
 
 let cache: { at: number; loras: StackLora[] } | null = null;
@@ -30,14 +32,24 @@ async function stackLoras(): Promise<StackLora[]> {
 
 export function dropAdapterCache(): void { cache = null; }
 
-function enabledMap(): Map<string, boolean> {
-  return new Map(db.select().from(pictureAdapterPrefs).all().map((row) => [row.adapterId, row.enabled]));
+function adapterOf(stack: StackLora, lora: Lora): Adapter {
+  return {
+    ...stack, name: lora.name, classification: lora.audience, trigger_words: lora.trigger_words,
+    enabled: lora.removed_at === null && lora.availability.who !== "admins", needs_confirmation: lora.licence.acknowledged_by === null,
+  };
 }
 
 /** Every adapter in the library with the household's switch (admin view; no audience filtering). */
 export async function allAdapters(): Promise<Adapter[]> {
-  const [loras, prefs] = [await stackLoras(), enabledMap()];
-  return loras.map((lora) => ({ ...lora, enabled: prefs.get(lora.id) !== false }));
+  const stack = await stackLoras();
+  await adoptPictureLoras(stack);
+  const out: Adapter[] = [];
+  for (const s of stack) {
+    const lora = getLoraRecord(s.id);
+    // A file with no valid record is not offered (fail closed).
+    if (lora && lora.media === "picture" && lora.removed_at === null) out.push(adapterOf(s, lora));
+  }
+  return out;
 }
 
 /** The adapters a person may use now: enabled, and in an audience they hold. */
@@ -46,14 +58,39 @@ export async function adaptersFor(audiences: readonly AdapterAudience[]): Promis
   return (await allAdapters()).filter((a) => a.enabled && audiences.includes(a.classification));
 }
 
+/** An admin turns a style on for adults or back to admins only; turning it on is also the confirmation of a style that was added and not yet read. */
 export function setAdapterEnabled(id: string, enabled: boolean, by: string): void {
+  const lora = getLoraRecord(id);
+  if (!lora || lora.media !== "picture") return;
   const now = new Date().toISOString();
-  db.insert(pictureAdapterPrefs).values({ adapterId: id, enabled, updatedAt: now, updatedBy: by })
-    .onConflictDoUpdate({ target: pictureAdapterPrefs.adapterId, set: { enabled, updatedAt: now, updatedBy: by } }).run();
+  const confirm = enabled && lora.licence.acknowledged_by === null;
+  saveLora({
+    ...lora,
+    availability: enabled ? (lora.availability.who === "admins" ? { who: "adults", people: [] } : lora.availability) : { who: "admins", people: [] },
+    licence: confirm ? { ...lora.licence, acknowledged_by: by, acknowledged_at: now } : lora.licence,
+  }, by);
 }
 
+/** An admin's change of a style's name, words or age setting (the Stack has the same change). Lowering to all-ages is the admin's explicit choice and is recorded as such. */
+export function updatePictureRecord(id: string, patch: { name?: string; trigger_words?: string[]; classification?: "all-ages" | "adult-only" }, by: string): void {
+  const lora = getLoraRecord(id);
+  if (!lora || lora.media !== "picture") return;
+  const now = new Date().toISOString();
+  const audience = patch.classification ?? lora.audience;
+  saveLora({
+    ...lora,
+    name: patch.name?.trim().slice(0, 80) || lora.name,
+    trigger_words: patch.trigger_words ? patch.trigger_words.map((w) => w.trim()).filter(Boolean).slice(0, 12) : lora.trigger_words,
+    audience,
+    audience_set_by: audience === "all-ages" ? (audience === lora.audience ? lora.audience_set_by : by) : null,
+    audience_set_at: audience === "all-ages" ? (audience === lora.audience ? lora.audience_set_at : now) : null,
+  }, by);
+}
+
+/** The style left the library with its file: its record goes too. */
 export function forgetAdapterPref(id: string): void {
-  db.delete(pictureAdapterPrefs).where(eq(pictureAdapterPrefs.adapterId, id)).run();
+  const lora = getLoraRecord(id);
+  if (lora && lora.media === "picture") deleteLoraRecord(id);
 }
 
 function norm(text: string): string {

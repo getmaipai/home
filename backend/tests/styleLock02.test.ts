@@ -36,7 +36,7 @@ beforeEach(() => {
   resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   video = installFakeVideoStack(); video.loras = [];
   images = installFakeImageStack();
-  images.loras.push({ id: PIC_ID, name: PIC_NAME, sha256: "h".repeat(64), bytes: 777_777, base_model: "flux2-klein-4b", licence: null, source_url: null, classification: "adult-only", trigger_words: [PIC_WORD], strength_default: 1, added_at: "2026-10-17T00:00:00Z" });
+  images.loras.push({ id: PIC_ID, name: PIC_NAME, sha256: "d".repeat(64), bytes: 777_777, base_model: "flux2-klein-4b", licence: null, source_url: null, classification: "adult-only", trigger_words: [PIC_WORD], strength_default: 1, added_at: "2026-10-17T00:00:00Z" });
   calls = [];
 });
 afterEach(() => { video.restore(); images.restore(); __setComponentsFetchForTests(null); __setVideoStatusForTests(undefined); });
@@ -57,7 +57,7 @@ function stackComponents() {
   }) as never);
 }
 
-const SECRETS = [PIC_NAME, PIC_WORD, PIC_ID, "Hidden example", "777777", "hhhhhhhh", VID_NAME, VID_WORD, "Zebraquill"] as const;
+const SECRETS = [PIC_NAME, PIC_WORD, PIC_ID, "Hidden example", "777777", "dddddddd", VID_NAME, VID_WORD, "Zebraquill"] as const;
 const PAGES = ["/api/pictures/admin", "/api/videos/settings", "/api/components"] as const;
 
 async function setup() {

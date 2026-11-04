@@ -104,7 +104,7 @@ It is the best picture of the clips in this bench, with sound, in a quarter of t
 speech were not tried. **Verdict: needs-more, leaning adopt as a Max-tier video candidate** (4.0 min for 5 s, 14.8 GB): check licence terms (MiniMax-H3 community licence), sound and speech, a 5-prompt
 set, 1536x864, and a 2-stage latent upscale. Not run: BF16 DiT, the 8-step Turbo, the 2x latent upscaler and refiner the video used (no MLX path found).
 
-Second MiniMax clip, run after the capability work (`mm-jake-768x448-5s.mp4`, prompt "Adventure Time cartoon, Jake the Dog and BMO in the Tree Fort, Jake yells DAISY! in a deep goofy voice"): 202 s total, 35.4 s per step, 12.7 GB peak footprint, 124 frames with stereo sound (mean -22.2 dB, peak -6.5 dB).
+Second MiniMax clip, run after the capability work (`mm-jake-768x448-5s.mp4`, prompt "Adventure Time cartoon, Jake the Dog and BMO in the Tree Fort, Jake yells DAISY! in a deep goofy voice"): 202 s total, 35.4 s per step, 12.7 GB peak footprint, 124 frames with stereo sound (mean -22.2 dB, peak -6.5 dB). <!-- prose-lint: allow -->
 Opened frames (`mm-jake-sheet.png`): both characters are right, Jake with his green backpack and a blue BMO with face, arms and legs in a Tree Fort setting, mouths animated, Jake's mouth wide open in the last frame; a better character match than any LTX clip for BMO. Whisper heard "prison", so the shouted word is not confirmed intelligible; the owner must listen.
 Both runs had Low Power Mode off; `pmset` shows no High Power Mode entry. Step times stayed between 34 and 42 s, so no throttling mid-run. The 608x352 fallback was not needed (under 10 minutes). `h3.c` was not tried (needs an owner yes first). The 109 GB MiniMax download is still in `~/video-bench/mm/models`; deleting it needs the owner's yes.
 
@@ -169,7 +169,7 @@ Composition from the prompt is good (kick, saber, spatula); fine action ("formin
 |---|---|
 | Terminator from a reference picture (`ltx-terminator-i2v-bf16`, 768x448, 117 s, 42.8 GB) | yes, a clear gain: a chrome skeletal robot with a red eye walks out of flames and wreckage, the T-800 look the text-only clip (a cartoon) never reached. The reference was the only local stand-in, a frame Wan made; the model keeps its look and adds motion and sound |
 | Voltron, Chuck Norris, Will Smith from a picture | **not run**: no local picture of any of them exists and nothing was downloaded; a stand-in made by the same model would test motion, not likeness |
-| BMO and Finn shouting "DEAN!" and "DAISY!" (`ltx-bmo-finn`, 8 s) | Adventure Time look and Tree Fort are right; two Finns appear (white hat, blue shirt) and no BMO, only a small teal block held between them; mouths open and shouting; audio present (mean -28.3 dB). Words not verifiable (no transcript) |
+| BMO and Finn shouting "DEAN!" and "DAISY!" (`ltx-bmo-finn`, 8 s) | Adventure Time look and Tree Fort are right; two Finns appear (white hat, blue shirt) and no BMO, only a small teal block held between them; mouths open and shouting; audio present (mean -28.3 dB). Words not verifiable (no transcript) | <!-- prose-lint: allow -->
 | Marie Barone, "Poor naive Sarkis. I kinda feel bad for him." (`ltx-marie-sarkis`, 8 s) | the set, light and framing match a 2000s multi-camera sitcom kitchen; an older woman with short white hair in a floral shirt shakes her head and looks down. Audio present (mean -31.6 dB); the line is unverified, and no likeness to a specific person is claimed |
 
 ## LTX tier verdict (q4 against q8 against bf16)
@@ -226,10 +226,10 @@ Whisper only reads words. On laughter, music, rain, traffic and ambience it prin
 | `ltx-marie-sarkis` (bf16) | "Poor naive Sarkis. I kinda feel bad for him." | "Poor naive Snarkers. I'm a little mad friend." | right rhythm, words partly wrong |
 | `ltx-marie-sarkis-q8` | same | "Poor naive Sarkis. I kind of feel bad for him." | right |
 | `ltx-marie-sarkis-q4` | same | "Poor Naive Sarkis. I kind of feel bad for him." | right |
-| `ltx-bmo-finn` (bf16, 8 s) | BMO "DEAN!", Finn "DAISY!", alternating | "game you" | wrong |
-| `ltx-spongebob-patrick`, `-2`, `-3` (bf16, made by the videos session) | Dean and Daisy shouted | "Oh, Daisy! Daisy! Daisy! Daisy! Daisy!"; "Daisy Daisy Daisy"; "Dean. Dean. Daisy. Dean. Daisy." | the third has the alternation; the first two only Daisy |
-| `ltx-bmo-jake` | made by the videos session | "Pain a little bad, through that now! The end." | not scored (prompt not in my files) |
-| `ltx25-calico` (LTX 2.5, separate runtime, videos session) | made by the videos session | "Trade in your Mac Studio for two Collico Critters!" | clear words; spelling of the brand is Whisper's |
+| `ltx-bmo-finn` (bf16, 8 s) | BMO "DEAN!", Finn "DAISY!", alternating | "game you" | wrong | <!-- prose-lint: allow -->
+| `ltx-spongebob-patrick`, `-2`, `-3` (bf16, made by the videos session) | Dean and Daisy shouted | "Oh, Daisy! Daisy! Daisy! Daisy! Daisy!"; "Daisy Daisy Daisy"; "Dean. Dean. Daisy. Dean. Daisy." | the third has the alternation; the first two only Daisy | <!-- prose-lint: allow -->
+| `ltx-bmo-jake` | made by the videos session | "Pain a little bad, through that now! The end." | not scored (prompt not in my files) | <!-- prose-lint: allow -->
+| `ltx25-calico` (LTX 2.5, separate runtime, videos session) | made by the videos session | "Trade in your Mac Studio for two Collico Critters!" | clear words; spelling of the brand is Whisper's | <!-- prose-lint: allow -->
 | `ltx-goldengirls` (bf16), `-q4`, `-q8` | laughter, no words asked | "Thank you." / "Golden girl." / n/a | filler; no evidence |
 | `ltx-spongebob` (bf16), `-q4`, `-q8` | no dialogue asked | "Oh, oh, oh, ..." / "Please don't leave you with Hey" / "And it's a good sign." | q4 and q8 invented words; bf16 made laughter, matching what the owner heard |
 
@@ -276,8 +276,8 @@ Where they do not: flatness puts q8 as noisier than q4, while the owner heard q4
 ## MiniMax-H3 on the owner's use cases, with dialogue (2026-11-02)
 
 Argus INT8 DiT plus Turbo 4-step LoRA, 768x448, 124 frames (5.17 s) with stereo sound, seed 7, 4 denoiser steps, run one at a time under the gate lock, Low Power Mode off. Visual prompts are the same as the earlier `ltx-<slug>` clips plus a new Raymond prompt.
-Every prompt ends with the same two-line dialogue in separate turns (Dean: "Daisy, dinner is ready." then Daisy: "Coming, Dad!", one voice at a time, no laugh track, no music); for Smurfs, Voltron and SpongeBob the father and daughter were made characters of that world (Papa Smurf and Smurfette, a pilot father and daughter, Mr. Krabs and Pearl).
-Wall time includes loading and the streamed text encoder. Frames were opened (`minimax-<slug>-sheet.png`). Whisper transcripts are `minimax-<slug>.txt`. **Voice likeness to a character is not judged here: I cannot hear. Owner verdict on the first MiniMax speech clip (Jake and BMO): the words were gibberish until the last "DAISY!" and the voices did not sound like the characters' normal voices; the LTX-2.3 clips did.** Word accuracy below is from Whisper only.
+Every prompt ends with the same two-line dialogue in separate turns (Dean: "Daisy, dinner is ready." then Daisy: "Coming, Dad!", one voice at a time, no laugh track, no music); for Smurfs, Voltron and SpongeBob the father and daughter were made characters of that world (Papa Smurf and Smurfette, a pilot father and daughter, Mr. Krabs and Pearl). <!-- prose-lint: allow -->
+Wall time includes loading and the streamed text encoder. Frames were opened (`minimax-<slug>-sheet.png`). Whisper transcripts are `minimax-<slug>.txt`. **Voice likeness to a character is not judged here: I cannot hear. Owner verdict on the first MiniMax speech clip (Jake and BMO): the words were gibberish until the last "DAISY!" and the voices did not sound like the characters' normal voices; the LTX-2.3 clips did.** Word accuracy below is from Whisper only. <!-- prose-lint: allow -->
 I do not judge whether a real person's face matches a named person; where a real person was named I describe the picture and leave the likeness to the owner.
 
 | Clip (`minimax-<slug>.mp4`) | Wall | Per step | Peak | Picture (opened frames) | Whisper transcript against the two lines |
@@ -288,10 +288,10 @@ I do not judge whether a real person's face matches a named person; where a real
 | willsmith | 202 s | 32.9 s | 13.1 GB | middle-aged man with a grey goatee in a dark suit walking a city street with a girl, smiling; likeness left to the owner | both lines exact |
 | terminator | 204 s | 33.0 s | 12.6 GB | man with a glowing red cybernetic eye in armour walking out of a burning vehicle: clearly the Terminator character look, a young girl enters at the end | both lines, small wording changes |
 | vader | 207 s | 33.2 s | 12.6 GB | excellent: detailed Vader in a Death Star style corridor, a girl in a pink dress, red saber ignites; the best character match of the set | both lines exact |
-| smurfs | 192 s | 32.1 s | 13.2 GB | modern 3D Smurfs (not the classic 2D look): Smurfette, a white-bearded Smurf, a red-hatted Smurf behind, mushroom village | "Hey Zeezy, dinner is ready. Coming, Dad!" (name misheard) |
+| smurfs | 192 s | 32.1 s | 13.2 GB | modern 3D Smurfs (not the classic 2D look): Smurfette, a white-bearded Smurf, a red-hatted Smurf behind, mushroom village | "Hey Zeezy, dinner is ready. Coming, Dad!" (name misheard) | <!-- prose-lint: allow -->
 | voltron | 187 s | 31.2 s | 13.1 GB | an 80s anime super robot in red and gold with a drawn sword, a boy pilot and an orange-haired girl in the cockpit; a Voltron-like show look but not Voltron | "Daisy, dinner is ready. It's coming, Dad." |
 | spongebob | 199 s | 32.5 s | 12.6 GB | show-accurate: SpongeBob, Mr. Krabs and a blonde girl at the Krusty Krab sign (lettering slightly garbled), a pot steaming | both lines exact |
-| jake-bmo (earlier) | 202 s | 35.4 s | 12.7 GB | Jake and a proper blue BMO with face and limbs in the Tree Fort | "...DAISY!" at the end only; owner: gibberish before it, voices not the characters' |
+| jake-bmo (earlier) | 202 s | 35.4 s | 12.7 GB | Jake and a proper blue BMO with face and limbs in the Tree Fort | "...DAISY!" at the end only; owner: gibberish before it, voices not the characters' | <!-- prose-lint: allow -->
 
 Reading, judged separately (a matching transcript says nothing about picture, voice quality or voice likeness, and a clip is not good because Whisper matched the words):
 - **Words:** Whisper heard both lines in 8 of 9 clips; this only says the words were spoken clearly enough to transcribe.
@@ -303,7 +303,7 @@ Reading, judged separately (a matching transcript says nothing about picture, vo
 
 | Clip | Owner verdict |
 |---|---|
-| `minimax-jake-bmo` | gibberish until the final "DAISY!"; voices not the characters' normal voices (LTX-2.3 clips sounded like the characters) |
+| `minimax-jake-bmo` | gibberish until the final "DAISY!"; voices not the characters' normal voices (LTX-2.3 clips sounded like the characters) | <!-- prose-lint: allow -->
 | `minimax-goldengirls` | "awful", despite word-perfect lines |
 | `minimax-willsmith` | looked pretty good; colour and vibrancy far too intense |
 | `minimax-chucknorris` | looked good but is not him |
@@ -324,7 +324,7 @@ By the numbers MiniMax is about 40 percent more saturated than LTX on the same p
 | Clip, seed 7 | Per step | Wall | Peak | Picture | Whisper |
 |---|---:|---:|---:|---|---|
 | goldengirls, no cache | 30.2 s | 182 s | 13.4 GB | clean | both lines exact |
-| goldengirls, `--block-cache` | 21.1 s | 146 s | 13.0 GB | same layout; faces mushier, colours more saturated, more banding on the table cloth | "Hey, hey, hey, dinner is ready. Coming down!" (words changed) |
+| goldengirls, `--block-cache` | 21.1 s | 146 s | 13.0 GB | same layout; faces mushier, colours more saturated, more banding on the table cloth | "Hey, hey, hey, dinner is ready. Coming down!" (words changed) | <!-- prose-lint: allow -->
 | smurfs, no cache | 32.1 s | 192 s | 13.2 GB | clean | name misheard, otherwise both lines |
 | smurfs, `--block-cache` | 19.2 s | 140 s | 13.2 GB | same layout; slightly posterised, small details softer | "FOX 3" (speech lost) |
 
@@ -378,7 +378,7 @@ Its `generate.py` has no Turbo LoRA option (and no sigma-shift or ffmpeg flags),
 | Build | Wall | Steps (first, then the rest) | Peak footprint | Words (Whisper) | Picture (opened frames) |
 |---|---:|---|---:|---|---|
 | Argus INT8 + Turbo, baseline | 182 s | 30.2 s mean | 13.4 GB | both lines exact | four older people, bright kitchen |
-| PipeNetwork 8-bit, no LoRA | 434 s | 93.7, then 25.5, 21.6, 21.5 s | 113.1 GB | "Easy dinner is ready. Coming, Dad!" | coherent: a man and three women eating cheesecake at a patterned tablecloth; darker, with an odd quilted-leather wall; no flicker seen |
+| PipeNetwork 8-bit, no LoRA | 434 s | 93.7, then 25.5, 21.6, 21.5 s | 113.1 GB | "Easy dinner is ready. Coming, Dad!" | coherent: a man and three women eating cheesecake at a patterned tablecloth; darker, with an odd quilted-leather wall; no flicker seen | <!-- prose-lint: allow -->
 | PipeNetwork 6-bit, no LoRA | 323 s | 60.8, then 20.2, 34.8, 24.4 s | 113.0 GB | "Daisy, dinner is ready. Coming, Dad." | the same layout and cast, candles on the shelf, same quilted wall; coherent |
 
 Reading:
@@ -429,13 +429,13 @@ The three refine steps take 7 to 12 s at 512x288 (Smurfs 7, rain 10, Marie 11), 
 
 ### SpongeBob and Patrick turn by turn, and LTX-2.3 against LTX-2.5 for cartoon recall (2026-11-02)
 
-Prompt: the videos session's turn-by-turn SpongeBob and Patrick prompt (DEAN! then DAISY!, alternating, one voice at a time), seed 7, 121 frames.
+Prompt: the videos session's turn-by-turn SpongeBob and Patrick prompt (DEAN! then DAISY!, alternating, one voice at a time), seed 7, 121 frames. <!-- prose-lint: allow -->
 
 | Model | Size | Tool time | Peak | Whisper | Picture (opened frames) |
 |---|---|---:|---:|---|---|
-| LTX-2.5 q8 `--distilled` | 512x288 | 26.6 s | 25.4 GB footprint | "Deanne! Daisy! Deanne! Daisy! Daisy!" | show-accurate SpongeBob and Patrick, speaker's mouth moves, the other's is closed |
-| LTX-2.5 q8 | 640x352 | 37.4 s | 32.5 GB | "Deanne! Daisy! Deanne! Daisy!" | same, plain sea background |
-| LTX-2.5 q8 | 768x448 | 58.7 s | 45.9 GB | "Deanne! Daisy! Deanne! Daisy!" | same, with the pineapple house |
+| LTX-2.5 q8 `--distilled` | 512x288 | 26.6 s | 25.4 GB footprint | "Deanne! Daisy! Deanne! Daisy! Daisy!" | show-accurate SpongeBob and Patrick, speaker's mouth moves, the other's is closed | <!-- prose-lint: allow -->
+| LTX-2.5 q8 | 640x352 | 37.4 s | 32.5 GB | "Deanne! Daisy! Deanne! Daisy!" | same, plain sea background | <!-- prose-lint: allow -->
+| LTX-2.5 q8 | 768x448 | 58.7 s | 45.9 GB | "Deanne! Daisy! Deanne! Daisy!" | same, with the pineapple house | <!-- prose-lint: allow -->
 | LTX-2.3 bf16 | 512x320 | 42.7 s | 40.0 GB (MLX counter) | "T helemaal" | show-accurate, pineapple house |
 | LTX-2.3 bf16 | 640x384 | 48.7 s | 40.1 GB (MLX counter) | garbled | show-accurate, house door |
 
@@ -470,7 +470,7 @@ Fork runtime, MrMofer q8 `--distilled`, seed 7, one at a time under the gate. Cl
 
 | Prompt | Tool time | MLX peak | Footprint | rss max | Loudness | Whisper |
 |---|---:|---:|---:|---:|---:|---|
-| SpongeBob and Patrick, three turns each (`sb10`) | 42.9 s | 22.45 GB | 39.4 GB | 20.0 GB | -10.7 LUFS | "Dan! Daisy. Dan! Daisy. Dan! Daisy! Daisy!" (three turns, right order, one extra Daisy) |
+| SpongeBob and Patrick, three turns each (`sb10`) | 42.9 s | 22.45 GB | 39.4 GB | 20.0 GB | -10.7 LUFS | "Dan! Daisy. Dan! Daisy. Dan! Daisy! Daisy!" (three turns, right order, one extra Daisy) | <!-- prose-lint: allow -->
 | Papa Smurf and Smurfette, four lines (`smurfs10`) | 43.4 s | 22.45 GB | 39.4 GB | 20.0 GB | -17.0 LUFS | "Smurfette, dinner is ready. Coming, Papa. Hurry, the soup is hot. I am hungry." plus the instruction "Never both talking at once." spoken aloud |
 
 10 s costs about 1.7 times the 5 s clip's time (43 against 27 to 31 s) and 14 GB more footprint (39.4 against 25.3 GB). Frames: the Smurfs clip is clean across the 10 s; the SpongeBob clip shows the pineapple house merged into SpongeBob's head like a hat and one smeared eye.

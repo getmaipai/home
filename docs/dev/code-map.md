@@ -584,7 +584,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/install.ts` | INSTALL_KIND, INSTALL_TITLE, ISSUE_SOURCE, LICENCE_STEP_LINE, SHARED_SCREEN_LINE, NOT_LTX_LINE |
 | `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
-| `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras |
+| `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
 | `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
@@ -741,7 +741,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/persona.ts` | personaFromManifest, PERSONAS, reloadPersonas, __reloadPersonasForTests, PERSONA_IDS, DEFAULT_PERSONA_ID |
 | `backend/src/lib/personaIds.ts` | LIVE_PERSONA_IDS |
 | `backend/src/lib/personaJudge.ts` | judgePersonaConsistency |
-| `backend/src/lib/pictures/adapters.ts` | __resetAdapterCacheForTests, dropAdapterCache, allAdapters, adaptersFor, setAdapterEnabled, forgetAdapterPref |
+| `backend/src/lib/pictures/adapters.ts` | __resetAdapterCacheForTests, dropAdapterCache, allAdapters, adaptersFor, setAdapterEnabled, updatePictureRecord |
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |

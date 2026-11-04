@@ -11,7 +11,7 @@ Everything it remembers stays on your hub. It never goes anywhere else.
 
 A few standing facts about you are always in mind: who you are, and how you want your answers. For example, "Sage is a nurse" or "Sage wants short answers". Up to eight of these are shown to the assistant on every message, each with the date it learned the fact.
 
-Everything else is looked up only when your message is about it. A note about your kid's school, a trip, or how your week is going stays out of the way until you ask about it. The assistant is told to use a fact only when it changes the answer, and never to bring something up just because it knows it.
+Everything else is looked up only when your message is about it. A note about your kid's school, a trip, or your week stays out of the way until you ask about it. The assistant uses a fact only when it changes the answer. It never brings something up just because it knows it.
 
 A note you ask it to keep is always saved. Say "make a note that..." or "remember that..." and it goes in, no matter what. Each saved fact keeps the date it was learned, and a fact about one day (a visit, a game) drops out of the lookup a couple of days after that day.
 

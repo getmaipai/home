@@ -7,10 +7,11 @@
 // was `pending` (added, not yet confirmed) keeps its pending state as an unacknowledged licence until an admin opens it.
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people, videoAdapterPrefs } from "@/db/schema";
+import { people, pictureAdapterPrefs, videoAdapterPrefs } from "@/db/schema";
 import { ALL_BASE_IDS, type BaseId } from "@/lib/loras/baseFamilies";
 import { deleteLoraRecord, getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
 import { clipsUsingStyle } from "@/lib/loras/usage";
+import { patchLora, type StackLora } from "@/lib/pictures/stack";
 import { StackVideoError, listVideoLoras, removeVideoLora, updateVideoLora, type StackVideoLora } from "@/lib/videos/stack";
 
 const SYNC_MS = 10_000;
@@ -20,8 +21,9 @@ type Base = BaseId;
 
 let lastSync = 0;
 let inflight: Promise<void> | null = null;
+let picturesInflight: Promise<void> | null = null;
 export function dropLoraSyncCache(): void { lastSync = 0; }
-export function __resetLoraSyncForTests(): void { lastSync = 0; inflight = null; }
+export function __resetLoraSyncForTests(): void { lastSync = 0; inflight = null; picturesInflight = null; }
 
 /** The household owner: the admin a migrated record names when the old row named nobody usable. */
 function ownerId(): string | null {
@@ -53,12 +55,14 @@ function sourceOf(url: string | null): Lora["source"] {
 const iso = (value: string | undefined, fallback: string): string => { const t = Date.parse(value ?? ""); return Number.isNaN(t) ? fallback : new Date(t).toISOString(); };
 
 /** The `Lora` record of a Stack file that has none yet, or null when the file cannot be made into a valid one (no owner to name, a malformed hash). */
-export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean; updatedBy: string | null } | null, fallbackAdmin: string | null, now = new Date().toISOString()): Lora | null {
+export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean; updatedBy: string | null } | null, fallbackAdmin: string | null, now = new Date().toISOString(), media: "video" | "picture" = "video"): Lora | null {
   const sha = String(stack.sha256 ?? "").toLowerCase();
   if (!/^[a-f0-9]{64}$/.test(sha) || !fallbackAdmin) return null;
-  const pending = pref?.updatedBy === "pending";
-  const confirmer = pref?.updatedBy && PERSON.test(pref.updatedBy) ? pref.updatedBy : fallbackAdmin;
-  const base: Base | "unknown" = (BASES as readonly string[]).includes(stack.base_model) ? (stack.base_model as Base) : "unknown";
+  const addedBy = /^added:(.+)$/.exec(pref?.updatedBy ?? "")?.[1] ?? null;
+  const pending = pref?.updatedBy === "pending" || (media === "picture" && addedBy !== null && pref?.enabled === false);
+  const confirmer = pref?.updatedBy && PERSON.test(pref.updatedBy) ? pref.updatedBy : addedBy ?? fallbackAdmin;
+  // The spec's base list is the video engines only; a picture style's model family stays a fact the Stack owns (read at use, never copied here).
+  const base: Base | "unknown" = media === "video" && (BASES as readonly string[]).includes(stack.base_model) ? (stack.base_model as Base) : "unknown";
   const def = Math.min(2, Math.max(0, Number.isFinite(stack.strength_default) ? stack.strength_default : 1));
   const addedAt = iso(stack.added_at, now);
   const adultOnly = stack.classification !== "all-ages";
@@ -67,7 +71,7 @@ export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean;
     name: (stack.name ?? "").trim().slice(0, 80) || stack.id,
     kind: "style",
     description: "",
-    media: "video",
+    media,
     source: sourceOf(stack.source_url),
     file: { sha256: sha, bytes: Math.min(4_294_967_296, Math.max(1, Math.floor(stack.bytes || 1))), rank: Number.isInteger(stack.rank) && (stack.rank as number) >= 1 ? (stack.rank as number) : null, modules: [], format: "safetensors" },
     base_model: base,
@@ -79,7 +83,8 @@ export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean;
     audience: adultOnly ? "adult-only" : "all-ages",
     audience_set_by: adultOnly ? null : confirmer,
     audience_set_at: adultOnly ? null : addedAt,
-    availability: { who: "admins", people: [] },
+    // A video style migrates admin-only (the owner's 2026-11-02 rule). A picture style keeps what the household had: on for adults unless it was switched off.
+    availability: { who: media === "picture" && pref?.enabled !== false ? "adults" : "admins", people: [] },
     added_by: stack.added_by && PERSON.test(stack.added_by) ? stack.added_by : fallbackAdmin,
     added_at: addedAt,
     licence: { id: (stack.licence ?? "").slice(0, 80) || null, text: null, commercial_use: "unknown", acknowledged_by: pending ? null : confirmer, acknowledged_at: pending ? null : addedAt },
@@ -87,7 +92,7 @@ export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean;
     removed_at: null,
     trash_until: null,
     last_check: null,
-    provenance: { origin: "migration", job_id: null },
+    provenance: { origin: media === "picture" && addedBy !== null ? "file" : "migration", job_id: null },
     created_at: now,
     updated_at: now,
     hlc: "0:0:migrate",
@@ -143,4 +148,36 @@ export async function syncLoras(force = false): Promise<void> {
   if (!force && Date.now() - lastSync < SYNC_MS) return;
   if (!inflight) inflight = run().finally(() => { inflight = null; });
   await inflight;
+}
+
+/**
+ * VIDEO-LORA-12: the picture styles join the same table. Every Stack picture style that has no record gets one (the old `picture_adapter_prefs` row folded in, then
+ * deleted), and a record that is adult-only is never all-ages on the Stack (the second lock, written by Home). Never throws: a file that cannot be made a valid
+ * record stays unlisted and so unusable (fail closed).
+ */
+export async function adoptPictureLoras(stack: readonly StackLora[], addedBy: string | null = null): Promise<void> {
+  // Calls run one after another: a call that names who just added a style must not be answered by an earlier call that never heard of it.
+  const before = picturesInflight ?? Promise.resolve();
+  const mine: Promise<void> = (async () => {
+    await before.catch(() => undefined);
+    const prefs = new Map(db.select().from(pictureAdapterPrefs).all().map((row) => [row.adapterId, row]));
+    const owner = ownerId();
+    for (const s of stack) {
+      const have = getLoraRecord(s.id);
+      if (!have) {
+        // A style an admin just added starts switched off and unconfirmed, whatever the old row says.
+        const pref = addedBy ? { enabled: false, updatedBy: `added:${addedBy}` } : prefs.get(s.id) ?? null;
+        const made = recordFromStack(s as unknown as StackVideoLora, pref, owner, undefined, "picture");
+        if (!made) continue;
+        try {
+          saveLora(made, "migration");
+          db.delete(pictureAdapterPrefs).where(eq(pictureAdapterPrefs.adapterId, s.id)).run();
+        } catch (error) { console.warn(`[loras] picture style ${s.id} could not be adopted and stays unlisted: ${(error as Error).message}`); }
+      } else if (have.media === "picture" && have.audience === "adult-only" && s.classification === "all-ages") {
+        await patchLora(s.id, { classification: "adult-only" }).catch(() => undefined);
+      }
+    }
+  })();
+  picturesInflight = mine;
+  return mine.finally(() => { if (picturesInflight === mine) picturesInflight = null; });
 }

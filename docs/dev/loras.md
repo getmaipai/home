@@ -118,6 +118,15 @@ every admin route; an adult not marked saw only the all-ages style and no locked
 the owner saw one locked tile without a proof and the style with it; PATCH, nsfw, all-ages, remove and restore on the adult-only style answered 404 (the missing
 id's body) without a proof and 200 with it; no response without a proof held its name, trigger word, hash or id.
 
+## Pictures on the record (VIDEO-LORA-12)
+
+The Stack's picture styles are `Lora` records with `media: "picture"` in the same `loras` table; `picture_adapter_prefs` is no longer written. `lib/pictures/adapters.ts`
+joins each record to the Stack's list (the Stack keeps the model family, which the spec's base list does not cover, so `base_model` is read from the Stack at use and
+the record holds `unknown`). `adoptPictureLoras` in `lib/loras/sync.ts` makes a record for any Stack picture style that has none and folds in and deletes the old row: a
+style that was on (or had no row) becomes `availability.who: "adults"`, as before; one switched off becomes `admins`; one added and never confirmed keeps an
+unacknowledged licence (shown as "needs confirmation"). Turning a style on is the confirmation. A file with no valid record (a malformed hash, a second copy of one
+file) is not offered. Minors and adult-only access for pictures stay as built until ADULT-LOCK-07.
+
 ## One table of bases
 
 `backend/src/lib/loras/baseFamilies.ts` is the only place that names a model base, its Civitai labels (`LTXV2` sits on the LTX family row), its text patterns and whether it is supported on this install (`supportedBaseIds()`, fed by `setInstalledBasesProvider`); the browser, install, sync and routes read it.
