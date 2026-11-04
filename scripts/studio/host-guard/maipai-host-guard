@@ -1,0 +1,282 @@
+#!/bin/bash
+# MaiPai host guard. A root LaunchDaemon (com.maipai.host-guard) runs `maipai-host-guard run` every 60 seconds.
+#
+# Why: on 2026-10-26, 10-30 and 11-03 the Studio lost its user lookup service (getpwuid "does not exist") and its Metal shader
+# compiler (MTLCompilerService). sudo, shutdown, launchctl reboot and every new engine start then failed, and the only way out was
+# a hard power cycle. Root can still reboot, so this daemon probes, captures evidence once, and reboots the Mac by itself.
+# Record: docs/design/host-guard-2026-11-03.md (HOST-GUARD-01).
+#
+#   maipai-host-guard run                 one probe pass (the daemon calls this)
+#   maipai-host-guard status              print status.json
+#   maipai-host-guard mode off|dry|live   dry logs "would reboot" only; live reboots; off does nothing (writes tuning.json)
+#   maipai-host-guard capture             take the evidence bundle now (no reboot)
+#   maipai-host-guard uninstall           remove the daemon, the sudoers entry and this script (captures stay)
+#
+# Files in $STATE (default /var/db/maipai-host-guard):
+#   config.json   root-owned, written by the installer: {"owner":"<account>","uid":<n>,"data_dir":"<path>"}. Never changed by Home.
+#   tuning.json   written by Home (the Settings keys host.guard.*): {"mode","hard_minutes","metal_minutes","max_reboots_per_12h"}.
+#                 Every value is clamped to the ranges below and anything else is ignored. A root process never takes an account,
+#                 a path or a command from a file the user can write.
+#   status.json   world-readable, written after every pass. Schema version 1:
+#                 {"version":1,"owner","checked_at","mode","lookup","spawn","metal","hard_fails","metal_fails","uptime_s","note"}
+#   last-reboot.txt, reboots, captures/<stamp>/ (root-only, never read by Home), telemetry.csv (world-readable trend numbers).
+#
+# Safety: nothing for 15 minutes after boot; never reboots while a ship or install runs (up to 45 minutes); a Metal-only failure also
+# waits for a quiet moment (up to 30 more minutes); at most max_reboots_per_12h reboots; every reboot writes last-reboot.txt.
+set -u
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+# The test seams (MAIPAI_HG_*) are honored only when MAIPAI_HG_TEST=1, so a stray variable can never steer the root daemon.
+if [[ "${MAIPAI_HG_TEST:-}" != 1 ]]; then
+  unset MAIPAI_HG_STATE MAIPAI_HG_LOG MAIPAI_HG_SHUTDOWN MAIPAI_HG_REBOOT MAIPAI_HG_MIN_UPTIME MAIPAI_HG_DEFER_MAX MAIPAI_HG_QUIET_MAX \
+    MAIPAI_HG_REBOOT_WINDOW MAIPAI_HG_STACK_URL MAIPAI_HG_USER MAIPAI_HG_UID MAIPAI_HG_DATA MAIPAI_HG_NO_ASUSER MAIPAI_HG_FORCE MAIPAI_HG_QUIET \
+    MAIPAI_HG_CAPTURE_LIGHT MAIPAI_HG_NO_TELEMETRY MAIPAI_HG_HARD_LIMIT MAIPAI_HG_METAL_LIMIT MAIPAI_HG_MAX_REBOOTS MAIPAI_HG_FORCE_DELAY
+fi
+SELF="${BASH_SOURCE[0]}"
+
+STATE="${MAIPAI_HG_STATE:-/var/db/maipai-host-guard}"
+LOG="${MAIPAI_HG_LOG:-/var/log/maipai-host-guard.log}"
+SELF_PATH="/usr/local/libexec/maipai-host-guard"
+PLIST="/Library/LaunchDaemons/com.maipai.host-guard.plist"
+SUDOERS="/etc/sudoers.d/maipai-host-guard"
+SHUTDOWN_CMD="${MAIPAI_HG_SHUTDOWN:-/sbin/shutdown}"
+REBOOT_CMD="${MAIPAI_HG_REBOOT:-/sbin/reboot}"
+MIN_UPTIME="${MAIPAI_HG_MIN_UPTIME:-900}"
+DEFER_MAX="${MAIPAI_HG_DEFER_MAX:-2700}"
+QUIET_MAX="${MAIPAI_HG_QUIET_MAX:-1800}"
+REBOOT_WINDOW="${MAIPAI_HG_REBOOT_WINDOW:-43200}"
+STACK_URL="${MAIPAI_HG_STACK_URL:-http://127.0.0.1:8770}"
+FORCE_DELAY="${MAIPAI_HG_FORCE_DELAY:-150}"
+
+now() { date +%s; }
+stamp() { date '+%Y-%m-%d %H:%M:%S'; }
+log() { printf '%s %s\n' "$(stamp)" "$*" >> "$LOG" 2>/dev/null; }
+read_int() { local v; v="$(cat "$1" 2>/dev/null)"; [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo 0; }
+# with_timeout SECONDS CMD...: SIGALRM ends the command; exit status 142 means it timed out.
+# The command runs in its own process group and the whole group is killed on timeout, so a hung child cannot keep a pipe open.
+with_timeout() {
+  local s="$1"; shift
+  /usr/bin/perl -e 'my $t = shift; my $pid = fork(); if (!$pid) { setpgrp(0, 0); exec @ARGV or exit 127 } $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 142 }; alarm $t; waitpid($pid, 0); exit($? >> 8);' "$s" "$@"
+}
+jget() { /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null; }
+clamp() { # value min max default
+  local v="$1"; [[ "$v" =~ ^[0-9]{1,6}$ ]] || { echo "$4"; return; }
+  v=$((10#$v))
+  (( v < $2 )) && { echo "$2"; return; }; (( v > $3 )) && { echo "$3"; return; }; echo "$v"
+}
+
+# --- trusted config (root-owned) and clamped tuning (Home-written) ---
+OWNER=""; OWNER_UID=""; DATA="/usr/local/maipai-home/data"
+load_config() {
+  local c="$STATE/config.json" v
+  OWNER="${MAIPAI_HG_USER:-$(jget "$c" owner)}"; OWNER_UID="${MAIPAI_HG_UID:-$(jget "$c" uid)}"
+  v="${MAIPAI_HG_DATA:-$(jget "$c" data_dir)}"; [[ -n "$v" ]] && DATA="$v"
+  [[ "$OWNER" =~ ^[A-Za-z0-9._-]+$ && "$OWNER_UID" =~ ^[0-9]+$ ]] || return 1
+  if [[ -n "${MAIPAI_HG_NO_ASUSER:-}" ]]; then LAUNCH=(); else
+    # `launchctl asuser` joins the owner's session but stays uid 0, so `sudo -u` drops to the owner (which also exercises the user lookup).
+    LAUNCH=(/bin/launchctl asuser "$OWNER_UID" /usr/bin/sudo -n -u "$OWNER" --)
+  fi
+}
+load_tuning() {
+  local t="$STATE/tuning.json" m
+  m="$(jget "$t" mode)"; case "$m" in off|dry|live) MODE="$m" ;; *) MODE="$(cat "$STATE/mode" 2>/dev/null)"; case "$MODE" in off|dry|live) ;; *) MODE=dry ;; esac ;; esac
+  HARD_LIMIT="$(clamp "${MAIPAI_HG_HARD_LIMIT:-$(jget "$t" hard_minutes)}" 2 30 3)"
+  METAL_LIMIT="$(clamp "${MAIPAI_HG_METAL_LIMIT:-$(jget "$t" metal_minutes)}" 5 120 10)"
+  MAX_REBOOTS="$(clamp "${MAIPAI_HG_MAX_REBOOTS:-$(jget "$t" max_reboots_per_12h)}" 0 3 2)"
+}
+
+JXA='ObjC.import("Metal");
+var d = $.MTLCreateSystemDefaultDevice();
+if (!d || d.isNil()) { console.log("NODEVICE"); } else {
+  var e = Ref();
+  var lib = d.newLibraryWithSourceOptionsError("// '"$$"'-'"$(now)"'\nkernel void k(device float *a [[buffer(0)]], uint i [[thread_position_in_grid]]) { a[i] = a[i] + 1.0; }", $(), e);
+  console.log((!lib || lib.isNil()) ? "FAIL " + ObjC.unwrap(e[0].localizedDescription) : "OK");
+}'
+
+ms() { /usr/bin/perl -MTime::HiRes=time -e 'print int(time*1000)'; }
+
+probe_lookup() {
+  [[ "${MAIPAI_HG_FORCE:-}" == *lookup* ]] && { NOTE_L="forced"; return 1; }
+  local a b
+  a="$(with_timeout 25 /usr/bin/dscl . -read "/Users/$OWNER" UniqueID 2>&1 | tail -n 1)"
+  b="$(with_timeout 25 /usr/bin/id -u "$OWNER" 2>/dev/null | tail -n 1)"
+  NOTE_L="dscl='${a//$'\n'/ }' id='${b//$'\n'/ }'"
+  [[ "$a" == "UniqueID: $OWNER_UID" && "$b" == "$OWNER_UID" ]]
+}
+# Run a command in the owner's session: stdout to a file (the last line is the answer), stderr apart, and the exit status in RC.
+as_owner() { # seconds cmd...
+  local s="$1" out="$STATE/.probe.out"; shift
+  with_timeout "$s" ${LAUNCH[@]+"${LAUNCH[@]}"} "$@" >"$out" 2>"$STATE/.probe.err"; RC=$?
+  ANSWER="$(tail -n 1 "$out" 2>/dev/null)"; ERRTEXT="$(head -c 300 "$STATE/.probe.err" 2>/dev/null | tr '\n' ' ')"
+  # osascript prints console.log to stderr, so the Metal verdict is the one line that is exactly OK, NODEVICE or FAIL ..., from either stream.
+  VERDICT="$(cat "$out" "$STATE/.probe.err" 2>/dev/null | grep -E '^(OK|NODEVICE|FAIL )' | tail -n 1)"
+}
+sudo_is_broken() { [[ "$ERRTEXT" == *sudoers* || "$ERRTEXT" == *"syntax error"* || "$ERRTEXT" == *"parse error"* ]]; }
+probe_spawn() {
+  [[ "${MAIPAI_HG_FORCE:-}" == *spawn* ]] && { NOTE_S="forced"; return 1; }
+  as_owner 30 /usr/bin/id -un
+  NOTE_S="rc=$RC ${ANSWER} ${ERRTEXT}"
+  if (( RC != 0 )) && sudo_is_broken; then NOTE_S="sudo is broken (a sudoers file has an error); not counted: $ERRTEXT"; return 2; fi
+  [[ "$ANSWER" == "$OWNER" ]]
+}
+# One Metal compile through the same compiler service the engines use (the Stack's hostProbe.ts compiles the same shader; scripts/hostGuard.test.ts keeps the two texts equal).
+probe_metal() {
+  [[ "${MAIPAI_HG_FORCE:-}" == *metal* ]] && { NOTE_M="forced"; return 1; }
+  as_owner 45 /usr/bin/osascript -l JavaScript -e "$JXA"
+  NOTE_M="rc=$RC ${VERDICT:-no answer} ${ERRTEXT}"
+  [[ $RC -eq 0 && ( "$VERDICT" == "OK" || "$VERDICT" == "NODEVICE" ) ]]
+}
+has_session() { [[ -n "${MAIPAI_HG_NO_ASUSER:-}" ]] || with_timeout 15 /bin/launchctl print "gui/$OWNER_UID" >/dev/null 2>&1; }
+
+boot_age() {
+  local b; b="$(/usr/sbin/sysctl -n kern.boottime 2>/dev/null | sed -n 's/^{ sec = \([0-9]*\),.*/\1/p')"
+  [[ "$b" =~ ^[0-9]+$ ]] && echo $(( $(now) - b )) || echo 999999
+}
+ship_running() {
+  local pid; pid="$(cat "$DATA/ship.lock.d/pid" 2>/dev/null)"
+  if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then return 0; fi
+  /usr/bin/pgrep -f '/usr/local/libexec/maipai-(install|promote)' >/dev/null 2>&1
+}
+# A Metal-only failure keeps the running engines answering, so it waits for no chat turn or job in flight.
+stack_quiet() {
+  [[ -n "${MAIPAI_HG_QUIET:-}" ]] && { [[ "$MAIPAI_HG_QUIET" == yes ]]; return; }
+  local o; o="$(with_timeout 5 /usr/bin/curl -s -m 4 "$STACK_URL/stack/v1/memory" 2>/dev/null)"
+  [[ -z "$o" ]] && return 0   # the Stack does not answer: nothing is in flight
+  [[ "$o" == *'"queue_depth":{"reserved":0,"warm":0,"burst":0}'* ]]
+}
+
+write_status() { # lookup spawn metal hard metal_fails note
+  local tmp="$STATE/status.json.tmp" note="$6"
+  note="$(printf '%s' "$note" | tr -d '\\\001-\037' | cut -c1-400)"
+  printf '{"version":1,"owner":"%s","checked_at":%s,"mode":"%s","lookup":"%s","spawn":"%s","metal":"%s","hard_fails":%s,"metal_fails":%s,"uptime_s":%s,"note":"%s"}\n' \
+    "${OWNER:-}" "$(now)" "$MODE" "$1" "$2" "$3" "$4" "$5" "$(boot_age)" "$note" > "$tmp" && mv "$tmp" "$STATE/status.json" && chmod 644 "$STATE/status.json"
+}
+
+# One CSV row per pass: the numbers that tell the candidate causes apart (kernel zones, vnodes, ports, daemon sizes, engine sizes, probe times).
+telemetry() { # lookup_ms metal_ms
+  local f="$STATE/telemetry.csv" z vm wired comp avail p
+  [[ -s "$f" ]] || echo "ts,uptime_s,load1,wired_gb,compressor_gb,swap_gb,avail_pct,vnodes,sandbox_sandboxes,sandbox_profiles,ipc_ports,ipc_kmsgs,proc_task,threads,fileproc,procs,launchd_rss_mb,od_rss_mb,logd_rss_mb,splash_gb,llama_gb,lookup_ms,metal_ms" > "$f"
+  z="$(/usr/bin/zprint 2>/dev/null)"; vm="$(/usr/bin/vm_stat)"
+  zi() { echo "$z" | awk -v n="$1" '$1==n{print $(NF-2)}' | head -1; }
+  wired="$(echo "$vm" | awk '/wired down/{gsub("\\.","",$4);printf "%.1f",$4*16384/2^30}')"
+  comp="$(echo "$vm" | awk '/occupied by compressor/{gsub("\\.","",$5);printf "%.1f",$5*16384/2^30}')"
+  rss() { /bin/ps -o rss= -p "$1" 2>/dev/null | awk '{printf "%.0f",$1/1024}'; }
+  fp() { local t=0 g; for p in $(/usr/bin/pgrep -x "$1"); do g="$(/usr/bin/footprint "$p" 2>/dev/null | sed -n 2p | sed -E 's/.*Footprint: ([0-9.]+) ([GM]B).*/\1 \2/' | awk '{print ($2=="MB")?$1/1024:$1}')"; t="$(echo "$t ${g:-0}" | awk '{print $1+$2}')"; done; echo "$t"; }
+  echo "$(now),$(boot_age),$(/usr/sbin/sysctl -n vm.loadavg | awk '{print $2}'),$wired,$comp,$(/usr/sbin/sysctl -n vm.swapusage | awk '{gsub("M","",$6);printf "%.1f",$6/1024}'),$(/usr/sbin/sysctl -n kern.memorystatus_level),$(/usr/sbin/sysctl -n kern.num_vnodes),$(zi sandbox.sandboxes),$(zi sandbox.profiles),$(zi ipc.ports),$(zi ipc.kmsgs),$(zi proc_task),$(zi threads),$(zi fileproc),$(/bin/ps -ax | wc -l | tr -d ' '),$(rss 1),$(rss "$(/usr/bin/pgrep -x opendirectoryd | head -1)"),$(rss "$(/usr/bin/pgrep -x logd | head -1)"),$(fp splash),$(fp llama-server),$1,$2" >> "$f"
+  chmod 644 "$f"
+  [[ $(stat -f %z "$f" 2>/dev/null || echo 0) -gt 5000000 ]] && { tail -n 20000 "$f" > "$f.tmp"; head -1 "$f" | cat - "$f.tmp" > "$f.new"; mv "$f.new" "$f"; rm -f "$f.tmp"; }
+}
+
+capture() {
+  local dir="$STATE/captures/$(date +%Y%m%d-%H%M%S)" sd="" p
+  mkdir -p "$dir" && chmod 700 "$dir"
+  log "capture: start $dir"
+  # Root-only evidence for the lookup failure: nothing here is read or shown by Home. ps lists names only (no arguments).
+  if [[ -z "${MAIPAI_HG_CAPTURE_LIGHT:-}" ]]; then ( with_timeout 240 /usr/bin/sysdiagnose -f "$dir" -b -u -n -Q >"$dir/sysdiagnose.out" 2>&1 ) & sd=$!; fi
+  { echo "uptime: $(/usr/bin/uptime)"; /usr/sbin/sysctl vm.swapusage iogpu.wired_limit_mb kern.memorystatus_level kern.boottime kern.num_vnodes kern.maxvnodes 2>&1; } >"$dir/system.txt"
+  with_timeout 20 /usr/bin/vm_stat >"$dir/vm_stat.txt" 2>&1
+  with_timeout 30 /usr/bin/memory_pressure >"$dir/memory_pressure.txt" 2>&1
+  with_timeout 20 /bin/ps -axo pid,ppid,etime,pcpu,pmem,rss,state,comm >"$dir/ps.txt" 2>&1
+  with_timeout 30 /usr/bin/top -l 1 -n 30 -o mem >"$dir/top.txt" 2>&1
+  with_timeout 30 /usr/bin/zprint >"$dir/zprint.txt" 2>&1
+  { echo "--- dscl"; with_timeout 15 /usr/bin/dscl . -read "/Users/$OWNER" UniqueID; echo "--- id"; with_timeout 15 /usr/bin/id "$OWNER"; echo "--- spawn"; with_timeout 20 ${LAUNCH[@]+"${LAUNCH[@]}"} /usr/bin/id -un; echo "--- metal"; with_timeout 30 ${LAUNCH[@]+"${LAUNCH[@]}"} /usr/bin/osascript -l JavaScript -e "$JXA"; } >"$dir/probes.txt" 2>&1
+  with_timeout 30 /bin/launchctl print system 2>&1 | head -150 >"$dir/launchctl-system.txt"
+  with_timeout 30 /bin/launchctl print "gui/$OWNER_UID" 2>&1 | head -150 >"$dir/launchctl-gui.txt"
+  for p in $(/usr/bin/pgrep -x splash; /usr/bin/pgrep -x llama-server); do with_timeout 30 /usr/bin/footprint "$p" >>"$dir/footprint.txt" 2>&1; done
+  [[ -z "${MAIPAI_HG_CAPTURE_LIGHT:-}" ]] && with_timeout 60 /usr/sbin/spindump opendirectoryd 3 -file "$dir/spindump-opendirectoryd.txt" >/dev/null 2>&1
+  with_timeout 90 /usr/bin/log show --last 15m --style compact --predicate 'process == "launchd" OR process == "opendirectoryd" OR process == "MTLCompilerService" OR process == "kernel"' 2>&1 | grep -E ' (E|F) ' | head -3000 >"$dir/system-errors.txt"
+  [[ -n "$sd" ]] && wait "$sd" 2>/dev/null
+  echo "$(basename "$dir")" > "$STATE/last-capture"; chmod 644 "$STATE/last-capture"
+  find "$STATE/captures" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + 2>/dev/null
+  log "capture: done $dir"
+}
+
+do_reboot() { # reason
+  echo "$(now) $1" >> "$STATE/reboots"
+  { echo "$(stamp) $1"; echo "capture: $(cat "$STATE/last-capture" 2>/dev/null)"; } > "$STATE/last-reboot.txt"; chmod 644 "$STATE/last-reboot.txt" "$STATE/reboots"
+  log "REBOOT: $1"
+  "$SHUTDOWN_CMD" -r now "MaiPai host guard: $1" >>"$LOG" 2>&1
+  # Foreground on purpose: launchd kills this job's process group when the script exits, so a background fallback would never run.
+  sleep "$FORCE_DELAY"; log "graceful shutdown did not finish; forcing"; "$REBOOT_CMD" -q >>"$LOG" 2>&1
+}
+recent_reboots() {
+  local cutoff=$(( $(now) - REBOOT_WINDOW )) n=0 t
+  while read -r t _; do [[ "$t" =~ ^[0-9]+$ && $t -ge $cutoff ]] && n=$((n+1)); done < "$STATE/reboots" 2>/dev/null
+  echo "$n"
+}
+
+cmd_run() {
+  mkdir -p "$STATE/captures"; chmod 755 "$STATE"; touch "$STATE/reboots"; chmod 644 "$STATE/reboots"
+  [[ -f "$LOG" ]] && [[ $(stat -f %z "$LOG" 2>/dev/null || echo 0) -gt 1048576 ]] && tail -n 2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+  load_tuning
+  if ! load_config; then MODE=off; write_status - - - 0 0 "config.json missing or invalid"; log "config.json missing or invalid"; return 0; fi
+  if [[ "$MODE" == off ]]; then rm -f "$STATE/hard" "$STATE/metal" "$STATE/episode"; write_status - - - 0 0 "mode off"; return 0; fi
+  local up; up="$(boot_age)"
+  if (( up < MIN_UPTIME )); then rm -f "$STATE/hard" "$STATE/metal" "$STATE/episode"; write_status - - - 0 0 "settling after boot ($up s)"; return 0; fi
+
+  local l=ok s=ok m=ok t0 t1 t2 t3 rc
+  NOTE_L= NOTE_S= NOTE_M=
+  t0="$(ms)"; probe_lookup || l=FAIL; t1="$(ms)"
+  if has_session; then
+    probe_spawn; rc=$?; if (( rc == 1 )); then s=FAIL; elif (( rc == 2 )); then s=skipped; fi
+    t2="$(ms)"; if [[ $s == ok ]]; then probe_metal || m=FAIL; else m=skipped; fi; t3="$(ms)"
+  else
+    s=skipped; m=skipped; NOTE_S="the owner has no login session; not counted"; t2="$t1"; t3="$t1"
+  fi
+
+  local hard metal_fails
+  hard="$(read_int "$STATE/hard")"; metal_fails="$(read_int "$STATE/metal")"
+  if [[ $l == FAIL || $s == FAIL ]]; then hard=$((hard+1)); else hard=0; fi
+  if [[ $m == FAIL ]]; then metal_fails=$((metal_fails+1)); elif [[ $m == ok ]]; then metal_fails=0; fi
+  echo "$hard" > "$STATE/hard"; echo "$metal_fails" > "$STATE/metal"
+
+  local note="" reason="" metal_only=0
+  [[ $l == FAIL ]] && note="lookup: $NOTE_L;"
+  [[ $s == FAIL ]] && note="$note spawn: $NOTE_S;"
+  [[ $m == FAIL ]] && note="$note metal: $NOTE_M;"
+  note="${note//\"/\'}"
+  if (( hard > 0 || metal_fails > 0 )); then log "probe lookup=$l spawn=$s metal=$m hard=$hard metal_fails=$metal_fails $note"; fi
+
+  if (( hard >= HARD_LIMIT )); then reason="user lookup or service start failed for $hard minutes"
+  elif (( metal_fails >= METAL_LIMIT )); then reason="Metal shader compiler failed for $metal_fails minutes"; metal_only=1; fi
+  if [[ -z "$reason" ]]; then
+    rm -f "$STATE/episode"; write_status "$l" "$s" "$m" "$hard" "$metal_fails" "${note:-healthy}"
+    # Trend numbers only on a healthy pass, in their own bounded process, so they can never hold up a decision.
+    if (( hard == 0 && metal_fails == 0 )) && [[ -z "${MAIPAI_HG_NO_TELEMETRY:-}" ]]; then with_timeout 45 /bin/bash "$SELF" telemetry "$((t1-t0))" "$((t3-t2))" >/dev/null 2>&1; fi
+    return 0
+  fi
+
+  local ep; ep="$(read_int "$STATE/episode")"
+  if (( ep == 0 )); then ep="$(now)"; echo "$ep" > "$STATE/episode"; capture; fi
+  write_status "$l" "$s" "$m" "$hard" "$metal_fails" "TRIGGERED: $reason"
+
+  if ship_running && (( $(now) - ep < DEFER_MAX )); then log "deferred: a ship or install is running ($reason)"; return 0; fi
+  if (( metal_only )) && ! stack_quiet && (( $(now) - ep < QUIET_MAX )); then log "deferred: a chat turn or job is in flight ($reason)"; return 0; fi
+  if (( $(recent_reboots) >= MAX_REBOOTS )); then log "NOT rebooting: $MAX_REBOOTS reboots in the last 12 hours already ($reason)"; return 0; fi
+  if [[ "$MODE" != live ]]; then log "dry mode: WOULD REBOOT: $reason"; return 0; fi
+  rm -f "$STATE/episode" "$STATE/hard" "$STATE/metal"
+  do_reboot "$reason"
+}
+
+cmd_mode() {
+  case "${1:-}" in off|dry|live) ;; *) echo "usage: mode off|dry|live" >&2; exit 2 ;; esac
+  mkdir -p "$STATE"
+  local t="$STATE/tuning.json" h m x
+  h="$(clamp "$(jget "$t" hard_minutes)" 2 30 3)"; m="$(clamp "$(jget "$t" metal_minutes)" 5 120 10)"; x="$(clamp "$(jget "$t" max_reboots_per_12h)" 0 3 2)"
+  printf '{"mode":"%s","hard_minutes":%s,"metal_minutes":%s,"max_reboots_per_12h":%s}\n' "$1" "$h" "$m" "$x" > "$t.tmp" && mv "$t.tmp" "$t"
+  chown root:admin "$t" 2>/dev/null; chmod 664 "$t"; log "mode set to $1"; echo "mode: $1"
+}
+cmd_uninstall() {
+  /bin/launchctl bootout system/com.maipai.host-guard 2>/dev/null
+  rm -f "$PLIST" "$SUDOERS" "$SELF_PATH"
+  log "uninstalled (captures kept in $STATE/captures)"
+}
+
+case "${1:-}" in
+  run) cmd_run ;;
+  status) cat "$STATE/status.json" 2>/dev/null || echo '{"version":1,"note":"no run yet"}' ;;
+  mode) cmd_mode "${2:-}" ;;
+  telemetry) load_tuning; load_config && telemetry "${2:-0}" "${3:-0}" ;;
+  capture) load_tuning; load_config || { echo "config.json missing or invalid" >&2; exit 1; }; mkdir -p "$STATE/captures"; capture ;;
+  uninstall) cmd_uninstall ;;
+  *) echo "usage: maipai-host-guard run|status|mode off|dry|live|capture|uninstall" >&2; exit 2 ;;
+esac

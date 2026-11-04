@@ -48,9 +48,10 @@ with `com.maipai.host-guard` (every 60 s), the same pattern as `com.maipai.wired
   `metal_minutes` 5 to 120, `max_reboots_per_12h` 0 to 3, `mode` one of off, dry, live) and ignores anything else. A root process never takes an
   account, a path or a command from a file the user can write.
 - **Probes (each with a timeout):** the owner's lookup (`dscl` and `id`); a service start in the owner's session (`launchctl asuser`
-  plus `sudo -u`); one Metal shader compile. The Metal probe prefers the Stack's GPU-HEALTH-01 canary result when the Stack answers and
-  runs the same compile itself only when the Stack is unreachable (one definition of the compile: the Stack's `hostProbe.ts`; the
-  daemon carries a copy kept equal by the HOST-GUARD-01 test that compares the two scripts' text).
+  plus `sudo -u`); one Metal shader compile through the same compiler service the engines use. The Stack exposes no stable Metal canary
+  result to read (GPU-HEALTH-01's canary is an engine-restart request path), so the daemon runs the compile itself; the shader text is the Stack's
+  `hostProbe.ts` text, kept equal by the HOST-GUARD-01 test that compares the two files. Probes run in their own process group with a timeout, and a
+  probe that cannot run (the owner has no login session, or a sudoers file is broken) is skipped, never counted as a failure.
 - **Trigger:** lookup or service start failing for `hard_minutes` (default 3). Metal failing for `metal_minutes` (default 10) **and** a
   quiet moment: no chat turn or job in flight (read from the Stack ledger's queue depth and the chat role's busy state), waiting at most 30
   more minutes, since with only Metal failing the running engines still answer.
@@ -92,18 +93,19 @@ commons `spec/settings/keys.json` with their spec copy fields (S5, `docs/SETTING
   (the FFI read, the fallback to `ps rss`, or the process chosen), fix it, and add a test from a recorded sample. The ledger, governor and watchdog then see an engine's true size.
 - **Cap at launch (HOST-GUARD-05).** Splash chat gets `--max-memory` in every mode (today only coding mode). The value holds the cache for the **full reported context**
   (RULES.md rule 4: chat is never launched with a smaller context than the machine can hold): the admitted peak the governor already records
-  (`recordMeasuredFootprint` runs only for engines that do not map their weights, so Splash may have none: HOST-GUARD-05 establishes the peak from the corrected HOST-GUARD-04 figure over a warm session, not from the early post-load reading that F1 showed is wrong for chat, and a test proves the cap never falls below the full-context need) plus the Settings headroom
+  (the default headroom is 12 GB; `recordMeasuredFootprint` runs only for engines that do not map their weights, so Splash may have none: HOST-GUARD-05 establishes the peak from the corrected HOST-GUARD-04 figure over a warm session, not from the early post-load reading that F1 showed is wrong for chat, and a test proves the cap never falls below the full-context need) plus the Settings headroom
   `stack.engines.chat.max_memory_headroom_gb`. This bounds the KV pool in #644 without restarting anything, so R1 holds.
-- **Report, do not restart.** Past the cap the existing `resident-memory-grew.chat` is raised once with its Restart engine action (R1, unchanged).
-- **Optional maintenance restart (off by default).** `stack.engines.chat.maintenance_restart_hours` (default off) restarts the chat engine after that many hours in a
-  quiet window, only after the GPU-HEALTH-01 canary passes, at most once per 24 hours, with its own `RetireCause`. It is an owner opt-in because it is the one
-  place this design departs from R1 (section 3).
+- **Report when a restart is refused.** If a restart is refused (rate limit), the existing `resident-memory-grew.chat` is raised once with its Restart engine action.
+- **Ceiling and maintenance restarts (on, by the owner's 2026-11-04 ruling).** Past `memory_ceiling_factor` (default 1.15) times the cap for two looks, or after
+  `maintenance_restart_hours` (default 12), the watchdog restarts the chat engine in a quiet window, only after the Metal check passes, rate limited, with their own `RetireCause`s
+  (`memory-ceiling`, `maintenance-restart`). This is where the design departs from R1 (section 3).
 - **SPLASH-DISK-01** (open) already asks why Splash's footprint stayed 77 to 91 GB idle. HOST-GUARD-04 and -05 take the footprint half; disk writes stay in that row.
 
 ## 3. Supersedes
 
-- **resource-management.md R1** ("a reserved role is never restarted or evicted for memory it grew into"): unchanged by default. Only the opt-in maintenance
-  restart (`maintenance_restart_hours`, default off) departs from it, and only when the owner turns it on. **Owner decision needed to enable; none to ship the default.**
+- **resource-management.md R1** ("a reserved role is never restarted or evicted for memory it grew into"): **lifted for the chat role only by the owner's
+  ruling of 2026-11-04** ("turn on guards to kill restart whatever"). The Stack may restart chat past its memory ceiling (two looks, quiet, Metal check passes, at most one
+  per hour and four per day) and every `maintenance_restart_hours` (default 12; 0 turns it off) in a quiet window. R1 holds for every other reserved role.
 - **Coding-mode-only `--max-memory`** (`supervisor.ts` around line 1486, `docs/dev/coding-mode.md` line 36): chat mode now also passes it (rule 4 wording above).
 - **`lib/memory/darwin.ts` process figure**: corrected after HOST-GUARD-04 finds the cause; the `max(resident, footprint)` rule stays unless the finding says otherwise.
 - **The one-off `/usr/local/libexec/maipai-watchdog`** installed on the Studio on 2026-11-03: removed by the HOST-GUARD-01 installer.
