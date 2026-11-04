@@ -19,6 +19,8 @@ import { SPOKEN_EVIDENCE_TOKENS_MAX, SPOKEN_SOURCES_MAX, SPOKEN_SOURCE_TEXT_CHAR
 
 let people: BenchPeople;
 
+// The stub's window stands in for a small chat model. It must hold the tools block (about 3,300 tokens
+// since WRITING-FORMATS-02) plus a written reply ceiling of 1,536, or THIN-3G drops the tools for the turn.
 beforeEach(() => {
   resetDb();
   useDefaultScriptedStack();
@@ -26,7 +28,7 @@ beforeEach(() => {
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
   __resetSearchCacheForTests();
-  __setChatWindowContextForTests(4608);
+  __setChatWindowContextForTests(5120);
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 });
@@ -110,7 +112,7 @@ describe("a written adult turn with a search is unchanged (THIN-4F)", () => {
     const { toolContent, fetched } = await searchTurn({ spoken: false });
     expect(fetched.length).toBe(SEARCH_PAGES_MAX);
     const payload = JSON.parse(toolContent) as { sources: { page_text?: string }[] };
-    // THIN-GROUND-01 sizes the written evidence from the model's window (this stub's 4,096
+    // THIN-GROUND-01 sizes the written evidence from the model's window (this stub's small
     // tokens halve each 2,500-character page once), so the promise is "the written cap,
     // far above the spoken one", not a fixed 2,500.
     const pageLengths = payload.sources.filter((s) => s.page_text).map((s) => s.page_text!.length);
