@@ -95876,6 +95876,82 @@
         }
       }
     },
+    "/api/music/library/{id}/lyrics-realign": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Line up a Library track's lyrics with the file again",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Lining the words up again; the lyrics improve in a moment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "state"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "These lyrics have no timing."
+          },
+          "429": {
+            "description": "Asked again within a minute."
+          }
+        }
+      }
+    },
     "/api/music/jobs/{id}/delete": {
       "post": {
         "tags": [
