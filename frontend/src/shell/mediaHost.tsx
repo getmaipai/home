@@ -22,6 +22,8 @@ import { makingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type Hls from "hls.js";
+import { nextMusicQueueId, useMusicDj } from "@/shell/musicDj";
+import type { PlayerVoiceover } from "@maipai/ui/src/primitives/Player";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -37,6 +39,7 @@ export interface HoistedMedia extends MediaItemRef {
 
 export interface MediaDock {
   current: HoistedMedia | null;
+  voiceover?: PlayerVoiceover;
   /** Stop and unload the item (the mini bar's Close). */
   clear(): void;
   /** Play the next song of the music queue (the mini bar's Next); does nothing when there is none. */
@@ -205,16 +208,19 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     [navigate, store, listener, personId, pickMedia, makingNotice],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
+  const djFor = useMusicDj(current ? { id: current.id, appId: current.appId, live: liveStationIdOf(current.src) !== null } : null);
+  const voiceoverFor = useCallback((ref: MediaItemRef) => ref.id === djFor?.id ? djFor?.voiceover : undefined, [djFor]);
+  const hostWithDj = useMemo(() => ({ ...host, voiceoverFor }), [host, voiceoverFor]);
   // MEDIA-VIZ-03: the next song of the music queue, for the mini bar's Next and the Media Session's next track (and, when a song ends
   // away from Now playing, the host keeps the same queue moving with it). Null when there is no queue or no next song.
   const advance = useCallback(async () => {
     const held = store.get();
     if (!held || held.appId !== "music") return;
     try {
-      type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string; up_next?: { id: string } };
-      const item = await api.appData<NextItem | []>("music", "item", { id: held.id });
-      if (Array.isArray(item) || !item.up_next || store.get()?.id !== held.id) return;
-      const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: item.up_next.id }) });
+      const queuedId = await nextMusicQueueId(held.id);
+      if (!queuedId || store.get()?.id !== held.id) return;
+      const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: queuedId }) });
+      type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string };
       const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
       if (Array.isArray(next) || store.get()?.id !== held.id) return;
       const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
@@ -296,11 +302,11 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     if (hlsRef.current) { hlsRef.current.stopLoad(); hlsRef.current.startLoad(-1); } else held.el.load();
     void held.el.play().catch(() => undefined);
   }, [store]);
-  const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear, next: advance, retry }), [current, store, advance, retry]);
+  const dock = useMemo<MediaDock>(() => ({ current, voiceover: current?.id === djFor?.id ? djFor?.voiceover : undefined, clear: store.clear, next: advance, retry }), [current, djFor, store, advance, retry]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);
   return (
-    <MediaHostContext.Provider value={host}>
+    <MediaHostContext.Provider value={hostWithDj}>
       <MediaDockContext.Provider value={dock}>
        <ListenStatusContext.Provider value={speech}>
         {current ? <MediaPlayerRegistration adultOnly={refuseAdultOnly(current)} appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}

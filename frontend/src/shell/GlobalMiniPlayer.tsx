@@ -97,6 +97,7 @@ export function GlobalMiniPlayer() {
           title={held.title}
           subtitle={held.subtitle}
           poster={held.poster}
+          voiceover={held.appId === "music" ? dock.voiceover : undefined}
           live={live}
           mediaSession={false}
           onExpand={openPlayPage}

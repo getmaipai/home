@@ -42,3 +42,4 @@ For songs matched to MusicBrainz, Home can keep a short fact from the Wikipedia 
 # AI DJ
 
 The AI DJ can prepare short spoken introductions and song handoffs using local track tags and facts already stored on Home. It is off by default for children and teens until a parent turns it on, and nothing about the DJ leaves the home.
+After the second song, it can speak between songs; turn it off in Settings, Music.
