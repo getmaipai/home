@@ -71,6 +71,7 @@ export const HLC_BEARING_TABLES = [
   "music_jobs",
   "music_lyric_translations",
   "music_song_facts",
+  "music_dj_lines",
   "song_styles",
   "made_artists",
   "made_albums",

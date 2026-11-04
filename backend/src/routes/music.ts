@@ -36,6 +36,8 @@ import { requestRealign } from "@/lib/music/libraryAlign";
 import { cachedMadeTranslation, fillMadeTranslation, translationLanguage } from "@/lib/music/lyricsTranslate";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { refusePrompt } from "@/lib/pictures/policy";
+import { consumeDjLine, deleteCachedDjLine, ensureDjLines, type DjPosition } from "@/lib/music/djLines";
+import { getPersonSettingValue } from "@/lib/settings";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -53,6 +55,25 @@ const viewGate = createMiddleware<AppEnv>(async (c, next) => {
 const middleware = [requireAuth, gate] as [typeof requireAuth, typeof gate];
 const viewMiddleware = [requireAuth, viewGate] as [typeof requireAuth, typeof viewGate];
 const refusals = errorResponses({ 401: "Not signed in", 403: "Music is off for this profile", 404: "No such song", 409: "Commercial export not allowed" });
+
+const djPosition = z.enum(["intro", "transition", "outro"]);
+const djPrepareRoute = createRoute({ method: "post", path: "/dj/prepare", tags: ["Music"], summary: "Prepare short DJ lines for upcoming tracks", middleware: viewMiddleware, request: { body: { content: { "application/json": { schema: z.object({ after: z.string().min(1).max(80), next: z.array(z.string().min(1).max(80)).max(2), station: z.string().trim().max(120).optional() }) } } } }, responses: { 202: { description: "Preparation queued." }, 204: { description: "DJ is off." }, ...refusals } });
+musicRoutes.openapi(djPrepareRoute, (c) => {
+  const actor = c.get("person"), body = c.req.valid("json");
+  const mode = getPersonSettingValue(actor, "music.dj");
+  if (mode !== "minimal" && mode !== "full") return c.body(null, 204);
+  void ensureDjLines(actor, body.after, body.next, { stationName: body.station ?? null }).catch(() => {});
+  return c.body(null, 202);
+});
+const djLineRoute = createRoute({ method: "get", path: "/dj/line", tags: ["Music"], summary: "Fetch and consume a prepared DJ line", middleware: viewMiddleware, request: { query: z.object({ before: z.string().min(1).max(80), position: djPosition }) }, responses: { 200: { description: "One audio line." }, 204: { description: "No prepared line." }, ...refusals } });
+musicRoutes.openapi(djLineRoute, async (c) => {
+  const actor = c.get("person"), query = c.req.valid("query");
+  const line = consumeDjLine(actor, query.before, query.position as DjPosition);
+  if (!line) return c.body(null, 204);
+  return new Response(line.bytes, { headers: { "content-type": line.mediaType, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+});
+const djDeleteRoute = createRoute({ method: "delete", path: "/dj/line", tags: ["Music"], summary: "Delete a prepared DJ line", middleware: viewMiddleware, request: { query: z.object({ before: z.string().min(1).max(80), position: djPosition }) }, responses: { 204: { description: "Line deleted or absent." }, ...refusals } });
+musicRoutes.openapi(djDeleteRoute, (c) => { const actor = c.get("person"), query = c.req.valid("query"); deleteCachedDjLine(actor, query.before, query.position as DjPosition); return c.body(null, 204); });
 const params = z.object({ id: z.string().min(1).max(80) });
 const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string() });
 const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;

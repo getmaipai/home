@@ -2090,6 +2090,18 @@ export const musicSongFacts = sqliteTable("music_song_facts", {
   hlc: text("hlc").notNull(),
 });
 
+export const musicDjLines = sqliteTable("music_dj_lines", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+  mediaId: text("media_id").notNull(),
+  position: text("position").notNull(),
+  audioPath: text("audio_path").notNull(),
+  wordsCount: integer("words_count").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (table) => [index("music_dj_lines_person_idx").on(table.personId, table.createdAt), index("music_dj_lines_media_idx").on(table.personId, table.mediaId, table.position)]);
+
 // MUSIC-STUDIO-S2, MUSIC-LISTEN-C5: a saved song style and a band the household made. Both tables share one column set and one
 // store (lib/music/madeRecords.ts). `name` is the style's title or the band's name, kept as a column for listing and ordering;
 // `body` is the rest of the spec record (style, seed, shared_to and the band's own fields) as JSON. A person's own words live

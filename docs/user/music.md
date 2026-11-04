@@ -39,3 +39,6 @@ You can also change one right in chat. Open its card and choose Edit, or ask Hom
 Every change keeps the earlier version, so nothing is lost. Children and teens do not see these pages.
 
 For songs matched to MusicBrainz, Home can keep a short fact from the Wikipedia page linked to that recording. It looks up facts in the background, never while a song plays; a song without a linked page has no fact. The **Show facts and photos from Wikimedia** setting controls both song facts and artist photos and bios.
+# AI DJ
+
+The AI DJ can prepare short spoken introductions and song handoffs using local track tags and facts already stored on Home. It is off by default for children and teens until a parent turns it on, and nothing about the DJ leaves the home.
