@@ -36,6 +36,10 @@ Nothing approved is deleted; each line names the passage and what it says after 
   **Studio** page of Images. EDITOR-06 (a `photo-editor` app package) becomes IMG-STUDIO-02. EDITOR-07 and EDITOR-08 keep their meaning and open
   the Studio page. EDITOR-23 (a Create wrapper) is not needed. EDITOR-01 to 05 stand (they are the node, routes, crop, adjust and compare the Studio uses).
   Section 4's tools table stands; section 8 question 1 (one icon or two) is answered by this note: Images is one icon, Studio is a page in it.
+- (2026-11-04) Section 7 row "Change in words": `generate_image` with `change` stays and gains `styles` and more references (7a); "any other edit"
+  (`edit_picture`) also serves the Studio box through a forced tool call. Section 7 "spoken turns ... shared screen only" is unchanged. Person boxes
+  return only as the Stack's `find_people` output chosen by the model; the 2026-10-26 word-rule resolvers are not revived. IMG-PEOPLE-UNSURE-01
+  (its `choosePeople` no longer exists) and IMGEDIT-03 (the same phrases run live) fold into IMG-OPS-06 and IMG-CHAT-03.
 - The per-operation code in `backend/src/lib/imageEdit.ts` (`EDIT_OPERATIONS`, `EditToolKey`, the branch per operation) becomes registrations in the
   registry (section 5). Rule 12: the chat editor and `/api/image-edit/*` keep working through the whole port; nothing is deleted until the registry serves them.
 - `backend/packages/generate_image` stays the chat tool for making and changing a picture; it gains arguments (section 7). `show_images` is unchanged.
@@ -114,7 +118,7 @@ An operation is registered once with:
 
 | Field | Meaning |
 |---|---|
-| `id` | `<noun>.<verb>`: `picture.remove_background`, `picture.erase`, `picture.upscale`, `picture.resize`, `picture.crop`, `picture.adjust`, `picture.blur_background`, `picture.change` (Comment), `picture.expand`, `video.animate`, `video.frame_to_picture`, `video.trim`, `video.join` |
+| `id` | `<noun>.<verb>`: `picture.remove_background`, `picture.erase`, `picture.upscale`, `picture.resize`, `picture.crop`, `picture.adjust`, `picture.blur_background`, `picture.change` (Comment), `picture.expand`, `picture.locate` (returns boxes, never listed in the Studio rail or the card row), `video.animate`, `video.frame_to_picture`, `video.trim`, `video.join` |
 | `label`, `summary` | the plain name and one line (also the chat tool's text and the Studio rail's text; `describe` copy lint applies) |
 | `input` / `output` | media kinds (`picture`, `video`, `audio`) and slots, so a caller can ask "what can I do to a picture" |
 | `args` | a zod schema plus a small `controls` list (`mask`, `number`, `choice`, `words`) the Studio draws and the chat tool describes |
@@ -156,6 +160,7 @@ Layout (S2): the tool rail left, picture centred and prompt bar under it are `Im
 | 10 | Expand canvas (`picture.expand`) | `edit_masked` on a generated border mask | later |
 | 11 | Animate this picture (`video.animate`) | video engine, adults | later, via the registry |
 | 12 | Relight, change camera angle, layers | no tested local model | later, after a bench |
+| 13 | Combine pictures ("put her in this room", "make these one group photo"): `picture.change` with up to the engine's reference count (`edit.references`, today 2, so 3 pictures with the one being changed) | picture engine (edit with references, built for one by IMGEDIT-01/02) | IMG-OPS-05 |
 
 Everything else is as written in the editors note: versions are Library files, nothing is overwritten, Revert is "Use this version", a shared
 picture is edited as a copy in the editor's own "Edited" folder, incognito edits stay in memory, and every generated result passes `checkImages`
@@ -178,6 +183,35 @@ which tools a turn is offered follows the surface or an object in the conversati
 in the tool, not the card; a failed tool never fails the answer (rule 6); spoken turns read one line and show the card on the shared screen only.
 `edit_picture` is a package (`backend/packages/edit_picture`, `offer: {mode: "conditional", gate, bench_row}`) like `edit_video`; the registry only fills its `op` choices, and it counts as one tool toward rule 1's cap of 16 (the cap counts tools, not choices). Template ids in `generate_image`'s description are listed from the reader for this person (audience filtered), at most 24.
 
+## 7a. Three ways in, one path (owner, 2026-11-04)
+
+"Remove the boy on the left", "make it sunny", "combine these two" and "turn it Ghibli" work the same in regular chat, the companion (typed or
+spoken) and the Studio words box. One routing step, the model's own tool choice (rule 1, rule 2), and one set of operations behind it:
+
+| Where | How the words reach the registry |
+|---|---|
+| Regular chat or companion chat | the turn offers `generate_image` and `edit_picture` when a picture is in the conversation; the model's choice inside `edit_picture` goes straight to `runMediaOp`. There is no second routing module. Spoken turns read one line; the card shows on the shared screen only (rule 0, section 7), nothing about a spoken turn's shape changes |
+| Studio words box | one engine-native tool call (rule 2) using the same `edit_picture` schema with that tool forced and the open picture, painted area and chosen pictures as its context; the call goes straight to `runMediaOp`. Words with a painted area are `picture.change` |
+
+- **Combine** is `picture.change` with more reference pictures (a widened references argument, capped by `edit.references`; the Stack's
+  `IMAGE_REFERENCES_MAX` is 2). No separate op. A child gets no reference pictures (cartoon lane). Every picture passes `prepareEditSource`.
+- **Style by words** ("turn it Ghibli"). `picture.change` takes `styles`, up to two saved style names the person said. Videos resolves names with
+  `resolveStyles` over the `Lora` records; pictures still read the Stack list and `picture_adapter_prefs` (`adapters.ts`). They become one lookup when
+  VIDEO-LORA-12 moves pictures onto the `Lora` record, and a locked picture style exists after ADULT-LOCK-07 (organisation principle 4). Until then `styles` uses the
+  lookup `generate_image` already uses for pictures and moves with VIDEO-LORA-12; this note builds no third lookup. An unknown or unusable name stops
+  the edit with the tool's failure kind and the model says it in its own words. Never an invented name.
+- **A person named in words** ("the boy on the left"). `picture.locate` is an `edit_picture` op choice (no new tool, cap of 16 unchanged; it returns boxes, not a file or a job, so it is never listed as a Studio tool or a card action). It calls
+  the Stack's `find_people`, which returns numbered boxes as fractions of the picture, and hands the boxes to the model, which picks the number (no
+  regex or word list; the 2026-10-26 `choosePeople` and `resolvePosition` word rules are gone and stay gone). One chosen box is the area for `picture.erase` (remove) or
+  `picture.change` (replace). `find_people` finds people only: objects ("the red car") have no tested locator, so they use `picture.change`
+  with the words alone until a bench (IMG-LATER). A child gets no `locate` (a located box is a mask, section 9). Readiness comes from
+  `editToolsStatus` and `roleHealth`; when the reader is not ready the model uses `picture.change` with the words and says so. `locate` logs counts only (rule 6a).
+- **In the Studio box** a found person is handled inside the one forced call: the tool's `locate` step returns the boxes to the model within the same call and the model then names the box for `erase` or `change`; one call from the person's side, two steps inside it.
+- **Several people or none.** In chat and companion turns the tool returns the count and the positions as a kind of result and the model asks which
+  one in its own words; no stored line (rule 6). In the Studio box a short hint under the box is that control's own copy (S6).
+- The result is always a new version and a picture card with Edit in Studio; the original stays. Gates are those of section 9, in the functions, not the entry point.
+- Bench rows: remove-by-position (three people), make-sunny, combine-two, Ghibli restyle, ambiguous-person question.
+
 ## 8. Reuse check (org principle 6, rule 9b)
 
 | Need | Reused | New |
@@ -189,6 +223,9 @@ in the tool, not the card; a failed tool never fails the answer (rule 6); spoken
 | Picture card actions | the shipped Elements and the video card's `actions` pattern (K1) | additive `actions` from the registry |
 | Operations | `lib/imageEdit.ts`, `lib/videos/*` | the registry (Home code, no kit) |
 | Template record | settings/records pattern, spec first | `media_template` (additive) |
+| Words choose the operation (chat, companion, Studio box) | the turn's own tool call to `edit_picture`; the Studio box uses the same schema with the tool forced (rule 2) | none (no `routeMediaOp`) |
+| Find a named person | Stack `find_people` boxes, the model picks | `picture.locate` op choice |
+| Style by name | one lookup shared with Videos (`styleChoice.ts`, `adapters.ts` merged) | none new |
 | Status, queue, errors | S6 rows, `useMakingAvailability`, job cards | none |
 
 Considered and not used: a new manifest field `uses_ops` (the `permissions` vocabulary already does this); a second route family beside the media-app action host (one handler is mounted at both paths); a Home `*Panel`, `*Feed` or `*Card` (rules 9, 9b); a second editor library (the editors note rules out filerobot); a template
@@ -225,6 +262,9 @@ pack words; failures say what to do.
 | IMG-OPS-04 | S, Home | `video.animate`, `video.frame_to_picture` registered from `lib/videos`; Videos Start frame offers Remove background and Upscale from the registry | a clip started from a cleaned photo, run for real |
 | IMG-TPL-01 | M, spec then Home | `media_template` spec record; the reader; 16 launch templates and their samples made by our engine, each opened and judged | check.sh validates every template; samples opened |
 | IMG-CHAT-01 | M, Home | `edit_picture` from the registry; `generate_image` `template` and `references`; bench rows for the conditional set | bench passes; each action run once in chat |
+| IMG-OPS-05 | S, Home | `picture.change` takes up to `edit.references` pictures and `styles`; needs VIDEO-LORA-12 for the shared lookup | a real combine and a real Ghibli restyle |
+| IMG-OPS-06 | S, Home | `picture.locate` from `find_people`, the model picks the box | one, several, none, reader down; a real "remove the boy on the left" |
+| IMG-CHAT-03 | M, Home | every registry op by words in chat, the companion and the Studio box; folds IMGEDIT-03 | each phrase once in chat and as a companion turn; bench |
 | IMG-UI-00 | S, commons | `prompt_bar` `blanks` prop (name, label, example); picture rows in `result_feed`; picture card `actions` from a list; UI-DECISIONS rows; tag | tests, opened at 1440 and 390 |
 | IMG-UI-01 | M, Home | `packages/images` manifest, `index`, `pictures`, `create` pages and scopes; the Template popover; pin the VIDEO-UI tags (needs VIDEO-UI-02 to 05 and IMG-UI-00) | dev hub opened at 1440 and 390 with a real picture from a template; every entry state seen once; controls disabled with the one line while the picture engine is not ready |
 | IMG-STUDIO-01 | M, commons | The data-driven `operations` prop and `onRunOperation`; Crop, Adjust, Compare, Comment brush in `ImageEditor`; `image_editor` node (EDITOR-01, 03, 05, IMGEDIT-04) | commons tests; opened at both widths; tag |
