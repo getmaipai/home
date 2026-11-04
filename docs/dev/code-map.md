@@ -635,6 +635,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, startMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
+| `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS |
