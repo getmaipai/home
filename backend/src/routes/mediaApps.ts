@@ -30,6 +30,7 @@ import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
 import { requestRealign } from "@/lib/music/libraryAlign";
+import { cachedTranslation, fillTranslation, readableLyrics, translationLanguage } from "@/lib/music/lyricsTranslate";
 import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, madeFileFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
@@ -76,6 +77,19 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
 
   if (appId === "music") {
+    routes.get("/library/:id/lyrics-translation", requireAuth, async (c, next) => {
+      const person = c.get("person");
+      if (!mediaAppAllowed(person, "music") || !appRouteAllowed(person, "music", "data", "library", undefined, "open")) return next();
+      const id = c.req.param("id");
+      const language = translationLanguage(person);
+      if (!language) return c.body(null, 204);
+      const lines = readableLyrics(person, id);
+      if (!lines) return c.json({ error: "That song is not in the library." }, 404);
+      const cached = cachedTranslation(id, language, lines);
+      if (cached) return c.json({ language, lines: cached }, 200);
+      void fillTranslation(id, language, lines).catch(() => {});
+      return c.json({ pending: true as const }, 202);
+    });
     const radio = radioRoutes();
     radio.get("/art", requireAuth, async (c, next) => {
     const person = c.get("person");

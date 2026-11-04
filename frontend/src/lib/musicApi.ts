@@ -46,7 +46,7 @@ export interface MusicCard {
   /** The owner's own words; null when there are none. */
   lyrics: string | null;
   /** `words` (each with start and end seconds) is present on a line once the song's words were timed (MUSIC-GEN-20b); the kit wipes the highlight word by word. */
-  timed_lyrics: { t: number; line: string; section: string | null; words?: { t: number; end: number; text: string }[] }[] | null;
+  timed_lyrics: { t: number; line: string; section: string | null; secondary?: string; words?: { t: number; end: number; text: string }[] }[] | null;
   duration_s: number | null;
   /** ISO time the song was asked for. */
   started_at: number;

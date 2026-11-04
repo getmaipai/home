@@ -33,6 +33,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { timedLyricsFor } from "@/lib/music/timedWords";
 import { requestRealign } from "@/lib/music/libraryAlign";
+import { cachedMadeTranslation, fillMadeTranslation, translationLanguage } from "@/lib/music/lyricsTranslate";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { refusePrompt } from "@/lib/pictures/policy";
 export const musicRoutes = apiRouter();
@@ -66,7 +67,7 @@ const cardSchema = z.object({
   stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),
   making_version: z.object({ stage_label: z.string(), progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable() }).nullable(),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
-  timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable(), words: z.array(z.object({ t: z.number(), end: z.number(), text: z.string() })).optional().describe("Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing.") })).nullable(),
+  timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable(), secondary: z.string().optional(), words: z.array(z.object({ t: z.number(), end: z.number(), text: z.string() })).optional().describe("Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing.") })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed", "max"]), boost_offered: z.boolean(), max_offered: z.boolean().describe("Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."), max_installed: z.boolean().describe("Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
@@ -170,7 +171,15 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS),
     quality: (current ?? root).request.quality === "max" ? "max" as const : (current ?? root).request.quality === "detailed" ? "detailed" as const : "quick" as const, boost_offered: boostOffered, max_offered: maxShown, max_installed: musicMaxInstalled(engine), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null,
-    timed_lyrics: timedLyricsFor(shown),
+    timed_lyrics: (() => {
+      const timed = timedLyricsFor(shown);
+      const language = translationLanguage(actor);
+      if (!timed || !language || !shown.fileId) return timed;
+      const translated = cachedMadeTranslation(shown.fileId, language, timed.map((line) => line.line));
+      if (translated?.length === timed.length) return timed.map((line, index) => ({ ...line, ...(translated[index] ? { secondary: translated[index]! } : {}) }));
+      if (shown.state === "done") void fillMadeTranslation(shown.fileId, language, timed.map((line) => line.line)).catch(() => {});
+      return timed;
+    })(),
     lyrics: cardLyricsOf(shown), duration_s: current?.durationS ?? root.durationS,
   };
 }

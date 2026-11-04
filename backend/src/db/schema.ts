@@ -350,6 +350,16 @@ export const settingsValues = sqliteTable(
   (table) => [primaryKey({ columns: [table.scope, table.key] })],
 );
 
+export const musicLyricTranslations = sqliteTable("music_lyric_translations", {
+  id: text("id").primaryKey(),
+  mediaId: text("media_id").notNull(),
+  language: text("language").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  linesJson: text("lines_json").notNull(),
+  createdAt: text("created_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (table) => [uniqueIndex("music_lyric_translations_key").on(table.mediaId, table.language)]);
+
 // The durable scheduler port (4.7): "one-shot and recurring jobs...
 // persisted, survives restarts." Not a spec 3.1 record type (chapter 3's
 // own record table has no Job entry, and 4.7 doesn't ask for one), so

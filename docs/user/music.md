@@ -12,6 +12,8 @@ When Home makes a song with words, it listens to the finished song and times eve
 
 Songs in your library that have timed lyrics get the same word-by-word highlight. After the lyrics are found, Home listens to your file on your own home server and times each word, first for the opening lines, then for the whole song (on songs over four minutes, only the opening lines get word timing). If the highlight looks off, open Now playing and choose **Lyrics look off**; Home lines the words up again. You can ask once a minute. Nothing leaves your home.
 
+Choose a language in your Music settings to see a translation under timed lyrics. Home uses its local chat model and saves the result for that song and language; if the translation is still being prepared, check again in a moment. Lyrics and translations are shown only when they pass your profile's music limits.
+
 A song made in chat can be split into its parts. Open the song card and choose **Stems**, or ask in chat to split it. You get four tracks: Vocals, Drums, Bass and Other. Use Next to step through them. It takes about a minute and happens on your own home server. You can also split an audio file of your own. Open it in Library, then choose **Split into stems**. Stems stay on this home server, and splitting does not make a voice. Adults only.
 
 Radio uses songs from your library only. It looks for the same artist, album artist, kind of music and decade. It does not
