@@ -21,7 +21,8 @@ import {
 import { listLoraRecords } from "@/lib/loras/store";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { MAX_INSTALL_BYTES } from "@/lib/loras/source";
-import { NOT_LTX_LINE } from "@/lib/loras/install";
+import { BASE_UNSTATED_LINE, NOT_LTX_LINE } from "@/lib/loras/install";
+import { baseWords, BROWSE_BASES, INSTALLABLE_BASE_IDS, isSupportedBase } from "@/lib/loras/baseFamilies";
 import type { PersonRow } from "@/types";
 
 export const lorasSourceRoutes = apiRouter();
@@ -38,11 +39,10 @@ function mayReveal(c: Ctx, admin: PersonRow): boolean { return sessionOf(c) !== 
 
 const mb = (bytes: number): string => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`);
 const LICENCE_WORDS = { open: "open licence", non_commercial: "no-selling licence", custom: "custom licence", unknown: "licence not stated" } as const;
-const BASE_WORDS = { "ltx-2.5": "LTX 2.5", "ltx-2.3": "LTX 2.3", "wan2.2-ti2v-5b": "Wan", unknown: "an unknown base" } as const;
 
 /** One fixed-template line built from fields (never a model), and why Install is disabled when it is. */
 function lineAndReason(hit: Hit, admin: PersonRow): { line: string; reason: string | null; installed: { id: string; name: string } | null } {
-  const parts = [`Made for ${BASE_WORDS[hit.base_model]}`];
+  const parts = [`Made for ${hit.base_unstated ? "LTX 2 (version not stated)" : baseWords(hit.base_model)}`];
   if (hit.bytes !== null) parts.push(mb(hit.bytes));
   parts.push(LICENCE_WORDS[hit.licence_class]);
   if (hit.downloads > 0) parts.push(`${hit.downloads.toLocaleString("en-US")} downloads`);
@@ -52,7 +52,8 @@ function lineAndReason(hit: Hit, admin: PersonRow): { line: string; reason: stri
   if (have) {
     const seen = readLora(admin, have.lora.id, "own_written");
     if (seen && seen.state === "open") { installed = { id: seen.lora.id, name: seen.lora.name }; reason = `Already installed as ${seen.lora.name}`; } else reason = "Already installed";
-  } else if (hit.base_model !== "ltx-2.3" && hit.base_model !== "ltx-2.5") reason = NOT_LTX_LINE(hit.base_label).replace(/\.$/, "");
+  } else if (hit.base_unstated) reason = BASE_UNSTATED_LINE.replace(/\.$/, "");
+  else if (!isSupportedBase(hit.base_model)) reason = NOT_LTX_LINE(hit.base_label).replace(/\.$/, "");
   else if (hit.bytes !== null && hit.bytes > MAX_INSTALL_BYTES) reason = "File is over 4 GB";
   else if (hit.gated) reason = "Asks you to accept terms on Hugging Face first";
   return { line: parts.join(", "), reason, installed };
@@ -63,7 +64,7 @@ function view(hit: Hit, admin: PersonRow) {
   return {
     key: hitKey(hit), site: hit.site, remote_id: hit.remote_id, version_id: hit.version_id, title: hit.title, creator: hit.creator, page_url: hit.page_url,
     preview: hit.preview_url ? `/api/loras/browse/${hit.site}/${encodeURIComponent(hit.remote_id)}/preview${hit.version_id && hit.site === "civitai" ? `?version=${encodeURIComponent(hit.version_id)}` : ""}` : null,
-    base_label: hit.base_label, base_model: hit.base_model, kind: hit.kind, bytes: hit.bytes, sha256: hit.sha256, licence: { id: hit.licence_id, class: hit.licence_class, commercial_use: hit.commercial_use },
+    base_label: hit.base_label, base_model: hit.base_model, base_unstated: hit.base_unstated, kind: hit.kind, bytes: hit.bytes, sha256: hit.sha256, licence: { id: hit.licence_id, class: hit.licence_class, commercial_use: hit.commercial_use },
     downloads: hit.downloads, rating: hit.rating, created_at: hit.created_at, trigger_words: hit.trigger_words, also_on: hit.also_on, gated: hit.gated,
     adult_check: hit.adult_check.state, installed, reason, line, confirm_item: confirmItemOf(hit),
   };
@@ -80,7 +81,7 @@ function sourceFailure(error: unknown): { body: { error: string; code: string };
 
 const BrowseBody = z.object({
   source: z.enum(["huggingface", "civitai", "both"]).default("huggingface"), q: z.string().max(200).default(""), media: z.literal("video").default("video"),
-  kind: z.enum(["any", "style", "character"]).default("any"), base: z.enum(["default", "ltx-2.5", "ltx-2.3", "wan", "all"]).default("default"),
+  kind: z.enum(["any", "style", "character"]).default("any"), base: z.enum(["default", ...BROWSE_BASES, "all"]).default("default"),
   installed: z.enum(["any", "not_installed", "installed"]).default("any"), sort: z.enum(["downloads", "rating", "newest"]).default("downloads"),
   cursor: z.string().max(2000).nullable().default(null), adult: z.boolean().default(false),
 });
@@ -148,7 +149,7 @@ lorasSourceRoutes.openapi(previewRoute, async (c) => {
 const InstallBody = z.object({
   source: z.enum(["huggingface", "civitai"]), remote_id: z.string().max(200).optional(), version_id: z.string().max(200).nullable().optional(), url: z.string().max(2048).optional(), file: z.string().max(500).nullable().optional(),
   name: z.string().trim().max(80).optional(), kind: z.enum(["style", "character"]).optional(), audience: z.enum(["all-ages", "adult-only"]), licence_confirmed: z.boolean(),
-  base_model: z.enum(["ltx-2.3", "ltx-2.5"]).optional(), confirm_ticket: z.string().max(200).optional(), as_separate: z.boolean().optional(),
+  base_model: z.enum(INSTALLABLE_BASE_IDS).optional(), confirm_ticket: z.string().max(200).optional(), as_separate: z.boolean().optional(),
 });
 const installRoute = createRoute({
   method: "post", path: "/install", tags: ["LoRAs"], summary: "Download a style into the library (an admin's click, after the licence step)", middleware: [requireAuth, requireRole("owner", "admin")] as const,

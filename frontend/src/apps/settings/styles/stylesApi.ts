@@ -27,7 +27,7 @@ export interface BrowseQuery {
 /** A hit the caller may see. Adult and unknown hits never appear here: they are the response's one `locked` flag. */
 export interface BrowseHit {
   key: string; site: "huggingface" | "civitai"; remote_id: string; version_id: string | null; title: string; creator: string | null; page_url: string | null; preview: string | null;
-  base_label: string; base_model: BaseModelId; kind: string; bytes: number | null; sha256: string | null;
+  base_label: string; base_model: BaseModelId; /** A generic LTX 2 label with no version stated: install only after the admin picks the version. */ base_unstated?: boolean; kind: string; bytes: number | null; sha256: string | null;
   licence: { id: string | null; class: "open" | "non_commercial" | "custom" | "unknown"; commercial_use: string };
   downloads: number; rating: number | null; created_at: string | null; trigger_words: string[]; also_on: string[]; gated: boolean;
   adult_check: AdultCheckState; installed: { id: string; name: string } | null; reason: string | null; line: string; confirm_item: string;

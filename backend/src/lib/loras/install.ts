@@ -13,6 +13,7 @@ import { raiseIssue, registerFixHandler, resolveIssue } from "@/lib/issues";
 import { createJob, updateJob } from "@/lib/jobs";
 import { readLora } from "@/lib/loras/access";
 import { cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
+import { INSTALLABLE_BASE_IDS, isSupportedBase, supportedFamilyWords, type BaseId } from "@/lib/loras/baseFamilies";
 import { fetchHit, hitKey, installedAs, MAX_INSTALL_BYTES, SourceError, civitaiEnabled, tokenFor, parseHfLink, type Hit, type LoraSite } from "@/lib/loras/source";
 import { getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
 import { recordFromStack, syncLoras } from "@/lib/loras/sync";
@@ -25,7 +26,8 @@ export const ISSUE_SOURCE = "styles";
 
 export const LICENCE_STEP_LINE = "Read the licence and confirm it first, then install the style.";
 export const SHARED_SCREEN_LINE = "Install styles on your own screen.";
-export const NOT_LTX_LINE = (label: string | null): string => `Made for ${label ?? "another base"}. This household's videos use LTX.`;
+export const NOT_LTX_LINE = (label: string | null): string => `Made for ${label ?? "another base"}. This household's videos use ${supportedFamilyWords()}.`;
+export const BASE_UNSTATED_LINE = "This style does not say which LTX 2 version it is for. Ask its maker, or pick the version yourself.";
 export const TOO_BIG_LINE = "File is over 4 GB. Home can't use a style that large.";
 export const NO_FILE_LINE = "No safe style file was found there. Home only installs .safetensors files.";
 export const GATED_LINE = "Asks you to accept terms on Hugging Face first. Accept them on the site, save a Hugging Face token in settings, then try again.";
@@ -38,7 +40,7 @@ export const CHANGED_FILE_LINE = "The source changed this file since you install
 
 export interface InstallBody {
   source: LoraSite; remote_id?: string; version_id?: string | null; url?: string; file?: string | null;
-  name?: string; kind?: "style" | "character"; audience: "all-ages" | "adult-only"; licence_confirmed: boolean; base_model?: "ltx-2.3" | "ltx-2.5";
+  name?: string; kind?: "style" | "character"; audience: "all-ages" | "adult-only"; licence_confirmed: boolean; base_model?: BaseId;
   confirm_ticket?: string; as_separate?: boolean;
 }
 export interface InstallActor { admin: PersonRow; sessionKey: string | null; proof: AdultProof }
@@ -50,7 +52,7 @@ export type InstallResult =
 interface Ctx {
   site: LoraSite; remote_id: string; version_id: string | null; page_url: string; name: string; kind: "style" | "character"; audience: "all-ages" | "adult-only";
   adult_check: AdultCheck; licence_id: string | null; commercial_use: "yes" | "no" | "unknown"; trigger_words: string[]; added_by: string;
-  file_url: string; sha256: string | null; base_model: "ltx-2.3" | "ltx-2.5"; licence_text: string;
+  file_url: string; sha256: string | null; base_model: BaseId; licence_text: string;
 }
 const sealCtx = (ctx: Ctx): string => encryptSecret(JSON.stringify(ctx));
 function openCtx(provenance: string): { ctx: Ctx; stackJobId: string } | null {
@@ -101,8 +103,11 @@ export async function startLoraInstall(actor: InstallActor, body: InstallBody): 
     if (have.by === "version" && hit.sha256 !== null && have.lora.file.sha256 !== hit.sha256) return fail(409, "changed_file", CHANGED_FILE_LINE, seen ? { existing_id: seen.id } : {});
     return fail(409, "duplicate", seen ? duplicateLine(seen.name) : DUPLICATE_LOCKED_LINE, seen ? { existing_id: seen.id } : {});
   }
-  const base = hit.base_model !== "unknown" ? hit.base_model : body.base_model ?? "unknown";
-  if (base !== "ltx-2.3" && base !== "ltx-2.5") return fail(422, "not_ltx", NOT_LTX_LINE(hit.base_label));
+  // The version comes from the source; only when the source names none does the admin's own pick count (checked here, not trusted from the client). Never guessed.
+  const picked = body.base_model && (INSTALLABLE_BASE_IDS as readonly string[]).includes(body.base_model) ? body.base_model : null;
+  const base = hit.base_model !== "unknown" ? hit.base_model : picked ?? "unknown";
+  if (base === "unknown" && hit.base_unstated) return fail(422, "base_unstated", BASE_UNSTATED_LINE);
+  if (base === "unknown" || !isSupportedBase(base)) return fail(422, "not_ltx", NOT_LTX_LINE(hit.base_label));
   if (!hit.file_url) return fail(422, "no_file", NO_FILE_LINE);
   if (hit.bytes !== null && hit.bytes > MAX_INSTALL_BYTES) return fail(422, "too_large", TOO_BIG_LINE);
   const token = tokenFor(hit.site);

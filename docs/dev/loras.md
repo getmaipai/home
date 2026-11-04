@@ -117,3 +117,7 @@ HTTP proof on a dev hub (8877, `--no-stack`; styles seeded through the store): a
 every admin route; an adult not marked saw only the all-ages style and no locked tile; the marked adult saw a locked tile, and the style only with their own proof;
 the owner saw one locked tile without a proof and the style with it; PATCH, nsfw, all-ages, remove and restore on the adult-only style answered 404 (the missing
 id's body) without a proof and 200 with it; no response without a proof held its name, trigger word, hash or id.
+
+## One table of bases
+
+`backend/src/lib/loras/baseFamilies.ts` is the only place that names a model base, its Civitai labels (`LTXV2` sits on the LTX family row), its text patterns and whether it is supported on this install (`supportedBaseIds()`, fed by `setInstalledBasesProvider`); the browser, install, sync and routes read it.

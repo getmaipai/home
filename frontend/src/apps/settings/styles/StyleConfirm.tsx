@@ -39,7 +39,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
   const [changed, setChanged] = useState(false);
   const [duplicate, setDuplicate] = useState<{ id: string | null; line: string } | null>(null);
   const open = licenceIsOpen(hit);
-  const blocked = hit.reason && !hit.installed ? hit.reason : null;
+  const blocked = hit.reason && !hit.installed && !hit.base_unstated ? hit.reason : null;
   const canInstall = !busy && !blocked && !hit.installed && name.trim().length > 0 && (open || read) && (!needsBase || base !== "");
 
   const body = (ticket?: string, separate?: boolean): InstallBody => ({
@@ -89,7 +89,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
             </div>
             <div className="flex flex-col gap-5">
               <DialogSection title="Made for">
-                <p className="text-sm">{needsBase ? "Home could not tell what this style was made for." : `${hit.base_label}. ${sizeWords(hit.bytes ?? 0)}.`}</p>
+                <p className="text-sm">{needsBase ? (hit.base_unstated ? `${hit.reason ?? ""}.` : "Home could not tell what this style was made for.") : `${hit.base_label}. ${sizeWords(hit.bytes ?? 0)}.`}</p>
                 {needsBase ? (
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="style-base">What was this style made for?</Label>

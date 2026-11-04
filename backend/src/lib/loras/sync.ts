@@ -8,14 +8,15 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people, videoAdapterPrefs } from "@/db/schema";
+import { ALL_BASE_IDS, type BaseId } from "@/lib/loras/baseFamilies";
 import { deleteLoraRecord, getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
 import { clipsUsingStyle } from "@/lib/loras/usage";
 import { StackVideoError, listVideoLoras, removeVideoLora, updateVideoLora, type StackVideoLora } from "@/lib/videos/stack";
 
 const SYNC_MS = 10_000;
 const PERSON = /^person-[a-z0-9]{6,}$/;
-const BASES = ["ltx-2.3", "ltx-2.5", "wan2.2-ti2v-5b"] as const;
-type Base = (typeof BASES)[number];
+const BASES: readonly string[] = ALL_BASE_IDS;
+type Base = BaseId;
 
 let lastSync = 0;
 let inflight: Promise<void> | null = null;

@@ -3,6 +3,7 @@
 // setting already guarantees it). The prompt and the reference picture travel in bodies and are never logged or
 // put in an error message (rule 6a). A test replaces `fetch` with `__setVideosFetchForTests`.
 import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
+import type { BaseId } from "@/lib/loras/baseFamilies";
 import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
 import type { StackLiveFields } from "@/lib/genLive";
 import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "@/lib/stack/fullView";
@@ -318,7 +319,7 @@ export async function removeVideoLora(id: string): Promise<void> {
 // VIDEO-LORA-07: the Stack's `video.lora.install` job (VIDEO-LORA-06). Home names the file; the Stack downloads it. The token rides in this one body only.
 export interface StackLoraInstallBody {
   source: "huggingface" | "civitai"; url: string; name: string; licence: string; licence_acknowledged: boolean; audience: "all-ages" | "adult";
-  trigger_words?: string[]; added_by?: string; base_model?: "ltx-2.3" | "ltx-2.5"; sha256_expected?: string; token?: string; source_url?: string;
+  trigger_words?: string[]; added_by?: string; base_model?: BaseId; sha256_expected?: string; token?: string; source_url?: string;
 }
 export class StackInstallRefused extends StackVideoError {
   constructor(status: number, code: string, message: string, readonly existingId: string | null = null) { super(status, code, message); this.name = "StackInstallRefused"; }
