@@ -5615,7 +5615,7 @@
             }
           },
           "409": {
-            "description": "Coding mode is not ready or the Stack could not start the switch.",
+            "description": "Coding mode is not ready or the Stack could not start the switch; the host guard file could not be updated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5774,6 +5774,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Mac self-check settings file could not be updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -24113,6 +24131,7 @@
                       "power",
                       "display-awake",
                       "wired-limit",
+                      "host-guard",
                       "no-auto-major-upgrade",
                       "remote-login",
                       "advice-accounts",
@@ -24307,6 +24326,7 @@
                       "power",
                       "display-awake",
                       "wired-limit",
+                      "host-guard",
                       "no-auto-major-upgrade",
                       "remote-login",
                       "advice-accounts",

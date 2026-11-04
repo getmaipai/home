@@ -492,6 +492,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/homeCardQueries.ts` | isFixedHomeCardQuery |
 | `backend/src/lib/homeListeners.ts` | startHomeListeners, attachHouseholdTlsRebind |
 | `backend/src/lib/homeSupervisorRoles.ts` | getHomeSupervisorRoles |
+| `backend/src/lib/hostGuardTuning.ts` | HOST_GUARD_STATE_DIR, writeHostGuardTuning, isHostGuardSetting |
 | `backend/src/lib/hostTune.ts` | HOST_TUNE_IDS, HostTuneItemSchema, detectHostTune, changeHostTune |
 | `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_PROVIDER_NAME, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed |
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
