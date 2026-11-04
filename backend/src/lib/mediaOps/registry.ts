@@ -3,7 +3,7 @@ import { ImageEditError, editToolsStatus } from "@/lib/imageEdit";
 import { roleHealth } from "@/lib/roleHealth";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
-import { CHILD_NO_PHOTOS_LINE, kidLaneOn } from "@/lib/pictures/lane";
+import { kidLaneOn } from "@/lib/pictures/lane";
 import type { MediaOp, MediaKind, MediaRef } from "./types";
 import type { PersonRow } from "@/types";
 const ops = new Map<string, MediaOp>();
@@ -65,10 +65,6 @@ export async function runMediaOp(actor: PersonRow, id: string, input: { source: 
  }
  const op = ops.get(id);
  if (!op) throw new ImageEditError(404, "Unknown media operation.", "not_found");
- const usesPeople = (input.args as { people?: unknown } | null)?.people;
- if ((op.id === "picture.locate" || (op.id === "picture.erase" && usesPeople)) && laneOfPerson(actor) === "child") {
-  throw new ImageEditError(422, CHILD_NO_PHOTOS_LINE, "child_cartoons_only");
- }
  if (!bandAllowed(actor, op.minBand)) {
   throw new ImageEditError(403, "This operation isn't available for this profile.", "forbidden");
  }

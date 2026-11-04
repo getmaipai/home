@@ -21,12 +21,12 @@ function person(id: string, role: string) { const now = new Date().toISOString()
   expect((await listMediaOps(child, { input: "picture" })).map(x => x.id)).toEqual(ids);
   expect(await listMediaOps(guest, { input: "picture" })).toEqual([]);
  });
- test("locate is helper-only and unavailable to children and guests", async () => {
+ test("locate is helper-only, open to every age, and refused to guests", async () => {
   resetDb(); __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: [], reason: null }, true);
   const adult = person("locate-adult", "owner"), teen = person("locate-teen", "teen"), child = person("locate-child", "child"), guest = person("locate-guest", "guest");
   expect((await listMediaOps(adult, { input: "picture", includeHelpers: true })).find((op) => op.id === "picture.locate")?.ready).toBe(true);
   expect((await listMediaOps(teen, { input: "picture", includeHelpers: true })).find((op) => op.id === "picture.locate")?.ready).toBe(true);
-  await expect(runMediaOp(child, "picture.locate", { source: { kind: "picture", via: "chat", id: "x", conversationId: "c" }, args: {} })).rejects.toMatchObject({ status: 422, code: "child_cartoons_only" });
+  expect((await listMediaOps(child, { input: "picture", includeHelpers: true })).find((op) => op.id === "picture.locate")?.ready).toBe(true);
   await expect(runMediaOp(guest, "picture.locate", { source: { kind: "picture", via: "chat", id: "x", conversationId: "c" }, args: {} })).rejects.toMatchObject({ status: 403 });
  });
  test("every op has descriptive copy and controls", () => { for (const op of registeredMediaOps()) { expect(op.label.length).toBeGreaterThan(0); expect(op.summary.length).toBeGreaterThan(0); expect(Array.isArray(op.controls)).toBe(true); } });

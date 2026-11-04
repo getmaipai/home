@@ -204,7 +204,7 @@ spoken) and the Studio words box. One routing step, the model's own tool choice 
   the Stack's `find_people`, which returns numbered boxes as fractions of the picture, and hands the boxes to the model, which picks the number (no
   regex or word list; the 2026-10-26 `choosePeople` and `resolvePosition` word rules are gone and stay gone). One chosen box is the area for `picture.erase` (remove) or
   `picture.change` (replace). `find_people` finds people only: objects ("the red car") have no tested locator, so they use `picture.change`
-  with the words alone until a bench (IMG-LATER). A child gets no `locate` (a located box is a mask, section 9). Readiness comes from
+  with the words alone until a bench (IMG-LATER). Every age may use `locate` and erase by people (owner ruling 2026-11-04: they make no content). Animals: the Stack finder detects people only, so an animal finder is a Stack slice (IMG-OPS-07). Readiness comes from
   `editToolsStatus` and `roleHealth`; when the reader is not ready the model uses `picture.change` with the words and says so. `locate` logs counts only (rule 6a).
 - **In the Studio box** a found person is handled inside the one forced call: the tool's `locate` step returns the boxes to the model within the same call and the model then names the box for `erase` or `change`; one call from the person's side, two steps inside it.
 - **Several people or none.** In chat and companion turns the tool returns the count and the positions as a kind of result and the model asks which

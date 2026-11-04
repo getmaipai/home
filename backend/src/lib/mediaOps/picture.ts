@@ -70,7 +70,7 @@ registerMediaOp({
   args: empty,
   controls: [],
   needs: null,
-  minBand: "teen",
+  minBand: "child",
   listed: false,
   run: async ({ actor, signal }, { source }) => {
     const status = await editToolsStatus(actor);
