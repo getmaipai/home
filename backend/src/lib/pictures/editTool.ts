@@ -16,7 +16,7 @@ import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract
 import { outcomeOf } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
-import { runPictureTool } from "./people";
+import { runPictureEdit } from "@/lib/mediaOps/registry";
 import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
 import { PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
@@ -117,17 +117,11 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   if (kind === "remove_background" || kind === "upscale") {
     // The Stack's non-generative tools: the same pixels, a cut-out or a bigger copy.
     try {
-      const job = await startPictureJob({
-        actor, conversationId: state.conversationId, turnId: state.turnId, temporary, kind: "edit", prompt: instruction,
-        body: { prompt: instruction, audience: "all-ages" },
-        edit: { sourceId: base.id, label: kind === "upscale" ? "Enlarged" : "Background removed", method: "tool" },
-        local: async (progress, signal) => {
-          progress(kind === "upscale" ? "enlarging" : "removing background", 20);
-          const made = await runPictureTool(kind, base.bytes, base.mediaType, kind === "upscale" ? { scale: "2" } : {}, signal);
-          return [{ b64_json: Buffer.from(made.png).toString("base64"), width: made.width, height: made.height, model: made.model, ms: made.ms }];
-        },
-      });
-      return started(callId, args, job.id, kind === "upscale" ? "The picture is being made bigger." : "The background is being removed.", laneOf(audience));
+      const result = await runPictureEdit(actor, kind, { source: { kind: "picture", via: "chat", id: base.id, conversationId: state.conversationId }, args: kind === "upscale" ? { scale: 2 } : {} });
+      const payload = "job" in result ? result.job : result.file;
+      const jobId = typeof payload === "object" && payload !== null && "job" in payload ? String((payload as { job: string }).job) : undefined;
+      if (!jobId) return failed(callId, args, "bad_operation_result", "errored");
+      return started(callId, args, jobId, kind === "upscale" ? "The picture is being made bigger." : "The background is being removed.", laneOf(audience));
     } catch (error) {
       return startFailure(callId, args, error);
     }

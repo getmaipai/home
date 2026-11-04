@@ -5,7 +5,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { ImageEditError, applyPreview, cancelEdit, startComment, editErrorFrom, editToolsStatus, listVersions, pollEdit, readPicture, readPreview, saveUploadedVersion, startEdit, type EditOperation } from "@/lib/imageEdit";
+import { ImageEditError, applyPreview, cancelEdit, editErrorFrom, editToolsStatus, listVersions, pollEdit, readPicture, readPreview, saveUploadedVersion } from "@/lib/imageEdit";
+import { runPictureEdit, getMediaOpJob } from "@/lib/mediaOps/registry";
 
 export const imageEditRoutes = apiRouter();
 
@@ -76,7 +77,7 @@ imageEditRoutes.openapi(editRoute, async (c) => {
   const actor = c.get("person");
   try {
     const form = await c.req.parseBody();
-    const operation = String(form.operation ?? "") as EditOperation;
+    const operation = String(form.operation ?? "") as "remove_background" | "erase" | "upscale" | "resize";
     if (!["remove_background", "erase", "upscale", "resize"].includes(operation)) throw new ImageEditError(400, "Pick a tool to run.", "bad_operation");
     const mask = form.mask instanceof File ? new Uint8Array(await form.mask.arrayBuffer()) : undefined;
     if (mask && mask.byteLength > 20 * 1024 * 1024) throw new ImageEditError(413, "The painted area is too big. Paint a smaller area.", "too_large");
@@ -86,8 +87,9 @@ imageEditRoutes.openapi(editRoute, async (c) => {
     const height = wholeNumber(form.height, 1, 8000);
     if (operation === "resize" && (width === undefined || height === undefined)) throw new ImageEditError(422, "Give a width and a height to resize to.", "size_required");
     if (operation === "upscale" && scale === undefined) throw new ImageEditError(422, "Upscale by 2 or 4.", "bad_scale");
-    const result = await startEdit(actor, String(form.conversation_id ?? ""), c.req.valid("param").id, { operation, mask, scale, width, height }, c.req.raw.signal);
-    return c.json(result, 200) as never;
+    const args = { ...(mask ? { mask } : {}), ...(scale !== undefined ? { scale } : {}), ...(width !== undefined ? { width } : {}), ...(height !== undefined ? { height } : {}) };
+    const result = await runPictureEdit(actor, operation, { source: { kind: "picture", via: "chat", id: c.req.valid("param").id, conversationId: String(form.conversation_id ?? "") }, args }, c.req.raw.signal);
+    return c.json("job" in result ? result.job : result.file, 200) as never;
   } catch (error) { return fail(c, error) as never; }
 });
 
@@ -98,7 +100,7 @@ const jobRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: ProgressSchema } }, description: "Running with a percent, or done with a preview, or failed." }, ...refusals },
 });
 imageEditRoutes.openapi(jobRoute, async (c) => {
-  try { return c.json(await pollEdit(c.get("person"), c.req.valid("param").job), 200) as never; } catch (error) { return fail(c, error) as never; }
+  try { return c.json(await getMediaOpJob(c.get("person"), c.req.valid("param").job), 200) as never; } catch (error) { return fail(c, error) as never; }
 });
 const cancelRoute = createRoute({
   method: "delete", path: "/jobs/{job}", tags: ["Image editor"], summary: "Stop a running edit", middleware: [requireAuth] as const,
@@ -154,6 +156,7 @@ const commentRoute = createRoute({
 imageEditRoutes.openapi(commentRoute, async (c) => {
   try {
     const body = c.req.valid("json");
-    return c.json(await startComment(c.get("person"), body.conversation_id, c.req.valid("param").id, { prompt: body.prompt, region: body.region ?? null, maskPng: body.mask ? new Uint8Array(Buffer.from(body.mask, "base64")) : null, referenceId: body.reference_id ?? null }), 200) as never;
+    const result = await runPictureEdit(c.get("person"), "change", { source: { kind: "picture", via: "chat", id: c.req.valid("param").id, conversationId: body.conversation_id }, args: { prompt: body.prompt, region: body.region ?? null, maskPng: body.mask ? new Uint8Array(Buffer.from(body.mask, "base64")) : null, referenceId: body.reference_id ?? null } });
+    return c.json("job" in result ? result.job : result.file, 200) as never;
   } catch (error) { return fail(c, error) as never; }
 });

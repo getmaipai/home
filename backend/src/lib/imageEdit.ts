@@ -1,4 +1,4 @@
-import { canReadFileAudience } from "@/lib/access";
+import { canReadFileAudience, fileAudience } from "@/lib/access";
 // IMGTOOLS-03/04: the picture editor's server half. The person opens a
 // picture they already have (a chat attachment) in the canvas and runs a
 // tool on it: remove the background, erase an object under a painted mask,
@@ -50,7 +50,7 @@ import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
 
 export class ImageEditError extends Error {
-  constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 500 | 502 | 503, message: string, readonly code = "failed") { super(message); }
+  constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 500 | 501 | 502 | 503, message: string, readonly code = "failed") { super(message); }
 }
 
 export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize"] as const;
@@ -160,10 +160,11 @@ export interface SourcePicture {
   sha256: string;
   /** The first picture this chain of edits started from. */
   rootId: string;
+  audience?: "all-ages" | "adult-only";
 }
 
 const EDIT_NOTE = "image-edit:";
-export interface EditProvenance { v: 1; op: EditProvenanceOp; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number }
+export interface EditProvenance { v: 1; audience?: "all-ages" | "adult-only"; op: EditProvenanceOp; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number }
 
 function parseProvenance(note: string): EditProvenance | null {
   if (!note.startsWith(EDIT_NOTE)) return null;
@@ -215,7 +216,7 @@ function loadSourceChecked(actor: PersonRow, conversationId: string, id: string,
     if (!conversation || conversation.personId !== actor.id) throw new ImageEditError(403, "You can edit pictures from your own chats. Save a copy of this one first.", "not_yours");
   }
   const provenance = parseProvenance(row.provenance);
-  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
 }
 
 export interface PictureVersion { id: string; url: string; label: string; created_at: string; op: EditProvenanceOp | "original"; width: number | null; height: number | null; media_type: string; source: string | null; source_sha256: string | null }
@@ -263,7 +264,8 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
   }
   const bytes = new Uint8Array(clean);
-  const provenance: EditProvenance & { audience?: "all-ages" | "adult-only" } = { v: 1, ...(meta.audience ? { audience: meta.audience } : {}), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
+  const audience = source.audience === "adult-only" || meta.audience === "adult-only" ? "adult-only" : "all-ages";
+  const provenance: EditProvenance & { audience?: "all-ages" | "adult-only" } = { v: 1, audience, op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
   if (source.temporary) {
     const id = newFileId();
     storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: provenance });

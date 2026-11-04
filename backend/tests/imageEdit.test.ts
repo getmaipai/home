@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
-import { __resetImageEditForTests, __setImageToolsForTests, regionForStack } from "@/lib/imageEdit";
+import { __resetImageEditForTests, __setImageToolsForTests, regionForStack, saveVersion, type SourcePicture } from "@/lib/imageEdit";
+import { getTemporaryChatImageForReader } from "@/lib/attachments";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import type { StackClient, StackImageToolsStatus } from "@/lib/stack/client";
 import { StackError } from "@/lib/stack/errors";
@@ -66,6 +67,15 @@ function editForm(conversationId: string, fields: Record<string, string>, mask?:
   if (mask) form.append("mask", new File([mask], "mask.png", { type: "image/png" }));
   return form;
 }
+
+
+  test("a saved edit keeps the strictest audience of its source", async () => {
+    const { actor } = await owner();
+    const source: SourcePicture = { id: "source-adult", conversationId: "temporary-audience", temporary: true, turnId: null, mediaType: "image/jpeg", name: "source", bytes: await jpegBytes(), sha256: "source-hash", rootId: "source-adult", audience: "adult-only" };
+    const png = new Uint8Array(Buffer.from(await pngBase64(), "base64"));
+    const version = await saveVersion(actor, source, png, { op: "resize", label: "Resized", audience: "all-ages" });
+    expect((getTemporaryChatImageForReader(actor, source.conversationId, version.id)?.edit as unknown as { audience?: string } | undefined)?.audience).toBe("adult-only");
+  });
 
 describe("regionForStack", () => {
   test("a box dragged backwards, a click and a huge box all become a valid region inside the picture", () => {
