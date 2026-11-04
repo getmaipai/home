@@ -19,8 +19,9 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
   }),
   SettingsKey.parse({
     key: "music.artist_wikimedia", scope: "household", selector: "boolean", default: true,
-    label: "Show artist photos and short bios from Wikimedia",
-    help: "In the background, Home asks Wikidata, Wikipedia and Wikimedia Commons about an artist you have songs by, using only the artist's public Wikidata id (found through MusicBrainz), to keep one photo and a two-sentence bio on your computer. Nothing about your home is sent. Never for an artist under 18. Off stops it; photos and bios already kept stay, and artists show the generated cover instead.",
+    label: "Show facts and photos from Wikimedia",
+    help: "In the background, Home asks Wikidata, Wikipedia and Wikimedia Commons about an artist you have songs by, and about each song, using only public ids found through MusicBrainz. It keeps one photo, a short bio and a short fact on your computer. Nothing about your home is sent. Never for an artist under 18. Off stops it; what is already kept stays, and artists show the generated cover instead.",
+    copy: { does: "Shows facts and photos about your artists and songs, kept on your computer." },
     level: "advanced", secret: false, lives_in: "household.media_lookups", honoured_by: ["home"],
   }),
   SettingsKey.parse({

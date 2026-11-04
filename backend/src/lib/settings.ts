@@ -723,7 +723,7 @@ export function setValue(
 
   const auth = isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
-    : (isCodingPersonKey(key) || key === "ui.home_layout") && parsed.kind === "person"
+    : (isCodingPersonKey(key) || key === "ui.home_layout" || key === "music.dj") && parsed.kind === "person"
     ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
     : key === COMPANIONS_ALLOWED_KEY
       ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
@@ -994,7 +994,7 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   const auth = isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
-    : (isCodingPersonKey(key) || key === "ui.home_layout") && parsed.kind === "person"
+    : (isCodingPersonKey(key) || key === "ui.home_layout" || key === "music.dj") && parsed.kind === "person"
     ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
     : key === COMPANIONS_ALLOWED_KEY
     ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)

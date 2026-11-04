@@ -115,6 +115,8 @@ describe("settings guard agreement metadata", () => {
         expectedDefaults.teen = coding!.teen as never;
         if ("adult" in coding!) expectedDefaults.adult = coding!.adult as never;
       }
+      // MUSIC-DJ-01: the DJ is off for a child and a teen until a parent turns it on (spec band_default).
+      if (key.key === "music.dj") { expectedDefaults.child = "off" as never; expectedDefaults.teen = "off" as never; }
       if (key.key === "ease.preset") expectedDefaults.child = "simple";
       if (key.key === "ease.reading_level") expectedDefaults.child = "plain";
       expect(key.band_default, `${key.key} band default`).toEqual(expectedDefaults);
