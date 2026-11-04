@@ -32,6 +32,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [ambient-companion-2026-10-27.md](ambient-companion-2026-10-27.md) | owner ruling (RULES.md S2) | ambient companion ruling |
 | [bots-in-the-ambient-companion-2026-10-31.md](bots-in-the-ambient-companion-2026-10-31.md) | current | BOTS-AMBIENT-01 |
 | [auto-close-apps-2026-10-30.md](auto-close-apps-2026-10-30.md) | proposed, not decided, not built | MEM-SPACE-07 to -12 |
+| [host-guard-2026-11-03.md](host-guard-2026-11-03.md) | current | HOST-GUARD-00 to -06 |
 | [chat-cards-2026-10-18.md](chat-cards-2026-10-18.md) | design and audit only; nothing built | chat cards rows |
 | [chat-engine-comparison-2026-10-17.md](chat-engine-comparison-2026-10-17.md) | built on Stack side | ENGINE-MLX-01 |
 | [clock-and-reminders-redesign-2026-10-30.md](clock-and-reminders-redesign-2026-10-30.md) | design from owner mockups | Clock and Reminders rows |
