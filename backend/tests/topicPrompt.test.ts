@@ -192,6 +192,8 @@ const EXEMPT: Record<string, string> = {
   "lib/turnMachine/researchPipeline.ts": "the understand, plan and analysis stages of a research turn, JSON or notes handed to the writing round; the writing round that answers the person carries the topic block",
   "lib/music/album.ts": "writes a made-up album record (title, blurb, cover words, song titles) for an adult only (make_album is min_role adult, offered on an adult's own written screen); the tool runs inside a chat turn that carries the topic block, and the card gives no advice",
   "lib/music/band.ts": "writes a made-up band record (name, history, sound words) for an adult only (make_band is min_role adult, offered on an adult's own written screen); the tool runs inside a chat turn that carries the topic block, and the card gives no advice",
+  "lib/music/djLines.ts": "writes a one or two sentence host line from the track's tags and stored facts for the music player; the line is stored and spoken only when it passes the child text check (bandAllows at the child band) for that person, and it is never a chat reply",
+  "lib/music/lyricsTranslate.ts": "translates stored lyric lines for the lyrics view; a translation with any line that trips the same text check lyrics pass at ingest (band outranks the toggle) is dropped and never stored, and it is never a chat reply",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",

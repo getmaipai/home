@@ -218,7 +218,7 @@ export function platformConnections(): PrivacyConnection[] {
     }),
     row("platform:music-song-facts", getHouseholdSettingValue("music.artist_wikimedia") !== false ? "musicbrainz.org, wikidata.org, en.wikipedia.org" : null, {
       when: "in the background after MusicBrainz matches a song, at about one recording per second; never when a song plays. Turn off Show facts and photos from Wikimedia in Music settings to stop new lookups.",
-      what: "MusicBrainz gets the matched recording's public id. Wikidata and Wikipedia get only linked public ids and the page title, plus your home's internet address. No song title, listening history, name, account or cookie is sent.",
+      what: "MusicBrainz gets the matched recording's public id. Wikidata and Wikipedia get only linked public ids and the page title, plus your home's internet address. Nothing anyone in the house said or saved is sent: no song title, listening history, name, account or cookie.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
