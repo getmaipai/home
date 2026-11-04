@@ -69,6 +69,8 @@ export const HLC_BEARING_TABLES = [
   "music_album_covers",
   "music_artist_profiles",
   "music_jobs",
+  "music_lyric_translations",
+  "music_song_facts",
   "song_styles",
   "made_artists",
   "made_albums",
