@@ -659,6 +659,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/bandActions.ts` | BAND_ACTION_NAMES, runBandAction |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
+| `backend/src/lib/music/djLines.ts` | DJ_ANGLES, DJ_LINE_PROMPT, writeDjLine, synthesizeDjLine, saveDjLine, pruneDjLines |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, prepareOwnedStemsJob |
 | `backend/src/lib/music/libraryAlign.ts` | QUICK_WINDOW_S, QUICK_LEAD_S, INSTANT_MATCH_S, RETRY_AFTER_MS, LIBRARY_ALIGN_MAX_BYTES, __setLibraryAlignPollMsForTests |
 | `backend/src/lib/music/lyricsAlign.ts` | buildLines, keepOrdered, spaceUnanchored, reconcile |
