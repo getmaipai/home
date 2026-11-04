@@ -20,8 +20,8 @@ const sampleBoxes = [
 
 function addOwner(): PersonRow {
   const now = new Date().toISOString();
-  db.insert(people).values({ id: "locate-owner", displayName: "Owner", role: "owner", avatarSeed: "owner", source: "test", createdAt: now, updatedAt: now, hlc: "1:0:test00" }).run();
-  return db.select().from(people).all().find((row) => row.id === "locate-owner")!;
+  db.insert(people).values({ id: "person-locateowner", displayName: "Owner", role: "owner", avatarSeed: "owner", source: "test", createdAt: now, updatedAt: now, hlc: "1:0:test00" }).run();
+  return db.select().from(people).all().find((row) => row.id === "person-locateowner")!;
 }
 
 function imageToolsStub(imageEdit: (form: FormData) => Promise<unknown>) {
@@ -165,9 +165,9 @@ describe("picture people operations", () => {
       const url = String(input);
       if (url.endsWith("/stack/v1/image/loras")) {
         return new Response(JSON.stringify({ loras: [{
-          id: "watercolor",
+          id: "lora-cccccccccccccccc",
           name: "Watercolor",
-          sha256: "hash",
+          sha256: "a".repeat(64),
           bytes: 1,
           base_model: "base",
           licence: null,
