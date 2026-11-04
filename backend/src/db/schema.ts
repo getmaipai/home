@@ -2080,6 +2080,16 @@ export const musicArtistProfiles = sqliteTable("music_artist_profiles", {
   provenance: text("provenance").notNull(),
 });
 
+// MUSIC-FACTS-01: local two-sentence fact for a matched MusicBrainz recording.
+export const musicSongFacts = sqliteTable("music_song_facts", {
+  musicbrainzRecordingId: text("musicbrainz_recording_id").primaryKey(),
+  status: text("status").notNull(),
+  summary: text("summary"),
+  pageUrl: text("page_url"),
+  fetchedAt: text("fetched_at").notNull(),
+  hlc: text("hlc").notNull(),
+});
+
 // MUSIC-STUDIO-S2, MUSIC-LISTEN-C5: a saved song style and a band the household made. Both tables share one column set and one
 // store (lib/music/madeRecords.ts). `name` is the style's title or the band's name, kept as a column for listing and ordering;
 // `body` is the rest of the spec record (style, seed, shared_to and the band's own fields) as JSON. A person's own words live

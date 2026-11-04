@@ -65,6 +65,7 @@ import {
   mediaWatchSessions,
   mediaItems,
   musicArtistProfiles,
+  musicSongFacts,
   musicAlbumCovers,
   mediaSources,
   newsInterests,
@@ -237,6 +238,7 @@ export function resetDb(): void {
   db.delete(mediaWatchDays).run();
   db.delete(mediaItems).run();
   db.delete(musicArtistProfiles).run();
+  db.delete(musicSongFacts).run();
   db.delete(musicAlbumCovers).run();
   forgetAlbumCovers();
   db.delete(mediaSources).run();

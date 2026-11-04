@@ -173,6 +173,26 @@
           ]
         },
         {
+          "type": "media_shelf",
+          "bind": {
+            "source": "package",
+            "path": "up-next",
+            "params": {
+              "id": "$state.id",
+              "scope": "fact"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "density": "compact",
+          "hide_when_empty": true
+        },
+        {
           "type": "creation_header",
           "variant": "byline",
           "bind": {

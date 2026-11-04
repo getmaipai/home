@@ -16,6 +16,12 @@ test("Music uses the audio player and routes tracks to Now playing", () => {
   expect(playRoute("track","media-song000001")).toBe("/apps/music/play?id=media-song000001");
 });
 
+test("Now playing has a Did you know shelf after the player that hides when empty", () => {
+  const doc=JSON.parse(readFileSync(resolve(pages,"play.json"),"utf8"));
+  const main=doc.body[0].main;
+  expect(main[1]).toMatchObject({type:"media_shelf",hide_when_empty:true,orientation:"vertical",variant:"plain",bind:{source:"package",path:"up-next",params:{id:"$state.id",scope:"fact"}}});
+});
+
 test("a music element requests autoplay for queue transitions", async () => {
   const { createMediaStore } = await import("./mediaHost");
   const store = createMediaStore();

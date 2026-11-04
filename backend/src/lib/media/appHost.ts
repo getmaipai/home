@@ -32,6 +32,7 @@ import { libraryProvenance } from "@/lib/libraryProvenance";
 import { speakerAgeBand } from "@/lib/ageBand";
 
 import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
+import { songFactFor } from "./songFacts";
 import { getMade } from "@/lib/music/madeRecords";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 
@@ -71,6 +72,7 @@ export interface MediaRow {
 }
 
 export interface MediaItemView extends MediaRow {
+  song_fact?: { summary: string; url: string };
   /** MEDIA-DETAIL-04c: the Edit sheet shows only when true; the cover picker lists these (newest first, up to 24). */
   can_edit?: boolean;
   cover_choices?: Array<{ file_id: string; url: string; alt: string }>;
@@ -750,6 +752,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
     ...base, channel: item.subtitle, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),
     chapters: item.chapters.map((chapter) => ({ start_s: chapter.start_s, title: chapter.title })), captions: [],
     ...(facts ? { facts } : {}),
+    ...(appId === "music" && item.kind === "track" ? (() => { const fact = songFactFor(item, person); return fact ? { song_fact: fact } : {}; })() : {}),
     ...(seconds !== undefined && !progress?.completed ? { position_s: seconds } : {}),
     ...(appId === "books" ? {} : (() => { const can = isOwnerOrAdmin(person) || mediaBandOf(person) === "adult"; return { can_edit: can, cover_choices: can ? coverChoices(person) : [] }; })()),
     liked: collectionIds(person, "liked").includes(item.id), watch_later: collectionIds(person, "watch_later").includes(item.id),
@@ -1191,6 +1194,12 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
   if (dataId === "playlists" && params.query !== undefined) return nameMatches(visiblePlaylists(person).map((collection) => playlistTile(person, collection)), params.query).slice(0, 12);
   if (dataId === "artist" && params.scope === "popular") return popularTracks(person, params.id ?? "");
   if (dataId === "artist-albums" && params.scope) return discography(person, params.id ?? "", params.scope);
+  if (dataId === "up-next" && params.scope === "fact") {
+    // One text-only tile under the player: the stored Wikipedia fact for the playing song, band-checked for this reader; nothing when there is none.
+    const item = params.id ? readableIn(person, "music", params.id) : null;
+    const fact = item && item.kind === "track" ? songFactFor(item, person) : null;
+    return fact ? [{ ...rowsOf(person, [item!])[0]!, title: "Did you know?", channel: `${fact.summary} (Wikipedia)`, source_url: fact.url, thumbnail: null, backdrop: null, playing: false }] : [];
+  }
   if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
   if (dataId === "songs") { saveBandSingles(person); return trackRows(person, musicLibrary(person)); }
   if (dataId === "albums") {

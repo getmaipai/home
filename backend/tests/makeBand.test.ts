@@ -26,7 +26,7 @@ function song(mbArtist: string | null) {
     musicbrainzArtistId: mbArtist, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: stamp.createdAt, ...stamp }).run();
 }
 function client(genres: string[], calls: string[] = []): MusicBrainzClient {
-  return { searchRecordings: async () => [], lookupArtistWikidata: async () => null, lookupArtistGenres: async (id) => { calls.push(id); return genres; } };
+  return { searchRecordings: async () => [], lookupArtistWikidata: async () => null, lookupRecordingRelations: async () => ({}), lookupArtistGenres: async (id) => { calls.push(id); return genres; } };
 }
 
 beforeEach(() => {

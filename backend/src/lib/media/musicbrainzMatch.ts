@@ -77,6 +77,7 @@ export interface ClientDeps {
 export interface MbCredit { name?: string; joinphrase?: string; artist?: { id?: string; name?: string } }
 export interface MbRelease { id?: string; title?: string; "release-group"?: { id?: string }; media?: Array<{ track?: Array<{ number?: string }>; "track-offset"?: number }> }
 export interface MbRecording { id?: string; title?: string; score?: number; length?: number; "artist-credit"?: MbCredit[]; releases?: MbRelease[] }
+export interface MbRecordingRelations { relations?: Array<{ type?: string; url?: { resource?: string } }> }
 
 export class MusicBrainzUnavailable extends Error {}
 
@@ -86,6 +87,8 @@ export interface MusicBrainzClient {
   lookupArtistWikidata(artistId: string): Promise<string | null>;
   /** MUSIC-LIKE-01: the artist's public genre names, for a band made "like" a playing song. Only the artist's MusicBrainz id is sent. */
   lookupArtistGenres(artistId: string): Promise<string[]>;
+  /** MUSIC-FACTS-01: the recording's linked Wikipedia page or Wikidata entity. */
+  lookupRecordingRelations(recordingId: string): Promise<MbRecordingRelations>;
 }
 
 /** One client holds the one queue: every request to MusicBrainz from this process goes through it, so the spacing is global. */
@@ -158,6 +161,14 @@ export function createMusicBrainzClient(deps: ClientDeps = {}): MusicBrainzClien
       url.searchParams.set("fmt", "json");
       const body = (await getJson(url)) as { genres?: Array<{ name?: string; count?: number }> } | null;
       return (body?.genres ?? []).filter((g) => typeof g.name === "string" && g.name !== "").sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).slice(0, 6).map((g) => g.name!);
+    },
+    async lookupRecordingRelations(recordingId) {
+      if (!UUID.test(recordingId.toLowerCase())) return {};
+      const url = new URL(`${baseUrl()}/ws/2/recording/${recordingId}`);
+      url.searchParams.set("inc", "url-rels+work-rels");
+      url.searchParams.set("fmt", "json");
+      const body = (await getJson(url)) as MbRecordingRelations | null;
+      return body ?? {};
     },
   };
 }

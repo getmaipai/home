@@ -37,3 +37,5 @@ You can fill the form yourself, or ask in chat, for example "Make an album calle
 You can also change one right in chat. Open its card and choose Edit, or ask Home to change it.
 
 Every change keeps the earlier version, so nothing is lost. Children and teens do not see these pages.
+
+For songs matched to MusicBrainz, Home can keep a short fact from the Wikipedia page linked to that recording. It looks up facts in the background, never while a song plays; a song without a linked page has no fact. The **Show facts and photos from Wikimedia** setting controls both song facts and artist photos and bios.

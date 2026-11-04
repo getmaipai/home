@@ -216,6 +216,10 @@ export function platformConnections(): PrivacyConnection[] {
       when: "only when someone opens Lyrics on a song that has no words yet, never for a song made at home, never for a child, once per song, at most one request a second. Turn it off under Music settings.",
       what: "the song's title, artist, album and length, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, account, cookie or listening history.",
     }),
+    row("platform:music-song-facts", getHouseholdSettingValue("music.artist_wikimedia") !== false ? "musicbrainz.org, wikidata.org, en.wikipedia.org" : null, {
+      when: "in the background after MusicBrainz matches a song, at about one recording per second; never when a song plays. Turn off Show facts and photos from Wikimedia in Music settings to stop new lookups.",
+      what: "MusicBrainz gets the matched recording's public id. Wikidata and Wikipedia get only linked public ids and the page title, plus your home's internet address. No song title, listening history, name, account or cookie is sent.",
+    }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
       what: "the words searched, and your home's internet address. Nothing else anyone in the house said or saved.",
