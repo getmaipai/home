@@ -105,6 +105,102 @@ Pass bar: an arm is the default for a subject type when it scores at least 4 of 
 4. May the bench use CivitAI-style character LoRAs or only models in the Stack catalog? Recommend: catalog only.
 5. Should a saved subject (sheet) be shared household-wide or private to its creator? Recommend: private by default, shareable.
 
+## 8. Per-shot consistency for video (characters, objects, scenery)
+
+Jesse's addition (2026-11-04): a shot must keep its character, its objects and its scenery. Sources are dated as found 2026-11-04.
+
+### 8.1 What we already have for shots
+
+- **Designed, not built:** `video-create-2026-11-01.md` plans `generate_video` inputs `start_frame`, `end_frame`, `character`, `place`, `recipe`; backlog
+  VIDEO-CREATE-01 V4 "Characters and Places, spec first" and V5 Storyboard, stitch, voice overlay. Its pick: a character is saved reference pictures, no training first.
+- **Built or queued:** `continue` (last frame of a clip, then a picture start; EDITOR-15), `join` (cut or crossfade, up to 6 pieces), the Studio edit
+  surface (VIDEO-STUDIO-*), VIDEO-INPUTS-01 picture start and optional end frame on LTX-2.5, VIDEO-INPUTS-03 Start and End slots (End needs a bench),
+  VIDEO-INPUTS-06 extend and retake. Companion clips already work from one approved rest picture (CMEDIA-STATES). `media_template` is one record for
+  images and later videos (IMG-TPL-01).
+- **Missing:** a saved object or scenery, one shot list that says who, what and where, and any measure of sameness from shot to shot.
+
+### 8.2 One shared concept: the household Cast, Props and Places library
+
+One definition (principle 4), used by Create (images), the Studio, templates, chat tools and video shots. V4's "Characters and Places" becomes this, with Props added.
+- **A saved subject** has: a name; a kind (character, prop, place); who owns it and who may use it (private by default, shareable); a one-line look
+  description (words the tools start from); approved reference pictures; for a character a voice (optional); a "real" flag when it is a real person or
+  animal (drives consent and child rules); the pictures' provenance and clock stamp like every record; optionally a trained style (LoRA) from step 4 of the ladder.
+- **References by kind:** character = front, two three-quarters, back, one close face (section 5, step 2). Prop = front, side, top, one in-use picture, on plain background.
+  Place = one wide establishing plate, plus 3 to 4 angles of the same room or spot (made by editing the plate), no people in them, plus a time-of-day variant if needed.
+- **Where it lives:** a spec record in `commons/spec` (additive, spec first, like `media_template`); the files in the Library; companions are characters
+  that also have states. Home owns it; the Stack only receives pictures.
+- **How a shot picks subjects:** a shot lists its subjects (who, what, where) by name. Chat resolves names ("Rex on the beach with the red kite") the way it resolves
+  styles today; Create shows chips. The shot's first frame is built from at most 4 references: the place plate first, then the characters, then the prop.
+  More than 4 subjects in one frame is refused with a plain line (split the shot).
+
+### 8.3 Per-shot method, cheapest first
+
+1. **Keyframe first.** For each shot, make its first frame as a picture (Klein 4B, subject references, place plate as one reference), the person approves it, then
+   animate that frame. This moves the hard consistency problem into the image engine we already measured, and a person can fix one picture cheaply.
+   LTX's own guide calls anchoring to a reference at frame 0 the most accessible method and says to reuse the same reference in every clip
+   ([LTX](https://ltx.io/blog/how-to-maintain-character-consistency-in-ai-video)).
+2. **Re-pin every clip.** A continued clip starts from the approved reference or a re-edited last frame, never from the raw last frame alone (the raw last frame carries the
+   previous clip's drift). Chunk long shots into short segments and chain by keyframe; sources agree consistency over time is the weak point
+   ([review of LTX-2.3 modes](https://www.mindstudio.ai/blog/ltx-2-3-video-to-video-modes-results)).
+3. **First and last frame pinning.** LTX-2.3 takes guide images at chosen frame positions in ComfyUI workflows ([RunComfy](https://www.runcomfy.com/comfyui-workflows/ltx-2-3-first-last-frame-in-comfyui-keyframe-to-smooth-video));
+   a community post saw the last frame come out blurrier without re-conditioning at the upscale stage ([post](https://t.me/s/rStableDiffusion/61914)). We have it only as a
+   plan (VIDEO-INPUTS-01/03); bench first. Pinning both ends of a shot also locks the scenery start and end.
+4. **Scenery lock.** Make the plate once; every shot's keyframe is an edit of the plate (character added to it), so walls, light and layout come from one source. Moving
+   camera shots: pin a first frame from a new angle of the plate. Pure video models do not remember a room between clips; the plate is the memory.
+5. **Objects.** A prop is held in the keyframe (reference edit places it). Inside the clip the model may morph it, so keep prop shots short (about 4 s) and
+   the prop large in frame; check with the object score. Fallback: composite a cut-out prop over a generated clip (we already cut out backgrounds). No open
+   LTX reference-to-video for objects was found.
+6. **Open reference-to-video exists on Wan, not LTX.** Wan2.1 VACE (Apache-2.0) takes reference faces, animals and objects; Phantom (up to 4 references) and MAGREF do
+   multi-subject ([VACE](https://arxiv.org/html/2503.07598v1), [summary](https://nathanshipley.github.io/banodoco-kb/kb/wan/index.html)). Jesse rejected Wan on quality
+   (2026-11-01), so this stays a comparison bench arm only, not a plan. Wan 2.7 R2V is hosted; its open status is unconfirmed.
+7. **LTX today, honestly.** LTX-2.3 (what the Stack runs): start picture and first/last guides; an official reference-sheet IC-LoRA (character, props, locations on a
+   sheet) is gated on Hugging Face ([card](https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients)) and its licence terms must be read before use; users report
+   image conditioning can change face, hair and clothing ([LTX-2 issue 255](https://github.com/Lightricks/LTX-2/issues/255)). LTX-2.5 claims native multi-shot scenes,
+   but the only source is one third-party guide (unverified). Treat reference-sheet and multi-shot as "to bench", not "can".
+8. **Length and seed.** Short shots (4 to 6 s) hold identity better; one third-party comparison saw face drift past about 6 s on Wan
+   ([comparison](https://magichour.ai/blog/ltx-2-3-vs-wan-2-2)), and LTX shows similar behaviour in user reports. Keep a seed per shot; run best of 3 seeds scored by the
+   section 8.5 score, as the companion pipeline does. Crowded, many-subject prompts hurt consistency ([same sources](https://www.eachlabs.ai/ltx/ltx-v2-5/ltx-2-5-audio-to-video-pro)).
+9. **Voice.** LTX makes sound, and its audio-to-video path holds a given voice across shots (vendor claim, untested by others). Safer for us: make dialogue with our own
+   speech tool in the character's voice and lay it over silent or lip-synced shots, as VIDEO-STUDIO already does (`synthesizeSpeech`, `mix`). Same voice from the library record.
+10. **Careful mode (opt-in, slow):** Qwen-Image-Edit-2511 for the keyframe (6 min each), more seeds, a post-render score with automatic retry up to 3 times, and a person approves
+    each keyframe. Offered when the quick score fails.
+
+### 8.4 Drift across a chain of clips, and how to measure it
+
+Drift grows each hand-off (last frame to next start). Measure on every clip: compare sampled frames (first, middle, last) to the subject's approved references.
+
+### 8.5 Per-shot score
+
+For each shot, 1 to 5 each: **character match** (face-embedding or DINOv2 cosine to the sheet plus a chat-model check of clothes and colours), **object match** (DINOv2
+crop similarity plus the model reading logo/text), **scenery match** (global-embedding and colour-histogram distance to the plate, layout check by the chat model),
+and **motion sanity** (no morphing, flicker; frame-difference spike count). The blind A/B by Jesse on a contact sheet (three frames per shot) decides; the numbers
+flag regressions. Chain drift = the slope of character and scenery scores across shots 1, 2, 3.
+
+### 8.6 Video bench cases (add to section 6; cheapest first)
+
+- **V0 (minutes, picture engine only):** build the keyframes for the 3-shot sequence below with Klein and the plate; score them. If keyframes fail, video cannot pass.
+- **V1:** 3-shot sequence, one cartoon character, one prop (red kite), one place (beach plate). Shot 1 wide, shot 2 close-up of the prop in hand, shot 3 a new
+  angle of the same beach. Arms: (a) text only, (b) keyframe-first from references, (c) keyframe plus last-frame pin, (d) raw last-frame chain with no re-pin.
+- **V2:** same with a pet from 3 photos.   **V3:** same with a product (bottle) as the prop.
+- **V4:** 6-clip continue chain, measure the drift slope with and without re-pinning.
+- **V5:** the reference-sheet IC-LoRA (once its terms are read) against keyframe-first; Wan VACE as a comparison arm only.
+- **V6:** voice: one character speaking in 3 shots, our speech tool against LTX audio-to-video, listen blind.
+Run V0 and V1 first (one LTX clip is about 15 s at 43 GB peak, so only one at a time, chat unloaded per the resource order). Two seeds each, then best of 3 for the winner.
+
+### 8.7 Rules for the video part
+
+Local only, nothing fetched at run time (the IC-LoRA needs a one-time licence accept, a Jesse step). Real adults: household option and the Stack proof as today. Real
+children: the owner chose a real child's photos only with parent opt-in, and the architect rules on that first, so the library blocks a "real" child subject until it does;
+invented characters are fine. The adult/teen/child gates stay in front of every shot. A prop or place with a real person visible counts as a real-person subject.
+
+### 8.8 New open questions
+
+1. Rename V4 "Characters and Places" to Cast, Props and Places and add Props now (recommended: yes, one record, spec first)?
+2. Is a shot limit of 4 references per frame and 4 to 6 s per shot acceptable for the first release?
+3. Read and accept the gated reference-sheet IC-LoRA terms for the bench (your step, one click)?
+
+Unverified in section 8: LTX-2.5 native multi-shot, LTX audio voice holding across shots, any LTX reference-to-video for objects, and whether the IC-LoRA runs in our MLX build.
+
 ## Not checked
 
 Qwen-Image-Edit-2511 date and licence come from HF mirrors; PuLID's own licence text; whether mflux trains Klein 4B directly on this Mac and how fast;
