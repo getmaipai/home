@@ -67930,11 +67930,23 @@
                   "licence_confirmed": {
                     "type": "boolean"
                   },
+                  "media": {
+                    "type": "string",
+                    "enum": [
+                      "video",
+                      "picture"
+                    ],
+                    "default": "video"
+                  },
                   "base_model": {
                     "type": "string",
                     "enum": [
                       "ltx-2.5",
-                      "ltx-2.3"
+                      "ltx-2.3",
+                      "wan2.2-ti2v-5b",
+                      "flux2-klein-4b",
+                      "z-image-turbo",
+                      "ernie-image-turbo"
                     ]
                   },
                   "confirm_ticket": {
