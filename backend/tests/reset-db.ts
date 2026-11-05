@@ -61,6 +61,7 @@ import {
   loras,
   mediaCollections,
   mediaSubjects,
+  mediaProductions,
   mediaProgress,
   mediaWatchDays,
   mediaWatchSessions,
@@ -327,6 +328,7 @@ export function resetDb(): void {
   db.delete(madeArtists).run(); // MUSIC-LISTEN-C5
   db.delete(madeAlbums).run(); // MUSIC-STUDIO-ALBUM
   db.delete(madeRevisions).run(); // MUSIC-STUDIO-EDIT
+  db.delete(mediaProductions).run();
   db.delete(mediaSubjects).run(); // IMG-SUBJECT-01: owner_person_id references people
   db.delete(people).run();
 }

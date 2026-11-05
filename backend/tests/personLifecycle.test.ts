@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
-import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets } from "@/db/schema";
+import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets, mediaProductions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { newPersonId } from "@/lib/id";
 import { hashSecret } from "@/lib/secret";
@@ -10,11 +10,22 @@ import {
   memorializePerson,
   disableExpiredGuests,
   applyAgeBandChanges,
+  erasePersonData,
 } from "@/lib/personLifecycle";
+import { createMediaProduction } from "@/lib/mediaProductions";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
 
 beforeEach(() => resetDb());
+
+test("person erasure deletes their media productions", () => {
+  const owner = insertPerson({ role: "owner" });
+  createMediaProduction(owner, { title: "Private cut" });
+  expect(db.select().from(mediaProductions).all()).toHaveLength(1);
+  // Erasure uses the same transactional deletion path as deletePerson; exercise it directly here.
+  erasePersonData(owner.id, []);
+  expect(db.select().from(mediaProductions).all()).toEqual([]);
+});
 
 function insertPerson(overrides: Partial<typeof people.$inferInsert> = {}): PersonRow {
   const now = new Date().toISOString();

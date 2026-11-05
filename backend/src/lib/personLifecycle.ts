@@ -407,6 +407,8 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   const ownedProjects = db.select({ id: projects.id }).from(projects).where(eq(projects.person, personId)).all();
   projectDirsAfterCommit.push(...ownedProjects.map((project) => join(projectsDir, project.id)));
   const projectRows = sqlite.query("DELETE FROM projects WHERE person = ?").run(personId).changes;
+  // PRODUCTION-01: productions are private creator data and are erased with their owner.
+  sqlite.query("DELETE FROM media_productions WHERE owner_person_id = ?").run(personId);
   // Lists belong to an individual only when explicitly person-scoped.
   // Household lists can carry an incidental person value and remain.
   sqlite.query("DELETE FROM lists WHERE scope = 'person' AND person = ?").run(personId);

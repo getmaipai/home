@@ -2350,6 +2350,33 @@ export const mediaSubjects = sqliteTable(
   (table) => [index("media_subjects_owner_idx").on(table.ownerPersonId)],
 );
 
+// PRODUCTION-01: the spec's private, shareable production record. Structured media stays in JSON
+// so script/cast edits remain additive operations over one portable record.
+export const mediaProductions = sqliteTable(
+  "media_productions",
+  {
+    id: text("id").primaryKey(),
+    ownerPersonId: text("owner_person_id").notNull().references(() => people.id),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    sharedTo: text("shared_to").notNull().default("[]"),
+    cast: text("cast").notNull().default("[]"),
+    sets: text("sets").notNull().default("[]"),
+    props: text("props").notNull().default("[]"),
+    episodes: text("episodes").notNull().default("[]"),
+    clipFileIds: text("clip_file_ids").notNull().default("[]"),
+    pictureFileIds: text("picture_file_ids").notNull().default("[]"),
+    musicLineIds: text("music_line_ids").notNull().default("[]"),
+    voiceLineIds: text("voice_line_ids").notNull().default("[]"),
+    finishedCutFileIds: text("finished_cut_file_ids").notNull().default("[]"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [index("media_productions_owner_idx").on(table.ownerPersonId)],
+);
+
 export const newsInterests = sqliteTable(
   "news_interests",
   {

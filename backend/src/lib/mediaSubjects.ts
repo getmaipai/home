@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, mediaSubjects, people } from "@/db/schema";
+import { attachments, mediaSubjects, mediaProductions, people } from "@/db/schema";
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { attachmentFilePath } from "@/lib/attachments";
@@ -39,7 +39,17 @@ export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<
   db.update(mediaSubjects).set({ name, kind: updated.kind, look, referenceIds: JSON.stringify(ids), real: updated.real ?? false, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, id)).run();
   return getMediaSubject(actor, id);
 }
-export function deleteMediaSubject(actor: PersonRow, id: string): boolean { const row = rowById(id); if (!row || row.ownerPersonId !== actor.id) return false; db.delete(mediaSubjects).where(eq(mediaSubjects.id, id)).run(); return true; }
+export function deleteMediaSubject(actor: PersonRow, id: string): boolean {
+  const row = rowById(id); if (!row || row.ownerPersonId !== actor.id) return false;
+  const names = db.select().from(mediaProductions).all().filter((p) => p.ownerPersonId === actor.id).filter((p) => {
+    const cast = JSON.parse(p.cast) as Array<{subject_id:string;wardrobe_variant_ids?:string[]}>;
+    const sets = JSON.parse(p.sets) as string[], props = JSON.parse(p.props) as string[];
+    const episodes = JSON.parse(p.episodes) as Array<{scenes:Array<{shots:Array<{subject_ids:string[]}>}>}>;
+    return cast.some((c) => c.subject_id === id || c.wardrobe_variant_ids?.includes(id)) || sets.includes(id) || props.includes(id) || episodes.some((e) => e.scenes.some((s) => s.shots.some((shot) => shot.subject_ids.includes(id))));
+  }).map((p) => p.title);
+  if (names.length) throw new Error(`This subject is used in ${names.join(", ")}. Remove it from those productions first.`);
+  db.delete(mediaSubjects).where(eq(mediaSubjects.id, id)).run(); return true;
+}
 export function shareMediaSubject(actor: PersonRow, id: string, personId: string, shared: boolean): MediaSubject | null {
   const row = rowById(id); if (!row || row.ownerPersonId !== actor.id) return null;
   const target = db.select({ id: people.id, role: people.role }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
