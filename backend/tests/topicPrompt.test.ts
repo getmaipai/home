@@ -194,6 +194,7 @@ const EXEMPT: Record<string, string> = {
   "lib/music/band.ts": "writes a made-up band record (name, history, sound words) for an adult only (make_band is min_role adult, offered on an adult's own written screen); the tool runs inside a chat turn that carries the topic block, and the card gives no advice",
   "lib/music/djLines.ts": "writes a one or two sentence host line from the track's tags and stored facts for the music player; the line is stored and spoken only when it passes the child text check (bandAllows at the child band) for that person, and it is never a chat reply",
   "lib/music/lyricsTranslate.ts": "translates stored lyric lines for the lyrics view; a translation with any line that trips the same text check lyrics pass at ingest (band outranks the toggle) is dropped and never stored, and it is never a chat reply",
+  "routes/imageEdit.ts": "the Studio words box: one forced tool call that picks a picture operation and its arguments; no text reaches the person (the result is a picture card), and every gate runs inside the operation it picks",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",
