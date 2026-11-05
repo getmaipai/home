@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, captionsOps, crossfadeProblem, frameOps, gradeOps, joinOps, lastFrameAt, mixOps, reframeOps, speedOps, trimOps, trimRange } from "./editPlan";
+import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, frameOps, gradeOps, joinOps, lastFrameAt, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -44,7 +44,7 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "reframe", "grade", "speed", "captions", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.enum(ids(VIDEO_LOOKS)).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
@@ -58,8 +58,12 @@ export const editVideoArgs = z.object({
   from_s: z.number().min(0).max(600).optional(),
   to_s: z.number().gt(0).max(600).optional(),
   clips: z.array(z.string().trim().min(1).max(80)).min(MIN_JOIN_CLIPS).max(MAX_JOIN_CLIPS).optional(),
-  transition: z.enum(JOIN_TRANSITIONS).optional(),
+  transition: z.string().optional(),
   transition_s: z.number().min(MIN_CROSSFADE_S).max(MAX_CROSSFADE_S).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
+  subtitle: z.string().trim().max(160).optional(),
+  credits: z.array(z.object({ role: z.string().trim().max(40).optional(), name: z.string().trim().min(1).max(60) })).min(1).max(60).optional(),
+  credits_title: z.string().trim().max(120).optional(),
   sound: z.enum(["voice", "music"]).optional(),
   line: z.string().trim().min(1).max(600).optional(),
   voice: z.string().trim().min(1).max(80).optional(),
@@ -131,9 +135,15 @@ export async function makeItMaxBody(actor: PersonRow, band: Parameters<typeof ti
 
 export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
+  if (args.change === "join" && args.transition !== undefined && typeof args.transition === "string" && !(JOIN_TRANSITIONS as readonly string[]).includes(args.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
+  if (Array.isArray(args.credits) && args.credits.length > 60) return refused(callId, args, "Credits can have up to 60 names. Shorten the list and try again.", "too_many_credits");
+  if (Array.isArray(args.credits) && args.credits.some((line) => !line || typeof line !== "object" || typeof (line as { name?: unknown }).name !== "string" || !(line as { name: string }).name.trim() || (line as { name: string }).name.trim().length > 60 || ((line as { role?: unknown }).role !== undefined && (typeof (line as { role?: unknown }).role !== "string" || ((line as { role: string }).role.trim().length > 40))))) return refused(callId, args, "Each credit needs a name up to 60 characters and an optional role up to 40 characters.", "bad_credit_line");
+  if (typeof args.title === "string" && args.title.trim().length > 120) return refused(callId, args, "A title can have up to 120 characters. Shorten it and try again.", "title_too_long");
+  if (typeof args.subtitle === "string" && args.subtitle.trim().length > 160) return refused(callId, args, "A subtitle can have up to 160 characters. Shorten it and try again.", "subtitle_too_long");
   const parsed = editVideoArgs.safeParse(args);
   if (!parsed.success) return failed(callId, args, "bad_arguments", "bad_arguments");
   const value = parsed.data;
+  if (value.change === "join" && value.transition !== undefined && !(JOIN_TRANSITIONS as readonly string[]).includes(value.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
@@ -146,7 +156,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
-  if (["extend", "retake", "trim", "join", "mix", "reframe", "grade", "speed", "captions"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
@@ -371,7 +381,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   const seconds = first.files[0]?.seconds ?? null;
 
   let inputs: EditFile[];
-  let ops;
+  let ops: import("./stackEdit").EditOp[];
   let spoken: { line: string; voice: string } | null = null;
   // Never lower than the sources: any adult-only clip, an adult-only track or an adult line makes the edit adult-only.
   const marks: MarkSource[] = await Promise.all(sources.map(clipMarkOf));
@@ -383,13 +393,20 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     describe = `cut to ${range.from} to ${range.to} seconds`;
   } else if (value.change === "join") {
     const crossfade = value.transition === "crossfade";
+    const transition = (value.transition ?? "cut") as (typeof JOIN_TRANSITIONS)[number];
     const duration = value.transition_s ?? DEFAULT_CROSSFADE_S;
     if (crossfade) {
       const tooShort = crossfadeProblem(sources.map((job) => job.files[0]?.seconds ?? null), duration);
       if (tooShort) return refused(callId, args, tooShort, "crossfade_too_short");
     }
-    inputs = clipFiles; ops = joinOps(crossfade ? "crossfade" : "cut", duration);
-    describe = `${sources.length} videos joined in the order you named${crossfade ? `, with a ${duration} second crossfade between them` : ""}`;
+    const videoSeconds = sources.map((job) => job.files[0]?.seconds ?? job.request.seconds ?? null);
+    const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - (transition === "cut" ? 0 : (sources.length - 1) * duration) : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
+    const added = (value.title ? 3 : 0) + (value.credits ? Math.max(3, Math.ceil((value.credits.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
+    if (baseLength + added > 600) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
+    inputs = clipFiles; ops = joinOps(transition, duration);
+    if (value.title) ops.unshift(titleCardOp(value.title, value.subtitle, "start"));
+    if (value.credits) ops.push(creditsOp(value.credits, value.credits_title));
+    describe = `${sources.length} videos joined in the order you named${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${value.title ? ", with a title" : ""}${value.credits ? ", with rolling credits" : ""}`;
   } else if (value.change === "reframe") {
     if (!value.aspect) return refused(callId, args, "Tell me the shape you want: vertical, square or widescreen.", "missing_aspect");
     inputs = [clipFiles[0]!]; ops = reframeOps(value.aspect, value.fill ?? "crop"); describe = "reframed";
@@ -404,6 +421,15 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   } else if (value.change === "captions") {
     if (!value.captions?.length || value.captions.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
     inputs = [clipFiles[0]!]; ops = captionsOps(value.captions, value.position ?? "bottom"); describe = "captions added";
+  } else if (value.change === "title_card" || value.change === "credits") {
+    const clipLength = seconds ?? first.request.seconds;
+    const added = value.change === "title_card" ? (value.title ? 3 : 0) : (value.credits ? Math.max(3, Math.ceil((value.credits.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
+    if (value.change === "title_card" && !value.title) return refused(callId, args, "Tell me the title to put on the video.", "missing_title");
+    if (value.change === "credits" && !value.credits?.length) return refused(callId, args, "Tell me the names to put in the credits.", "missing_credits");
+    if (clipLength + added > 600) return refused(callId, args, "That film would be longer than 10 minutes. Use a shorter video or fewer credit lines.", "film_too_long");
+    inputs = [clipFiles[0]!];
+    ops = value.change === "title_card" ? [titleCardOp(value.title!, value.subtitle, "start")] : [creditsOp(value.credits!, value.credits_title)];
+    describe = value.change === "title_card" ? "title added" : "rolling credits added";
   } else {
     const start = value.start_s ?? 0;
     if (seconds !== null && start >= seconds) return refused(callId, args, START_PAST_END_LINE, "start_past_end");

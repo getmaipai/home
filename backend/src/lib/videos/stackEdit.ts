@@ -22,6 +22,9 @@ export type EditOp =
   | { op: "frame"; at_s: number }
   /** On the Stack since a23ac89 (2026-11-02): join the working clip and the later files, blending each seam over `duration_s` (0.3 to 1.0, up to 6 clips). */
   | { op: "crossfade"; duration_s: number; with?: number[] }
+  | { op: "transition"; kind: "fade" | "dissolve" | "wipeleft" | "wiperight" | "wipeup" | "wipedown" | "slideleft" | "slideright" | "slideup" | "slidedown" | "circleopen" | "circleclose" | "radial" | "smoothleft" | "smoothright" | "fadeblack" | "fadewhite" | "zoomin" | "pixelize"; duration_s: number; with?: number[] }
+  | { op: "title_card"; text: string; subtitle?: string; duration_s: number; position: "center" | "lower_third" | "top"; background: "black" | "white" | string; text_color: "black" | "white" | string; fade_in_s?: number; fade_out_s?: number; place: "start" | "end" }
+  | { op: "credits"; lines: Array<{ role?: string; name: string }>; duration_s?: number; speed?: number; background: "black" | "white" | string; text_color: "black" | "white" | string; title?: string }
   | { op: "reframe"; aspect: "9:16" | "1:1" | "16:9" | "4:5"; fill: "crop" | "blur" }
   | { op: "grade"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; grain?: number; vignette?: number }
   | { op: "speed"; factor: number }

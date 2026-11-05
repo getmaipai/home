@@ -280,7 +280,7 @@ describe("B: edit_video continue", () => {
     const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, EDIT_VIDEO_TOOL_ID, "manifest.json"), "utf8")) as { version: string; args: { properties: Record<string, { enum?: string[]; minimum?: number; maximum?: number }> } };
     expect(manifest.version).toMatch(/^0\.(?:[3-9]|\d{2,})\.\d+$/); // at least 0.3.0; an exact version went red on every manifest bump (VIDEO-INPUTS-03 made it 0.5.0)
     expect(manifest.args.properties.change!.enum).toContain("continue");
-    expect(manifest.args.properties.transition!.enum).toEqual(["cut", "crossfade"]);
+    expect(manifest.args.properties.transition!.enum).toEqual(expect.arrayContaining(["cut", "crossfade", "wipeleft", "slideleft", "fadeblack"]));
     expect(manifest.args.properties.transition_s).toMatchObject({ minimum: 0.3, maximum: 1 });
   });
 });

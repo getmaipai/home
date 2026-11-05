@@ -7,6 +7,12 @@
 - VIDEO-LORA-10: `styles` and `strength` for another_take, remix and continue. Left out, the new video keeps the first one's styles; an empty list takes the style off. Names only, never ids; a name the person never said is not matched.
 - Add reframe, grade, speed and timed captions to finished video edits.
 
+## [0.6.0] - 2026-11-05
+
+### Added
+
+- Join clips with a transition, title card, and rolling credits in one finished film.
+
 ## [0.5.0] - 2026-11-05
 
 ### Added

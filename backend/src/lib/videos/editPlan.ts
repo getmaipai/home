@@ -49,7 +49,8 @@ export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade",
 export function speedOps(factor: number): EditOp[] { return [{ op: "speed", factor }]; }
 export function captionsOps(lines: CaptionLine[], position: CaptionPosition = "bottom"): EditOp[] { return [{ op: "captions", lines, position }]; }
 
-export const JOIN_TRANSITIONS = ["cut", "crossfade"] as const;
+export const TRANSITION_KINDS = ["fade", "dissolve", "wipeleft", "wiperight", "wipeup", "wipedown", "slideleft", "slideright", "slideup", "slidedown", "circleopen", "circleclose", "radial", "smoothleft", "smoothright", "fadeblack", "fadewhite", "zoomin", "pixelize"] as const;
+export const JOIN_TRANSITIONS = ["cut", "crossfade", ...TRANSITION_KINDS] as const;
 export type JoinTransition = (typeof JOIN_TRANSITIONS)[number];
 export const MIN_CROSSFADE_S = 0.3;
 export const MAX_CROSSFADE_S = 1.0;
@@ -62,7 +63,16 @@ export const CROSSFADE_IN_STACK = true;
 
 /** Clips in the order the person named them: the first is the working clip, `concat` joins every later file (a straight cut), `crossfade` blends each seam over `duration_s`. */
 export function joinOps(transition: JoinTransition = "cut", duration: number = DEFAULT_CROSSFADE_S): EditOp[] {
-  return transition === "crossfade" ? crossfadeOps(duration) : [{ op: "concat" }];
+  if (transition === "crossfade") return crossfadeOps(duration);
+  if ((TRANSITION_KINDS as readonly string[]).includes(transition)) return [{ op: "transition", kind: transition as (typeof TRANSITION_KINDS)[number], duration_s: duration }];
+  return [{ op: "concat" }];
+}
+
+export function titleCardOp(text: string, subtitle?: string, place: "start" | "end" = "start"): EditOp {
+  return { op: "title_card", text, ...(subtitle ? { subtitle } : {}), duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place };
+}
+export function creditsOp(lines: Array<{ role?: string; name: string }>, title?: string): EditOp {
+  return { op: "credits", lines, background: "black", text_color: "white", ...(title ? { title } : {}) };
 }
 
 /** The Stack's `crossfade` op: the working clip then the later files, each seam blending the last `duration_s` of one clip into the first `duration_s` of the next. */
