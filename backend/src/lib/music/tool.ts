@@ -8,12 +8,11 @@ import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
 import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "./ready";
-import { plainMusicFailure, prepareStemsJob, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
+import { plainMusicFailure, prepareStemsJob, readMusicFile, resolveSongSource, startMusicJob } from "./jobs";
 import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsForWords, hookOf } from "./sections";
 import { StackMusicError, musicBody, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
-import { provenanceFor } from "./commercial";
 import { resolveSound } from "./sound";
 import { likenessCallRefusal } from "@/lib/likeness";
 /** What a refused song's reply starts with; the Make a song page strips it to show the person the plain line. */
@@ -108,8 +107,12 @@ function isWholeSong(lyrics: string, stored: string | undefined): boolean {
 }
 type EditPlan = { ok: true; task: MusicTask; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; line: string };
 export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusicArgs>, limits = { min_seconds: 10, max_seconds: source.request.max_seconds ?? FULL_SONG.max }): EditPlan {
-  // A file the person owns can be split into stems and nothing else: no edit, cover or remake takes it or its stems as a source.
-  if (source.fileId && provenanceFor(source.fileId)?.source_kind === "upload") return { ok: false, line: "That file is yours, not a song made here, so it can only be split into stems." };
+  // A stem of a file the person owns is never an edit, cover or remake source (stem-splitting 10.2 point 3; a stem lives only as a split result).
+  if (source.request.ownedFile && source.task === "stems") return { ok: false, line: "That file is yours, not a song made here, so it can only be split into stems." };
+  // Owned uploads are admitted by resolveSongSource after its ownership and generated-file checks.
+  if (source.request.ownedFile && ["remake", "variation", "make_full", "make_quick", "stems"].includes(args.change)) {
+    return { ok: false, line: "That change needs a song made here. Try restyle, instrumental, trim, fade or loudness on this file." };
+  }
   const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, ...stored } = source.request;
   const request: MusicRequest = { ...stored, seconds: source.durationS ?? stored.seconds, seed: source.seed ?? stored.seed,
     ...(args.description !== undefined ? { description: args.description } : {}), ...(args.lyrics !== undefined ? { lyrics: args.lyrics } : {}),
@@ -190,10 +193,10 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   let request: MusicRequest; let task: MusicTask; let body: Omit<MusicBody, "timeout_ms">; let parentFileId: string | null = null;
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
-    // sourceMusicJob already proved the song is this person's, made here, in this chat: no bytes are read for it.
-    const source = sourceMusicJob(actor, state.conversationId, parsed.data.track, temporary);
+    const source = resolveSongSource(actor, parsed.data.track, state.conversationId, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
     if (parsed.data.change === "stems") {
+      if (source.request.ownedFile) return refused("Choose Stems from the file in your Library.", "source_not_made_here");
       const prepared = await prepareStemsJob(actor, source);
       if (!prepared.ok) return failed(prepared.status === 503 ? "stems_unavailable" : "source_not_made_here", prepared.status === 503 ? "unavailable" : "bad_arguments");
       ({ request, task, body } = prepared); parentFileId = source.fileId;
@@ -204,12 +207,13 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
     const plan = prepareMusicEdit(source, parsed.data, engine!.limits);
     if (!plan.ok) return refused(plan.line, "section_or_range");
-    ({ request, task, body } = plan); parentFileId = source.fileId;
+    ({ request, task, body } = plan); parentFileId = source.request.ownedFile ? null : source.fileId;
     // Only a task that edits the audio itself sends it; a remake or variation is a fresh text2music job and reads and hashes nothing.
     if (body.task !== "text2music") {
       const file = readMusicFile(actor, source, source.fileId);
       if (!file) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
       body.source = Buffer.from(file.bytes).toString("base64"); body.source_sha256 = file.sha256;
+      if (source.request.ownedFile) body.origin = "owned_file";
     }
   } else {
     engine = await musicEngineStatus();

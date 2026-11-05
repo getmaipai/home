@@ -227,16 +227,43 @@ describe("native music edits, versions and section timing", () => {
     const out = await runEditMusic({ state, args: { track: "latest", change: "rewrite_section", from_s: 2, to_s: 8, lyrics: "Waffles rise under the sunny skies all day long ".repeat(10) }, callId: "c", spoken: false });
     expect(out.result?.reply?.text).toContain("which part the new words replace"); expect(fake.submitted).toHaveLength(1);
   });
-  test("uploads, foreign songs and songs in another conversation cannot be edited", async () => {
+  test("foreign songs and songs in another conversation cannot be edited", async () => {
     const state = musicState(people.owner); const original = await generate(state);
-    const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes: testM4a(), mediaType: "audio/mp4", deduplicate: false });
-    if (!upload.ok) throw new Error("upload failed");
-    for (const [other, track] of [[state, upload.value.id], [{ ...state, conversationId: "conv-another-chat" }, original.fileId!], [musicState(people.child), original.fileId!]] as const) {
+    for (const [other, track] of [[{ ...state, conversationId: "conv-another-chat" }, original.fileId!], [musicState(people.child), original.fileId!]] as const) {
       await runEditMusic({ state: other, args: { track, change: "restyle", description: "jazz piano" }, callId: "c", spoken: false });
     }
-    db.update(attachments).set({ provenance: "composer:upload" }).where(eq(attachments.id, original.fileId!)).run();
-    await runEditMusic({ state, args: { track: original.fileId, change: "remake" }, callId: "c", spoken: false });
     expect(fake.submitted).toHaveLength(1);
+  });
+  test("an owned upload can be made instrumental and stays upload provenance", async () => {
+    const state = musicState(people.owner);
+    const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes: testM4a(), mediaType: "audio/mp4", deduplicate: false });
+    if (!upload.ok) throw new Error("upload failed");
+    const out = await runEditMusic({ state, args: { track: upload.value.id, change: "instrumental" }, callId: "u", spoken: false });
+    expect(out.result?.reply?.text).toStartWith("I've started your song.");
+    const id = musicForOutcomes([out])!.id;
+    expect(fake.submitted.at(-1)).toMatchObject({ task: "cover", instrumental: true, origin: "owned_file", source: Buffer.from(testM4a()).toString("base64") });
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const result = getMusicJobFor(people.owner, id)!;
+    const row = db.select().from(attachments).where(eq(attachments.id, result.fileId!)).get()!;
+    expect(generationOf(row.provenance)).toMatchObject({ source_kind: "upload", parent_file_id: null });
+    expect(commercialUseOf(result.fileId!)).toBe("unknown");
+    expect(readMusicFile(people.owner, result, result.fileId!)).not.toBeNull(); // a finished edit of an upload still reads through the made-song path
+    const trimmed = await runEditMusic({ state, args: { track: upload.value.id, change: "trim", from_s: 0, to_s: 10 }, callId: "t", spoken: false });
+    expect(fake.submitted.at(-1)).toMatchObject({ task: "edit", edit: { op: "trim", from_s: 0, to_s: 10 }, origin: "owned_file" });
+    const trimId = musicForOutcomes([trimmed])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, trimId)?.state === "done");
+    expect(generationOf(db.select().from(attachments).where(eq(attachments.id, getMusicJobFor(people.owner, trimId)!.fileId!)).get()!.provenance)).toMatchObject({ source_kind: "upload", parent_file_id: null });
+  });
+  test("an attached song is still refused for teens and children", async () => {
+    const state = musicState(people.owner);
+    const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes: testM4a(), mediaType: "audio/mp4", deduplicate: false });
+    if (!upload.ok) throw new Error("upload failed");
+    for (const role of ["teen", "child"] as const) {
+      const minor = { ...people.child, role };
+      const out = await runEditMusic({ state: { ...state, actor: minor }, args: { track: upload.value.id, change: "instrumental" }, callId: "m", spoken: false });
+      expect(out.result?.data).toMatchObject({ refused: "minor" });
+    }
+    expect(fake.submitted).toHaveLength(0);
   });
   test("latest uses the selected version, keeps branches and exposes Version N URLs", async () => {
     const state = musicState(people.owner); const original = await generate(state);

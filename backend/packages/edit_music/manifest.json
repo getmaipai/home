@@ -75,7 +75,7 @@
       "track": {
         "type": "string",
         "grounded": false,
-        "description": "Use latest for the selected song in this chat, or an exact file id of a version made here. Uploaded audio is never accepted.",
+        "description": "Use latest for the selected song in this chat, a made-here file id, or the id of an audio file the person owns.",
         "minLength": 1,
         "maxLength": 80
       },

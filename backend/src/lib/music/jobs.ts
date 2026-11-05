@@ -122,19 +122,43 @@ export async function prepareStemsJob(actor: PersonRow, source: MusicJob): Promi
 }
 /** TIER-STEMS-02b: an audio file in the person's own Library. Only theirs, never a song made here (that has its own card) and never a file shared with them. The bytes go to the local Stack and nowhere else. */
 export const OWNED_STEMS_MAX_BYTES = 40 * 1024 * 1024;
-export async function prepareOwnedStemsJob(actor: PersonRow, fileId: string): Promise<{ ok: true; request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; name: string } | { ok: false; status: 404 | 413 | 422 | 503; line: string }> {
+type OwnedAudioRead = { ok: true; row: typeof attachments.$inferSelect; bytes: Uint8Array; sha256: string; seconds: number } | { ok: false; reason: "missing" | "generated" | "large" | "unreadable" };
+/** Shared ownership, media, size and local-read check for the owned-audio tools. */
+function readOwnedAudio(actor: PersonRow, fileId: string): OwnedAudioRead {
   const row = db.select().from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
-  if (!row || !row.mediaType.startsWith("audio/")) return { ok: false, status: 404, line: "That file isn't available any more." };
-  if (generationOf(row.provenance)) return { ok: false, status: 422, line: "That song was made in a chat. Open it there and choose Stems." };
-  if (row.size > OWNED_STEMS_MAX_BYTES) return { ok: false, status: 413, line: "That file is too big to split. Try one under 40 MB." };
-  if (!stemsStatusReady(await stemsStatus())) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
+  if (!row || !row.mediaType.startsWith("audio/")) return { ok: false, reason: "missing" };
+  if (generationOf(row.provenance)) return { ok: false, reason: "generated" };
+  if (row.size > OWNED_STEMS_MAX_BYTES) return { ok: false, reason: "large" };
   const read = readAttachment(actor, fileId);
-  if (!read.ok) return { ok: false, status: 404, line: "That file isn't available any more." };
-  const name = (row.name ?? "Audio file").replace(/\.[A-Za-z0-9]{1,5}$/, "").trim().slice(0, 80) || "Audio file";
+  if (!read.ok) return { ok: false, reason: "unreadable" };
   const seconds = Math.min(720, Math.max(10, Math.round(row.size / 16_000)));
+  return { ok: true, row, bytes: read.value.bytes, sha256: read.value.record.sha256, seconds };
+}
+/** Made-here songs in this conversation, or a non-generated audio file owned by this person. */
+export function resolveSongSource(actor: PersonRow, track: string, conversationId: string, temporary = false): MusicJob | null {
+  const made = sourceMusicJob(actor, conversationId, track, temporary);
+  if (made || track === "latest") return made;
+  const owned = readOwnedAudio(actor, track);
+  if (!owned.ok) return null;
+  const now = new Date().toISOString();
+  return { id: `upload-${track}`, personId: actor.id, conversationId, turnId: null, task: "trim",
+    request: { description: "", title: "Audio file", instrumental: false, seconds: owned.seconds, ownedFile: true },
+    stackJob: null, state: "done", stage: null, progress: 1, etaSeconds: null, position: null, errorCode: null, errorLine: null,
+    fileId: track, parentFileId: null, coverJobId: null, coverFileId: null, seed: null, durationS: owned.seconds, lrc: null,
+    chosenAt: now, createdAt: now, updatedAt: now, temporary: false };
+}
+export async function prepareOwnedStemsJob(actor: PersonRow, fileId: string): Promise<{ ok: true; request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; name: string } | { ok: false; status: 404 | 413 | 422 | 503; line: string }> {
+  const owned = readOwnedAudio(actor, fileId);
+  if (!owned.ok) {
+    if (owned.reason === "generated") return { ok: false, status: 422, line: "That song was made in a chat. Open it there and choose Stems." };
+    if (owned.reason === "large") return { ok: false, status: 413, line: "That file is too big to split. Try one under 40 MB." };
+    return { ok: false, status: 404, line: "That file isn't available any more." };
+  }
+  if (!stemsStatusReady(await stemsStatus())) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
+  const name = (owned.row.name ?? "Audio file").replace(/\.[A-Za-z0-9]{1,5}$/, "").trim().slice(0, 80) || "Audio file";
   return { ok: true, name,
-    request: { description: "", instrumental: false, seconds, title: name, ownedFile: true },
-    body: { task: "edit", caption: "", duration_s: seconds, source: Buffer.from(read.value.bytes).toString("base64"), source_sha256: read.value.record.sha256, origin: "owned_file" } };
+    request: { description: "", instrumental: false, seconds: owned.seconds, title: name, ownedFile: true },
+    body: { task: "edit", caption: "", duration_s: owned.seconds, source: Buffer.from(owned.bytes).toString("base64"), source_sha256: owned.sha256, origin: "owned_file" } };
 }
 export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   if (input.task === "text2music") {
@@ -244,7 +268,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   const provenance: GenerationProvenance = {
     kind: "music", job_id: job.id, task: job.task, ...stamp, seed: song.seed, duration_s: song.duration_s,
     bpm: song.bpm ?? job.request.bpm ?? null, key: song.key ?? job.request.key ?? null,
-    parent_file_id: job.parentFileId, source_kind: job.parentFileId ? "made_here" : "none",
+    parent_file_id: job.request.ownedFile ? null : job.parentFileId, source_kind: job.request.ownedFile ? "upload" : job.parentFileId ? "made_here" : "none",
     made_at: new Date().toISOString(),
   };
   if (job.temporary) {
@@ -328,6 +352,11 @@ export function resumeMusicJobs(): void {
   void releaseHouseholdQueue();
 }
 export function readMusicFile(actor: PersonRow, job: MusicJob, fileId: string): { bytes: Uint8Array; mediaType: string; sha256: string } | null {
+  if (job.id.startsWith("upload-")) { // the synthetic source of resolveSongSource; finished jobs (stems, edits of an upload) read through the made-song path below
+    if (job.personId !== actor.id || job.fileId !== fileId) return null;
+    const owned = readOwnedAudio(actor, fileId);
+    return owned.ok ? { bytes: owned.bytes, mediaType: owned.row.mediaType, sha256: owned.sha256 } : null;
+  }
   if (job.personId !== actor.id || job.fileId !== fileId || !job.conversationId) return null;
   if (job.temporary) {
     pruneMusicJobs(); const song = temporarySongs.get(fileId);
