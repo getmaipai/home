@@ -22,11 +22,12 @@ import { listLoraRecords } from "@/lib/loras/store";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { MAX_INSTALL_BYTES } from "@/lib/loras/source";
 import { BASE_UNSTATED_LINE, NOT_LTX_LINE } from "@/lib/loras/install";
-import { baseWords, BROWSE_BASES, INSTALLABLE_BASE_IDS, isSupportedBase, mediaOfBase, type Media } from "@/lib/loras/baseFamilies";
+import { ALL_BASE_IDS, baseWords, BROWSE_BASES, isSupportedBase, mediaOfBase, type AnyBaseId, type Media } from "@/lib/loras/baseFamilies";
 import type { PersonRow } from "@/types";
 
 export const lorasSourceRoutes = apiRouter();
 const NOT_FOUND = { error: "That style isn't there any more." };
+const INSTALL_BASE_IDS = [...ALL_BASE_IDS] as [AnyBaseId, ...AnyBaseId[]];
 
 type Ctx = Parameters<Parameters<typeof lorasSourceRoutes.openapi>[1]>[0];
 const sessionOf = (c: Ctx): string | null => sessionKeyOf(getCookie(c, "session"));
@@ -49,7 +50,7 @@ function lineAndReason(hit: Hit, admin: PersonRow, browsed: Media = "video"): { 
   parts.push(LICENCE_WORDS[hit.licence_class]);
   if (hit.downloads > 0) parts.push(`${hit.downloads.toLocaleString("en-US")} downloads`);
   let reason: string | null = null;
-  const have = installedAs(hit, listLoraRecords());
+  const have = installedAs(hit, listLoraRecords(), mediaOfBase(hit.base_model) ?? browsed);
   let installed: { id: string; name: string } | null = null;
   if (have) {
     const seen = readLora(admin, have.lora.id, "own_written");
@@ -107,7 +108,7 @@ lorasSourceRoutes.openapi(browseRoute, async (c) => {
     const browsed = await browseHits({ source, q: body.q, kind: body.kind, media: body.media, base: body.base, sort: body.sort, cursor: body.cursor, nsfw: reveal });
     const records = listLoraRecords();
     // Filter on the full hit, THEN redact: what is locked is decided once, from the classified hit, and the filter never changes what a caller sees of it.
-    const wanted = browsed.hits.filter((h) => (body.installed === "any" ? true : (installedAs(h, records) !== null) === (body.installed === "installed")));
+    const wanted = browsed.hits.filter((h) => (body.installed === "any" ? true : (installedAs(h, records, body.media) !== null) === (body.installed === "installed")));
     const shown = wanted.filter((h) => h.adult_check.state === "normal" || reveal);
     const locked = wanted.length > shown.length;
     return c.json({ items: shown.map((h) => view(h, admin, body.media)), locked, next_cursor: browsed.next, notes }, 200);
@@ -155,7 +156,7 @@ lorasSourceRoutes.openapi(previewRoute, async (c) => {
 const InstallBody = z.object({
   source: z.enum(["huggingface", "civitai"]), remote_id: z.string().max(200).optional(), version_id: z.string().max(200).nullable().optional(), url: z.string().max(2048).optional(), file: z.string().max(500).nullable().optional(),
   name: z.string().trim().max(80).optional(), kind: z.enum(["style", "character"]).optional(), audience: z.enum(["all-ages", "adult-only"]), licence_confirmed: z.boolean(),
-  base_model: z.enum(INSTALLABLE_BASE_IDS).optional(), confirm_ticket: z.string().max(200).optional(), as_separate: z.boolean().optional(),
+  media: z.enum(["video", "picture"]).default("video"), base_model: z.enum(INSTALL_BASE_IDS).optional(), confirm_ticket: z.string().max(200).optional(), as_separate: z.boolean().optional(),
 });
 const installRoute = createRoute({
   method: "post", path: "/install", tags: ["LoRAs"], summary: "Download a style into the library (an admin's click, after the licence step)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
@@ -166,7 +167,9 @@ const installRoute = createRoute({
   },
 });
 lorasSourceRoutes.openapi(installRoute, async (c) => {
-  const result = await startLoraInstall({ admin: c.get("person"), sessionKey: sessionOf(c), proof: requestProof() }, c.req.valid("json"));
+  const body = c.req.valid("json");
+  if (body.base_model && mediaOfBase(body.base_model) !== body.media) return c.json({ error: `That base is not available for ${body.media}.` }, 400) as never;
+  const result = await startLoraInstall({ admin: c.get("person"), sessionKey: sessionOf(c), proof: requestProof() }, body);
   if (result.ok) return c.json({ job: result.job }, 202);
   return c.json({ error: result.error, code: result.code, ...(result.existing_id ? { existing_id: result.existing_id } : {}) }, result.status) as never;
 });

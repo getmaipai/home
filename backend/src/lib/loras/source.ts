@@ -9,7 +9,7 @@
 import { listLoraRecords, type Lora } from "@/lib/loras/store";
 import { classifyCivitai, classifyHuggingFace, cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { baseFromText, basesNamedIn, civitaiLabel, civitaiLabelsFor, wantedBaseIds, type AnyBaseId, type BrowseBase, type Media } from "@/lib/loras/baseFamilies";
+import { baseFromText, basesNamedIn, civitaiLabel, civitaiLabelsFor, mediaOfBase, wantedBaseIds, type AnyBaseId, type BrowseBase, type Media } from "@/lib/loras/baseFamilies";
 
 export type LoraSite = "huggingface" | "civitai";
 export type SourceChoice = LoraSite | "both";
@@ -417,8 +417,8 @@ export function dedupeHits(hits: readonly Hit[]): Hit[] {
 
 export interface InstalledMatch { lora: Lora; by: "version" | "sha" }
 /** The live record (not in the trash) this hit already is: same site and version id, then same sha256. */
-export function installedAs(hit: Pick<Hit, "site" | "remote_id" | "version_id" | "sha256">, records: readonly Lora[] = listLoraRecords()): InstalledMatch | null {
-  const live = records.filter((r) => r.removed_at === null);
+export function installedAs(hit: Pick<Hit, "site" | "remote_id" | "version_id" | "sha256" | "base_model">, records: readonly Lora[] = listLoraRecords(), media: Media = mediaOfBase(hit.base_model) ?? "video"): InstalledMatch | null {
+  const live = records.filter((r) => r.removed_at === null && r.media === media);
   const byVersion = hit.version_id ? live.find((r) => r.source.site === hit.site && r.source.version_id === hit.version_id && (hit.site === "civitai" || r.source.remote_id === hit.remote_id)) : undefined;
   if (byVersion) return { lora: byVersion, by: "version" };
   const bySha = hit.sha256 ? live.find((r) => r.file.sha256 === hit.sha256) : undefined;

@@ -14,8 +14,8 @@ import { listLoraRecords } from "@/lib/loras/store";
 import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { listIssues } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
+import { installFakeLoraJobs, type FakeLoraInstall } from "./fixtures/loraInstallFake";
 import { household, PASSCODE, unlock, unlockHeader } from "./fixtures/adultLock";
 import { putLora } from "./fixtures/lora";
 import type { TestClient } from "./client";
@@ -65,33 +65,8 @@ function installSourceFetch(): void {
   }) as typeof fetch });
 }
 
-interface FakeInstall { all: Array<Record<string, unknown>>; bodies: Array<Record<string, unknown>>; state: "running" | "done" | "failed"; reason: string | null; classification: "all-ages" | "adult-only"; refuse: { status: number; code: string; error: string; existing_id?: string } | null }
 let fake: FakeVideoStack;
-let inst: FakeInstall;
-function installFakeInstall(): void {
-  inst = { all: [], bodies: [], state: "running", reason: null, classification: "adult-only", refuse: null };
-  const inner = fake.handler;
-  const handler = (async (input: string | URL | Request, init?: RequestInit) => {
-    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
-    const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json" } });
-    if (init?.method === "POST" && url.pathname === "/stack/v1/video/loras/install") {
-      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-      inst.bodies.push(body); inst.all.push(body);
-      if (inst.refuse) return json({ error: inst.refuse.error, code: inst.refuse.code, ...(inst.refuse.existing_id ? { existing_id: inst.refuse.existing_id } : {}) }, inst.refuse.status);
-      return json({ job: `job-install-${inst.all.length}` }, 202);
-    }
-    const jobMatch = /^\/stack\/v1\/jobs\/job-install-(\d+)$/.exec(url.pathname);
-    if (jobMatch) {
-      const b = inst.all[Number(jobMatch[1]) - 1]!;
-      const lora = { id: `lora-${sha("e").slice(0, 16)}`, name: String(b.name), sha256: sha("e"), bytes: 412 * 1024 * 1024, base_model: String(b.base_model), licence: "x", source_url: typeof b.source_url === "string" ? b.source_url : null, classification: inst.classification, strength_default: 1, trigger_words: [], added_at: "2026-11-02T00:00:00Z" };
-      if (inst.state === "done") { fake.loras = [lora]; return json({ job: { id: `job-install-${jobMatch[1]}`, state: "done", percent: 100, completedBytes: 1, totalBytes: 1, status: "Done", reason: null, result: { lora } } }); }
-      if (inst.state === "failed") return json({ job: { id: `job-install-${jobMatch[1]}`, state: "failed", percent: 40, status: "failed", reason: inst.reason, result: { code: "hash_mismatch" } } });
-      return json({ job: { id: `job-install-${jobMatch[1]}`, state: "running", percent: 40, completedBytes: 40, totalBytes: 100, status: "Downloading a style", reason: null, result: null } });
-    }
-    return inner(input, init);
-  }) as typeof fetch;
-  __setVideosFetchForTests(handler);
-}
+let inst: FakeLoraInstall;
 
 const post = (c: TestClient, path: string, body: unknown, proof?: string) => c.request(path, { method: "POST", body, headers: proof ? unlockHeader(proof) : {} });
 const text = async (res: Response) => (await res.text()) + JSON.stringify([...res.headers.entries()]);
@@ -100,7 +75,7 @@ const browse = (c: TestClient, body: Record<string, unknown> = {}, proof?: strin
 beforeEach(() => {
   resetDb(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests(); __resetSourceForTests();
   fake = installFakeVideoStack(); fake.loras = [];
-  installSourceFetch(); installFakeInstall();
+  installSourceFetch(); inst = installFakeLoraJobs(fake, "/stack/v1/video/loras/install");
 });
 afterEach(() => { fake.restore(); __resetSourceForTests(); setHouseholdSettingValue("generation.styles.civitai", false); setHouseholdSettingValue("generation.styles.civitai_key", ""); setHouseholdSettingValue("voice.hf_token", ""); });
 

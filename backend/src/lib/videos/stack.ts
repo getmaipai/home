@@ -3,7 +3,7 @@
 // setting already guarantees it). The prompt and the reference picture travel in bodies and are never logged or
 // put in an error message (rule 6a). A test replaces `fetch` with `__setVideosFetchForTests`.
 import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
-import type { BaseId } from "@/lib/loras/baseFamilies";
+import type { AnyBaseId, Media } from "@/lib/loras/baseFamilies";
 import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
 import type { StackLiveFields } from "@/lib/genLive";
 import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "@/lib/stack/fullView";
@@ -319,7 +319,27 @@ export async function removeVideoLora(id: string): Promise<void> {
 // VIDEO-LORA-07: the Stack's `video.lora.install` job (VIDEO-LORA-06). Home names the file; the Stack downloads it. The token rides in this one body only.
 export interface StackLoraInstallBody {
   source: "huggingface" | "civitai"; url: string; name: string; licence: string; licence_acknowledged: boolean; audience: "all-ages" | "adult";
-  trigger_words?: string[]; added_by?: string; base_model?: BaseId; sha256_expected?: string; token?: string; source_url?: string;
+  trigger_words?: string[]; added_by?: string; base_model?: AnyBaseId; sha256_expected?: string; token?: string; source_url?: string;
+}
+export interface StackPictureLoraInstallBody {
+  site: "huggingface" | "civitai"; url: string; name: string; licence?: string; licence_acknowledged?: boolean;
+  classification?: "all-ages" | "adult-only"; trigger_words?: string[]; added_by?: string; base_model?: AnyBaseId;
+  sha256_expected?: string; token?: string; source_url?: string;
+}
+
+/** The picture Stack names the source `site` and its adult class `adult-only`. */
+export function pictureInstallBody(body: StackLoraInstallBody): StackPictureLoraInstallBody {
+  return {
+    site: body.source, url: body.url, name: body.name, licence: body.licence,
+    licence_acknowledged: body.licence_acknowledged,
+    classification: body.audience === "adult" ? "adult-only" : "all-ages",
+    ...(body.trigger_words ? { trigger_words: body.trigger_words } : {}),
+    ...(body.added_by ? { added_by: body.added_by } : {}),
+    ...(body.base_model ? { base_model: body.base_model } : {}),
+    ...(body.sha256_expected ? { sha256_expected: body.sha256_expected } : {}),
+    ...(body.token ? { token: body.token } : {}),
+    ...(body.source_url ? { source_url: body.source_url } : {}),
+  };
 }
 export class StackInstallRefused extends StackVideoError {
   constructor(status: number, code: string, message: string, readonly existingId: string | null = null) { super(status, code, message); this.name = "StackInstallRefused"; }
@@ -332,13 +352,18 @@ async function refusal(res: Response): Promise<never> {
 }
 
 /** Starts the install job and returns its id at once. The Stack answers 409 duplicate_lora (with `existing_id`) when the hash is already in its library. */
-export async function installVideoLora(body: StackLoraInstallBody): Promise<{ job: string }> {
-  const res = await request("/stack/v1/video/loras/install", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 30_000 });
+export async function installStackLora(media: Media, body: StackLoraInstallBody): Promise<{ job: string }> {
+  const path = media === "picture" ? "/stack/v1/image/loras/install" : "/stack/v1/video/loras/install";
+  const payload = media === "picture" ? pictureInstallBody(body) : body;
+  const res = await request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), timeoutMs: 30_000 });
   if (res.status !== 202 && res.status !== 200) return refusal(res);
   const parsed = await res.json() as { job?: string };
   if (!parsed.job) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
   return { job: parsed.job };
 }
+
+/** Existing callers stay on the video route with the same request body. */
+export const installVideoLora = (body: StackLoraInstallBody): Promise<{ job: string }> => installStackLora("video", body);
 
 export interface StackInstallJob { state: string; percent: number | null; completedBytes: number | null; totalBytes: number | null; status: string | null; reason: string | null; result: unknown }
 export async function getStackInstallJob(job: string): Promise<StackInstallJob | null> {

@@ -100,5 +100,14 @@ The three labels were confirmed live against the public Civitai API on 2026-11-0
 bases and are in no row, so their styles never show in a picture search. A hit's media is the media of its base (`mediaOfBase`); a hit with no
 known base takes the media being browsed, so the "Made for ..." and not-supported sentences name pictures or videos correctly.
 
-Still open: the Hugging Face base tags picture styles use (the patterns read the repository name and tags, and have not been checked against
-real picture repositories), and install, which stays video-only until STYLES-01b.
+Picture install uses the shared `POST /api/loras/install` route with `media: "picture"` (omitting `media` still means video). Home refetches
+the source hit, applies the same licence, duplicate, base and adult checks, then starts the Stack picture job at
+`POST /stack/v1/image/loras/install`. Home maps `source` to Stack's `site` and `audience: "adult"` to
+`classification: "adult-only"`; it sends the selected `base_model`, expected hash and saved token in that request body. The job is read from
+the same wrapped `/stack/v1/jobs/{id}` response, and its picture record joins the shared LoRA store through `adoptPictureLoras` before Home
+applies the install metadata and admin-only availability. A picture style's stored base remains `unknown`, because the Stack owns that fact
+and reads it when the style is used.
+
+The install route and fake Stack contract are covered locally. This is **Not yet proven against the real picture Stack (STYLES-05)**. Still
+open: the Hugging Face base tags picture styles use (the patterns read the repository name and tags, and have not been checked against real
+picture repositories).

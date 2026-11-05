@@ -583,7 +583,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
 | `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, NO_EVIDENCE, cleanTriggerWords |
-| `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, INSTALLABLE_BASE_IDS, mediaOfBase, setInstalledBasesProvider |
+| `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, INSTALLABLE_BASE_IDS, installableBaseIds, mediaOfBase |
 | `backend/src/lib/loras/install.ts` | INSTALL_KIND, INSTALL_TITLE, ISSUE_SOURCE, LICENCE_STEP_LINE, SHARED_SCREEN_LINE, NOT_LTX_LINE |
 | `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |

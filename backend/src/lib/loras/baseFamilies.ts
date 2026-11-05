@@ -47,8 +47,9 @@ export const BASE_FAMILIES = [
 
 type Row = (typeof BASE_FAMILIES)[number]["bases"][number];
 /** Every concrete base id the table names. */
-export type BaseId = "ltx-2.5" | "ltx-2.3" | "wan2.2-ti2v-5b";
 export type AnyBaseId = Row["id"];
+/** Bases represented by the older video-only spec record. */
+export type BaseId = "ltx-2.5" | "ltx-2.3" | "wan2.2-ti2v-5b";
 /** The `browse` values a search may ask for, besides "default" and "all". */
 export type BrowseBase = Row["browse"];
 export type Media = "video" | "picture";
@@ -61,7 +62,11 @@ export const BROWSE_BASES: Readonly<Record<Media, readonly BrowseBase[]>> = {
   picture: ROWS.filter((r) => r.media === "picture").map((r) => r.browse),
 };
 /** The bases an install may name when the source does not say (every installable one; the tuple form is for zod). */
-export const INSTALLABLE_BASE_IDS = ROWS.filter((r) => r.media === "video" && r.installable).map((r) => r.id) as unknown as [BaseId, ...BaseId[]];
+export const INSTALLABLE_BASE_IDS = installableBaseIds("video") as [BaseId, ...BaseId[]];
+/** The table's installable bases for one media kind. */
+export function installableBaseIds(media: Media): AnyBaseId[] {
+  return ROWS.filter((r) => r.media === media && r.installable).map((r) => r.id);
+}
 
 /** Which media a base belongs to (video or picture), or null for an id the table does not know. */
 export const mediaOfBase = (id: string): Media | null => ROWS.find((r) => r.id === id)?.media ?? null;
