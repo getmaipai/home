@@ -61348,6 +61348,2484 @@
         }
       }
     },
+    "/api/media-productions": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "List productions visible to this person",
+        "responses": {
+          "200": {
+            "description": "Owned and explicitly shared productions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "productions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "owner_person_id": {
+                            "type": "string"
+                          },
+                          "shared_to": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "cast": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "subject_id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "wardrobe_variant_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "default": []
+                                },
+                                "voice_choice": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 500,
+                                  "default": null
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "default": ""
+                                }
+                              },
+                              "required": [
+                                "subject_id",
+                                "role"
+                              ]
+                            }
+                          },
+                          "sets": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "props": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "episodes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "scenes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "shots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 80
+                                            },
+                                            "subject_ids": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "clip_file_id": {
+                                              "type": "string",
+                                              "nullable": true
+                                            },
+                                            "picture_file_id": {
+                                              "type": "string",
+                                              "nullable": true
+                                            },
+                                            "music_line_id": {
+                                              "type": "string",
+                                              "nullable": true
+                                            },
+                                            "voice_line_id": {
+                                              "type": "string",
+                                              "nullable": true
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "subject_ids"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "shots"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "scenes"
+                              ]
+                            }
+                          },
+                          "clip_file_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "picture_file_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "music_line_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "voice_line_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "finished_cut_file_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "provenance": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "hlc": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "summary",
+                          "owner_person_id",
+                          "shared_to",
+                          "cast",
+                          "sets",
+                          "props",
+                          "episodes",
+                          "clip_file_ids",
+                          "picture_file_ids",
+                          "music_line_ids",
+                          "voice_line_ids",
+                          "finished_cut_file_ids",
+                          "provenance",
+                          "created_at",
+                          "updated_at",
+                          "hlc"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "productions"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Create a private media production",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "cast": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subject_id": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "wardrobe_variant_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "default": []
+                        },
+                        "voice_choice": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 500,
+                          "default": null
+                        },
+                        "notes": {
+                          "type": "string",
+                          "maxLength": 2000,
+                          "default": ""
+                        }
+                      },
+                      "required": [
+                        "subject_id",
+                        "role"
+                      ]
+                    }
+                  },
+                  "sets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "props": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "episodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "scenes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "shots": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    },
+                                    "subject_ids": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "clip_file_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "picture_file_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "music_line_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "voice_line_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "subject_ids"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "shots"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "scenes"
+                      ]
+                    }
+                  },
+                  "clip_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "picture_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "music_line_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "voice_line_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "finished_cut_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject_id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "wardrobe_variant_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "voice_choice": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 500,
+                            "default": null
+                          },
+                          "notes": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "subject_id",
+                          "role"
+                        ]
+                      }
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "episodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scenes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "shots": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "subject_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "clip_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "picture_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "music_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "voice_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "subject_ids"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "shots"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "scenes"
+                        ]
+                      }
+                    },
+                    "clip_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "picture_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finished_cut_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "summary",
+                    "owner_person_id",
+                    "shared_to",
+                    "cast",
+                    "sets",
+                    "props",
+                    "episodes",
+                    "clip_file_ids",
+                    "picture_file_ids",
+                    "music_line_ids",
+                    "voice_line_ids",
+                    "finished_cut_file_ids",
+                    "provenance",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unavailable for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media-productions/{id}": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Get a visible production",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject_id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "wardrobe_variant_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "voice_choice": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 500,
+                            "default": null
+                          },
+                          "notes": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "subject_id",
+                          "role"
+                        ]
+                      }
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "episodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scenes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "shots": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "subject_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "clip_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "picture_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "music_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "voice_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "subject_ids"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "shots"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "scenes"
+                        ]
+                      }
+                    },
+                    "clip_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "picture_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finished_cut_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "summary",
+                    "owner_person_id",
+                    "shared_to",
+                    "cast",
+                    "sets",
+                    "props",
+                    "episodes",
+                    "clip_file_ids",
+                    "picture_file_ids",
+                    "music_line_ids",
+                    "voice_line_ids",
+                    "finished_cut_file_ids",
+                    "provenance",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Update fields on an owned production",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "cast": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subject_id": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "wardrobe_variant_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "default": []
+                        },
+                        "voice_choice": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 500,
+                          "default": null
+                        },
+                        "notes": {
+                          "type": "string",
+                          "maxLength": 2000,
+                          "default": ""
+                        }
+                      },
+                      "required": [
+                        "subject_id",
+                        "role"
+                      ]
+                    }
+                  },
+                  "sets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "props": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "episodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "scenes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "shots": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    },
+                                    "subject_ids": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "clip_file_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "picture_file_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "music_line_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "voice_line_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "subject_ids"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "shots"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "scenes"
+                      ]
+                    }
+                  },
+                  "clip_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "picture_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "music_line_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "voice_line_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "finished_cut_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject_id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "wardrobe_variant_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "voice_choice": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 500,
+                            "default": null
+                          },
+                          "notes": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "subject_id",
+                          "role"
+                        ]
+                      }
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "episodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scenes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "shots": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "subject_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "clip_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "picture_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "music_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "voice_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "subject_ids"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "shots"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "scenes"
+                        ]
+                      }
+                    },
+                    "clip_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "picture_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finished_cut_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "summary",
+                    "owner_person_id",
+                    "shared_to",
+                    "cast",
+                    "sets",
+                    "props",
+                    "episodes",
+                    "clip_file_ids",
+                    "picture_file_ids",
+                    "music_line_ids",
+                    "voice_line_ids",
+                    "finished_cut_file_ids",
+                    "provenance",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Delete an owned production",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media-productions/{id}/share": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Share a production with a named household member",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "person_id": {
+                    "type": "string"
+                  },
+                  "shared": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "person_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated share",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject_id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "wardrobe_variant_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "voice_choice": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 500,
+                            "default": null
+                          },
+                          "notes": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "subject_id",
+                          "role"
+                        ]
+                      }
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "episodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scenes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "shots": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "subject_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "clip_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "picture_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "music_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "voice_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "subject_ids"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "shots"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "scenes"
+                        ]
+                      }
+                    },
+                    "clip_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "picture_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finished_cut_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "summary",
+                    "owner_person_id",
+                    "shared_to",
+                    "cast",
+                    "sets",
+                    "props",
+                    "episodes",
+                    "clip_file_ids",
+                    "picture_file_ids",
+                    "music_line_ids",
+                    "voice_line_ids",
+                    "finished_cut_file_ids",
+                    "provenance",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid share",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media-productions/{id}/subjects": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Resolve a production's cast subjects for this person",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Caller-visible cast subjects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "cast"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media-productions/{id}/cast": {
+      "patch": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Apply one typed cast operation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "add",
+                      "replace",
+                      "remove"
+                    ]
+                  },
+                  "subject_id": {
+                    "type": "string"
+                  },
+                  "entry": {
+                    "type": "object",
+                    "properties": {
+                      "subject_id": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "wardrobe_variant_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "voice_choice": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 500,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "default": ""
+                      }
+                    },
+                    "required": [
+                      "subject_id",
+                      "role"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "subject_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject_id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "wardrobe_variant_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "voice_choice": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 500,
+                            "default": null
+                          },
+                          "notes": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "subject_id",
+                          "role"
+                        ]
+                      }
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "episodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scenes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "shots": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "subject_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "clip_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "picture_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "music_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "voice_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "subject_ids"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "shots"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "scenes"
+                        ]
+                      }
+                    },
+                    "clip_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "picture_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finished_cut_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "summary",
+                    "owner_person_id",
+                    "shared_to",
+                    "cast",
+                    "sets",
+                    "props",
+                    "episodes",
+                    "clip_file_ids",
+                    "picture_file_ids",
+                    "music_line_ids",
+                    "voice_line_ids",
+                    "finished_cut_file_ids",
+                    "provenance",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cast operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media-productions/{id}/script": {
+      "patch": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Apply one typed episode operation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "add_episode",
+                      "replace_episode",
+                      "remove_episode"
+                    ]
+                  },
+                  "episode_id": {
+                    "type": "string"
+                  },
+                  "episode": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "scenes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "shots": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                  },
+                                  "subject_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "clip_file_id": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "picture_file_id": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "music_line_id": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "voice_line_id": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "subject_ids"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "shots"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "scenes"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "episode_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated production",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject_id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "wardrobe_variant_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "voice_choice": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 500,
+                            "default": null
+                          },
+                          "notes": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "default": ""
+                          }
+                        },
+                        "required": [
+                          "subject_id",
+                          "role"
+                        ]
+                      }
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "episodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scenes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "shots": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "subject_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "clip_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "picture_file_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "music_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "voice_line_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "subject_ids"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "shots"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "scenes"
+                        ]
+                      }
+                    },
+                    "clip_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "picture_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_line_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finished_cut_file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "summary",
+                    "owner_person_id",
+                    "shared_to",
+                    "cast",
+                    "sets",
+                    "props",
+                    "episodes",
+                    "clip_file_ids",
+                    "picture_file_ids",
+                    "music_line_ids",
+                    "voice_line_ids",
+                    "finished_cut_file_ids",
+                    "provenance",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid script operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Production unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [
