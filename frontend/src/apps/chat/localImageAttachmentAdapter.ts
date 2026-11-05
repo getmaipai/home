@@ -5,6 +5,10 @@ const MAX_IMAGE_BYTES = MAX_CHAT_IMAGE_BYTES;
 const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 const DOCUMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.oasis.opendocument.presentation"]);
 const stagedDocuments = new Map<string, File>();
+const stagedAudio = new Map<string, File>();
+const AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav", "audio/aac", "audio/ogg", "audio/flac"]);
+const AUDIO_NAME = /\.(mp3|m4a|wav|aac|ogg|flac)$/i;
+const MAX_AUDIO_BYTES = 40 * 1024 * 1024;
 
 /** The browser-side portion of ATT-01's immutable local attachment record.
  * The conversation and turn references are supplied by the turn engine when
@@ -55,6 +59,10 @@ const HEIC_NAME = /\.(heic|heif)$/i;
 function isPicture(file: File): boolean {
   return file.type.toLowerCase().startsWith("image/") || HEIC_NAME.test(file.name);
 }
+function isAudio(file: File): boolean {
+  const type = file.type.toLowerCase();
+  return AUDIO_TYPES.has(type) || (!type && AUDIO_NAME.test(file.name));
+}
 
 function validateImage(file: File): void {
   if (!isPicture(file)) {
@@ -81,7 +89,7 @@ function validateImage(file: File): void {
 export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentAdapterOptions = {}): AttachmentAdapter {
   return {
     get accept() {
-      return options.enabled?.() !== false ? "image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp";
+      return options.enabled?.() !== false ? "image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/aac,audio/ogg,audio/flac,.mp3,.m4a,.wav,.aac,.ogg,.flac" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/aac,audio/ogg,audio/flac,.mp3,.m4a,.wav,.aac,.ogg,.flac";
     },
 
     async add({ file }): Promise<PendingAttachment> {
@@ -90,6 +98,13 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
         const id = newLocalAttachmentId();
         stagedDocuments.set(id, file);
         return { id, type: "file", name: file.name, contentType: file.type, file, status: { type: "requires-action", reason: "composer-send" } };
+      }
+      if (isAudio(file)) {
+        if (file.size > MAX_AUDIO_BYTES) throw new Error("Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac.");
+        if (stagedAudio.size > 0) throw new Error("Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac.");
+        const id = newLocalAttachmentId();
+        stagedAudio.set(id, file);
+        return { id, type: "file", name: file.name, contentType: file.type || "audio/mpeg", file, status: { type: "requires-action", reason: "composer-send" } };
       }
       validateImage(file);
       if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "Photo uploads are turned off for this profile.");
@@ -119,6 +134,8 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
     async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
       const doc = stagedDocuments.get(attachment.id);
       if (doc) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Document: ${doc.name}` }] };
+      const audio = stagedAudio.get(attachment.id);
+      if (audio) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Audio: ${audio.name}` }] };
       if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "Photo uploads are turned off for this profile.");
       validateImage(attachment.file);
       return {
@@ -132,6 +149,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
 
     async remove(attachment): Promise<void> {
       stagedDocuments.delete(attachment.id);
+      stagedAudio.delete(attachment.id);
       stagedRecords.delete(attachment.id);
       options.onRemove?.(attachment.id);
     },
@@ -149,7 +167,11 @@ export function clearStagedImageAttachment(id: string): void {
 export function clearStagedImageAttachments(): void {
   stagedRecords.clear();
   stagedDocuments.clear();
+  stagedAudio.clear();
 }
+
+export function stagedAudioFile(id: string): File | undefined { return stagedAudio.get(id); }
+export function clearStagedAudioFile(id: string): void { stagedAudio.delete(id); }
 
 export async function stagedDocumentPayload(id: string): Promise<{ name: string; mediaType: string; data: string } | undefined> {
   const file = stagedDocuments.get(id);

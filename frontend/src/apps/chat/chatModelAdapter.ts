@@ -9,7 +9,7 @@ import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { messageText } from "@/apps/chat/chatMessageText";
-import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
+import { stagedDocumentPayload, stagedAudioFile, clearStagedAudioFile, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
 import { textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
@@ -28,6 +28,8 @@ import type { PageContext as SpecPageContext } from "@maipai/spec/gen/ts/page-co
 const MusicToolResultEvent = ToolTurnStreamEvent.options[1].extend({
   outcome: ToolTurnStreamEvent.options[1].shape.outcome.extend({ musicJobId: z.string().min(1).optional() }),
 });
+
+class AudioUploadError extends Error {}
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -249,14 +251,15 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const newPictures = lastMessage?.role === "user" ? lastMessage.attachments.filter((attachment) => attachment.type === "image" && !isStoredPicture(attachment)) : [];
       const imageAttached = newPictures.length > 0;
       const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
+      const audioAttachments = lastMessage?.role === "user" ? lastMessage.attachments.map((attachment) => ({ attachment, file: stagedAudioFile(attachment.id) })).filter((item): item is { attachment: (typeof lastMessage.attachments)[number]; file: File } => Boolean(item.file)) : [];
       const typedText = lastUserText(messages, !quoteSpoken);
       const mentionCompanionId = lastMessage?.role === "user" ? unstable_defaultDirectiveFormatter.parse(messageText(lastMessage)).find((segment): segment is Extract<ReturnType<typeof unstable_defaultDirectiveFormatter.parse>[number], { kind: "mention" }> => segment.kind === "mention" && segment.type === "person")?.id : undefined;
       const retryWithCurrent = deps.consumeRetryWithCurrentCompanion?.() ?? false;
       const retrySpeakerId = !retryWithCurrent && unstable_parentId && unstable_assistantMessageId
         ? deps.findReplacedSpeaker?.({ parentId: unstable_parentId, newMessageId: unstable_assistantMessageId })
         : undefined;
-      const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
-      if (!text && !imageAttached && documentPayloads.length === 0) return;
+      const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : audioAttachments.length > 0 ? "Please listen to the attached audio." : undefined);
+      if (!text && !imageAttached && documentPayloads.length === 0 && audioAttachments.length === 0) return;
       deps.onReplyState?.("waiting");
       const provisionalSpeaker = deps.getSelectedSpeaker?.();
       if (provisionalSpeaker) yield { metadata: { custom: { answered_by: provisionalSpeaker } } };
@@ -400,7 +403,21 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         if (conversationId) await deps.resumeConversationIfClosed?.(conversationId);
         const temporary = deps.consumeTemporary?.();
         const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
-        const photoTurnId = imageAttached ? `turn-${randomUuid().replaceAll("-", "").toLowerCase()}` : undefined;
+        const audioParts: { id: string; name: string; media_type: string; duration_ms?: number }[] = [];
+        const photoTurnId = imageAttached || audioAttachments.length ? `turn-${randomUuid().replaceAll("-", "").toLowerCase()}` : undefined;
+        if (audioAttachments.length > 1) throw new Error("Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac.");
+        for (const { attachment, file } of audioAttachments) {
+          const form = new FormData();
+          form.append("file", file, attachment.name ?? file.name);
+          form.append("turn_id", photoTurnId!);
+          if (conversationId) form.append("conversation_id", conversationId);
+          const response = await fetch("/api/attachments/upload-audio", { method: "POST", credentials: "include", body: form, signal: abortSignal });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new AudioUploadError(payload.error ?? "Could not upload this audio file.");
+          const item = payload.audio as (typeof audioParts)[number];
+          audioParts.push(item);
+          clearStagedAudioFile(attachment.id);
+        }
         if (imageAttached && lastMessage?.role === "user") {
           const photos = newPictures;
           if (photos.length > MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
@@ -466,6 +483,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             askAnswer: reconnectAttempts === 0 ? askArm0 : undefined,
             documentAttachments: reconnectAttempts === 0 && documentPayloads.length > 0 ? documentPayloads : undefined,
             images: imageParts.length > 0 ? imageParts : undefined,
+            audio: audioParts.length > 0 ? audioParts : undefined,
           }));
           if (askForm && !askFormSettled) {
             askFormSettled = true;
@@ -929,6 +947,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         const message =
           hubDown
             ? HUB_DOWN_LINE
+          : e instanceof AudioUploadError
+            ? e.message
           : e instanceof ApiError && e.code === "unavailable"
             ? failureLine("unreachable", false)
             : e instanceof ApiError && e.code === "temporary_mismatch"

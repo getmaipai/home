@@ -130,6 +130,11 @@ function sentPictureAttachments(images: NonNullable<ConversationTurnWithMemoryId
   }));
 }
 
+type TurnWithAudio = ConversationTurnWithMemoryIds & { audio?: { id: string; name: string; media_type: string; duration_ms?: number }[] };
+function sentAudioAttachments(audio: NonNullable<TurnWithAudio["audio"]>): CompleteAttachment[] {
+  return audio.map((item) => ({ id: item.id, type: "file", name: item.name, contentType: item.media_type, status: { type: "complete" }, content: [{ type: "text", text: `Audio: ${item.name}${item.duration_ms === undefined ? "" : ` (${Math.round(item.duration_ms / 1000)}s)`}` }] }));
+}
+
 export function rowsToBranchableMessages(
   rows: ConversationTurnWithMemoryIds[],
   selfName: string,
@@ -153,7 +158,7 @@ export function rowsToBranchableMessages(
       // UPLOAD-IMG-02: the person's sent pictures, rebuilt as the same
       // image attachments a live send carries, so the shipped Thread's
       // UserMessageAttachments draws them above the bubble on a reload too.
-      ...(row.images?.length ? { attachments: sentPictureAttachments(row.images, conversationId) } : {}),
+      ...((row.images?.length || (row as TurnWithAudio).audio?.length) ? { attachments: [...(row.images?.length ? sentPictureAttachments(row.images, conversationId) : []), ...((row as TurnWithAudio).audio?.length ? sentAudioAttachments((row as TurnWithAudio).audio!) : [])] } : {}),
       createdAt,
       // CHAT-20: the same memory fields the reply carries below - a
       // turn's memory belongs to the whole exchange, not one side of it

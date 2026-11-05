@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { attachmentAddErrorMessage } from "@/apps/chat/composerAddMenu";
 
+test("audio picker accepts supported song formats", () => {
+  const accepted = "audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/aac,audio/ogg,audio/flac,.mp3,.m4a,.wav,.aac,.ogg,.flac";
+  expect(accepted).toContain(".mp3");
+  expect(accepted).toContain(".m4a");
+});
+
 // UPLOAD-IMG-02: a refused file is reported by assistant-ui as an event, not
 // a tile. Each refusal becomes one plain line a parent understands, never
 // the runtime's own "File type ... is not accepted. Accepted types: ..." text.

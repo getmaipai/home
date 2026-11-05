@@ -75,6 +75,7 @@ export const PackageScopeContext = createContext<{ scope: InstalledPackage | nul
 
 const CameraIcon = getIcon("camera");
 const FileTextIcon = getIcon("file-text");
+const MusicIcon = getIcon("music");
 const SearchIcon = getIcon("search");
 const SparklesIcon = getIcon("sparkles");
 
@@ -121,6 +122,15 @@ function AddPhotosAndFilesItem({ onSelect, photos, reason }: { onSelect: () => v
     {!photos && <ComposerMenuLabel>{reason}</ComposerMenuLabel>}
     </>
   );
+}
+
+function AddAudioItem({ onSelect }: { onSelect: () => void }) {
+  const { addAttachment, disabled } = useComposerAddAttachment();
+  return <ComposerAddMenuItem icon={MusicIcon} name="Add a song or audio file" description="MP3, M4A, WAV, AAC, OGG or FLAC" disabled={disabled} onClick={() => {
+    const input = document.createElement("input"); input.type = "file"; input.accept = "audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/aac,audio/ogg,audio/flac,.mp3,.m4a,.wav,.aac,.ogg,.flac"; input.hidden = true;
+    input.onchange = () => { const file = input.files?.[0]; input.remove(); if (file) void addAttachment(file); };
+    document.body.appendChild(input); input.click(); onSelect();
+  }} />;
 }
 
 /** UPLOAD-IMG-02: whether this person may send pictures - ChatPage's
@@ -298,6 +308,7 @@ export function ComposerAddMenu() {
       <ComposerMenu open={open} inert={!open} align="start">
         <GroupLabel>Add</GroupLabel>
         <AddPhotosAndFilesItem onSelect={close} photos={photosAllowed} reason={photoDisabledReason} />
+        <AddAudioItem onSelect={close} />
         {photosAllowed && <TakeAPhotoItem onSelect={close} />}
         <CreateImageItem overview={enginesQuery.data} onSelect={close} />
         <WebSearchItem onSelect={close} />

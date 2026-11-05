@@ -49,6 +49,10 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   let turnCalls = 0;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/attachments/upload-audio")) {
+      imageUploads.push(init?.body as FormData);
+      return Promise.resolve(new Response(JSON.stringify({ audio: { id: "audio-file123", name: "song.m4a", media_type: "audio/mp4", duration_ms: 9000 } }), { status: 201, headers: { "content-type": "application/json" } }));
+    }
     if (url.includes("/api/attachments/upload")) {
       imageUploads.push(init?.body as FormData);
       return Promise.resolve(new Response(JSON.stringify({ conversation_id: "conv-images", turn_id: "turn-image", image: { id: "file-image123", name: "photo.png", width: 12, height: 8, media_type: "image/jpeg" } }), { status: 201, headers: { "content-type": "application/json" } }));
@@ -348,6 +352,36 @@ describe("sent image transport", () => {
       await adapter.remove(pending as PendingAttachment);
       env.restore();
     }
+  });
+
+  test("uploads staged audio before sending its returned metadata", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-audio", reply: { text: "I can help." }, source: "model", safety: SAFETY } }]));
+    const adapter = createLocalImageAttachmentAdapter();
+    const pending = await adapter.add({ file: new File(["audio bytes"], "song.m4a", { type: "audio/mp4" }) }) as PendingAttachment;
+    const complete = await adapter.send(pending);
+    try {
+      const result = await collect([{ ...fakeUserMessage("Make it reggae"), attachments: [complete] } as unknown as ThreadMessage]);
+      expect(result.error).toBeUndefined();
+      expect(env.imageUploads).toHaveLength(1);
+      expect((env.imageUploads[0]!.get("turn_id") as string)).toMatch(/^turn-/);
+      expect(env.turnBodies[0]).toMatchObject({ audio: [{ id: "audio-file123", name: "song.m4a", media_type: "audio/mp4", duration_ms: 9000 }] });
+    } finally { await adapter.remove(pending); env.restore(); }
+  });
+
+  test("a failed audio upload prevents the turn request", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-audio", reply: { text: "unused" }, source: "model", safety: SAFETY } }]));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => String(input).includes("upload-audio")
+      ? Promise.resolve(new Response("{\"error\":\"Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac.\"}", { status: 413 }))
+      : Promise.reject(new Error("turn should not be sent"))) as unknown as typeof fetch;
+    const adapter = createLocalImageAttachmentAdapter();
+    const pending = await adapter.add({ file: new File(["audio bytes"], "song.mp3", { type: "audio/mpeg" }) }) as PendingAttachment;
+    const complete = await adapter.send(pending);
+    try {
+      const result = await collect([{ ...fakeUserMessage("Remove vocals"), attachments: [complete] } as unknown as ThreadMessage]);
+      expect(result.error).toBeInstanceOf(Error);
+      expect((result.error as Error).message).toContain("Add one audio file under 40 MB");
+    } finally { await adapter.remove(pending); globalThis.fetch = originalFetch; env.restore(); }
   });
 });
 

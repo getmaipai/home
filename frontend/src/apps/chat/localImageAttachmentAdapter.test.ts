@@ -99,4 +99,21 @@ describe("local image attachment adapter", () => {
     const pending = await adapter.add({ file: new File(["x"], "IMG_0001.HEIC", { type: "" }) }) as PendingAttachment;
     expect(pending.type).toBe("image");
   });
+
+  test("stages accepted audio, including a named mp3 with an empty browser type", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
+    expect((await adapter.add({ file: new File(["m4a"], "song.m4a", { type: "audio/x-m4a" }) })) as PendingAttachment).toMatchObject({ type: "file", name: "song.m4a" });
+    await adapter.remove({ id: "unused", type: "file" } as PendingAttachment).catch(() => {});
+    clearStagedImageAttachments();
+    expect((await adapter.add({ file: new File(["mp3"], "track.mp3", { type: "" }) })) as PendingAttachment).toMatchObject({ type: "file", name: "track.mp3" });
+  });
+
+  test("limits audio to one file under 40 MB and still rejects text files", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
+    const song = await adapter.add({ file: new File(["x"], "song.mp3", { type: "audio/mpeg" }) }) as PendingAttachment;
+    await expect(adapter.add({ file: new File(["x"], "second.ogg", { type: "audio/ogg" }) })).rejects.toThrow("Add one audio file under 40 MB");
+    await adapter.remove(song);
+    await expect(adapter.add({ file: new File([new Uint8Array(41 * 1024 * 1024)], "large.m4a", { type: "audio/mp4" }) })).rejects.toThrow("Add one audio file under 40 MB");
+    await expect(adapter.add({ file: new File(["x"], "note.txt", { type: "text/plain" }) })).rejects.toThrow("image files");
+  });
 });
