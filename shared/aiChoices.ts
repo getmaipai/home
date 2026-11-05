@@ -191,7 +191,7 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
 const MODEL_NAMES: Record<string, string> = {
   "reads-pictures": "Muse Glimmer 30B picture reader",
   "image-tools": "ISNet, LaMa and Real-ESRGAN",
-  "tool-look": "YOLOX Nano",
+  "tool-look": "YOLOX Nano and YOLOX-s",
 };
 
 /** The parts line of a choice: each model by name, and every engine file (Python base, engine tools) as one short "Engine files" item, so a long list of engine parts never buries the model's name. */
