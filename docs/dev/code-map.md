@@ -97,7 +97,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ChatComposerNotice, ChatMessageQueue, ComposerTrailingWithThinkingMode |
 | `frontend/src/apps/chat/chatToolUis.tsx` | SpecSheetToolRender, ArtifactCardToolRender, ProducedArtifactCard, ConfirmToolRender, AskToolRender, ProjectFinishedArtifact |
 | `frontend/src/apps/chat/companionComposerMentions.tsx` | CompanionComposerMentions |
-| `frontend/src/apps/chat/composerAddMenu.tsx` | unwiredControlsAreEnabled, __setUnwiredControlsForTests, PackageScopeContext, PhotoUploadsContext, attachmentAddErrorMessage, ComposerAddMenu |
+| `frontend/src/apps/chat/composerAddMenu.tsx` | unwiredControlsAreEnabled, __setUnwiredControlsForTests, PackageScopeContext, AudioUploadsContext, PhotoUploadsContext, attachmentAddErrorMessage |
 | `frontend/src/apps/chat/composerDictationWaveform.tsx` | DictationLevelMeterProvider, ComposerDictationWaveform |
 | `frontend/src/apps/chat/composerDraftRestore.tsx` | useComposerDraftRestore |
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
