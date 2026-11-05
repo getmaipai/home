@@ -1,0 +1,103 @@
+# Audio and music parity with Higgsfield: gaps, changes, screens (2026-11-05)
+
+Status: architect APPROVED 2026-11-05 (first pass REJECTED with edits, applied here). Item: AUDIO-PARITY-01. Owner ask 2026-11-05 (Jesse): review Higgsfield's audio and music feature list, find our gaps and the changes needed, and make the screens and flow match. Sources: our repo (origin/main, read 2026-11-05) and Higgsfield's own pages and third-party guides (URLs at the end). "Verified" means seen on a Higgsfield page; "secondhand" means a third-party guide only.
+
+## 1. Corrections to the list we were given
+
+- **Higgsfield has no dedicated music or sound-effects generator.** Its Audio tab (Voiceover, Change Voice, Translate) says so in its own launch post. Ambience appears only inside Seed Audio multi-speaker scenes. "Music, effects, ambience and dialogue in one track" is ByteDance's model description, not a verified Higgsfield screen.
+- **Seed Audio 1.0** (verified): a free prompt where "@" references attachments, 50+ voice presets, sample rate, speed, volume, WAV, MP3 or OGG/Opus out; about 2 minutes (secondhand).
+- **Urban Cuts and ClipCut are outfit reels** (selfie plus wardrobe photos plus music, cuts on the beat, 9:16 MP4). "Recreate the pacing of a reference edit" has no documented Higgsfield tool.
+- **Music Video Director** is real (verified): drop an MP3, WAV or M4A, add 1 to 4 photos, press Make My Video. Stages: Song DNA (BPM, length, sections), Cast Lock (same face), Direction (a shot plan per section), Final Cut (hard cuts on the beat, audio from 0:00, lip-synced, one MP4). No timeline, prompts or editing; no model, price or limits named.
+- Higgsfield has no song generation, covers, extend or stems. We are ahead there.
+
+## 2. Coverage and changes
+
+| # | Capability | Us today | Change (owner row) |
+|---|---|---|---|
+| 1 | Music beds for a scene | Songs and instrumentals with a length control; `edit_video mix` overlays audio | "Add music" on a clip calls `generate_music` instrumental fitted to the clip seconds (one definition); lands on the Studio Music lane (VIDEO-STUDIO, Videos) |
+| 2 | Sound effects and ambience | Planned: music-listen-create slice C7 and MUSIC-GEN-11 (tool `make_sound`, Sound card) | Build C7 as written; this note adds nothing to its design except the Create tab placement below |
+| 3 | One combined track | Studio export lays voice lines over music (VIDEO-STUDIO-07) | The lanes are video-studio 4.6's Video, Voice and Music ("Music and sounds" once C7 exists); no change here |
+| 4 | Video with synced sound | Built: LTX-2.3 sound and speech; children and teens get no sound | A Sound switch and a "no music" chip in Create; the chat model writes the four audio layers (dialogue, effects, ambience, music) into the prompt (Videos) |
+| 5 | Audio-driven video | Planned: VIDEO-INPUTS-04/05, VIDEO-UI-09, benches first | Keep; add "Use in a video" on audio results (a `MusicTrack` `actions` entry, kit first) |
+| 6 | Automatic music video | Absent | MUSIC-VIDEO-01, section 4 |
+| 7 | Beat-synced short edits | Absent | Beat detection and "Cut to the beat" (section 3). Outfit reels need a try-on model we do not have; deferred for that reason only |
+| 8 | Voiceover, clone, replace, dub | Voiceover (`edit_video mix`, Studio lines); cloned voices admin-only | V1 to V3, section 5 |
+| 9 | Full songs, covers, remix, stems | Built; MUSIC-REMIX-01 R2 to R6 in progress | Tempo, pitch and loop stay in music-listen-create 3.3 and 6; multitrack stays unproposed |
+
+## 3. Screens and flow
+
+Higgsfield's Audio tab: a tool switch at the bottom left (Voiceover, Change Voice, Translate), then model, voice preset, script, Generate; audio stays in the same project as the video.
+
+- **Create tabs.** Music Create gets two tabs beside Song, Band, Album, Style: **Sounds** (the C7 design: prompt, length, variations, history) and **Voice** (a three-way switch: Voiceover, Change voice, Translate). Same two-pane layout as Video Create (prompt panel left, result feed right, VIDEO-UI-01). Parts: kit `Tabs`, the kit segmented control for the three-way switch, the kit file-upload part; no className and no `*Panel` wrapper (rules 9, 9b). "Use in a video" and "Add to Studio" are `MusicTrack` `actions` and a Sound card: a `commons` change first with a `UI-DECISIONS.md` row (owner: Music, tag ourselves).
+- **Video Studio** keeps video-studio 4.6's lanes. A lane's "+" opens the same generator in the kit `Sheet`; any lane change is a `TrackStudio` prop in `commons` first, owned by Videos.
+- **Beat detection** (Music owns): local, Beat This! with librosa as the fallback; it returns BPM, beat times and sections for any audio. "Cut to the beat" in Studio calls it and cuts chosen clips through the one `media.edit` path (Videos).
+- **Chat (owner rule 2026-11-01, music-listen-create 3.3, not yet in RULES.md).** Conditional tools, offered only when relevant, set stays at 16 or fewer (rule 1): `make_sound`, `voiceover`, `change_voice`, `translate_dub`, `add_music_to_clip`, `cut_to_beat`, `make_music_video`. Each has CHAT-AB-01 rows (a positive, a negative, a minor refusal) and code never picks the task from words.
+
+Music video, one screen like Higgsfield's plus the step they lack. Home: Videos Create hosts it (the render is a video job); Music's "Make a video for this song" opens it with the song filled in.
+1. Drop a song (MP3, WAV or M4A, or pick one from Music) and add one to four photos (saved subjects).
+2. Song DNA shows BPM, length and sections, found locally.
+3. **Shot plan**: one row per section, written shot, still, Redo. It is the existing `media_production` shot list and `PRODUCTION-VIDEO-01` subjects, never a second store. A "Just make it" switch skips this step.
+4. Render and cut on the beat; progress is the existing job Status row.
+5. One MP4 in My clips, Open in Studio.
+
+## 4. MUSIC-VIDEO-01 (L, after the benches)
+
+Song DNA (beats, sections, timed words from `lyricsAlign`), Cast Lock (saved subjects), Direction (the household chat model writes one shot per section into `media_production`), shots (LTX clips from a still with audio-to-video lip sync, blocked until VIDEO-INPUTS-04 and -05 pass), Final Cut (ffmpeg cut on the beat and mux of the original audio through `media.edit`, EDITOR-11). The source is the person's own song through the `owned_file` path of song-remix section 3.1; nothing leaves the home.
+- **Gate, adult:** request-aware CSAM screening on the lyrics and shot text; direct CSAM detection on the stills, the clips and the final MP4; an unrun check on an adult-only media job fails closed; no other content block (rules 0 and 10).
+- **Minors:** a minor's music video, Change voice and Translate are refused until a named later row exists; its hard prerequisites are MUSIC-GEN-22, CONTENT-POLICY-01 and -04 and the video child rules (no sound, short clips). Song-remix R5 covers audio edits only and is not that row.
+
+## 5. Voice slices
+
+| Slice | What | Needs |
+|---|---|---|
+| V1 | Voice tab: Voiceover with a voice picker and script box. Chatterbox Turbo has only nonverbal tags (`[laugh]`, `[sigh]`, `[cough]`, `[chuckle]`); the box offers those, not named emotions | none |
+| V2 | Change voice on a video or audio: transcribe, speak in the picked voice with the same timing, remux | existing voices only, never V4 |
+| V3 | Translate and dub: transcribe (mlx-whisper), translate (chat model), speak in the picked voice, lip sync when a face is visible | VIDEO-INPUTS-04 lip-sync bench; existing voices only, never V4 |
+
+Voice rules for V1 to V3: a minor never lists or picks a clip voice and gets preset voices only (household-voices-2026-10-20.md, SAFETY.md); the typed script and the translated text pass the same text floors through the shared gate function the Studio uses (`videoRefusalFor`; for an adult this is the CSAM check only, rule 0); transcripts and translations are dropped after use, never stored or logged (rule 6a); an uploaded video or audio source follows the song-remix `owned_file` path. Results of Voiceover, Change voice, Translate and Sounds are records with provenance (engine, voice id and kind; principle 3, VOICES-06); a sound is `media-item` `kind: "sound"`, spec first.
+
+**V4, clone a voice for every adult: an owner ruling, not decided here.** Today only owners and admins add cloned voices (VOICES-02), and SAFETY.md says a member, teen or child cannot make one. Opening it would change that line, the org standard in `.github` and household-voices decision 7, which only Jesse can do; the commit would carry `Owner-approved: <date>`. Note the length: our clone clips are 6 to 30 seconds (VOICES-04, Chatterbox); "up to 2 minutes" is Higgsfield's figure.
+
+## 5b. Who builds what (agreed with the VIDEOS session, 2026-11-05; Videos records it in its VIDEO-STUDIO rows)
+
+- **Videos owns** the Studio lanes and "Add music to a clip", audio-driven video and lip sync, and the clip and render side of the music video. There is one `media.edit` path for audio on clips, owned by Videos; Music calls it and never adds a second.
+- **Music owns** beat and section detection, the Sounds maker (C7) and the Create tabs.
+- Traps from Videos: a2v and lipdub are not measured on the Stack yet (check `/stack/v1/roles` before any claim); Stack job replies are wrapped as `{ job: {...} }`; video qualities are quick = Wan, detailed = LTX 2.3, ltx25, ltx25max; `VideoPlayer` has a `notice` prop and `poll_while` is required for refresh (VIDEO-UI-01 rev 7).
+
+## 6. Reuse check (org principle 6)
+
+| Piece | Prebuilt used | Hand-built only where |
+|---|---|---|
+| Beat and section detection | Beat This! (MIT) with librosa (ISC) as fallback; licences read before use | the section merge with lyric sections |
+| Transcription for dub and change voice | mlx-whisper (MIT), already planned in song-remix | none |
+| Speech and voice | the existing Chatterbox Turbo TTS and voice manager; Seed-VC or SoulX-Singer only if R0's bench of song-remix wants voice conversion | none |
+| Cutting and muxing | ffmpeg through the one `media.edit` path | none |
+| Shot plan | `media_production` and the Storyboard stitch (PRODUCTION-01) | the lyric-to-shot writer prompt |
+| Sounds engine | ACE-Step stings first at Standard; Stable Audio 3 Small SFX optional at Boost and Max, never for a minor (rule 8), no licence gate (music-listen-create section 5) | none |
+| Tabs, switch, side sheet, upload | kit `Tabs`, segmented control, `Sheet`, file-upload part | none |
+
+## 7. Supersedes
+
+- music-listen-create-2026-11-01.md section 7 slice C7 and music-studio S7 for the Create-tab placement of Sounds only (the engine and tool stay as written there); section 6 "music video for a song, later" is replaced by MUSIC-VIDEO-01; MUSIC-GEN-11 is built under C7.
+- Nothing in video-studio-2026-11-02.md section 4.6 (lanes are not changed).
+- The rows of section 2 of this note replace no existing row; they point at owners.
+
+## 8. Status (rule S6)
+
+Long jobs (sounds, voice, dub, music video, beat cut) report through the existing job Status row and Repairs; controls are absent or disabled through the existing music and video health rows; a feature whose bench has not passed is absent (video-create-one-page rule 5). No new banner, toast or poll.
+
+## 9. Order
+
+1. Finish MUSIC-REMIX-01 R2 to R6 (in progress).
+2. Sounds (C7) and "Add music to a clip".
+3. Beat detection and Cut to the beat.
+4. Voice V1, then V2.
+5. MUSIC-VIDEO-01 and V3 after the VIDEO-INPUTS benches pass.
+
+Each slice ships with its chat half, goes to Codex as one-to-three-file briefs, and is opened in the preview at 1440 and 390 before landing.
+
+## 10. Unknowns
+
+Higgsfield's live Audio tab layout, Seed Audio price, whether Music Video Director exposes the shot plan, Urban Cuts' official page, the voice preset count (21 or 40 plus) and translate language count (10 or 18). We could not log in.
+
+Sources: higgsfield.ai/blog/higgsfield-audio, higgsfield.ai/blog/higgsfield-audio-ai-voice-tools, higgsfield.ai help-center pages for lipsync and Seedance, the Kling 3.0 guide, mv-director.higgsfield.app, higgsfield.ai/es/apps/clipcut, fal.ai/seed-audio-1.0, wavespeed.ai Urban Cuts, gregpreece.com and frankx.ai workflow guides.
