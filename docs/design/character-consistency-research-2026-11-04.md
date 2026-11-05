@@ -133,30 +133,31 @@ One definition (principle 4), used by Create (images), the Studio, templates, ch
   styles today; Create shows chips. The shot's first frame is built from at most 4 references: the place plate first, then the characters, then the prop.
   More than 4 subjects in one frame is refused with a plain line (split the shot).
 
-### 8.2a Three scopes: house, person, person per project (owner model, 2026-11-04)
+### 8.2a Three scopes: house, person, person per production (owner model, 2026-11-04)
 
-Jesse's example: using video generation to make TV shows. Each show has its own characters; one character (an "actor") can appear in two shows.
+Jesse's example: using video generation to make TV shows, movies and YouTube content. Each show has its own characters; one character (an "actor") can appear in two shows.
 
 | Scope | What lives there | Who sees it | Today |
 |---|---|---|---|
 | **House** | household companions (CMEDIA), household styles, shared templates | everyone, by household rules | exists |
 | **Person** | that person's saved characters, props and places (their "talent pool") | only them; Share is an explicit per-item action to named people | new, section 8.2 |
-| **Person per project** | a **Project** (a show, a film, a series) with its **cast, props and places for that project**, its shot list / storyboard, its finished clips | only the creator (and anyone they Share the project with) | new |
+| **Person per production** | a **Production** (a show, a movie, a YouTube channel or series, a one-off video) with its **cast, props and places for that production**, its shot list / storyboard, its finished clips | only the creator (and anyone they Share the production with) | new |
 
 Rules:
-- **Reference, not copy.** A project's cast is a list of references to the person's saved subjects. An actor in two shows is one saved character cast in two projects:
-  fix the face once and both shows follow. A change to the character's approved pictures is offered to each project that uses it, never forced into a finished episode.
-- **Role in a project** is a small per-project layer over the actor: role name, wardrobe or look variant (extra approved references), voice choice, notes. So the same
-  actor can wear a different costume or age in show B without changing show A. A look variant belongs to the project unless the person promotes it to the actor.
-- **Project-only subjects** can be created inside a project (a one-off monster); they live in that project and can be "moved up" to the person's pool later.
+- **Reference, not copy.** A production's cast is a list of references to the person's saved subjects. An actor in two shows is one saved character cast in two productions:
+  fix the face once and both shows follow. A change to the character's approved pictures is offered to each production that uses it, never forced into a finished episode.
+- **Role in a production** is a small per-production layer over the actor: role name, wardrobe or look variant (extra approved references), voice choice, notes. So the same
+  actor can wear a different costume or age in show B without changing show A. A look variant belongs to the production unless the person promotes it to the actor.
+- **Production-only subjects** can be created inside a production (a one-off monster); they live in that production and can be "moved up" to the person's pool later.
 - **Places and props** work the same way (a set used in two shows is one place).
-- **Deleting** a project never deletes the actors in the person's pool; deleting an actor that is cast in a project asks first and names the projects.
-- **Privacy:** nothing in a project is visible to the household by default; the Library shows a project's finished files to its creator only until shared.
-- **Naming:** "Project" already means a background harness job (BACKLOG "Projects", harness-turns-and-projects-2026-09-26). The person-facing word here is "Show" or "Film"; the record is a `media_project`, not the harness project. The architect should rule on the name.
-- **Fits the storyboard:** the Storyboard strip (video-create-2026-11-01.md, EDITOR-12) belongs to a project; its shots name their subjects from the project's cast.
-- **Images use it too:** a project can hold pictures (a comic, a poster set) with the same cast.
+- **Deleting** a production never deletes the actors in the person's pool; deleting an actor that is cast in a production asks first and names the productions.
+- **Privacy:** nothing in a production is visible to the household by default; the Library shows a production's finished files to its creator only until shared.
+- **Name (Jesse chose "Productions", 2026-11-04):** "Project" already means a background harness job, and "Studio" already names the editor page in Videos, Music and Images, so neither is used. The record is a `media_production`.
+- **Fits the storyboard:** the Storyboard strip (video-create-2026-11-01.md, EDITOR-12) belongs to a production; its shots name their subjects from the production's cast.
+- **A production holds:** script (episodes, scenes, shots), cast, sets and props, clips and first-frame pictures in order, music and voice lines, and the finished cuts. Other media (pictures for a comic or thumbnails for a channel) can live in it too.
+- **Images use it too:** a production can hold pictures (a comic, a poster set) with the same cast.
 
-Open question for the architect: one `media_project` record shared by Videos and Images, or Videos first. Recommend one record, kind-agnostic (like `media_template`).
+Open question for the architect: one `media_production` record shared by Videos and Images, or Videos first. Recommend one record, kind-agnostic (like `media_template`).
 
 ### 8.3 Per-shot method, cheapest first
 
