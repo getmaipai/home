@@ -526,7 +526,7 @@ export function regionForStack(region: CommentRegion | null | undefined): string
 }
 
 /** A Comment: the person describes a change, optionally pointing at an area, and the picture engine changes only that area (the rest of the picture stays as it was). The result is a preview the person applies as a new version, exactly like Erase. Gates run first: only a person who may make pictures, and the two absolute lines on the words. */
-export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; maskPng?: Uint8Array | null; referenceId?: string | null; references?: Array<{ kind: "picture"; via: "chat"; id: string; conversationId?: string }>; styles?: string[] }): Promise<EditProgress> {
+export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; maskPng?: Uint8Array | null; referenceId?: string | null; references?: Array<{ kind: "picture"; via: "chat"; id: string; conversationId?: string }>; styles?: string[]; subjectIds?: string[] }): Promise<EditProgress> {
   const source = loadSource(actor, conversationId, id, true);
   const denial = pictureDenial(editorAudience(actor));
   if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);

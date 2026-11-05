@@ -41,6 +41,8 @@ export interface PictureRequest {
   tier?: "boost" | "max";
   /** IMGEDIT-01: an edit of a picture already in this chat. The result is saved as the next version of that picture (so the editor shows Original and Undo), and its source is never changed. */
   edit?: { source_id: string; label: string; method: "instruct" | "tool" };
+  /** IMG-SUBJECT-01: ids whose private saved description or references shaped this output. */
+  subject_ids?: string[];
 }
 
 export interface PictureJob {

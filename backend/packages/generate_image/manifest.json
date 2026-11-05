@@ -63,6 +63,13 @@
         "grounded": false,
         "description": "Optional. The name of one of the household's saved styles, only when the person names it, for example \"my pixel style\" gives \"pixel\". Leave it out otherwise; never invent one."
       },
+      "subjects": {
+        "type": "array",
+        "items": { "type": "string", "maxLength": 80 },
+        "maxItems": 3,
+        "grounded": false,
+        "description": "Optional. Names from the available saved subjects list, only when the person chooses them. Home supplies their saved look and reference pictures. Never invent or guess a subject name."
+      },
       "quality": {
         "type": "string",
         "enum": [

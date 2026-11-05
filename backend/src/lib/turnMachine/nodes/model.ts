@@ -1,6 +1,7 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { withStyleList } from "@/lib/videos/styleToolSpec";
 import { listTemplates } from "@/lib/media/templates";
+import { listMediaSubjects } from "@/lib/mediaSubjects";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
@@ -177,6 +178,10 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
     const choices = operations.map((operation) => {
       const args = z.toJSONSchema(operation.args, { unrepresentable: "any" }) as Record<string, unknown>;
       const properties = args.properties && typeof args.properties === "object" ? { ...(args.properties as Record<string, unknown>) } : {};
+      if (operation.id === "picture.change" && state.actor) {
+        const subjects = listMediaSubjects(state.actor);
+        properties.subjects = { type: "array", items: { type: "string", enum: subjects.map((item) => item.name) }, maxItems: 3, uniqueItems: true, description: `Optional saved subject names chosen by the person. Available to this person: ${subjects.map((item) => item.name).join(", ") || "none"}.` };
+      }
       for (const key of ["mask", "maskPng", "maskBase64", "maskPngBase64"]) delete properties[key];
       const required = Array.isArray(args.required) ? args.required.filter((key) => typeof key !== "string" || !["mask", "maskPng", "maskBase64", "maskPngBase64"].includes(key)) : undefined;
       return {
@@ -216,6 +221,8 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
     schema.required = (Array.isArray(schema.required) ? schema.required : []).filter((key: string) => key !== "prompt");
     schema.properties.template = { type: "string", enum: templates.map((row) => row.id), description: `Optional picture template id. Available to this person: ${templates.map((row) => `${row.id} (${row.title}; ${[...row.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)].map((m) => `${m[1]}: ${m[2]} (example: ${m[3]})`).join(", ") || "no blanks"})`).join("; ")}` };
     schema.properties.blanks = { type: "object", additionalProperties: { type: "string" }, description: "Values for the named blanks shown in the selected template." };
+    const subjects = listMediaSubjects(state.actor);
+    schema.properties.subjects = { type: "array", items: { type: "string", enum: subjects.map((item) => item.name) }, maxItems: 3, uniqueItems: true, description: `Optional. Name only subjects the person chose. Available to this person: ${subjects.map((item) => item.name).join(", ") || "none"}.` };
     args = schema;
     description = `${description} For a template, set its id and fill every named blank using the labels and examples in the template argument description; a free prompt is not needed. Otherwise provide prompt. The final filled prompt follows the same picture rules.`;
   }

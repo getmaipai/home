@@ -2330,6 +2330,26 @@ export const mediaCollections = sqliteTable(
 // person, is shown to that person only (never to another person or an admin page, RULES 6a), carries the spec's id,
 // provenance and clock stamp, and goes with the person when they are forgotten (lib/personLifecycle.ts).
 // A person's follow of a topic or a source (spec NewsInterest). One row per person and channel.
+// IMG-SUBJECT-01: a person's saved picture subject; private unless explicitly shared.
+export const mediaSubjects = sqliteTable(
+  "media_subjects",
+  {
+    id: text("id").primaryKey(),
+    ownerPersonId: text("owner_person_id").notNull().references(() => people.id),
+    name: text("name").notNull(),
+    kind: text("kind").notNull(),
+    sharedWith: text("shared_with").notNull().default("[]"),
+    look: text("look").notNull(),
+    referenceIds: text("reference_ids").notNull().default("[]"),
+    real: integer("real", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [index("media_subjects_owner_idx").on(table.ownerPersonId)],
+);
+
 export const newsInterests = sqliteTable(
   "news_interests",
   {

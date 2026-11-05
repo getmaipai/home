@@ -305,6 +305,12 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   sqlite.query("DELETE FROM media_watch_sessions WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM media_watch_days WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM media_collections WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM media_subjects WHERE owner_person_id = ?").run(personId);
+  const subjectShares = sqlite.query("SELECT id, shared_with FROM media_subjects WHERE EXISTS (SELECT 1 FROM json_each(media_subjects.shared_with) WHERE value = ?)").all(personId) as Array<{ id: string; shared_with: string }>;
+  for (const subject of subjectShares) {
+    const remaining = (JSON.parse(subject.shared_with) as string[]).filter((id) => id !== personId);
+    sqlite.query("UPDATE media_subjects SET shared_with = ?, updated_at = ?, hlc = ? WHERE id = ?").run(JSON.stringify(remaining), mediaNow, nextHlc(), subject.id);
+  }
   sqlite.query("UPDATE media_sources SET deleted_at = ?2 WHERE owner_person_id = ?1 AND scope = 'person' AND deleted_at IS NULL").run(personId, mediaNow);
   sqlite.query("UPDATE media_sources SET owner_person_id = NULL WHERE owner_person_id = ?").run(personId);
 

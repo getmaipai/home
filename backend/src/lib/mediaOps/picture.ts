@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { startEdit, loadSource, editToolsStatus, ImageEditError } from "@/lib/imageEdit";
+import { storeFile } from "@/lib/attachments";
 import { startComment } from "@/lib/imageEdit";
 import { runPictureTool } from "@/lib/pictures/people";
 import { registerMediaOp } from "./registry";
+import { createMediaSubject } from "@/lib/mediaSubjects";
+import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
+import { db } from "@/db";
+import { attachments } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 const empty = z.object({});
 const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
@@ -19,6 +25,7 @@ const changeArgs = z.object({
   referenceId: z.string().nullable().optional(),
   references: z.array(referenceSchema).optional(),
   styles: z.array(z.string()).max(2).optional(),
+  subjects: z.array(z.string().max(80)).max(3).optional(),
 });
 
 function chatSource(source: { conversationId?: string; id: string }) {
@@ -53,6 +60,33 @@ registerEdit("adjust", "Adjust", "Adjust brightness, contrast, saturation and wa
 registerEdit("blur_background", "Blur background", "Blur the picture background while keeping the subject clear.", blurArgs, [{ kind: "number", name: "radius", label: "Blur", min: 1, max: 40 }], "blur_background");
 
 registerMediaOp({
+  id: "picture.save_subject",
+  label: "Save subject",
+  summary: "Save this picture as a named character, prop, or place for later pictures.",
+  input: "picture",
+  output: "data",
+  args: z.object({ name: z.string().min(1).max(80), kind: z.enum(["character", "prop", "place"]), look: z.string().min(1).max(1000) }),
+  controls: [{ kind: "words", name: "name", label: "Subject name" }, { kind: "words", name: "look", label: "Look words" }],
+  needs: null,
+  minBand: "child",
+  listed: false,
+  run: async ({ actor }, { source, args }: any) => {
+    if (!source.conversationId) throw new Error("A chat picture needs its conversation id.");
+    const loaded = loadSource(actor, source.conversationId, source.id, false);
+    const sourceIsGenerated = /^picture-gen:/.test(db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.id)).get()?.provenance ?? "");
+    if (actor.role === "child" || actor.role === "teen") {
+      if (!sourceIsGenerated) throw new ImageEditError(422, "I can't save a real photo as a subject for this profile yet.", "real_minor_subject");
+      const screen = await screenInputImage(loaded.bytes, args.look, viewerOf(actor));
+      if (!screen.ok) throw new ImageEditError(422, screen.line, screen.code);
+    }
+    const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: loaded.mediaType, bytes: loaded.bytes, provenance: "media-subject-reference", retention: "kept", name: `${args.name} reference` });
+    if (!saved.ok) throw new ImageEditError(saved.status, saved.error, "save_failed");
+    const subject = createMediaSubject(actor, { name: args.name, kind: args.kind, look: args.look, referenceIds: [saved.value.id], real: false }, "chat");
+    return { subject: { id: subject.id, name: subject.name, kind: subject.kind } };
+  },
+});
+
+registerMediaOp({
   id: "picture.change",
   label: "Change",
   summary: "Change a picture using words and reference pictures.",
@@ -63,7 +97,15 @@ registerMediaOp({
   needs: "image",
   minBand: "child",
   run: async ({ actor }, { source, args }) => {
-    const result = await startComment(actor, chatSource(source).conversationId, source.id, args as z.infer<typeof changeArgs>);
+    const values = args as z.infer<typeof changeArgs>;
+    const { subjectsForNames } = await import("@/lib/mediaSubjects");
+    const selected = subjectsForNames(actor, values.subjects ?? []);
+    if (!selected) throw new ImageEditError(422, "Choose a saved subject from your available list.", "unknown_subject");
+    const result = await startComment(actor, chatSource(source).conversationId, source.id, {
+      ...values,
+      prompt: [...selected.map(({ subject }) => subject.look), values.prompt].join(". "),
+      subjectIds: selected.map(({ subject }) => subject.id),
+    });
     return "job" in result ? { job: result } : { file: result };
   },
 });

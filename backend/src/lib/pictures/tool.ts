@@ -19,6 +19,7 @@ import { StackPicturesError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { getTemplate } from "@/lib/media/templates";
 import { runMediaOp } from "@/lib/mediaOps/registry";
+import { subjectsForNames } from "@/lib/mediaSubjects";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture, latestPictureId } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
@@ -116,10 +117,17 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const refusal = refusalFor(audience, normalized) ?? likenessCallRefusal(audience.actor, normalized);
   if (refusal) return refused(callId, args, refusal);
   const prompt = promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : "");
+  const chosenSubjects = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
+  const resolvedSubjects = subjectsForNames(state.actor as PersonRow, chosenSubjects);
+  if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
 
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
   if (typeof normalized.change === "string" && normalized.change.trim() !== "") {
     const mapped = { ...normalized };
+    if (resolvedSubjects.length) {
+      mapped.prompt = [...resolvedSubjects.map(({ subject }) => subject.look), String(mapped.prompt ?? "")].filter(Boolean).join(". ");
+      mapped.subjectIds = resolvedSubjects.map(({ subject }) => subject.id);
+    }
     if (Array.isArray(normalized.references)) {
       const refs = (normalized.references as unknown[]).flatMap((entry) => {
         const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
@@ -160,7 +168,12 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   // The absolute line is checked again on what is actually sent: the style's trigger words are added by Home, so they
   // are part of the request too.
   const sentPrompt = withTriggerWords(prompt, adapter);
-  const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`, { lane });
+  const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), sentPrompt].join(". ");
+  const subjectRefs = resolvedSubjects.flatMap(({ subject, references }) => references.map((ref) => ({ ...ref, kind: subject.kind })))
+    .sort((a, b) => ({ place: 0, character: 1, prop: 2 }[a.kind] - { place: 0, character: 1, prop: 2 }[b.kind]))
+    .slice(0, Math.max(1, 1 + (engine.edit?.references ?? 0)));
+  const strictAudience = subjectRefs.some((ref) => ref.audience === "adult-only") ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
+  const second = refusePrompt(`${subjectPrompt} ${adapter?.name ?? ""}`, { lane });
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
   // KIDS-CREATE-01: a child gets a daily limit, the cartoon look forced, Quick only, one or two pictures, and no friction text.
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
@@ -176,23 +189,38 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     const temporary = state.temporary === true || state.ephemeral === true;
     const job = await startPictureJob({
       actor: state.actor as PersonRow,
+      subjectIds: resolvedSubjects.map(({ subject }) => subject.id),
       conversationId: state.conversationId,
       turnId: state.turnId,
       companionId: state.persona?.id ?? null,
       temporary,
       kind: "generate",
-      prompt,
+      prompt: subjectPrompt,
       tier: jobTier("image", tierAsked.tier, choice.quality),
       body: {
-        prompt: kid ? forceCartoon(sentPrompt) : sentPrompt,
+        prompt: kid ? forceCartoon(subjectPrompt) : subjectPrompt,
         size,
         n: kid ? Math.min(count, KID_MAX_COUNT) : count,
         ...(choice.model ? { model: choice.model } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
-        audience: lane === "adult" && adultStylesAllowed() ? "adult" : "all-ages",
+        audience: lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages",
         ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
+      ...(subjectRefs.length ? { submit: async () => {
+        const form = new FormData();
+        form.append("image", new File([new Uint8Array(subjectRefs[0]!.bytes)], "subject-reference", { type: subjectRefs[0]!.mediaType }));
+        form.append("operation", "edit");
+        form.append("instruction", subjectPrompt);
+        form.append("image_source", "uploaded");
+        if (subjectRefs[1] && (engine.edit?.references ?? 0) > 0) {
+          form.append("reference", new File([new Uint8Array(subjectRefs[1].bytes)], "subject-reference-2", { type: subjectRefs[1].mediaType }));
+          form.append("reference_source", "uploaded");
+        }
+        form.append("timeout_ms", "1");
+        const { submitEdit } = await import("./stack");
+        return { ...(await submitEdit(form)), done: null };
+      } } : {}),
       ...(template?.transparent ? { onDone: async (fileId: string) => {
         await templateMediaOpRunner(state.actor as PersonRow, BACKGROUND_REMOVAL_OP, { source: { kind: "picture", via: "chat", id: fileId, conversationId: state.conversationId ?? "" }, args: {} }, input.signal);
       } } : {}),

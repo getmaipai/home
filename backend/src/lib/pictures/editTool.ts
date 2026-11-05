@@ -172,6 +172,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   try {
     const job = await startPictureJob({
       actor, conversationId: state.conversationId, turnId: state.turnId, temporary, kind: "edit", prompt: instruction,
+      subjectIds: Array.isArray(args.subjectIds) ? args.subjectIds.filter((id): id is string => typeof id === "string") : [],
       body: { prompt: instruction, audience: laneOf(audience) === "adult" ? "adult" : "all-ages" },
       edit: { sourceId: base.id, label, method: "instruct" },
       // A version the editor re-encoded is not in the Stack's ledger of its own pictures; it is then sent as what it is, an upload with no person (as Comment does).

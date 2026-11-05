@@ -99,6 +99,7 @@ export interface StartPictureInput {
   local?: (progress: (phase: string, percent: number) => void, signal: AbortSignal) => Promise<StackPic[]>;
   /** Follow-on media work for each stored generated file, through the media-op registry. */
   onDone?: (fileId: string) => Promise<void>;
+  subjectIds?: string[];
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackPicturesError` when the Stack refuses
@@ -115,7 +116,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
@@ -300,7 +301,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
         continue;
       }
       if (!job.turnId || !(await waitForTurnRow(job.turnId, job))) { if (stopped(job)) { discardStored(storedIds); return; } throw new Error("turn row never appeared"); }
-      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, index, ...meta, width, height })}`, deduplicate: false, retention: "conversation" });
+      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, index, ...meta, width, height, ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`, deduplicate: false, retention: "conversation" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;

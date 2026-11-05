@@ -38,6 +38,8 @@ Coding keys are stored on this computer. A coding tool sends its request to the 
 
 A picture, video or style that looks like someone in your home is made on your own computer, only when that adult has said yes in their own settings. Home keeps a dated note each time they change their answer, and a list of each time something was made that looks like them. Only they can read it. No photo or prompt is kept in that list. Nothing about it leaves your house.
 
+Saved picture subjects (characters, props and places) stay on this computer. Their names, descriptions, reference pictures and any people they are shared with are stored in Home; only the owner and the named people they share with can use them. When selected for a picture, the description and reference picture are sent to the household's configured picture engine on the Stack. A subject is deleted when its owner deletes it or their profile is erased. Children and teens cannot save or use subjects marked as real people.
+
 ## What never leaves your house
 
 Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai does not collect usage stats or crash reports. Nothing your family says is used to train anything. Your browser saves a copy of MaiPai's own screens on this device so the app can still open without internet. That cache is same-origin only: it stores the app's own files, never anything you typed or anything MaiPai remembers.
