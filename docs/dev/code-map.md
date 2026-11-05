@@ -640,10 +640,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
 | `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
+| `backend/src/lib/media/templates.ts` | listTemplates, getTemplate |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
+| `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, mediaOpSchema, listMediaOps, runMediaOp, getMediaOpJob |
 | `backend/src/lib/memory.ts` | validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord, remember |
 | `backend/src/lib/memoryContentPolicy.ts` | CREDENTIAL_SAFE_MESSAGE, CREDENTIAL_REDACTION, detectCredential, hasDeclaredCredentialField, redactCredentials |
@@ -763,7 +765,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
-| `backend/src/lib/pictures/tool.ts` | PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
+| `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
 | `backend/src/lib/placement.ts` | defaultModelBytes, minimum, checkPlacement |
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
