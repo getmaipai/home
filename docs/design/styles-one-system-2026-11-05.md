@@ -83,5 +83,5 @@ Rule: a new style feature is built once against the record and the table. Only t
 ## 7. Open items (measurements, not owner questions)
 
 - Measured 2026-11-05: the picture install job reply wraps the same `{ job }` and returns `{ lora }`, but its request body is thinner than the video one (STYLES-00).
-- Civitai base labels for the picture families.
+- Done 2026-11-05: Civitai base labels for the picture families (`Flux.2 Klein 4B`, `ZImageTurbo`, `Ernie`), and one real picture style installed and used (STYLES-05, details in `docs/dev/lora-sources.md`). Findings: the list route hid picture styles (fixed); a new picture style is off for chat until an admin enables it; the style is applied only when the model names it (STYLES-04 answers that).
 - Which picture styles a base can stack two of without a muddy result (a bench, one sample per pair).

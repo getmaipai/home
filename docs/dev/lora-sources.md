@@ -108,6 +108,24 @@ the same wrapped `/stack/v1/jobs/{id}` response, and its picture record joins th
 applies the install metadata and admin-only availability. A picture style's stored base remains `unknown`, because the Stack owns that fact
 and reads it when the style is used.
 
-The install route and fake Stack contract are covered locally. This is **Not yet proven against the real picture Stack (STYLES-05)**. Still
-open: the Hugging Face base tags picture styles use (the patterns read the repository name and tags, and have not been checked against real
-picture repositories).
+## Measured against the real Stack (STYLES-05, 2026-11-05)
+
+One real picture style went through the whole chain on a dev hub that used the live Stack: browse (`media: "picture"`, Hugging Face), install of
+`tarn59/pixel_art_style_lora_z_image_turbo` (Apache-2.0, a Z-Image Turbo style, 1 click, about 20 seconds), the Stack job, the Home record, an admin
+switching it on for adults, and a chat turn that made a picture with it. The picture was opened and judged: chunky stepped-pixel art, clearly unlike
+the same request made without the style (which came out as smooth illustration with a pixel-art look from the words alone).
+
+What was found, and what is open:
+
+- **The one styles list hid picture styles.** `GET /api/loras` and `/api/loras/available` called `readLoras` without a media, which defaults to video, so
+  the new record was in the database and invisible. Fixed (`ae2e524dc`): both take an optional `media` (`video` default, or `picture`).
+- **A fresh picture style is off for chat.** It lands admins-only, and the picture tool's `enabled` rule (`availability.who !== "admins"`) leaves it out
+  of `adaptersFor` for everyone, the owner included, until an admin sets availability to adults. That is the picture rule from before VIDEO-LORA-12;
+  video lets an admin use an admins-only style in Create. Open: decide whether picture chat should follow `loraAccess` the way video does.
+- **The style is applied only when the model names it.** `generate_image` takes `style` only when the person names the style. Of three chat turns,
+  turn 1 ("in my Pixel art style") sent no style, turn 2 sent the name `Pixel` while the Stack was restarting for another session's release (cause not
+  proven), turn 3 ("my saved style called Pixel art") sent it: the job carried `loras: [{ id, scale: 1 }]`, the style's own model (`z-image-turbo`) and
+  Detailed. STYLES-04 (suggest a style chip from the prompt, the person confirms) is the fix for this, not a tighter tool description.
+- A fresh install's trigger words are empty (Hugging Face gave none); the admin typed `pixel art` in the style's settings for this run.
+- Hugging Face base tags for picture styles: the patterns found 3 picture hits for `flux2 klein` and 19 for `z-image-turbo` with the base read right on
+  each; no wrong-base hit was seen in those 22. Not a full audit.
