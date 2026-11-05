@@ -645,6 +645,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
+| `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, mediaOpSchema, listMediaOps, runMediaOp, getMediaOpJob |
 | `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, createMediaProduction, updateMediaProduction, updateProductionCast |
