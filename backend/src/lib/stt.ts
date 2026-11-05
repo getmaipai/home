@@ -23,3 +23,18 @@ async function transcribeViaStack(samples: Float32Array, sampleRate: number): Pr
 export function transcribeUtterance(samples: Float32Array, sampleRate: number): Promise<string> {
   return transcribeViaStack(samples, sampleRate);
 }
+
+/** Transcribe a saved audio clip through the same Stack STT role/client. */
+export async function transcribeAudioClip(bytes: Uint8Array, mimeType: string): Promise<string> {
+  const form = new FormData();
+  form.append("file", new File([bytes], `voice.${mimeType.split("/")[1] ?? "audio"}`, { type: mimeType }));
+  form.append("model", "stt");
+  try {
+    const result = await getStackClient().transcribe(form);
+    resolveStackOffline("stt");
+    return result.data.text;
+  } catch (err) {
+    reportStackFailure(err, "stt");
+    throw err;
+  }
+}

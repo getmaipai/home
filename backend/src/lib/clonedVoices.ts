@@ -23,6 +23,7 @@ import type { PersonRow } from "@/types";
 import type { ClonedVoiceInfo } from "@/wire";
 import type { StackVoice } from "@/lib/stack/types";
 import { appendLogLine } from "@/lib/log";
+import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 
 export type ClonedVoiceOpResult<T> =
   | { ok: true; value: T }
@@ -131,6 +132,7 @@ export function saveClonedVoice(
     createdAt: new Date().toISOString(),
     temperature,
     pitchSemitones,
+    transcript: null,
   };
   try {
     db.insert(clonedVoices).values(row).run();
@@ -151,6 +153,7 @@ export function saveClonedVoice(
   }
   // One audit line: who made it and with which settings; never the person's name, the voice's name or the clip.
   appendLogLine(`voice.created id=${id} by=${creator.id} role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}`);
+  void transcribeClonedVoiceOnce(id, bytes, mimeType).catch(() => {});
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
 
@@ -234,12 +237,12 @@ export function getClonedVoiceFile(id: string): { path: string; mimeType: string
 }
 
 /** Read the reference bytes for an existing household voice without making a second clip copy on disk. */
-export function readClonedVoiceClip(id: string): { bytes: Uint8Array; mimeType: string; label: string } | null {
+export function readClonedVoiceClip(id: string): { bytes: Uint8Array; mimeType: string; label: string; transcript: string | null } | null {
   const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
   if (!row) return null;
   const path = join(clonedVoicesDir, row.fileName);
   if (!existsSync(path)) return null;
-  return { bytes: new Uint8Array(readFileSync(path)), mimeType: row.mimeType, label: row.label };
+  return { bytes: new Uint8Array(readFileSync(path)), mimeType: row.mimeType, label: row.label, transcript: row.transcript };
 }
 
 export function clonedVoiceExists(id: string): boolean {

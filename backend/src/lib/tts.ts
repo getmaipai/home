@@ -10,6 +10,7 @@ import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
 import { householdVoiceSpeech, readClonedVoiceClip } from "@/lib/clonedVoices";
 import { fetchRecordedSpeech, recordedSpeechReferenceForTest, submitRecordedSpeech, waitForRecordedSpeech } from "@/lib/recordedSpeech";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
+import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 
 const TTS_UNAVAILABLE_COPY = "Home can't speak right now. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
 
@@ -86,15 +87,14 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
  * Typed inline Fish cues are retained verbatim; Home never adds a cue here. */
 export async function synthesizeRecordedSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean } = {}): Promise<RecordedSpeechResult> {
   const fallback = async (): Promise<RecordedSpeechResult> => ({ ...(await synthesizeSpeech(rawText, voiceUrl, opts)), engine: "chatterbox-turbo" });
-  // Voice rows currently have no transcript field. Until one is provided by a future voice flow,
-  // do not guess or transcribe: the Stack requires the clip's exact sample words.
   if (typeof rawText !== "string" || rawText.trim().length === 0 || rawText.length > MAX_TEXT_LENGTH) return { ...(await synthesizeSpeech(rawText, voiceUrl, opts)), engine: "chatterbox-turbo" };
   try {
     const testReference = recordedSpeechReferenceForTest(voiceUrl);
     const household = testReference ? true : householdVoiceSpeech(voiceUrl);
     const match = typeof voiceUrl === "string" ? /(?:\/cloned\/)?(voice-[a-z0-9]{6,})(?:\/file)?/.exec(voiceUrl) : null;
     const clip = testReference ?? (household && match ? readClonedVoiceClip(match[1]!) : null);
-    const transcript = testReference?.transcript;
+    let transcript = testReference?.transcript ?? clip?.transcript ?? null;
+    if (clip && !transcript && match) transcript = await transcribeClonedVoiceOnce(match[1]!, clip.bytes, clip.mimeType);
     if (!clip || !transcript?.trim()) return await fallback();
     const status = await waitForRecordedSpeech();
     if (!status?.available || !status.ready || !status.installed) return await fallback();

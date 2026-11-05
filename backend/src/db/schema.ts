@@ -1023,6 +1023,7 @@ export const clonedVoices = sqliteTable("cloned_voices", {
   // (-12 to 12); null means the engine default and no shift.
   temperature: real("temperature"),
   pitchSemitones: real("pitch_semitones"),
+  transcript: text("transcript"),
 });
 
 export const scheduledJobs = sqliteTable("scheduled_jobs", {

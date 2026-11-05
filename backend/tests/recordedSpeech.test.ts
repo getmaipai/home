@@ -5,6 +5,10 @@ import { synthesizeRecordedSpeech, synthesizeSpeech } from "@/lib/tts";
 import { __setTtsTagsForTests } from "@/lib/ttsCapabilities";
 import { __setRecordedSpeechFetchForTests, __setRecordedSpeechReferenceForTests } from "@/lib/recordedSpeech";
 import { resetDb } from "./reset-db";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { saveClonedVoice, clonedVoiceUrl } from "@/lib/clonedVoices";
+import { __setClonedVoiceTranscriberForTests, transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 
 const fixtureRef = "voice-abcdef";
 const audio = new Uint8Array([1, 2, 3]);
@@ -15,11 +19,12 @@ let jobState: "done" | "failed" = "done";
 let submittedText = "";
 let consoleText = "";
 let requests: string[] = [];
+let transcribeCalls = 0;
 
 describe("recorded speech V6", () => {
   beforeEach(() => {
     resetDb(); setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8771");
-    fallbackCalls = 0; stackAvailable = true; installed = true; jobState = "done"; submittedText = ""; consoleText = ""; requests = [];
+    fallbackCalls = 0; stackAvailable = true; installed = true; jobState = "done"; submittedText = ""; consoleText = ""; requests = []; transcribeCalls = 0;
     __setTtsTagsForTests([]);
     __setRecordedSpeechReferenceForTests((voice) => voice === fixtureRef ? { bytes: new Uint8Array([4, 5]), mimeType: "audio/wav", transcript: "reference words" } : null);
     __setRecordedSpeechFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
@@ -33,7 +38,7 @@ describe("recorded speech V6", () => {
     }) as typeof fetch);
     __setStackClientForTests({ speak: async (_form: FormData) => { fallbackCalls++; return new Response(new Uint8Array([9]), { headers: { "content-type": "audio/wav" } }); } } as never);
   });
-  afterEach(() => { __setRecordedSpeechFetchForTests(null); __setRecordedSpeechReferenceForTests(null); __setTtsTagsForTests(null); __resetStackEngineForTests(); });
+  afterEach(() => { __setRecordedSpeechFetchForTests(null); __setRecordedSpeechReferenceForTests(null); __setClonedVoiceTranscriberForTests(null); __setTtsTagsForTests(null); __resetStackEngineForTests(); });
 
   test("uses Fish with normalized words, preserved typed emotion cues, and model revision", async () => {
     const result = await synthesizeRecordedSpeech("On 3 PM [whispers] [angry] [laughs]", fixtureRef);
@@ -59,6 +64,38 @@ describe("recorded speech V6", () => {
     const old = console.log; console.log = (...args: unknown[]) => { consoleText += args.join(" "); };
     try { await synthesizeRecordedSpeech(secret, fixtureRef); await synthesizeSpeech(secret); } finally { console.log = old; }
     expect(consoleText).not.toContain(secret);
+    expect(fallbackCalls).toBe(1);
+  });
+
+  test("fills a household transcript lazily and reuses it on the next Fish render", async () => {
+    const now = new Date().toISOString();
+    const owner = { id: "person-owner01", displayName: "Owner", nickname: null, birthdate: null, role: "owner", avatarSeed: "seed", source: "manual", localOnly: false, createdAt: now, updatedAt: now, deletedAt: null, hlc: "1700000000000:0:testfix" };
+    db.insert(people).values(owner as never).run();
+    __setClonedVoiceTranscriberForTests(async () => { throw new Error("initial background attempt unavailable"); });
+    const saved = saveClonedVoice(owner as never, "Voice", new Uint8Array([1, 2]), "audio/wav");
+    if (!saved.ok) throw new Error("voice setup failed");
+    // Set the lazy attempt after the save's intentionally failed background attempt settles.
+    await transcribeClonedVoiceOnce(saved.value.id, new Uint8Array([1, 2]), "audio/wav");
+    __setClonedVoiceTranscriberForTests(async () => { transcribeCalls++; return "  exact sample words  "; });
+    __setStackClientForTests({ speak: async () => { fallbackCalls++; return new Response(new Uint8Array([9]), { headers: { "content-type": "audio/wav" } }); } } as never);
+    const voice = clonedVoiceUrl(saved.value.id);
+    const first = await synthesizeRecordedSpeech("First line", voice);
+    const second = await synthesizeRecordedSpeech("Second line", voice);
+    expect(first.engine).toBe("fish-audio-drama-3");
+    expect(second.engine).toBe("fish-audio-drama-3");
+    expect(transcribeCalls).toBe(1);
+    expect(requests.filter((url) => url.endsWith("/v1/audio/speech/recorded"))).toHaveLength(2);
+  });
+
+  test("empty lazy STT output falls back to Chatterbox", async () => {
+    const now = new Date().toISOString();
+    const owner = { id: "person-owner01", displayName: "Owner", nickname: null, birthdate: null, role: "owner", avatarSeed: "seed", source: "manual", localOnly: false, createdAt: now, updatedAt: now, deletedAt: null, hlc: "1700000000000:0:testfix" };
+    db.insert(people).values(owner as never).run();
+    __setClonedVoiceTranscriberForTests(async () => "   ");
+    const saved = saveClonedVoice(owner as never, "Voice", new Uint8Array([1, 2]), "audio/wav");
+    if (!saved.ok) throw new Error("voice setup failed");
+    const result = await synthesizeRecordedSpeech("Line", clonedVoiceUrl(saved.value.id));
+    expect(result.engine).toBe("chatterbox-turbo");
     expect(fallbackCalls).toBe(1);
   });
 });

@@ -1,10 +1,12 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { resetDb } from "./reset-db";
-import { clonedVoicesDir } from "@/lib/paths";
+import { clonedVoicesDir, logsDir } from "@/lib/paths";
+import { __setClonedVoiceTranscriberForTests, transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
+import { clonedVoices } from "@/db/schema";
 import {
   listClonedVoices,
   saveClonedVoice,
@@ -27,6 +29,7 @@ function resetClonedVoicesDir(): void {
 beforeEach(() => {
   resetDb();
   resetClonedVoicesDir();
+  __setClonedVoiceTranscriberForTests(null);
 });
 
 function makePerson(displayName: string, role: string): PersonRow {
@@ -89,6 +92,28 @@ describe("saveClonedVoice()", () => {
     expect(file).not.toBeNull();
     expect(existsSync(file!.path)).toBe(true);
     expect(file!.mimeType).toBe("audio/wav");
+  });
+
+  test("transcribes a saved clip in the background and stores bounded trimmed text", async () => {
+    const jesse = makePerson("Jesse", "owner");
+    const secret = "transcript-must-never-appear-xy123";
+    __setClonedVoiceTranscriberForTests(async () => `  ${secret} ${"sample words ".repeat(100)}  `);
+    const result = saveClonedVoice(jesse, "Dad", WAV_BYTES, "audio/wav");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    await transcribeClonedVoiceOnce(result.value.id, WAV_BYTES, "audio/wav");
+    expect(db.select({ transcript: clonedVoices.transcript }).from(clonedVoices).get()?.transcript).toHaveLength(1000);
+    expect(listClonedVoices()[0]).not.toHaveProperty("transcript");
+    const logPath = join(logsDir, "hub.log");
+    if (existsSync(logPath)) expect(readFileSync(logPath, "utf8")).not.toContain(secret);
+  });
+
+  test("a failed background transcription does not fail saving", async () => {
+    const jesse = makePerson("Jesse", "owner");
+    __setClonedVoiceTranscriberForTests(async () => { throw new Error("STT down"); });
+    const result = saveClonedVoice(jesse, "Dad", WAV_BYTES, "audio/wav");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(await transcribeClonedVoiceOnce(result.value.id, WAV_BYTES, "audio/wav")).toBeNull();
   });
 });
 
