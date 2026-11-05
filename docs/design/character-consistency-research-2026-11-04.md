@@ -6,6 +6,19 @@ Rules that bound every answer: everything runs on the Studio (M5 Max, 128 GB), o
 in [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) and [content-policy-2026-10-18.md](content-policy-2026-10-18.md).
 Web claims below come from vendor pages, model cards and community posts found 2026-11-04; "unverified" marks what I could not confirm at the source.
 
+## Supersedes
+
+- The approved `video-reference` and `video-project` records and the V4 "Characters and Places" step (video-create-2026-11-01.md, VIDEO-CREATE-01): replaced by the single saved-subject record (character, prop, place) and `media_production` below. Migrate before delete (port-before-delete rule).
+- Companion pictures stay in the companion store; a companion can also be cast as a character.
+
+## Owner decisions (Jesse, 2026-11-04)
+
+1. Per-subject training is allowed for invented characters, pets, mascots and products; real adults go through the household likeness option like any likeness LoRA (no extra consent prompt, rule 0).
+2. Real children: the architect ruled (2026-11-05) this is allowed as an added child protection with these conditions: applies to every minor; off by default; per child; only a parent or admin can switch it on, never the child or teen; revoking it deletes the trained LoRA; every output counts as a known minor for the CSAM check (rule 10); children never get it in their own lane. Jesse chose "parent opt-in only".
+3. An opt-in slow "Careful" re-render (about 6 minutes, 39 GB) is allowed. Training and Careful progress show on the job's own card (S6), never a raw error.
+4. Saved subjects are private to their creator; sharing is an explicit per-item Share. The container for shows, movies and YouTube is a Production.
+5. `media_production` and the saved-subject record carry id, provenance and clock stamp from first boot (principle 3) and are defined in `commons/spec` first (additive).
+
 ## 1. What we already have
 
 - **Picture engine (Stack, mflux):** FLUX.2 Klein 4B (Quick, Apache-2.0), Z-Image-Turbo (Detailed), ERNIE-Image-Turbo (text-to-picture only).
@@ -57,8 +70,8 @@ Papers report repeated edits lose high-frequency detail, brighten the picture an
 
 ## 4. Safety and rules notes
 
-- **Real people:** a likeness LoRA is a model of a person's face kept on the Studio. Adults only per the 2026-10-17 ruling; stored in the household LoRA
-  library with the household as owner; the Stack proof still binds each use. Nothing here changes the minor line: any possible-minor output
+- **Real people:** a likeness LoRA is a model of a person's face kept on the Studio. Under the household likeness option (SAFETY.md); stored in the household LoRA
+  library; the Stack proof still binds each use. Nothing here changes the minor line: any possible-minor output
   in sexual media is withheld.
 - **Children:** a child's face must never train a LoRA by default (no-real-people rule for child and teen lanes; a parent-owned decision at most).
   Cartoon characters a child invents are fine; reference edits of a child's photo stay inside the child lane filters. This needs Jesse (question 2).
@@ -124,7 +137,7 @@ Jesse's addition (2026-11-04): a shot must keep its character, its objects and i
 One definition (principle 4), used by Create (images), the Studio, templates, chat tools and video shots. V4's "Characters and Places" becomes this, with Props added.
 - **A saved subject** has: a name; a kind (character, prop, place); who owns it; **private to its creator, never listed for the household** (owner ruling 2026-11-04: custom video characters are not a family library); sharing is an explicit per-item Share to named people, off by default; a one-line look
   description (words the tools start from); approved reference pictures; for a character a voice (optional); a "real" flag when it is a real person or
-  animal (drives consent and child rules); the pictures' provenance and clock stamp like every record; optionally a trained style (LoRA) from step 4 of the ladder.
+  animal (a label only; the household likeness option and the minor line decide what is allowed, no consent prompt blocks an adult request); the pictures' provenance and clock stamp like every record; optionally a trained style (LoRA) from step 4 of the ladder.
 - **References by kind:** character = front, two three-quarters, back, one close face (section 5, step 2). Prop = front, side, top, one in-use picture, on plain background.
   Place = one wide establishing plate, plus 3 to 4 angles of the same room or spot (made by editing the plate), no people in them, plus a time-of-day variant if needed.
 - **Where it lives:** a spec record in `commons/spec` (additive, spec first, like `media_template`); the files in the Library; companions are characters
