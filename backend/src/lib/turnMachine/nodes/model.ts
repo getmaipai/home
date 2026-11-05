@@ -1,7 +1,6 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
+import { editPictureSpec, generateImageSchema } from "@/lib/mediaOps/chatSchema";
 import { withStyleList } from "@/lib/videos/styleToolSpec";
-import { listTemplates } from "@/lib/media/templates";
-import { listMediaSubjects } from "@/lib/mediaSubjects";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
@@ -56,7 +55,6 @@ import { minorSearchGate } from "@/lib/searchAssist/minorGate";
 import { weatherAssistEligibility, WEATHER_TOOL } from "@/lib/searchAssist/weatherAssist";
 import { listMediaOps } from "@/lib/mediaOps/registry";
 import type { PersonRow } from "@/types";
-import { z } from "zod";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
  * function can't tell apart by its own outcome code alone - a pre-stream
@@ -171,38 +169,7 @@ export type ModelOutput =
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
 export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState): ToolSpec | null {
-  if (id === "edit_picture") {
-    if (!state?.editPictureAllowed) return null;
-    const operations = state.editPictureOps ?? [];
-    if (!operations.length) return null;
-    const choices = operations.map((operation) => {
-      const args = z.toJSONSchema(operation.args, { unrepresentable: "any" }) as Record<string, unknown>;
-      const properties = args.properties && typeof args.properties === "object" ? { ...(args.properties as Record<string, unknown>) } : {};
-      if (operation.id === "picture.change" && state.actor) {
-        const subjects = listMediaSubjects(state.actor);
-        properties.subjects = { type: "array", items: { type: "string", enum: subjects.map((item) => item.name) }, maxItems: 3, uniqueItems: true, description: `Optional saved subject names chosen by the person. Available to this person: ${subjects.map((item) => item.name).join(", ") || "none"}.` };
-      }
-      for (const key of ["mask", "maskPng", "maskBase64", "maskPngBase64"]) delete properties[key];
-      const required = Array.isArray(args.required) ? args.required.filter((key) => typeof key !== "string" || !["mask", "maskPng", "maskBase64", "maskPngBase64"].includes(key)) : undefined;
-      return {
-        type: "object", required: ["op", "source", "args"],
-        properties: {
-          op: { type: "string", const: operation.id, description: operation.summary },
-          source: { type: "string", enum: [...new Set([...(state.editPictureIds ?? []), ...(state.images ?? []).map((image) => image.id), "attached", "attached_2", "latest"])], description: "A picture id in this conversation, or exactly attached, attached_2, or latest." },
-          args: { ...args, properties, ...(required ? { required } : {}), description: operation.summary },
-        },
-      };
-    });
-    return {
-      id,
-      description: "Use one of the available picture operations with its shown arguments. For locate, inspect the numbered boxes and pick by number only if the intended subject is clear; otherwise ask one short question.",
-      args: {
-        type: "object",
-        properties: { op: { type: "string", enum: operations.map((operation) => operation.id), description: operations.map((operation) => `${operation.id}: ${operation.summary}`).join(" ") } },
-        oneOf: choices,
-      },
-    };
-  }
+  if (id === "edit_picture") return editPictureSpec(id, state);
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json
   // for loadManifestOnly() to find below.
@@ -214,18 +181,7 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
   if (missingRequired(loaded.value).length > 0) return null;
   let args = loaded.value.args;
   let description = loaded.value.description;
-  if (id === "generate_image" && state) {
-    const templates = listTemplates({ actor: state.actor, kind: "picture" });
-    const schema = structuredClone(args) as Record<string, any>;
-    schema.properties ??= {};
-    schema.required = (Array.isArray(schema.required) ? schema.required : []).filter((key: string) => key !== "prompt");
-    schema.properties.template = { type: "string", enum: templates.map((row) => row.id), description: `Optional picture template id. Available to this person: ${templates.map((row) => `${row.id} (${row.title}; ${[...row.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)].map((m) => `${m[1]}: ${m[2]} (example: ${m[3]})`).join(", ") || "no blanks"})`).join("; ")}` };
-    schema.properties.blanks = { type: "object", additionalProperties: { type: "string" }, description: "Values for the named blanks shown in the selected template." };
-    const subjects = listMediaSubjects(state.actor);
-    schema.properties.subjects = { type: "array", items: { type: "string", enum: subjects.map((item) => item.name) }, maxItems: 3, uniqueItems: true, description: `Optional. Name only subjects the person chose. Available to this person: ${subjects.map((item) => item.name).join(", ") || "none"}.` };
-    args = schema;
-    description = `${description} For a template, set its id and fill every named blank using the labels and examples in the template argument description; a free prompt is not needed. Otherwise provide prompt. The final filled prompt follows the same picture rules.`;
-  }
+  if (id === "generate_image" && state) ({ args, description } = generateImageSchema(args, description, state));
   const spec: ToolSpec = { id, description, args };
   // VIDEO-LORA-10: the video tools list the styles this person may name (none for a screen or a person that may not).
   return id === "generate_video" || id === "edit_video" ? withStyleList(spec, state) : spec;
