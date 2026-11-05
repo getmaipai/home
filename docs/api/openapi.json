@@ -55737,6 +55737,119 @@
         }
       }
     },
+    "/api/attachments/upload-audio": {
+      "post": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "Store one chat audio file locally",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "nullable": true
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "turn_id": {
+                    "type": "string"
+                  },
+                  "temporary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "turn_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored audio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "audio": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "media_type": {
+                          "type": "string"
+                        },
+                        "duration_ms": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "media_type"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "audio"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid audio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Audio uploads unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Audio too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/attachments/upload": {
       "post": {
         "tags": [
