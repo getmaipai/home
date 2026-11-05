@@ -103,7 +103,7 @@ Pass bar: an arm is the default for a subject type when it scores at least 4 of 
 2. **Children:** may a child's photos ever train a LoRA or be a long-lived "subject" (parent-approved), or never? Recommend: never for real children; cartoon characters they invent are fine.
 3. **Is a 6 minute "Careful" re-render (Qwen-Image-Edit-2511, 39 GB) acceptable** as an opt-in, or only Klein speeds?
 4. May the bench use CivitAI-style character LoRAs or only models in the Stack catalog? Recommend: catalog only.
-5. Should a saved subject (sheet) be shared household-wide or private to its creator? Recommend: private by default, shareable.
+5. ~~Shared household-wide or private?~~ Decided by Jesse 2026-11-04: private to the creator, never in a family library; sharing only as an explicit per-item Share. Household companions (CMEDIA) keep their own household store.
 
 ## 8. Per-shot consistency for video (characters, objects, scenery)
 
@@ -119,10 +119,10 @@ Jesse's addition (2026-11-04): a shot must keep its character, its objects and i
   images and later videos (IMG-TPL-01).
 - **Missing:** a saved object or scenery, one shot list that says who, what and where, and any measure of sameness from shot to shot.
 
-### 8.2 One shared concept: the household Cast, Props and Places library
+### 8.2 One shared concept: the personal Cast, Props and Places library
 
 One definition (principle 4), used by Create (images), the Studio, templates, chat tools and video shots. V4's "Characters and Places" becomes this, with Props added.
-- **A saved subject** has: a name; a kind (character, prop, place); who owns it and who may use it (private by default, shareable); a one-line look
+- **A saved subject** has: a name; a kind (character, prop, place); who owns it; **private to its creator, never listed for the household** (owner ruling 2026-11-04: custom video characters are not a family library); sharing is an explicit per-item Share to named people, off by default; a one-line look
   description (words the tools start from); approved reference pictures; for a character a voice (optional); a "real" flag when it is a real person or
   animal (drives consent and child rules); the pictures' provenance and clock stamp like every record; optionally a trained style (LoRA) from step 4 of the ladder.
 - **References by kind:** character = front, two three-quarters, back, one close face (section 5, step 2). Prop = front, side, top, one in-use picture, on plain background.
