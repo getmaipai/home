@@ -50,9 +50,10 @@ Song DNA (beats, sections, timed words from `lyricsAlign`), Cast Lock (saved sub
 
 | Slice | What | Needs |
 |---|---|---|
-| V1 | Voice tab: Voiceover with a voice picker and script box. Chatterbox Turbo has only nonverbal tags (`[laugh]`, `[sigh]`, `[cough]`, `[chuckle]`); the box offers those, not named emotions | none |
+| V1 | Voice tab: Voiceover with a voice picker and script box. The box offers the tags of the engine that will speak: Chatterbox Turbo has only nonverbal tags (`[laugh]`, `[sigh]`, `[cough]`, `[chuckle]`); once V6 lands the recorded engine's own documented list replaces it for recorded work, and the box never offers a tag the engine cannot speak | none |
 | V2 | Change voice on a video or audio: transcribe, speak in the picked voice with the same timing, remux | existing voices only, never V4 |
 | V3 | Translate and dub: transcribe (mlx-whisper), translate (chat model), speak in the picked voice, lip sync when a face is visible | VIDEO-INPUTS-04 lip-sync bench; existing voices only, never V4 |
+| V6 | **Recorded voice engine**: every non-realtime spoken output (Voiceover, Change voice, Translate, video voice lines, Studio lines, read-aloud files) uses Fish Audio Drama 3 where the tier can hold it; realtime chat voice stays Chatterbox Turbo. Chosen by Jesse 2026-11-05 after listening to the six-line bench; see "V6 design" below | the V6 bench checks below; V1 to V3 render with it once it lands |
 | V5 | **Inspired voice**: a new voice based on an uploaded voice, not a copy. Named "Inspired voice" by Jesse 2026-11-05, so it is never confused with "Clone a voice" (V4, an exact copy). Flow: upload or pick a voice, choose how different it should be, hear three previews, keep one; saved as a clip plus settings like any voice | the V5 bench below; same voice rules as V4 |
 
 Voice rules for V1 to V3: until V4 lands, a minor gets preset voices only (household-voices-2026-10-20.md, SAFETY.md); after V4 a minor may use clip voices like anyone else; the typed script and the translated text pass the same text floors through the shared gate function the Studio uses (`videoRefusalFor`; for an adult this is the CSAM check only, rule 0); transcripts and translations are dropped after use, never stored or logged (rule 6a); an uploaded video or audio source follows the song-remix `owned_file` path. Results of Voiceover, Change voice, Translate and Sounds are records with provenance (engine, voice id and kind; principle 3, VOICES-06); a sound is `media-item` `kind: "sound"`, spec first.
@@ -67,12 +68,23 @@ Voice rules for V1 to V3: until V4 lands, a minor gets preset voices only (house
 - **Music owns** beat and section detection, the Sounds maker (C7) and the Create tabs.
 - Traps from Videos: a2v and lipdub are not measured on the Stack yet (check `/stack/v1/roles` before any claim); Stack job replies are wrapped as `{ job: {...} }`; video qualities are quick = Wan, detailed = LTX 2.3, ltx25, ltx25max; `VideoPlayer` has a `notice` prop and `poll_while` is required for refresh (VIDEO-UI-01 rev 7).
 
+**V6 design (bench 2026-11-05, Mac Studio M5 Max).** Question from Jesse: do recorded voices use plain Chatterbox or something better, since expression matters more than speed when nothing is live. Six candidates, six lines (a long story, two short, a laugh, a whisper, a date and time line), 36 clips, Whisper large-v3-turbo for word error, results in the bench folder's `RESULTS.md`. Jesse listened and chose **Fish Audio Drama 3** (`mlx-community/fish-audio-drama-3-4bit`). Measured: word error 0.0 on five of six lines (the date line 0.235, mostly Whisper's own number formatting), render speed 0.37 to 0.72 of real time (1.4 to 2.7 times faster than real time, so fine for recorded work, not for live talk), peak memory 28.7 GB (the largest of the six; Chatterbox peaks at 5 GB). The decisions:
+- **Scope:** recorded work only. The realtime voice, the robot's live speech and the DJ stay on Chatterbox Turbo; one definition of "which voice engine" per mode, chosen by the Stack role, never by a client or a setting a person sees.
+- **Where:** a Stack speech role `speech_recorded` beside the existing speech role, with the engine behind it as an installable model package (download, never vendored, `RELEASES-AND-DEPENDENCIES.md`). Home asks for a recorded line the way it asks today; the Stack picks the engine and returns audio. Additive request field only.
+- **Resource priority (owner order, 2026-10-21):** chat first, then images, then video, then everything else. A Fish render queues behind them and shows the existing Status row, never a raw error (S6). At 28.7 GB it loads on demand and unloads after idle; a tier too small to hold it (Reduced, and Standard when chat plus images are resident) falls back to Chatterbox Turbo with the same line, and the card says nothing about memory (owner rule 2026-11-01). The fallback is a per-render decision, not a setting.
+- **Licence:** the Fish Audio Community License is free for use under USD 500,000 annual revenue, and requires a separate agreement for a hosted service. MaiPai Home is self-hosted and the household downloads the model itself, so the household is the licensee; the existing licence prompt (LICENCE-ACK-01) shows the terms at download, and nothing is bundled. Jesse chose the engine knowing the cap (2026-11-05); no further question is raised. Recheck the licence text at the pinned model revision when the package is cut.
+- **Expression:** the Voice tab's script box offers the tags this engine documents on its model card (read at build time and kept in one list in the voice spec, like the Chatterbox list now), so V1's "nonverbal tags only" line becomes per-engine. The typed script and any translation still pass the same text floors (rule 0 for adults).
+- **Bench items before the engine is the default:** (a) does it accept a reference clip, and how close does a V4 clone come; if it cannot, a clone voice renders with Chatterbox Turbo and the card says which engine spoke (honest provenance, VOICES-06); (b) PerTh or equivalent watermark and nothing phoning home (`PRIVACY.md`); (c) a 60-second read-aloud and a three-voice dialogue for drift and seams; (d) the cold-load time on Standard; (e) a child's line goes through the same floors with no extra control (rule 8); (f) the closeness measurement `tier-families-and-options-2026-10-30.md` F5 requires before a family swap between tiers: the same line and reference rendered by Fish and by the Chatterbox fallback, scored on speaker similarity and a blind listen, so the fallback is shown close enough or the card names which engine spoke.
+- **Chat:** no new tool. A chat ask for a voiceover or a read-aloud file uses the existing speech tool; the engine is the Stack's choice. CHAT-AB-01 gets no new row.
+- **Records:** every recorded line carries provenance with engine id and model revision (principle 3, VOICES-06), spec first only if the engine id field is not already in `@maipai/spec`.
+
 ## 6. Reuse check (org principle 6)
 
 | Piece | Prebuilt used | Hand-built only where |
 |---|---|---|
 | Beat and section detection | Beat This! (MIT) with librosa (ISC) as fallback; licences read before use | the section merge with lyric sections |
 | Transcription for dub and change voice | mlx-whisper (MIT), already planned in song-remix | none |
+| Recorded speech | Fish Audio Drama 3 as an installable model package behind a Stack role (V6); the existing Stack speech path, model-package install and LICENCE-ACK-01 | the role and its tier fallback |
 | Speech and voice | the existing Chatterbox Turbo TTS and voice manager (V5 blends its own speaker embedding, no new model); Seed-VC or SoulX-Singer only if R0's bench of song-remix wants voice conversion | the speaker-embedding blend and the formant nudge in the Stack's Chatterbox worker |
 | Cutting and muxing | ffmpeg through the one `media.edit` path | none |
 | Shot plan | `media_production` and the Storyboard stitch (PRODUCTION-01) | the lyric-to-shot writer prompt |
@@ -85,6 +97,7 @@ Voice rules for V1 to V3: until V4 lands, a minor gets preset voices only (house
 - Nothing in video-studio-2026-11-02.md section 4.6 (lanes are not changed).
 - SAFETY.md voice-from-a-clip bullet, household-voices decision 7 and its minor rule: replaced by the V4 slice commit (`Owner-approved: 2026-11-05`).
 - The rows of section 2 of this note replace no existing row; they point at owners.
+- V6 supersedes, for recorded (non-realtime) speech only: `studio-voice-2026-10-17.md` lines 73-74 and 87-88, which rejected Fish drama-3 because its licence blocks selling the product (stale: Jesse chose it on 2026-11-05 knowing the Fish Community License, free under USD 500,000 annual revenue, separate agreement for a hosted service; the old note's "non-commercial" reading is replaced by the terms quoted in V6); `resource-tiers-2026-10-27.md` section 5.6, "voice has no Boost or Max", which stays true for realtime voice and no longer holds for recorded voice, where the Fish slot loads on demand with a tier fallback; `tier-families-and-options-2026-10-30.md` principle 2 and F5, one family per category and a swap only between measured-close tiers, which V6 keeps by adding the F5 closeness measurement as bench item (f) and by choosing the family per mode (realtime Chatterbox, recorded Fish) rather than per tier.
 
 ## 8. Status (rule S6)
 
@@ -95,7 +108,7 @@ Long jobs (sounds, voice, dub, music video, beat cut) report through the existin
 1. Finish MUSIC-REMIX-01 R2 to R6 (in progress).
 2. Sounds (C7) and "Add music to a clip".
 3. Beat detection and Cut to the beat.
-4. Voice V1, then V2.
+4. Voice V1, then V2; V6 (Fish recorded voice) after its bench items and before V1 ships, so V1 never needs the nonverbal-only wording.
 5. MUSIC-VIDEO-01 and V3 after the VIDEO-INPUTS benches pass.
 
 Each slice ships with its chat half, goes to Codex as one-to-three-file briefs, and is opened in the preview at 1440 and 390 before landing.
