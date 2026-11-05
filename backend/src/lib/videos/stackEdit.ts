@@ -21,7 +21,11 @@ export type EditOp =
   /** A picture of one moment of the clip (the Stack's `frame` op); it ends the edit and the output name ends in .png. */
   | { op: "frame"; at_s: number }
   /** On the Stack since a23ac89 (2026-11-02): join the working clip and the later files, blending each seam over `duration_s` (0.3 to 1.0, up to 6 clips). */
-  | { op: "crossfade"; duration_s: number; with?: number[] };
+  | { op: "crossfade"; duration_s: number; with?: number[] }
+  | { op: "reframe"; aspect: "9:16" | "1:1" | "16:9" | "4:5"; fill: "crop" | "blur" }
+  | { op: "grade"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; grain?: number; vignette?: number }
+  | { op: "speed"; factor: number }
+  | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
 /** One file the Stack reads: its bytes and the extension it is staged with (the Stack looks at the content, not the name). */
 export interface EditFile { bytes: Uint8Array; ext: string }

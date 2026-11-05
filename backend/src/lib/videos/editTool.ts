@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, crossfadeProblem, frameOps, joinOps, lastFrameAt, mixOps, trimOps, trimRange } from "./editPlan";
+import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, captionsOps, crossfadeProblem, frameOps, gradeOps, joinOps, lastFrameAt, mixOps, reframeOps, speedOps, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -44,7 +44,7 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "reframe", "grade", "speed", "captions", "continue", "extend", "retake"]),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.enum(ids(VIDEO_LOOKS)).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
@@ -66,6 +66,17 @@ export const editVideoArgs = z.object({
   track: z.string().trim().min(1).max(80).optional(),
   level: z.enum(MIX_LEVEL_IDS).optional(),
   start_s: z.number().min(0).max(600).optional(),
+  aspect: z.enum(VIDEO_ASPECTS).optional(),
+  fill: z.enum(["crop", "blur"]).optional(),
+  warmth: z.number().min(-1).max(1).optional(),
+  brightness: z.number().min(-1).max(1).optional(),
+  contrast: z.number().min(-1).max(1).optional(),
+  saturation: z.number().min(-1).max(1).optional(),
+  grain: z.number().min(0).max(1).optional(),
+  vignette: z.number().min(0).max(1).optional(),
+  factor: z.number().min(0.25).max(4).optional(),
+  captions: z.array(z.object({ from_s: z.number().min(0).max(600), to_s: z.number().gt(0).max(600), text: z.string().trim().min(1).max(160) })).max(40).optional(),
+  position: z.enum(CAPTION_POSITIONS).optional(),
 });
 
 export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open the video you mean and try again.";
@@ -123,6 +134,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const parsed = editVideoArgs.safeParse(args);
   if (!parsed.success) return failed(callId, args, "bad_arguments", "bad_arguments");
   const value = parsed.data;
+  if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
   // The surface and age gate, then the same screening any typed prompt gets (a remix's new words are screened like a first request).
@@ -134,11 +146,12 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
-  if (["extend", "retake", "trim", "join", "mix"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "mix", "reframe", "grade", "speed", "captions"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
     if (value.change === "join" && value.transition === "crossfade" && !CROSSFADE_IN_STACK) return refused(callId, args, CROSSFADE_NOT_SUPPORTED_LINE, "not_supported");
+    if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
     if (value.change === "extend" || value.change === "retake") return extendOrRetake(input, value, actor, audience, temporary);
     return editFinishedClips(input, value, actor, temporary);
   }
@@ -377,6 +390,20 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     }
     inputs = clipFiles; ops = joinOps(crossfade ? "crossfade" : "cut", duration);
     describe = `${sources.length} videos joined in the order you named${crossfade ? `, with a ${duration} second crossfade between them` : ""}`;
+  } else if (value.change === "reframe") {
+    if (!value.aspect) return refused(callId, args, "Tell me the shape you want: vertical, square or widescreen.", "missing_aspect");
+    inputs = [clipFiles[0]!]; ops = reframeOps(value.aspect, value.fill ?? "crop"); describe = "reframed";
+  } else if (value.change === "grade") {
+    const grade = { brightness: value.brightness, contrast: value.contrast, saturation: value.saturation, warmth: value.warmth, grain: value.grain, vignette: value.vignette };
+    const changes = Object.fromEntries(Object.entries(grade).filter(([, v]) => v !== undefined));
+    if (!Object.keys(changes).length) return refused(callId, args, "Tell me what to change in the look, such as warmth, contrast or grain.", "nothing_to_grade");
+    inputs = [clipFiles[0]!]; ops = gradeOps(changes); describe = "colour and texture adjusted";
+  } else if (value.change === "speed") {
+    if (value.factor === undefined) return refused(callId, args, "Tell me how fast to make it, from quarter speed to four times speed.", "missing_speed");
+    inputs = [clipFiles[0]!]; ops = speedOps(value.factor); describe = `speed changed to ${value.factor}x`;
+  } else if (value.change === "captions") {
+    if (!value.captions?.length || value.captions.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
+    inputs = [clipFiles[0]!]; ops = captionsOps(value.captions, value.position ?? "bottom"); describe = "captions added";
   } else {
     const start = value.start_s ?? 0;
     if (seconds !== null && start >= seconds) return refused(callId, args, START_PAST_END_LINE, "start_past_end");

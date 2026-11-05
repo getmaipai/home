@@ -38,6 +38,17 @@ export function trimOps(from: number, to: number): EditOp[] {
   return [{ op: "trim", in_s: from, out_s: to }];
 }
 
+export const VIDEO_ASPECTS = ["9:16", "1:1", "16:9", "4:5"] as const;
+export type VideoAspect = (typeof VIDEO_ASPECTS)[number];
+export const CAPTION_POSITIONS = ["bottom", "middle", "top"] as const;
+export type CaptionPosition = (typeof CAPTION_POSITIONS)[number];
+export type CaptionLine = { from_s: number; to_s: number; text: string };
+export type GradeValues = { brightness?: number; contrast?: number; saturation?: number; warmth?: number; grain?: number; vignette?: number };
+export function reframeOps(aspect: VideoAspect, fill: "crop" | "blur" = "crop"): EditOp[] { return [{ op: "reframe", aspect, fill }]; }
+export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade", ...values }]; }
+export function speedOps(factor: number): EditOp[] { return [{ op: "speed", factor }]; }
+export function captionsOps(lines: CaptionLine[], position: CaptionPosition = "bottom"): EditOp[] { return [{ op: "captions", lines, position }]; }
+
 export const JOIN_TRANSITIONS = ["cut", "crossfade"] as const;
 export type JoinTransition = (typeof JOIN_TRANSITIONS)[number];
 export const MIN_CROSSFADE_S = 0.3;

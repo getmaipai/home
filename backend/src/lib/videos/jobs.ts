@@ -70,7 +70,7 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
-  edit?: { from: string; change: "trim" | "join" | "mix"; with?: string[] };
+  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions"; with?: string[] };
 }
 
 export interface VideoJob {
