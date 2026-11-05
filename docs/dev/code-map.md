@@ -800,6 +800,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
 | `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, deleteReceivedBackupsForDevice |
+| `backend/src/lib/recordedSpeech.ts` | __setRecordedSpeechFetchForTests, __setRecordedSpeechReferenceForTests, recordedSpeechReferenceForTest, recordedSpeechStatus, waitForRecordedSpeech, submitRecordedSpeech |
 | `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice, resetReducedTruthForTests, enterStackReducedChat, leaveStackReducedChat |
 | `backend/src/lib/reference/article.ts` | __resetReferenceArticleCacheForTests, loadArticleFor, articlePayloadFor, readArticleImage |
 | `backend/src/lib/reference/keyPoints.ts` | __setReferenceKeyPointsModelForTests, articleText, referenceKeyPoints, referenceItemId, readReferenceArticle |
@@ -989,7 +990,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/trash/sweep.ts` | TRASH_SWEEP_MS, startTrashSweeper, stopTrashSweeper |
 | `backend/src/lib/triviaSource.ts` | runTrivia, checkedOpenTdbHost, __resetTriviaForTests |
 | `backend/src/lib/trustProxy.ts` | TRUST_PROXY |
-| `backend/src/lib/tts.ts` | synthesizeSpeech |
+| `backend/src/lib/tts.ts` | synthesizeSpeech, synthesizeRecordedSpeech |
 | `backend/src/lib/ttsCapabilities.ts` | readTtsTags, getTtsTags, __setTtsTagsForTests |
 | `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
