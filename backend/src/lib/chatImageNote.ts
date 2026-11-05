@@ -44,6 +44,11 @@ export function picturesWindowNote(images: readonly ChatImagePart[]): string {
   return parts.join(" ");
 }
 
+/** Audio is an input for the edit_music tool; the chat window records only that an audio file was attached. */
+export function audioAttachedNote(audio: readonly import("@/wire").ChatAudioPart[]): string {
+  return audio.length ? "[audio attached]" : "";
+}
+
 /** VISION-02c: the plain words for why a picture could not be read. */
 export function pictureFailureWords(kind: string): string {
   if (kind === "context_too_large") return "it did not fit in the conversation";

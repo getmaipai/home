@@ -254,6 +254,13 @@ describe("native music edits, versions and section timing", () => {
     await waitForMusic(() => getMusicJobFor(people.owner, trimId)?.state === "done");
     expect(generationOf(db.select().from(attachments).where(eq(attachments.id, getMusicJobFor(people.owner, trimId)!.fileId!)).get()!.provenance)).toMatchObject({ source_kind: "upload", parent_file_id: null });
   });
+  test("attached track refuses zero or multiple audio files plainly", async () => {
+    const state = musicState(people.owner);
+    for (const audio of [[], [{ id: "file-audio001", name: "a.m4a", media_type: "audio/mp4" }, { id: "file-audio002", name: "b.m4a", media_type: "audio/mp4" }]]) {
+      const out = await runEditMusic({ state: { ...state, audio }, args: { track: "attached", change: "restyle", description: "reggae" }, callId: "a", spoken: false });
+      expect(out.result?.reply?.text).toContain("Attach one audio file to your message.");
+    }
+  });
   test("an attached song is still refused for teens and children", async () => {
     const state = musicState(people.owner);
     const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes: testM4a(), mediaType: "audio/mp4", deduplicate: false });

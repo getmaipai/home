@@ -503,6 +503,7 @@ export const conversationTurns = sqliteTable(
     // UPLOAD-IMG-01: additive structured parts on the person's message.
     // Contains only attachment ids and display metadata, never image bytes.
     images: text("images"),
+    audio: text("audio"),
     replyText: text("reply_text").notNull(),
     // Spec 4.5: point-in-time identity of the persona that answered; null for old and bare turns.
     answeredBy: text("answered_by"),

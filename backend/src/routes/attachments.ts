@@ -5,14 +5,49 @@ import { requireAuth } from "@/middleware/auth";
 import { attachments, conversationTurns } from "@/db/schema";
 import { db } from "@/db";
 import { newFileId } from "@/lib/id";
-import { insertProvisionalTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { insertProvisionalTurn, isTemporaryConversation, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { createAttachment, readAttachmentForConversation, storeTemporaryChatImage, getTemporaryChatImage, getTemporaryChatImageForReader, temporaryChatImagesForTurn } from "@/lib/attachments";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import { cleanChatImage, chatImageThumbnail } from "@/lib/imageUpload";
-import { MAX_CHAT_IMAGES, MAX_CHAT_IMAGE_BYTES, CHAT_IMAGE_REFUSAL } from "@/wire";
+import { MAX_CHAT_IMAGES, MAX_CHAT_IMAGE_BYTES, CHAT_IMAGE_REFUSAL, MAX_CHAT_AUDIO, MAX_CHAT_AUDIO_BYTES, CHAT_AUDIO_REFUSAL } from "@/wire";
 
 export const attachmentsRoutes = apiRouter();
+const CHAT_AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav", "audio/aac", "audio/ogg", "audio/flac"]);
+const AUDIO_EXTENSIONS: Record<string, string> = { ".mp3": "audio/mpeg", ".m4a": "audio/x-m4a", ".wav": "audio/wav", ".aac": "audio/aac", ".ogg": "audio/ogg", ".flac": "audio/flac" };
+const audioUploadRoute = createRoute({
+  method: "post", path: "/upload-audio", tags: ["Attachments"], summary: "Store one chat audio file locally",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "multipart/form-data": { schema: z.object({ file: z.any(), conversation_id: z.string().optional(), turn_id: z.string(), temporary: z.string().optional() }) } } } },
+  responses: { 201: { content: { "application/json": { schema: z.object({ audio: z.object({ id: z.string(), name: z.string(), media_type: z.string(), duration_ms: z.number().optional() }) }) } }, description: "Stored audio." }, ...errorResponses({ 400: "Invalid audio", 403: "Audio uploads unavailable", 404: "Conversation unavailable", 413: "Audio too large" }) },
+});
+attachmentsRoutes.openapi(audioUploadRoute, async (c) => {
+  const actor = c.get("person");
+  const form = await c.req.parseBody();
+  const file = form.file;
+  const turnId = String(form.turn_id ?? "");
+  if (!(file instanceof File) || !/^turn-[a-z0-9]{8,40}$/.test(turnId)) return c.json({ error: "Invalid audio upload." }, 400);
+  if (file.size > MAX_CHAT_AUDIO_BYTES) return c.json({ error: CHAT_AUDIO_REFUSAL }, 413);
+  const mediaType = (file.type || AUDIO_EXTENSIONS[file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ""] || "").toLowerCase();
+  if (!CHAT_AUDIO_TYPES.has(mediaType)) return c.json({ error: "Choose an MP3, M4A, WAV, AAC, OGG, or FLAC audio file." }, 400);
+  const requestedConversationId = String(form.conversation_id || "") || undefined;
+  if (form.temporary === "true" || (requestedConversationId && isTemporaryConversation(requestedConversationId))) return c.json({ error: "Audio attachments are not available in temporary chats." }, 400);
+  const resolved = resolveOrCreateConversation(actor, "chat", requestedConversationId);
+  if (!resolved.ok) return c.json({ error: resolved.error }, 404);
+  const conversationId = resolved.value.id;
+  const priorCount = db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.turnId, turnId), eq(attachments.conversationId, conversationId))).all().filter((row) => {
+    const attachment = db.select({ mediaType: attachments.mediaType }).from(attachments).where(eq(attachments.id, row.id)).get();
+    return attachment?.mediaType.startsWith("audio/");
+  }).length;
+  if (priorCount >= MAX_CHAT_AUDIO) return c.json({ error: CHAT_AUDIO_REFUSAL }, 400);
+  const existingTurn = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+  if (!existingTurn) insertProvisionalTurn(actor, "chat", conversationId, turnId, "");
+  else if (existingTurn.personId !== actor.id || existingTurn.conversationId !== conversationId || existingTurn.status !== "running") return c.json({ error: "Turn unavailable." }, 404);
+  const name = redactCredentials(file.name.replace(/[\r\n\0]/g, "").slice(0, 255)).trim() || "audio";
+  const created = createAttachment(actor, { conversationId, turnId, mediaType, bytes: new Uint8Array(await file.arrayBuffer()), provenance: `composer:${name}`, name, deduplicate: false });
+  if (!created.ok) return c.json({ error: created.error }, created.status === 403 ? 403 : 400);
+  return c.json({ audio: { id: created.value.id, name, media_type: mediaType } }, 201);
+});
 const uploadRoute = createRoute({
   method: "post", path: "/upload", tags: ["Attachments"], summary: "Store one cleaned chat picture locally",
   middleware: [requireAuth] as const,

@@ -4,12 +4,12 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Song",
-  "description": "Change a song made here in this chat, split it into stems, or keep every version.",
+  "description": "Change a song made here or attached in chat, split it into stems, or keep every version.",
   "offer": {
     "mode": "conditional",
     "gate": "musicEditAllowed",
     "bench_row": "music-edit-tool",
-    "reason": "adult on their own written screen with music enabled and an available Stack music model; this conversation also holds a song made here"
+    "reason": "adult on their own written screen with music enabled and an available Stack music model; this conversation has a song or an attached audio file"
   },
   "author": "MaiPai",
   "license": "AGPL-3.0",
@@ -22,7 +22,11 @@
       "extend it by twenty seconds",
       "trim the first five seconds",
       "give me another take",
-      "split this into stems"
+      "split this into stems",
+      "make it reggae",
+      "remove vocals",
+      "remove the vocals from this",
+      "have the companion sing it"
     ],
     "patterns": []
   },
@@ -75,14 +79,14 @@
       "track": {
         "type": "string",
         "grounded": false,
-        "description": "Use latest for the selected song in this chat, a made-here file id, or the id of an audio file the person owns.",
+        "description": "Use attached for the audio file on this message, latest for the selected song in this chat, a made-here file id, or the id of an audio file the person owns.",
         "minLength": 1,
         "maxLength": 80
       },
       "change": {
         "type": "string",
         "grounded": false,
-        "description": "The change the person asked for.",
+        "description": "The change requested. Companion singing is coming and is not available yet.",
         "enum": [
           "remake",
           "restyle",
@@ -95,7 +99,8 @@
           "loudness",
           "make_full",
           "make_quick",
-          "stems"
+          "stems",
+          "voice_swap"
         ]
       },
       "section": {

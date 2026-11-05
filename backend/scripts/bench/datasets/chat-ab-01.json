@@ -1,6 +1,6 @@
 {
   "id": "chat-ab-01",
-  "note": "CHAT-AB-01: 22 single-turn items (2 runs per arm) and 2 nine-turn scripts (1 run per arm). `expectedAll` is a list of needles that must all appear (word-boundary, case-insensitive); each needle may be written as `a|b` for alternatives. Only the `reasoning` items and the multi-turn facts are machine-checked; every other reply is read by a person.",
+  "note": "CHAT-AB-01: 26 single-turn items (2 runs per arm) and 2 nine-turn scripts (1 run per arm). `expectedAll` is a list of needles that must all appear (word-boundary, case-insensitive); each needle may be written as `a|b` for alternatives. Only the `reasoning` items and the multi-turn facts are machine-checked; every other reply is read by a person.",
   "items": [
     {
       "id": "k1-heat-pump",
@@ -62,7 +62,7 @@
       "category": "reasoning",
       "prompt": "A tank fills in 6 hours with pipe A alone and in 9 hours with pipe B alone. A drain empties a full tank in 18 hours. With A, B and the drain all open, how long does it take to fill an empty tank?",
       "expectedAll": [
-        "4.5|4 1/2|4½|four and a half|4 hours and 30|4 hours 30|4 hours, 30"
+        "4.5|4 1/2|4\u00bd|four and a half|4 hours and 30|4 hours 30|4 hours, 30"
       ]
     },
     {
@@ -124,6 +124,42 @@
       "id": "q4-tallest",
       "category": "world",
       "prompt": "What is the tallest building in the world and how tall is it?"
+    },
+    {
+      "id": "m1-attached-reggae",
+      "category": "writing",
+      "prompt": "make it reggae",
+      "audio_attachment": {
+        "fixture": "short-song",
+        "media_type": "audio/mp4"
+      }
+    },
+    {
+      "id": "m2-attached-remove-vocals",
+      "category": "writing",
+      "prompt": "remove vocals",
+      "audio_attachment": {
+        "fixture": "short-song",
+        "media_type": "audio/mp4"
+      }
+    },
+    {
+      "id": "m3-attached-companion-sing",
+      "category": "writing",
+      "prompt": "have the companion sing it",
+      "audio_attachment": {
+        "fixture": "short-song",
+        "media_type": "audio/mp4"
+      }
+    },
+    {
+      "id": "m4-audio-no-music-intent",
+      "category": "writing",
+      "prompt": "What is an M4A file?",
+      "audio_attachment": {
+        "fixture": "short-song",
+        "media_type": "audio/mp4"
+      }
     }
   ],
   "scripts": [

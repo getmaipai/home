@@ -99,6 +99,7 @@ export interface RunTurnNextOpts {
   tryCompanionId?: string;
   turnId?: string;
   images?: import("@/wire").ChatImagePart[];
+  audio?: import("@/wire").ChatAudioPart[];
   temporary?: boolean;
   signal?: AbortSignal;
   // APPROVE-CARD-01: a tapped approve/deny card, from POST /api/turn or
@@ -210,7 +211,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     turn_id: state.turnId,
     answered_by: state.ephemeral || state.tryDraft ? null : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
     ...(state.offer ? { offer_id: state.offer.id } : {}),
-    ...(state.images?.length ? { images: state.images } : {}),
+    ...(state.images?.length ? { images: state.images } : {}), ...(state.audio?.length ? { audio: state.audio } : {}),
     ...(state.toolEvents.some((event) => event.t === "block")
       ? { blocks: state.toolEvents.flatMap((event) => event.t === "block" ? [event.block] : []) }
       : {}),
@@ -318,7 +319,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { ...(state.searchAssist?.eligible && state.searchAssist.p_rounded !== null ? { rules: ["search_assist.scored"] } : {}), signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  const opts = { ...(state.searchAssist?.eligible && state.searchAssist.p_rounded !== null ? { rules: ["search_assist.scored"] } : {}), signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.audio?.length ? { audio: state.audio } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
@@ -669,7 +670,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ephemeral: opts.ephemeral === true,
     text,
     hasPictureInConversation: (opts.images?.length ?? 0) > 0 || latestPictureId(actor, conversation.id, temporary || opts.ephemeral === true) !== null,
-    musicEditAvailable: () => conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
+    musicEditAvailable: () => (opts.audio?.length ?? 0) > 0 || conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
@@ -689,6 +690,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     // VISION-02c: only the five stored fields come from a caller; the
     // shown-to-model mark is the hub's own (model.ts), never a client's.
     ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),
+    ...(opts.audio?.length ? { audio: opts.audio.map(({ id, name, media_type, duration_ms }) => ({ id, name, media_type, ...(duration_ms !== undefined ? { duration_ms } : {}) })) } : {}),
     ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
     ...(picturesOk ? { picturesAllowed: true } : {}),
     ...(editPictureOk ? { editPictureAllowed: true } : {}),

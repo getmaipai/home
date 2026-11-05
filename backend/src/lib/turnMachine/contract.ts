@@ -222,6 +222,7 @@ export interface TurnState {
    * turn, which injects none). Written into the turn's stats JSON. */
   memoryTrace?: import("@/wire").MemoryTraceStats;
   images?: import("@/wire").ChatImagePart[];
+  audio?: import("@/wire").ChatAudioPart[];
   editPictureAllowed?: boolean;
   editPictureOps?: Awaited<ReturnType<typeof import("@/lib/mediaOps/registry").listMediaOps>>;
   editPictureIds?: string[];

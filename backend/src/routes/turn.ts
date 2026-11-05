@@ -21,7 +21,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { safetyRefusalLine } from "@/lib/failureCopy";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
-import { MAX_CHAT_IMAGES, type TurnStreamEvent, type TurnValue } from "@/wire";
+import { MAX_CHAT_IMAGES, MAX_CHAT_AUDIO, type ChatAudioPart, type TurnStreamEvent, type TurnValue } from "@/wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
@@ -980,6 +980,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     page_context?: unknown;
     document_attachments?: { name: string; media_type: string; data: string }[];
     images?: { id: string; name: string; width: number; height: number; media_type: string }[];
+    audio?: ChatAudioPart[];
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -1021,6 +1022,19 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       }
       const metadata = await sharp(bytes).metadata().catch(() => null);
       if (!metadata || metadata.width !== part.width || metadata.height !== part.height) return c.json({ error: "Picture metadata did not match its stored copy." }, 400);
+    }
+  }
+  const audioParts = body.audio ?? [];
+  const audioTypes = new Set(["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav", "audio/aac", "audio/ogg", "audio/flac"]);
+  if (!Array.isArray(audioParts) || audioParts.length > MAX_CHAT_AUDIO || audioParts.some((item) => !item || typeof item.id !== "string" || !/^file-[a-z0-9]{6,}$/.test(item.id) || typeof item.name !== "string" || item.name.length > 255 || typeof item.media_type !== "string" || !audioTypes.has(item.media_type) || (item.duration_ms !== undefined && (!Number.isInteger(item.duration_ms) || item.duration_ms < 0)))) return c.json({ error: "Invalid audio attachment." }, 400);
+  if (audioParts.length > 0) {
+    if (!body.turn_id || !body.conversation_id || body.surface && body.surface !== "chat" || body.spoken === true || body.bare === true || body.temporary === true || isTemporaryConversation(body.conversation_id)) return c.json({ error: "Audio attachments are available on written chat turns only." }, 400);
+    for (const part of audioParts) {
+      const row = db.select().from(attachments).where(eq(attachments.id, part.id)).get();
+      if (!row || row.ownerPersonId !== actor.id || row.conversationId !== body.conversation_id || row.turnId !== body.turn_id || row.mediaType !== part.media_type || !row.mediaType.startsWith("audio/")) return c.json({ error: "Audio unavailable." }, 404);
+      const read = readAttachment(actor, part.id);
+      if (!read.ok) return c.json({ error: "Audio unavailable." }, 404);
+      if ((row.name ?? "") !== part.name) return c.json({ error: "Audio metadata did not match its stored copy." }, 400);
     }
   }
   const parsedEvidence = z.object({ speaker_evidence: evidence.nullish(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
@@ -1117,6 +1131,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       ephemeral,
       documentAttachments: documentAttachments.map((item) => ({ name: item.name, mediaType: item.media_type, data: item.data })),
       ...(imageParts.length ? { turnId: body.turn_id, images: imageParts } : {}),
+      ...(audioParts.length ? { turnId: body.turn_id, audio: audioParts } : {}),
       ...(surface === "robot" && !bare ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
     });
   } catch (err) {

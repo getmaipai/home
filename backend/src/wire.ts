@@ -409,6 +409,7 @@ export interface TurnValue {
   media_items?: Media[];
   /** UPLOAD-IMG-01: the user's cleaned local images, represented by store ids. */
   images?: ChatImagePart[];
+  audio?: ChatAudioPart[];
   /** GENUI-02: answer blocks accepted by the host and emitted as block events. */
   blocks?: AnswerBlock[];
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
@@ -522,10 +523,14 @@ export interface ChatImagePart {
    * later window names it as shown then, not as never seen. */
   shown_to_model?: true;
 }
+export interface ChatAudioPart { id: string; name: string; media_type: string; duration_ms?: number }
 export interface AnsweredBy { companion_id: string; name: string; look: string | null; via: "conversation" | "mention" | "device" | "fallback"; look_version_id?: string | null; voice_version?: string | null; portrait?: string | null }
 export const MAX_CHAT_IMAGES = 4;
 export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 export const CHAT_IMAGE_REFUSAL = "You can add up to 4 pictures, each up to 10 MB.";
+export const MAX_CHAT_AUDIO = 1;
+export const MAX_CHAT_AUDIO_BYTES = 40 * 1024 * 1024;
+export const CHAT_AUDIO_REFUSAL = "You can attach one audio file up to 40 MB.";
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
 
@@ -567,7 +572,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
  * tool_call and tool_result events): what was searched, whether it worked, and the sites it read. */
 export interface ResearchStep { call_id: string; package_id: string; label: string; state: "ok" | "error"; sites?: { host: string; url: string }[] }
 
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks" | "answeredBy"> & { answered_by: AnsweredBy | null; sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; research_steps?: ResearchStep[]; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; video?: { id?: string; locked?: true }; music?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "audio" | "answerImages" | "blocks" | "answeredBy"> & { answered_by: AnsweredBy | null; sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; audio?: ChatAudioPart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; research_steps?: ResearchStep[]; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; video?: { id?: string; locked?: true }; music?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

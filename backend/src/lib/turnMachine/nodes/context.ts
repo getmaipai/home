@@ -45,7 +45,7 @@ import { PICK_UP_THREADS_KEY } from "@/settings/chatKeys";
 import { getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
-import { picturesAttachedNote, picturesNotReadNote } from "@/lib/chatImageNote";
+import { picturesAttachedNote, picturesNotReadNote, audioAttachedNote } from "@/lib/chatImageNote";
 import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@/lib/chatPictures";
 import type { LlmImagePart } from "@/lib/llm";
 import { chatCatalogEntry } from "@/lib/modelCatalog";
@@ -220,6 +220,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       items.push({ id: "attachment-pictures", text: picturesAttachedNote(state.images), source: "attachment", subjects: [], disclosure: "child_ok" });
     }
   }
+  if (state.audio?.length && !state.bare) items.push({ id: "attachment-audio", text: audioAttachedNote(state.audio), source: "attachment", subjects: [], disclosure: "child_ok" });
 
   // The window (THIN-3C): every turn after the summary's anchor, sized by
   // the engine's count once the rest of the prompt is known (below). What

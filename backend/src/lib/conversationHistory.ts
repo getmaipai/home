@@ -44,6 +44,8 @@ import { conversationTurns, conversations, people, memoryRecords, commands, open
 import { pruneTemporaryChatImages } from "@/lib/attachments";
 import { picturesWindowNote, storedImages } from "@/lib/chatImageNote";
 import type { ChatImagePart } from "@/wire";
+import type { ChatAudioPart } from "@/wire";
+import { audioAttachedNote } from "@/lib/chatImageNote";
 import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
 import { canAccessPerson, canHaveTemporaryChat } from "@/lib/access";
@@ -492,7 +494,7 @@ export function resolveSupersedes(supersedes: string | null | undefined, convers
   return superseded && superseded.conversationId === conversationId && superseded.personId === conversation?.personId ? supersedes : null;
 }
 
-export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; answeredBy?: import("@/wire").AnsweredBy | null; status?: "done" | "failed" };
+export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; audio?: import("@/wire").ChatAudioPart[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; answeredBy?: import("@/wire").AnsweredBy | null; status?: "done" | "failed" };
 
 /** The row a completed turn would produce, with no persistence of its
  * own - pulled out of logTurn() (TEMP-CHAT-01) so a temporary
@@ -539,6 +541,10 @@ function buildTurnRow(
     ? db.select({ images: conversationTurns.images, personId: conversationTurns.personId })
       .from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get()
     : undefined;
+  const inheritedAudio = !opts.audio?.length && supersedes
+    ? db.select({ audio: conversationTurns.audio, personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get()
+    : undefined;
+  const audio = opts.audio?.length ? opts.audio : inheritedAudio?.personId === actor.id && inheritedAudio.audio ? JSON.parse(inheritedAudio.audio) as ChatAudioPart[] : [];
   const images = opts.images?.length
     ? opts.images
     : inheritedImages?.personId === actor.id && inheritedImages.images
@@ -574,6 +580,7 @@ function buildTurnRow(
     conversationId: value.conversation_id,
     userText,
     images: images.length ? JSON.stringify(images) : null,
+    audio: audio.length ? JSON.stringify(audio) : null,
     // GENUI-05: new turns keep their pictures in `blocks`; this legacy column (migration 0087) is only read.
     answerImages: null,
     blocks: value.blocks?.length ? JSON.stringify(value.blocks) : null,
@@ -706,6 +713,7 @@ export function logTurn(
   // turn has a validated details document stored beside its outcomes.
   value.document_available = Boolean(opts.document);
   if (opts.images?.length) value.images = opts.images;
+  if (row.audio) value.audio = JSON.parse(row.audio) as ChatAudioPart[];
   const storedRow = insertTurnAndBumpConversation(row, value.conversation_id, opts.status ?? "done");
   value.parent_turn_id = storedRow.parentTurnId;
   value.branch_chosen = storedRow.branchChosen;
@@ -2057,7 +2065,7 @@ export function listConversationTurns(
   const bandOut = speakerAgeBand(actor, new Date());
   const forBand = (text: string) => (bandOut === "child" ? stripLinksForChild(text) : text);
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, answeredBy: rawAnsweredBy, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, audio: rawAudio, answerImages: rawAnswerImages, blocks: rawBlocks, answeredBy: rawAnsweredBy, ...row } = r;
     const answered_by = parseAnsweredBy(rawAnsweredBy);
     // Named once, read by both fields below (a code review's own
     // finding: two separately-inlined copies of the identical condition
@@ -2081,7 +2089,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: videoByTurn.get(r.id) ? { id: videoByTurn.get(r.id)! } : { locked: true as const } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAudio ? { audio: JSON.parse(rawAudio) as ChatAudioPart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: videoByTurn.get(r.id) ? { id: videoByTurn.get(r.id)! } : { locked: true as const } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2402,8 +2410,9 @@ function replaySearchOutcomes(t: ConversationTurnRow): ToolExecutionOutcome[] {
   } catch { return []; }
 }
 
-function withPicturesNote(text: string, images: readonly ChatImagePart[]): string {
-  return images.length > 0 ? `${text}\n\n${picturesWindowNote(images)}` : text;
+function withPicturesNote(text: string, images: readonly ChatImagePart[], audio: readonly ChatAudioPart[] = []): string {
+  const notes = [images.length > 0 ? picturesWindowNote(images) : "", audioAttachedNote(audio)].filter(Boolean);
+  return notes.length ? `${text}\n\n${notes.join(" ")}` : text;
 }
 
 /** What the window says about an earlier picture or video turn: the tool was called and started the job, so a later
@@ -2429,7 +2438,7 @@ function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
   // was shown on its turn is named as shown then and not again (its own
   // reply on that turn holds what it saw); the picture itself goes to the
   // model only on the turn it was sent.
-  const userText = redactCredentials(withPicturesNote(t.userText, storedImages(t.images)));
+  const userText = redactCredentials(withPicturesNote(t.userText, storedImages(t.images), t.audio ? JSON.parse(t.audio) as ChatAudioPart[] : []));
   const modelTurn = t.source === "model" || (t.source === "plugin" && t.routingTier === "tool");
   // CHAT-LATE-SYSTEM-01: the engine's chat template accepts a system
   // message only first. A note about what happened on this turn (a guard
@@ -3128,13 +3137,13 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     return pendingAskCache.get(conversationId) ?? null;
   };
   return capped.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, answeredBy: rawAnsweredBy, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, audio: rawAudio, answerImages: rawAnswerImages, blocks: rawBlocks, answeredBy: rawAnsweredBy, ...row } = r;
     const answered_by = parseAnsweredBy(rawAnsweredBy);
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAudio ? { audio: JSON.parse(rawAudio) as ChatAudioPart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

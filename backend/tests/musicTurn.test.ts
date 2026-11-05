@@ -16,6 +16,8 @@ import { installFakeImageStack, until } from "./pictureFixture";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { getMusicJobFor } from "@/lib/music/jobs";
 import { householdAllowsMusic } from "@/lib/music/policy";
+import { createAttachment } from "@/lib/attachments";
+import { insertProvisionalTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -89,6 +91,40 @@ test("the music household switch and Stack readiness close the live turn gate", 
       expect(seen.flatMap(names)).not.toContain("generate_music");
     });
   }
+});
+test("an attached audio file offers edit_music and restyles through the owned-file Stack path", async () => {
+  const conversation = resolveOrCreateConversation(people.owner, "chat");
+  if (!conversation.ok) throw new Error("conversation unavailable");
+  const uploadTurnId = "turn-audio0001";
+  insertProvisionalTurn(people.owner, "chat", conversation.value.id, uploadTurnId, "");
+  const attached = createAttachment(people.owner, { conversationId: conversation.value.id, turnId: uploadTurnId, mediaType: "audio/mp4", bytes: new Uint8Array([1, 2, 3]), deduplicate: false, provenance: "composer:demo.m4a" });
+  if (!attached.ok) throw new Error("attachment unavailable");
+  const call = { id: "editcall", name: "edit_music", args: JSON.stringify({ track: "attached", change: "restyle", description: "reggae" }) };
+  await withStub({ calls: (r) => r.tool_choice === "none" || isPhrasing(r) ? undefined : [call], reply: () => "A reggae version is on its way." }, async (seen) => {
+    const result = await runTurnNext(people.owner, "chat", "make it reggae", { conversationId: conversation.value.id, audio: [{ id: attached.value.id, name: "demo.m4a", media_type: "audio/mp4" }] });
+    if (!result.ok) throw new Error("turn failed");
+    expect(names(seen.find((r) => (r.tools?.length ?? 0) > 0))).toContain("edit_music");
+    await waitForMusic(() => fake.submitted.some((item) => item.origin === "owned_file"));
+    expect(fake.submitted.at(-1)).toMatchObject({ task: "cover", origin: "owned_file" });
+  });
+});
+test("audio is stored on the turn and inherited by a retry", async () => {
+  const audio = [{ id: "file-audio0001", name: "private-name.m4a", media_type: "audio/mp4" }];
+  let conversationId = "";
+  let originalTurnId = "";
+  await withStub({ calls: () => undefined, reply: () => "I hear an attachment." }, async () => {
+    const first = await runTurnNext(people.owner, "chat", "what do you think?", { audio });
+    if (!first.ok) throw new Error("first turn failed");
+    conversationId = first.value.conversation_id; originalTurnId = first.value.turn_id;
+    const history = listConversationTurns(people.owner, conversationId);
+    if (!history.ok) throw new Error("history unavailable");
+    expect(history.value.find((turn) => turn.id === originalTurnId)?.audio).toEqual(audio);
+    const retry = await runTurnNext(people.owner, "chat", "try again", { conversationId, supersedes: originalTurnId });
+    if (!retry.ok) throw new Error("retry failed");
+    const retried = listConversationTurns(people.owner, conversationId);
+    if (!retried.ok) throw new Error("history unavailable");
+    expect(retried.value.find((turn) => turn.id === retry.value.turn_id)?.audio).toEqual(audio);
+  });
 });
 test("the music key is in Home's settings registry and the household switch reads false when off", () => {
   expect(getRegistryKey("generation.music.enabled")?.lives_in).toBe("household.media_music");
