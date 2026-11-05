@@ -7,12 +7,13 @@ import { people, pictureAdapterPrefs } from "@/db/schema";
 import { allAdapters, adaptersFor, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
 import { readLoras } from "@/lib/loras/access";
 import { getLoraRecord, listLoraRecords } from "@/lib/loras/store";
-import { __resetLoraSyncForTests, adoptPictureLoras } from "@/lib/loras/sync";
+import { __resetLoraSyncForTests, adoptPictureLoras, recordFromStack } from "@/lib/loras/sync";
 import { TestClient } from "./client";
 import { unlock, unlockHeader } from "./fixtures/adultLock";
 import { resetDb } from "./reset-db";
 import { installFakeImageStack, type FakeImageStack } from "./pictureFixture";
 import type { PersonRow } from "@/types";
+import type { StackVideoLora } from "@/lib/videos/stack";
 
 const PIXEL = "lora-aaaaaaaaaaaaaaaa";
 const BOUDOIR = "lora-bbbbbbbbbbbbbbbb";
@@ -35,10 +36,17 @@ describe("pictures on the Lora record", () => {
     const [pixel, boudoir] = [getLoraRecord(PIXEL)!, getLoraRecord(BOUDOIR)!];
     expect(pictureRecords().map((l) => l.id).sort()).toEqual([PIXEL, BOUDOIR]);
     expect(pixel).toMatchObject({ media: "picture", kind: "style", audience: "all-ages", audience_set_by: actor.id, availability: { who: "adults", people: [] }, trigger_words: ["pixelart"] });
+    expect(pixel.strength).toEqual({ default: 0.8, min: 0, max: 2 });
     expect(boudoir).toMatchObject({ media: "picture", audience: "adult-only", audience_set_by: null });
     expect(pixel.file.sha256).toBe("a".repeat(64));
     // The Stack's own facts still decide the model family (Quick or Detailed); the record does not copy them.
     expect((await allAdapters()).find((a) => a.id === PIXEL)!.base_model).toBe("flux2-klein-4b");
+  });
+
+  test("a picture record gets its complete strength range from the Stack default", async () => {
+    const { actor } = await owner();
+    const made = recordFromStack(fake.loras[0] as unknown as StackVideoLora, null, actor.id, undefined, "picture");
+    expect(made?.strength).toEqual({ default: 0.8, min: 0, max: 2 });
   });
 
   test("old preference rows are folded into the records and deleted; a style added but not confirmed stays unconfirmed", async () => {

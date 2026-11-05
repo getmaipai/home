@@ -8,7 +8,7 @@ import type { Lora } from "@/lib/loras/store";
 import { MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
 import { ltx25LorasSupported } from "./loraWire";
-import { addedForLine, buildPromptPlan } from "./promptPlan";
+import { addedForLine, buildPromptPlan } from "@/lib/loras/promptPlan";
 import type { StackVideoStatus } from "./stack";
 import type { PersonRow } from "@/types";
 

@@ -14,7 +14,6 @@ export interface Adapter extends StackLora {
   /** Added but not yet confirmed by an admin. */
   needs_confirmation: boolean;
 }
-
 let cache: { at: number; loras: StackLora[] } | null = null;
 const CACHE_MS = 10_000;
 export function __resetAdapterCacheForTests(): void { cache = null; }
@@ -106,12 +105,4 @@ export function matchAdapter(adapters: readonly Adapter[], named: string): Adapt
   // A name too short to mean anything ("A", "!!!") only matches exactly, never by being found inside other words.
   const loose = wanted.length < 3 ? [] : adapters.filter((a) => { const name = norm(a.name); return (name.length >= 3 && (name.includes(wanted) || wanted.includes(name))) || a.trigger_words.some((t) => norm(t) === wanted); });
   return loose.length === 1 ? loose[0]! : null;
-}
-
-/** The prompt with the adapter's trigger words added by Home, not by the model reading wording. */
-export function withTriggerWords(prompt: string, adapter: Adapter | null): string {
-  if (!adapter || adapter.trigger_words.length === 0) return prompt;
-  const lower = prompt.toLowerCase();
-  const missing = adapter.trigger_words.filter((word) => !lower.includes(word.toLowerCase()));
-  return missing.length === 0 ? prompt : `${prompt.trim()}, ${missing.join(", ")}`;
 }

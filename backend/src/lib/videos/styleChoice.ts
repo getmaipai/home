@@ -8,7 +8,7 @@ import { loraAccess } from "@/lib/loras/access";
 import { listLoraRecords } from "@/lib/loras/store";
 import { matchVideoAdapter, loraSurfaceOf, videoAdaptersFor, type VideoAdapter } from "./adapters";
 import type { VideoAudience } from "./policy";
-import { MAX_STYLES, STYLE_STRENGTHS, type StyleStrength } from "./promptPlan";
+import { MAX_STYLES, STYLE_STRENGTHS, type StyleStrength } from "@/lib/loras/promptPlan";
 
 export const STYLE_GONE_LINE = "That style isn't available any more. Choose another style, or make the video without one.";
 export const STYLE_MIXED_LEVELS_LINE = "These styles were made for different kinds of video, so they can't be used together here. Pick styles made for the same kind, or make the video without one.";

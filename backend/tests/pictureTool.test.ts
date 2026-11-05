@@ -16,6 +16,8 @@ import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversati
 import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { db } from "@/db";
+import { getLoraRecord, saveLora } from "@/lib/loras/store";
+import { adaptersFor } from "@/lib/pictures/adapters";
 import { attachments, people as peopleTable } from "@/db/schema";
 import { cancelPictureJob, getPictureJob, startPictureJob, __setPicturePollMsForTests } from "@/lib/pictures/jobs";
 import { deleteAttachmentsForTurns } from "@/lib/attachments";
@@ -24,7 +26,7 @@ import { saveJob, type PictureJob } from "@/lib/pictures/jobStore";
 import { cardView, phaseLabel } from "@/routes/pictures";
 import { JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
 import { __setPictureStatusForTests } from "@/lib/pictures/ready";
-import { __setTemplateMediaOpRunnerForTests } from "@/lib/pictures/tool";
+import { __setPictureToolLoraReaderForTests, __setTemplateMediaOpRunnerForTests } from "@/lib/pictures/tool";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
@@ -44,6 +46,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   __setTemplateMediaOpRunnerForTests(null);
+  __setPictureToolLoraReaderForTests(null);
   fake.restore();
   __resetLlmSupervisorForTests();
   __resetPortOwnershipForTests();
@@ -198,12 +201,25 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
   });
 
   test("a style the person named is matched in the library, with its trigger word added by Home", async () => {
+    await adaptersFor(["all-ages"]);
+    const record = getLoraRecord("lora-aaaaaaaaaaaaaaaa")!;
+    saveLora({ ...record, positive_addins: ["soft pastel shading"] }, people.owner.id);
     const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a castle on a hill", style: "my pixel style" }) };
     await withStub(script(call), async () => {
       await streamValue(people.owner, "a castle on a hill in my pixel style");
       const sent = fake.submitted[0]!;
-      expect(sent.prompt).toBe("a castle on a hill, pixelart");
+      expect(sent.prompt).toBe("pixelart, a castle on a hill, soft pastel shading");
       expect(sent.loras).toEqual([{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }]);
+    });
+  });
+
+  test("a matched style with no record keeps the former trigger-word prompt and default strength", async () => {
+    __setPictureToolLoraReaderForTests(() => null);
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a castle", style: "pixel art" }) };
+    await withStub(script(call), async () => {
+      await streamValue(people.owner, "a castle in pixel art style");
+      expect(fake.submitted[0]!.prompt).toBe("a castle, pixelart");
+      expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }]);
     });
   });
 

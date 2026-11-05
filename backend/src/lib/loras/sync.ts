@@ -79,7 +79,7 @@ export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean;
     trigger_words: cleanWords(stack.trigger_words ?? []),
     trigger_position: "start",
     positive_addins: [], negative_addins: [], avoid_as_positive: [],
-    strength: { default: def, min: 0, max: Math.max(1.5, def) },
+    strength: media === "picture" ? { default: def, min: 0, max: 2 } : { default: def, min: 0, max: Math.max(1.5, def) },
     audience: adultOnly ? "adult-only" : "all-ages",
     audience_set_by: adultOnly ? null : confirmer,
     audience_set_at: adultOnly ? null : addedAt,

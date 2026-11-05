@@ -12,7 +12,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { unlockedFor } from "@/lib/adultLock";
 import { lockedStyleOutcome } from "@/lib/videos/lock";
-import { buildPromptPlan } from "./promptPlan";
+import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, resolveStyles, strengthWord, styleNamesOf } from "./styleChoice";
 import { LORAS_UNSUPPORTED_LINE, ltx25LorasSupported } from "./loraWire";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";

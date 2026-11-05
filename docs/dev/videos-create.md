@@ -147,7 +147,7 @@ The Videos package has a third Create page, `studio` (`pages/studio.json`, adult
 
 ## Styles (VIDEO-LORA-09)
 
-The Style popover has two more sections after Look and Camera, **Styles** and **Characters**, and a **Strength** control (Less, Normal, More), built by `lib/videos/createStyles.ts` for the signed-in person (the page JSON holds none of it). The pieces, the rules and the limits are in [loras.md](loras.md), "Styles in Create and chat". In short: only styles the person may use are drawn; adult-only ones are one lock tile that opens the passcode dialog; at a level the Stack does not report LoRA-capable the controls are disabled with one plain line (Max for now); the make action takes `style`, `character` and `strength`; the prompt is built by `lib/videos/promptPlan.ts`.
+The Style popover has two more sections after Look and Camera, **Styles** and **Characters**, and a **Strength** control (Less, Normal, More), built by `lib/videos/createStyles.ts` for the signed-in person (the page JSON holds none of it). The pieces, the rules and the limits are in [loras.md](loras.md), "Styles in Create and chat". In short: only styles the person may use are drawn; adult-only ones are one lock tile that opens the passcode dialog; at a level the Stack does not report LoRA-capable the controls are disabled with one plain line (Max for now); the make action takes `style`, `character` and `strength`; the prompt is built by `lib/loras/promptPlan.ts`.
 
 ## Audience floor
 

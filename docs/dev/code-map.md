@@ -585,6 +585,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, NO_EVIDENCE, cleanTriggerWords |
 | `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, INSTALLABLE_BASE_IDS, installableBaseIds, mediaOfBase |
 | `backend/src/lib/loras/install.ts` | INSTALL_KIND, INSTALL_TITLE, ISSUE_SOURCE, LICENCE_STEP_LINE, SHARED_SCREEN_LINE, NOT_LTX_LINE |
+| `backend/src/lib/loras/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
 | `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
 | `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
@@ -768,7 +769,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
-| `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
+| `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
 | `backend/src/lib/placement.ts` | defaultModelBytes, minimum, checkPlacement |
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
@@ -1042,7 +1043,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
-| `backend/src/lib/videos/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |

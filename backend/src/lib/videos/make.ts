@@ -12,7 +12,7 @@ import { videoDenial, VIDEO_DENIAL_LINE, type VideoAudience } from "./policy";
 import { loadLibraryPicture } from "./jobs";
 import { LOCKED_START_LINE } from "./lock";
 import { resolveStyles, strengthWord } from "./styleChoice";
-import type { StyleStrength } from "./promptPlan";
+import type { StyleStrength } from "@/lib/loras/promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
 

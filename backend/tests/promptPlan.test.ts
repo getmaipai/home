@@ -1,6 +1,6 @@
 // VIDEO-LORA-09: the prompt plan table (design 6.1, test 12). Pure: no database.
 import { describe, expect, test } from "bun:test";
-import { addedForLine, buildPromptPlan, strengthFor, TWO_AT_A_TIME_LINE, TWO_CHARACTERS_LINE, TOO_MUCH_ADDED_LINE, type StyleForPlan } from "@/lib/videos/promptPlan";
+import { addedForLine, buildPromptPlan, strengthFor, TWO_AT_A_TIME_LINE, TWO_CHARACTERS_LINE, TOO_MUCH_ADDED_LINE, type StyleForPlan } from "@/lib/loras/promptPlan";
 
 let n = 0;
 function style(over: Partial<StyleForPlan> = {}): StyleForPlan {

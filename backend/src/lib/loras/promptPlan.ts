@@ -19,6 +19,9 @@ export const TWO_AT_A_TIME_LINE = "Two styles at a time is the most. Pick one or
 export const TWO_CHARACTERS_LINE = "Only one character style can be used in a clip. Keep one character and choose styles for the rest.";
 export const TOO_MUCH_ADDED_LINE = "These styles add too much to your words together. Pick one, or shorten their added phrases in Settings, Styles.";
 export const NO_BASE_LINE = "A style has no video type set yet. Ask an admin to set what it is for in Settings, Styles.";
+export function noBaseLine(media: "video" | "picture"): string {
+  return media === "picture" ? "A style has no picture type set yet. Ask an admin to set what it is for in Settings, Styles." : NO_BASE_LINE;
+}
 
 export type StyleForPlan = Pick<Lora, "id" | "name" | "kind" | "trigger_words" | "trigger_position" | "positive_addins" | "negative_addins" | "avoid_as_positive" | "strength">;
 
@@ -30,6 +33,8 @@ export interface PromptPlanInput {
   strength?: StyleStrength | undefined;
   /** What the engine says about negative text: only "nag" sends it; anything else gets the say-instead words in the positive prompt. */
   negativePrompt?: "none" | "nag" | undefined;
+  /** The wording for a style with no base set. Defaults to video for existing callers. */
+  media?: "video" | "picture" | undefined;
 }
 
 export interface PlanLine {

@@ -8,7 +8,9 @@ import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
-import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
+import { adaptersFor, matchAdapter } from "./adapters";
+import { getLoraRecord } from "@/lib/loras/store";
+import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
@@ -27,6 +29,8 @@ import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPicture
 const KID_MAX_COUNT = 2;
 let templateMediaOpRunner = runMediaOp;
 export function __setTemplateMediaOpRunnerForTests(runner: typeof runMediaOp | null): void { templateMediaOpRunner = runner ?? runMediaOp; }
+let loraRecordReader = getLoraRecord;
+export function __setPictureToolLoraReaderForTests(reader: typeof getLoraRecord | null): void { loraRecordReader = reader ?? getLoraRecord; }
 export { GENERATE_IMAGE_TOOL_ID };
 
 export const PICTURE_SIZES: Record<string, string> = {
@@ -49,7 +53,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
   };
 }
 
-export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | NonNullable<ReturnType<typeof likenessCallRefusal>>;
+export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "plan"; why: "style_plan"; line: string } | NonNullable<ReturnType<typeof likenessCallRefusal>>;
 
 /** The refusal for this call, or null: the surface and age gate first, then the minor line on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
@@ -165,9 +169,17 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const kid = lane === "child";
   // A child never picks a style (the cartoon look is the style).
   const adapter = named && !kid ? matchAdapter(available, named) : null;
-  // The absolute line is checked again on what is actually sent: the style's trigger words are added by Home, so they
-  // are part of the request too.
-  const sentPrompt = withTriggerWords(prompt, adapter);
+  // The absolute line is checked again on what is actually sent, including the style phrases the plan adds.
+  const foundRecord = adapter ? loraRecordReader(adapter.id) : null;
+  const record = foundRecord?.media === "picture" ? foundRecord : null;
+  // A missing record is an old/corrupt library state; keep the former single-adapter prompt behavior for that case.
+  const fallbackPrompt = adapter && !record && adapter.trigger_words.length > 0
+    ? (() => { const missing = adapter.trigger_words.filter((word) => !prompt.toLowerCase().includes(word.toLowerCase())); return missing.length ? `${prompt.trim()}, ${missing.join(", ")}` : prompt; })()
+    : prompt;
+  const plan = record
+    ? buildPromptPlan({ words: prompt, styles: [record], strength: undefined, negativePrompt: "none", media: "picture" })
+    : null;
+  const sentPrompt = plan?.ok ? plan.prompt : fallbackPrompt;
   const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), sentPrompt].join(". ");
   const subjectRefs = resolvedSubjects.flatMap(({ subject, references }) => references.map((ref) => ({ ...ref, kind: subject.kind })))
     .sort((a, b) => ({ place: 0, character: 1, prop: 2 }[a.kind] - { place: 0, character: 1, prop: 2 }[b.kind]))
@@ -175,6 +187,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const strictAudience = subjectRefs.some((ref) => ref.audience === "adult-only") ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
   const second = refusePrompt(`${subjectPrompt} ${adapter?.name ?? ""}`, { lane });
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
+  if (plan && !plan.ok) return refused(callId, args, { kind: "plan", why: "style_plan", line: plan.line });
   // KIDS-CREATE-01: a child gets a daily limit, the cartoon look forced, Quick only, one or two pictures, and no friction text.
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
@@ -204,7 +217,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         ...(choice.model ? { model: choice.model } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages",
-        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
+        ...(plan?.ok ? { loras: plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength })) } : adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
       ...(subjectRefs.length ? { submit: async () => {

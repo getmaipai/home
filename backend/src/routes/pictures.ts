@@ -9,7 +9,9 @@ import { routeAudience } from "@/lib/pictures/audience";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
-import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
+import { adaptersFor } from "@/lib/pictures/adapters";
+import { buildPromptPlan } from "@/lib/loras/promptPlan";
+import { getLoraRecord } from "@/lib/loras/store";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseQuality, detailedReady, isPictureQuality, QUICK_MODEL } from "@/lib/pictures/quality";
@@ -186,7 +188,10 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
   // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
   const used = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [a] : []; });
-  const prompt = used.reduce((text, a) => withTriggerWords(text, a), words);
+  // Old saved picture jobs may contain four adapters; the current plan uses the first two in their saved order.
+  const plan = buildPromptPlan({ words, styles: used.slice(0, 2).flatMap((adapter) => { const record = getLoraRecord(adapter.id); return record ? [record] : []; }), strength: undefined, negativePrompt: "none", media: "picture" });
+  if (!plan.ok) return c.json({ error: plan.line, code: plan.code }, 422) as never;
+  const prompt = plan.prompt;
   const lane = laneOf(routeAudience(actor));
   const kid = lane === "child";
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
@@ -197,7 +202,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
   const choice = kid ? { quality: "quick" as const, model: QUICK_MODEL, note: null, announce: false } : chooseQuality({ requested: allowedQuality(actor, "image", isPictureQuality(asked.quality) ? asked.quality : tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).quality ?? source.request.quality ?? "quick", routeAudience(actor).band), style: used[0] ?? null, engine: await pictureEngineStatus() });
-  const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
+  const loras = plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength }));
   const slot = kid ? reserveKid(actor, "picture", 1, words) : null;
   if (kid && !slot) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {

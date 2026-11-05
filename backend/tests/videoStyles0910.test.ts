@@ -12,7 +12,7 @@ import { STYLE_GONE_LINE, listableStyleNames, resolveStyles } from "@/lib/videos
 import { withStyleList } from "@/lib/videos/styleToolSpec";
 import { bodyOfVideoJob, makeAudienceOf } from "@/lib/videos/make";
 import { getVideoJobFor } from "@/lib/videos/jobs";
-import { TWO_CHARACTERS_LINE } from "@/lib/videos/promptPlan";
+import { TWO_CHARACTERS_LINE } from "@/lib/loras/promptPlan";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { household, unlock, unlockHeader } from "./fixtures/adultLock";
