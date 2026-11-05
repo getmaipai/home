@@ -1,5 +1,12 @@
 {
-  "description": "Home executes the registry-backed edit_picture tool directly.",
-  "messages": [{ "role": "user", "content": "Use the picture operation." }],
-  "expected": "The picture operation is handled by Home."
+  "description": "Smoke fixture for the bundled edit_picture package: the recipe answers with a fixed line. In a chat turn the hub runs the operation itself through the media operations registry (backend/src/lib/turnMachine/nodes/tool.ts); that path is covered by backend/tests/editPicture.test.ts and mediaOps*.test.ts, not this emulator.",
+  "inputs": { "op": "picture.remove_background" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "The picture operation picture.remove_background is handled by Home: in a chat turn the hub runs it itself (backend/src/lib/turnMachine/nodes/tool.ts).", "speech": "The picture operation picture.remove_background is handled by Home: in a chat turn the hub runs it itself (backend/src/lib/turnMachine/nodes/tool.ts)." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
 }

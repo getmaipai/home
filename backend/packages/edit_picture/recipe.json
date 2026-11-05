@@ -1,4 +1,7 @@
 {
   "id": "edit_picture",
-  "steps": [{ "kind": "reply", "text": "The picture operation is handled by Home." }]
+  "inputs": [{ "name": "op", "selector": "text" }],
+  "steps": [
+    { "op": "format", "as": "reply", "text": "The picture operation {op} is handled by Home: in a chat turn the hub runs it itself (backend/src/lib/turnMachine/nodes/tool.ts)." }
+  ]
 }
