@@ -1,4 +1,4 @@
-// VIDEO-STUDIO-07: the spoken lines of a Studio session. A typed line is screened, spoken once (`synthesizeSpeech`, as `edit_video` mix does) and kept here
+// VIDEO-STUDIO-07: the spoken lines of a Studio session. A typed line is screened, spoken once (`synthesizeRecordedSpeech`, as `edit_video` mix does) and kept here
 // in memory so the page can play it and the export can lay it over the film. Memory only: nothing is written to the Library or the disk, a line is gone
 // after two hours or a restart (the export then says so in one line), and only the person who made it can read it.
 import { randomSuffix } from "@/lib/id";

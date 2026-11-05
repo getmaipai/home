@@ -121,7 +121,7 @@ The **Studio** is a page for people who want to cut and mix a video themselves. 
 4. **Set the sound.** Each track has a level. Pick a piece to turn it up or down, fade it in or out, or lower a song while someone speaks. Pick a clip that has another clip after it to blend them (a crossfade).
 5. **Press Export as a new clip.** Home makes a new video and keeps the old one. A card shows it being made. When it is ready, press **Open in My clips**, or **Keep editing** to change it more.
 
-A film can have 6 clips, 2 voice lines, 2 songs and be up to 60 seconds long. What you hear in the Studio is a preview: it cuts where the export blends, and the final loudness is set when you export. If a video is locked, the Studio shows a lock instead. Unlock it with your passcode and it opens. When it locks again, edits you did not export are gone.
+A film can have 6 clips, 2 voice lines, 2 songs and be up to 60 seconds long. What you hear in the Studio is a preview: it cuts where the export blends, and the final loudness is set when you export. If a video is locked, the Studio shows a lock instead. Unlock it with your passcode and it opens. When it locks again, edits you did not export are gone. Recorded voice lines sound more natural and may take a little longer. When the computer is busy, Home uses the standard voice.
 
 The new video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
 

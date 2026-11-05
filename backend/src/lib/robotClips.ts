@@ -12,7 +12,7 @@ import { safetySensorMappings, type SafetyAlarmKind } from "@/lib/safetyAlarm";
 import { getDeviceSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { VOICE_SETTINGS_KEYS, VOICE_ENGINE_DEFAULT } from "@/settings/voiceKeys";
-import { synthesizeSpeech } from "@/lib/tts";
+import { synthesizeRecordedSpeech } from "@/lib/tts";
 import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
 
 export interface RobotClip {
@@ -257,7 +257,7 @@ async function render(deviceId: string): Promise<RobotClipBundle | null> {
       continue;
     }
     try {
-      const result = await synthesizeSpeech(clip.text, voice);
+      const result = await synthesizeRecordedSpeech(clip.text, voice);
       if (!result.ok) {
         synthesisFailed = true;
         await raiseClipIssue(deviceId, clip, "the local voice engine is not available", "error");

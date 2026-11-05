@@ -9,7 +9,7 @@ import { readAttachment } from "@/lib/attachments";
 import { fileAudience } from "@/lib/access";
 import { lockItemOfProvenance, type MarkSource } from "@/lib/adultLock";
 import { getMusicJobFor, readMusicFile } from "@/lib/music/jobs";
-import { synthesizeSpeech } from "@/lib/tts";
+import { synthesizeRecordedSpeech } from "@/lib/tts";
 import { listClonedVoices } from "@/lib/clonedVoices";
 import { getOfferedVoices } from "@/lib/voiceResolve";
 import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
@@ -109,7 +109,7 @@ export async function voiceChoice(actor: PersonRow, named: string | undefined): 
 
 /** A typed line spoken by the home's text to speech; null when it cannot speak right now. */
 export async function speakLine(line: string, voice: string): Promise<EditFile | null> {
-  const spoken = await synthesizeSpeech(line, voice);
+  const spoken = await synthesizeRecordedSpeech(line, voice);
   if (!spoken.ok) return null;
   try {
     const bytes = new Uint8Array(await new Response(spoken.value.stream).arrayBuffer());

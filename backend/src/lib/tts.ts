@@ -7,7 +7,8 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
 import { toSpokenText } from "@/lib/spokenText";
 import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
-import { householdVoiceSpeech } from "@/lib/clonedVoices";
+import { householdVoiceSpeech, readClonedVoiceClip } from "@/lib/clonedVoices";
+import { fetchRecordedSpeech, recordedSpeechReferenceForTest, submitRecordedSpeech, waitForRecordedSpeech } from "@/lib/recordedSpeech";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
 const TTS_UNAVAILABLE_COPY = "Home can't speak right now. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
@@ -19,6 +20,9 @@ export interface TtsSynthesizeValue {
   stream: ReadableStream<Uint8Array>;
   contentType: string;
 }
+
+export type RecordedSpeechEngine = "fish-audio-drama-3" | "chatterbox-turbo";
+export type RecordedSpeechResult = ({ ok: true; value: TtsSynthesizeValue } | { ok: false; status: 400 | 503; code: "invalid_input" | "unavailable"; error: string }) & { engine: RecordedSpeechEngine; revision?: string };
 
 export type TtsOpResult =
   | { ok: true; value: TtsSynthesizeValue }
@@ -75,5 +79,32 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
     return result.ok ? result : { ...result, error: TTS_UNAVAILABLE_COPY };
   } catch {
     return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };
+  }
+}
+
+/** Recorded work tries Fish only for an explicitly transcript-backed household clip.
+ * Typed inline Fish cues are retained verbatim; Home never adds a cue here. */
+export async function synthesizeRecordedSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean } = {}): Promise<RecordedSpeechResult> {
+  const fallback = async (): Promise<RecordedSpeechResult> => ({ ...(await synthesizeSpeech(rawText, voiceUrl, opts)), engine: "chatterbox-turbo" });
+  // Voice rows currently have no transcript field. Until one is provided by a future voice flow,
+  // do not guess or transcribe: the Stack requires the clip's exact sample words.
+  if (typeof rawText !== "string" || rawText.trim().length === 0 || rawText.length > MAX_TEXT_LENGTH) return { ...(await synthesizeSpeech(rawText, voiceUrl, opts)), engine: "chatterbox-turbo" };
+  try {
+    const testReference = recordedSpeechReferenceForTest(voiceUrl);
+    const household = testReference ? true : householdVoiceSpeech(voiceUrl);
+    const match = typeof voiceUrl === "string" ? /(?:\/cloned\/)?(voice-[a-z0-9]{6,})(?:\/file)?/.exec(voiceUrl) : null;
+    const clip = testReference ?? (household && match ? readClonedVoiceClip(match[1]!) : null);
+    const transcript = testReference?.transcript;
+    if (!clip || !transcript?.trim()) return await fallback();
+    const status = await waitForRecordedSpeech();
+    if (!status?.available || !status.ready || !status.installed) return await fallback();
+    const text = opts.normalize === false ? rawText : toSpokenText(rawText);
+    const submitted = await submitRecordedSpeech(text, clip.bytes, clip.mimeType, transcript);
+    const audio = await fetchRecordedSpeech(submitted.job, submitted.done ? submitted.data : null);
+    if (!audio || !audio.bytes.length) return await fallback();
+    const revision = status.models?.find((model) => model.installed && model.revision)?.revision;
+    return { ok: true, value: { stream: new ReadableStream({ start(controller) { controller.enqueue(audio.bytes); controller.close(); } }), contentType: audio.contentType }, engine: "fish-audio-drama-3", ...(revision ? { revision } : {}) };
+  } catch {
+    return await fallback();
   }
 }
