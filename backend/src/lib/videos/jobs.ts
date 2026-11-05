@@ -633,7 +633,7 @@ export type EditRun = (signal: AbortSignal) => Promise<{ ok: true; clip: EditedC
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
+export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -649,11 +649,11 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   };
   liveJobs.set(job.id, job);
   saveVideoJob(job);
-  void runEdit(job, input.actor, input.run, input.source);
+  void runEdit(job, input.actor, input.run, input.source, input.onSaved);
   return { ok: true, job };
 }
 
-async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: VideoJob): Promise<void> {
+async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: VideoJob, onSaved?: (fileId: string) => void): Promise<void> {
   const controller = new AbortController();
   watching.set(job.id, controller);
   try {
@@ -666,6 +666,7 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     if (seconds !== null) job.request.seconds = Math.max(1, Math.round(seconds));
     const quality = job.request.quality === "detailed" ? "detailed" as const : "quick" as const;
     await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit");
+    if (job.state === "done" && job.files[0]) { try { onSaved?.(job.files[0].id); } catch { /* the saved film remains delivered */ } }
   } catch {
     job.state = "failed";
     job.error = `${EDIT_FAILED_PREFIX} Something went wrong while making it. Try again.`;

@@ -26,7 +26,7 @@ import { attachmentFilePath } from "@/lib/attachments";
 import { existsSync } from "node:fs";
 import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
-import { activeVideoJobsFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
+import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
 import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, frameOps, gradeOps, joinOps, lastFrameAt, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
@@ -37,14 +37,17 @@ import { prepareVideoRerun } from "./rerun";
 import { resolveStyles } from "./styleChoice";
 import { ltx25LorasSupported } from "./loraWire";
 import { videoAudienceOf, videoRefusalFor, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
+import { getMediaProduction, listMediaProductions, updateMediaProduction } from "@/lib/mediaProductions";
+import { getMediaSubject } from "@/lib/mediaSubjects";
 
 export const EDIT_VIDEO_TOOL_ID = "edit_video";
 
 const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) => item.id) as [string, ...string[]];
 
 export const editVideoArgs = z.object({
-  clip: z.string().trim().min(1).max(80),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
+  clip: z.string().trim().min(1).max(80).optional(),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
+  production: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.enum(ids(VIDEO_LOOKS)).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
@@ -81,6 +84,9 @@ export const editVideoArgs = z.object({
   factor: z.number().min(0.25).max(4).optional(),
   captions: z.array(z.object({ from_s: z.number().min(0).max(600), to_s: z.number().gt(0).max(600), text: z.string().trim().min(1).max(160) })).max(40).optional(),
   position: z.enum(CAPTION_POSITIONS).optional(),
+}).superRefine((value, ctx) => {
+  if (value.change === "film") { if (!value.production) ctx.addIssue({ code: "custom", path: ["production"], message: "A production is required" }); }
+  else if (!value.clip) ctx.addIssue({ code: "custom", path: ["clip"], message: "A video is required" });
 });
 
 export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open the video you mean and try again.";
@@ -135,7 +141,7 @@ export async function makeItMaxBody(actor: PersonRow, band: Parameters<typeof ti
 
 export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
-  if (args.change === "join" && args.transition !== undefined && typeof args.transition === "string" && !(JOIN_TRANSITIONS as readonly string[]).includes(args.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
+  if ((args.change === "join" || args.change === "film") && args.transition !== undefined && typeof args.transition === "string" && !(JOIN_TRANSITIONS as readonly string[]).includes(args.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
   if (Array.isArray(args.credits) && args.credits.length > 60) return refused(callId, args, "Credits can have up to 60 names. Shorten the list and try again.", "too_many_credits");
   if (Array.isArray(args.credits) && args.credits.some((line) => !line || typeof line !== "object" || typeof (line as { name?: unknown }).name !== "string" || !(line as { name: string }).name.trim() || (line as { name: string }).name.trim().length > 60 || ((line as { role?: unknown }).role !== undefined && (typeof (line as { role?: unknown }).role !== "string" || ((line as { role: string }).role.trim().length > 40))))) return refused(callId, args, "Each credit needs a name up to 60 characters and an optional role up to 40 characters.", "bad_credit_line");
   if (typeof args.title === "string" && args.title.trim().length > 120) return refused(callId, args, "A title can have up to 120 characters. Shorten it and try again.", "title_too_long");
@@ -143,7 +149,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const parsed = editVideoArgs.safeParse(args);
   if (!parsed.success) return failed(callId, args, "bad_arguments", "bad_arguments");
   const value = parsed.data;
-  if (value.change === "join" && value.transition !== undefined && !(JOIN_TRANSITIONS as readonly string[]).includes(value.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
+  if ((value.change === "join" || value.change === "film") && value.transition !== undefined && !(JOIN_TRANSITIONS as readonly string[]).includes(value.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
@@ -156,17 +162,18 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
-  if (["extend", "retake", "trim", "join", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
-    if (value.change === "join" && value.transition === "crossfade" && !CROSSFADE_IN_STACK) return refused(callId, args, CROSSFADE_NOT_SUPPORTED_LINE, "not_supported");
+    if ((value.change === "join" || value.change === "film") && value.transition === "crossfade" && !CROSSFADE_IN_STACK) return refused(callId, args, CROSSFADE_NOT_SUPPORTED_LINE, "not_supported");
     if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
+    if (value.change === "film") return filmProduction(input, value, actor, temporary);
     if (value.change === "extend" || value.change === "retake") return extendOrRetake(input, value, actor, audience, temporary);
     return editFinishedClips(input, value, actor, temporary);
   }
   const continuing = value.change === "continue";
-  const source = continuing ? ownClip(actor, state, value.clip, temporary) : sourceVideoJob(actor, state.conversationId, value.clip, temporary);
+  const source = continuing ? ownClip(actor, state, value.clip!, temporary) : sourceVideoJob(actor, state.conversationId, value.clip!, temporary);
   if (!source) return refused(callId, args, NO_CLIP_LINE, "no_clip");
   // ADULT-LOCK-02 (design 3.7): a locked source needs an unlock first; nothing starts and nothing of it is named.
   if (videoJobLockState(actor, source) !== "open") return refused(callId, args, LOCKED_START_LINE, "locked");
@@ -312,7 +319,7 @@ async function extendOrRetake(input: RunEditVideoInput, value: EditArgs, actor: 
   const refuse = (line: string, why: string) => refused(callId, args, line, why);
   if (laneOf(audience) !== "adult") return refuse(MINOR_MAKE_LINE, "minor");
   if (tierArgument({ person: actor, category: "video", arg: "max", band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) return refuse(MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
-  const source = ownClip(actor, state, value.clip, temporary);
+  const source = ownClip(actor, state, value.clip!, temporary);
   if (!source || temporary) return refuse(NO_CLIP_LINE, "no_clip");
   if (source.request.tier !== "max" && (source.request as VideoRequest & { stackBody?: { model?: string } }).stackBody?.model !== LTX25_MAX_MODEL && source.files[0]?.model !== LTX25_MAX_MODEL) return refuse(MAX_EDIT_NOT_READY_LINE, "source_not_max");
   const file = source.files[0];
@@ -361,21 +368,48 @@ async function extendOrRetake(input: RunEditVideoInput, value: EditArgs, actor: 
   return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `A new version of the video is being made at Max; the first one is kept. Tell the person it is on its way.` }, data: { videoJobId: started.job.id }, actions: [] } });
 }
 
-async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, temporary: boolean): Promise<ToolExecutionOutcome> {
+async function filmProduction(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, temporary: boolean): Promise<ToolExecutionOutcome> {
+  const { callId, args } = input;
+  if (actor.role === "guest") return refused(callId, args, "Productions aren't available to guest profiles.", "guest");
+  const requested = value.production!;
+  const visible = listMediaProductions(actor);
+  const production = getMediaProduction(actor, requested) ?? (visible.filter((item) => item.title === requested).length === 1 ? visible.find((item) => item.title === requested)! : null);
+  if (!production) return refused(callId, args, "I can't find that production. Choose one you can see.", "no_production");
+  const shots = production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));
+  const clipShots = shots.flatMap((shot, index) => shot.clip_file_id ? [{ shot, number: index + 1, fileId: shot.clip_file_id }] : []);
+  if (clipShots.length < 2) return refused(callId, args, "Make at least two shots first", "too_few_shots");
+  const sources: VideoJob[] = [];
+  const files: EditFile[] = [];
+  for (const item of clipShots) {
+    const job = editableClip(actor, getVideoJobByFileFor(actor, item.fileId));
+    const file = job ? clipFileOf(actor, job) : null;
+    if (!job || !file) return refused(callId, args, `Shot ${item.number} is not a finished video you can edit.`, "shot_not_editable");
+    sources.push(job); files.push(file);
+  }
+  const credits = production.cast.flatMap((entry) => {
+    const subject = getMediaSubject(actor, entry.subject_id);
+    return subject ? [{ role: entry.role.slice(0, 40), name: subject.name.slice(0, 60) }] : [];
+  });
+  credits.push({ role: "Made with", name: "MaiPai" });
+  return editFinishedClips(input, { ...value, change: "film" }, actor, temporary, { production, sources, files, credits });
+}
+
+async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, temporary: boolean, film?: { production: import("@/lib/mediaProductions").Production; sources: VideoJob[]; files: EditFile[]; credits: Array<{ role: string; name: string }> }): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   let sources: VideoJob[];
-  if (value.change === "join") {
+  if (film) { sources = film.sources; }
+  else if (value.change === "join") {
     if (!value.clips || value.clips.length < MIN_JOIN_CLIPS) return refused(callId, args, JOIN_CLIPS_LINE, "join_clips");
     const found = value.clips.map((clip) => ownClip(actor, state, clip, temporary));
     if (found.some((job) => job === null)) return refused(callId, args, NO_CLIPS_LINE, "no_clip");
     sources = found as VideoJob[];
   } else {
-    const one = ownClip(actor, state, value.clip, temporary);
+    const one = ownClip(actor, state, value.clip!, temporary);
     if (!one) return refused(callId, args, NO_CLIP_LINE, "no_clip");
     sources = [one];
   }
   const first = sources[0]!;
-  const files = sources.map((job) => clipFileOf(actor, job));
+  const files = film ? film.files : sources.map((job) => clipFileOf(actor, job));
   if (files.some((file) => file === null)) return refused(callId, args, NO_CLIP_LINE, "no_clip");
   const clipFiles = files as EditFile[];
   const seconds = first.files[0]?.seconds ?? null;
@@ -391,9 +425,9 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     if (!range.ok) return refused(callId, args, range.line, "bad_cut");
     inputs = clipFiles; ops = trimOps(range.from, range.to);
     describe = `cut to ${range.from} to ${range.to} seconds`;
-  } else if (value.change === "join") {
+  } else if (value.change === "join" || value.change === "film") {
     const crossfade = value.transition === "crossfade";
-    const transition = (value.transition ?? "cut") as (typeof JOIN_TRANSITIONS)[number];
+    const transition = (value.transition ?? (film ? "fade" : "cut")) as (typeof JOIN_TRANSITIONS)[number];
     const duration = value.transition_s ?? DEFAULT_CROSSFADE_S;
     if (crossfade) {
       const tooShort = crossfadeProblem(sources.map((job) => job.files[0]?.seconds ?? null), duration);
@@ -401,12 +435,15 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     }
     const videoSeconds = sources.map((job) => job.files[0]?.seconds ?? job.request.seconds ?? null);
     const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - (transition === "cut" ? 0 : (sources.length - 1) * duration) : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
-    const added = (value.title ? 3 : 0) + (value.credits ? Math.max(3, Math.ceil((value.credits.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
+    const title = film?.production.title ?? value.title;
+    const subtitle = film ? film.production.summary.trim().slice(0, 160) || undefined : value.subtitle;
+    const creditLines = film?.credits ?? value.credits;
+    const added = (title ? 3 : 0) + (creditLines ? Math.max(3, Math.ceil((creditLines.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
     if (baseLength + added > 600) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
     inputs = clipFiles; ops = joinOps(transition, duration);
-    if (value.title) ops.unshift(titleCardOp(value.title, value.subtitle, "start"));
-    if (value.credits) ops.push(creditsOp(value.credits, value.credits_title));
-    describe = `${sources.length} videos joined in the order you named${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${value.title ? ", with a title" : ""}${value.credits ? ", with rolling credits" : ""}`;
+    if (title) ops.unshift(titleCardOp(title, subtitle, "start"));
+    if (creditLines) ops.push(creditsOp(creditLines, value.credits_title));
+    describe = `${sources.length} videos joined in order${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${title ? ", with a title" : ""}${creditLines ? ", with rolling credits" : ""}`;
   } else if (value.change === "reframe") {
     if (!value.aspect) return refused(callId, args, "Tell me the shape you want: vertical, square or widescreen.", "missing_aspect");
     inputs = [clipFiles[0]!]; ops = reframeOps(value.aspect, value.fill ?? "crop"); describe = "reframed";
@@ -454,7 +491,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     } else return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
   }
 
-  const edit: NonNullable<VideoRequest["edit"]> = { from: first.id, change: value.change as "trim" | "join" | "mix", ...(value.change === "join" ? { with: sources.slice(1).map((job) => job.id) } : {}) };
+  const edit: NonNullable<VideoRequest["edit"]> = { from: first.id, change: value.change as "trim" | "join" | "mix", ...((value.change === "join" || value.change === "film") ? { with: sources.slice(1).map((job) => job.id) } : {}) };
   const run: EditRun = async (signal) => {
     const files = [...inputs];
     if (spoken) {
@@ -466,7 +503,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
   };
   const mark = newItemMark(marks, false);
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,

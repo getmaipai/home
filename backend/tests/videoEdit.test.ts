@@ -118,8 +118,8 @@ describe("C1: generate_video declares what the Create page has", () => {
 describe("C2: edit_video", () => {
   test("the package declares the thirteen changes (continue, extend, retake and the four finishing ops included), the gate, the bench row and a reason", () => {
     const m = manifest(EDIT_VIDEO_TOOL_ID);
-    expect(m.args.required).toEqual(["clip", "change"]);
-    expect(m.args.properties.change!.enum).toEqual(["another_take", "remix", "make_it_max", "trim", "join", "mix", "continue", "extend", "retake", "reframe", "grade", "speed", "captions", "title_card", "credits"]);
+    expect(m.args.required).toEqual(["change"]);
+    expect(m.args.properties.change!.enum).toEqual(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "continue", "extend", "retake", "reframe", "grade", "speed", "captions", "title_card", "credits"]);
     expect(m.args.properties.look!.enum).toEqual(ids(VIDEO_LOOKS));
     expect(m.args.properties.camera!.enum).toEqual(ids(VIDEO_RECIPES));
     expect(m.args.properties.voices!.enum).toEqual(ids(VIDEO_VOICES));
