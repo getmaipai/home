@@ -1,6 +1,6 @@
 {
   "id": "generate_video",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
@@ -116,6 +116,13 @@
         },
         "grounded": false,
         "description": "Optional. The names of up to two of the person's saved video styles, only when the person names one or asks for that look in a way a listed style matches. Leave it out otherwise; never invent a name."
+      },
+      "subjects": {
+        "type": "array",
+        "maxItems": 3,
+        "items": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "grounded": false,
+        "description": "Optional. Names of the person's saved characters, places or props the video should show; only names they gave."
       },
       "strength": {
         "type": "string",

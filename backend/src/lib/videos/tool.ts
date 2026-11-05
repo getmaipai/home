@@ -29,6 +29,7 @@ import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality,
 import { StackVideoError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
+import { subjectsForNames } from "@/lib/mediaSubjects";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 
@@ -124,6 +125,10 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
 
   const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
   if (prompt.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
+  const names = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
+  const resolvedSubjects = subjectsForNames(state.actor as PersonRow, names);
+  if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
+  const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), prompt].filter(Boolean).join(". ");
   const engine = await videoEngineStatus();
   if (!videoStatusReady(engine, laneOf(audience) === "adult")) return failed(callId, args, "no_engine", "unavailable", "no video model is installed on the Stack");
 
@@ -134,6 +139,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const lane = laneOf(audience);
   const kid = lane === "child";
   if (kid && isAttached(args.from_picture)) return refused(callId, args, { kind: "child", why: "photos", line: CHILD_NO_PHOTOS_LINE });
+  if (kid && resolvedSubjects.some(({ subject }) => subject.real || subject.kind !== "character")) return refused(callId, args, { kind: "child", why: "photos", line: CHILD_NO_PHOTOS_LINE });
   if (kid && videosMadeToday(actor) + 1 > kidsDailyVideos()) return refused(callId, args, { kind: "child", why: "daily_limit", line: CHILD_VIDEO_LIMIT_LINE });
 
   // A clip can start from a picture this home's Stack made ("latest" or an id), or from a photo the person attached to this message.
@@ -169,6 +175,16 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     image = ref.base64;
     sourceFileId = ref.id;
     if (ref.width && ref.height) portrait = ref.height > ref.width;
+  }
+  if (!image && resolvedSubjects.length) {
+    const reference = resolvedSubjects.find(({ subject }) => subject.kind === "character") ?? resolvedSubjects.find(({ subject }) => subject.kind === "place") ?? resolvedSubjects.find(({ subject }) => subject.kind === "prop");
+    const ref = reference?.references[0];
+    if (ref) {
+      if (kid) return refused(callId, args, { kind: "child", why: "photos", line: CHILD_NO_PHOTOS_LINE });
+      const screened = await screenInputImage(ref.bytes, subjectPrompt, viewerOf(actor, audience.band));
+      if (!screened.ok) return refuseWith(screened.line);
+      image = Buffer.from(ref.bytes).toString("base64"); imageSource = "uploaded"; sourceFileId = ref.id;
+    }
   }
 
   // Only a style this person may use right now can match; the model never sees the library. VIDEO-LORA-09: one resolver for names (chat) and ids (Create, a stored clip).
@@ -206,7 +222,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   }
   const styleStrength = strengthWord(args.strength);
   const loraOf = (m: typeof choice.maker) => (m === "ltx25max" ? engine?.qualities?.ltx25max : m === "ltx25" ? engine?.qualities?.ltx25 : undefined)?.loras;
-  const plan = buildPromptPlan({ words: prompt, styles: adapters.map((a) => a.lora), strength: styleStrength, negativePrompt: loraOf(choice.maker)?.negative_prompt });
+  const plan = buildPromptPlan({ words: subjectPrompt, styles: adapters.map((a) => a.lora), strength: styleStrength, negativePrompt: loraOf(choice.maker)?.negative_prompt });
   if (!plan.ok) return styleRefusal(callId, args, plan.line, plan.code);
   const seconds = kid ? Math.min(choice.seconds, KID_MAX_SECONDS) : choice.seconds;
   const size = videoSizeFor(choice.maker, choice.quality, portrait, engine);
@@ -239,13 +255,14 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       companionId: state.persona?.id ?? null,
       temporary,
       kind: image ? "animate" : "generate",
-      prompt,
+      prompt: subjectPrompt,
       sourceFileId,
+      ...(resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       ...(create ? { create } : {}),
       ...(input.adultOnly ? { adultOnly: true, ...(input.adultLock ? { adultLock: input.adultLock } : {}) } : {}),
       body: {
-        prompt: kid ? forceCartoon(prompt) : withVideoVoices(withVideoRecipe(withVideoLook(plan.prompt, look), recipe), voices),
+        prompt: kid ? forceCartoon(subjectPrompt) : withVideoVoices(withVideoRecipe(withVideoLook(plan.prompt, look), recipe), voices),
         // A new seed for every clip (stored on the job); Another take rolls a different one.
         seed: typeof args.seed === "number" && Number.isInteger(args.seed) && args.seed > 0 && args.seed < 2_147_483_647 ? args.seed : Math.floor(Math.random() * 2_147_483_647),
         size,

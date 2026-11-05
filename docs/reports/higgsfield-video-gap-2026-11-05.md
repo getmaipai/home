@@ -12,9 +12,9 @@ first), **Not planned** (no local model and not in scope).
 | Higgsfield feature | Home today | Next step |
 |---|---|---|
 | Text to video (model, length, size, audio) | Built: `generate_video`, three resource tiers, look, camera, voices, portrait or landscape | none |
-| Image to video | Built on Wan and LTX-2.3; LTX-2.5 refuses a picture start | VIDEO-INPUTS-01 |
+| Image to video | Built on Wan, LTX-2.3 and LTX-2.5 (Stack VIDEO-INPUTS-01 landed: start picture and end picture) | none |
 | Reference to video (pictures, video, audio) | Designed: `references` slots, `audio` and `video` kinds | VIDEO-INPUTS-03, -05, -06 |
-| Start and End frame, keyframes | Designed; End frame waits for its bench | VIDEO-INPUTS-01, -03 |
+| Start and End frame, keyframes | Stack built (LTX-2.5 start and end picture); Home `end_frame` argument and slot not built | VIDEO-INPUTS-03 |
 | Multi-shot and AI director | Storage built: Productions hold episodes, scenes and shots (PRODUCTION-01, backend only). No render, no director | PRODUCTION-VIDEO-01 (new) |
 | Camera and lens presets | Built: 8 camera moves, 5 looks, sample loops. Lens, era looks, speed ramps: not built | later row below |
 | 3D angles, virtual reshoot | Local later | LOCAL-VIDEO-GAPS-01 |
@@ -27,7 +27,7 @@ first), **Not planned** (no local model and not in scope).
 | Face swap, recast | Local later; consent rules apply (likeness) | LOCAL-VIDEO-GAPS-01 |
 | Restyle, Mixed Media | Partly built (looks apply at generation); restyle of footage Local later | LOCAL-VIDEO-GAPS-01 |
 | One-click effects, transitions | Designed as built-in prompt recipes | V1 recipes |
-| Video extension | Built: Continue from last frame (EDITOR-15); true Extend waits for VIDEO-EVAL-04 | VIDEO-INPUTS-06 |
+| Video extension | Built: Continue from last frame (EDITOR-15). Stack extend and retake on Max landed (LTX25-EDIT-01); Home does not call them yet | VIDEO-INPUTS-06 |
 | Reframe, aspect conversion | Not built | LOCAL-VIDEO-GAPS-01 |
 | Background removal, depth map | Cutout exists for companion clips; not for generated clips | LOCAL-VIDEO-GAPS-01 |
 | Relight, grade, HDR | Not built | LOCAL-VIDEO-GAPS-01 |
@@ -42,9 +42,9 @@ first), **Not planned** (no local model and not in scope).
 
 ## Build order agreed with the owner
 
-1. VIDEO-INPUTS-01 (Stack): picture start on LTX-2.5.
-2. VIDEO-INPUTS-02 and -03: still first, then Start and End frame slots.
-3. PRODUCTION-VIDEO-01: `generate_video` takes saved subjects and a production shot (cast and places as start pictures and prompt text), so characters stay the same across shots. Characters are not rebuilt: V4 is dropped in favor of IMG-SUBJECT-01 and PRODUCTION-01.
+1. Done in the Stack: picture start and end picture on LTX-2.5 (VIDEO-INPUTS-01), extend and retake on Max (LTX25-EDIT-01).
+2. Home: `end_frame` argument and slots (VIDEO-INPUTS-03), still first (VIDEO-INPUTS-02), Home calls for extend and retake (VIDEO-INPUTS-06).
+3. PRODUCTION-VIDEO-01 (slice A, saved subjects on `generate_video`, built 2026-11-05): `generate_video` takes saved subjects and a production shot (cast and places as start pictures and prompt text), so characters stay the same across shots. Characters are not rebuilt: V4 is dropped in favor of IMG-SUBJECT-01 and PRODUCTION-01.
 4. Storyboard render: play a production's shots in order and join them (needs EDITOR-11; the `ClipTimeline` sign-off).
 
 Items 1 and 3 touch the Stack and `commons` and each has a bench before its button, so they land as separate slices.

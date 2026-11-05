@@ -4,6 +4,10 @@ All notable changes to the Make a Video package, in [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+
+- VIDEO-SUBJECTS-01: `subjects` names saved characters, places or props for a video. Home adds their looks and can start the clip from a screened reference picture; adult-only references make the clip adult-only. Children cannot use photo references. Video jobs have no `subjectIds` field, so subject ids are not recorded on them.
+
 ### Changed
 
 - VIDEO-LORA-10: `styles` (the names of up to two saved styles, listed to the model per person: only the all-ages styles that person may use, never an adult-only one) and `strength` (less, normal, more) replace `style`. Home builds the words (VIDEO-LORA-09, `lib/videos/promptPlan.ts`); an older call that still sends `style` runs as before. A person or screen that may use no style is offered neither argument.
