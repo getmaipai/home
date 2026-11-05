@@ -53,7 +53,7 @@ export class ImageEditError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 500 | 501 | 502 | 503, message: string, readonly code = "failed") { super(message); }
 }
 
-export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize"] as const;
+export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background"] as const;
 export type EditOperation = typeof EDIT_OPERATIONS[number];
 /** The change a Comment asks for in words (the Stack's generative edit, IMGGEN-EDITOR-01). */
 export type AnyEditOp = EditOperation | "comment";
@@ -74,7 +74,7 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 // ---------------------------------------------------------------- tools status
 
 export interface EditToolState { enabled: boolean; reason?: string }
-export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "find_people" | "find_subjects";
+export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
   state: "ready" | "preparing" | "not_installed" | "unavailable" | "off";
   /** One plain line for the editor to show, or null when everything is ready. */
@@ -105,7 +105,7 @@ async function commentState(actor: PersonRow): Promise<EditToolState> {
 }
 
 function off(reason: string): Record<EditToolKey, EditToolState> {
-  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
+  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
 }
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
@@ -140,6 +140,9 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
     remove_background: needs("isnet", status.vision, "The background remover"),
     erase: needs("lama", false, "The eraser"),
     resize: preparing ? { enabled: false, reason: prepareReason } : { enabled: true },
+    crop: { enabled: true },
+    adjust: { enabled: true },
+    blur_background: needs("isnet", status.vision, "The background remover"),
     find_people: needs("vision", status.vision, "The people finder"),
     find_subjects: status.operations?.includes("find_subjects") ? { enabled: true } : needs("vision", status.vision, "The people finder"),
   };
@@ -324,7 +327,62 @@ export function editErrorFrom(error: unknown): ImageEditError {
   return new ImageEditError(500, "The edit could not be finished. Try again.", "failed");
 }
 
-export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number }
+export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number }
+
+/** Local, metadata-free pixel transforms used by picture.crop and picture.adjust. */
+export async function processLocalPicture(bytes: Uint8Array, input: StartEditInput): Promise<{ png: Uint8Array; width: number; height: number }> {
+  const image = sharp(bytes, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" });
+  const meta = await image.metadata();
+  const sourceWidth = meta.width ?? 0;
+  const sourceHeight = meta.height ?? 0;
+  if (!sourceWidth || !sourceHeight) throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
+  let pipeline = image;
+  let width = sourceWidth;
+  let height = sourceHeight;
+  if (input.operation === "crop") {
+    let left: number; let top: number; let cropWidth: number; let cropHeight: number;
+    if (input.aspect) {
+      const [rw = 1, rh = 1] = input.aspect.split(":").map(Number);
+      const ratio = rw / rh;
+      if (sourceWidth / sourceHeight > ratio) { cropHeight = sourceHeight; cropWidth = Math.round(cropHeight * ratio); }
+      else { cropWidth = sourceWidth; cropHeight = Math.round(cropWidth / ratio); }
+      left = Math.floor((sourceWidth - cropWidth) / 2);
+      top = Math.floor((sourceHeight - cropHeight) / 2);
+    } else {
+      left = Math.floor((input.x ?? 0) * sourceWidth);
+      top = Math.floor((input.y ?? 0) * sourceHeight);
+      cropWidth = Math.floor((input.width ?? 1) * sourceWidth);
+      cropHeight = Math.floor((input.height ?? 1) * sourceHeight);
+      if (left < 0 || top < 0 || cropWidth < 1 || cropHeight < 1 || left + cropWidth > sourceWidth || top + cropHeight > sourceHeight) throw new ImageEditError(422, "Choose a crop inside the picture.", "bad_crop");
+    }
+    width = cropWidth; height = cropHeight;
+    pipeline = pipeline.extract({ left, top, width, height });
+  } else {
+    if (input.auto) pipeline = pipeline.normalize();
+    const brightness = 1 + (input.brightness ?? 0) / 100;
+    const contrast = 1 + (input.contrast ?? 0) / 100;
+    const saturation = Math.max(0, 1 + (input.saturation ?? 0) / 100);
+    pipeline = pipeline.modulate({ brightness, saturation });
+    if (contrast !== 1) pipeline = pipeline.linear(contrast, 128 * (1 - contrast));
+    const warmth = (input.warmth ?? 0) / 100;
+    if (warmth !== 0) {
+      const overlay = await sharp({ create: { width, height, channels: 4, background: warmth > 0 ? { r: 255, g: 180, b: 80, alpha: Math.abs(warmth) * 0.18 } : { r: 80, g: 160, b: 255, alpha: Math.abs(warmth) * 0.18 } } }).png().toBuffer();
+      pipeline = pipeline.composite([{ input: overlay, blend: "soft-light" }]);
+    }
+  }
+  const { data, info } = await pipeline.png().toBuffer({ resolveWithObject: true });
+  return { png: new Uint8Array(data), width: info.width, height: info.height };
+}
+
+/** Composite a supplied transparent cutout over a blurred copy of its source. */
+export async function processBackgroundBlur(bytes: Uint8Array, mattePng: Uint8Array, radius: number): Promise<{ png: Uint8Array; width: number; height: number }> {
+  const metadata = await sharp(bytes).metadata();
+  const width = metadata.width ?? 0; const height = metadata.height ?? 0;
+  if (!width || !height) throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
+  const background = await sharp(bytes).blur(radius).png().toBuffer();
+  const png = new Uint8Array(await sharp(background).composite([{ input: Buffer.from(mattePng) }]).png().toBuffer());
+  return { png, width, height };
+}
 
 /** Sends a picture to the Stack's image tools. Fast tools answer at once; slow ones continue as a job the browser polls. */
 export async function startEdit(actor: PersonRow, conversationId: string, id: string, input: StartEditInput, signal?: AbortSignal): Promise<EditProgress> {
@@ -335,8 +393,19 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   if (input.operation === "erase" && !input.mask?.byteLength && !input.people && !input.subjects) throw new ImageEditError(422, "Paint over what you want gone, then press Erase.", "mask_empty");
   if (input.operation === "erase" && Number(Boolean(input.mask?.byteLength)) + Number(Boolean(input.people)) + Number(Boolean(input.subjects)) > 1) throw new ImageEditError(422, "Choose exactly one area to erase.", "erase_target_conflict");
   const status = await editToolsStatus(actor);
-  const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : "resize";
+  const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : input.operation === "crop" || input.operation === "adjust" ? input.operation : input.operation === "blur_background" ? "blur_background" : "resize";
   if (!status.tools[tool].enabled) throw new ImageEditError(503, status.tools[tool].reason ?? status.note ?? "This tool isn't available yet.", "unavailable");
+  if (input.operation === "crop" || input.operation === "adjust" || input.operation === "blur_background") {
+    if (input.operation === "blur_background") {
+      const matte = await startEdit(actor, conversationId, id, { operation: "remove_background" }, signal);
+      if (matte.state !== "done") throw new ImageEditError(503, status.tools.remove_background.reason ?? "The background remover isn't ready yet.", "unavailable");
+      const cutout = readPreview(actor, matte.preview.token).png;
+      const result = await processBackgroundBlur(source.bytes, cutout, input.radius ?? 12);
+      return { state: "done", preview: keepPreview(actor, source, input.operation, result.png, result) };
+    }
+    const { png, width, height } = await processLocalPicture(source.bytes, input);
+    return { state: "done", preview: keepPreview(actor, source, input.operation, png, { width, height }) };
+  }
   try {
     const operation = input.operation === "erase" && input.subjects ? "erase_subjects" : input.operation === "erase" && input.people ? "erase_people" : input.operation;
     let reply: Awaited<ReturnType<typeof submitImageTool>>;
@@ -364,7 +433,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   }
 }
 
-const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing", comment: "Making your change" };
+const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", comment: "Making your change" };
 
 /** The state of a running edit; the first poll that sees it finished takes the PNG from the Stack and keeps it as a preview. */
 export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditProgress> {
@@ -419,7 +488,7 @@ export function readPreview(actor: PersonRow, token: string): Preview {
 export async function applyPreview(actor: PersonRow, token: string, label?: string): Promise<PictureVersion> {
   const preview = readPreview(actor, token);
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
-  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", comment: "Changed as described" };
+  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", comment: "Changed as described" };
   const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms });
   previews.delete(token);
   return version;
