@@ -345,7 +345,9 @@ export async function getStackInstallJob(job: string): Promise<StackInstallJob |
   const res = await request(`/stack/v1/jobs/${encodeURIComponent(job)}`, { method: "GET", timeoutMs: 8_000 });
   if (res.status === 404) return null;
   if (!res.ok) return failure(res);
-  const b = await res.json() as Record<string, unknown>;
+  // The Stack answers `{ job: {...} }` (measured against the live Stack 2026-11-04); read the inner job.
+  const outer = await res.json() as Record<string, unknown>;
+  const b = (outer.job && typeof outer.job === "object" ? outer.job : outer) as Record<string, unknown>;
   const n = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return { state: typeof b.state === "string" ? b.state : "running", percent: n(b.percent), completedBytes: n(b.completedBytes), totalBytes: n(b.totalBytes), status: typeof b.status === "string" ? b.status : null, reason: typeof b.reason === "string" ? b.reason : null, result: b.result ?? null };
 }

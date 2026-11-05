@@ -84,9 +84,9 @@ function installFakeInstall(): void {
     if (jobMatch) {
       const b = inst.all[Number(jobMatch[1]) - 1]!;
       const lora = { id: `lora-${sha("e").slice(0, 16)}`, name: String(b.name), sha256: sha("e"), bytes: 412 * 1024 * 1024, base_model: String(b.base_model), licence: "x", source_url: typeof b.source_url === "string" ? b.source_url : null, classification: inst.classification, strength_default: 1, trigger_words: [], added_at: "2026-11-02T00:00:00Z" };
-      if (inst.state === "done") { fake.loras = [lora]; return json({ id: `job-install-${jobMatch[1]}`, state: "done", percent: 100, completedBytes: 1, totalBytes: 1, status: "Done", reason: null, result: { lora } }); }
-      if (inst.state === "failed") return json({ id: `job-install-${jobMatch[1]}`, state: "failed", percent: 40, status: "failed", reason: inst.reason, result: { code: "hash_mismatch" } });
-      return json({ id: `job-install-${jobMatch[1]}`, state: "running", percent: 40, completedBytes: 40, totalBytes: 100, status: "Downloading a style", reason: null, result: null });
+      if (inst.state === "done") { fake.loras = [lora]; return json({ job: { id: `job-install-${jobMatch[1]}`, state: "done", percent: 100, completedBytes: 1, totalBytes: 1, status: "Done", reason: null, result: { lora } } }); }
+      if (inst.state === "failed") return json({ job: { id: `job-install-${jobMatch[1]}`, state: "failed", percent: 40, status: "failed", reason: inst.reason, result: { code: "hash_mismatch" } } });
+      return json({ job: { id: `job-install-${jobMatch[1]}`, state: "running", percent: 40, completedBytes: 40, totalBytes: 100, status: "Downloading a style", reason: null, result: null } });
     }
     return inner(input, init);
   }) as typeof fetch;

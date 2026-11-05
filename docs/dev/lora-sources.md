@@ -73,3 +73,13 @@ Settings, Pictures, videos and music, tab Styles (`frontend/src/apps/settings/st
 
 Backend added for it: `GET /api/loras` rows carry `adult_check` (evidence), and `POST /api/loras/{id}/all-ages` refuses a style whose check is `adult` without a valid ticket (`tests/loras08.test.ts`). Not built yet: Delete now in Recently removed, Check the file again, adding a file by its path, and the once-per-admin licence notice (the panel's licence step covers each install).
 
+
+## Measured against the real Stack and Hugging Face (2026-11-04)
+
+One real run on a dev hub: search "Clay Mation" on Hugging Face, install `vrgamedevgirl84/LTX_2.3_Clay_Mation_Style_LoRa` (336 MB, adults only, base picked as LTX 2.3), then a 2 second Detailed clip with it. The finished clip is clearly clay.
+
+- The Stack answers a job as `{ "job": {...} }`. `getStackInstallJob` read the outer object, so every install stayed "running" and never wrote its record. Fixed; the `loras07` fake Stack now uses the real shape.
+- Hugging Face hits are never `normal` (the check has no safe signal there), so a search shows one lock tile until the adult unlock is live. That is by design, not a failure.
+- This repo says `Lightricks/LTX-Video` as its base, which reads as unknown, so the install needed `base_model: "ltx-2.3"` in the body (the Styles tab asks for it).
+- The default base filter ("default") returned nothing until `setInstalledBasesProvider` is wired to the Stack's video readiness; `base: "all"` was used for the search.
+- The Hugging Face base label repeats the base text (`Lightricks/LTX-Video Lightricks/LTX-Video ...`): cosmetic, not fixed.
