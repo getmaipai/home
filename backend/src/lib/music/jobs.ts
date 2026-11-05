@@ -11,13 +11,14 @@ import type { PersonRow } from "@/types";
 import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
-import { prepareMusicEdit } from "./tool";
+import { partsDoneLine, prepareMusicEdit } from "./tool";
 import { sungLyricsFromLrc } from "./sections";
 import { startSongCover } from "./cover";
 import { startWordTiming } from "./timedWords";
 import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { m4aSeconds } from "./m4a";
+import { mixMusicParts } from "./mixParts";
 import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -66,7 +67,8 @@ async function releaseMusic(job: MusicJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
     const storedBody = (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody;
-    const submitted = job.task === "stems"
+    const partsJob = !!job.request.parts;
+    const submitted = job.task === "stems" || partsJob
       ? { job: await submitStems(storedBody?.source ?? "", storedBody?.source_sha256 ?? "", storedBody?.origin), done: null }
       : await submitMusic({ ...slotBodyFor(job, storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
     if (job.state !== "queued" || !liveJobs.has(job.id)) { void cancelOrDeleteMusic(submitted.job); return; }
@@ -191,7 +193,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   finally { starting.delete(input.actor.id); }
 }
 
-function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
+function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
 const stopped = (job: MusicJob): boolean => job.state === "cancelled";
 async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
@@ -201,7 +203,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
     if (early && await finish(job, actor, early, controller.signal) !== false) return;
     while (!controller.signal.aborted && Date.now() < deadline) {
       let status;
-      try { status = job.task === "stems" ? await getStemsJob(job.stackJob) : await getMusicJob(job.stackJob); }
+      try { status = job.task === "stems" || job.request.parts ? await getStemsJob(job.stackJob) : await getMusicJob(job.stackJob); }
       catch (error) {
         if (controller.signal.aborted) return;
         if (error instanceof StackMusicError && error.status === 404) { fail(job, "lost_job"); return; }
@@ -238,6 +240,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
 }
 async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<false | void> {
   if (stopped(job)) return;
+  if (job.request.parts) return finishParts(job, actor, songs as unknown as StackStem[], signal);
   if (job.task === "stems") return finishStems(job, actor, songs as unknown as StackStem[], signal);
   const song = songs[0];
   if (!song || !Number.isFinite(song.duration_s) || !Number.isFinite(song.seed)) { fail(job, "bad_reply"); return; }
@@ -332,6 +335,41 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
   }
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
+}
+async function finishParts(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
+  const kept = job.request.parts;
+  if (!kept || !stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "bad_reply"); return; }
+  let turn = false;
+  for (let i = 0; i < 120 && !signal.aborted; i++) {
+    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, job.turnId!), eq(conversationTurns.personId, actor.id))).get()) { turn = true; break; }
+    await sleep(500, signal);
+  }
+  if (signal.aborted || stopped(job)) return;
+  if (!turn) { fail(job, "lost_turn"); return; }
+  try {
+    const fetched: Partial<Record<"vocals" | "drums" | "bass" | "other", Uint8Array>> = {};
+    for (const stem of stems) if (kept.keep.includes(stem.stem)) fetched[stem.stem] = await fetchStem(stem.url);
+    if (signal.aborted || stopped(job)) return;
+    const bytes = await mixMusicParts(fetched, kept.keep);
+    if (signal.aborted || stopped(job)) return;
+    if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
+    const owned = job.request.ownedFile === true;
+    const parent = owned ? null : job.parentFileId ? provenanceFor(job.parentFileId) : null;
+    if (!owned && !parent) { fail(job, "source_not_made_here"); return; }
+    const seconds = Math.round(m4aSeconds(bytes) ?? job.request.seconds);
+    const provenance: GenerationProvenance = { kind: "music", job_id: job.id, task: "trim", ...modelStampFor("trim", null, parent), seed: null, duration_s: seconds,
+      bpm: parent?.bpm ?? null, key: parent?.key ?? null, parent_file_id: job.parentFileId, source_kind: owned ? "upload" : "made_here", made_at: new Date().toISOString() };
+    if (job.temporary) {
+      job.fileId = newFileId(); temporarySongs.set(job.fileId, { bytes, jobId: job.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(job.createdAt), provenance });
+    } else {
+      const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "conversation" });
+      if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
+      job.fileId = made.value.id;
+    }
+    job.request = { ...job.request, title: job.request.title ?? "Song", instrumental: kept.keep.length === 1 && kept.keep[0] !== "vocals", seconds };
+    job.durationS = seconds; job.seed = parent?.seed ?? null; job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
+    saveMusicJob(job);
+  } catch (error) { fail(job, error instanceof StackMusicError ? error.code : "stems_failed"); }
 }
 export async function cancelMusicJob(actor: PersonRow, id: string): Promise<MusicJob | null> {
   const job = getMusicJobFor(actor, id);

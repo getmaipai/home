@@ -10,6 +10,8 @@ export interface MusicRequest {
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed" | "max"; /** TIER-HOME-03: read by the household queue. MUSIC-MAX-01: Max is the engine's XL SFT maker. */ tier?: "standard" | "boost" | "max"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
+  /** A kept-part mix made from private intermediate stems. */
+  parts?: { keep: Array<"vocals" | "drums" | "bass" | "other">; drop: Array<"vocals" | "drums" | "bass" | "other"> };
   /** MUSIC-LIKE-01: a made band's first single. The song saved from this job is filed under the band (artist text and made_artist_id). */
   band?: { id: string; name: string };
   /** MUSIC-STUDIO-ALBUM: a track of a made album. The song saved from this job is listed on the album (lib/music/album.ts syncAlbumTracks). */

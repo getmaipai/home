@@ -144,6 +144,18 @@
       }
     },
     {
+      "id": "m5-attached-keep-drums-bass",
+      "category": "writing",
+      "prompt": "keep only the drums and bass",
+      "audio_attachment": { "fixture": "short-song", "media_type": "audio/mp4" }
+    },
+    {
+      "id": "m6-attached-no-music-intent-parts-negative",
+      "category": "writing",
+      "prompt": "What is a bass drum?",
+      "audio_attachment": { "fixture": "short-song", "media_type": "audio/mp4" }
+    },
+    {
       "id": "m3-attached-companion-sing",
       "category": "writing",
       "prompt": "have the companion sing it",

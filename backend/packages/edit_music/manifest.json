@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Song",
-  "description": "Change a song made here or attached in chat, split it into stems, or keep every version.",
+  "description": "Change a song made here or attached in chat, keep or drop parts into one finished song, split it into stems, or keep every version.",
   "offer": {
     "mode": "conditional",
     "gate": "musicEditAllowed",
@@ -26,6 +26,10 @@
       "make it reggae",
       "remove vocals",
       "remove the vocals from this",
+      "keep only the drums and bass",
+      "just the vocals",
+      "make it karaoke",
+      "mute the drums",
       "have the companion sing it"
     ],
     "patterns": []
@@ -86,7 +90,7 @@
       "change": {
         "type": "string",
         "grounded": false,
-        "description": "The change requested. Companion singing is coming and is not available yet.",
+        "description": "The change requested. For parts, give exactly one of parts.keep or parts.drop using vocals, drums, bass or other. This returns one finished song.",
         "enum": [
           "remake",
           "restyle",
@@ -100,8 +104,18 @@
           "make_full",
           "make_quick",
           "stems",
+          "parts",
           "voice_swap"
         ]
+      },
+      "parts": {
+        "type": "object",
+        "grounded": false,
+        "description": "For change parts, set exactly one: keep (parts to keep) or drop (parts to remove). Choose at least one part and leave at least one part in the mix.",
+        "properties": {
+          "keep": { "type": "array", "items": { "type": "string", "enum": ["vocals", "drums", "bass", "other"] }, "minItems": 1 },
+          "drop": { "type": "array", "items": { "type": "string", "enum": ["vocals", "drums", "bass", "other"] }, "minItems": 1 }
+        }
       },
       "section": {
         "type": "string",

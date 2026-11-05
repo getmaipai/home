@@ -19,11 +19,18 @@ import { MUSIC_NOTE, generationOf, type MusicJob } from "@/lib/music/types";
 import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import { runSmoke } from "@/lib/smoke";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setMusicMixRunnerForTests, __setMusicMixToolsForTests, mixMusicParts, mixPcmWav } from "@/lib/music/mixParts";
+import { writeFileSync } from "node:fs";
 import type { TurnState } from "@/lib/turnMachine/contract";
+function pcmFixture(samples: number[]): Uint8Array {
+  const output = new Uint8Array(44 + samples.length * 2); const view = new DataView(output.buffer);
+  const text = (at: number, value: string) => { for (let i = 0; i < value.length; i++) output[at + i] = value.charCodeAt(i); };
+  text(0, "RIFF"); view.setUint32(4, output.length - 8, true); text(8, "WAVE"); text(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true); view.setUint32(24, 44100, true); view.setUint32(28, 176400, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, samples.length * 2, true); samples.forEach((sample, i) => view.setInt16(44 + i * 2, sample, true)); return output;
+}
 let people: ReturnType<typeof createBenchPeople>;
 let fake: ReturnType<typeof installFakeMusicStack>;
-beforeEach(() => { resetDb(); people = createBenchPeople(); fake = installFakeMusicStack(); });
-afterEach(() => fake.restore());
+beforeEach(() => { resetDb(); people = createBenchPeople(); fake = installFakeMusicStack(); __setMusicMixToolsForTests({ afconvert: "/usr/bin/afconvert", ffmpeg: null }); __setMusicMixRunnerForTests(async (command) => { (globalThis as unknown as { lastMixCommand: string[] }).lastMixCommand = command; const output = command.at(-1)!; if (command.includes("WAVE")) writeFileSync(output, pcmFixture([12000, -12000])); else writeFileSync(output, new Uint8Array([0, 0, 0, 28, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20])); return true; }); });
+afterEach(() => { __setMusicMixRunnerForTests(null); __setMusicMixToolsForTests(null); fake.restore(); });
 const ARGS = { description: "a gentle folk song with an original voice", lyrics: LYRICS, title: "Pancakes", seconds: 60, bpm: 100, key: "C major", language: "en" };
 async function generate(state = musicState(people.owner), args: Record<string, unknown> = ARGS): Promise<MusicJob> {
   const outcome = await runGenerateMusic({ state, args, callId: "g", spoken: false });
@@ -177,6 +184,44 @@ describe("music jobs and their private files", () => {
   });
 });
 describe("native music edits, versions and section timing", () => {
+  test("parts on an attached upload makes one mixed file with upload provenance; kept stems alone are mixed alone", async () => {
+    const state = musicState(people.owner);
+    const bytes = testM4a();
+    const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes, mediaType: "audio/mp4", deduplicate: false });
+    if (!upload.ok) throw new Error("upload failed");
+    state.audio = [{ id: upload.value.id } as never];
+    fake.stems = true;
+    fake.allStems = true;
+    const dropped = await runEditMusic({ state, args: { track: "attached", change: "parts", parts: { drop: ["vocals"] } }, callId: "p", spoken: false });
+    expect(dropped.result?.reply?.text).toBe("Here it is without the vocals.");
+    const jobId = musicForOutcomes([dropped])!.id;
+    await waitForMusic(() => ["done", "failed"].includes(getMusicJobFor(people.owner, jobId)?.state ?? ""));
+    const done = getMusicJobFor(people.owner, jobId)!;
+    expect(done.errorCode).toBeNull();
+    expect(db.select().from(musicJobs).where(eq(musicJobs.id, jobId)).all()).toHaveLength(1);
+    expect(done.fileId).toBeTruthy();
+    const row = db.select().from(attachments).where(eq(attachments.id, done.fileId!)).get()!;
+    expect(generationOf(row.provenance)).toMatchObject({ source_kind: "upload", task: "trim", model: { id: "unknown" }, commercial_use: "unknown", parent_file_id: upload.value.id });
+    expect(db.select().from(attachments).all()).toHaveLength(2);
+    expect((globalThis as unknown as { lastMixCommand: string[] }).lastMixCommand.filter((arg) => arg === "-i").length).toBeGreaterThanOrEqual(0);
+
+    const keepVocal = await runEditMusic({ state, args: { track: upload.value.id, change: "parts", parts: { keep: ["vocals"] } }, callId: "p2", spoken: false });
+    const vocalId = musicForOutcomes([keepVocal])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, vocalId)?.state === "done");
+    expect((globalThis as unknown as { lastMixCommand: string[] }).lastMixCommand.length).toBeGreaterThan(0);
+  });
+  test("parts validation refuses both modes, no kept parts and unknown part; stems is never a track", async () => {
+    const state = musicState(people.owner);
+    const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes: testM4a(), mediaType: "audio/mp4", deduplicate: false });
+    if (!upload.ok) throw new Error("upload failed");
+    for (const parts of [{ keep: ["vocals"], drop: ["drums"] }, { drop: ["vocals", "drums", "bass", "other"] }, { keep: ["unknown"] }]) {
+      const out = await runEditMusic({ state, args: { track: upload.value.id, change: "parts", parts }, callId: "p", spoken: false });
+      expect(out.result?.reply?.text).toContain("Choose one or more parts");
+    }
+    const invalidTrack = await runEditMusic({ state, args: { track: "vocals", change: "parts", parts: { keep: ["vocals"] } }, callId: "p", spoken: false });
+    expect(invalidTrack.result?.data).toMatchObject({ refused: "source_not_made_here" });
+    expect(db.select().from(musicJobs).all()).toHaveLength(0);
+  });
   test("each change sends the right Stack body, with original bytes and sha256 only on source tasks", async () => {
     const state = musicState(people.owner);
     const original = await generate(state);
@@ -292,5 +337,28 @@ describe("native music edits, versions and section timing", () => {
     db.update(musicJobs).set({ request: JSON.stringify({ ...source.request, title: "naked child" }) }).where(eq(musicJobs.id, source.id)).run();
     const outcome = await runEditMusic({ state, args: { track: source.fileId, change: "remake" }, callId: "c", spoken: false });
     expect(JSON.stringify(outcome.result)).toContain("minor_sexual"); expect(fake.submitted).toHaveLength(1);
+  });
+});
+
+describe("PCM WAV music mixing", () => {
+  test("neither converter available reports mix_unavailable", async () => {
+    __setMusicMixToolsForTests({ afconvert: null, ffmpeg: null }); __setMusicMixRunnerForTests(null);
+    await expect(mixMusicParts({ vocals: testM4a() }, ["vocals"])).rejects.toThrow("mix_unavailable");
+    __setMusicMixToolsForTests({ afconvert: "/usr/bin/afconvert", ffmpeg: null });
+  });
+  function wav(samples: number[]): Uint8Array {
+    const output = new Uint8Array(44 + samples.length * 2); const view = new DataView(output.buffer);
+    const text = (at: number, value: string) => { for (let i = 0; i < value.length; i++) output[at + i] = value.charCodeAt(i); };
+    text(0, "RIFF"); view.setUint32(4, output.length - 8, true); text(8, "WAVE"); text(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true); view.setUint32(24, 44100, true); view.setUint32(28, 176400, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, samples.length * 2, true);
+    samples.forEach((sample, i) => view.setInt16(44 + i * 2, sample, true)); return output;
+  }
+  function samples(bytes: Uint8Array): number[] { const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); const length = view.getUint32(40, true) / 2; return Array.from({ length }, (_, i) => view.getInt16(44 + i * 2, true)); }
+  test("sums two stems sample-wise then scales under the peak limit", () => {
+    const mixed = samples(mixPcmWav([wav([24000, -24000, 24000, -24000]), wav([24000, -24000, 24000, -24000])]));
+    expect(mixed[0]).toBe(29164); expect(mixed[0]).toBeLessThanOrEqual(Math.ceil(32768 * 0.89)); expect(mixed[1]).toBe(-mixed[0]!);
+  });
+  test("a single stem retains its level and shorter stems are padded with silence", () => {
+    expect(samples(mixPcmWav([wav([12000, -12000])]))).toEqual([12000, -12000]);
+    expect(samples(mixPcmWav([wav([12000, 16000, 20000, 24000]), wav([6000, 6000])]))).toEqual([18000, 22000, 20000, 24000]);
   });
 });

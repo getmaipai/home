@@ -31,7 +31,8 @@ export const generateMusicArgs = z.object({ ...common, description: common.descr
   /** MUSIC-STUDIO-STYLE: make the song in a saved song style, a made band's sound, or an album (ids the person can read). */
   song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional() });
 export const editMusicArgs = z.object({
-  ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems", "voice_swap"]),
+  ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems", "parts", "voice_swap"]),
+  parts: z.object({ keep: z.array(z.string()).min(1).optional(), drop: z.array(z.string()).min(1).optional() }).optional(),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
   seconds: z.number().finite().positive().optional(), at: z.enum(["start", "end"]).optional(), where: z.enum(["in", "out", "both"]).optional(),
   strength: z.number().finite().min(0.3).max(1).optional(), lufs: z.number().finite().min(-70).max(-5).optional(),
@@ -106,6 +107,21 @@ function isWholeSong(lyrics: string, stored: string | undefined): boolean {
   return /\[(?:verse|chorus|bridge|intro|outro|pre-chorus|hook|refrain|instrumental)[^\]]*\]/i.test(lyrics) && lyrics.length >= (stored?.length ?? 0) / 2;
 }
 type EditPlan = { ok: true; task: MusicTask; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; line: string };
+export const MUSIC_PARTS = ["vocals", "drums", "bass", "other"] as const;
+export function keptMusicParts(parts: z.infer<typeof editMusicArgs>["parts"]): { keep: Array<typeof MUSIC_PARTS[number]>; drop: Array<typeof MUSIC_PARTS[number]> } | null {
+  if (!parts || (!!parts.keep === !!parts.drop)) return null;
+  const chosen = parts.keep ?? parts.drop!;
+  if (chosen.some((part) => !(MUSIC_PARTS as readonly string[]).includes(part))) return null;
+  const selected = new Set(chosen);
+  const keep = parts.keep ? MUSIC_PARTS.filter((part) => selected.has(part)) : MUSIC_PARTS.filter((part) => !selected.has(part));
+  const drop = MUSIC_PARTS.filter((part) => !keep.includes(part));
+  return keep.length ? { keep: [...keep], drop: [...drop] } : null;
+}
+export function partsDoneLine(parts: { keep: readonly string[]; drop: readonly string[] }): string {
+  if (parts.keep.length === 1) return `Here it is with just the ${parts.keep[0]}.`;
+  if (parts.drop.length === 1) return `Here it is without the ${parts.drop[0]}.`;
+  return `Here it is with the ${parts.keep.join(" and ")} kept.`;
+}
 export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusicArgs>, limits = { min_seconds: 10, max_seconds: source.request.max_seconds ?? FULL_SONG.max }): EditPlan {
   // A stem of a file the person owns is never an edit, cover or remake source (stem-splitting 10.2 point 3; a stem lives only as a split result).
   if (source.request.ownedFile && source.task === "stems") return { ok: false, line: "That file is yours, not a song made here, so it can only be split into stems." };
@@ -161,6 +177,12 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
     case "fade":
       task = "fade"; stackTask = "edit"; request.edit = { op: "fade", seconds: args.seconds ?? 3, where: args.where ?? "out" }; break;
     case "loudness": task = "loudness"; stackTask = "edit"; request.edit = { op: "loudness", lufs: args.lufs ?? -14 }; break;
+    case "parts": {
+      const parts = keptMusicParts(args.parts);
+      if (!parts) return { ok: false, line: "Choose one or more parts to keep or drop, and leave at least one part." };
+      task = "trim"; stackTask = "edit"; request.parts = parts;
+      break;
+    }
   }
   // New words (or none, for an instrumental) replace the person's kept words: Make it full must sing what this version sings.
   if (args.change !== "make_full" && args.change !== "make_quick" && (args.lyrics !== undefined || request.instrumental)) { delete request.written_lyrics; delete request.cut; }
@@ -195,6 +217,21 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     if (parsed.data.change === "voice_swap") return refused("Companion singing for attached songs is coming.", "voice_swap_not_available");
+    if (parsed.data.change === "parts") {
+      const parts = keptMusicParts(parsed.data.parts);
+      if (!parts) return refused("Choose one or more parts to keep or drop, and leave at least one part.", "bad_parts");
+      const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio?.[0]?.id ?? "" : parsed.data.track, state.conversationId, temporary);
+      if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+      const prepared = source.request.ownedFile ? await prepareOwnedStemsJob(actor, source.fileId) : await prepareStemsJob(actor, source);
+      if (!prepared.ok) return prepared.status === 503 ? failed("stems_unavailable", "unavailable") : refused(prepared.line, "source_not_made_here");
+      const file = readMusicFile(actor, source, source.fileId);
+      if (!file) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+      const request = { ...prepared.request, title: parsed.data.title ?? source.request.title ?? "Song", parts };
+      const body = { ...prepared.body, source: Buffer.from(file.bytes).toString("base64"), source_sha256: file.sha256 };
+      const task: MusicTask = "trim";
+      const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId: source.fileId });
+      return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: partsDoneLine(parts) }, data: { musicJobId: job.id }, actions: [] } });
+    }
     if (parsed.data.track === "attached" && (state.audio?.length ?? 0) !== 1) return refused("Attach one audio file to your message.", "source_not_made_here");
     if (parsed.data.track === "attached" && parsed.data.change === "stems") {
       const prepared = await prepareOwnedStemsJob(actor, state.audio![0]!.id);

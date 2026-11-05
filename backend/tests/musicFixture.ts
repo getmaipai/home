@@ -21,6 +21,8 @@ export function installFakeMusicStack() {
     lrc: LRC as string | ((seconds: number) => string),
     immediate: false, queued: false, model: "ace-step-1-5-turbo" as string | undefined, beforeSubmit: undefined as (() => Promise<void>) | undefined,
     stems: false,
+    stemFiles: new Map<string, Uint8Array>(),
+    allStems: false,
     /** MUSIC-GEN-20b: the Stack's `align` task. `installed` false answers 503 not_installed; `mode` "async" answers 202 and finishes on the second poll; `reply` builds the data from the sent lyrics. */
     align: { installed: true, mode: "sync" as "sync" | "async" | "fail", submitted: [] as { lyrics: string; origin?: string; bytes: number }[], deleted: 0,
       reply: ((lyrics: string) => { const lines = lyrics.split("\n"); const words: { t: number; end: number; text: string }[] = []; const line_starts: number[] = [];
@@ -35,10 +37,10 @@ export function installFakeMusicStack() {
     if (path === "/stack/v1/music") return json(readyMusicStatusForTests());
     if (path === "/stack/v1/stems") return json({ available: fake.stems, state: fake.stems ? "idle" : "not-installed" });
     if (path === "/v1/audio/stems" && method === "POST") { fake.stems = true; fake.polls.set("stems-job", 0); return json({ job: "stems-job" }, 202); }
-    if (path.startsWith("/v1/audio/stems/") && path.endsWith(".m4a")) return new Response(testM4a(), { headers: { "content-type": "audio/mp4" } });
+    if (path.startsWith("/v1/audio/stems/") && path.endsWith(".m4a")) return new Response(fake.stemFiles.get(path.split("/").at(-1)!) ?? testM4a(), { headers: { "content-type": "audio/mp4" } });
     if (path === "/v1/audio/stems/stems-job") {
       const polls = (fake.polls.get("stems-job") ?? 0) + 1; fake.polls.set("stems-job", polls);
-      return json(polls >= fake.pollsToFinish ? { state: "done", data: [{ url: "/v1/audio/stems/vocals.m4a", stem: "vocals" }, { url: "/v1/audio/stems/drums.m4a", stem: "drums" }] } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
+      return json(polls >= fake.pollsToFinish ? { state: "done", data: (fake.allStems ? ["vocals", "drums", "bass", "other"] : ["vocals", "drums"]).map((stem) => ({ url: `/v1/audio/stems/${stem}.m4a`, stem })) } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
     }
     if (path === "/v1/audio/align" && method === "POST") {
       const body = JSON.parse(String(init?.body)) as { source: string; lyrics: string; origin?: string };
