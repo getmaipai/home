@@ -67505,7 +67505,8 @@
                   "media": {
                     "type": "string",
                     "enum": [
-                      "video"
+                      "video",
+                      "picture"
                     ],
                     "default": "video"
                   },
@@ -67525,6 +67526,9 @@
                       "ltx-2.5",
                       "ltx-2.3",
                       "wan",
+                      "flux2-klein-4b",
+                      "z-image-turbo",
+                      "ernie-image-turbo",
                       "all"
                     ],
                     "default": "default"
