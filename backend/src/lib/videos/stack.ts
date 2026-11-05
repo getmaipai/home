@@ -106,7 +106,7 @@ export interface StackVideoStatus {
   audio: boolean;
   reference_images?: { generated: boolean; uploaded: boolean; reason: string };
   /** VIDEO-LTX-01: the two models. An older Stack has none: Quick only, from the fields above. */
-  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality; /** LTX25-MAX-01: the Max profile, the same shape as `ltx25` with one `max` profile; absent on a Stack that lacks it. */ ltx25max?: StackLtx25Quality };
+  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality; /** LTX25-MAX-01: the Max profile, the same shape as `ltx25` with one `max` profile; absent on a Stack that lacks it. */ ltx25max?: StackLtx25Quality & { extend?: boolean; retake?: boolean; extend_seconds?: { min: number; max: number }; retake_from_seconds?: { min: number; max: number } } };
 }
 
 export interface StackVideoLora {
@@ -139,6 +139,10 @@ export interface VideoBody {
   /** VIDEO-INPUTS-01: a last picture for an LTX-2.5 clip (needs `image`; the Stack refuses it on Quick and Detailed). Sent only when `qualities.<model>.end_image` is true. */
   end_image?: string;
   loras?: Array<{ id: string; strength: number; sha256?: string }>;
+  /** LTX25-EDIT-01: extend or retake an existing Max clip by its Stack-readable absolute path. */
+  source_video?: string;
+  extend_seconds?: number;
+  retake_from_seconds?: number;
   audience: "all-ages" | "adult";
   /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), "ltx25-q8" is LTX-2.5 with sound (VIDEO-TIERS-01, adults only; the Stack answers 422 to a LoRA, and to a picture unless its `image_to_video` flag is true), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;

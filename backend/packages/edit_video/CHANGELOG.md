@@ -25,3 +25,9 @@
 ### Added
 
 - VIDEO-CHAT-01: change a video made in chat with `another_take`, `remix` and `make_it_max`, on the same function the Create page's buttons use. Offered only once the chat holds a finished video.
+
+## [0.4.0] - 2026-11-05
+
+### Added
+
+- VIDEO-INPUTS-06: extend a finished Max clip by a chosen number of seconds, or retake it from a chosen time with optional new words. The first clip stays saved.

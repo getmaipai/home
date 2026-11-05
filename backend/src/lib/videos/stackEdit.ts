@@ -3,7 +3,7 @@
 // one job folder under its own data directory (declared to the Stack as a read and write media root, the way the companion clips are),
 // submits the job, polls it with a deadline, reads the finished file back and deletes the folder, whatever happened. Only the local Stack
 // is called; no file name, clip or line a person typed is logged or put in an error. A failure is one plain line, never a thrown error.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { dataDir } from "@/lib/paths";
 import { newFileId } from "@/lib/id";
@@ -64,6 +64,24 @@ async function openEditRoot(root: string): Promise<void> {
   const current = await client.mediaRoots();
   if (current.read.includes(root) && current.write.includes(root)) return;
   await client.setMediaRoots({ read: [...new Set([...current.read, root])], write: [...new Set([...current.write, root])] });
+}
+
+/** A private copy of one stored clip inside the folder the Stack may read, so a Stack edit never needs the whole attachments folder opened. Call `cleanup` when the job is over. Null when the Stack is remote or the copy fails. */
+export async function stageClipForStack(sourcePath: string): Promise<{ path: string; cleanup: () => void } | null> {
+  if (isRemoteStackSelected()) return null;
+  const root = resolve(dataDir, "video-edit");
+  const dir = join(root, newFileId());
+  try {
+    mkdirSync(root, { recursive: true, mode: 0o700 });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    await openEditRoot(root);
+    const path = join(dir, "source.mp4");
+    copyFileSync(sourcePath, path);
+    return { path, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  } catch {
+    rmSync(dir, { recursive: true, force: true });
+    return null;
+  }
 }
 
 /** Submits one `media.edit` job with these files and steps, waits for it and returns the finished file's bytes. */

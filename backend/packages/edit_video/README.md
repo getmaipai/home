@@ -9,3 +9,4 @@ Works offline after the video model is installed.
 ## License
 
 AGPL-3.0. See the repository LICENSE.
+You can also extend a Max video or retake it from a chosen time.

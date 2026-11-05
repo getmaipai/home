@@ -22,10 +22,14 @@ import { laneOf } from "@/lib/pictures/lane";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
+import { attachmentFilePath } from "@/lib/attachments";
+import { existsSync } from "node:fs";
+import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
+import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
 import { CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, crossfadeProblem, frameOps, joinOps, lastFrameAt, mixOps, trimOps, trimRange } from "./editPlan";
-import { runStackEdit, type EditFile } from "./stackEdit";
+import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
@@ -40,7 +44,7 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "continue"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "mix", "continue", "extend", "retake"]),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.enum(ids(VIDEO_LOOKS)).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
@@ -83,6 +87,8 @@ export const CONTINUE_TRASH_LINE = "That video is in Trash. Restore it from Tras
 export const CONTINUE_BUSY_LINE = "You already have a video being made. Wait for it to finish, or stop it first.";
 export const CONTINUE_FRAME_LINE = "I couldn't continue that video. The last picture could not be read from it. Try again.";
 export const START_PAST_END_LINE = "That is after the video ends. Pick a start time inside it.";
+export const MAX_EDIT_NOT_READY_LINE = "This computer cannot extend or retake videos yet. An admin can check Settings, Models and storage.";
+export const MAX_EDIT_RANGE_LINE = "That time is outside the range this computer can use. Pick a time in range, then try again.";
 
 export interface RunEditVideoInput { state: GenerateVideoState; args: Record<string, unknown>; callId: string; spoken: boolean }
 
@@ -121,18 +127,19 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
   // The surface and age gate, then the same screening any typed prompt gets (a remix's new words are screened like a first request).
   // A typed voice line is screened like a prompt, before any speech is made.
-  const typed = value.change === "remix" || value.change === "continue" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : "";
+  const typed = value.change === "remix" || value.change === "continue" || value.change === "retake" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : "";
   const refusal = videoRefusalFor(audience, { prompt: typed });
   if (refusal) return refused(callId, args, refusal.line, refusal.why);
   { const likeness = likenessRefusal(actor, typed); if (likeness) return refused(callId, args, likeness, "household_likeness_off"); }
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
-  if (value.change === "trim" || value.change === "join" || value.change === "mix") {
+  if (["extend", "retake", "trim", "join", "mix"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
     if (value.change === "join" && value.transition === "crossfade" && !CROSSFADE_IN_STACK) return refused(callId, args, CROSSFADE_NOT_SUPPORTED_LINE, "not_supported");
+    if (value.change === "extend" || value.change === "retake") return extendOrRetake(input, value, actor, audience, temporary);
     return editFinishedClips(input, value, actor, temporary);
   }
   const continuing = value.change === "continue";
@@ -275,6 +282,62 @@ function ownClip(actor: PersonRow, state: GenerateVideoState, clip: string, temp
   if (job && temporary && job.conversationId !== state.conversationId) return null;
   return editableClip(actor, job);
 }
+
+/** LTX25-EDIT-01: extend or retake a saved, finished clip directly from its attachment path. */
+async function extendOrRetake(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, audience: ReturnType<typeof videoAudienceOf>, temporary: boolean): Promise<ToolExecutionOutcome> {
+  const { state, args, callId } = input;
+  const refuse = (line: string, why: string) => refused(callId, args, line, why);
+  if (laneOf(audience) !== "adult") return refuse(MINOR_MAKE_LINE, "minor");
+  if (tierArgument({ person: actor, category: "video", arg: "max", band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) return refuse(MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
+  const source = ownClip(actor, state, value.clip, temporary);
+  if (!source || temporary) return refuse(NO_CLIP_LINE, "no_clip");
+  if (source.request.tier !== "max" && (source.request as VideoRequest & { stackBody?: { model?: string } }).stackBody?.model !== LTX25_MAX_MODEL && source.files[0]?.model !== LTX25_MAX_MODEL) return refuse(MAX_EDIT_NOT_READY_LINE, "source_not_max");
+  const file = source.files[0];
+  const row = file ? db.select().from(attachments).where(eq(attachments.id, file.id)).get() : null;
+  if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id) return refuse(NO_CLIP_LINE, "no_clip");
+  const sourceVideo = attachmentFilePath(row.storagePath);
+  if (!existsSync(sourceVideo)) return refuse(NO_CLIP_LINE, "no_clip");
+  if (isRemoteStackSelected()) return refuse(MAX_EDIT_NOT_READY_LINE, "stack_path_unavailable");
+  const engine = await videoEngineStatus();
+  const max = engine?.qualities?.ltx25max;
+  const mode = value.change as "extend" | "retake";
+  const supported = mode === "extend" ? max?.extend === true : max?.retake === true;
+  const range = mode === "extend" ? max?.extend_seconds : max?.retake_from_seconds;
+  if (!supported || !range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.min > range.max) return refuse(MAX_EDIT_NOT_READY_LINE, "max_edit_not_ready");
+  if (activeVideoJobsFor(actor) > 0) return refuse(CONTINUE_BUSY_LINE, "already_making");
+  const requested = mode === "extend" ? value.seconds : value.from_s;
+  if (requested === undefined || requested < range.min || requested > range.max) return refuse(MAX_EDIT_RANGE_LINE, "out_of_range");
+  const prompt = mode === "retake" ? value.prompt ?? source.prompt : source.prompt;
+  const run: EditRun = async (signal) => {
+    // The Stack reads only folders Home declared: it gets a private copy of the clip, removed when the job ends.
+    const staged = await stageClipForStack(sourceVideo);
+    if (!staged) return { ok: false, line: MAX_EDIT_NOT_READY_LINE };
+    try {
+      const submitted = await submitVideo({ prompt, audience: "adult", model: LTX25_MAX_MODEL, tier: "max", size: "1024x576", seconds: source.request.seconds, timeout_ms: 1, source_video: staged.path, ...(mode === "extend" ? { extend_seconds: Math.round(Math.min(range.max, Math.max(range.min, requested))) } : { retake_from_seconds: requested }) });
+      if (submitted.done?.[0]?.url) {
+        const video = await fetchClip(submitted.job);
+        const clip = submitted.done[0];
+        return { ok: true, clip: { video, seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0 } };
+      }
+      for (;;) {
+        if (signal.aborted) return { ok: false, line: "I couldn't change that video. The edit did not finish. Try again, or change what you asked for." };
+        const job = await getStackVideoJob(submitted.job);
+        if (job.state === "failed" || job.state === "cancelled") return { ok: false, line: "I couldn't change that video. The edit did not finish. Try again, or change what you asked for." };
+        if (job.state === "done") {
+          const clip = job.data[0];
+          if (!clip) return { ok: false, line: "I couldn't change that video. The edited video could not be read back. Try again." };
+          return { ok: true, clip: { video: await fetchClip(submitted.job), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0 } };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    } catch { return { ok: false, line: "I couldn't change that video. The edit did not finish. Try again, or change what you asked for." }; }
+    finally { staged.cleanup(); }
+  };
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: source.id, change: mode as "mix" }, run, adultOnly: true, adultLock: (await clipMarkOf(source)).lock });
+  if (!started.ok) return refuse(started.line, "already_making");
+  return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `A new version of the video is being made at Max; the first one is kept. Tell the person it is on its way.` }, data: { videoJobId: started.job.id }, actions: [] } });
+}
+
 async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, temporary: boolean): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   let sources: VideoJob[];
