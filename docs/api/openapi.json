@@ -99884,8 +99884,14 @@
                       "restyle",
                       "instrumental",
                       "parts",
-                      "stems"
+                      "stems",
+                      "voice_swap"
                     ]
+                  },
+                  "voice": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
                   },
                   "style": {
                     "type": "string",
