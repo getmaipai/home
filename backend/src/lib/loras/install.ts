@@ -13,7 +13,7 @@ import { raiseIssue, registerFixHandler, resolveIssue } from "@/lib/issues";
 import { createJob, updateJob } from "@/lib/jobs";
 import { readLora } from "@/lib/loras/access";
 import { cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
-import { INSTALLABLE_BASE_IDS, isSupportedBase, supportedFamilyWords, type BaseId } from "@/lib/loras/baseFamilies";
+import { INSTALLABLE_BASE_IDS, isSupportedBase, supportedFamilyWords, type BaseId, type Media } from "@/lib/loras/baseFamilies";
 import { fetchHit, hitKey, installedAs, MAX_INSTALL_BYTES, SourceError, civitaiEnabled, tokenFor, parseHfLink, type Hit, type LoraSite } from "@/lib/loras/source";
 import { getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
 import { recordFromStack, syncLoras } from "@/lib/loras/sync";
@@ -26,7 +26,7 @@ export const ISSUE_SOURCE = "styles";
 
 export const LICENCE_STEP_LINE = "Read the licence and confirm it first, then install the style.";
 export const SHARED_SCREEN_LINE = "Install styles on your own screen.";
-export const NOT_LTX_LINE = (label: string | null): string => `Made for ${label ?? "another base"}. This household's videos use ${supportedFamilyWords()}.`;
+export const NOT_LTX_LINE = (label: string | null, media: Media = "video"): string => `Made for ${label ?? "another base"}. This household's ${media === "picture" ? "pictures" : "videos"} use ${supportedFamilyWords(media)}.`;
 export const BASE_UNSTATED_LINE = "This style does not say which LTX 2 version it is for. Ask its maker, or pick the version yourself.";
 export const TOO_BIG_LINE = "File is over 4 GB. Home can't use a style that large.";
 export const NO_FILE_LINE = "No safe style file was found there. Home only installs .safetensors files.";
@@ -105,7 +105,7 @@ export async function startLoraInstall(actor: InstallActor, body: InstallBody): 
   }
   // The version comes from the source; only when the source names none does the admin's own pick count (checked here, not trusted from the client). Never guessed.
   const picked = body.base_model && (INSTALLABLE_BASE_IDS as readonly string[]).includes(body.base_model) ? body.base_model : null;
-  const base = hit.base_model !== "unknown" ? hit.base_model : picked ?? "unknown";
+  const base = hit.base_model !== "unknown" && (INSTALLABLE_BASE_IDS as readonly string[]).includes(hit.base_model) ? hit.base_model as BaseId : picked ?? "unknown";
   if (base === "unknown" && hit.base_unstated) return fail(422, "base_unstated", BASE_UNSTATED_LINE);
   if (base === "unknown" || !isSupportedBase(base)) return fail(422, "not_ltx", NOT_LTX_LINE(hit.base_label));
   if (!hit.file_url) return fail(422, "no_file", NO_FILE_LINE);

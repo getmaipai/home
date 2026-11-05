@@ -9,11 +9,11 @@
 import { listLoraRecords, type Lora } from "@/lib/loras/store";
 import { classifyCivitai, classifyHuggingFace, cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { baseFromText, basesNamedIn, civitaiLabel, civitaiLabelsFor, wantedBaseIds, type BaseId, type BrowseBase } from "@/lib/loras/baseFamilies";
+import { baseFromText, basesNamedIn, civitaiLabel, civitaiLabelsFor, wantedBaseIds, type AnyBaseId, type BrowseBase, type Media } from "@/lib/loras/baseFamilies";
 
 export type LoraSite = "huggingface" | "civitai";
 export type SourceChoice = LoraSite | "both";
-export type HitBase = BaseId | "unknown";
+export type HitBase = AnyBaseId | "unknown";
 export type LicenceClass = "open" | "non_commercial" | "custom" | "unknown";
 
 export const CIVITAI_ENABLED_KEY = "generation.styles.civitai";
@@ -178,9 +178,9 @@ const numOr = (v: unknown, d: number): number => (typeof v === "number" && Numbe
 export const ltxBaseFromText = (text: string): HitBase => baseFromText(text);
 
 /** A Civitai base label as a base: a concrete label maps directly; a generic family label (LTXV2) takes its version from the texts, only when exactly one version is named. */
-function civitaiBase(label: string | null, texts: readonly (string | null)[]): { base: HitBase; unstated: boolean } {
+function civitaiBase(label: string | null, texts: readonly (string | null)[], media: Media = "video"): { base: HitBase; unstated: boolean } {
   if (!label) return { base: "unknown", unstated: false };
-  const known = civitaiLabel(label);
+  const known = civitaiLabel(label, media);
   if (known.kind === "base") return { base: known.id, unstated: false };
   if (known.kind === "generic") {
     const named = basesNamedIn(texts.filter((t): t is string => !!t).join(" "), known.candidates);
@@ -205,7 +205,7 @@ function civitaiLicence(allow: unknown): { id: string | null; cls: LicenceClass;
   return { id: sell ? "Civitai (commercial use allowed)" : "Civitai (no selling)", cls: sell ? "custom" : "non_commercial", commercial: sell ? "yes" : "no" };
 }
 
-function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: string): Hit | null {
+function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: string, media: Media = "video"): Hit | null {
   const m = rec(modelRaw);
   const id = m.id;
   if (typeof id !== "number" && typeof id !== "string") return null;
@@ -219,7 +219,7 @@ function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: s
   const lic = civitaiLicence(m.allowCommercialUse);
   const stats = rec(m.stats);
   const baseLabel = str(chosen.baseModel);
-  const { base, unstated } = civitaiBase(baseLabel, [str(m.name), str(chosen.name), str(m.description), str(chosen.description)]);
+  const { base, unstated } = civitaiBase(baseLabel, [str(m.name), str(chosen.name), str(m.description), str(chosen.description)], media);
   const tags = arr(m.tags).map((t) => (typeof t === "string" ? t : str(rec(t).name) ?? ""));
   const preview = images.find((i) => typeof i.url === "string" && String(i.type ?? "image") === "image" && /^https:\/\/image\.civitai\.com\//.test(String(i.url)));
   const versionId = String(chosen.id);
@@ -245,7 +245,7 @@ function hfHit(raw: unknown): Hit | null {
   const tags = arr(m.tags).filter((t): t is string => typeof t === "string");
   const card = rec(m.cardData);
   const baseText = [...tags.filter((t) => t.startsWith("base_model:")), ...arr(card.base_model).map(String), typeof card.base_model === "string" ? card.base_model : ""].join(" ");
-  const base = ltxBaseFromText(baseText);
+  const base = baseFromText(baseText);
   const licenceId = str(card.license) ?? tags.find((t) => t.startsWith("license:"))?.slice(8) ?? null;
   const lc = licenceClassOf(licenceId);
   const hit: Hit = {
@@ -276,6 +276,7 @@ function hfHit(raw: unknown): Hit | null {
 // ---- browse and detail --------------------------------------------------------------------------------------------------------------------------
 
 export interface BrowseParams {
+  media?: Media;
   source: SourceChoice; q: string; kind: "any" | "style" | "character"; base: "default" | BrowseBase | "all";
   sort: "downloads" | "rating" | "newest"; cursor: string | null; /** Sent upstream as `nsfw=true` ONLY when the caller holds a valid unlock proof and asked for adult results. */ nsfw: boolean;
 }
@@ -283,10 +284,11 @@ interface Cursor { h: string | null; c: string | null; n: number }
 const decodeCursor = (s: string | null): Cursor => { if (!s) return { h: null, c: null, n: 0 }; try { const v = rec(JSON.parse(Buffer.from(s, "base64url").toString())); return { h: str(v.h), c: str(v.c), n: Math.max(0, Math.floor(numOr(v.n, 0))) }; } catch { return { h: null, c: null, n: 0 }; } };
 const encodeCursor = (c: Cursor): string => Buffer.from(JSON.stringify(c)).toString("base64url");
 
-const basesFor = (p: BrowseParams): string[] => civitaiLabelsFor(p.base);
+const mediaOf = (p: BrowseParams): Media => p.media ?? "video";
+const basesFor = (p: BrowseParams): string[] => civitaiLabelsFor(p.base, mediaOf(p));
 /** Whether a hit belongs in this search. A generic-label hit with no stated version is kept in the default search only (it is shown, not installable). */
 const baseWanted = (p: BrowseParams, hit: Pick<Hit, "base_model" | "base_unstated">): boolean =>
-  p.base === "all" || (hit.base_unstated ? p.base === "default" : (wantedBaseIds(p.base) as string[]).includes(hit.base_model));
+  (hit.base_model !== "unknown" && wantedBaseIds(p.base, mediaOf(p)).includes(hit.base_model)) || (hit.base_unstated && p.base === "default");
 
 async function browseHf(p: BrowseParams, cursor: string | null): Promise<{ hits: Hit[]; next: string | null }> {
   let url: string;
@@ -319,7 +321,7 @@ async function browseCivitai(p: BrowseParams, cursor: string | null): Promise<{ 
   const { body } = await getJson("civitai", `https://civitai.com/api/v1/models?${q}`);
   const b = rec(body);
   if (!Array.isArray(b.items)) throw new SourceError("bad_response", "Civitai sent something Home can't read. Try again later.", 502);
-  const hits = b.items.map((m) => civitaiHit(m, basesFor(p))).filter((h): h is Hit => h !== null).filter((h) => baseWanted(p, h));
+  const hits = b.items.map((m) => civitaiHit(m, basesFor(p), undefined, mediaOf(p))).filter((h): h is Hit => h !== null).filter((h) => baseWanted(p, h));
   return { hits, next: str(rec(b.metadata).nextCursor) };
 }
 

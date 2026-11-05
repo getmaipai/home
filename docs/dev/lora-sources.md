@@ -83,3 +83,22 @@ One real run on a dev hub: search "Clay Mation" on Hugging Face, install `vrgame
 - This repo says `Lightricks/LTX-Video` as its base, which reads as unknown, so the install needed `base_model: "ltx-2.3"` in the body (the Styles tab asks for it).
 - The default base filter ("default") returned nothing until `setInstalledBasesProvider` is wired to the Stack's video readiness; `base: "all"` was used for the search.
 - The Hugging Face base label repeats the base text (`Lightricks/LTX-Video Lightricks/LTX-Video ...`): cosmetic, not fixed.
+
+## Pictures (STYLES-01a, 2026-11-05)
+
+The browser searches picture styles through the same code as video styles. `lib/loras/baseFamilies.ts` is still the one table; each family now has
+`media: "video" | "picture"`, and the browse body takes `media` (default `video`) with a `base` that has to belong to it (a mismatch is a 400 with
+"That base is not available for picture.").
+
+| Base id | Civitai label | Family words |
+|---|---|---|
+| `flux2-klein-4b` | `Flux.2 Klein 4B` | Flux |
+| `z-image-turbo` | `ZImageTurbo` | Z-Image |
+| `ernie-image-turbo` | `Ernie` | ERNIE |
+
+The three labels were confirmed live against the public Civitai API on 2026-11-05. `Flux.2 Klein 9B`, `Flux.2 D` and `ZImageBase` are different
+bases and are in no row, so their styles never show in a picture search. A hit's media is the media of its base (`mediaOfBase`); a hit with no
+known base takes the media being browsed, so the "Made for ..." and not-supported sentences name pictures or videos correctly.
+
+Still open: the Hugging Face base tags picture styles use (the patterns read the repository name and tags, and have not been checked against
+real picture repositories), and install, which stays video-only until STYLES-01b.

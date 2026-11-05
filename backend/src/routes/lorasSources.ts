@@ -22,7 +22,7 @@ import { listLoraRecords } from "@/lib/loras/store";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { MAX_INSTALL_BYTES } from "@/lib/loras/source";
 import { BASE_UNSTATED_LINE, NOT_LTX_LINE } from "@/lib/loras/install";
-import { baseWords, BROWSE_BASES, INSTALLABLE_BASE_IDS, isSupportedBase } from "@/lib/loras/baseFamilies";
+import { baseWords, BROWSE_BASES, INSTALLABLE_BASE_IDS, isSupportedBase, mediaOfBase, type Media } from "@/lib/loras/baseFamilies";
 import type { PersonRow } from "@/types";
 
 export const lorasSourceRoutes = apiRouter();
@@ -41,7 +41,9 @@ const mb = (bytes: number): string => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 
 const LICENCE_WORDS = { open: "open licence", non_commercial: "no-selling licence", custom: "custom licence", unknown: "licence not stated" } as const;
 
 /** One fixed-template line built from fields (never a model), and why Install is disabled when it is. */
-function lineAndReason(hit: Hit, admin: PersonRow): { line: string; reason: string | null; installed: { id: string; name: string } | null } {
+function lineAndReason(hit: Hit, admin: PersonRow, browsed: Media = "video"): { line: string; reason: string | null; installed: { id: string; name: string } | null } {
+  // A hit's media is the one its base belongs to; a hit with no known base takes the media being browsed.
+  const media = mediaOfBase(hit.base_model) ?? browsed;
   const parts = [`Made for ${hit.base_unstated ? "LTX 2 (version not stated)" : baseWords(hit.base_model)}`];
   if (hit.bytes !== null) parts.push(mb(hit.bytes));
   parts.push(LICENCE_WORDS[hit.licence_class]);
@@ -53,14 +55,14 @@ function lineAndReason(hit: Hit, admin: PersonRow): { line: string; reason: stri
     const seen = readLora(admin, have.lora.id, "own_written");
     if (seen && seen.state === "open") { installed = { id: seen.lora.id, name: seen.lora.name }; reason = `Already installed as ${seen.lora.name}`; } else reason = "Already installed";
   } else if (hit.base_unstated) reason = BASE_UNSTATED_LINE.replace(/\.$/, "");
-  else if (!isSupportedBase(hit.base_model)) reason = NOT_LTX_LINE(hit.base_label).replace(/\.$/, "");
+  else if (!isSupportedBase(hit.base_model, media)) reason = NOT_LTX_LINE(hit.base_label, media).replace(/\.$/, "");
   else if (hit.bytes !== null && hit.bytes > MAX_INSTALL_BYTES) reason = "File is over 4 GB";
   else if (hit.gated) reason = "Asks you to accept terms on Hugging Face first";
   return { line: parts.join(", "), reason, installed };
 }
 
-function view(hit: Hit, admin: PersonRow) {
-  const { line, reason, installed } = lineAndReason(hit, admin);
+function view(hit: Hit, admin: PersonRow, browsed: Media = "video") {
+  const { line, reason, installed } = lineAndReason(hit, admin, browsed);
   return {
     key: hitKey(hit), site: hit.site, remote_id: hit.remote_id, version_id: hit.version_id, title: hit.title, creator: hit.creator, page_url: hit.page_url,
     preview: hit.preview_url ? `/api/loras/browse/${hit.site}/${encodeURIComponent(hit.remote_id)}/preview${hit.version_id && hit.site === "civitai" ? `?version=${encodeURIComponent(hit.version_id)}` : ""}` : null,
@@ -80,10 +82,14 @@ function sourceFailure(error: unknown): { body: { error: string; code: string };
 // ---- browse -------------------------------------------------------------------------------------------------------------------------------------
 
 const BrowseBody = z.object({
-  source: z.enum(["huggingface", "civitai", "both"]).default("huggingface"), q: z.string().max(200).default(""), media: z.literal("video").default("video"),
-  kind: z.enum(["any", "style", "character"]).default("any"), base: z.enum(["default", ...BROWSE_BASES, "all"]).default("default"),
+  source: z.enum(["huggingface", "civitai", "both"]).default("huggingface"), q: z.string().max(200).default(""), media: z.enum(["video", "picture"]).default("video"),
+  kind: z.enum(["any", "style", "character"]).default("any"), base: z.enum(["default", ...BROWSE_BASES.video, ...BROWSE_BASES.picture, "all"]).default("default"),
   installed: z.enum(["any", "not_installed", "installed"]).default("any"), sort: z.enum(["downloads", "rating", "newest"]).default("downloads"),
   cursor: z.string().max(2000).nullable().default(null), adult: z.boolean().default(false),
+}).superRefine((body, ctx) => {
+  if (body.base !== "default" && body.base !== "all" && !(BROWSE_BASES[body.media] as readonly string[]).includes(body.base)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["base"], message: `That base is not available for ${body.media}.` });
+  }
 });
 const browseRoute = createRoute({
   method: "post", path: "/browse", tags: ["LoRAs"], summary: "Search the style sources (owner or admin)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
@@ -98,13 +104,13 @@ lorasSourceRoutes.openapi(browseRoute, async (c) => {
   let source = body.source;
   if (source === "both" && !civitaiEnabled()) { source = "huggingface"; notes.push("Civitai is off, so only Hugging Face was searched."); }
   try {
-    const browsed = await browseHits({ source, q: body.q, kind: body.kind, base: body.base, sort: body.sort, cursor: body.cursor, nsfw: reveal });
+    const browsed = await browseHits({ source, q: body.q, kind: body.kind, media: body.media, base: body.base, sort: body.sort, cursor: body.cursor, nsfw: reveal });
     const records = listLoraRecords();
     // Filter on the full hit, THEN redact: what is locked is decided once, from the classified hit, and the filter never changes what a caller sees of it.
     const wanted = browsed.hits.filter((h) => (body.installed === "any" ? true : (installedAs(h, records) !== null) === (body.installed === "installed")));
     const shown = wanted.filter((h) => h.adult_check.state === "normal" || reveal);
     const locked = wanted.length > shown.length;
-    return c.json({ items: shown.map((h) => view(h, admin)), locked, next_cursor: browsed.next, notes }, 200);
+    return c.json({ items: shown.map((h) => view(h, admin, body.media)), locked, next_cursor: browsed.next, notes }, 200);
   } catch (error) { const f = sourceFailure(error); return c.json(f.body, f.status) as never; }
 });
 
