@@ -38,6 +38,8 @@ import { runAllSmokeTests } from "@/lib/smoke";
 import { startConversationTitleSweep } from "@/lib/conversationTitle";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { registerLoraInstallFixes } from "@/lib/loras/install";
+import { setInstalledBasesProvider } from "@/lib/loras/baseFamilies";
+import { installedBasesNow } from "@/lib/loras/readiness";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
 import { startHomeListeners, attachHouseholdTlsRebind } from "@/lib/homeListeners";
@@ -409,6 +411,7 @@ ensureCoreJob("package_cache.sweep", "every:1d");
 // closes that gap.
 registerRenewFixHandler();
 registerLoraInstallFixes();
+setInstalledBasesProvider(installedBasesNow);
 
 // TLS is enabled only when this install already has its own household
 // leaf. Before the first mint, HTTP serves all interfaces. After a mint,

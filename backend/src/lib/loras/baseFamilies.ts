@@ -6,8 +6,8 @@
 // only in the name, version name or description). `LTXV` (44) is LTX video v1 and is deliberately in no row. Wan's label is unconfirmed.
 // Picture labels were confirmed live against the public API 2026-11-05: `Flux.2 Klein 4B`, `ZImageTurbo`, and `Ernie`. Klein 9B, Flux.2 D and ZImageBase are different bases.
 //
-// "Supported on this install" is `supportedBaseIds()`: the bases whose engine this computer actually has. Until the video readiness feeds `setInstalledBasesProvider`, it is every
-// base marked `installable` (Home can only install styles for those). A different machine or engine changes the answer through the provider, with no edit here.
+// "Supported on this install" is `supportedBaseIds()`: the installable bases its video and picture engines report can use styles right now. An unknown engine status falls back to every
+// installable base for that call, so a Stack hiccup never makes the browser silently empty. A different machine or engine changes the answer through the provider, with no edit here.
 
 export const BASE_FAMILIES = [
   {
@@ -73,9 +73,9 @@ export const mediaOfBase = (id: string): Media | null => ROWS.find((r) => r.id =
 
 const rowOf = (id: string): FamilyRow | undefined => ROWS.find((r) => r.id === id);
 
-let provider: (() => ReadonlySet<string>) | null = null;
-/** Feed the bases the household's installed engines can use. `null` goes back to every installable base. */
-export function setInstalledBasesProvider(fn: (() => ReadonlySet<string>) | null): void { provider = fn; }
+let provider: (() => ReadonlySet<string> | null) | null = null;
+/** Feed the bases the household's installed engines can use. A null provider result means unknown and allows every installable base for that call. */
+export function setInstalledBasesProvider(fn: (() => ReadonlySet<string> | null) | null): void { provider = fn; }
 
 /** The bases supported on this install: installable here AND (when a provider is set) made by an engine the household has. */
 export function supportedBaseIds(media: Media = "video"): AnyBaseId[] {

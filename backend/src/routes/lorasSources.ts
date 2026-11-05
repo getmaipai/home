@@ -22,7 +22,9 @@ import { listLoraRecords } from "@/lib/loras/store";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { MAX_INSTALL_BYTES } from "@/lib/loras/source";
 import { BASE_UNSTATED_LINE, NOT_LTX_LINE } from "@/lib/loras/install";
-import { ALL_BASE_IDS, baseWords, BROWSE_BASES, isSupportedBase, mediaOfBase, type AnyBaseId, type Media } from "@/lib/loras/baseFamilies";
+import { ALL_BASE_IDS, baseWords, BROWSE_BASES, isSupportedBase, mediaOfBase, supportedBaseIds, type AnyBaseId, type Media } from "@/lib/loras/baseFamilies";
+import { videoEngineStatus } from "@/lib/videos/ready";
+import { pictureEngineStatus } from "@/lib/pictures/ready";
 import type { PersonRow } from "@/types";
 
 export const lorasSourceRoutes = apiRouter();
@@ -100,8 +102,13 @@ const browseRoute = createRoute({
 lorasSourceRoutes.openapi(browseRoute, async (c) => {
   const admin = c.get("person");
   const body = c.req.valid("json");
+  if (body.media === "video") await videoEngineStatus(); else await pictureEngineStatus();
   const reveal = mayReveal(c, admin) && body.adult;
   const notes: string[] = [];
+  if (supportedBaseIds(body.media).length === 0) {
+    notes.push(body.media === "video" ? "This computer has no video model that can use styles yet." : "This computer has no picture model that can use styles yet.");
+    return c.json({ items: [], locked: false, next_cursor: null, notes }, 200);
+  }
   let source = body.source;
   if (source === "both" && !civitaiEnabled()) { source = "huggingface"; notes.push("Civitai is off, so only Hugging Face was searched."); }
   try {
@@ -168,6 +175,7 @@ const installRoute = createRoute({
 });
 lorasSourceRoutes.openapi(installRoute, async (c) => {
   const body = c.req.valid("json");
+  if (body.media === "video") await videoEngineStatus(); else await pictureEngineStatus();
   if (body.base_model && mediaOfBase(body.base_model) !== body.media) return c.json({ error: `That base is not available for ${body.media}.` }, 400) as never;
   const result = await startLoraInstall({ admin: c.get("person"), sessionKey: sessionOf(c), proof: requestProof() }, body);
   if (result.ok) return c.json({ job: result.job }, 202);

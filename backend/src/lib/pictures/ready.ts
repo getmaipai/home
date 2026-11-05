@@ -34,6 +34,13 @@ export async function pictureEngineStatus(): Promise<StackImageStatus | null> {
   return Promise.race([pending, new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_500))]);
 }
 
+/** The last picture status read, without waiting or fetching. */
+export function peekPictureEngineStatus(): StackImageStatus | null {
+  if (forTests !== undefined) return forTests;
+  if (!isStackConfigured()) return null;
+  return cached?.status ?? null;
+}
+
 export function dropPictureStatusCache(): void { cached = null; }
 
 /** The engine is installed and able to take a job (building or running counts: the job queues). */

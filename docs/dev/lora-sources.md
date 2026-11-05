@@ -81,7 +81,7 @@ One real run on a dev hub: search "Clay Mation" on Hugging Face, install `vrgame
 - The Stack answers a job as `{ "job": {...} }`. `getStackInstallJob` read the outer object, so every install stayed "running" and never wrote its record. Fixed; the `loras07` fake Stack now uses the real shape.
 - Hugging Face hits are never `normal` (the check has no safe signal there), so a search shows one lock tile until the adult unlock is live. That is by design, not a failure.
 - This repo says `Lightricks/LTX-Video` as its base, which reads as unknown, so the install needed `base_model: "ltx-2.3"` in the body (the Styles tab asks for it).
-- The default base filter ("default") returned nothing until `setInstalledBasesProvider` is wired to the Stack's video readiness; `base: "all"` was used for the search.
+- The default base filter ("default") returned nothing until `setInstalledBasesProvider` was wired to real Stack readiness. Fixed in STYLES-03: known models contribute only bases they report can take styles, and an unknown Stack status falls back to every installable base instead of silently emptying the search.
 - The Hugging Face base label repeats the base text (`Lightricks/LTX-Video Lightricks/LTX-Video ...`): cosmetic, not fixed.
 
 ## Pictures (STYLES-01a, 2026-11-05)

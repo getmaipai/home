@@ -586,6 +586,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, INSTALLABLE_BASE_IDS, installableBaseIds, mediaOfBase |
 | `backend/src/lib/loras/install.ts` | INSTALL_KIND, INSTALL_TITLE, ISSUE_SOURCE, LICENCE_STEP_LINE, SHARED_SCREEN_LINE, NOT_LTX_LINE |
 | `backend/src/lib/loras/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
+| `backend/src/lib/loras/readiness.ts` | installedBasesNow |
 | `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
 | `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
@@ -767,7 +768,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
-| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
+| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureEngineReady |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
 | `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |

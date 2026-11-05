@@ -9,6 +9,9 @@ import {
 } from "@/lib/loras/baseFamilies";
 import { NOT_LTX_LINE } from "@/lib/loras/install";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
+import { installedBasesNow } from "@/lib/loras/readiness";
 import { household } from "./fixtures/adultLock";
 
 setDefaultTimeout(30_000);
@@ -60,6 +63,8 @@ beforeEach(() => {
 afterEach(() => {
   __resetSourceForTests();
   setInstalledBasesProvider(null);
+  __setPictureStatusForTests(undefined);
+  __setVideoStatusForTests(undefined);
   setHouseholdSettingValue("generation.styles.civitai", false);
 });
 
@@ -132,6 +137,28 @@ describe("browsing for pictures", () => {
 });
 
 describe("the browse route", () => {
+  test("a known-empty picture status returns no items and the plain note", async () => {
+    setInstalledBasesProvider(installedBasesNow);
+    __setVideoStatusForTests(readyVideoStatusForTests());
+    __setPictureStatusForTests(readyStatusForTests({ models: [{ id: "flux2-klein-4b", installed: true, loras: false }] as never }));
+    const { owner } = await household();
+    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ items: [], notes: ["This computer has no picture model that can use styles yet."], next_cursor: null });
+    expect(urls).toEqual([]);
+  });
+
+  test("null statuses keep the picture browser searching normally", async () => {
+    setInstalledBasesProvider(installedBasesNow);
+    __setVideoStatusForTests(null);
+    __setPictureStatusForTests(null);
+    const { owner } = await household();
+    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
+    expect(res.status).toBe(200);
+    expect((await res.json() as { items: unknown[] }).items.length).toBe(3);
+    expect(labelsAsked()).toEqual(PICTURE_LABELS);
+  });
+
   test("a picture search through the route lists picture hits with picture wording", async () => {
     const { owner } = await household();
     const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
