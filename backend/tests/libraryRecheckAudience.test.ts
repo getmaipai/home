@@ -13,10 +13,14 @@ import { newShareId } from "@/lib/id";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { testPng } from "./pictureFixture";
+import { __unlockedForTests } from "@/lib/adultLock";
 
 beforeEach(resetDb);
 afterEach(() => __resetAgeCheckForTests());
 const benign = { ok: true, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none", is_nude_or_sexual: false, confidence: 1 } } satisfies ImageCheck;
+async function proofFor(client: TestClient) {
+  return ((await client.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "recheck" }).then(response => response.json())) as { proof: string }).proof;
+}
 async function fixture() {
   const owner = new TestClient();
   await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -39,7 +43,8 @@ test("adult owner rechecks stored pixels despite sexual prompt words; child then
   __resetAgeCheckForTests(async images => { checked += images.length; return [benign]; });
   expect((await f.clients.child!.get(`/api/files/${f.id}/content`)).status).toBe(404);
   db.update(people).set({ birthdate: "2020-01-01" }).where(eq(people.id, f.actor.id)).run();
-  expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`)).status).toBe(200);
+  const proof = await proofFor(f.owner);
+  expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`, undefined, { "x-adult-unlock": proof })).status).toBe(200);
   expect(checked).toBe(1); expect(f.audience()).toBe("all-ages");
   expect((await f.clients.child!.get(`/api/files/${f.id}/content`)).status).toBe(200);
   const list = await (await f.clients.child!.get("/api/library")).json() as { items: { id: string }[] };
@@ -50,13 +55,14 @@ test("adult owner rechecks stored pixels despite sexual prompt words; child then
 });
 for (const scenario of ["sexual", "doubt", "failure", "empty", "error"] as const) test(`${scenario} leaves adult-only`, async () => {
   const f = await fixture();
+  const proof = await proofFor(f.owner);
   __resetAgeCheckForTests(async () => {
     if (scenario === "error") throw new Error("unavailable");
     if (scenario === "empty") return [];
     if (scenario === "failure") return [{ ok: false, why: "timeout" }];
     return [{ ok: true, verdict: { ...benign.verdict, is_nude_or_sexual: scenario === "sexual", confidence: scenario === "doubt" ? 0.1 : 1 } }];
   });
-  expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`)).status).toBe(400);
+  expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`, undefined, { "x-adult-unlock": proof })).status).toBe(400);
   expect(f.audience()).toBe("adult-only");
 });
 test("non-owner adults and minors receive 404, including minor owners; the role decides", async () => {
@@ -70,9 +76,9 @@ test("non-owner adults and minors receive 404, including minor owners; the role 
   expect(checked).toBe(0);
 });
 test("rechecks are rate limited per person", async () => {
-  const f = await fixture(); __resetAgeCheckForTests(async () => [{ ok: false, why: "unavailable" }]);
-  for (let i = 0; i < 20; i++) expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`)).status).toBe(400);
-  expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`)).status).toBe(429);
+  const f = await fixture(); const proof = await proofFor(f.owner); __resetAgeCheckForTests(async () => [{ ok: false, why: "unavailable" }]);
+  for (let i = 0; i < 20; i++) expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`, undefined, { "x-adult-unlock": proof })).status).toBe(400);
+  expect((await f.owner.post(`/api/files/${f.id}/recheck-audience`, undefined, { "x-adult-unlock": proof })).status).toBe(429);
 });
 
 import { recheckFileAudience } from "@/lib/libraryAudience";
@@ -87,7 +93,7 @@ for (const change of ["provenance", "ownership", "role", "disabled", "deleted", 
     if (change === "trash") db.update(attachments).set({ deletedAt: new Date().toISOString() }).where(eq(attachments.id, f.id)).run();
     return [benign];
   });
-  expect((await recheckFileAudience(f.actor, f.id)).ok).toBe(false);
+  expect(await __unlockedForTests(f.actor.id, () => recheckFileAudience(f.actor, f.id))).toMatchObject({ ok: false });
   expect(f.audience()).toBe("adult-only");
   if (change === "provenance") expect(db.select().from(attachments).where(eq(attachments.id, f.id)).get()!.provenance).toContain('"newer":true');
 });
@@ -104,10 +110,10 @@ for (const scenario of ["disabled", "deleted", "malformed", "array", "non-image"
 test("each adult has an independent recheck limiter", async () => {
   const f = await fixture();
   __resetAgeCheckForTests(async () => [{ ok: false, why: "unavailable" }]);
-  for (let i = 0; i < 20; i++) expect((await recheckFileAudience(f.actor, f.id))).toMatchObject({ status: 400 });
-  expect(await recheckFileAudience(f.actor, f.id)).toMatchObject({ status: 429 });
+  for (let i = 0; i < 20; i++) expect(await __unlockedForTests(f.actor.id, () => recheckFileAudience(f.actor, f.id))).toMatchObject({ status: 400 });
+  expect(await __unlockedForTests(f.actor.id, () => recheckFileAudience(f.actor, f.id))).toMatchObject({ status: 429 });
   const other = db.select().from(people).all().find(p => p.role === "adult")!;
   const file = storeFile(other, { conversationId: null, turnId: null, bytes: await testPng(), mediaType: "image/png", provenance: 'picture-gen:{"v":1,"audience":"adult-only"}', retention: "kept" });
   if (!file.ok) throw new Error(file.error);
-  expect(await recheckFileAudience(other, file.value.id)).toMatchObject({ status: 400 });
+  expect(await __unlockedForTests(other.id, () => recheckFileAudience(other, file.value.id))).toMatchObject({ status: 400 });
 });

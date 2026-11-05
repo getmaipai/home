@@ -253,7 +253,7 @@ for (const role of ["child", "teen"] as const) {
       'image-edit:{"audience":"all-ages","prompt":"Needle D"}',
     ];
     const ids = notes.map((note, n) => share(file(100 + n, n === 10 ? "video/mp4" : "image/png", note), n % 2 ? minorId : "household"));
-    const visible = [ids[0]!, ids[6]!, ids[10]!, ids[13]!];
+    const visible = [ids[0]!, ids[10]!, ids[13]!];
     const fetched = share(file(200, "image/png", 'picture-gen:{"audience":"all-ages"}'));
     db.update(attachments).set({ origin: "fetched" }).where(eq(attachments.id, fetched)).run();
     for (const sort of ["newest", "oldest", "name", "size"]) {
@@ -278,16 +278,16 @@ for (const role of ["child", "teen"] as const) {
           expect(seen).toEqual(all.items.map(x => x.id));
         }
         const totals = await summary(reader.get(`/api/library/summary?sort=${sort}&search=${search}`));
-        expect(totals.items).toBe(4);
-        expect(totals.bytes).toBe(433);
-        expect(totals.per_kind.image).toEqual({ items: 3, bytes: 322 });
+        expect(totals.items).toBe(3);
+        expect(totals.bytes).toBe(326);
+        expect(totals.per_kind.image).toEqual({ items: 2, bytes: 215 });
         expect(totals.per_kind.video).toEqual({ items: 1, bytes: 111 });
       }
     }
     const actor = db.select().from(people).where(eq(people.id, minorId)).get()!;
     expect(canAccessFile(actor, minorId, visible[0]!)).toBe(false);
     expect(canAccessFile(actor, minorId, "file-ffffffffffffffff")).toBe(false);
-    for (const hidden of [...ids.filter(id => !visible.includes(id)), fetched, "file-ffffffffffffffff"]) expect((await reader.get(`/api/files/${hidden}`)).status).toBe(404);
+    for (const hidden of [...ids.filter(id => !visible.includes(id)), fetched, "file-ffffffffffffffff"]) expect({ hidden, status: (await reader.get(`/api/files/${hidden}`)).status }).toEqual({ hidden, status: 404 });
   });
 }
 
@@ -378,12 +378,12 @@ for (const role of ["child", "teen"] as const) test(`Only me keeps ${role} owner
   share(file(6, "image/png", 'picture-gen:{"audience":"adult-only"}'));
   file(7);
   const rows = (await page(reader.get("/api/library?shared=none"))).items;
-  // Ownership passes the existing audience predicate, even for unclassified or adult-only rows.
-  expect(rows.map(row => row.id).sort()).toEqual(owned.sort());
+  // A minor owner still sees the all-ages and unclassified owned rows, while the Adult lock hides adult-only pictures.
+  expect(rows.map(row => row.id).sort()).toEqual([owned[0]!, owned[2]!].sort());
   const totals = await summary(reader.get("/api/library/summary?shared=none"));
-  expect(totals.items).toBe(3);
-  expect(totals.bytes).toBe(9);
-  expect(totals.per_kind.image).toEqual({ items: 3, bytes: 9 });
+  expect(totals.items).toBe(2);
+  expect(totals.bytes).toBe(6);
+  expect(totals.per_kind.image).toEqual({ items: 2, bytes: 6 });
 });
 
 for (const path of ["/api/library", "/api/library/summary"]) test(`${path} rejects unknown sharing filters with plain allowed values`, async () => {

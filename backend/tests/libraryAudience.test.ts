@@ -132,9 +132,11 @@ for (const role of ["child", "teen"] as const) {
       // Owners retain access even after their role changes to a minor band.
       db.update(people).set({ role }).where(eq(people.id, ownerId)).run();
       const minorOwner = db.select().from(people).where(eq(people.id, ownerId)).get()!;
-      // ADULT-LOCK-02: a minor never receives an adult-only clip, its former owner included (the lock is never unlockable for a minor).
-      expect(listFilesVisibleToActor(minorOwner).map(row => row.file.id).sort()).toEqual([...ids].sort());
-      for (const id of ids) {
+      // ADULT-LOCK-02 / 07: a minor never receives adult-only media, including a picture owned before their role changed.
+      expect(listFilesVisibleToActor(minorOwner).map(row => row.file.id).sort()).toEqual(ids.filter(id => id !== adultId).sort());
+      expect(getAttachment(minorOwner, adultId).ok).toBe(false);
+      expect(readAttachment(minorOwner, adultId).ok).toBe(false);
+      for (const id of ids.filter(id => id !== adultId)) {
         expect(getAttachment(minorOwner, id).ok).toBe(true);
         expect(readAttachment(minorOwner, id).ok).toBe(true);
       }

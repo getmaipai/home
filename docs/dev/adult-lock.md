@@ -35,8 +35,19 @@ never hold a proof; a minor, a guest-less shared screen and a spoken turn get 40
 - otherwise `open` with a valid proof for this person and session, else `locked`
 
 Until the spec carries the fields (VIDEO-LORA-02, ADULT-LOCK-06) both are read from the provenance note: `made_audience` falls back to `audience`, and
-`lock` defaults to on for an adult-only item. `LOCKED_WRITERS` lists the covered writers (`video-gen`, `video-edit`, `video-poster`); pictures and songs
-join it in ADULT-LOCK-07.
+`lock` defaults to on for an adult-only item. `LOCKED_WRITERS` lists the covered writers (`video-gen`, `video-edit`, `video-poster`, `picture-gen`,
+`image-edit`); songs follow in a later ADULT-LOCK-07 slice.
+
+## Pictures (ADULT-LOCK-07, slice 1)
+
+The file-level lock covers `picture-gen` and `image-edit` as well as the video writers. An adult-only picture note that already exists and has no `lock`
+key is locked immediately, because the default is on; no migration is needed. This changes adult owners' existing picture access until they unlock with
+their proof. All-ages picture notes, including music cover pictures written by the picture job path, remain open.
+
+This slice covers stored file reads, thumbnails, Library filtering and the existing file share, trash, and edit choke points. Picture job routes, chat
+parts, auto-mark and unmark, and the frontend card remain open for slices 2 to 5. In `adultMarks.ts`, `itemRow` and `writeLock` still target video job ids
+and video poster notes. The `video-poster:` and `video-gen:` / `video-edit:` lookups in `libraryTrash.ts`, plus the poster association in `library.ts`,
+remain video-specific; picture edits use their existing `image-edit:` root relation.
 
 ## Where it is applied
 

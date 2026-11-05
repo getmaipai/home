@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { attachments, people, shares } from "@/db/schema";
 import { createAttachment, getAttachment } from "@/lib/attachments";
 import { createShare, deleteShare, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
+import { __unlockedForTests } from "@/lib/adultLock";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -202,12 +203,12 @@ describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", (
     const made = createAttachment(ownerPerson, { conversationId, turnId, mediaType: "image/png", provenance: 'picture-gen:{"v":1,"audience":"adult-only"}', bytes: new TextEncoder().encode("adult picture") });
     if (!made.ok) throw new Error(made.error);
     for (const to of ["household", teen.id, child.id]) {
-      const refused = createShare(ownerPerson, { fileId: made.value.id, to });
+      const refused = __unlockedForTests(ownerPerson.id, () => createShare(ownerPerson, { fileId: made.value.id, to }));
       expect(refused.ok).toBe(false);
       if (!refused.ok) { expect(refused.status).toBe(403); expect(refused.error).toContain("adult only"); }
     }
     expect(db.select().from(shares).all()).toHaveLength(0);
-    expect(createShare(ownerPerson, { fileId: made.value.id, to: lucia.id }).ok).toBe(true);
+    expect(__unlockedForTests(ownerPerson.id, () => createShare(ownerPerson, { fileId: made.value.id, to: lucia.id })).ok).toBe(true);
     // An unclassified upload may be shared, but a minor still cannot read it (BUG-LIBRARY-SHARE-CHILD-01).
     const upload = createAttachment(ownerPerson, { conversationId, turnId, mediaType: "image/png", provenance: "composer:upload", bytes: new TextEncoder().encode("plain upload") });
     if (!upload.ok) throw new Error(upload.error);

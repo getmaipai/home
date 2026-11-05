@@ -221,8 +221,9 @@ describe("a minor never gets it, either way; a shared or spoken surface never un
     expect(lockState(item, adult, { token: null, sessionKey: null })).toBe("locked");
     expect(lockState(lockItemOfProvenance("person-a", 'video-gen:{"audience":"adult-only","lock":"off"}'), adult, { token: null, sessionKey: null })).toBe("open");
     expect(lockState(lockItemOfProvenance("person-a", 'video-gen:{"audience":"all-ages"}'), adult, { token: null, sessionKey: null })).toBe("open");
-    // A picture is not covered until pictures adopt the lock (ADULT-LOCK-07).
-    expect(lockItemOfProvenance("person-a", 'picture-gen:{"audience":"adult-only"}')).toBeNull();
+    expect(lockState(lockItemOfProvenance("person-a", 'picture-gen:{"audience":"adult-only"}'), adult, { token: null, sessionKey: null })).toBe("locked");
+    expect(lockState(lockItemOfProvenance("person-a", 'picture-gen:{"audience":"all-ages"}'), adult, { token: null, sessionKey: null })).toBe("open");
+    expect(lockState(lockItemOfProvenance("person-a", 'picture-gen:{"audience":"adult-only","audience":"all-ages"}'), adult, { token: null, sessionKey: null })).toBe("locked");
     expect(lockedView(true)).toEqual({ locked: true, making: true });
   });
 

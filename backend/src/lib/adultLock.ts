@@ -32,8 +32,8 @@ export const TICKET_MS = 30 * 1000;
 /** The request header the page sends the proof in. */
 export const PROOF_HEADER = "x-adult-unlock";
 
-/** The writers whose items the lock covers. Videos first; pictures and songs adopt it by joining this list (ADULT-LOCK-07 and later rows). */
-export const LOCKED_WRITERS: readonly string[] = ["video-gen", "video-edit", "video-poster"];
+/** The writers whose file items the lock covers. Pictures join the video writers in ADULT-LOCK-07 slice 1; songs follow later. */
+export const LOCKED_WRITERS: readonly string[] = ["video-gen", "video-edit", "video-poster", "picture-gen", "image-edit"];
 
 let clock: () => number = () => Date.now();
 /** Test-only: a movable clock for the idle and absolute lifetimes. */
@@ -164,12 +164,66 @@ export interface LockItem { ownerPersonId: string; madeAudience: "all-ages" | "a
 
 export type LockResult = "open" | "locked" | "hidden";
 
+/** Read duplicate top-level JSON keys the same way SQLite's json_each does in lockedFilterSql. JSON.parse keeps only the last duplicate. */
+function hasTopLevelString(provenance: string, keys: readonly string[], wanted: string): boolean {
+  const colon = provenance.indexOf(":");
+  if (colon < 0) return false;
+  const source = provenance.slice(colon + 1).trim();
+  if (!source.startsWith("{")) return false;
+  let i = 1;
+  while (i < source.length) {
+    while (i < source.length && /[\s,]/.test(source[i]!)) i++;
+    if (source[i] === "}") return false;
+    if (source[i] !== '"') return false;
+    const keyStart = i;
+    i++;
+    let escaped = false;
+    while (i < source.length) {
+      const ch = source[i++]!;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') break;
+    }
+    let key: unknown;
+    try { key = JSON.parse(source.slice(keyStart, i)); } catch { return false; }
+    while (/\s/.test(source[i] ?? "")) i++;
+    if (source[i] !== ":") return false;
+    i++;
+    while (/\s/.test(source[i] ?? "")) i++;
+    const valueStart = i;
+    let depth = 0;
+    let inString = false;
+    escaped = false;
+    while (i < source.length) {
+      const ch = source[i]!;
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+      } else if (ch === '"') inString = true;
+      else if (ch === "{" || ch === "[") depth++;
+      else if (ch === "}" || ch === "]") {
+        if (depth === 0) break;
+        depth--;
+      } else if (ch === "," && depth === 0) break;
+      i++;
+    }
+    if (keys.includes(String(key))) {
+      try { if (JSON.parse(source.slice(valueStart, i)) === wanted) return true; } catch { return false; }
+    }
+    if (source[i] === ",") i++;
+  }
+  return false;
+}
+
 /** The lock item of a Library file's provenance note, or null when the lock does not cover it (not a locked writer). */
 export function lockItemOfProvenance(ownerPersonId: string, provenance: string): LockItem | null {
   const meta = libraryProvenance(provenance);
   if (!meta.writer || !LOCKED_WRITERS.includes(meta.writer)) return null;
   // Either key saying adult-only counts (the same rule as lockedFilterSql): the machine fact is never lowered.
-  const made = meta.made_audience === "adult-only" ? "adult-only" : fileAudience(provenance) === "adult-only" ? "adult-only" : meta.made_audience === "all-ages" ? "all-ages" : fileAudience(provenance);
+  // Fail closed: any one reading that says adult-only wins (the duplicate-key scan, the parsed made fact, the parsed audience), so a mistake in one of them cannot open an adult item.
+  const adult = hasTopLevelString(provenance, ["audience", "made_audience"], "adult-only") || meta.made_audience === "adult-only" || fileAudience(provenance) === "adult-only";
+  const made = adult ? "adult-only" : meta.made_audience === "all-ages" ? "all-ages" : fileAudience(provenance);
   return { ownerPersonId, madeAudience: made, lock: meta.lock === "off" ? "off" : "on" };
 }
 

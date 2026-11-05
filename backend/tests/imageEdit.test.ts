@@ -186,11 +186,12 @@ describe("picture editor routes", () => {
     const note = JSON.parse(row.provenance.replace("image-edit:", "")) as Record<string, unknown>;
     expect(note).toMatchObject({ v: 1, op: "remove_background", source: picture.id, root: picture.id, engine: "vision", model: "apple-vision" });
     expect(typeof note.source_sha256).toBe("string");
-    const served = await client.get(version.url);
+    const proof = ((await client.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "image-edit-test" }).then(response => response.json())) as { proof: string }).proof;
+    const served = await client.get(version.url, { "x-adult-unlock": proof });
     expect(served.status).toBe(200);
     expect(served.headers.get("content-type")).toBe("image/png");
     expect((await sharp(new Uint8Array(await served.arrayBuffer())).metadata()).exif).toBeUndefined();
-    const versions = (await (await client.get(`/api/image-edit/pictures/${version.id}/versions?conversation_id=${conversation.value.id}`)).json()) as { versions: { id: string; op: string }[] };
+    const versions = (await (await client.get(`/api/image-edit/pictures/${version.id}/versions?conversation_id=${conversation.value.id}`, { "x-adult-unlock": proof })).json()) as { versions: { id: string; op: string }[] };
     expect(versions.versions.map((v) => v.op)).toEqual(["original", "remove_background"]);
     expect(versions.versions[0]!.id).toBe(picture.id);
     expect((await client.get(`/api/image-edit/previews/${body.preview.token}`)).status).toBe(404);
