@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Song",
-  "description": "Change a song made here or attached in chat, keep or drop parts into one finished song, split it into stems, or keep every version.",
+  "description": "Change a song made here or attached in chat, keep or drop its parts, split it into stems, or keep every version.",
   "offer": {
     "mode": "conditional",
     "gate": "musicEditAllowed",
