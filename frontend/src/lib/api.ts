@@ -1,4 +1,5 @@
 import { isDeviceRevoked, removeAllOfflineMedia } from "@/lib/offlineMedia";
+import { randomUuid } from "@/lib/randomUuid";
 import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -818,6 +819,15 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
 /** JSON API request entry point for feature-specific API modules and components. */
 export async function requestJson<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   return request<T>(path, init);
+}
+
+/** Upload audio through the same route and multipart shape used by chat. */
+export async function uploadAudioAttachment(file: File): Promise<{ id: string; name: string; media_type: string }> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  form.append("turn_id", `turn-${randomUuid().replaceAll("-", "").toLowerCase()}`);
+  const result = await request<{ audio: { id: string; name: string; media_type: string } }>("/api/attachments/upload-audio", { method: "POST", body: form });
+  return result.audio;
 }
 
 // Shared by streamSpeech() and streamTurn(): both POST JSON and want the

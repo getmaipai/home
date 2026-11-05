@@ -20,6 +20,7 @@ import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/me
 import { RemixSong } from "./MusicRemix";
 import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
+import { BringSong } from "./BringSong";
 
 type Make = "song" | "band" | "album" | "song_style";
 const MAKES: Array<{ id: Make; label: string }> = [{ id: "song", label: "Song" }, { id: "band", label: "Band" }, { id: "album", label: "Album" }, { id: "song_style", label: "Style" }];
@@ -225,6 +226,7 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
   return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
+    {song ? <BringSong /> : null}
     {song ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
     <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">

@@ -11,14 +11,17 @@ import type { MusicCard } from "@/lib/musicApi";
 let baseFetch: typeof fetch;
 let calls: Array<{ url: string; method: string; body: string }>;
 let engine = true;
+let uploadStatus = 200;
 const song = { id: "mus-1", title: "Neon Rain", state: "done", progress: 1, versions: [{ id: "v1", url: "/f/1" }], current_id: "v1" } as unknown as MusicCard;
 
 beforeEach(() => {
-  calls = []; engine = true; baseFetch = globalThis.fetch;
+  calls = []; engine = true; uploadStatus = 200; baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     calls.push({ url, method: init?.method ?? "GET", body: String(init?.body ?? "") });
     if (url.startsWith("/api/music/status")) return Promise.resolve(Response.json({ can_make: engine, engine_ready: engine, limits: {} }));
+    if (url === "/api/library/upload") return Promise.resolve(new Response(JSON.stringify(uploadStatus === 200 ? { id: "file-audio", name: "song.mp3", kind: "audio", media_type: "audio/mpeg", size_bytes: 5, duplicate: false } : { error: "plain upload refusal" }), { status: uploadStatus === 200 ? 201 : uploadStatus }));
+    if (url === "/api/music/from-file/edit") return Promise.resolve(Response.json({ ...song, id: "mus-upload-edit" }));
     if (url.startsWith("/api/music/songs")) return Promise.resolve(Response.json({ ...song, id: "mus-new" }));
     if (url.includes("/revise")) return Promise.resolve(Response.json({ ...song, id: "mus-rev" }));
     if (url.endsWith("/delete")) return Promise.resolve(Response.json({ deleted: 1, trash_until: null }));
@@ -32,6 +35,30 @@ afterEach(() => { cleanup(); globalThis.fetch = baseFetch; });
 const open = (search = "") => renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search={search} /></MemoryRouter></ToastProvider>);
 
 describe("Create controls", () => {
+  test("adult Edit surface uploads a Library file and offers the supported actions", async () => {
+    const view = open("?song=mus-1");
+    const input = view.container.querySelector('[data-testid="bring-song"] input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File(["audio"], "song.mp3", { type: "audio/mpeg" })] } });
+    await view.findByText("song.mp3");
+    expect(view.getByLabelText("How should it sound?")).toBeTruthy();
+    expect(view.getByRole("button", { name: "Change the style" }).hasAttribute("disabled")).toBe(true);
+    for (const label of ["Change the style", "Remove the vocals", "Split into stems"]) expect(view.getByRole("button", { name: label })).toBeTruthy();
+    fireEvent.change(view.getByLabelText("How should it sound?"), { target: { value: "soft jazz" } });
+    fireEvent.click(view.getByRole("button", { name: "Change the style" }));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/library/upload" && call.method === "POST")).toBe(true));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/from-file/edit" && call.body.includes('"style":"soft jazz"'))).toBe(true));
+    fireEvent.click(view.getByRole("button", { name: "Remove the vocals" }));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/from-file/edit" && call.body.includes('"parts":{"drop":["vocals"]}'))).toBe(true));
+  });
+
+  test("rejects upload errors with a plain supported-file line", async () => {
+    uploadStatus = 422;
+    const view = open("?song=mus-1");
+    fireEvent.change(view.container.querySelector('[data-testid="bring-song"] input[type="file"]')!, { target: { files: [new File(["bad"], "song.txt", { type: "text/plain" })] } });
+    expect(await view.findByText("Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac.")).toBeTruthy();
+    expect(view.queryByText("plain upload refusal")).toBeNull();
+  });
+
   test("mode, lyrics, instrumental, length and styles chips each change state", async () => {
     const view = open();
     const bar = within(await view.findByTestId("music-docked-bar"));

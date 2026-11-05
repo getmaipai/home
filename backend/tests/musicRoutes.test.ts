@@ -8,7 +8,7 @@ import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, waitForMusic, LYRICS, testM4a } from "./musicFixture";
 import { runGenerateMusic, runEditMusic, prepareMusicEdit } from "@/lib/music/tool";
 import { musicForOutcomes } from "@/lib/composer";
-import { getMusicJobFor, musicVersions, type MusicJob } from "@/lib/music/jobs";
+import { getMusicJobFor, musicVersions, resolveSongSource, type MusicJob } from "@/lib/music/jobs";
 import { sourceMusicJob } from "@/lib/music/jobs";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { commercialUseOf } from "@/lib/music/commercial";
@@ -18,12 +18,14 @@ import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setMusicStatusForTests } from "@/lib/music/ready";
 import { attachmentFilePath } from "@/lib/attachments";
-import { existsSync, truncateSync } from "node:fs";
+import { existsSync, truncateSync, writeFileSync } from "node:fs";
+import { __setMusicMixToolsForTests, __setMusicMixRunnerForTests } from "@/lib/music/mixParts";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import type { PersonRow } from "@/types";
+function pcmFixture(samples: number[]): Uint8Array { const output = new Uint8Array(44 + samples.length * 2); const view = new DataView(output.buffer); const text = (at: number, value: string) => { for (let i = 0; i < value.length; i++) output[at + i] = value.charCodeAt(i); }; text(0, "RIFF"); view.setUint32(4, output.length - 8, true); text(8, "WAVE"); text(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true); view.setUint32(24, 44100, true); view.setUint32(28, 176400, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, samples.length * 2, true); samples.forEach((sample, i) => view.setInt16(44 + i * 2, sample, true)); return output; }
 let fake: ReturnType<typeof installFakeMusicStack>;
-beforeEach(() => { resetDb(); __resetThrottleForTests(); fake = installFakeMusicStack(); });
-afterEach(() => fake.restore());
+beforeEach(() => { resetDb(); __resetThrottleForTests(); fake = installFakeMusicStack(); __setMusicMixToolsForTests({ afconvert: "/usr/bin/afconvert", ffmpeg: null }); __setMusicMixRunnerForTests(async (command) => { const output = command.at(-1)!; if (command.includes("WAVE")) writeFileSync(output, pcmFixture([12000, -12000])); else writeFileSync(output, new Uint8Array([0, 0, 0, 28, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20])); return true; }); });
+afterEach(() => { fake.restore(); __setMusicMixRunnerForTests(null); __setMusicMixToolsForTests(null); });
 async function owner() {
   const client = new TestClient(); expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
   return { client, actor: db.select().from(people).where(eq(people.displayName, "Sage")).get()! };
@@ -121,6 +123,76 @@ describe("music routes", () => {
     expect(history.ok && history.value.map((turn) => (turn as unknown as { userText?: string }).userText)).toContain("Split: Garage Take");
     const stemOfStem = await client.post(`/api/music/jobs/${card.id}/stems`, { file_id: stemJob.fileId });
     expect(stemOfStem.status).toBe(404);
+  });
+  test("revises an owned uploaded audio file through the normal edit job path", async () => {
+    const { actor, client } = await owner();
+    const file = await uploadAudio(client, "Garage Take.m4a");
+    const response = await client.post(`/api/music/jobs/upload-${file.id}/revise`, { change: "make it reggae" });
+    expect(response.status).toBe(404);
+    const source = resolveSongSource(actor, file.id, "conversation-unused");
+    expect(source?.id).toBe(`upload-${file.id}`);
+    expect(prepareMusicEdit(source!, { track: file.id, change: "remake", description: "make it reggae" }).ok).toBe(false);
+  });
+  test("uploaded-source revision requires audio ownership and remains adult only", async () => {
+    const { actor, client } = await owner();
+    const file = await uploadAudio(client, "Garage Take.m4a");
+    const other = new TestClient();
+    expect((await other.post(`/api/music/jobs/upload-${file.id}/revise`, { change: "make it reggae" })).status).toBe(401);
+    expect((await client.post("/api/music/jobs/upload-file-missing/revise", { change: "make it reggae" })).status).toBe(404);
+    db.update(people).set({ role: "teen" }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
+    expect((await client.post(`/api/music/jobs/upload-${file.id}/revise`, { change: "make it reggae" })).status).toBe(403);
+  });
+  test("from-file edits start owned-file jobs and refuse unsafe sources", async () => {
+    const { actor, client } = await owner();
+    const file = await uploadAudio(client, "Garage Take.m4a");
+    const missingStyle = await client.post("/api/music/from-file/edit", { file_id: file.id, change: "restyle" });
+    expect(missingStyle.status).toBe(400);
+    const unknown = await client.post("/api/music/from-file/edit", { file_id: file.id, change: "remake" });
+    expect(unknown.status).toBe(400);
+    fake.stems = true;
+    for (const request of [
+      { change: "restyle", style: "soft jazz" },
+      { change: "instrumental" },
+    ]) {
+      const response = await client.post("/api/music/from-file/edit", { file_id: file.id, ...request });
+      expect(response.status).toBe(200);
+      const card = await response.json() as { id: string; task: string };
+      expect(card.id).toBeTruthy();
+      if (request.change !== "parts") await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+      const created = getMusicJobFor(actor, card.id)!;
+      expect(created.request.parts).toBeUndefined();
+      expect(created.request.ownedFile).toBe(true);
+      const row = db.select().from(attachments).where(eq(attachments.id, created.fileId!)).get()!;
+      expect(generationOf(row.provenance)?.source_kind).toBe("upload");
+      expect(commercialUseOf(created.fileId!)).toBe("unknown");
+      expect(fake.submitted.at(-1)?.origin).toBe("owned_file");
+    }
+    const stranger = new TestClient();
+    const created = await client.post("/api/people", { displayName: "Riff", role: "adult", secret: "0000" });
+    const otherPerson = await created.json() as { id: string };
+    expect((await stranger.post("/api/auth/verify-secret", { personId: otherPerson.id, secret: "0000" })).status).toBe(200);
+    expect((await stranger.post("/api/music/from-file/edit", { file_id: file.id, change: "restyle", style: "soft jazz" })).status).toBe(404);
+    for (const role of ["teen", "child"] as const) {
+      db.update(people).set({ role }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
+      expect((await client.post("/api/music/from-file/edit", { file_id: file.id, change: "restyle", style: "soft jazz" })).status).toBe(403);
+    }
+  });
+  test("from-file parts drop vocals starts a job for an owned upload", async () => {
+    const { actor, client } = await owner(); const file = await uploadAudio(client, "Parts.m4a"); fake.stems = true; fake.allStems = true;
+    const response = await client.post("/api/music/from-file/edit", { file_id: file.id, change: "parts", parts: { drop: ["vocals"] } });
+    expect(response.status).toBe(200);
+    const card = await response.json() as { id: string };
+    expect(getMusicJobFor(actor, card.id)?.request).toMatchObject({ ownedFile: true, parts: { keep: ["drums", "bass", "other"], drop: ["vocals"] } });
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done" || getMusicJobFor(actor, card.id)?.state === "failed");
+    expect(getMusicJobFor(actor, card.id)?.state).toBe("done");
+  });
+  test("from-file stems starts a stems job for an owned upload", async () => {
+    const { actor, client } = await owner(); const file = await uploadAudio(client, "Stems.m4a"); fake.stems = true;
+    const response = await client.post("/api/music/from-file/edit", { file_id: file.id, change: "stems" });
+    expect(response.status).toBe(200);
+    const card = await response.json() as { id: string };
+    expect(getMusicJobFor(actor, card.id)?.task).toBe("stems");
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
   });
   test("refuses to split a file that is not the person's own audio", async () => {
     const { actor, client } = await owner(); fake.stems = true;

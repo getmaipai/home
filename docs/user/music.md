@@ -38,6 +38,10 @@ You can also change one right in chat. Open its card and choose Edit, or ask Hom
 
 Every change keeps the earlier version, so nothing is lost. Children and teens do not see these pages.
 
+## Bring a song
+
+In Create, choose **Bring a song** in Edit or Stems. Add one audio file under 40 MB. You can change its style, remove its vocals, or split it into stems. The file stays in your Library and is sent only to your local music worker when you choose an action. Teens and children cannot use these controls yet.
+
 For songs matched to MusicBrainz, Home can keep a short fact from the Wikipedia page linked to that recording. It looks up facts in the background, never while a song plays; a song without a linked page has no fact. The **Show facts and photos from Wikimedia** setting controls both song facts and artist photos and bios.
 # AI DJ
 

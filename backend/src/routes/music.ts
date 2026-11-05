@@ -21,9 +21,9 @@ import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/pol
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "@/lib/music/ready";
-import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
+import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, readMusicFile, resolveSongSource, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { authorizeTier, maxOffered } from "@/lib/tiers";
-import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, runGenerateMusic, type MusicToolInput } from "@/lib/music/tool";
+import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, prepareOwnedMusicEdit, runGenerateMusic, startOwnedMusicPartsJob, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { likenessRefusal } from "@/lib/likeness";
@@ -357,6 +357,50 @@ musicRoutes.openapi(stemsFromFileRoute, async (c) => {
   try { job = await startMusicJob({ actor, conversationId: conversation.value.id, turnId, temporary, task: "stems", request: prepared.request, body: prepared.body, parentFileId: file_id }); }
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
   if (!temporary) logTurn(actor, "chat", `Split: ${prepared.name}`, { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  return c.json(await musicCardView(actor, job), 200);
+});
+const fromFileEditBody = z.object({ file_id: z.string().min(1).max(80), change: z.enum(["restyle", "instrumental", "parts", "stems"]), style: z.string().trim().min(3).max(600).optional(), parts: z.object({ keep: z.array(z.string()).optional(), drop: z.array(z.string()).optional() }).optional() }).superRefine((value, ctx) => { if (value.change === "restyle" && !value.style) ctx.addIssue({ code: "custom", path: ["style"], message: "Add a style." }); });
+const fromFileEditRoute = createRoute({ method: "post", path: "/from-file/edit", tags: ["Music"], summary: "Edit an audio file in my Library", middleware,
+  request: { body: { content: { "application/json": { schema: fromFileEditBody } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The new song card." }, 413: { description: "The file is too big." }, 422: { description: "The edit cannot be made." }, ...refusals, ...errorResponses({ 503: "Music is unavailable" }) } });
+musicRoutes.openapi(fromFileEditRoute, async c => {
+  const actor = c.get("person"), args = c.req.valid("json");
+  const source = resolveSongSource(actor, args.file_id, "pending");
+  if (!source?.fileId) return c.json({ error: "That file isn't available any more." }, 404) as never;
+  const engine = await musicEngineStatus();
+  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  const prompt = args.style ?? "";
+  const refusal = refuseMusicPrompt(prompt);
+  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  const likeness = likenessRefusal(actor, prompt);
+  if (likeness) return c.json({ error: likeness }, 403) as never;
+  const plan = prepareOwnedMusicEdit(source, { change: args.change === "stems" ? "stems" : args.change, ...(args.style ? { style: args.style } : {}), ...(args.parts ? { parts: args.parts } : {}) }, engine!.limits);
+  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
+  const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});
+  if (!conversation.ok) return c.json({ error: plainMusicFailure("failed") }, 503) as never;
+  const turnId = newConversationTurnId();
+  if (args.change === "parts") {
+    try {
+      const result = await startOwnedMusicPartsJob({ actor, source, parts: args.parts, conversationId: conversation.value.id, turnId, temporary: false });
+      if (!result.ok) return c.json({ error: result.line }, ("status" in result ? result.status : 422)) as never;
+      logTurn(actor, "chat", "Edit an audio file", { reply: { text: "Changing your song." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+      return c.json(await musicCardView(actor, result.job), 200);
+    } catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  }
+  let body = plan.body;
+  if (args.change === "stems") {
+    const prepared = await prepareOwnedStemsJob(actor, args.file_id);
+    if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
+    body = prepared.body;
+  } else {
+    const read = readMusicFile(actor, source, args.file_id);
+    if (!read) return c.json({ error: "That file isn't available any more." }, 404) as never;
+    body.source = Buffer.from(read.bytes).toString("base64"); body.source_sha256 = read.sha256; body.origin = "owned_file";
+  }
+  let job: MusicJob;
+  try { job = await startMusicJob({ actor, conversationId: conversation.value.id, turnId, temporary: false, task: plan.task, request: plan.request, body, parentFileId: args.change === "stems" ? args.file_id : null }); }
+  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  logTurn(actor, "chat", "Edit an audio file", { reply: { text: "Changing your song." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
   return c.json(await musicCardView(actor, job), 200);
 });
 // MUSIC-GEN-20c: "Lyrics look off" on a scanned Library track: line the words up with the file again, ignoring the stored words. It reads the track

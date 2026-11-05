@@ -55,6 +55,7 @@ export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits:
 
 export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; bpm?: number; key?: string; song_style?: string; band?: string }
 export interface SongDetailChanges { title?: string; lyrics?: string; description?: string; bpm?: number; key?: string }
+export interface FileEditBody { file_id: string; change: "restyle" | "instrumental" | "parts" | "stems"; style?: string; parts?: { keep?: string[]; drop?: string[] } }
 
 export const musicApi = {
   status: () => requestJson<MusicStatus>("/api/music/status"),
@@ -74,6 +75,7 @@ export const musicApi = {
   details: (id: string, changes: SongDetailChanges, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/details`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...changes, ...(fileId ? { file_id: fileId } : {}) }) }),
   stems: (id: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/stems`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { file_id: fileId } : {}) }),
   stemsFromFile: (fileId: string) => requestJson<MusicCard>("/api/music/stems/from-file", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
+  editFromFile: (body: FileEditBody) => requestJson<MusicCard>("/api/music/from-file/edit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   newCover: (id: string, prompt: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/cover`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) }),
   useVersion: (id: string, fileId: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/use`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
   /** A personal download of one version (never the commercial purpose). */

@@ -37,6 +37,26 @@ export const editMusicArgs = z.object({
   seconds: z.number().finite().positive().optional(), at: z.enum(["start", "end"]).optional(), where: z.enum(["in", "out", "both"]).optional(),
   strength: z.number().finite().min(0.3).max(1).optional(), lufs: z.number().finite().min(-70).max(-5).optional(),
 });
+/** Shared attached-file edit preparation used by the tool and Music Create. */
+export function prepareOwnedMusicEdit(source: MusicJob, args: { change: "restyle" | "instrumental" | "parts" | "stems"; style?: string; parts?: { keep?: string[]; drop?: string[] } }, limits: { min_seconds: number; max_seconds: number }) {
+  if (args.change === "stems") return { ok: true as const, task: "stems" as const, request: source.request, body: musicBody(source.request, "edit") };
+  const plan = prepareMusicEdit(source, { track: source.fileId!, change: args.change, ...(args.style ? { description: args.style } : {}), ...(args.parts ? { parts: args.parts } : {}) }, limits);
+  return plan;
+}
+/** Start the owned-file parts job used by both edit_music and the Library edit route. */
+export async function startOwnedMusicPartsJob(input: { actor: PersonRow; source: MusicJob; parts: z.infer<typeof editMusicArgs>["parts"]; title?: string; conversationId: string; turnId: string; companionId?: string | null; temporary: boolean }) {
+  const kept = keptMusicParts(input.parts);
+  if (!kept) return { ok: false as const, line: "Choose one or more parts to keep or drop, and leave at least one part." };
+  if (!input.source.fileId) return { ok: false as const, line: plainMusicFailure("source_not_made_here") };
+  const prepared = await prepareOwnedStemsJob(input.actor, input.source.fileId);
+  if (!prepared.ok) return { ok: false as const, line: prepared.line, status: prepared.status };
+  const file = readMusicFile(input.actor, input.source, input.source.fileId);
+  if (!file) return { ok: false as const, line: plainMusicFailure("source_not_made_here") };
+  const request = { ...prepared.request, title: input.title ?? input.source.request.title ?? "Song", parts: kept };
+  const body = { ...prepared.body, source: Buffer.from(file.bytes).toString("base64"), source_sha256: file.sha256 };
+  const job = await startMusicJob({ actor: input.actor, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, temporary: input.temporary, task: "trim", request, body, parentFileId: input.source.fileId });
+  return { ok: true as const, job, parts: kept };
+}
 export function musicRefusalFor(audience: MusicAudience, args: Record<string, unknown>) {
   const denied = musicDenial(audience);
   if (denied) return { kind: "denied" as const, why: denied, line: MUSIC_DENIAL_LINE[denied] };
@@ -218,19 +238,11 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     if (parsed.data.change === "voice_swap") return refused("Companion singing for attached songs is coming.", "voice_swap_not_available");
     if (parsed.data.change === "parts") {
-      const parts = keptMusicParts(parsed.data.parts);
-      if (!parts) return refused("Choose one or more parts to keep or drop, and leave at least one part.", "bad_parts");
       const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio?.[0]?.id ?? "" : parsed.data.track, state.conversationId, temporary);
       if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
-      const prepared = source.request.ownedFile ? await prepareOwnedStemsJob(actor, source.fileId) : await prepareStemsJob(actor, source);
-      if (!prepared.ok) return prepared.status === 503 ? failed("stems_unavailable", "unavailable") : refused(prepared.line, "source_not_made_here");
-      const file = readMusicFile(actor, source, source.fileId);
-      if (!file) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
-      const request = { ...prepared.request, title: parsed.data.title ?? source.request.title ?? "Song", parts };
-      const body = { ...prepared.body, source: Buffer.from(file.bytes).toString("base64"), source_sha256: file.sha256 };
-      const task: MusicTask = "trim";
-      const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId: source.fileId });
-      return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: partsDoneLine(parts) }, data: { musicJobId: job.id }, actions: [] } });
+      const result = await startOwnedMusicPartsJob({ actor, source, parts: parsed.data.parts, title: parsed.data.title, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary });
+      if (!result.ok) return "status" in result && result.status === 503 ? failed("stems_unavailable", "unavailable") : refused(result.line, "source_not_made_here");
+      return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: partsDoneLine(result.parts) }, data: { musicJobId: result.job.id }, actions: [] } });
     }
     if (parsed.data.track === "attached" && (state.audio?.length ?? 0) !== 1) return refused("Attach one audio file to your message.", "source_not_made_here");
     if (parsed.data.track === "attached" && parsed.data.change === "stems") {
