@@ -53,7 +53,7 @@ import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
-import { PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
+import { AudioUploadsContext, PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
 import "@/shell/pages/chatTouchTargets.css";
 import "@/shell/pages/chatReplyMarkdown.css";
 import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
@@ -1611,6 +1611,7 @@ export function ChatPage({ person }: { person: Roster }) {
       <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <ImageEditContext.Provider value={imageEditor.editContext}>
+      <AudioUploadsContext.Provider value={person.age_band === "adult"}>
       <PhotoUploadsContext.Provider value={{ settingAllowed: photoUploadsEnabled, modelCanReadPictures: imagePartsAvailable }}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: closeAwareSetVoiceOpen, openFromWake: openVoiceFromWake }}>
       <WakeWordPersonContext.Provider value={person}>
@@ -1906,6 +1907,7 @@ export function ChatPage({ person }: { person: Roster }) {
       </WakeWordPersonContext.Provider>
       </VoiceSessionProvider>
       </PhotoUploadsContext.Provider>
+      </AudioUploadsContext.Provider>
       </ImageEditContext.Provider>
       </PackageScopeContext.Provider>
       </DraftConversationContext.Provider>

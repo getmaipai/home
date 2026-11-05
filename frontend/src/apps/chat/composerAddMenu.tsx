@@ -124,8 +124,13 @@ function AddPhotosAndFilesItem({ onSelect, photos, reason }: { onSelect: () => v
   );
 }
 
+/** MUSIC-REMIX-01 R2b: whether this person may attach a song to change (adults until the teen and child lane lands, song-remix 3.4). Off by default so a menu outside the chat page never offers a control it cannot honour. */
+export const AudioUploadsContext = createContext<boolean>(false);
+
 function AddAudioItem({ onSelect }: { onSelect: () => void }) {
   const { addAttachment, disabled } = useComposerAddAttachment();
+  const allowed = useContext(AudioUploadsContext);
+  if (!allowed) return null;
   return <ComposerAddMenuItem icon={MusicIcon} name="Add a song or audio file" description="MP3, M4A, WAV, AAC, OGG or FLAC" disabled={disabled} onClick={() => {
     const input = document.createElement("input"); input.type = "file"; input.accept = "audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/aac,audio/ogg,audio/flac,.mp3,.m4a,.wav,.aac,.ogg,.flac"; input.hidden = true;
     input.onchange = () => { const file = input.files?.[0]; input.remove(); if (file) void addAttachment(file); };

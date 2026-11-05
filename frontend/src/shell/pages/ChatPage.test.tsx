@@ -3827,9 +3827,9 @@ describe("ChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       fireEvent.click(addButton());
       await within(addMenu()).findByText("Add photos and files");
       const items = Array.from(addMenu().querySelectorAll('[data-slot="composer-menu-item"]')).map((el) => el.textContent);
-      expect(items).toEqual([expect.stringContaining("Add photos and files"), expect.stringContaining("Take a photo")]);
+      expect(items).toEqual([expect.stringContaining("Add photos and files"), expect.stringContaining("Add a song or audio file"), expect.stringContaining("Take a photo")]);
       // One compact row per item (no description line), opening above the "+" at its start edge.
-      expect(items).toEqual(["Add photos and files", "Take a photo"]);
+      expect(items).toEqual(["Add photos and files", "Add a song or audio file", "Take a photo"]);
       expect(addMenu().className).toContain("bottom-full");
       expect(addMenu().className).toContain("start-0");
       expect(addMenu().className).not.toContain("end-0");
