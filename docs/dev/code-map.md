@@ -411,6 +411,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/chatTransitions.ts` | DEFAULT_TRANSITION_SECONDS, RUNNING_LONG_FACTOR, RUNNING_LONG_LINE, __resetTransitionsForTests, recordTransition, estimateSeconds |
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
+| `backend/src/lib/clonedVoiceTranscript.ts` | __setClonedVoiceTranscriberForTests, normalizeVoiceTranscript, updateClonedVoiceTranscript, transcribeClonedVoiceOnce |
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, renameClonedVoice, deleteClonedVoice, getClonedVoiceFile |
 | `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, transportRefusal, requestsPerMinute, rateRefusal |
@@ -958,7 +959,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/store.ts` | fetchVerifiedIndex, install, rollback, uninstall, setChannel |
 | `backend/src/lib/storeIndex.ts` | verifyEnvelopeSignature, fetchRawIndex, verifyIndex, verifyTargetHash |
 | `backend/src/lib/structuredPartIds.ts` | SPEC_SHEET_READY, SPEC_SHEET_BOUND |
-| `backend/src/lib/stt.ts` | transcribeUtterance |
+| `backend/src/lib/stt.ts` | transcribeUtterance, transcribeAudioClip |
 | `backend/src/lib/sttAssets.ts` | SILERO_VAD_ASSET, sileroVadPath, ensureSileroVadAsset |
 | `backend/src/lib/sttSession.ts` | getEndpointer, __setSileroLoaderForTests, __resetSileroLoaderForTests, isLikelySpeech, SttSession, encodeWav |
 | `backend/src/lib/styleLock.ts` | pictureStyleAccess, styleOfComponent, styleAccessResolver, componentStyleAccess |
