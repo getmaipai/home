@@ -60602,6 +60602,140 @@
         }
       }
     },
+    "/api/media-templates": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "List picture templates available to this profile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "picture",
+                "video"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audience-filtered templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "templates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "picture",
+                              "video"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "all-ages",
+                              "adult-only"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "references": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "styles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "aspect": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "transparent": {
+                            "type": "boolean"
+                          },
+                          "provenance": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "hlc": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "title",
+                          "summary",
+                          "category",
+                          "audience",
+                          "prompt",
+                          "references",
+                          "styles",
+                          "aspect",
+                          "transparent",
+                          "provenance",
+                          "created_at",
+                          "updated_at",
+                          "hlc"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "templates"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [

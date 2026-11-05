@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-sticker",
+  "kind": "picture",
+  "title": "Sticker",
+  "summary": "Make sticker with a few details you choose.",
+  "category": "social",
+  "audience": "all-ages",
+  "prompt": "A clean sticker of {{subject|Subject|a happy little cloud}}, bold outline, isolated on transparent background, no words.",
+  "references": [],
+  "styles": [],
+  "aspect": "1:1",
+  "transparent": true,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:17:maipai01"
+}

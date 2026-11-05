@@ -3,6 +3,7 @@
 // (policy.ts, checked again at the policy node and here: age and surface gates outrank every rule, rule 0),
 // starts a Stack job, and returns at once with a short line for the model to relay. The picture itself arrives
 // on the card (frontend PictureToolRender) when the job finishes, so a slow render never holds the answer.
+import { BACKGROUND_REMOVAL_OP } from "@/lib/mediaOps/ids";
 import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
@@ -16,11 +17,15 @@ import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from "./quality";
 import { StackPicturesError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
+import { getTemplate } from "@/lib/media/templates";
+import { runMediaOp } from "@/lib/mediaOps/registry";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture, latestPictureId } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
 
 const KID_MAX_COUNT = 2;
+let templateMediaOpRunner = runMediaOp;
+export function __setTemplateMediaOpRunnerForTests(runner: typeof runMediaOp | null): void { templateMediaOpRunner = runner ?? runMediaOp; }
 export { GENERATE_IMAGE_TOOL_ID };
 
 export const PICTURE_SIZES: Record<string, string> = {
@@ -84,8 +89,22 @@ function refused(callId: string, args: Record<string, unknown>, refusal: Picture
 export async function runGenerateImage(input: RunGenerateImageInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   const audience = audienceOf(state, input.spoken);
-  // The household's likeness option (lib/likeness.ts) is checked here, after the policy gate: its refusal is not a minor-line reason.
   const normalized = { ...args };
+  let template: ReturnType<typeof getTemplate> = null;
+  let promptOverride: string | null = null;
+  if (typeof args.template === "string" && args.template) {
+    template = getTemplate(args.template);
+    if (!template || template.kind !== "picture" || (template.audience === "adult-only" && (audience.band !== "adult" || !adultStylesAllowed()))) {
+      return failed(callId, args, "bad_template", "bad_arguments");
+    }
+    const blanks = args.blanks && typeof args.blanks === "object" && !Array.isArray(args.blanks) ? args.blanks as Record<string, unknown> : {};
+    const required = [...template.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g)].map((match) => match[1]!);
+    const missing = required.find((name) => typeof blanks[name] !== "string" || !(blanks[name] as string).trim());
+    if (missing) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `Ask for ${missing.replaceAll("_", " ")} before making this picture.` }, actions: [] } });
+    promptOverride = template.prompt.replace(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g, (_whole, name: string) => String(blanks[name]).trim());
+    normalized.prompt = promptOverride;
+  }
+  // The household's likeness option (lib/likeness.ts) is checked here, after the policy gate: its refusal is not a minor-line reason.
   if (Array.isArray(args.references)) {
     const refs = (args.references as unknown[]).flatMap((entry) => {
       const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
@@ -93,11 +112,10 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     }).slice(0, 2);
     if (refs.length) normalized.reference = refs[0];
   }
-  // Templates are introduced by IMG-TPL-01; accepting the field now keeps callers forward compatible.
   delete normalized.template;
   const refusal = refusalFor(audience, normalized) ?? likenessCallRefusal(audience.actor, normalized);
   if (refusal) return refused(callId, args, refusal);
-  const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
+  const prompt = promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : "");
 
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
   if (typeof normalized.change === "string" && normalized.change.trim() !== "") {
@@ -129,7 +147,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   }
   const maxN = engine.limits?.max_n ?? 4;
   const count = clampCount(args.count, maxN);
-  const size = PICTURE_SIZES[typeof args.size === "string" ? args.size : "square"] ?? PICTURE_SIZES.square!;
+  const aspectSize: Record<string, string> = { "1:1":"square", "3:2":"landscape", "2:3":"portrait", "16:9":"wide", "9:16":"tall" };
+  const size = PICTURE_SIZES[template?.aspect ? aspectSize[template.aspect] ?? "square" : typeof args.size === "string" ? args.size : "square"] ?? PICTURE_SIZES.square!;
 
   // Only an adapter this person may use right now can match; the model never sees the library.
   const available = await adaptersFor(adapterAudiencesFor(audience));
@@ -174,6 +193,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
+      ...(template?.transparent ? { onDone: async (fileId: string) => {
+        await templateMediaOpRunner(state.actor as PersonRow, BACKGROUND_REMOVAL_OP, { source: { kind: "picture", via: "chat", id: fileId, conversationId: state.conversationId ?? "" }, args: {} }, input.signal);
+      } } : {}),
     });
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({

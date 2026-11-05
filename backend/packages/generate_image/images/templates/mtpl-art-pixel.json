@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-artpixel",
+  "kind": "picture",
+  "title": "Pixel art",
+  "summary": "Make pixel art with a few details you choose.",
+  "category": "art",
+  "audience": "all-ages",
+  "prompt": "A small pixel-art scene of {{subject|Subject|a cabin beside a lake}}, with a limited color set and crisp square pixels.",
+  "references": [],
+  "styles": [],
+  "aspect": "1:1",
+  "transparent": false,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:8:maipai01"
+}

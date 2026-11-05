@@ -720,6 +720,9 @@ NODE
     exit 1
   fi
 
+  stage "backend: validate bundled media templates"
+  (cd backend && bun run scripts/check-media-templates.ts)
+
   stage "backend: typecheck"
   (cd backend && bunx tsc --noEmit)
 

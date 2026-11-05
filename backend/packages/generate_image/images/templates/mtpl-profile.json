@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-profile",
+  "kind": "picture",
+  "title": "Profile picture",
+  "summary": "Make profile picture with a few details you choose.",
+  "category": "social",
+  "audience": "all-ages",
+  "prompt": "A simple profile picture of {{subject|Subject|a smiling orange fox}}, centered in a circle, bright background, no words.",
+  "references": [],
+  "styles": [],
+  "aspect": "1:1",
+  "transparent": false,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:16:maipai01"
+}

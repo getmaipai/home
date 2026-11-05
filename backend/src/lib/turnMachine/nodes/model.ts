@@ -1,5 +1,6 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { withStyleList } from "@/lib/videos/styleToolSpec";
+import { listTemplates } from "@/lib/media/templates";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
@@ -206,7 +207,19 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
   if (!loaded.ok) return null;
   // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
   if (missingRequired(loaded.value).length > 0) return null;
-  const spec: ToolSpec = { id, description: id === "generate_image" ? `${loaded.value.description} Templates arrive later; do not use a template argument.` : loaded.value.description, args: loaded.value.args };
+  let args = loaded.value.args;
+  let description = loaded.value.description;
+  if (id === "generate_image" && state) {
+    const templates = listTemplates({ actor: state.actor, kind: "picture" });
+    const schema = structuredClone(args) as Record<string, any>;
+    schema.properties ??= {};
+    schema.required = (Array.isArray(schema.required) ? schema.required : []).filter((key: string) => key !== "prompt");
+    schema.properties.template = { type: "string", enum: templates.map((row) => row.id), description: `Optional picture template id. Available to this person: ${templates.map((row) => `${row.id} (${row.title}; ${[...row.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)].map((m) => `${m[1]}: ${m[2]} (example: ${m[3]})`).join(", ") || "no blanks"})`).join("; ")}` };
+    schema.properties.blanks = { type: "object", additionalProperties: { type: "string" }, description: "Values for the named blanks shown in the selected template." };
+    args = schema;
+    description = `${description} For a template, set its id and fill every named blank using the labels and examples in the template argument description; a free prompt is not needed. Otherwise provide prompt. The final filled prompt follows the same picture rules.`;
+  }
+  const spec: ToolSpec = { id, description, args };
   // VIDEO-LORA-10: the video tools list the styles this person may name (none for a screen or a person that may not).
   return id === "generate_video" || id === "edit_video" ? withStyleList(spec, state) : spec;
 }

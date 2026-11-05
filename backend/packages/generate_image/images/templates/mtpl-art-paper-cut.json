@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-artpapercut",
+  "kind": "picture",
+  "title": "Paper cut",
+  "summary": "Make paper cut with a few details you choose.",
+  "category": "art",
+  "audience": "all-ages",
+  "prompt": "A layered paper-cut picture of {{subject|Subject|a yellow sun over green hills}}, with simple shapes and soft shadows.",
+  "references": [],
+  "styles": [],
+  "aspect": "3:2",
+  "transparent": false,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:7:maipai01"
+}

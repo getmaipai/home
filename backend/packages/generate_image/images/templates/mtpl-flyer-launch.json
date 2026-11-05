@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-flyerlaunch",
+  "kind": "picture",
+  "title": "Flyer",
+  "summary": "Make flyer with a few details you choose.",
+  "category": "other",
+  "audience": "all-ages",
+  "prompt": "A friendly flyer for {{event|Event|a neighborhood book swap}} at {{place|Place|the community hall}}. Leave clear room for the words {{details|Details|Bring a book}}.",
+  "references": [],
+  "styles": [],
+  "aspect": "2:3",
+  "transparent": false,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:11:maipai01"
+}

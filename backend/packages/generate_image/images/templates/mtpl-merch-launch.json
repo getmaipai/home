@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-merchlaunch",
+  "kind": "picture",
+  "title": "Merch",
+  "summary": "Make merch with a few details you choose.",
+  "category": "other",
+  "audience": "all-ages",
+  "prompt": "A simple shirt graphic about {{subject|Subject|helping bees}}, with the words {{label|Short label|Bee kind}}. Original shapes, no brand marks.",
+  "references": [],
+  "styles": [],
+  "aspect": "1:1",
+  "transparent": false,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:12:maipai01"
+}

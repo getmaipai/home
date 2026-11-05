@@ -24,6 +24,7 @@ import { saveJob, type PictureJob } from "@/lib/pictures/jobStore";
 import { cardView, phaseLabel } from "@/routes/pictures";
 import { JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
 import { __setPictureStatusForTests } from "@/lib/pictures/ready";
+import { __setTemplateMediaOpRunnerForTests } from "@/lib/pictures/tool";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
@@ -42,6 +43,7 @@ beforeEach(() => {
   fake = installFakeImageStack();
 });
 afterEach(() => {
+  __setTemplateMediaOpRunnerForTests(null);
   fake.restore();
   __resetLlmSupervisorForTests();
   __resetPortOwnershipForTests();
@@ -162,6 +164,36 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       await streamValue(people.owner, "three tall poster ideas of a lighthouse");
       expect(fake.submitted[0]!.size).toBe("768x1344");
       expect(fake.submitted[0]!.n).toBe(3);
+    });
+  });
+
+  test("a template fills its named blanks and uses its aspect", async () => {
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ template: "mtpl-productmarble", blanks: { item: "a green tea cup" } }) };
+    await withStub(script(call), async () => {
+      await streamValue(people.owner, "make a product photo of a green tea cup");
+      expect(fake.submitted[0]!.prompt).toContain("a green tea cup");
+      expect(fake.submitted[0]!.size).toBe("1024x1024");
+    });
+  });
+
+  test("a template with a missing blank asks for it and starts no job", async () => {
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ template: "mtpl-productmarble", blanks: {} }) };
+    await withStub(script(call), async (seen) => {
+      await streamValue(people.owner, "make a product photo");
+      expect(fake.submitted).toHaveLength(0);
+      expect(seen.some((request) => request.messages.some((message) => message.role === "tool" && String(message.content).includes("item")))).toBe(true);
+    });
+  });
+
+  test("a transparent template calls remove_background through the media operation registry", async () => {
+    const calls: unknown[] = [];
+    __setTemplateMediaOpRunnerForTests(async (...args) => { calls.push(args.slice(0, 3)); return {}; });
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ template: "mtpl-sticker", blanks: { subject: "a smiling blue bird" } }) };
+    await withStub(script(call), async () => {
+      const { value } = await streamValue(people.owner, "make a sticker of a smiling blue bird");
+      await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "done");
+      await until(() => calls.length === 1);
+      expect(calls[0]).toMatchObject([people.owner, "picture.remove_background", { source: { kind: "picture", via: "chat" }, args: {} }]);
     });
   });
 

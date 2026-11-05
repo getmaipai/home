@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-greetingcard",
+  "kind": "picture",
+  "title": "Greeting card",
+  "summary": "Make greeting card with a few details you choose.",
+  "category": "story",
+  "audience": "all-ages",
+  "prompt": "A cheerful card for {{occasion|Occasion|a birthday}}, for {{name|Name|Nova}}. Add the short words {{message|Message|Have a great day}} in large clear letters.",
+  "references": [],
+  "styles": [],
+  "aspect": "3:2",
+  "transparent": false,
+  "provenance": "MaiPai launch template, authored 2026-11-04",
+  "created_at": "2026-11-04T00:00:00Z",
+  "updated_at": "2026-11-04T00:00:00Z",
+  "hlc": "1793750400000:14:maipai01"
+}

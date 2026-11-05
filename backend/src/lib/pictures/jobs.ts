@@ -26,6 +26,7 @@ export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureR
 
 type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReason?: QueueJob["riseReason"] };
 const queuedPictureSubmits = new Map<string, () => Promise<{ job: string; done: StackPic[] | null }>>();
+const generatedPictureCallbacks = new Map<string, (fileId: string) => Promise<void>>();
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;
   const phaseHold = PERSISTED_HOLDS.find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
@@ -54,7 +55,7 @@ async function releasePicture(job: PictureJob): Promise<void> {
     void watch(job, db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow, submitted.done);
   } catch (error) {
     if (error instanceof StackPicturesError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.phase = "queued"; saveJob(job); return; }
-    job.state = "failed"; job.error = plainFailure(error); queuedPictureSubmits.delete(job.id); savePictureJob(job);
+    job.state = "failed"; job.error = plainFailure(error); queuedPictureSubmits.delete(job.id); generatedPictureCallbacks.delete(job.id); savePictureJob(job);
   }
 }
 
@@ -73,6 +74,7 @@ export function __resetPictureJobsForTests(): void {
   watching.clear();
   starting.clear();
   queuedPictureSubmits.clear();
+  generatedPictureCallbacks.clear();
   __clearPictureStoreForTests();
 }
 
@@ -95,6 +97,8 @@ export interface StartPictureInput {
   submit?: () => Promise<{ job: string; done: StackPic[] | null }>;
   /** Work Home does itself for non-generative picture tools: no Stack job to poll. */
   local?: (progress: (phase: string, percent: number) => void, signal: AbortSignal) => Promise<StackPic[]>;
+  /** Follow-on media work for each stored generated file, through the media-op registry. */
+  onDone?: (fileId: string) => Promise<void>;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackPicturesError` when the Stack refuses
@@ -116,6 +120,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     };
     markLive(job);
     if (input.submit) queuedPictureSubmits.set(job.id, input.submit);
+    if (input.onDone) generatedPictureCallbacks.set(job.id, input.onDone);
     savePictureJob(job);
     if (input.local) void watchLocal(job, input.actor, input.local);
     else void releaseHouseholdQueue();
@@ -255,7 +260,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   const view = viewOfJob(job, actor);
   const files: PictureFile[] = [];
   const storedIds: string[] = [];
-  const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; savePictureJob(job); if (stackJob) void cancelOrDelete(stackJob); };
+  const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; generatedPictureCallbacks.delete(job.id); savePictureJob(job); if (stackJob) void cancelOrDelete(stackJob); };
   try {
     // Fetch and prove every picture first; nothing is stored until the safety check has seen all of them.
     const made: Array<{ raw: Uint8Array; width: number; height: number; meta: { seed: number | null; model: string | null; steps: number | null; ms: number | null } }> = [];
@@ -315,6 +320,9 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   job.error = null;
   queuedPictureSubmits.delete(job.id);
   savePictureJob(job);
+  const callback = generatedPictureCallbacks.get(job.id);
+  generatedPictureCallbacks.delete(job.id);
+  if (callback) for (const file of files) void callback(file.id).catch(() => undefined);
   // A stored cover may update its song, but never changes this picture's outcome.
   try { const { finishSongCover } = await import("@/lib/music/cover"); finishSongCover(job); } catch { /* optional cover linkage */ }
   try { const { finishBandPicture } = await import("@/lib/music/band"); finishBandPicture(job); } catch { /* optional band linkage */ }
@@ -327,6 +335,7 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
   const job = getPictureJob(actor, id);
   if (!job) return null;
   if (job.state === "done" || job.state === "failed" || job.state === "cancelled") return job;
+  generatedPictureCallbacks.delete(job.id);
   job.state = "cancelled";
   job.error = null;
   queuedPictureSubmits.delete(job.id);
