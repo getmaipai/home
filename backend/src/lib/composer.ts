@@ -783,7 +783,7 @@ export function videoForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { i
 /** IMGGEN-UI-01: `TurnValue.picture`, the id of the picture job this turn's `generate_image` call started. */
 export function pictureForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
   for (const outcome of outcomes) {
-    if (outcome.status !== "succeeded" || outcome.packageId !== "generate_image") continue;
+    if (outcome.status !== "succeeded" || (outcome.packageId !== "generate_image" && outcome.packageId !== "edit_picture")) continue;
     const id = recordData(outcome.result?.data)?.pictureJobId;
     if (typeof id === "string") return { id };
   }

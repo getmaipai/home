@@ -74,7 +74,7 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 // ---------------------------------------------------------------- tools status
 
 export interface EditToolState { enabled: boolean; reason?: string }
-export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "find_people";
+export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
   state: "ready" | "preparing" | "not_installed" | "unavailable" | "off";
   /** One plain line for the editor to show, or null when everything is ready. */
@@ -105,7 +105,7 @@ async function commentState(actor: PersonRow): Promise<EditToolState> {
 }
 
 function off(reason: string): Record<EditToolKey, EditToolState> {
-  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, find_people: { enabled: false, reason } };
+  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
 }
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
@@ -141,6 +141,7 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
     erase: needs("lama", false, "The eraser"),
     resize: preparing ? { enabled: false, reason: prepareReason } : { enabled: true },
     find_people: needs("vision", status.vision, "The people finder"),
+    find_subjects: status.operations?.includes("find_subjects") ? { enabled: true } : needs("vision", status.vision, "The people finder"),
   };
   if (preparing) return { state: "preparing", note: status.phase ? `Getting the editing tools ready (${status.phase}).` : "Getting the editing tools ready.", tools, limits };
   if (status.state === "needs-setup") return { state: "ready", note: "The first edit takes a few minutes while the editing tools get ready.", tools, limits };
@@ -323,7 +324,7 @@ export function editErrorFrom(error: unknown): ImageEditError {
   return new ImageEditError(500, "The edit could not be finished. Try again.", "failed");
 }
 
-export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; scale?: number; width?: number; height?: number; factor?: number }
+export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number }
 
 /** Sends a picture to the Stack's image tools. Fast tools answer at once; slow ones continue as a job the browser polls. */
 export async function startEdit(actor: PersonRow, conversationId: string, id: string, input: StartEditInput, signal?: AbortSignal): Promise<EditProgress> {
@@ -331,19 +332,19 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   if (input.operation === "erase" && input.people && laneOf(editorAudience(actor)) === "child") {
     throw new ImageEditError(422, CHILD_NO_PHOTOS_LINE, "child_cartoons_only");
   }
-  if (input.operation === "erase" && !input.mask?.byteLength && !input.people) throw new ImageEditError(422, "Paint over what you want gone, then press Erase.", "mask_empty");
-  if (input.operation === "erase" && Boolean(input.mask?.byteLength) && Boolean(input.people)) throw new ImageEditError(422, "Choose exactly one area to erase.", "erase_target_conflict");
+  if (input.operation === "erase" && !input.mask?.byteLength && !input.people && !input.subjects) throw new ImageEditError(422, "Paint over what you want gone, then press Erase.", "mask_empty");
+  if (input.operation === "erase" && Number(Boolean(input.mask?.byteLength)) + Number(Boolean(input.people)) + Number(Boolean(input.subjects)) > 1) throw new ImageEditError(422, "Choose exactly one area to erase.", "erase_target_conflict");
   const status = await editToolsStatus(actor);
   const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : "resize";
   if (!status.tools[tool].enabled) throw new ImageEditError(503, status.tools[tool].reason ?? status.note ?? "This tool isn't available yet.", "unavailable");
   try {
-    const operation = input.operation === "erase" && input.people ? "erase_people" : input.operation;
+    const operation = input.operation === "erase" && input.subjects ? "erase_subjects" : input.operation === "erase" && input.people ? "erase_people" : input.operation;
     let reply: Awaited<ReturnType<typeof submitImageTool>>;
-    if (input.people) {
+    if (input.people || input.subjects) {
       const form = new FormData();
       form.append("image", new File([new Uint8Array(source.bytes)], "picture", { type: source.mediaType }));
       form.append("operation", operation);
-      form.append("people", input.people);
+      if (input.subjects) form.append("subjects", input.subjects); else form.append("people", input.people!);
       form.append("timeout_ms", String(EDIT_WAIT_MS));
       const peopleReply = await getStackClient().imageEdit(form, { signal });
       reply = peopleReply.kind === "done"

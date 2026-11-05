@@ -6,11 +6,13 @@ import { musicsAllowed } from "@/lib/music/policy";
 import { musicEngineReady } from "@/lib/music/ready";
 import { picturesAllowed } from "@/lib/pictures/policy";
 import { pictureEngineReady } from "@/lib/pictures/ready";
+import { listMediaOps } from "@/lib/mediaOps/registry";
 import { videosAllowed } from "@/lib/videos/policy";
 import { videoEngineReady } from "@/lib/videos/ready";
 import { laneOf } from "@/lib/pictures/lane";
 import { itemRefsIn } from "@/lib/items/tool";
 import { writingFormatsFor } from "@/lib/writingFormats";
+import { pictureIdsInConversation } from "@/lib/pictures/editTool";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { withTurnToolGates, type MusicObjectGate } from "./budget";
 import { isMusicObjectRef, musicObjectOf, type MusicObjectRef } from "@/lib/music/objects";
@@ -28,6 +30,7 @@ export interface TurnToolGateInput {
   bare: boolean;
   ephemeral: boolean;
   text: string;
+  hasPictureInConversation?: boolean;
   musicEditAvailable: () => boolean;
   /** VIDEO-CHAT-01: whether the chat already holds a finished video (left out: no). */
   videoEditAvailable?: () => boolean;
@@ -57,6 +60,9 @@ export interface TurnToolGateResult {
   budget: TurnBudget;
   answerImagesOk: boolean;
   picturesOk: boolean;
+  editPictureOk: boolean;
+  editPictureOps: Awaited<ReturnType<typeof listMediaOps>>;
+  editPictureIds: string[];
   videosOk: boolean;
   musicOk: boolean;
   musicEditOk: boolean;
@@ -93,6 +99,11 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const latchKey = input.conversationId ? `${input.actor.id}\u0000${input.conversationId}` : undefined;
   const latch = latchKey ? getConversationLatch(latchKey) : null;
   const picturesOk = pictureEligible && (pictureReadyNow || latch?.pictureEngineReady === true);
+  const editPictureOps = input.hasPictureInConversation === true && pictureEligible
+    ? (await listMediaOps(input.actor, { input: "picture", includeHelpers: true })).filter((op) => op.enabled)
+    : [];
+  const editPictureOk = editPictureOps.length > 0;
+  const editPictureIds = editPictureOk && input.conversationId ? pictureIdsInConversation(input.actor, input.conversationId, input.temporary || input.ephemeral) : [];
   const videosOk = videoEligible && (videoReadyNow || latch?.videoEngineReady === true);
   const musicOk = musicEligible && (musicReadyNow || latch?.musicEngineReady === true);
   if (latch) {
@@ -131,10 +142,13 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const musicObject: MusicObjectGate = !objectAllowed ? null : (musicObjectRef?.kind ?? "none");
   const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk),
     writingFormatOk,
     answerImagesOk,
     picturesOk,
+    editPictureOk,
+    editPictureOps,
+    editPictureIds,
     videosOk,
     musicOk,
     musicEditOk,

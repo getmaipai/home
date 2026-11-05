@@ -4,6 +4,8 @@ import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
+import { __setImageToolsForTests } from "@/lib/imageEdit";
+import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
 import { resolveTurnBudgetBase } from "@/lib/turnMachine/budget";
@@ -58,11 +60,24 @@ afterEach(() => {
   __resetSettingsCacheForTests();
   __resetToolGateLatchForTests();
   __setPictureStatusForTests(undefined);
+  __setImageToolsForTests(undefined);
+  __setRoleHealthForTests({});
   __setVideoStatusForTests(undefined);
   __setMusicStatusForTests(undefined);
 });
 
 describe("conversation tool gate latch", () => {
+  test("offers edit_picture only when this turn has a picture and ready registry operations", async () => {
+    const actor = makePerson("owner", "picture-editor-owner");
+    __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: [], reason: null }, true);
+    __setRoleHealthForTests({ image: { availability: "ready", reason: null } });
+    const withPicture = await budgetWithTurnToolGates(gateInput(actor, { hasPictureInConversation: true }));
+    const withoutPicture = await budgetWithTurnToolGates(gateInput(actor, { hasPictureInConversation: false }));
+    expect(withPicture.budget.tools_offered).toContain("edit_picture");
+    expect(withPicture.editPictureOps.map((op) => op.id)).toContain("picture.change");
+    expect(withoutPicture.budget.tools_offered).not.toContain("edit_picture");
+  });
+
   test("keeps ready engine tools stable within a conversation and isolated across conversations", async () => {
     const actor = makePerson("owner");
     setReady(true);

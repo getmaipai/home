@@ -52,6 +52,9 @@ import { searchAssistEligibility, MINOR_RESCUE_ENABLED } from "@/lib/searchAssis
 import { bumpSearchAssistCounter } from "@/lib/searchAssist/counters";
 import { minorSearchGate } from "@/lib/searchAssist/minorGate";
 import { weatherAssistEligibility, WEATHER_TOOL } from "@/lib/searchAssist/weatherAssist";
+import { listMediaOps } from "@/lib/mediaOps/registry";
+import type { PersonRow } from "@/types";
+import { z } from "zod";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
  * function can't tell apart by its own outcome code alone - a pre-stream
@@ -165,7 +168,35 @@ export type ModelOutput =
   // never empty text.
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
-export function toolSpecFor(id: string, lane: Lane = "adult", state?: Parameters<typeof withStyleList>[1]): ToolSpec | null {
+export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState): ToolSpec | null {
+  if (id === "edit_picture") {
+    if (!state?.editPictureAllowed) return null;
+    const operations = state.editPictureOps ?? [];
+    if (!operations.length) return null;
+    const choices = operations.map((operation) => {
+      const args = z.toJSONSchema(operation.args, { unrepresentable: "any" }) as Record<string, unknown>;
+      const properties = args.properties && typeof args.properties === "object" ? { ...(args.properties as Record<string, unknown>) } : {};
+      for (const key of ["mask", "maskPng", "maskBase64", "maskPngBase64"]) delete properties[key];
+      const required = Array.isArray(args.required) ? args.required.filter((key) => typeof key !== "string" || !["mask", "maskPng", "maskBase64", "maskPngBase64"].includes(key)) : undefined;
+      return {
+        type: "object", required: ["op", "source", "args"],
+        properties: {
+          op: { type: "string", const: operation.id, description: operation.summary },
+          source: { type: "string", enum: [...new Set([...(state.editPictureIds ?? []), ...(state.images ?? []).map((image) => image.id), "attached", "attached_2", "latest"])], description: "A picture id in this conversation, or exactly attached, attached_2, or latest." },
+          args: { ...args, properties, ...(required ? { required } : {}), description: operation.summary },
+        },
+      };
+    });
+    return {
+      id,
+      description: "Use one of the available picture operations with its shown arguments. For locate, inspect the numbered boxes and pick by number only if the intended subject is clear; otherwise ask one short question.",
+      args: {
+        type: "object",
+        properties: { op: { type: "string", enum: operations.map((operation) => operation.id), description: operations.map((operation) => `${operation.id}: ${operation.summary}`).join(" ") } },
+        oneOf: choices,
+      },
+    };
+  }
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json
   // for loadManifestOnly() to find below.
@@ -175,10 +206,11 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: Parameters
   if (!loaded.ok) return null;
   // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
   if (missingRequired(loaded.value).length > 0) return null;
-  const spec: ToolSpec = { id, description: loaded.value.description, args: loaded.value.args };
+  const spec: ToolSpec = { id, description: id === "generate_image" ? `${loaded.value.description} Templates arrive later; do not use a template argument.` : loaded.value.description, args: loaded.value.args };
   // VIDEO-LORA-10: the video tools list the styles this person may name (none for a screen or a person that may not).
   return id === "generate_video" || id === "edit_video" ? withStyleList(spec, state) : spec;
 }
+
 
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
  * 2026-09-22.md "The reply floor"): a written, non-brevity, adult

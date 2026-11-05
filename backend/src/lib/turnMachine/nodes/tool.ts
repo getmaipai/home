@@ -26,6 +26,9 @@ import { WRITING_FORMAT_TOOL_ID, runWritingFormatTool } from "@/lib/writingForma
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
+import { runMediaOp } from "@/lib/mediaOps/registry";
+import { latestPictureId } from "@/lib/pictures/editTool";
+import { ImageEditError } from "@/lib/imageEdit";
 import { GENERATE_VIDEO_TOOL_ID, runGenerateVideo } from "@/lib/videos/tool";
 import { redactLockedVideoOutcome } from "@/lib/videos/lock";
 import { EDIT_VIDEO_TOOL_ID, runEditVideo } from "@/lib/videos/editTool";
@@ -222,6 +225,32 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
+    if (tool === "edit_picture") {
+      const raw = proposal.request.args as { op?: unknown; source?: unknown; args?: unknown };
+      const sourceId = typeof raw.source === "string" ? raw.source : "";
+      const images = state.images ?? [];
+      const id = sourceId === "attached" ? images[0]?.id
+        : sourceId === "attached_2" ? images[1]?.id
+        : sourceId === "latest" ? latestPictureId(state.actor, state.conversationId, state.temporary || state.ephemeral === true) : sourceId;
+      const args = (raw.args ?? {}) as Record<string, unknown>;
+      if (typeof args.maskBase64 === "string") { args.mask = new Uint8Array(Buffer.from(args.maskBase64, "base64")); delete args.maskBase64; }
+      if (typeof args.maskPngBase64 === "string") { args.maskPng = new Uint8Array(Buffer.from(args.maskPngBase64, "base64")); delete args.maskPngBase64; }
+      try {
+        const result = await runMediaOp(state.actor, String(raw.op ?? ""), { source: { kind: "picture", via: "chat", id: id ?? "", conversationId: state.conversationId }, args }, signal);
+        const resultData = "people" in result || "subjects" in result ? result : null;
+        const payload = "job" in result ? result.job : result.file;
+        const job = typeof payload === "object" && payload !== null && "job" in payload ? String((payload as { job: string }).job) : null;
+        const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: proposal.request.args, durationMs: 0, result: { reply: { text: job ? "The picture edit is on its way." : resultData ? "I found the numbered picture subjects." : "The picture edit is ready as a new version." }, data: { ...(job ? { pictureJobId: job } : {}), ...(resultData ?? {}) }, actions: [] } });
+        outcomes.push(outcome);
+        toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(job ? { pictureJobId: job } : {}) } });
+      } catch (error) {
+        const known = error instanceof ImageEditError;
+        const failure = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args: proposal.request.args, errorCode: known ? error.code : "edit_failed", failureKind: known && error.status < 500 ? "found_nothing" : known ? "unavailable" : "errored", detail: known ? error.message : undefined, durationMs: 0 });
+        outcomes.push(failure);
+        toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(failure) });
+      }
+      continue;
+    }
     // LIVE-0923-01 (home/docs/dev.md): the old path's own forced-search
     // call never trusted the model's own `category` argument either
     // (the old engine file's resolveToolCalls() call, noteIgnoredModelWeb
@@ -398,7 +427,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // IMGGEN-HOME-01: the picture tool starts a Stack job and answers at once; the card on the thread follows the job.
     // It never goes through runPlugin() (the package holds its description and arguments; this is its one runner).
     if (tool === GENERATE_IMAGE_TOOL_ID) {
-      const outcome = await runGenerateImage({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+      const outcome = await runGenerateImage({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", signal });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

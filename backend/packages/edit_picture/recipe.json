@@ -1,0 +1,4 @@
+{
+  "id": "edit_picture",
+  "steps": [{ "kind": "reply", "text": "The picture operation is handled by Home." }]
+}

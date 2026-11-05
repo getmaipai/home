@@ -24,6 +24,7 @@ export function registerMediaOp<T extends MediaOp>(op: T): T {
 export function registeredMediaOps(): readonly MediaOp[] {
  return [...ops.values()];
 }
+export function mediaOpSchema(id: string): MediaOp | undefined { return ops.get(id); }
 
 function bandAllowed(actor: PersonRow, min: MediaOp["minBand"]): boolean {
  if (actor.role === "guest") return false;
@@ -43,7 +44,7 @@ async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boo
  const key = op.id === "picture.upscale"
   ? "resize"
   : op.id === "picture.locate"
-   ? "find_people"
+   ? (status.tools.find_subjects?.enabled ? "find_subjects" : "find_people")
    : op.id.slice("picture.".length);
  const state = status.tools[key as keyof typeof status.tools];
  return state?.enabled ? { ready: true } : { ready: false, reason: state?.reason ?? status.note ?? "This operation isn't available yet." };
@@ -56,7 +57,7 @@ export async function listMediaOps(actor: PersonRow, filter: { input?: MediaKind
   (!filter.input || op.input === filter.input) &&
   (!filter.output || op.output === filter.output) &&
   bandAllowed(actor, op.minBand));
- return Promise.all(visible.map(async (op) => ({ ...op, ...(await availability(actor, op)) })));
+ return Promise.all(visible.map(async (op) => { const state = await availability(actor, op); return { ...op, ready: state.ready, enabled: state.ready, ...(state.reason ? { reason: state.reason } : {}) }; }));
 }
 export async function runMediaOp(actor: PersonRow, id: string, input: { source: MediaRef; args: unknown }, signal?: AbortSignal) {
  await ensureRegistered();
@@ -68,7 +69,12 @@ export async function runMediaOp(actor: PersonRow, id: string, input: { source: 
  if (!bandAllowed(actor, op.minBand)) {
   throw new ImageEditError(403, "This operation isn't available for this profile.", "forbidden");
  }
- const args = op.args.parse(input.args);
+ let args: unknown;
+ try { args = op.args.parse(input.args); }
+ catch (error) {
+  if (error instanceof Error && error.name === "ZodError") throw new ImageEditError(422, "Those arguments don't fit this picture operation.", "bad_arguments");
+  throw error;
+ }
  if (input.source.kind !== op.input) throw new ImageEditError(422, "That source is not the right media type.", "bad_source");
  if (input.source.via === "file") throw new ImageEditError(501, "Library file addressing is not available yet.", "not_implemented");
  return op.run({ actor, signal }, { source: input.source, args });

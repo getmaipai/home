@@ -200,11 +200,10 @@ spoken) and the Studio words box. One routing step, the model's own tool choice 
   VIDEO-LORA-12 moves pictures onto the `Lora` record, and a locked picture style exists after ADULT-LOCK-07 (organisation principle 4). Until then `styles` uses the
   lookup `generate_image` already uses for pictures and moves with VIDEO-LORA-12; this note builds no third lookup. An unknown or unusable name stops
   the edit with the tool's failure kind and the model says it in its own words. Never an invented name.
-- **A person named in words** ("the boy on the left"). `picture.locate` is an `edit_picture` op choice (no new tool, cap of 16 unchanged; it returns boxes, not a file or a job, so it is never listed as a Studio tool or a card action). It calls
-  the Stack's `find_people`, which returns numbered boxes as fractions of the picture, and hands the boxes to the model, which picks the number (no
+- **A subject named in words** ("the dog on the left", "the boy on the left"). `picture.locate` is an `edit_picture` op choice (no new tool, cap of 16 unchanged; it returns boxes, not a file or a job, so it is never listed as a Studio tool or a card action). It calls
+  the Stack's `find_subjects` operation, which returns numbered boxes as fractions of the picture with detector `kind` and `label`, and hands the boxes to the model, which picks the number (no
   regex or word list; the 2026-10-26 `choosePeople` and `resolvePosition` word rules are gone and stay gone). One chosen box is the area for `picture.erase` (remove) or
-  `picture.change` (replace). `find_people` finds people only: objects ("the red car") have no tested locator, so they use `picture.change`
-  with the words alone until a bench (IMG-LATER). Every age may use `locate` and erase by people (owner ruling 2026-11-04: they make no content). Animals: the Stack finder detects people only, so an animal finder is a Stack slice (IMG-OPS-07). Readiness comes from
+  `picture.change` (replace). On older Stacks, Home falls back to `find_people` and preserves `people` for old callers. Every age may locate and erase people, animals and objects (owner ruling 2026-11-04: finding and erasing make no content). Readiness comes from
   `editToolsStatus` and `roleHealth`; when the reader is not ready the model uses `picture.change` with the words and says so. `locate` logs counts only (rule 6a).
 - **In the Studio box** a found person is handled inside the one forced call: the tool's `locate` step returns the boxes to the model within the same call and the model then names the box for `erase` or `change`; one call from the person's side, two steps inside it.
 - **Several people or none.** In chat and companion turns the tool returns the count and the positions as a kind of result and the model asks which

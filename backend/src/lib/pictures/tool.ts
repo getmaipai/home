@@ -17,7 +17,7 @@ import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from 
 import { StackPicturesError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 
-import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
+import { GENERATE_IMAGE_TOOL_ID, runEditPicture, latestPictureId } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
 
 const KID_MAX_COUNT = 2;
@@ -66,6 +66,7 @@ export interface RunGenerateImageInput {
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;
+  signal?: AbortSignal;
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -84,13 +85,43 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const { state, args, callId } = input;
   const audience = audienceOf(state, input.spoken);
   // The household's likeness option (lib/likeness.ts) is checked here, after the policy gate: its refusal is not a minor-line reason.
-  const refusal = refusalFor(audience, args) ?? likenessCallRefusal(audience.actor, args);
+  const normalized = { ...args };
+  if (Array.isArray(args.references)) {
+    const refs = (args.references as unknown[]).flatMap((entry) => {
+      const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
+      return id ? [id] : [];
+    }).slice(0, 2);
+    if (refs.length) normalized.reference = refs[0];
+  }
+  // Templates are introduced by IMG-TPL-01; accepting the field now keeps callers forward compatible.
+  delete normalized.template;
+  const refusal = refusalFor(audience, normalized) ?? likenessCallRefusal(audience.actor, normalized);
   if (refusal) return refused(callId, args, refusal);
+  const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
 
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
-  if (typeof args.change === "string" && args.change.trim() !== "") return runEditPicture({ state, args, callId, audience });
+  if (typeof normalized.change === "string" && normalized.change.trim() !== "") {
+    const mapped = { ...normalized };
+    if (Array.isArray(normalized.references)) {
+      const refs = (normalized.references as unknown[]).flatMap((entry) => {
+        const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
+        return id ? [id] : [];
+      }).slice(0, 2);
+      if (refs.length) mapped.reference = refs[0];
+      if (refs.length > 1) mapped.references = refs.slice(1).map((id) => ({ kind: "picture", via: "chat", id, conversationId: state.conversationId }));
+    }
+    return runEditPicture({ state, args: mapped, callId, audience });
+  }
+  if (Array.isArray(normalized.references) && normalized.references.length) {
+    const sourceId = latestPictureId(state.actor as PersonRow, state.conversationId, state.temporary === true || state.ephemeral === true);
+    if (!sourceId) return failed(callId, args, "no_picture", "bad_arguments");
+    const references = (normalized.references as unknown[]).flatMap((entry) => {
+      const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
+      return id ? [{ kind: "picture" as const, via: "chat" as const, id, conversationId: state.conversationId }] : [];
+    }).slice(0, 2);
+    return runEditPicture({ state, args: { prompt, change: sourceId, references: references.map((ref) => ref.id) }, callId, audience });
+  }
 
-  const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
   if (prompt.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const engine = await pictureEngineStatus();
   if (!engine || engine.state === "unsupported" || engine.state === "off" || engine.state === "not-installed" || engine.available === false) {

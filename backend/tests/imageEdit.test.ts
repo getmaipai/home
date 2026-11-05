@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, people } from "@/db/schema";
+import { attachments, people, settingsValues } from "@/db/schema";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { __resetImageEditForTests, __setImageToolsForTests, regionForStack, saveVersion, type SourcePicture } from "@/lib/imageEdit";
@@ -14,6 +14,7 @@ import { TestClient } from "./client";
 import { installFakeImageStack, type FakeImageStack } from "./pictureFixture";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { resetDb } from "./reset-db";
+import { __setRoleHealthForTests } from "@/lib/roleHealth";
 
 const READY: StackImageToolsStatus = { state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: { upscale_in: 6 }, operations: ["remove_background", "erase", "upscale", "resize"], reason: null };
 
@@ -41,7 +42,7 @@ function stubStack(): Stub {
 }
 
 beforeEach(() => { resetDb(); __resetImageEditForTests(); });
-afterEach(() => { __setStackClientForTests(null); __resetStackEngineForTests(); __resetImageEditForTests(); });
+afterEach(() => { __setStackClientForTests(null); __resetStackEngineForTests(); __resetImageEditForTests(); __setRoleHealthForTests({}); });
 
 async function owner() {
   const client = new TestClient();
@@ -88,6 +89,39 @@ describe("regionForStack", () => {
 });
 
 describe("picture editor routes", () => {
+  test("words box forces one edit_picture call and returns the selected edit job", async () => {
+    const { client, actor } = await owner();
+    db.insert(settingsValues).values({ scope: `person:${actor.id}`, key: "chat.photo_uploads", value: "true", hlc: "1:0:test", source: "self", setBy: actor.id, updatedAt: new Date().toISOString() }).run();
+    const stub = stubStack();
+    __setImageToolsForTests(READY, true);
+    __setRoleHealthForTests({ image: { availability: "ready", reason: null } });
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("no conversation");
+    const picture = await upload(client, conversation.value.id);
+    let chatRequests = 0;
+    let forcedRequest: any;
+    (stub.client as unknown as { chat: (...args: any[]) => Promise<unknown> }).chat = async (request: unknown) => {
+      chatRequests++;
+      forcedRequest = request;
+      return { data: { choices: [{ message: { role: "assistant", tool_calls: [{ id: "edit-1", type: "function", function: { name: "edit_picture", arguments: JSON.stringify({ op: "picture.erase", source: "latest", args: { subjects: "2" } }) } }], content: null }, finish_reason: "tool_calls" }] }, identity: { host: "local", build: null, model: "test", healthy: true } };
+    };
+    stub.script.reply = async () => ({ kind: "running", job: "words-edit-job" });
+    __setStackClientForTests(stub.client);
+    const response = await client.post(`/api/image-edit/pictures/${picture.id}/words`, { conversation_id: conversation.value.id, prompt: "make it sunny" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: "running", job: "words-edit-job" });
+    expect(chatRequests).toBe(1);
+    expect(forcedRequest.tool_choice).toBe("required");
+    expect(forcedRequest.tools.map((item: any) => item.function.name)).toContain("edit_picture");
+    const offeredEdit = forcedRequest.tools.find((item: any) => item.function.name === "edit_picture").function.parameters;
+    expect(offeredEdit.properties.op.enum).toContain("picture.erase");
+    const eraseChoice = offeredEdit.oneOf.find((choice: any) => choice.properties.op.const === "picture.erase");
+    expect(JSON.stringify(eraseChoice.properties.args)).not.toContain("mask");
+    expect(stub.calls.edits).toHaveLength(1);
+    expect(stub.calls.edits[0]?.get("operation")).toBe("erase_subjects");
+    expect(stub.calls.edits[0]?.get("subjects")).toBe("2");
+  });
+
   test("status reports each tool from the Stack and the reason a tool is off", async () => {
     const { client } = await owner();
     const stub = stubStack();

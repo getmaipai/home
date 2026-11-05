@@ -381,6 +381,15 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
     }
 
+    if (call.tool === "edit_picture") {
+      const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: (call.args ?? {}) as Record<string, unknown>, callId: call.id ?? call.tool } };
+      if (!state.editPictureAllowed) {
+        noteRefusal("picture_not_here");
+        entries.push({ proposal, decision: { allow: false, reason: "picture_not_here" } });
+      } else entries.push({ proposal, decision: { allow: true } });
+      continue;
+    }
+
     // NEWS-DISCUSS-TOOL-2026-10-27: `read_item` reads only a reference the person typed in this very message, and only on a turn
     // that was offered it; a guessed or invented reference is refused here, before any reader runs.
     if (call.tool === READ_ITEM_TOOL_ID) {

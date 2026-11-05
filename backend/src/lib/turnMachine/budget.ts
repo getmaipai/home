@@ -176,11 +176,11 @@ function musicObjectOffer(gate: string | undefined, object: MusicObjectGate): bo
   }
 }
 
-function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false): boolean {
+function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false): boolean {
   if (offer.mode === "base") return true;
   if (offer.mode !== "conditional" || !offer.bench_row) return false;
   // IMGGEN-HOME-01: `picturesAllowed` is decided once per turn (pictures/policy.ts and the Stack's picture engine being up).
-  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "writingFormatAllowed" && writingFormatOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
+  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "pictureEditAllowed" && editPictureOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "writingFormatAllowed" && writingFormatOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
 }
 
 export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string } }, status: "enabled" | "disabled", usedInChat = false): string | null {
@@ -203,7 +203,7 @@ const MUSIC_SHRINK_ORDER = "writing_format make_song_style make_album edit_band 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
 const STUDIO_SHRINK_ORDER = "writing_format make_song_style make_album edit_music".split(" ");
 
-export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false): TurnBudget {
+export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false): TurnBudget {
   const cap = budget.max_tools ?? 0;
   if (budget === NO_RECORD_BUDGET) return budget;
   if (cap === 0) return budget.tools_offered.length === 0 ? budget : { ...budget, tools_offered: [] };
@@ -213,13 +213,13 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   for (const manifest of listInstalledManifests()) {
     const offer = manifest.offer;
     const forcedForMeasurement = offerOverridesForTests.has(manifest.id);
-    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk))) continue;
+    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk))) continue;
     const status = statuses.get(manifest.id);
     if (status && (status.status !== "enabled" || status.smokeOk === false)) continue;
     candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
   }
   for (const tool of VIRTUAL_TOOL_REGISTRY) {
-    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
+    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 
   // VIDEO-CHAT-01: the video set (at most four tools) keeps its place; when the total would pass the cap, the music set shrinks first.

@@ -4,6 +4,7 @@ import { chatLeaseHeldBy } from "@/lib/chatLease";
 import { SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
 import { isLookupPackage } from "@/lib/ruleNames";
 import { conversationHasMusic } from "@/lib/music/jobs";
+import { latestPictureId } from "@/lib/pictures/editTool";
 import { threadMusicObject } from "@/lib/music/objects";
 import { conversationHasVideo } from "@/lib/videos/jobs";
 import { pageContextForTurn } from "@/lib/pageContext";
@@ -667,11 +668,12 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     bare,
     ephemeral: opts.ephemeral === true,
     text,
+    hasPictureInConversation: (opts.images?.length ?? 0) > 0 || latestPictureId(actor, conversation.id, temporary || opts.ephemeral === true) !== null,
     musicEditAvailable: () => conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
-  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk } = gated;
+  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -689,6 +691,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),
     ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
     ...(picturesOk ? { picturesAllowed: true } : {}),
+    ...(editPictureOk ? { editPictureAllowed: true } : {}),
+    ...(editPictureOk ? { editPictureOps } : {}),
+    ...(editPictureOk ? { editPictureIds } : {}),
     ...(videosOk ? { videosAllowed: true } : {}),
     ...(musicOk ? { musicAllowed: true } : {}),
     ...(musicEditOk ? { musicEditAllowed: true } : {}),

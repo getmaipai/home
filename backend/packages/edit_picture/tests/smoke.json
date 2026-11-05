@@ -1,0 +1,5 @@
+{
+  "description": "Home executes the registry-backed edit_picture tool directly.",
+  "messages": [{ "role": "user", "content": "Use the picture operation." }],
+  "expected": "The picture operation is handled by Home."
+}

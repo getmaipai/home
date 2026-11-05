@@ -59,6 +59,14 @@ export function latestPictureId(actor: PersonRow, conversationId: string, tempor
   return row?.id ?? null;
 }
 
+/** Picture ids this signed-in person can address in a stored chat. Temporary chats expose only their newest id through `latest`. */
+export function pictureIdsInConversation(actor: PersonRow, conversationId: string, temporary: boolean): string[] {
+  if (temporary) return [];
+  return db.select({ id: attachments.id }).from(attachments)
+    .where(and(eq(attachments.conversationId, conversationId), eq(attachments.ownerPersonId, actor.id), like(attachments.mediaType, "image/%")))
+    .orderBy(desc(attachments.createdAt), desc(attachments.hlc)).all().map((row) => row.id);
+}
+
 /** `attached` (the first picture on this message), `attached_2` (the second), `latest` (the newest in this chat) or a picture id of this chat. */
 function pictureIdFor(input: RunEditInput, word: unknown): string | null {
   const token = typeof word === "string" ? word.trim() : "";
@@ -131,7 +139,8 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const status = await pictureEngineStatus().catch(() => null);
   if (!status || status.available === false || !status.edit?.generative) return failed(callId, args, "no_engine", "unavailable", "no picture model that can change a picture is installed on the Stack");
 
-  const ref = args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "" ? load(input, args.reference) : null;
+  const extraReferences = Array.isArray(args.references) ? (args.references as unknown[]).map((value) => typeof value === "string" ? value : value && typeof value === "object" && "id" in value ? String((value as { id: unknown }).id) : "").filter(Boolean).slice(0, 1) : [];
+  const ref = args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "" ? load(input, args.reference) : extraReferences.length ? load(input, extraReferences[0]) : null;
   if (args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "" && !ref) return line(callId, args, NOT_FOUND_LINE);
   if (ref && (status.edit.references ?? 0) < 1) return line(callId, args, REFERENCES_MISSING_LINE);
   if (ref && ref.id === base.id) return line(callId, args, "The second picture has to be a different picture from the one you want changed.");

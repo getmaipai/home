@@ -6,7 +6,13 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { ImageEditError, applyPreview, cancelEdit, editErrorFrom, editToolsStatus, listVersions, pollEdit, readPicture, readPreview, saveUploadedVersion } from "@/lib/imageEdit";
-import { runPictureEdit, getMediaOpJob } from "@/lib/mediaOps/registry";
+import { runPictureEdit, getMediaOpJob, listMediaOps } from "@/lib/mediaOps/registry";
+import { complete } from "@/lib/llm";
+import { toToolDefinition } from "@/lib/llm";
+import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
+import { runMediaOp } from "@/lib/mediaOps/registry";
+import type { TurnState } from "@/lib/turnMachine/contract";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 
 export const imageEditRoutes = apiRouter();
 
@@ -157,6 +163,33 @@ imageEditRoutes.openapi(commentRoute, async (c) => {
   try {
     const body = c.req.valid("json");
     const result = await runPictureEdit(c.get("person"), "change", { source: { kind: "picture", via: "chat", id: c.req.valid("param").id, conversationId: body.conversation_id }, args: { prompt: body.prompt, region: body.region ?? null, maskPng: body.mask ? new Uint8Array(Buffer.from(body.mask, "base64")) : null, referenceId: body.reference_id ?? null } });
+    return c.json("job" in result ? result.job : result.file, 200) as never;
+  } catch (error) { return fail(c, error) as never; }
+});
+
+const wordsRoute = createRoute({
+  method: "post", path: "/pictures/{id}/words", tags: ["Image editor"], summary: "Run a picture edit chosen by the model from words", middleware: [requireAuth] as const,
+  request: { params: pictureParams, body: { content: { "application/json": { schema: z.object({ conversation_id: z.string().min(1).max(80), prompt: z.string().min(1).max(2000), mask: z.string().max(14_000_000).nullable().optional(), references: z.array(z.string().min(1).max(80)).max(2).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: ProgressSchema } }, description: "The model selected an operation and Home ran it through the media registry." }, ...refusals },
+});
+imageEditRoutes.openapi(wordsRoute, async (c) => {
+  try {
+    const actor = c.get("person");
+    const body = c.req.valid("json");
+    const sourceId = c.req.valid("param").id;
+    const operations = (await listMediaOps(actor, { input: "picture", includeHelpers: true })).filter((operation) => operation.enabled);
+    const tool = toolSpecFor("edit_picture", laneOfPerson(actor), { actor, editPictureAllowed: operations.length > 0, editPictureOps: operations, editPictureIds: [sourceId] } as TurnState);
+    if (!tool || !operations.some((operation) => operation.enabled)) throw new ImageEditError(503, "Picture edits are not available yet.", "unavailable");
+    const forced = await complete("chat", [{ role: "user", content: `Picture id: ${sourceId}. Painted area supplied: ${body.mask ? "yes" : "no"}. Other picture ids: ${(body.references ?? []).join(", ")}. Request: ${body.prompt}` }], { tools: [tool], tool_choice: "required", thinking: false, dropReasoning: true, signal: c.req.raw.signal });
+    if (!forced.ok) throw new ImageEditError(503, "The picture edit could not be chosen right now.", "model_unavailable");
+    const call = forced.value.tool_calls?.find((item) => item.tool === "edit_picture");
+    if (!call || !call.args || typeof call.args !== "object") throw new ImageEditError(503, "The picture edit could not be chosen right now.", "no_tool_call");
+    const selected = call.args as { op?: unknown; args?: Record<string, unknown> };
+    const operation = operations.find((item) => item.id === selected.op && item.enabled);
+    if (!operation) throw new ImageEditError(422, "That picture operation is not available.", "operation_unavailable");
+    const args = { ...(selected.args ?? {}) };
+    if (body.mask && operation.controls.some((control) => control.kind === "mask")) args.mask = new Uint8Array(Buffer.from(body.mask, "base64"));
+    const result = await runMediaOp(actor, operation.id, { source: { kind: "picture", via: "chat", id: sourceId, conversationId: body.conversation_id }, args }, c.req.raw.signal);
     return c.json("job" in result ? result.job : result.file, 200) as never;
   } catch (error) { return fail(c, error) as never; }
 });

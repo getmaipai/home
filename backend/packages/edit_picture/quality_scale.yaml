@@ -1,0 +1,3 @@
+package: edit_picture
+scale: bronze
+notes: Registry-backed picture edits are conditionally offered only for a conversation with a picture and a ready operation.

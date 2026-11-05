@@ -1,0 +1,26 @@
+{
+  "id": "edit_picture",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Edit a Picture",
+  "description": "Use an available picture operation on a picture in this conversation.",
+  "offer": { "mode": "conditional", "gate": "pictureEditAllowed", "bench_row": "picture-edit-tool", "priority": 90 },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "args": {
+    "type": "object",
+    "required": ["op", "source", "args"],
+    "properties": {
+      "op": { "type": "string", "maxLength": 80, "grounded": false },
+      "source": { "type": "string", "maxLength": 80, "grounded": false },
+      "args": { "type": "object", "grounded": false }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [], "optional": [], "platforms": ["home"], "min_role": "child", "consequential": false,
+  "offline": "full", "data_sources": [], "permissions": [], "notifications": [], "backup": "exclude",
+  "background": false, "contributes": {}, "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }, "config": []
+}

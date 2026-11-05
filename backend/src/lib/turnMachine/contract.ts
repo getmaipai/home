@@ -222,6 +222,9 @@ export interface TurnState {
    * turn, which injects none). Written into the turn's stats JSON. */
   memoryTrace?: import("@/wire").MemoryTraceStats;
   images?: import("@/wire").ChatImagePart[];
+  editPictureAllowed?: boolean;
+  editPictureOps?: Awaited<ReturnType<typeof import("@/lib/mediaOps/registry").listMediaOps>>;
+  editPictureIds?: string[];
   /** VISION-02c: the turn's pictures as picture parts for a chat model
    * that reads them (the context node decides, from the Stack's chat row
    * and the person's settings); absent when they go as a note instead. */

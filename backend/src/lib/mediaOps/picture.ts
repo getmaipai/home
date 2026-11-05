@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { startEdit, startComment, loadSource, editToolsStatus, ImageEditError } from "@/lib/imageEdit";
+import { startEdit, loadSource, editToolsStatus, ImageEditError } from "@/lib/imageEdit";
+import { startComment } from "@/lib/imageEdit";
 import { runPictureTool } from "@/lib/pictures/people";
 import { registerMediaOp } from "./registry";
 
 const empty = z.object({});
-const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional() });
+const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
 const upscaleArgs = z.object({ scale: z.union([z.literal(2), z.literal(4)]).default(2) });
 const resizeArgs = z.object({ width: z.number().int().min(1).max(8000), height: z.number().int().min(1).max(8000) });
 const referenceSchema = z.object({ kind: z.literal("picture"), via: z.literal("chat"), id: z.string(), conversationId: z.string().optional() });
@@ -63,8 +64,8 @@ registerMediaOp({
 
 registerMediaOp({
   id: "picture.locate",
-  label: "Locate people",
-  summary: "Find people and return their numbered picture boxes.",
+  label: "Locate subjects",
+  summary: "Find picture subjects and return their numbered boxes and labels.",
   input: "picture",
   output: "data",
   args: empty,
@@ -74,15 +75,17 @@ registerMediaOp({
   listed: false,
   run: async ({ actor, signal }, { source }) => {
     const status = await editToolsStatus(actor);
-    if (!status.tools.find_people.enabled) {
-      throw new ImageEditError(503, status.tools.find_people.reason ?? status.note ?? "The people finder isn't available yet.", "unavailable");
+    const key = status.tools.find_subjects ? "find_subjects" : "find_people";
+    if (!status.tools[key].enabled) {
+      throw new ImageEditError(503, status.tools[key].reason ?? status.note ?? "The picture finder isn't available yet.", "unavailable");
     }
     const picture = sourceData(source, actor);
-    const found = await runPictureTool("find_people", picture.bytes, picture.mediaType, {}, signal);
-    if (!found.people) throw new Error("The people finder did not return boxes.");
-    const people = found.people.map((box) => ({ n: box.id, x: box.x, y: box.y, width: box.w, height: box.h }));
-    console.info("media_op.people_found", { count: people.length });
-    return { people };
+    const found = await runPictureTool(key, picture.bytes, picture.mediaType, {}, signal);
+    const subjects = found.subjects?.map((box) => ({ n: box.id, x: box.x, y: box.y, width: box.w, height: box.h, kind: box.kind, ...(box.label ? { label: box.label } : {}) }))
+      ?? found.people?.map((box) => ({ n: box.id, x: box.x, y: box.y, width: box.w, height: box.h, kind: "person" })) ?? [];
+    const people = subjects.filter((box) => box.kind === "person");
+    console.info("media_op.subjects_found", { count: subjects.length });
+    return { subjects, people };
   },
 });
 
