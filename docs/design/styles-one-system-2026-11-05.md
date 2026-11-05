@@ -73,7 +73,8 @@ Rule: a new style feature is built once against the record and the table. Only t
 
 ## 6. Build slices (each one lands alone, tests first)
 
-1. **STYLES-01 media parameter.** `media` on browse, install and the base table; picture rows with live-confirmed labels; tests with a fake picture Stack in the real reply shape (`{ job: {...} }`).
+0. **STYLES-00 picture Stack install parity (Stack repo, its own worktree, first).** Read 2026-11-05: the picture install (`images/loras.ts` `startLoraInstall`) takes only a Hugging Face link. It has no Civitai download host, no expected hash, no token, no base model, and its job reply carries `{ lora }` with the picture record shape. Bring it to the video route's body (`url`, `sha256_expected`, `token`, `base_model`, `audience`, `licence_acknowledged`) and keep the old link body working (additive API). Tag and pin per the Stack rules.
+1. **STYLES-01 media parameter** (after STYLES-00). `media` on browse, install and the base table; picture rows with live-confirmed labels; tests with a fake picture Stack in the real reply shape (`{ job: {...} }`).
 2. **STYLES-02 one prompt plan.** Move the plan to `lib/loras/promptPlan.ts`; both Create pages and both chat tools call it; a test that the same input gives the same words for both media.
 3. **STYLES-03 readiness provider.** Feed `setInstalledBasesProvider` from the Stack roles so the default search is never empty by accident (it returned nothing on the 2026-11-04 run).
 4. **STYLES-04 suggestions** (after ADULT-LOCK-07, so pictures hold the Adult lock before a picture style can be suggested). `allow_suggesting` in the record (spec first, in `commons/spec`), the matcher, the chips on both Create pages, the editor switch. Tests: an adult-only style is never a candidate while locked or for a minor.
@@ -81,6 +82,6 @@ Rule: a new style feature is built once against the record and the table. Only t
 
 ## 7. Open items (measurements, not owner questions)
 
-- Whether the picture Stack's install job reply matches the video one (it returned nothing readable on 2026-11-04 from the list route); STYLES-01 starts by reading it.
+- Measured 2026-11-05: the picture install job reply wraps the same `{ job }` and returns `{ lora }`, but its request body is thinner than the video one (STYLES-00).
 - Civitai base labels for the picture families.
 - Which picture styles a base can stack two of without a muddy result (a bench, one sample per pair).
