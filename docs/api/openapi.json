@@ -68735,6 +68735,18 @@
             "required": false,
             "name": "removed",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "video",
+                "picture"
+              ]
+            },
+            "required": false,
+            "name": "media",
+            "in": "query"
           }
         ],
         "responses": {
@@ -69018,6 +69030,20 @@
           "LoRAs"
         ],
         "summary": "The styles this person may use in Create and Edit",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "video",
+                "picture"
+              ]
+            },
+            "required": false,
+            "name": "media",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Empty for a child, a teen, a guest or a shared screen.",
