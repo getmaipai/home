@@ -1,6 +1,6 @@
 {
   "id": "generate_video",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
@@ -43,6 +43,12 @@
         "maxLength": 80,
         "grounded": false,
         "description": "Optional. Set to \"latest\" only when the person asks to animate or bring to life a picture that was made earlier in this chat. Set to \"attached\" when the person attached a photo to this message and asks to animate it. Leave it out for a video from words alone."
+      },
+      "end_frame": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional. A picture the video should end on. Use \"latest\" or a picture id made earlier in this chat. Needs from_picture too; the video starts on that picture and ends on this one."
       },
       "orientation": {
         "type": "string",

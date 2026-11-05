@@ -271,7 +271,7 @@ export function withCheckedLtx25(status: StackVideoStatus): StackVideoStatus {
       if (!(x.width > 0) || !(x.height > 0) || !(x.max_seconds > 0)) return [];
       return [{ ...x, name: x.name as StackLtx25Profile["name"], width: x.width, height: x.height, size: `${x.width}x${x.height}`, max_seconds: x.max_seconds } as StackLtx25Profile];
     });
-    return { ...quality, ready: quality.ready === true, profiles };
+    return { ...quality, ready: quality.ready === true, image_to_video: quality.image_to_video === true, end_image: quality.end_image === true, profiles };
   };
   const ltx25 = checked(qualities.ltx25, ["standard", "boost"]);
   const ltx25max = checked(qualities.ltx25max, ["max"]);

@@ -25,7 +25,7 @@ import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
-import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, ltx25VideoReady, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
+import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
 import { StackVideoError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
@@ -148,6 +148,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let sourceFileId: string | null = null;
   let portrait = args.orientation === "portrait";
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
+  const ending = typeof args.end_frame === "string" ? args.end_frame.trim() : "";
+  if (ending && kid) return refused(callId, args, { kind: "child", why: "photos", line: CHILD_NO_PHOTOS_LINE });
   const refuseWith = (line: string) => refused(callId, args, { kind: "child", why: "photos", line });
   if (input.prepared) {
     image = input.prepared.image; imageSource = input.prepared.imageSource; sourceFileId = input.prepared.sourceFileId;
@@ -186,6 +188,19 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       image = Buffer.from(ref.bytes).toString("base64"); imageSource = "uploaded"; sourceFileId = ref.id;
     }
   }
+  let endImage: string | undefined;
+  let endFileId: string | null = null;
+  let endAudience: "adult-only" | null = null;
+  if (ending) {
+    if (!image) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: an ending picture needs a starting picture too." }, data: { refused: "end_frame_needs_start" }, actions: [] } });
+    const id = /^(latest|last|this|that)$/i.test(ending) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId!) : latestGeneratedPictureId(actor, state.conversationId!)) : ending;
+    const ref = id && state.conversationId ? loadGeneratedReference(actor, state.conversationId, id, temporary) : null;
+    if (!ref || !ref.ok) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${ref && !ref.ok ? ref.line : "I can only use a picture made here in this chat for the ending picture."}` }, data: { refused: "end_reference" }, actions: [] } });
+    if (ref.id === sourceFileId) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: The ending picture must be different from the starting picture." }, data: { refused: "same_end_frame" }, actions: [] } });
+    endImage = ref.base64; endFileId = ref.id;
+    const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, ref.id)).get();
+    endAudience = row?.provenance?.includes('"audience":"adult-only"') ? "adult-only" : null;
+  }
 
   // Only a style this person may use right now can match; the model never sees the library. VIDEO-LORA-09: one resolver for names (chat) and ids (Create, a stored clip).
   const picked = kid ? { ok: true as const, adapters: [], unmatched: [] } : await resolveStyles({ audience, names: styleNamesOf(args), ids: input.styleIds, ...(typeof state.utterance === "string" ? { utterance: state.utterance } : {}) });
@@ -204,6 +219,11 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const asksMax = tierAsked.tier === "max" && maxReady;
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
   const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
+  if (ending) {
+    const endMaker = maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
+    if (!endMaker) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: This computer's video model cannot end on a picture yet." }, data: { refused: "end_frame_unavailable" }, actions: [] } });
+    choice.maker = endMaker; choice.quality = "quick"; choice.seconds = Math.min(choice.seconds, endMaker === "ltx25max" ? 10 : 10); choice.note = null;
+  }
   // A style made for Detailed cannot be used without Detailed: say so rather than start a clip the Stack would refuse.
   if (adapter && qualityOfBase(adapter.base_model) === "detailed" && !detailedVideoReady(engine)) {
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, which are not on this computer yet. An admin can get them in Settings, Models and storage, or I can make the video without the style." }, data: { refused: "style_needs_detailed" }, actions: [] } });
@@ -257,7 +277,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       kind: image ? "animate" : "generate",
       prompt: subjectPrompt,
       sourceFileId,
-      ...(resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
+      endFileId,
+      ...(endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       ...(create ? { create } : {}),
       ...(input.adultOnly ? { adultOnly: true, ...(input.adultLock ? { adultLock: input.adultLock } : {}) } : {}),
@@ -268,9 +289,10 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         size,
         seconds,
         ...(maxMade ? { model: LTX25_MAX_MODEL } : ltx25 ? { model: LTX25_MODEL } : choice.maker === "ltx23" ? { model: "detailed" as const } : {}),
-        audience: stackAudienceFor(audience),
+        audience: endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? "adult" : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
+        ...(endImage ? { end_image: endImage } : {}),
         ...(adapters.length > 0 ? { loras: plan.loras } : {}),
         ...(plan.negative ? { negative_prompt: plan.negative } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),

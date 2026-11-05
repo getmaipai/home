@@ -6,6 +6,7 @@ All notable changes to the Make a Video package, in [Keep a Changelog](https://k
 
 ### Added
 
+- VIDEO-INPUTS-03: `end_frame` names a generated picture from this chat for an LTX-2.5 clip to end on; Home requires a distinct start picture and records both picture ids.
 - VIDEO-SUBJECTS-01: `subjects` names saved characters, places or props for a video. Home adds their looks and can start the clip from a screened reference picture; adult-only references make the clip adult-only. Children cannot use photo references. Video jobs have no `subjectIds` field, so subject ids are not recorded on them.
 
 ### Changed
