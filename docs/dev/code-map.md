@@ -233,6 +233,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pageHeaderTitle.tsx` | headerEntryFor, HeaderTitle, PageHeaderTitle, PageHeaderActions |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
 | `frontend/src/shell/pages/BackupsPage.tsx` | BackupsIcon, BackupsPage |
+| `frontend/src/shell/pages/BringSong.tsx` | BRING_SONG_LINE, BringSong |
 | `frontend/src/shell/pages/ChatColumn.tsx` | CHAT_COLUMN_ID, CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH, CHAT_SETTINGS_PATH, chatColumnShortcutLabel, useChatThreadListState, searchableThreadsFor |
 | `frontend/src/shell/pages/ChatPage.tsx` | ChatPage |
 | `frontend/src/shell/pages/ChatShortcutReference.tsx` | ChatShortcutReference |
