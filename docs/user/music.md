@@ -16,6 +16,8 @@ Choose a language in your Music settings to see a translation under timed lyrics
 
 A song made in chat can be split into its parts. Open the song card and choose **Stems**, or ask in chat to split it. You get four tracks: Vocals, Drums, Bass and Other. Use Next to step through them. It takes about a minute and happens on your own home server. You can also split an audio file of your own. Open it in Library, then choose **Split into stems**. Stems stay on this home server, and splitting does not make a voice. Adults only.
 
+In Music Create, bring in a song you made or own and choose **Sing it in another voice** to have a household voice sing it. Pick a voice with a saved sample. A poor sample can make the singing sound rough or unlike the voice you chose.
+
 Radio uses songs from your library only. It looks for the same artist, album artist, kind of music and decade. It does not
 search the web. Kids never see or play songs marked explicit.
 

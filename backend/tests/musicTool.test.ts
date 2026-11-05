@@ -20,6 +20,7 @@ import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import { runSmoke } from "@/lib/smoke";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setMusicMixRunnerForTests, __setMusicMixToolsForTests, mixMusicParts, mixPcmWav } from "@/lib/music/mixParts";
+import { saveClonedVoice } from "@/lib/clonedVoices";
 import { writeFileSync } from "node:fs";
 import type { TurnState } from "@/lib/turnMachine/contract";
 function pcmFixture(samples: number[]): Uint8Array {
@@ -221,6 +222,56 @@ describe("native music edits, versions and section timing", () => {
     const invalidTrack = await runEditMusic({ state, args: { track: "vocals", change: "parts", parts: { keep: ["vocals"] } }, callId: "p", spoken: false });
     expect(invalidTrack.result?.data).toMatchObject({ refused: "source_not_made_here" });
     expect(db.select().from(musicJobs).all()).toHaveLength(0);
+  });
+  test("voice swap makes one finished mix from vocals conversion and all instrumental stems", async () => {
+    const state = musicState(people.owner); const parent = await generate(state); fake.stems = true; fake.allStems = true;
+    __setMusicMixToolsForTests({ afconvert: null, ffmpeg: "ffmpeg" });
+    const voice = saveClonedVoice(people.owner, "Nova", new Uint8Array([1, 2, 3]), "audio/wav");
+    if (!voice.ok) throw new Error("voice setup failed");
+    const before = db.select().from(attachments).all().length;
+    const outcome = await runEditMusic({ state, args: { track: parent.fileId, change: "voice_swap", voice: voice.value.id }, callId: "voice", spoken: false });
+    expect(outcome.result?.reply?.text).toBe("Here it is sung by Nova.");
+    const id = musicForOutcomes([outcome])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const result = getMusicJobFor(people.owner, id)!;
+    expect(db.select().from(attachments).all()).toHaveLength(before + 1);
+    expect(fake.voiceConvert.submitted).toHaveLength(1);
+    expect(fake.voiceConvert.deleted).toBe(1); expect(fake.stemDeleted).toBe(1);
+    expect(fake.voiceConvert.submitted[0]).toMatchObject({ pitch_shift: 0, auto_shift: false });
+    expect(Buffer.from(fake.voiceConvert.submitted[0]!.reference, "base64")).toEqual(Buffer.from([1, 2, 3]));
+    expect((globalThis as unknown as { lastMixCommand: string[] }).lastMixCommand.filter((part) => part === "-i")).toHaveLength(4);
+    expect(result.request).not.toHaveProperty("stems"); expect(result.request).not.toHaveProperty("convertedVocal");
+    expect(result.request.title).toBe("Pancakes");
+    const row = db.select().from(attachments).where(eq(attachments.id, result.fileId!)).get()!;
+    expect(generationOf(row.provenance)).toMatchObject({ task: "cover", source_kind: "made_here", parent_file_id: parent.fileId, model: { id: "unknown" }, engine: { id: "unknown" }, commercial_use: "unknown" });
+    expect(commercialUseOf(result.fileId!)).toBe("unknown");
+  });
+  test("voice swap accepts an attached owned file and preserves upload provenance", async () => {
+    const state = musicState(people.owner); fake.stems = true; fake.allStems = true;
+    const upload = createAttachment(people.owner, { conversationId: state.conversationId, turnId: state.turnId, bytes: testM4a(), mediaType: "audio/mp4", deduplicate: false });
+    if (!upload.ok) throw new Error("upload failed");
+    const voice = saveClonedVoice(people.owner, "Nova", new Uint8Array([1]), "audio/wav"); if (!voice.ok) throw new Error("voice setup failed");
+    const outcome = await runEditMusic({ state: { ...state, audio: [{ id: upload.value.id, name: "track.m4a", media_type: "audio/mp4" }] }, args: { track: "attached", change: "voice_swap", voice: voice.value.id }, callId: "voice-upload", spoken: false });
+    const id = musicForOutcomes([outcome])!.id; await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const result = getMusicJobFor(people.owner, id)!;
+    expect(generationOf(db.select().from(attachments).where(eq(attachments.id, result.fileId!)).get()!.provenance)).toMatchObject({ source_kind: "upload", parent_file_id: null, model: { id: "unknown" }, commercial_use: "unknown" });
+  });
+  test("voice swap refuses a preset voice without a clip and minors", async () => {
+    const state = musicState(people.owner); const parent = await generate(state); fake.stems = true;
+    const preset = await runEditMusic({ state, args: { track: parent.fileId, change: "voice_swap", voice: "soprano" }, callId: "preset", spoken: false });
+    expect(preset.result?.reply?.text).toContain("That voice has no sample to sing with.");
+    for (const role of ["teen", "child"] as const) {
+      const out = await runEditMusic({ state: { ...state, actor: { ...people.child, role } }, args: { track: parent.fileId, change: "voice_swap", voice: "companion" }, callId: role, spoken: false });
+      expect(out.result?.data).toMatchObject({ refused: "minor" });
+    }
+  });
+  test("voice conversion down path leaves the plain failure line on the job", async () => {
+    const state = musicState(people.owner); const parent = await generate(state); fake.stems = true; fake.allStems = true; fake.voiceConvert.fail = true;
+    const voice = saveClonedVoice(people.owner, "Nova", new Uint8Array([1]), "audio/wav"); if (!voice.ok) throw new Error("voice setup failed");
+    const outcome = await runEditMusic({ state, args: { track: parent.fileId, change: "voice_swap", voice: voice.value.id }, callId: "voice-down", spoken: false });
+    const id = musicForOutcomes([outcome])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "failed");
+    expect(getMusicJobFor(people.owner, id)?.errorLine).toBe("The voice could not be changed. Try again in a minute.");
   });
   test("each change sends the right Stack body, with original bytes and sha256 only on source tasks", async () => {
     const state = musicState(people.owner);

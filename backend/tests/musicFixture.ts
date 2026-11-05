@@ -21,6 +21,8 @@ export function installFakeMusicStack() {
     lrc: LRC as string | ((seconds: number) => string),
     immediate: false, queued: false, model: "ace-step-1-5-turbo" as string | undefined, beforeSubmit: undefined as (() => Promise<void>) | undefined,
     stems: false,
+    voiceConvert: { fail: false, submitted: [] as Array<{ source: string; reference: string; pitch_shift: number; auto_shift: boolean }>, polls: 0, deleted: 0 },
+    stemDeleted: 0,
     stemFiles: new Map<string, Uint8Array>(),
     allStems: false,
     /** MUSIC-GEN-20b: the Stack's `align` task. `installed` false answers 503 not_installed; `mode` "async" answers 202 and finishes on the second poll; `reply` builds the data from the sent lyrics. */
@@ -36,9 +38,22 @@ export function installFakeMusicStack() {
     const method = init?.method ?? "GET";
     if (path === "/stack/v1/music") return json(readyMusicStatusForTests());
     if (path === "/stack/v1/stems") return json({ available: fake.stems, state: fake.stems ? "idle" : "not-installed" });
+    if (path === "/stack/v1/voice-convert") return json({ voice_convert: { available: true, state: fake.voiceConvert.fail ? "not-installed" : "idle", ready: !fake.voiceConvert.fail } });
+    if (path === "/v1/audio/voice-convert" && method === "POST") {
+      const body = JSON.parse(String(init?.body)) as { source: string; reference: string; pitch_shift: number; auto_shift: boolean };
+      fake.voiceConvert.submitted.push(body); fake.voiceConvert.polls = 0;
+      return fake.voiceConvert.fail ? json({ error: "unavailable", code: "not_installed" }, 503) : json({ job: "voice-job", data: null }, 202);
+    }
+    if (path === "/v1/audio/voice-convert/voice-job") {
+      if (method === "DELETE") { fake.voiceConvert.deleted++; return json({ job: "voice-job", state: "deleted" }); }
+      fake.voiceConvert.polls++;
+      return fake.voiceConvert.fail ? json({ job: "voice-job", state: "failed", code: "failed" }) : json(fake.voiceConvert.polls > 1 ? { job: "voice-job", state: "done", data: { url: "/v1/audio/voice-convert/voice-job/file", content_type: "audio/mp4", bytes: 12, sha256: "0".repeat(64) } } : { job: "voice-job", state: "running", stage: "converting", progress_fraction: 0.5 });
+    }
+    if (path === "/v1/audio/voice-convert/voice-job/file") return new Response(testM4a(), { headers: { "content-type": "audio/mp4" } });
     if (path === "/v1/audio/stems" && method === "POST") { fake.stems = true; fake.polls.set("stems-job", 0); return json({ job: "stems-job" }, 202); }
     if (path.startsWith("/v1/audio/stems/") && path.endsWith(".m4a")) return new Response(fake.stemFiles.get(path.split("/").at(-1)!) ?? testM4a(), { headers: { "content-type": "audio/mp4" } });
     if (path === "/v1/audio/stems/stems-job") {
+      if (method === "DELETE") { fake.stemDeleted++; return json({ job: "stems-job", state: "deleted" }); }
       const polls = (fake.polls.get("stems-job") ?? 0) + 1; fake.polls.set("stems-job", polls);
       return json(polls >= fake.pollsToFinish ? { state: "done", data: (fake.allStems ? ["vocals", "drums", "bass", "other"] : ["vocals", "drums"]).map((stem) => ({ url: `/v1/audio/stems/${stem}.m4a`, stem })) } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
     }

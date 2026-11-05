@@ -12,6 +12,8 @@ export interface MusicRequest {
   edit?: import("./stack").MusicBody["edit"];
   /** A kept-part mix made from private intermediate stems. */
   parts?: { keep: Array<"vocals" | "drums" | "bass" | "other">; drop: Array<"vocals" | "drums" | "bass" | "other"> };
+  /** A voice swap keeps the target's id only; the private reference clip is read from the voice manager at finish time. */
+  voiceSwap?: { voiceId: string };
   /** MUSIC-LIKE-01: a made band's first single. The song saved from this job is filed under the band (artist text and made_artist_id). */
   band?: { id: string; name: string };
   /** MUSIC-STUDIO-ALBUM: a track of a made album. The song saved from this job is listed on the album (lib/music/album.ts syncAlbumTracks). */

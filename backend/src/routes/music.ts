@@ -38,6 +38,7 @@ import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial
 import { refusePrompt } from "@/lib/pictures/policy";
 import { consumeDjLine, deleteCachedDjLine, ensureDjLines, type DjPosition } from "@/lib/music/djLines";
 import { getPersonSettingValue } from "@/lib/settings";
+import { readClonedVoiceClip } from "@/lib/clonedVoices";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -94,13 +95,14 @@ const cardSchema = z.object({
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 const MUSIC_STAGE_LABELS: Record<string, string> = {
   loading: "Loading", starting: "Loading",
+  splitting: "Making", voice_convert: "Making", "voice-convert": "Making", pitch: "Making", converting: "Making", mix: "Mixing",
   planning: "Planning", lm: "Planning",
   making: "Making", dit: "Making", music: "Making", generating: "Making",
   vae: "Mixing", decoding: "Mixing", mixing: "Finishing", encoding: "Finishing", saving: "Finishing",
   paused: jobQueueCopy("paused_chat", "paused_chat", null, null, "adult"),
 };
 const MUSIC_STAGE_INDEX: Record<string, number> = {
-  loading: 1, starting: 1, planning: 2, lm: 2,
+  loading: 1, starting: 1, planning: 2, lm: 2, splitting: 3, voice_convert: 3, "voice-convert": 3, pitch: 3, converting: 3, mix: 4,
   dit: 3, making: 3, music: 3, generating: 3,
   vae: 4, decoding: 4, mixing: 5, encoding: 5, saving: 5,
 };
@@ -359,7 +361,7 @@ musicRoutes.openapi(stemsFromFileRoute, async (c) => {
   if (!temporary) logTurn(actor, "chat", `Split: ${prepared.name}`, { reply: { text: "Splitting it into stems." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
   return c.json(await musicCardView(actor, job), 200);
 });
-const fromFileEditBody = z.object({ file_id: z.string().min(1).max(80), change: z.enum(["restyle", "instrumental", "parts", "stems"]), style: z.string().trim().min(3).max(600).optional(), parts: z.object({ keep: z.array(z.string()).optional(), drop: z.array(z.string()).optional() }).optional() }).superRefine((value, ctx) => { if (value.change === "restyle" && !value.style) ctx.addIssue({ code: "custom", path: ["style"], message: "Add a style." }); });
+const fromFileEditBody = z.object({ file_id: z.string().min(1).max(80), change: z.enum(["restyle", "instrumental", "parts", "stems", "voice_swap"]), voice: z.string().min(1).max(80).optional(), style: z.string().trim().min(3).max(600).optional(), parts: z.object({ keep: z.array(z.string()).optional(), drop: z.array(z.string()).optional() }).optional() }).superRefine((value, ctx) => { if (value.change === "restyle" && !value.style) ctx.addIssue({ code: "custom", path: ["style"], message: "Add a style." }); if (value.change === "voice_swap" && !value.voice) ctx.addIssue({ code: "custom", path: ["voice"], message: "Choose a voice." }); });
 const fromFileEditRoute = createRoute({ method: "post", path: "/from-file/edit", tags: ["Music"], summary: "Edit an audio file in my Library", middleware,
   request: { body: { content: { "application/json": { schema: fromFileEditBody } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The new song card." }, 413: { description: "The file is too big." }, 422: { description: "The edit cannot be made." }, ...refusals, ...errorResponses({ 503: "Music is unavailable" }) } });
@@ -374,11 +376,23 @@ musicRoutes.openapi(fromFileEditRoute, async c => {
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
   const likeness = likenessRefusal(actor, prompt);
   if (likeness) return c.json({ error: likeness }, 403) as never;
-  const plan = prepareOwnedMusicEdit(source, { change: args.change === "stems" ? "stems" : args.change, ...(args.style ? { style: args.style } : {}), ...(args.parts ? { parts: args.parts } : {}) }, engine!.limits);
+  const sharedPlan = prepareOwnedMusicEdit(source, { change: args.change, ...(args.style ? { style: args.style } : {}), ...(args.parts ? { parts: args.parts } : {}) }, engine!.limits);
+  const plan = sharedPlan;
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
   const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});
   if (!conversation.ok) return c.json({ error: plainMusicFailure("failed") }, 503) as never;
   const turnId = newConversationTurnId();
+  if (args.change === "voice_swap") {
+    const clip = readClonedVoiceClip(args.voice!);
+    if (!clip) return c.json({ error: "That voice has no sample to sing with." }, 422) as never;
+    const prepared = await prepareOwnedStemsJob(actor, args.file_id);
+    if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
+    let job: MusicJob;
+    try { job = await startMusicJob({ actor, conversationId: conversation.value.id, turnId, temporary: false, task: "stems", request: { ...prepared.request, voiceSwap: { voiceId: args.voice! } }, body: prepared.body, parentFileId: null }); }
+    catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "voice_swap") }, 503) as never; }
+    logTurn(actor, "chat", "Edit an audio file", { reply: { text: "Changing your song." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+    return c.json(await musicCardView(actor, job), 200);
+  }
   if (args.change === "parts") {
     try {
       const result = await startOwnedMusicPartsJob({ actor, source, parts: args.parts, conversationId: conversation.value.id, turnId, temporary: false });

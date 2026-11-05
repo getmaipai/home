@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Song",
-  "description": "Change a song made here or attached in chat, keep or drop its parts, split it into stems, or keep every version.",
+  "description": "Have a household voice sing a song you made or brought into chat.",
   "offer": {
     "mode": "conditional",
     "gate": "musicEditAllowed",
@@ -30,7 +30,8 @@
       "just the vocals",
       "make it karaoke",
       "mute the drums",
-      "have the companion sing it"
+      "have the companion sing it",
+      "make this sound like Nova singing"
     ],
     "patterns": []
   },
@@ -75,11 +76,6 @@
         "maxLength": 20,
         "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$"
       },
-      "imitates_real_voice": {
-        "type": "boolean",
-        "grounded": false,
-        "description": "Set true when the person asks to sound like a named real singer or another real identifiable person. Home refuses copying real voices. Use an original voice for a similar style instead."
-      },
       "track": {
         "type": "string",
         "grounded": false,
@@ -87,10 +83,15 @@
         "minLength": 1,
         "maxLength": 80
       },
+      "voice": {
+        "type": "string",
+        "grounded": false,
+        "description": "For voice_swap, the household voice id or companion to sing the song."
+      },
       "change": {
         "type": "string",
         "grounded": false,
-        "description": "The change requested. For parts, give exactly one of parts.keep or parts.drop using vocals, drums, bass or other. This returns one finished song.",
+        "description": "The change requested. For parts, give exactly one of parts.keep or parts.drop using vocals, drums, bass or other. For voice_swap, set voice. This returns one finished song.",
         "enum": [
           "remake",
           "restyle",

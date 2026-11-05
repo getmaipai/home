@@ -165,6 +165,18 @@
       }
     },
     {
+      "id": "m7-attached-named-companion-sing",
+      "category": "writing",
+      "prompt": "make this sound like Nova singing",
+      "audio_attachment": { "fixture": "short-song", "media_type": "audio/mp4" }
+    },
+    {
+      "id": "m8-attached-no-intent-negative",
+      "category": "writing",
+      "prompt": "Is this recording mono or stereo?",
+      "audio_attachment": { "fixture": "short-song", "media_type": "audio/mp4" }
+    },
+    {
       "id": "m4-audio-no-music-intent",
       "category": "writing",
       "prompt": "What is an M4A file?",

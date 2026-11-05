@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-type Part = "vocals" | "drums" | "bass" | "other";
+type Part = "vocals" | "drums" | "bass" | "other" | "converted_vocals";
 type Runner = (command: string[], cwd: string) => Promise<boolean>;
 let runnerForTests: Runner | null = null;
 let toolsForTests: { afconvert: string | null; ffmpeg: string | null } | null = null;

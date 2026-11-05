@@ -55,7 +55,7 @@ export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits:
 
 export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; bpm?: number; key?: string; song_style?: string; band?: string }
 export interface SongDetailChanges { title?: string; lyrics?: string; description?: string; bpm?: number; key?: string }
-export interface FileEditBody { file_id: string; change: "restyle" | "instrumental" | "parts" | "stems"; style?: string; parts?: { keep?: string[]; drop?: string[] } }
+export interface FileEditBody { file_id: string; change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; voice?: string; style?: string; parts?: { keep?: string[]; drop?: string[] } }
 
 export const musicApi = {
   status: () => requestJson<MusicStatus>("/api/music/status"),

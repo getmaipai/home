@@ -6,6 +6,9 @@ export interface StackSong { url?: string; duration_s: number; seed: number; lrc
 /** What the Stack lists for a finished split: each stem by name, fetched at its url; every stem is as long as the song. */
 export interface StackStem { url: string; stem: "vocals" | "drums" | "bass" | "other" }
 export interface StackStemsStatus { available: boolean; state: string; install?: unknown }
+export interface StackVoiceConvertStatus { available: boolean; state: string; ready?: boolean; install?: unknown }
+export interface StackVoiceConvertData { url: string; content_type: "audio/mp4"; bytes: number; sha256: string }
+export interface StackVoiceConvertJob { state: MusicState; stage?: string | null; stage_label?: string | null; progress_fraction?: number | null; eta_seconds?: number | null; position?: number | null; code?: string | null; data?: StackVoiceConvertData | null }
 export interface StackMusicStatus {
   available: boolean; state: string; limits: { min_seconds: number; max_seconds: number };
   quality: string[]; default_quality?: "quick" | "detailed" | "max"; install?: unknown;
@@ -91,6 +94,9 @@ export async function submitStems(source: string, source_sha256: string, origin?
 export async function getStemsJob(job: string): Promise<StackMusicJob> {
   return await (await checked(await request(`/v1/audio/stems/${encodeURIComponent(job)}`))).json() as StackMusicJob;
 }
+export async function deleteStemsJob(job: string): Promise<void> {
+  try { await (await request(`/v1/audio/stems/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ }
+}
 export async function fetchStem(url: string): Promise<Uint8Array> {
   const base = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
   if (!base) throw new StackMusicError(503, "no_stack");
@@ -100,6 +106,26 @@ export async function fetchStem(url: string): Promise<Uint8Array> {
   const path = `${parsed.pathname}${parsed.search}`;
   return new Uint8Array(await (await checked(await request(path, {}, 120_000))).arrayBuffer());
 }
+
+export async function submitVoiceConvert(source: string, reference: string): Promise<{ job: string; done: StackVoiceConvertData | null }> {
+  const res = await checked(await request("/v1/audio/voice-convert", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, reference, pitch_shift: 0, auto_shift: false, timeout_ms: 1 }) }, 60_000));
+  const parsed = await res.json() as { job?: string; data?: StackVoiceConvertData | null };
+  if (!parsed.job) throw new StackMusicError(502, "bad_reply");
+  return { job: parsed.job, done: res.status === 200 ? parsed.data ?? null : null };
+}
+export async function getVoiceConvertJob(job: string): Promise<StackVoiceConvertJob> {
+  return await (await checked(await request(`/v1/audio/voice-convert/${encodeURIComponent(job)}`))).json() as StackVoiceConvertJob;
+}
+export async function deleteVoiceConvertJob(job: string): Promise<void> {
+  try { await (await request(`/v1/audio/voice-convert/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ }
+}
+export async function fetchConverted(url: string): Promise<Uint8Array> { return fetchStem(url); }
+export async function voiceConvertStatus(): Promise<StackVoiceConvertStatus | null> {
+  try { const body = await (await checked(await request("/stack/v1/voice-convert", {}, 5_000))).json() as { voice_convert?: StackVoiceConvertStatus };
+    return body.voice_convert ?? null;
+  } catch { return null; }
+}
+export function voiceConvertReady(status: StackVoiceConvertStatus | null): boolean { return !!status?.available && status.ready === true; }
 
 /** MUSIC-GEN-20b: per-word lyric timing (`POST /v1/audio/align`). Lyrics and source bytes travel only in bodies; errors carry a code and counts, never words. */
 export interface StackAlignWord { t: number; end: number; text: string }

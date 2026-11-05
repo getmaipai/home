@@ -7,7 +7,7 @@
 // audio-conditioning state per URL after first use, so storing the file
 // and serving it at a stable local URL is sufficient; precomputing is a
 // later optimization (faster reload), not a correctness requirement.
-import { writeFileSync, unlinkSync, existsSync } from "node:fs";
+import { writeFileSync, unlinkSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -231,6 +231,15 @@ export function getClonedVoiceFile(id: string): { path: string; mimeType: string
   const path = join(clonedVoicesDir, row.fileName);
   if (!existsSync(path)) return null;
   return { path, mimeType: row.mimeType };
+}
+
+/** Read the reference bytes for an existing household voice without making a second clip copy on disk. */
+export function readClonedVoiceClip(id: string): { bytes: Uint8Array; mimeType: string; label: string } | null {
+  const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
+  if (!row) return null;
+  const path = join(clonedVoicesDir, row.fileName);
+  if (!existsSync(path)) return null;
+  return { bytes: new Uint8Array(readFileSync(path)), mimeType: row.mimeType, label: row.label };
 }
 
 export function clonedVoiceExists(id: string): boolean {

@@ -30,7 +30,7 @@ const clock = (seconds: number | null): string => (seconds && seconds > 0 ? `${M
 const text = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 
 export const STEMS_LINE = "Splitting a song into stems is not available on this Home yet.";
-export const COVER_SONG_LINE = "Covering a song in a new voice needs an uploaded recording, which Home does not accept yet.";
+export const COVER_SONG_LINE = "Bring a song to change its style, remove vocals, split stems, or sing it in another household voice.";
 export const songAddress = (id: string | null): string => (id ? `/apps/music/create?song=${encodeURIComponent(id)}` : "/apps/music/create");
 export const studioAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}`;
 export const stemsAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}&split=1`;
@@ -226,7 +226,7 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
   return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
-    {song ? <BringSong /> : null}
+    {song ? <BringSong adult={adult} /> : null}
     {song ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
     <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">

@@ -21,6 +21,7 @@ import { attachmentFilePath } from "@/lib/attachments";
 import { existsSync, truncateSync, writeFileSync } from "node:fs";
 import { __setMusicMixToolsForTests, __setMusicMixRunnerForTests } from "@/lib/music/mixParts";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { saveClonedVoice } from "@/lib/clonedVoices";
 import type { PersonRow } from "@/types";
 function pcmFixture(samples: number[]): Uint8Array { const output = new Uint8Array(44 + samples.length * 2); const view = new DataView(output.buffer); const text = (at: number, value: string) => { for (let i = 0; i < value.length; i++) output[at + i] = value.charCodeAt(i); }; text(0, "RIFF"); view.setUint32(4, output.length - 8, true); text(8, "WAVE"); text(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true); view.setUint32(24, 44100, true); view.setUint32(28, 176400, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, samples.length * 2, true); samples.forEach((sample, i) => view.setInt16(44 + i * 2, sample, true)); return output; }
 let fake: ReturnType<typeof installFakeMusicStack>;
@@ -193,6 +194,16 @@ describe("music routes", () => {
     const card = await response.json() as { id: string };
     expect(getMusicJobFor(actor, card.id)?.task).toBe("stems");
     await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+  });
+  test("from-file voice_swap starts one owned-file conversion job with the chosen voice", async () => {
+    const { actor, client } = await owner(); const file = await uploadAudio(client, "Voice swap.m4a"); fake.stems = true; fake.allStems = true;
+    const voice = saveClonedVoice(actor, "Nova", new Uint8Array([1, 2]), "audio/wav"); if (!voice.ok) throw new Error("voice setup failed");
+    const response = await client.post("/api/music/from-file/edit", { file_id: file.id, change: "voice_swap", voice: voice.value.id });
+    expect(response.status).toBe(200);
+    const card = await response.json() as { id: string };
+    expect(getMusicJobFor(actor, card.id)?.request).toMatchObject({ ownedFile: true, voiceSwap: { voiceId: voice.value.id } });
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+    expect(generationOf(db.select().from(attachments).where(eq(attachments.id, getMusicJobFor(actor, card.id)!.fileId!)).get()!.provenance)?.source_kind).toBe("upload");
   });
   test("refuses to split a file that is not the person's own audio", async () => {
     const { actor, client } = await owner(); fake.stems = true;

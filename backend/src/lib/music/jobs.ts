@@ -8,7 +8,7 @@ import { attachmentFilePath, createAttachment, readAttachment, readAttachmentFor
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady } from "./stack";
+import { cancelOrDeleteMusic, deleteStemsJob, deleteVoiceConvertJob, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady, submitVoiceConvert, getVoiceConvertJob, fetchConverted } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
 import { partsDoneLine, prepareMusicEdit } from "./tool";
@@ -19,6 +19,7 @@ import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { m4aSeconds } from "./m4a";
 import { mixMusicParts } from "./mixParts";
+import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -80,6 +81,7 @@ async function releaseMusic(job: MusicJob): Promise<void> {
   } catch (error) { if (error instanceof StackMusicError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
 }
 export function plainMusicFailure(code: string): string {
+  if (code === "voice_swap") return "The voice could not be changed. Try again in a minute.";
   if (code === "stems_unavailable") return "The stems could not be made. Try again in a minute.";
   if (code === "stems_failed") return "The stems could not be made. Try again in a minute.";
   const prefix = "I couldn't make that song.";
@@ -193,7 +195,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   finally { starting.delete(input.actor.id); }
 }
 
-function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
+function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
 const stopped = (job: MusicJob): boolean => job.state === "cancelled";
 async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
@@ -234,12 +236,16 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
   } catch (error) { if (!controller.signal.aborted) fail(job, error instanceof StackMusicError ? error.code : "failed"); }
   finally {
     watching.delete(job.id); if (job.state !== "queued") liveJobs.delete(job.id); forgetRemovedMusicJob(job.id);
-    if (job.stackJob) await cancelOrDeleteMusic(job.stackJob);
+    if (job.stackJob) {
+      if (job.request.voiceSwap || job.request.parts) await deleteStemsJob(job.stackJob);
+      else await cancelOrDeleteMusic(job.stackJob);
+    }
     refreshHouseholdQueue();
   }
 }
 async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<false | void> {
   if (stopped(job)) return;
+  if (job.request.voiceSwap) return finishVoiceSwap(job, actor, songs as unknown as StackStem[], signal);
   if (job.request.parts) return finishParts(job, actor, songs as unknown as StackStem[], signal);
   if (job.task === "stems") return finishStems(job, actor, songs as unknown as StackStem[], signal);
   const song = songs[0];
@@ -370,6 +376,66 @@ async function finishParts(job: MusicJob, actor: PersonRow, stems: StackStem[], 
     job.durationS = seconds; job.seed = parent?.seed ?? null; job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
     saveMusicJob(job);
   } catch (error) { fail(job, error instanceof StackMusicError ? error.code : "stems_failed"); }
+}
+/** One job owns all private split and converted audio. Only the final mix is saved as a song. */
+async function finishVoiceSwap(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
+  const target = job.request.voiceSwap;
+  if (!target || !stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "voice_swap"); return; }
+  let turn = false;
+  for (let i = 0; i < 120 && !signal.aborted; i++) {
+    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, job.turnId!), eq(conversationTurns.personId, actor.id))).get()) { turn = true; break; }
+    await sleep(500, signal);
+  }
+  if (signal.aborted || stopped(job)) return;
+  if (!turn) { fail(job, "voice_swap"); return; }
+  try {
+    const reference = readClonedVoiceClip(target.voiceId);
+    if (!reference) { fail(job, "voice_swap"); return; }
+    const fetched: Partial<Record<"vocals" | "drums" | "bass" | "other", Uint8Array>> = {};
+    for (const stem of stems) fetched[stem.stem] = await fetchStem(stem.url);
+    const vocals = fetched.vocals;
+    if (!vocals || !fetched.drums || !fetched.bass || !fetched.other || signal.aborted || stopped(job)) { if (!signal.aborted) fail(job, "voice_swap"); return; }
+    job.stage = "voice-convert"; job.progress = 0.45; job.etaSeconds = null; saveMusicJob(job);
+    const submitted = await submitVoiceConvert(Buffer.from(vocals).toString("base64"), Buffer.from(reference.bytes).toString("base64"));
+    let convertedBytes: Uint8Array;
+    try {
+      let converted = submitted.done;
+      const deadline = Date.now() + 20 * 60_000;
+      while (!converted && Date.now() < deadline && !signal.aborted && !stopped(job)) {
+        await sleep(POLL_MS, signal);
+        const status = await getVoiceConvertJob(submitted.job);
+        if (status.state === "done") converted = status.data ?? null;
+        else if (status.state === "failed" || status.state === "cancelled") throw new StackMusicError(500, "voice_swap");
+        else { job.stage = status.stage ?? "voice-convert"; job.progress = Math.max(0.45, Math.min(0.85, 0.45 + 0.4 * (status.progress_fraction ?? 0))); job.etaSeconds = status.eta_seconds ?? null; saveMusicJob(job); }
+      }
+      if (signal.aborted || stopped(job)) return;
+      if (!converted) throw new StackMusicError(504, "voice_swap");
+      convertedBytes = await fetchConverted(converted.url);
+    } finally { await deleteVoiceConvertJob(submitted.job); }
+    if (signal.aborted || stopped(job)) return;
+    job.stage = "mix"; job.progress = 0.88; job.etaSeconds = null; saveMusicJob(job);
+    const mixed = await mixMusicParts({ drums: fetched.drums, bass: fetched.bass, other: fetched.other, converted_vocals: convertedBytes }, ["drums", "bass", "other", "converted_vocals"]);
+    if (signal.aborted || stopped(job)) return;
+    if (mixed.length < 12 || Buffer.from(mixed.subarray(4, 8)).toString() !== "ftyp") { fail(job, "voice_swap"); return; }
+    const owned = job.request.ownedFile === true;
+    const parent = owned ? null : job.parentFileId ? provenanceFor(job.parentFileId) : null;
+    if (!owned && !parent) { fail(job, "voice_swap"); return; }
+    const seconds = Math.round(m4aSeconds(mixed) ?? job.request.seconds);
+    const provenance: GenerationProvenance = { kind: "music", job_id: job.id, task: "cover",
+      model: { id: "unknown", revision: "unknown", licence: "unknown" }, engine: { id: "unknown", version: "unknown" },
+      commercial_use: "unknown", commercial_basis: "The voice conversion model is unknown, so its licence and training data are not cleared for commercial use.", seed: null,
+      duration_s: seconds, bpm: parent?.bpm ?? null, key: parent?.key ?? null, parent_file_id: job.parentFileId,
+      source_kind: owned ? "upload" : "made_here", made_at: new Date().toISOString() };
+    if (job.temporary) {
+      job.fileId = newFileId(); temporarySongs.set(job.fileId, { bytes: mixed, jobId: job.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(job.createdAt), provenance });
+    } else {
+      const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes: mixed, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "conversation" });
+      if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "voice_swap"); return; }
+      job.fileId = made.value.id;
+    }
+    job.request = { ...job.request, title: job.request.title ?? "Song", instrumental: false, seconds };
+    job.durationS = seconds; job.seed = null; job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null; saveMusicJob(job);
+  } catch { if (!signal.aborted) fail(job, "voice_swap"); }
 }
 export async function cancelMusicJob(actor: PersonRow, id: string): Promise<MusicJob | null> {
   const job = getMusicJobFor(actor, id);

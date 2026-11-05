@@ -15,6 +15,10 @@ import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 import { resolveSound } from "./sound";
 import { likenessCallRefusal } from "@/lib/likeness";
+import { readClonedVoiceClip } from "@/lib/clonedVoices";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { companionVoiceKey } from "@/settings/companionVoiceKeys";
+import { VOICE_ENGINE_DEFAULT } from "@/settings/voiceKeys";
 /** What a refused song's reply starts with; the Make a song page strips it to show the person the plain line. */
 export const REFUSED_PREFIX = "No song was made. Say this to the person and keep its meaning: ";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
@@ -36,9 +40,10 @@ export const editMusicArgs = z.object({
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
   seconds: z.number().finite().positive().optional(), at: z.enum(["start", "end"]).optional(), where: z.enum(["in", "out", "both"]).optional(),
   strength: z.number().finite().min(0.3).max(1).optional(), lufs: z.number().finite().min(-70).max(-5).optional(),
-});
+  voice: z.string().min(1).max(80).optional(),
+}).superRefine((value, ctx) => { if (value.change === "voice_swap" && !value.voice) ctx.addIssue({ code: "custom", path: ["voice"], message: "Choose a voice." }); });
 /** Shared attached-file edit preparation used by the tool and Music Create. */
-export function prepareOwnedMusicEdit(source: MusicJob, args: { change: "restyle" | "instrumental" | "parts" | "stems"; style?: string; parts?: { keep?: string[]; drop?: string[] } }, limits: { min_seconds: number; max_seconds: number }) {
+export function prepareOwnedMusicEdit(source: MusicJob, args: { change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; style?: string; parts?: { keep?: string[]; drop?: string[] } }, limits: { min_seconds: number; max_seconds: number }) {
   if (args.change === "stems") return { ok: true as const, task: "stems" as const, request: source.request, body: musicBody(source.request, "edit") };
   const plan = prepareMusicEdit(source, { track: source.fileId!, change: args.change, ...(args.style ? { description: args.style } : {}), ...(args.parts ? { parts: args.parts } : {}) }, limits);
   return plan;
@@ -146,7 +151,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
   // A stem of a file the person owns is never an edit, cover or remake source (stem-splitting 10.2 point 3; a stem lives only as a split result).
   if (source.request.ownedFile && source.task === "stems") return { ok: false, line: "That file is yours, not a song made here, so it can only be split into stems." };
   // Owned uploads are admitted by resolveSongSource after its ownership and generated-file checks.
-  if (source.request.ownedFile && ["remake", "variation", "make_full", "make_quick", "stems", "voice_swap"].includes(args.change)) {
+  if (source.request.ownedFile && ["remake", "variation", "make_full", "make_quick", "stems"].includes(args.change)) {
     return { ok: false, line: "That change needs a song made here. Try restyle, instrumental, trim, fade or loudness on this file." };
   }
   const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, ...stored } = source.request;
@@ -157,7 +162,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
   delete request.retried;
   let task: MusicTask; let stackTask: MusicBody["task"];
   switch (args.change) {
-    case "voice_swap": return { ok: false, line: "Companion singing for attached songs is coming." };
+    case "voice_swap": task = "stems"; stackTask = "edit"; break;
     case "stems": task = "stems"; stackTask = "edit"; break;
     case "remake": task = "remake"; stackTask = "text2music"; if (args.seconds !== undefined) request.seconds = args.seconds; break;
     case "make_full": case "make_quick": {
@@ -236,7 +241,6 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   let request: MusicRequest; let task: MusicTask; let body: Omit<MusicBody, "timeout_ms">; let parentFileId: string | null = null;
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
-    if (parsed.data.change === "voice_swap") return refused("Companion singing for attached songs is coming.", "voice_swap_not_available");
     if (parsed.data.change === "parts") {
       const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio?.[0]?.id ?? "" : parsed.data.track, state.conversationId, temporary);
       if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
@@ -253,6 +257,23 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     }
     const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio![0]!.id : parsed.data.track, state.conversationId, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+    if (parsed.data.change === "voice_swap") {
+      const requestedVoice = parsed.data.voice!;
+      let voiceId = requestedVoice;
+      if (requestedVoice === "companion") {
+        const companionVoice = state.persona?.id ? getHouseholdSettingValue(companionVoiceKey(state.persona.id)) : null;
+        voiceId = String(companionVoice && companionVoice !== VOICE_ENGINE_DEFAULT ? companionVoice : getHouseholdSettingValue("tts.home_voice") ?? VOICE_ENGINE_DEFAULT);
+      }
+      const clip = readClonedVoiceClip(voiceId);
+      if (!clip) return refused("That voice has no sample to sing with.", "voice_sample_missing");
+      const prepared = source.request.ownedFile
+        ? await prepareOwnedStemsJob(actor, source.fileId)
+        : await prepareStemsJob(actor, source);
+      if (!prepared.ok) return prepared.status === 503 ? failed("stems_unavailable", "unavailable") : refused(prepared.line, "source_not_made_here");
+      const request = { ...prepared.request, title: parsed.data.title ?? source.request.title ?? "Song", ownedFile: source.request.ownedFile === true, voiceSwap: { voiceId } };
+      const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task: "stems", request, body: prepared.body, parentFileId: source.request.ownedFile ? null : source.fileId });
+      return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `Here it is sung by ${clip.label}.` }, data: { musicJobId: job.id }, actions: [] } });
+    }
     if (parsed.data.change === "stems") {
       if (source.request.ownedFile) return refused("Choose Stems from the file in your Library.", "source_not_made_here");
       const prepared = await prepareStemsJob(actor, source);
