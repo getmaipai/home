@@ -118,6 +118,20 @@ describe("stored pictures obey the Adult lock", () => {
     expect((await guest.get(`/api/files/${picture.id}/content`, proof)).status).toBe(401);
   });
 
+  test("an image-edit of an all-ages picture stays open, and an adult-only edit whose lock the creator cleared opens for its owner", async () => {
+    const h = await household();
+    const actor = h.row("Marlow");
+    const plain = await makePicture(actor, "all-ages", "Paper boat source");
+    const plainEdit = await makeImageEdit(actor, plain, "Paper boat resized", { audience: "all-ages" });
+    expect((await h.adult.client.get(`/api/files/${plainEdit.id}/content`)).status).toBe(200);
+    expect(JSON.stringify(await (await list(h.adult.client)).json())).toContain(plainEdit.id);
+    const adult = await makePicture(actor, "adult-only", "Zebraquill cleared source");
+    const cleared = await makeImageEdit(actor, adult, "Zebraquill cleared edit", { audience: "adult-only", lock: "off" });
+    expect((await h.adult.client.get(`/api/files/${cleared.id}/content`)).status).toBe(200);
+    expect((await h.adult.client.get(`/api/files/${adult.id}/content`)).status).toBe(404);
+    for (const minor of [h.teen, h.child]) expect((await minor.client.get(`/api/files/${cleared.id}/content`)).status).toBe(404);
+  });
+
   test("all-ages picture-gen provenance is open, including music cover writer notes", () => {
     const adult = { id: "person-adult", role: "adult" } as PersonRow;
     const teen = { id: "person-teen", role: "teen" } as PersonRow;

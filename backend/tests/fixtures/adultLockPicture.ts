@@ -25,9 +25,9 @@ export async function makePicture(actor: PersonRow, audience: "adult-only" | "al
   return { id: created.value.id, conversationId: conversation.value.id, turnId, label, sha256: created.value.sha256 };
 }
 
-export async function makeImageEdit(actor: PersonRow, source: Awaited<ReturnType<typeof makePicture>>, label: string) {
+export async function makeImageEdit(actor: PersonRow, source: Awaited<ReturnType<typeof makePicture>>, label: string, mark: { audience?: "adult-only" | "all-ages"; lock?: "on" | "off" } = {}) {
   const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes: await testPng(), deduplicate: false,
-    provenance: `image-edit:${JSON.stringify({ v: 1, audience: "adult-only", op: "resize", label, source: source.id, source_sha256: source.sha256, root: source.id, width: 1, height: 1 })}` });
+    provenance: `image-edit:${JSON.stringify({ v: 1, audience: mark.audience ?? "adult-only", ...(mark.lock ? { lock: mark.lock } : {}), op: "resize", label, source: source.id, source_sha256: source.sha256, root: source.id, width: 1, height: 1 })}` });
   if (!created.ok) throw new Error(created.error);
   return { id: created.value.id, label };
 }
