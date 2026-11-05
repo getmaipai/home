@@ -59,22 +59,25 @@ const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { nam
 
 const listRoute = createRoute({
   method: "get", path: "/", tags: ["LoRAs"], summary: "The household's styles an owner or admin may read now", middleware: [requireAuth, requireRole("owner", "admin")] as const,
-  request: { query: z.object({ removed: z.enum(["true", "false"]).optional() }) },
+  request: { query: z.object({ removed: z.enum(["true", "false"]).optional(), media: z.enum(["video", "picture"]).optional() }) },
   responses: { 200: { content: { "application/json": { schema: Locked.extend({ items: z.array(AdminLoraSchema) }) } }, description: "Adult-only styles are one locked tile until the Adult lock is open." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) },
 });
 lorasRoutes.openapi(listRoute, async (c) => {
   await syncLoras();
-  const list = readLoras(c.get("person"), surfaceOf(c), { removed: c.req.valid("query").removed === "true" });
+  const query = c.req.valid("query");
+  const list = readLoras(c.get("person"), surfaceOf(c), { removed: query.removed === "true", ...(query.media ? { media: query.media } : {}) });
   return c.json({ items: list.items.map(adminLoraView), locked: list.locked }, 200);
 });
 
 const availableRoute = createRoute({
   method: "get", path: "/available", tags: ["LoRAs"], summary: "The styles this person may use in Create and Edit", middleware: [requireAuth] as const,
+  request: { query: z.object({ media: z.enum(["video", "picture"]).optional() }) },
   responses: { 200: { content: { "application/json": { schema: Locked.extend({ items: z.array(PersonLoraSchema) }) } }, description: "Empty for a child, a teen, a guest or a shared screen." }, ...errorResponses({ 401: "Not signed in" }) },
 });
 lorasRoutes.openapi(availableRoute, async (c) => {
   await syncLoras();
-  const list = readLoras(c.get("person"), surfaceOf(c));
+  const { media } = c.req.valid("query");
+  const list = readLoras(c.get("person"), surfaceOf(c), media ? { media } : {});
   return c.json({ items: list.items.map(personLoraView), locked: list.locked }, 200);
 });
 
