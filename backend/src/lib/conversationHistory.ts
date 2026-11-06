@@ -247,6 +247,7 @@ function outcomeForRow(actor: PersonRow, o: ToolExecutionOutcome): ToolExecution
 
 function outcomesForReader(raw: string | null, actor: PersonRow, allowed: boolean): string | null {
   if (!allowed || !raw) return null;
+  if (!raw.includes("pictureJobId")) return raw;
   try {
     const outcomes = JSON.parse(raw) as ToolExecutionOutcome[];
     return JSON.stringify(outcomes.map((outcome) => redactLockedPictureOutcome(actor, outcome)));

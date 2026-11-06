@@ -33,7 +33,7 @@ export function redactLockedPictureOutcome(actor: PersonRow, outcome: ToolExecut
   if (typeof id !== "string") return outcome;
   const job = getPictureJob(actor, id);
   const item = job ? pictureJobLockItem(job) : null;
-  if (!job || item?.madeAudience !== "adult-only" || item.lock === "off") return outcome;
+  if (!job || item?.madeAudience !== "adult-only" || lockState(item, actor) === "open") return outcome;
   return outcomeOf({ callId: outcome.callId, packageId: outcome.packageId, status: outcome.status, via: outcome.via, args: { locked: true }, at: outcome.at, durationMs: outcome.durationMs, result: { reply: { text: LOCKED_PICTURE_RESULT_TEXT }, data: { locked: true }, actions: [] } });
 }
 
