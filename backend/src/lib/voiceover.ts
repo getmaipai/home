@@ -46,14 +46,35 @@ export async function makeVoiceover(actor: PersonRow, input: { script: string; v
   const voice = voices.find((item) => item.id === voiceId);
   if (!voice) return { ok: false, status: 422, line: "I don't know that voice. Choose a voice from the list, then try again." };
   try {
-    const spoken = await synthesizeRecordedSpeech(script, voiceId);
+    const saved = await speakAndStore(actor, script, voiceId, voice.kind, "Voiceover", { v: 1 });
+    if (!saved.ok) return saved;
+    return { ok: true, file_id: saved.file_id, seconds: saved.seconds, engine: saved.engine, ...(saved.revision ? { revision: saved.revision } : {}), voice: voiceId, kind: voice.kind };
+  } catch { return { ok: false, status: 503, line: "Home can't speak right now. Try again in a minute." }; }
+}
+
+export type SpokenFileResult = { ok: true; file_id: string; bytes: Uint8Array; seconds: number | null; engine: RecordedSpeechEngine; revision?: string } | { ok: false; status: 503; line: string };
+
+export type SpokenBytesResult = { ok: true; bytes: Uint8Array; seconds: number | null; engine: RecordedSpeechEngine; revision?: string } | { ok: false; status: 503; line: string };
+
+export async function speakToBytes(text: string, voiceId: string): Promise<SpokenBytesResult> {
+  try {
+    const spoken = await synthesizeRecordedSpeech(text, voiceId);
     if (!spoken.ok) return { ok: false, status: 503, line: "Home can't speak right now. Try again in a minute." };
     const bytes = new Uint8Array(await new Response(spoken.value.stream).arrayBuffer());
     if (!bytes.length) return { ok: false, status: 503, line: "Home can't speak right now. Try again in a minute." };
+    return { ok: true, bytes, seconds: audioSeconds(bytes), engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}) };
+  } catch { return { ok: false, status: 503, line: "Home can't speak right now. Try again in a minute." }; }
+}
+
+/** Speak and store a private Library audio file, with caller-supplied provenance additions. */
+export async function speakAndStore(actor: PersonRow, text: string, voiceId: string, kind: "preset" | "clip", namePrefix: string, provenance: Record<string, unknown>): Promise<SpokenFileResult> {
+  try {
+    const spoken = await speakToBytes(text, voiceId);
+    if (!spoken.ok) return spoken;
+    const { bytes } = spoken;
     const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
-    const provenance = `voiceover:${JSON.stringify({ v: 1, engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}), voice: voiceId, kind: voice.kind })}`;
-    const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: spoken.value.contentType || "audio/wav", bytes, provenance, deduplicate: false, retention: "kept", name: `Voiceover ${stamp}` });
+    const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "audio/wav", bytes, provenance: `voiceover:${JSON.stringify({ ...provenance, engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}), voice: voiceId, kind })}`, deduplicate: false, retention: "kept", name: `${namePrefix} ${stamp}` });
     if (!stored.ok) return { ok: false, status: 503, line: "Home can't speak right now. Try again in a minute." };
-    return { ok: true, file_id: stored.value.id, seconds: audioSeconds(bytes), engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}), voice: voiceId, kind: voice.kind };
+    return { ok: true, file_id: stored.value.id, bytes, seconds: spoken.seconds, engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}) };
   } catch { return { ok: false, status: 503, line: "Home can't speak right now. Try again in a minute." }; }
 }

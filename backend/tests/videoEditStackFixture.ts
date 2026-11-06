@@ -23,13 +23,14 @@ export interface FakeEditStack {
   speechFails: boolean;
   /** The container length the finished job reports. */
   durationS: number;
+  transcribedText: string;
   restore(): void;
 }
 
 export function installFakeEditStack(): FakeEditStack {
   const base = getStackClient();
   const roots = { read: [] as string[], write: [] as string[] };
-  const fake: FakeEditStack = { jobs: [], speech: [], rootsSet: [], pollsToFinish: 2, failWith: null, refuseSubmit: false, speechFails: false, durationS: 6, restore() { __setStackEditTimingForTests(null); __setStackClientForTests(null); } };
+  const fake: FakeEditStack = { jobs: [], speech: [], rootsSet: [], pollsToFinish: 2, failWith: null, refuseSubmit: false, speechFails: false, durationS: 6, transcribedText: "A harmless sentence.", restore() { __setStackEditTimingForTests(null); __setStackClientForTests(null); } };
   __setStackEditTimingForTests({ pollMs: 5, deadlineMs: 5_000 });
   const stamp = (job: FakeEditJob) => ({
     id: job.id, kind: "media.edit", role: null, state: job.state, percent: 0, completedBytes: 0, totalBytes: 0, status: "", position: null, input: null, result: null, reason: null,
@@ -72,6 +73,7 @@ export function installFakeEditStack(): FakeEditStack {
       if (fake.speechFails) throw new Error("speech engine down");
       return new Response(new Uint8Array(2048).fill(7), { headers: { "content-type": "audio/wav" } });
     },
+    transcribe: async () => ({ data: { text: fake.transcribedText }, identity: {} }),
   };
   __setStackClientForTests(client as never);
   return fake;
