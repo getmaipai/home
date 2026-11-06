@@ -43,24 +43,25 @@ afterEach(() => { __resetSourceForTests(); setInstalledBasesProvider(null); setH
 const baseModels = (): string[] => new URL(urls[urls.length - 1]!).searchParams.getAll("baseModels");
 
 describe("LTXV2 and the base check", () => {
-  test("the default search asks for LTXV 2.5, LTXV 2.3 and LTXV2", async () => {
+  test("the default search asks only for supported LTXV 2.5 and LTXV2", async () => {
     await browseHits(params());
-    expect(baseModels()).toEqual(["LTXV 2.5", "LTXV 2.3", "LTXV2"]);
+    expect(baseModels()).toEqual(["LTXV 2.5", "LTXV2"]);
   });
 
   test("an ltx-2.x search asks for its own version and the generic label", async () => {
-    await browseHits(params({ base: "ltx-2.3" }));
-    expect(baseModels()).toEqual(["LTXV 2.3", "LTXV2"]);
+    await browseHits(params({ base: "ltx-2.5" }));
+    expect(baseModels()).toEqual(["LTXV 2.5", "LTXV2"]);
   });
 
   test("LTXV2 with a version in its name maps to that version; none stated is flagged; two stated is flagged, never guessed", async () => {
-    const { hits } = await browseHits(params());
+    const { hits } = await browseHits(params({ base: "all" }));
     const by = (title: string) => hits.find((h) => h.title === title)!;
-    expect(by("(LTX-2.3 Lora) - Pose Helper (I2V)")).toMatchObject({ base_model: "ltx-2.3", base_unstated: false, base_label: "LTXV2" });
     expect(by("Clay")).toMatchObject({ base_model: "ltx-2.5", base_unstated: false });
-    expect(by("Mystery Look")).toMatchObject({ base_model: "unknown", base_unstated: true });
-    expect(by("Both Versions")).toMatchObject({ base_model: "unknown", base_unstated: true });
+    expect(by("Mystery Look")).toBeUndefined();
+    expect(by("Both Versions")).toBeUndefined();
     expect(by("Paper Boat")).toMatchObject({ base_model: "ltx-2.5", base_unstated: false });
+    expect(ltxBaseFromText("(LTX-2.3 Lora) - Pose Helper (I2V)")).toBe("ltx-2.3");
+    expect(by("(LTX-2.3 Lora) - Pose Helper (I2V)")).toMatchObject({ base_model: "ltx-2.3", base_unstated: false });
   });
 
   test("Krea 2 and the old LTXV are excluded by default, even when the source returns them", async () => {
@@ -86,7 +87,7 @@ describe("LTXV2 and the base check", () => {
 
 describe("the supported flag", () => {
   test("flipping a base off changes which labels are asked for and which hits are installable", async () => {
-    expect(supportedBaseIds()).toEqual(["ltx-2.5", "ltx-2.3"]);
+    expect(supportedBaseIds()).toEqual(["ltx-2.5"]);
     setInstalledBasesProvider(() => new Set(["ltx-2.5"]));
     expect(supportedBaseIds()).toEqual(["ltx-2.5"]);
     const { hits } = await browseHits(params());

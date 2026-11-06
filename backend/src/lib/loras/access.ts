@@ -43,7 +43,7 @@ export function loraAccess(person: PersonRow, lora: Lora, surface: LoraSurface =
 
 /** A LoRA a clip may be made with now: live, and its base known (an unknown base blocks use until an admin sets it). */
 export function loraUsable(lora: Lora): boolean {
-  return lora.removed_at === null && lora.base_model !== "unknown" && lora.compatible_with.length > 0;
+  return lora.removed_at === null && lora.base_model !== "unknown" && lora.base_model !== "ltx-2.3" && lora.compatible_with.length > 0;
 }
 
 export interface LoraList { items: Lora[]; /** One tile: some LoRAs are locked for this person. Never a count. */ locked: boolean }

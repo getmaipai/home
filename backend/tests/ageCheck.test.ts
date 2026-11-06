@@ -324,9 +324,11 @@ describe("a video job", () => {
     expect(listPending(people.owner).filter((n) => n.typeId === "safety.picture_withheld")).toHaveLength(1);
   });
 
-  test("VIDEO-LTX-01: a Detailed clip is checked like any other, with five keyframes past 6 seconds, and its sound track is stored untouched", async () => {
+  test("VIDEO-LTX-01: an LTX-2.5 Standard clip is checked like any other, with five keyframes past 6 seconds, and its sound track is stored untouched", async () => {
     expect([keyframeCount(null), keyframeCount(5), keyframeCount(6), keyframeCount(7), keyframeCount(10)]).toEqual([3, 3, 3, 5, 5]);
-    fake.detailed = "installed";
+    fake.ltx25 = "ready";
+    const { __setVideoStatusForTests, readyVideoStatusForTests } = await import("@/lib/videos/ready");
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
     const frames = [1, 2, 3, 4, 5].map((n) => Uint8Array.of(n));
     const secondsAsked: Array<number | null> = [];
     __setKeyframesForTests(async (_mp4, seconds) => { secondsAsked.push(seconds); return frames; });
@@ -335,14 +337,14 @@ describe("a video job", () => {
     const conv = await import("@/lib/conversationHistory");
     const resolved = conv.resolveOrCreateConversation(people.owner, "chat", undefined, {});
     if (!resolved.ok) throw new Error("no conversation");
-    const started = await startVideoJob({ actor: people.owner, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a hero says come with me", body: { prompt: "a hero says come with me", model: "detailed", seconds: 10, size: "768x448", audience: "adult" } as never });
+    const started = await startVideoJob({ actor: people.owner, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a hero says come with me", body: { prompt: "a hero says come with me", model: "ltx25-q8", seconds: 10, size: "512x256", audience: "adult" } });
     await until(() => ["done", "failed"].includes(getVideoJobFor(people.owner, started.id)?.state ?? ""));
     const job = getVideoJobFor(people.owner, started.id)!;
     expect(job.state).toBe("done");
     expect(secondsAsked).toEqual([10]);
     expect(received).toHaveLength(5);
     // The stored bytes are the Stack's bytes: nothing re-encodes the clip or its sound.
-    expect(job.files[0]).toMatchObject({ quality: "detailed", audio: true, seconds: 10 });
+    expect(job.files[0]).toMatchObject({ quality: "quick", audio: true, seconds: 10 });
     const { readVideoFile } = await import("@/lib/videos/jobs");
     const stored = readVideoFile(people.owner, job, job.files[0]!.id)!;
     const { testMp4 } = await import("./videoFixture");

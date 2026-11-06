@@ -14,8 +14,6 @@ export function installedBasesNow(): ReadonlySet<string> | null {
   const bases = new Set<string>();
   if (video === null) for (const id of installableBaseIds("video")) bases.add(id);
   if (picture === null) for (const id of installableBaseIds("picture")) bases.add(id);
-  // Detailed has no per-model LoRA flag in StackVideoStatus; existing wiring already permits styles when Detailed is installed.
-  if (video?.qualities?.detailed.installed === true) bases.add("ltx-2.3");
   if (video && (ltx25LorasSupported(video, LTX25_MODEL) || ltx25LorasSupported(video, LTX25_MAX_MODEL))) bases.add("ltx-2.5");
 
   if (picture) for (const model of picture.models) if (model.installed && model.loras === true) bases.add(model.id);

@@ -2,7 +2,7 @@
 // (lib/tiers.ts); this file only maps its model and options onto the fields the Stack's video route takes. It runs when the job is sent, so a
 // changed pick applies to the next job at that level, and a level switched off since the job was queued is sent at Standard.
 // Options the video engine reads: `length_seconds` (seconds) and `resolution` (the size, never above the engine's own). `steps` and `sound` are
-// not read by it (a distilled model with fixed steps; sound comes with the Detailed model): `SLOT_OPTIONS_READ` in shared/tierSlotOptions.ts.
+// not read by it (a distilled model with fixed steps; sound comes with LTX-2.5): `SLOT_OPTIONS_READ` in shared/tierSlotOptions.ts.
 import type { Lane } from "@/lib/pictures/lane";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import type { AgeBand } from "@/lib/ageBand";
@@ -12,11 +12,11 @@ import type { StackVideoStatus, VideoBody } from "@/lib/videos/stack";
 
 type Body = Omit<VideoBody, "timeout_ms">;
 
-/** The quality a slot's model id names: the LTX pin is Detailed, the Wan pin is Quick; any other id names neither. */
+/** The quality a slot's model id names: LTX-2.5 is Detailed, Wan is Quick; any other id names neither. */
 export function qualityOfSlotModel(id: string | null | undefined): VideoQuality | null {
   if (!id) return null;
   // LTX-2.5 serves both Standard and Boost (VIDEO-TIERS-01): its level is the job's tier, not its id (see `videoBodyForSlot`).
-  if (id === "detailed" || id.startsWith("ltx")) return "detailed";
+  if (id.startsWith("ltx25")) return "detailed";
   if (id === "quick" || id.startsWith("fastwan") || id.startsWith("wan")) return "quick";
   return null;
 }
@@ -71,6 +71,14 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
     // The queued size is the Stack's true size for the level it was queued at; a level lowered since (a switched-off Boost) gets the lower level's size.
     // The Stack's own reported profile for the level wins over the table, so a replayed job never sends a size the Stack lacks.
     const profile = ltx25Profile(engine, levelKey);
+    const resolution = run.options.resolution;
+    if (!run.lowered && typeof resolution === "number") {
+      const scaled = scaledSize(level, portrait, resolution);
+      if (scaled) body.size = scaled;
+    }
+    const length = run.options.length_seconds;
+    if (!run.lowered && typeof length === "number" && (base.seconds === undefined || base.seconds === QUICK_MAX_SECONDS || (levelKey === "standard" && base.seconds === LTX25_DEFAULTS.standard.max_seconds))) body.seconds = Math.round(length);
+    if (body.seconds !== undefined) body.seconds = Math.max(1, Math.min(body.seconds, maxSecondsFor(level, "ltx25", engine)));
     const queuedSize = base.size ? base.size.split("x").map(Number) : [];
     const [qw, qh] = portrait ? [queuedSize[1], queuedSize[0]] : queuedSize;
     const listed = (engine?.qualities?.ltx25?.profiles ?? []).some((p) => p.name === levelKey && p.width === qw && p.height === qh);
@@ -80,7 +88,7 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
     return { body, tier: run.tier, quality: level };
   }
   const shape = shapeOf(base.size);
-  // Only an LTX-2.5 clip can end on a picture (the Stack answers 422 to it on Wan and Detailed): any other model sends the start picture alone.
+  // Only an LTX-2.5 clip can end on a picture (the Stack answers 422 on Wan): any other model sends the start picture alone.
   delete body.end_image;
   // A minor is never sent LTX-2.5 (rules 0, 8, 10): the model goes back to the lane's own and the size and ceiling follow Wan.
   if (base.model === LTX25_MODEL && lane !== "adult") body.model = videoModelForLane(lane, base.model);

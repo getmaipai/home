@@ -100,7 +100,7 @@
         "minimum": 1,
         "maximum": 10,
         "grounded": false,
-        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. On a computer with the newest video model, Standard makes up to 10 seconds with sound and Boost makes up to 5 seconds with sound; otherwise Standard makes 5 seconds at most and a longer video is made at Boost automatically. When a length is cut to fit, the tool says so and you tell the person. A video that starts from a picture is 5 seconds at most and has no sound."
+        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. On a computer with the newer video model, Standard makes up to 10 seconds with sound and Boost makes up to 5 seconds with sound; otherwise a request for sound uses a silent Quick video. When a length is cut to fit, the tool says so and you tell the person. A video that starts from a picture is 5 seconds at most and has no sound."
       },
       "tier": {
         "type": "string",

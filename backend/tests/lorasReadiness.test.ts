@@ -34,10 +34,10 @@ describe("installed LoRA bases from Stack status", () => {
     expect(installedBasesNow()).toEqual(new Set(["ltx-2.5"]));
   });
 
-  test("LTX-2.5 and installed Detailed are both included", () => {
-    __setVideoStatusForTests(ltx25(video({ detailed: "installed", ltx25: "ready" }), true));
+  test("LTX-2.5 is included when its Stack reports style support", () => {
+    __setVideoStatusForTests(ltx25(video({ ltx25: "ready" }), true));
     __setPictureStatusForTests(picture([]));
-    expect(installedBasesNow()).toEqual(new Set(["ltx-2.3", "ltx-2.5"]));
+    expect(installedBasesNow()).toEqual(new Set(["ltx-2.5"]));
   });
 
   test("Max alone contributes LTX-2.5 when it reports style support", () => {
@@ -60,7 +60,7 @@ describe("installed LoRA bases from Stack status", () => {
     __setVideoStatusForTests(null);
     __setPictureStatusForTests(null);
     expect(installedBasesNow()).toBeNull();
-    expect(supportedBaseIds("video")).toEqual(["ltx-2.5", "ltx-2.3"]);
+    expect(supportedBaseIds("video")).toEqual(["ltx-2.5"]);
     expect(supportedBaseIds("picture")).toEqual(["flux2-klein-4b", "z-image-turbo", "ernie-image-turbo"]);
   });
 
@@ -70,7 +70,7 @@ describe("installed LoRA bases from Stack status", () => {
     expect(installedBasesNow()).toEqual(new Set([...installableBaseIds("picture")]));
     __setVideoStatusForTests(null);
     __setPictureStatusForTests(picture([{ id: "ernie-image-turbo", installed: true, loras: true }]));
-    expect(installedBasesNow()).toEqual(new Set(["ltx-2.5", "ltx-2.3", "ernie-image-turbo"]));
+    expect(installedBasesNow()).toEqual(new Set(["ltx-2.5", "ernie-image-turbo"]));
   });
 
   test("default search requests labels only for installed bases, and all labels while status is unknown", async () => {
@@ -90,8 +90,8 @@ describe("installed LoRA bases from Stack status", () => {
 
     __setVideoStatusForTests(null);
     __setPictureStatusForTests(null);
-    expect(civitaiLabelsFor("default", "video")).toEqual(["LTXV 2.5", "LTXV 2.3", "LTXV2"]);
+    expect(civitaiLabelsFor("default", "video")).toEqual(["LTXV 2.5", "LTXV2"]);
     await browseHits(params);
-    expect(new URL(urls.at(-1)!).searchParams.getAll("baseModels")).toEqual(["LTXV 2.5", "LTXV 2.3", "LTXV2"]);
+    expect(new URL(urls.at(-1)!).searchParams.getAll("baseModels")).toEqual(["LTXV 2.5", "LTXV2"]);
   });
 });

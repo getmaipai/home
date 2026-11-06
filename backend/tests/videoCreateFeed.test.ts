@@ -282,7 +282,7 @@ describe("Make it Max", () => {
     const { owner, row } = await household();
     fake.ltx25 = "ready";
     fake.ltx25max = "ready";
-    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed" }));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
     const mine = await makeClip(owner, row("Sage"));
     const res = await action(owner, "max", { id: mine.fileId });
     expect(res.status).toBe(200);
@@ -310,13 +310,13 @@ describe("Make it Max on a clip that started from a picture", () => {
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
     fake.ltx25 = "ready";
     fake.ltx25max = "ready";
-    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed", ltx25Picture: true }));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", ltx25Picture: true }));
     const first = await makeClip(owner, sage, { prompt: BOAT, start_frame: made.value.id });
     const refused = await action(owner, "max", { id: first.jobId });
     expect(refused.status).toBe(422);
     expect(((await refused.json()) as { code: string }).code).toBe("max_words_only");
     const submitted = fake.submitted.length;
-    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed", ltx25Picture: true, ltx25maxPicture: true }));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", ltx25Picture: true, ltx25maxPicture: true }));
     const ok = await action(owner, "max", { id: first.jobId });
     expect(ok.status).toBe(200);
     expect(fake.submitted).toHaveLength(submitted + 1);

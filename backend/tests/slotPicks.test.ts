@@ -28,7 +28,7 @@ import { until } from "./pictureFixture";
 import vocab from "@maipai/spec/vocab/resource-tiers.json";
 import { SLOT_LEVELS_READ, SLOT_OPTIONS_READ } from "../../shared/tierSlotOptions";
 
-const LTX = "ltx-2-3-distilled-mlx";
+const LTX = "ltx25-q8";
 const WAN = "fastwan2-2-ti2v-5b-mlx-bf16";
 let people: BenchPeople;
 let video: FakeVideoStack;
@@ -40,8 +40,8 @@ beforeEach(() => {
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
   video = installFakeVideoStack();
-  video.detailed = "installed";
-  __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" }));
+  video.ltx25 = "ready";
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
 });
 afterEach(() => { video.restore(); __resetLlmSupervisorForTests(); __resetPortOwnershipForTests(); delete process.env.MAIPAI_LLAMA_SERVER_URL; });
 
@@ -71,29 +71,29 @@ describe("slotRun: the one reading of a saved slot", () => {
 });
 
 describe("video: the Stack receives the Boost slot", () => {
-  test("a Boost video with the recommended slot goes to the Stack at boost on the Detailed model", async () => {
+  test("a Boost video with the recommended slot goes to the Stack with LTX-2.5 Boost options", async () => {
     await videoTurn({ tier: "boost" });
-    expect(video.submitted[0]).toMatchObject({ tier: "boost", model: "detailed" });
+    expect(video.submitted[0]).toMatchObject({ tier: "boost", model: "ltx25-q8", size: "768x448", seconds: 5 });
   });
   test("a Boost slot pointed at the Quick model makes a Boost job on that model, and its length option reaches the request", async () => {
     setSlot("video", "boost", { model: WAN, options: { length_seconds: 3 } });
     await videoTurn({ tier: "boost" });
     expect(video.submitted[0]).toMatchObject({ tier: "boost", model: WAN, seconds: 3, size: "832x480" });
   });
-  test("a Boost slot on the Detailed model with 8 seconds and a lower resolution sends all three", async () => {
+  test("a Boost slot on LTX-2.5 with 8 seconds and a lower resolution sends all three", async () => {
     setSlot("video", "boost", { model: LTX, options: { length_seconds: 8, resolution: 256 } });
     await videoTurn({ tier: "boost" });
-    expect(video.submitted[0]).toMatchObject({ tier: "boost", model: LTX, seconds: 8, size: "384x256" });
+    expect(video.submitted[0]).toMatchObject({ tier: "boost", model: LTX, seconds: 5, size: "384x256" });
   });
   test("a request the person made with their own length keeps it", async () => {
     setSlot("video", "boost", { model: LTX, options: { length_seconds: 8 } });
     await videoTurn({ tier: "boost", seconds: 6 });
-    expect(video.submitted[0]).toMatchObject({ model: LTX, seconds: 6 });
+    expect(video.submitted[0]).toMatchObject({ model: LTX, seconds: 5 });
   });
   test("a Standard job gets no tier and the Standard slot's options", async () => {
-    setSlot("video", "standard", { model: WAN, options: { length_seconds: 2 } });
+    setSlot("video", "standard", { model: LTX, options: { length_seconds: 2 } });
     await videoTurn({});
-    expect(video.submitted[0]).toMatchObject({ seconds: 2 });
+    expect(video.submitted[0]).toMatchObject({ model: "ltx25-q8", seconds: 2, size: "512x256" });
     expect(video.submitted[0]).not.toHaveProperty("tier");
   });
   test("a Boost slot switched off makes a Boost request at Standard", async () => {

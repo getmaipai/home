@@ -16,7 +16,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { __setVideoStatusForTests, readyVideoStatusForTests, videoStatusReady } from "@/lib/videos/ready";
-import { chooseVideoQuality, detailedVideoReady, etaWords, quickVideoReady } from "@/lib/videos/quality";
+import { chooseVideoQuality, etaWords, quickVideoReady } from "@/lib/videos/quality";
 import { videoCardView } from "@/routes/videos";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -33,10 +33,10 @@ import type { PersonRow } from "@/types";
 let people: BenchPeople;
 let fake: FakeVideoStack;
 
-const LTX_LORA = { ...TEST_VIDEO_LORAS[0]!, id: "lora-4444444444444444", name: "Talking Heads", sha256: "4".repeat(64), base_model: "ltx-2.3", trigger_words: ["talkinghead"] };
-const engineWith = (detailed: "installed" | "missing" | undefined) => readyVideoStatusForTests(detailed ? { detailed } : {});
+const LTX_LORA = { ...TEST_VIDEO_LORAS[0]!, id: "lora-4444444444444444", name: "Talking Heads", sha256: "4".repeat(64), base_model: "ltx-2.5", trigger_words: ["talkinghead"] };
+const engineWith = (ltx25: "ready" | "missing" | undefined) => readyVideoStatusForTests(ltx25 ? { ltx25, ltx25Picture: true } : {});
 /** A Stack that says Detailed can start from a picture (VIDEO-LTX-02, Stack d443349 and later). */
-const newStack = () => readyVideoStatusForTests({ detailed: "installed", detailedPicture: true });
+const newStack = () => readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true });
 
 beforeEach(() => {
   resetDb();
@@ -49,8 +49,8 @@ beforeEach(() => {
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
   fake = installFakeVideoStack();
   fake.loras = [...TEST_VIDEO_LORAS, LTX_LORA];
-  fake.detailed = "installed";
-  __setVideoStatusForTests(engineWith("installed"));
+  fake.ltx25 = "ready";
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
 });
 afterEach(() => {
   fake.restore();
@@ -77,48 +77,45 @@ const toolText = (seen: ChatCompletionRequest[]) => seen.find(isPhrasing)!.messa
 
 describe("the choice", () => {
   test("Quick is the default and stays 5 seconds with no model named to the Stack", () => {
-    const choice = chooseVideoQuality({ engine: engineWith("installed"), household: "quick" });
+    const choice = chooseVideoQuality({ engine: engineWith("ready"), household: "quick", adultLane: true });
     expect(choice).toMatchObject({ quality: "quick", seconds: 5, note: null, announce: false, shortened: false });
   });
-  test("a request, or the household, can choose Detailed; Detailed that is not installed falls back to Quick with a note and 5 seconds", () => {
-    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("installed"), household: "quick", seconds: 8 })).toMatchObject({ quality: "detailed", seconds: 8, announce: true });
-    expect(chooseVideoQuality({ engine: engineWith("installed"), household: "detailed" })).toMatchObject({ quality: "detailed", seconds: 5, announce: false });
-    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("missing"), household: "quick", seconds: 8 })).toMatchObject({ quality: "quick", seconds: 5, note: "detailed_not_installed", shortened: true });
-    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith(undefined), household: "quick" })).toMatchObject({ quality: "quick", note: "detailed_not_installed" });
+  test("adult Detailed requests use Boost and missing LTX-2.5 falls back to Standard", () => {
+    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("ready"), household: "quick", seconds: 8, adultLane: true })).toMatchObject({ quality: "detailed", seconds: 5, announce: true, shortened: true });
+    expect(chooseVideoQuality({ engine: engineWith("ready"), household: "detailed", adultLane: true })).toMatchObject({ quality: "detailed", seconds: 5, announce: false });
+    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("missing"), household: "quick", seconds: 8, adultLane: true })).toMatchObject({ quality: "quick", seconds: 5, note: "detailed_not_installed", shortened: true });
+    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith(undefined), household: "quick", adultLane: true })).toMatchObject({ quality: "quick", note: "detailed_not_installed" });
   });
-  test("a length past 5 seconds needs Detailed on its own; 10 is the most; Quick holds 5", () => {
-    expect(chooseVideoQuality({ engine: engineWith("installed"), household: "quick", seconds: 9 })).toMatchObject({ quality: "detailed", seconds: 9, announce: true });
-    expect(chooseVideoQuality({ engine: engineWith("installed"), household: "quick", seconds: 30 })).toMatchObject({ quality: "detailed", seconds: 10, shortened: true });
-    expect(chooseVideoQuality({ requested: "quick", engine: engineWith("installed"), household: "detailed", seconds: 8 })).toMatchObject({ quality: "quick", seconds: 5, shortened: true });
+  test("Standard supports 10 seconds; Quick requests map to Standard and honor the length", () => {
+    expect(chooseVideoQuality({ engine: engineWith("ready"), household: "quick", seconds: 9, adultLane: true })).toMatchObject({ quality: "quick", maker: "ltx25", seconds: 9, announce: false });
+    expect(chooseVideoQuality({ engine: engineWith("ready"), household: "quick", seconds: 30, adultLane: true })).toMatchObject({ quality: "quick", seconds: 10, shortened: true });
+    expect(chooseVideoQuality({ requested: "quick", engine: engineWith("ready"), household: "detailed", seconds: 8, adultLane: true })).toMatchObject({ quality: "quick", maker: "ltx25", seconds: 8, shortened: false });
   });
-  test("a style decides its own model: LTX makes it Detailed, Wan keeps it Quick, each with a note when it overrides the ask", () => {
-    expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, engine: engineWith("installed"), household: "quick" })).toMatchObject({ quality: "detailed", announce: true, note: null });
-    expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, requested: "quick", engine: engineWith("installed") })).toMatchObject({ quality: "detailed", note: "style_needs_detailed" });
-    expect(chooseVideoQuality({ style: { base_model: "wan2.2-ti2v-5b" }, requested: "detailed", engine: engineWith("installed") })).toMatchObject({ quality: "quick", note: "style_needs_quick" });
+  test("LTX-2.5 styles use Boost, Wan styles use Quick, and retired styles are refused", () => {
+    expect(chooseVideoQuality({ style: { base_model: "ltx-2.5" }, engine: engineWith("ready"), household: "quick", adultLane: true })).toMatchObject({ quality: "detailed", maker: "ltx25", announce: false, note: null });
+    expect(chooseVideoQuality({ style: { base_model: "wan2.2-ti2v-5b" }, requested: "detailed", engine: engineWith("ready") })).toMatchObject({ quality: "quick", note: "style_needs_quick" });
   });
-  test("a Stack that says Detailed can start from a picture lets one: the asked-for kind, the household default and a long length all stand (VIDEO-LTX-02)", () => {
-    expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), hasPicture: true })).toMatchObject({ quality: "detailed", note: null, seconds: 5, announce: true });
-    expect(chooseVideoQuality({ engine: newStack(), household: "detailed", hasPicture: true })).toMatchObject({ quality: "detailed", note: null });
-    expect(chooseVideoQuality({ engine: newStack(), household: "quick", seconds: 9, hasPicture: true })).toMatchObject({ quality: "detailed", seconds: 9, note: null });
-    expect(chooseVideoQuality({ engine: newStack(), household: "quick", hasPicture: true })).toMatchObject({ quality: "quick", note: null });
+  test("a picture uses the silent path unless the Stack allows LTX-2.5 picture starts", () => {
+    expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), hasPicture: true, adultLane: true })).toMatchObject({ quality: "detailed", maker: "ltx25", note: null, seconds: 5, announce: true });
+    expect(chooseVideoQuality({ engine: newStack(), household: "detailed", hasPicture: true, adultLane: true })).toMatchObject({ quality: "detailed", maker: "ltx25", note: null });
+    expect(chooseVideoQuality({ engine: newStack(), household: "quick", seconds: 9, hasPicture: true, adultLane: true })).toMatchObject({ quality: "quick", maker: "ltx25", seconds: 9, note: null });
+    expect(chooseVideoQuality({ engine: newStack(), household: "quick", hasPicture: true, adultLane: true })).toMatchObject({ quality: "quick", maker: "ltx25", note: null });
     // A teen or a child is Quick whatever the Stack can do.
     expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), hasPicture: true, quickOnly: true })).toMatchObject({ quality: "quick", note: null });
     expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), quickOnly: true })).toMatchObject({ quality: "quick", note: null });
   });
-  test("an older Stack (no image_to_video on Detailed): a picture starts a Quick clip only: Detailed asked for outright (or by length) is made Quick with the reason; the household default stays quiet", () => {
-    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("installed"), hasPicture: true })).toMatchObject({ quality: "quick", note: "picture_needs_quick", seconds: 5 });
-    expect(chooseVideoQuality({ engine: engineWith("installed"), household: "quick", seconds: 9, hasPicture: true })).toMatchObject({ quality: "quick", note: "picture_needs_quick", seconds: 5, shortened: true });
-    expect(chooseVideoQuality({ engine: engineWith("installed"), household: "detailed", hasPicture: true })).toMatchObject({ quality: "quick", note: null });
-    expect(chooseVideoQuality({ engine: engineWith("installed"), household: "quick", hasPicture: true })).toMatchObject({ quality: "quick", note: null });
+  test("a Stack without LTX-2.5 picture support uses Quick for picture starts", () => {
+    expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("ready"), hasPicture: true })).toMatchObject({ quality: "quick", maker: "wan", note: "detailed_not_installed", seconds: 5 });
+    expect(chooseVideoQuality({ engine: engineWith("ready"), household: "quick", seconds: 9, hasPicture: true, adultLane: true })).toMatchObject({ quality: "quick", maker: "ltx25", note: null, seconds: 9, shortened: false });
+    expect(chooseVideoQuality({ engine: engineWith("ready"), household: "detailed", hasPicture: true, adultLane: true })).toMatchObject({ quality: "detailed", maker: "ltx25", note: null });
   });
-  test("a computer with only Detailed installed makes Detailed videos, and is ready", () => {
-    const only = readyVideoStatusForTests({ detailed: "installed", quickMissing: true });
+  test("a computer with only LTX-2.5 ready is video ready", () => {
+    const only = readyVideoStatusForTests({ ltx25: "ready", quickMissing: true });
     expect(quickVideoReady(only)).toBe(false);
-    expect(detailedVideoReady(only)).toBe(true);
     expect(videoStatusReady(only, true)).toBe(true);
     expect(videoStatusReady(only, false)).toBe(false);
-    expect(chooseVideoQuality({ engine: only, household: "quick" })).toMatchObject({ quality: "detailed", note: "quick_not_installed" });
-    expect(videoStatusReady(readyVideoStatusForTests({ detailed: "missing", quickMissing: true }))).toBe(false);
+    expect(chooseVideoQuality({ engine: only, household: "quick", adultLane: true })).toMatchObject({ quality: "quick", maker: "ltx25", note: null });
+    expect(videoStatusReady(readyVideoStatusForTests({ ltx25: "missing", quickMissing: true }))).toBe(false);
   });
   test("how long it takes is told in plain words", () => {
     expect(etaWords("quick", 5)).toBe("about two minutes");
@@ -132,10 +129,10 @@ describe("the tool", () => {
     await withStub(script({}), async (seen) => {
       await streamValue(people.owner, "make a video of a hero in a corridor");
       const sent = fake.submitted[0]!;
-      expect(sent.model).toBeUndefined();
-      expect(sent).toMatchObject({ size: "832x480", seconds: 5 });
+      expect(sent.model).toBe("ltx25-q8");
+      expect(sent).toMatchObject({ size: "512x256", seconds: 5 });
       const text = toolText(seen);
-      expect(text).toContain("A Quick video has no sound");
+      expect(text).toContain("with sound");
       expect(text).not.toMatch(/\bwan\b|\bltx\b|gemma|fastwan/i);
     });
   });
@@ -143,10 +140,10 @@ describe("the tool", () => {
     await withStub(script({ tier: "boost" }), async (seen) => {
       const value = await streamValue(people.owner, "make a video where the hero says come with me");
       const sent = fake.submitted[0]!;
-      expect(sent).toMatchObject({ model: "detailed", size: "768x448", seconds: 5 });
+      expect(sent).toMatchObject({ model: "ltx25-q8", seconds: 5 });
       const text = toolText(seen);
-      expect(text).toContain("Detailed video");
-      expect(text).toContain("with sound and speech");
+      expect(text).toContain("This one has sound and speech");
+      expect(text).toContain("with sound");
       expect(text).not.toMatch(/\bwan\b|\bltx\b|gemma|fastwan/i);
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
       const job = getVideoJobFor(people.owner, value.video!.id)!;
@@ -156,19 +153,18 @@ describe("the tool", () => {
       expect(card.items[0]!.clip).toMatchObject({ has_sound: true, seconds: 5 });
     });
   });
-  test("a long one: 10 seconds in portrait is Detailed at 448x768 without asking", async () => {
+  test("a long one: 10 seconds in portrait uses Standard with LTX-2.5", async () => {
     await withStub(script({ seconds: 10, orientation: "portrait" }), async (seen) => {
       await streamValue(people.owner, "a ten second tall clip of a hero talking");
-      expect(fake.submitted[0]!).toMatchObject({ model: "detailed", size: "448x768", seconds: 10 });
+      expect(fake.submitted[0]!).toMatchObject({ model: "ltx25-q8", size: "256x512", seconds: 10 });
       expect(toolText(seen)).toContain("about two minutes");
-      expect(toolText(seen)).toContain("clearest in a clip of 5 seconds or less");
     });
   });
-  test("the household setting makes Detailed the default, and a request can still ask for Quick", async () => {
+  test("the household setting makes Boost the default, and a request can still ask for Standard", async () => {
     setHouseholdSettingValue("generation.video_tier", "boost");
     await withStub(script({}), async () => {
       await streamValue(people.owner, "make a video of a hero");
-      expect(fake.submitted[0]!.model).toBe("detailed");
+      expect(fake.submitted[0]!.model).toBe("ltx25-q8");
     });
     fake.submitted.length = 0;
     __resetVideoAdapterCacheForTests();
@@ -176,37 +172,54 @@ describe("the tool", () => {
       // the first clip is finished or stopped before a second one may start
       await until(() => fake.jobs[0]?.state === "done" || fake.jobs[0]?.deleted === true);
       await streamValue(people.owner, "make a quick one");
-      expect(fake.submitted[0]!.model).toBeUndefined();
+      expect(fake.submitted[0]!.model).toBe("ltx25-q8");
     });
   });
-  test("Detailed that is not installed makes a Quick video and tells the model how an admin gets it", async () => {
-    fake.detailed = "missing";
+  test("missing LTX-2.5 falls back to Quick and tells the model how an admin gets it", async () => {
+    fake.ltx25 = "missing";
     __setVideoStatusForTests(engineWith("missing"));
     await withStub(script({ quality: "detailed", seconds: 9 }), async (seen) => {
       await streamValue(people.owner, "make it detailed and nine seconds");
       expect(fake.submitted[0]!).toMatchObject({ size: "832x480", seconds: 5 });
       expect(fake.submitted[0]!.model).toBeUndefined();
       const text = toolText(seen);
-      expect(text).toContain("not on this computer yet");
+      expect(text).toContain("need a newer video model");
       expect(text).toContain("Settings, Models and storage");
       expect(text).toContain("so it is 5");
     });
   });
-  test("a style made for Detailed makes the video Detailed and sends its id; with Detailed missing nothing is sent", async () => {
-    await withStub(script({ style: "talking heads" }), async (seen) => {
-      await streamValue(people.owner, "a clip in the talking heads style");
-      expect(fake.submitted[0]!).toMatchObject({ model: "detailed", size: "768x448" });
+  test("an LTX-2.5 style rides Max when held, otherwise refusal follows the Stack's Max LoRA flag", async () => {
+    fake.ltx25max = "ready";
+    setHouseholdSettingValue("engines.video.tier.max", { model: "ltx25-max", options: {} });
+    setHouseholdSettingValue("engines.video.tier.boost", { model: "ltx25-q8", options: {} });
+    const engine = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" });
+    engine.qualities!.ltx25!.loras = { supported: true };
+    engine.qualities!.ltx25max!.loras = { supported: true };
+    __setVideoStatusForTests(engine);
+    await withStub(script({ style: "Talking Heads", tier: "max" }), async (seen) => {
+      await streamValue(people.owner, "a clip in the Talking Heads style");
+      expect(fake.submitted[0]!).toMatchObject({ model: "ltx25-max", size: "1024x576", tier: "max" });
       expect((fake.submitted[0]!.loras as Array<{ id: string }>)[0]!.id).toBe(LTX_LORA.id);
-      expect(toolText(seen)).toContain("Detailed video");
+    });
+    fake.submitted.length = 0;
+    const standard = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" });
+    standard.qualities!.ltx25max!.loras = { supported: true };
+    standard.qualities!.ltx25!.loras = { supported: false };
+    __setVideoStatusForTests(standard);
+    setHouseholdSettingValue("engines.video.tier.max", { model: "off", options: {} });
+    await withStub(script({ style: "Talking Heads", tier: "max" }), async (seen) => {
+      await streamValue(people.owner, "a clip in the Talking Heads style");
+      expect(fake.submitted).toHaveLength(0);
+      expect(toolText(seen)).toContain("can't use a style yet");
     });
   });
-  test("a style made for Detailed with Detailed missing is not sent to the Stack", async () => {
-    fake.detailed = "missing";
+  test("a style made for LTX-2.5 with LTX-2.5 missing is not sent to the Stack", async () => {
+    fake.ltx25 = "missing";
     __setVideoStatusForTests(engineWith("missing"));
     await withStub(script({ style: "talking heads" }), async (seen) => {
       await streamValue(people.owner, "a clip in the talking heads style");
       expect(fake.submitted).toHaveLength(0);
-      expect(toolText(seen)).toContain("only works with Detailed videos");
+      expect(toolText(seen)).toContain("needs the newer video model");
     });
   });
 });
@@ -226,25 +239,25 @@ describe("the card's switch and the routes", () => {
     await until(() => getVideoJobFor(actor, job.id)?.state === "done");
     return job;
   }
-  test("Make it Detailed makes the same words again as Detailed with the Stack's own sizes; Make it Quick comes back", async () => {
+  test("Make it Boost makes the same words again with the Stack's own options; Make it Standard comes back", async () => {
     const { client, actor } = await owner();
     const job = await finished(actor);
     const card = await (await client.get(`/api/videos/jobs/${job.id}`)).json() as { items: Array<{ quality: string; switch_to: string | null }> };
     expect(card.items[0]).toMatchObject({ quality: "quick", switch_to: "detailed" });
     const again = await client.post(`/api/videos/jobs/${job.id}/another`, { quality: "detailed" });
     expect(again.status).toBe(200);
-    expect(fake.submitted.at(-1)).toMatchObject({ model: "detailed", size: "768x448", seconds: 5 });
+      expect(fake.submitted.at(-1)).toMatchObject({ model: "ltx25-q8", seconds: 5 });
     await until(() => fake.jobs.at(-1)?.state === "done");
     const second = fake.jobs.at(-1)!;
-    expect(second.body.model).toBe("detailed");
-    const detailedJob = await finished(actor, { model: "detailed", size: "768x448" });
+    expect(second.body.model).toBe("ltx25-q8");
+    const detailedJob = await finished(actor, { model: "ltx25-q8", tier: "boost", quality: "detailed", size: "768x448" });
     const detailedCard = await (await client.get(`/api/videos/jobs/${detailedJob.id}`)).json() as { items: Array<{ quality: string; switch_to: string | null; clip: { has_sound: boolean } | null }> };
-    expect(detailedCard.items.at(-1)).toMatchObject({ quality: "detailed", switch_to: "quick" });
+    expect(detailedCard.items.at(-1)).toMatchObject({ quality: "quick", switch_to: "detailed" });
     expect(detailedCard.items.at(-1)!.clip!.has_sound).toBe(true);
     const back = await client.post(`/api/videos/jobs/${detailedJob.id}/another`, { quality: "quick" });
     expect(back.status).toBe(200);
-    expect(fake.submitted.at(-1)!.model).toBeUndefined();
-    expect(fake.submitted.at(-1)).toMatchObject({ size: "832x480", seconds: 5 });
+    expect(fake.submitted.at(-1)!.model).toBe("ltx25-q8");
+    expect(fake.submitted.at(-1)).toMatchObject({ size: "512x256", seconds: 5 });
   });
   test("a video made with a style offers no switch", async () => {
     const { client, actor } = await owner();
@@ -252,15 +265,14 @@ describe("the card's switch and the routes", () => {
     const card = await (await client.get(`/api/videos/jobs/${job.id}`)).json() as { items: Array<{ switch_to: string | null }> };
     expect(card.items[0]!.switch_to).toBeNull();
   });
-  test("the settings route reports the household's quality, Detailed's state, size and licence", async () => {
+  test("the settings route reports the household's quality and LTX-2.5 readiness", async () => {
     const { client } = await owner();
     const body = await (await client.get("/api/videos/settings")).json() as { quality: string; detailed: { installed: boolean; component: string; licence: { id: string } | null; download_bytes: number } };
     expect(body.quality).toBe("quick");
-    expect(body.detailed).toMatchObject({ installed: true, component: "ltx-2-3-distilled-mlx", download_bytes: 0 });
-    expect(body.detailed.licence!.id).toBe("ltx-2.x-community-2026-08-11");
-    fake.detailed = "missing";
+    expect(body.detailed).toMatchObject({ installed: true, component: "ltx25-q8", download_bytes: 0 });
+    fake.ltx25 = "missing";
     __setVideoStatusForTests(engineWith("missing"));
     const missing = await (await client.get("/api/videos/settings")).json() as { detailed: { installed: boolean; download_bytes: number } };
-    expect(missing.detailed).toMatchObject({ installed: false, download_bytes: 73_572_000_000 });
+    expect(missing.detailed).toMatchObject({ installed: false, download_bytes: 0 });
   });
 });

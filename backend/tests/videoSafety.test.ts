@@ -298,7 +298,7 @@ describe("the routes", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { can_make: boolean; limits: string; styles: Array<{ id: string }> };
     expect(body.can_make).toBe(true);
-    expect(body.limits).toBe("Quick videos are 5 seconds at 480p with no sound and take about 2 minutes. Detailed videos have sound and speech, run up to 10 seconds and take a minute or two.");
+    expect(body.limits).toBe("Quick videos are 5 seconds with no sound. Detailed videos have sound and speech for up to 5 seconds when the newer video model is ready.");
     // The adult-only style is locked until the owner's own unlock proof is valid (VIDEO-LORA-03), so only the all-ages one is listed.
     expect(body.styles.map((s) => s.id)).toEqual(["lora-1111111111111111"]);
     asRole(adult.actor.id, "child");

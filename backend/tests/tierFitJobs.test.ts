@@ -43,8 +43,8 @@ beforeEach(() => {
   __resetThrottleForTests(); __resetLlmSupervisorForTests(); __resetRateLimiterForTests(); __resetAdapterCacheForTests(); __resetVideoAdapterCacheForTests();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
   video = installFakeVideoStack();
-  video.detailed = "installed";
-  __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" }));
+  video.ltx25 = "ready";
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   image = installFakeImageStack();
   __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ZIMAGE] }));
 });

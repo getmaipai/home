@@ -20,7 +20,7 @@ import type { PersonRow } from "@/types";
 import type { TurnState } from "@/lib/turnMachine/contract";
 
 let video: FakeVideoStack; let stack: FakeEditStack;
-beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); video = installFakeVideoStack(); video.detailed = "installed"; __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); stack = installFakeEditStack(); });
+beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); video = installFakeVideoStack(); video.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); stack = installFakeEditStack(); });
 afterEach(() => { stack.restore(); video.restore(); __setVideoStatusForTests(undefined); __setKeyframesForTests(null); });
 function person(): PersonRow {
   const now = new Date().toISOString(); const id = "person-filmops";

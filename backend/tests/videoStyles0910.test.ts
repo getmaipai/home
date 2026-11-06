@@ -37,7 +37,7 @@ function stackHas(...records: Lora[]): void {
 }
 /** A Stack with LTX-2.5 and Max ready; `maxLoras` and `stdLoras` say which of them report LoRA support. */
 function engine(opts: { max?: boolean; std?: boolean; nag?: boolean }): void {
-  const status = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed" });
+  const status = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" });
   const loras = (supported: boolean) => ({ supported, max: 2, mode: "unfused" as const, negative_prompt: opts.nag ? ("nag" as const) : ("none" as const) });
   status.qualities!.ltx25!.loras = loras(opts.std === true);
   status.qualities!.ltx25max!.loras = loras(opts.max === true);

@@ -191,7 +191,7 @@ describe("the Create page and the make action", () => {
     expect(bar.submit.call.target).toBe("/api/plugins/videos/actions/make");
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("orientation").options.map((o: { value: string }) => o.value)).toEqual(["landscape", "portrait"]);
-    expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS]);
+    expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([QUICK_MAX_SECONDS]);
     expect(chip("camera").options.map((o: { value: string }) => o.value)).toEqual(["none", ...VIDEO_RECIPES.map((r) => r.id)]);
     // Levels: Standard first; Max only when the person is offered it, Boost only when they may use it; one level alone shows no segment.
     const adultRow = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
@@ -346,9 +346,9 @@ describe("V1b: look, length, voices, hint and Another take", () => {
 
   test("a look goes before the words and clean voices after, on a Boost clip; the card keeps only what was typed", async () => {
     const { owner } = await household();
-    fake.detailed = "installed";
-    __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" }));
-    const res = await owner.post("/api/videos/make", { prompt: BOAT, tier: "boost", seconds: 10, look: "classic-cartoon", voices: "clean", recipe: "dolly-in" });
+    fake.ltx25 = "ready";
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
+    const res = await owner.post("/api/videos/make", { prompt: BOAT, tier: "boost", seconds: 5, look: "classic-cartoon", voices: "clean", recipe: "dolly-in" });
     expect(res.status).toBe(200);
     const card = await res.json() as { items: Array<{ prompt: string }>; notice: string | null };
     expect(card.items[0]!.prompt).toBe(BOAT);
@@ -358,7 +358,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(sent).toContain(BOAT);
     expect(sent.indexOf(BOAT)).toBeLessThan(sent.indexOf(videoRecipeFor("dolly-in")!.wording));
     expect(sent).toEndWith("no laugh track, no music, only one character speaks at a time.");
-    expect(fake.submitted[0]!.seconds).toBe(10);
+    expect(fake.submitted[0]!.seconds).toBe(5);
     expect(typeof fake.submitted[0]!.seed).toBe("number");
   });
 

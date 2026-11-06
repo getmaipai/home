@@ -30,7 +30,7 @@ import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
 import { getStudioVoice } from "@/lib/videos/studioVoices";
 import { appRouteAllowed } from "@/lib/apps";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
-import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, detailedVideoReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
+import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { videoJobLockItem, videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { lockedView, sessionKeyOf } from "@/lib/adultLock";
 import { adultStateOf, setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
@@ -59,7 +59,7 @@ export function videoRouteAudience(actor: PersonRow): VideoAudience {
 /** The most clips one request's card holds (the first and each Make another). */
 export const MAX_CLIPS_PER_CARD = 8;
 
-export const VIDEO_LIMITS_LINE = "Quick videos are 5 seconds at 480p with no sound and take about 2 minutes. Detailed videos have sound and speech, run up to 10 seconds and take a minute or two.";
+export const VIDEO_LIMITS_LINE = "Quick videos are 5 seconds with no sound. Detailed videos have sound and speech for up to 5 seconds when the newer video model is ready.";
 
 const ItemSchema = z.object({
   id: z.string(),
@@ -74,7 +74,7 @@ const ItemSchema = z.object({
   prompt: z.string(),
   kind: z.enum(["generate", "animate", "edit"]),
   error: z.string().nullable(),
-  quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."),
+  quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (silent) or Detailed (with sound and speech)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
@@ -146,20 +146,19 @@ async function readyFlags(actor: PersonRow): Promise<{ quick: boolean; detailed:
   // A teen or a child is only ever on Quick (lane review): the card never offers them Detailed, and the job starter would override it anyway.
   // VIDEO-TIERS-01: an adult's LTX-2.5 serves both levels, so either switch is ready when the Stack says it is.
   const adult = laneOfPerson(actor) === "adult";
-  return { quick: quickVideoReady(engine) || (adult && ltx25VideoReady(engine)), detailed: adult && (detailedVideoReady(engine) || ltx25VideoReady(engine)), max: adult && ltx25MaxReady(engine) };
+  return { quick: quickVideoReady(engine) || (adult && ltx25VideoReady(engine)), detailed: adult && ltx25VideoReady(engine), max: adult && ltx25MaxReady(engine) };
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const refusals = errorResponses({ 401: "Not signed in", 403: "Videos are off for this profile", 404: "No such video job", 422: "That request is not allowed", 502: "Videos could not be made", 503: "Videos are not ready" });
 
-const TierStatusSchema = z.object({ ready: z.boolean(), max_seconds: z.number(), sound: z.boolean(), model: z.enum(["wan", "ltx23", "ltx25", "ltx25max"]).nullable() });
+const TierStatusSchema = z.object({ ready: z.boolean(), max_seconds: z.number(), sound: z.boolean(), model: z.enum(["wan", "ltx25", "ltx25max"]).nullable() });
 /** VIDEO-TIERS-01: what each level makes on this computer now (the one answer the Create page, the tools and the settings read). A teen or a child: Standard on Wan, silent. Max is the LTX-2.5 Max model when the Stack reports it ready. */
 export function videoTiersStatus(engine: Awaited<ReturnType<typeof videoEngineStatus>>, adult: boolean) {
   const ltx25 = adult && ltx25VideoReady(engine);
-  const boost23 = adult && detailedVideoReady(engine);
   return {
     standard: ltx25 ? { ready: true, max_seconds: maxSecondsFor("quick", "ltx25", engine), sound: true, model: "ltx25" as const } : { ready: quickVideoReady(engine), max_seconds: maxSecondsFor("quick", "wan"), sound: false, model: quickVideoReady(engine) ? "wan" as const : null },
-    boost: ltx25 ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx25", engine), sound: true, model: "ltx25" as const } : boost23 ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx23"), sound: true, model: "ltx23" as const } : { ready: false, max_seconds: 0, sound: false, model: null },
+    boost: ltx25 ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx25", engine), sound: true, model: "ltx25" as const } : { ready: false, max_seconds: 0, sound: false, model: null },
     max: adult && ltx25MaxReady(engine) ? { ready: true, max_seconds: maxSecondsFor("detailed", "ltx25max", engine), sound: true, model: "ltx25max" as const } : { ready: false, max_seconds: 0, sound: false, model: null },
   };
 }
@@ -403,7 +402,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: words, sourceFileId: source.request.source_file_id,
       tier: choice.maker === "ltx25max" ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(words) : words, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.maker === "ltx25max" ? { model: LTX25_MAX_MODEL } : choice.maker === "ltx25" ? { model: LTX25_MODEL } : choice.maker === "ltx23" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
+        prompt: laneOf(audience) === "child" ? forceCartoon(words) : words, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.maker === "ltx25max" ? { model: LTX25_MAX_MODEL } : choice.maker === "ltx25" ? { model: LTX25_MODEL } : {}), audience: stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated" } : {}),
@@ -521,11 +520,11 @@ const settingsRoute = createRoute({
     quality: z.enum(["quick", "detailed"]).describe("The household's Video quality setting."),
     detailed: z.object({
       installed: z.boolean(), available: z.boolean(), reason: z.string().nullable(),
-      download_bytes: z.number().describe("What getting Detailed videos would still download (0 when installed)."),
-      component: z.string().describe("The Models and storage id to install it with."),
+      download_bytes: z.number().describe("What getting the newer sound video model would still download (0 when installed)."),
+      component: z.string().describe("The Models and storage id for the newer sound video model."),
       licence: z.object({ id: z.string(), name: z.string(), url: z.string() }).nullable(),
       lora_base_model: z.string(),
-    }).describe("Detailed videos: sound and speech, up to 10 seconds."),
+    }).describe("Detailed videos use the newer model for sound and speech, up to 5 seconds."),
     enabled: z.boolean(), adult_adapters: z.boolean(), minors: z.string(), adapters: z.array(AdapterSchema),
     locked_styles: z.boolean().describe("Some adult-only styles are locked: one tile, never a count. They open with the person's own passcode (the Adult lock)."),
   }) } }, description: "Additive." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) },
@@ -540,14 +539,7 @@ videosRoutes.openapi(settingsRoute, async (c) => {
     state: engine?.state ?? "unavailable", available: engine?.available === true, reason: engine?.reason ?? (engine ? null : "Videos are not ready yet. Try again in a few minutes."), tier: engine?.tier ?? null,
     model_installed: engine?.qualities ? engine.qualities.quick.installed : engine?.model?.installed === true, limits: VIDEO_LIMITS_LINE,
     quality: householdVideoQuality(),
-    detailed: (() => {
-      const detailed = engine?.qualities?.detailed;
-      return {
-        installed: detailed?.installed === true, available: detailed?.available === true,
-        reason: detailed && !detailed.available ? detailed.memory.reason ?? engine?.reason ?? null : engine && !engine.qualities ? "Detailed videos need an update first. Ask an admin to update Home." : null,
-        download_bytes: detailed?.install.remaining_bytes ?? 0, component: "ltx-2-3-distilled-mlx", licence: detailed?.licence ?? null, lora_base_model: detailed?.lora_base_model ?? "ltx-2.3",
-      };
-    })(),
+    detailed: { installed: ltx25VideoReady(engine), available: ltx25VideoReady(engine), reason: null, download_bytes: ltx25VideoReady(engine) ? 0 : engine?.qualities?.ltx25?.install?.remaining_bytes ?? 0, component: "ltx25-q8", licence: engine?.qualities?.ltx25?.licence ?? null, lora_base_model: "ltx-2.5" },
     enabled: householdAllowsVideo(), adult_adapters: adultStylesAllowed(),
     minors: "Videos are off for children and teens. No setting turns them on.",
     adapters: adapters.map(adapterWire),

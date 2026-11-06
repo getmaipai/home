@@ -1,6 +1,6 @@
 # Video tiers: LTX for every tier, Wan and H3 parked (design draft, 2026-11-02)
 
-Status (2026-11-02): proposed; architect ruling pending. No code. Item: VIDEO-TIERS-01. Amends the video rows of
+Status (2026-11-02): proposed; architect ruling pending. No code. Item: VIDEO-TIERS-01. LTX-2.3 retired by owner order (2026-11-06), replaced by LTX-2.5 Standard and Boost. Amends the video rows of
 [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) section 5.3 and follows
 [video-create-2026-11-01.md](video-create-2026-11-01.md). Measurements are in
 [video-speed-bench-2026-11-01.md](video-speed-bench-2026-11-01.md); this note decides from them.

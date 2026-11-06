@@ -34,13 +34,13 @@ import { PACKAGES_DIR } from "@/lib/paths";
 
 let video: FakeVideoStack;
 let stack: FakeEditStack;
-const READY = (extra: Parameters<typeof readyVideoStatusForTests>[0] = {}) => readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", detailed: "installed", ...extra });
+const READY = (extra: Parameters<typeof readyVideoStatusForTests>[0] = {}) => readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready", ...extra });
 const PICTURES = () => READY({ ltx25Picture: true, ltx25maxPicture: true });
 beforeEach(() => {
   resetDb();
   __resetVideoAdapterCacheForTests();
   video = installFakeVideoStack();
-  video.ltx25 = "ready"; video.ltx25max = "ready"; video.detailed = "installed";
+  video.ltx25 = "ready"; video.ltx25max = "ready"; video.ltx25 = "ready";
   __setVideoStatusForTests(PICTURES());
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never })));
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);
@@ -103,7 +103,7 @@ describe("A: the Stack's picture flags decide, Home hard-codes nothing", () => {
   test("a style still keeps a clip off LTX-2.5, and a teen or a child never gets it (rule 8)", () => {
     const engine = PICTURES();
     expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, style: { base_model: "wan2.2-ti2v-5b" } }).maker).toBe("wan");
-    expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, max: true, style: { base_model: "ltx-2.3" } }).maker).toBe("ltx23");
+    expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, max: true, style: { base_model: "ltx-2.3" } }).maker).toBe("wan");
     expect(chooseVideoQuality({ requested: "detailed", engine, quickOnly: true, adultLane: false, hasPicture: true, max: true })).toMatchObject({ quality: "quick", maker: "wan" });
     const sent = videoBodyForSlot({ prompt: BOAT, audience: "all-ages", model: LTX25_MODEL, size: "512x256", seconds: 5, image: "abc", end_image: "def" }, "standard", "teen", "teen", engine);
     expect(sent.body.model).toBe(WAN_QUICK_VIDEO_MODEL);

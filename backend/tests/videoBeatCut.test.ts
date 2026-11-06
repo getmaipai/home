@@ -26,7 +26,7 @@ import { writeFileSync } from "node:fs";
 import { TestClient } from "./client";
 
 let fakeVideo: ReturnType<typeof installFakeVideoStack>; let fakeEdit: FakeEditStack;
-beforeEach(() => { resetDb(); fakeVideo = installFakeVideoStack(); fakeVideo.detailed = "installed"; __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 99, label: "adult", is_nude_or_sexual: false, confidence: 0.99 } }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); fakeEdit = installFakeEditStack(); });
+beforeEach(() => { resetDb(); fakeVideo = installFakeVideoStack(); fakeVideo.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 99, label: "adult", is_nude_or_sexual: false, confidence: 0.99 } }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); fakeEdit = installFakeEditStack(); });
 afterEach(() => { fakeEdit.restore(); fakeVideo.restore(); __setVideoStatusForTests(undefined); __setKeyframesForTests(null); __setMusicFetchForTests(null); });
 
 let personN = 0;

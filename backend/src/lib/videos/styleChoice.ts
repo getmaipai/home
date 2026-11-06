@@ -10,7 +10,7 @@ import { matchVideoAdapter, loraSurfaceOf, videoAdaptersFor, type VideoAdapter }
 import type { VideoAudience } from "./policy";
 import { MAX_STYLES, STYLE_STRENGTHS, type StyleStrength } from "@/lib/loras/promptPlan";
 
-export const STYLE_GONE_LINE = "That style isn't available any more. Choose another style, or make the video without one.";
+export const STYLE_GONE_LINE = "That style is no longer available. Choose another style, or make the video without one.";
 export const STYLE_MIXED_LEVELS_LINE = "These styles were made for different kinds of video, so they can't be used together here. Pick styles made for the same kind, or make the video without one.";
 export const STYLE_NOT_AT_LEVEL_LINE = "That style isn't made for this level. Pick another level, or make the video without the style.";
 export const STYLES_NEED_MAX_LINE = "Styles are for Max for now. Choose Max, or make the video without a style.";
@@ -44,10 +44,13 @@ export async function resolveStyles(input: { audience: VideoAudience; ids?: read
   const names = input.names ?? [];
   if (ids.length === 0 && names.length === 0) return { ok: true, adapters: [], unmatched: [] };
   const available = await videoAdaptersFor(audience, { includeLocked: true });
+  const surface = loraSurfaceOf(audience);
+  const retired = listLoraRecords().filter((lora) => lora.media === "video" && lora.base_model === "ltx-2.3" && lora.removed_at === null && loraAccess(audience.actor, lora, surface) !== "hidden");
   const adapters: VideoAdapter[] = [];
   const unmatched: string[] = [];
   const add = (adapter: VideoAdapter): void => { if (!adapters.some((a) => a.id === adapter.id)) adapters.push(adapter); };
   for (const id of ids) {
+    if (retired.some((lora) => lora.id === id)) return { ok: false, line: STYLE_GONE_LINE, code: "style_gone" };
     const adapter = available.find((a) => a.id === id);
     // A hidden, removed or unknown id is the same answer: the person is never told which.
     if (!adapter) return { ok: false, line: STYLE_GONE_LINE, code: "style_gone" };
@@ -55,6 +58,7 @@ export async function resolveStyles(input: { audience: VideoAudience; ids?: read
   }
   const typed = typeof input.utterance === "string" ? norm(input.utterance) : null;
   for (const name of names) {
+    if (retired.some((lora) => norm(lora.name) === norm(name))) return { ok: false, line: STYLE_GONE_LINE, code: "style_gone" };
     // An adult-only style is offered to the matcher only when the person's own words contain its name.
     const pool = available.filter((a) => a.classification !== "adult-only" || typed === null || typed.includes(norm(a.name)));
     const adapter = matchVideoAdapter(pool, name);

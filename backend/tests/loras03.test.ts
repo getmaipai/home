@@ -305,10 +305,10 @@ describe("a clip made with a style", () => {
     const { row } = await household();
     const admin = row("Sage");
     const style = putLora(admin.id, { base_model: "ltx-2.5", compatible_with: ["ltx-2.5"] });
-    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", detailed: "installed" }));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
     expect(await wireLoras([{ id: style.id, strength: 5 }], LTX25_MODEL)).toEqual({ ok: false, line: LORAS_UNSUPPORTED_LINE });
     await expect(startVideoJob({ actor: admin, conversationId: null, turnId: null, temporary: false, kind: "generate", prompt: "p", body: { prompt: "p", audience: "adult", model: LTX25_MODEL, loras: [{ id: style.id, strength: 1 }] } as never })).rejects.toMatchObject({ code: "loras_unsupported" });
-    const status = readyVideoStatusForTests({ ltx25: "ready", detailed: "installed" });
+    const status = readyVideoStatusForTests({ ltx25: "ready" });
     status.qualities!.ltx25!.loras = { supported: true, max: 2, mode: "unfused", negative_prompt: "none" };
     __setVideoStatusForTests(status);
     // Supported: the file's identity rides along and the strength is held inside the record's own range.

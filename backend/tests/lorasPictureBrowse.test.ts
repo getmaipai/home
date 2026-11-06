@@ -17,7 +17,7 @@ import { household } from "./fixtures/adultLock";
 setDefaultTimeout(30_000);
 
 const PICTURE_LABELS = ["Flux.2 Klein 4B", "ZImageTurbo", "Ernie"];
-const LTX_LABELS = ["LTXV 2.5", "LTXV 2.3", "LTXV2"];
+const LTX_LABELS = ["LTXV 2.5", "LTXV2"];
 
 const model = (id: number, name: string, baseModel: string) => ({
   id, name, type: "LORA", nsfw: false, nsfwLevel: 1, allowCommercialUse: ["Sell"], tags: [{ name: "style" }], stats: { downloadCount: 10, rating: 4 },
@@ -98,7 +98,7 @@ describe("the base table answers for pictures", () => {
     expect(mediaOfBase("ltx-2.3")).toBe("video");
     expect(mediaOfBase("nonsense")).toBeNull();
     expect(supportedBaseIds("picture")).toEqual(["flux2-klein-4b", "z-image-turbo", "ernie-image-turbo"]);
-    expect(supportedBaseIds()).toEqual(["ltx-2.5", "ltx-2.3"]);
+    expect(supportedBaseIds()).toEqual(["ltx-2.5"]);
     expect(supportedFamilyWords("picture")).toBe("Flux or Z-Image or ERNIE");
   });
 

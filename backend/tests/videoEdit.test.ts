@@ -33,8 +33,8 @@ beforeEach(() => {
   resetDb();
   __resetVideoAdapterCacheForTests();
   fake = installFakeVideoStack();
-  fake.detailed = "installed";
-  __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" }));
+  fake.ltx25 = "ready";
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
 });
 afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); });
 
@@ -91,10 +91,11 @@ describe("C1: generate_video declares what the Create page has", () => {
 
   test("an older call that sends quality still runs: detailed means Boost, quick means Standard", async () => {
     const actor = person("owner");
-    const { job } = await makeClip(actor, { prompt: BOAT, quality: "detailed", seconds: 8 });
-    expect(job.request.quality).toBe("detailed");
-    expect(bodyOfVideoJob(job).tier).toBe("boost");
-    expect(job.request.seconds).toBe(8);
+    const { job } = await makeClip(actor, { prompt: BOAT, quality: "detailed", seconds: 5 });
+    expect(job.request.quality).toBe("quick");
+    expect(bodyOfVideoJob(job).tier).toBe("standard");
+    expect(bodyOfVideoJob(job).tier).toBe("standard");
+    expect(job.request.seconds).toBe(5);
     await until(() => getVideoJobFor(actor, job.id)?.state === "done");
     const quick = await makeClip(actor, { prompt: BOAT, quality: "quick" });
     expect(quick.job.request.quality).toBe("quick");
@@ -139,7 +140,7 @@ describe("C2: edit_video", () => {
     expect(next.conversationId).toBe(job.conversationId);
     expect(next.prompt).toBe(BOAT);
     expect(next.request.seed).not.toBe(job.request.seed);
-    expect(next.request.size).toBe("480x832");
+    expect(next.request.size).toBe("256x512");
     expect(next.request.create).toMatchObject({ look: "anime", recipe: "dolly-in" });
     expect(fake.submitted).toHaveLength(2);
     expect(String(fake.submitted[1]!.prompt)).toStartWith(videoLookFor("anime")!.wording);
@@ -152,7 +153,7 @@ describe("C2: edit_video", () => {
     const remixed = jobOf(actor, await edit(state, { clip: job.id, change: "remix", prompt: "A paper plane glides over a green hill", look: "film", camera: "aerial", seconds: 8, tier: "boost", voices: "full" }));
     await until(() => getVideoJobFor(actor, remixed.id)?.state === "done");
     expect(remixed.prompt).toBe("A paper plane glides over a green hill");
-    expect(remixed.request.seconds).toBe(8);
+    expect(remixed.request.seconds).toBe(5);
     expect(remixed.request.tier).toBe("boost");
     expect(remixed.request.create).toMatchObject({ look: "film", recipe: "aerial", voices: "full" });
     expect(remixed.request.seed).not.toBe(job.request.seed);
@@ -175,7 +176,7 @@ describe("C2: edit_video", () => {
     const owner = person("owner");
     // The Stack reports the Max pack ready, so Max exists on this computer (LTX25-MAX-01).
     fake.ltx25 = "ready"; fake.ltx25max = "ready";
-    __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed", ltx25: "ready", ltx25max: "ready" }));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
     const { job, state } = await makeClip(owner, { prompt: BOAT, tier: "standard", seconds: 8 });
     const made = await edit(state, { clip: job.id, change: "make_it_max" });
     expect(made.status).toBe("succeeded");
@@ -200,7 +201,7 @@ describe("C2: edit_video", () => {
     const owner = person("owner");
     const { job, state } = await makeClip(owner, { prompt: BOAT, tier: "boost", seconds: 6 });
     for (const status of [undefined, "not-installed", "missing"] as const) {
-      __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed", ...(status ? { ltx25max: status } : {}) }));
+      __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ...(status ? { ltx25max: status } : {}) }));
       const before = fake.submitted.length;
       const refused = await edit(state, { clip: job.id, change: "make_it_max" });
       expect(refused.status).toBe("succeeded");

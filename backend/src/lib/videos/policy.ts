@@ -40,7 +40,7 @@ export function householdAllowsVideo(): boolean {
   }
 }
 
-/** `generation.video_tier`: "standard" (default) or "boost". The makers still say quick and detailed inside, so Standard reads as "quick" and Boost as "detailed". An unreadable value reads as Standard, the fast one. */
+/** `generation.video_tier`: "standard" (default) or "boost". The saved quality values still say quick and detailed, so Standard maps to quick and Boost to detailed. */
 export function householdVideoQuality(): "quick" | "detailed" {
   try {
     return getHouseholdSettingValue(VIDEO_TIER_KEY) === "boost" ? "detailed" : "quick";

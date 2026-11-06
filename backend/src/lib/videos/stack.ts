@@ -144,7 +144,7 @@ export interface VideoBody {
   extend_seconds?: number;
   retake_from_seconds?: number;
   audience: "all-ages" | "adult";
-  /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), "ltx25-q8" is LTX-2.5 with sound (VIDEO-TIERS-01, adults only; the Stack answers 422 to a LoRA, and to a picture unless its `image_to_video` flag is true), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
+  /** The video model, when the caller picks one: `ltx25-q8` is LTX-2.5 with sound (adults only), `ltx25-max` is Max, and left out is Quick; a teen or child is always sent Quick. */
   model?: string;
   /** TIER-HOME-04: the level the job runs at, from the slot (`lib/videos/slotBody.ts`); left out at Standard. */
   tier?: "boost" | "max";

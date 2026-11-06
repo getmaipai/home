@@ -1,8 +1,7 @@
 // VIDEO-LORA-03 (docs/design/video-loras-2026-11-02.md 6.4 and 6.5, docs/dev/loras.md): what goes to the Stack as a clip's `loras`. The chosen LoRAs are Home
 // records; the Stack names a file by id. Sending is behind the Stack's own report: LTX-2.5 (Standard, Boost, Max) takes a LoRA only when
 // `qualities.ltx25.loras.supported` (or `ltx25max` for Max) is true, which lands with VIDEO-LORA-05. Until then nothing is sent to it and a clip that asked for
-// one fails with a plain line before anything starts; it is never dropped silently (note 5.5). Quick (Wan) and Detailed (LTX-2.3) send `{ id, strength }`
-// as they always did.
+// one fails with a plain line before anything starts; it is never dropped silently (note 5.5). Quick (Wan) sends `{ id, strength }` as reported by its engine.
 import { getLoraRecord } from "@/lib/loras/store";
 import { LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
 import { videoEngineStatus } from "./ready";

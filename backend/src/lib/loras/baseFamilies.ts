@@ -2,8 +2,8 @@
 // One row per family, one row per base inside it: the Civitai `baseModels` labels, the text patterns that read a base from a name or a Hugging Face tag, the plain words,
 // and whether Home can install styles for it. `source.ts`, `install.ts`, `sync.ts` and `routes/lorasSources.ts` read this file and name no base or label themselves.
 //
-// Video Civitai labels were confirmed live 2026-11-03 against the public API: `LTXV 2.3` (97 styles), `LTXV 2.5` (32) and `LTXV2` (56, the generic LTX 2 family label: the version is
-// only in the name, version name or description). `LTXV` (44) is LTX video v1 and is deliberately in no row. Wan's label is unconfirmed.
+// Video Civitai labels were confirmed live 2026-11-03 against the public API. Retired 2.3 is recognized only so old records can be refused safely;
+// 2.5 and generic LTXV2 results remain searchable. `LTXV` is LTX video v1 and is deliberately in no row. Wan's label is unconfirmed.
 // Picture labels were confirmed live against the public API 2026-11-05: `Flux.2 Klein 4B`, `ZImageTurbo`, and `Ernie`. Klein 9B, Flux.2 D and ZImageBase are different bases.
 //
 // "Supported on this install" is `supportedBaseIds()`: the installable bases its video and picture engines report can use styles right now. An unknown engine status falls back to every
@@ -16,7 +16,7 @@ export const BASE_FAMILIES = [
     genericLabels: ["LTXV2"],
     bases: [
       { id: "ltx-2.5", browse: "ltx-2.5", labels: ["LTXV 2.5"], patterns: [/ltx[\s_-]*(?:v|video)?[\s_-]*2[._-]?5/], words: "LTX 2.5", short: "LTX-2.5", installable: true },
-      { id: "ltx-2.3", browse: "ltx-2.3", labels: ["LTXV 2.3"], patterns: [/ltx[\s_-]*(?:v|video)?[\s_-]*2[._-]?3/], words: "LTX 2.3", short: "LTX-2.3", installable: true },
+      { id: "ltx-2.3", browse: "ltx-2.3", labels: [], patterns: [/ltx[\s_-]*(?:v|video)?[\s_-]*2[._-]?3/], words: "retired video base", short: "retired video base", installable: false },
     ],
   },
   {
@@ -58,7 +58,7 @@ type FamilyRow = Row & { family: string; media: Media };
 const ROWS: readonly FamilyRow[] = BASE_FAMILIES.flatMap((f) => f.bases.map((b) => ({ ...b, family: f.id as string, media: f.media })));
 export const ALL_BASE_IDS: readonly AnyBaseId[] = ROWS.map((r) => r.id);
 export const BROWSE_BASES: Readonly<Record<Media, readonly BrowseBase[]>> = {
-  video: ROWS.filter((r) => r.media === "video").map((r) => r.browse),
+  video: ROWS.filter((r) => r.media === "video" && r.installable).map((r) => r.browse),
   picture: ROWS.filter((r) => r.media === "picture").map((r) => r.browse),
 };
 /** The bases an install may name when the source does not say (every installable one; the tuple form is for zod). */

@@ -288,7 +288,7 @@ const mediaOf = (p: BrowseParams): Media => p.media ?? "video";
 const basesFor = (p: BrowseParams): string[] => civitaiLabelsFor(p.base, mediaOf(p));
 /** Whether a hit belongs in this search. A generic-label hit with no stated version is kept in the default search only (it is shown, not installable). */
 const baseWanted = (p: BrowseParams, hit: Pick<Hit, "base_model" | "base_unstated">): boolean =>
-  (hit.base_model !== "unknown" && wantedBaseIds(p.base, mediaOf(p)).includes(hit.base_model)) || (hit.base_unstated && p.base === "default");
+  (hit.base_model !== "unknown" && (p.base === "all" || wantedBaseIds(p.base, mediaOf(p)).includes(hit.base_model))) || (hit.base_unstated && p.base === "default");
 
 async function browseHf(p: BrowseParams, cursor: string | null): Promise<{ hits: Hit[]; next: string | null }> {
   let url: string;

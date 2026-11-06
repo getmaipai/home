@@ -28,8 +28,8 @@ beforeEach(() => {
   resetDb(); __resetAdultLockForTests();
   __resetVideoAdapterCacheForTests();
   video = installFakeVideoStack();
-  video.detailed = "installed";
-  __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" }));
+  video.ltx25 = "ready";
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never })));
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);
   stack = installFakeEditStack();

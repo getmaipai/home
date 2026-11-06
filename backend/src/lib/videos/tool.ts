@@ -25,7 +25,7 @@ import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
-import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
+import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
 import { StackVideoError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
@@ -229,7 +229,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const adapters = picked.adapters;
   const adapter = adapters[0] ?? null;
   const styleNote = picked.unmatched.length > 0 ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
-  // VIDEO-LTX-01: Quick or Detailed. A style made for one model decides; a length past five seconds needs Detailed; else what was asked for, else the household's setting.
+  // Quick is the default; for an adult with LTX-2.5 ready, Detailed maps to Boost and longer lengths map to Standard.
   // LTX25-MAX-01: Max is offered only when the Stack reports its pack ready (not the slot list) and only to an adult; the grant is `tierArgument`'s own check.
   const maxReady = lane === "adult" && ltx25MaxReady(engine);
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "video", arg: args.tier, band: audience.band, maxAvailable: maxReady });
@@ -237,22 +237,21 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const ltx25Styles = lane === "adult" && adapters.length > 0 && adapters.every((a) => a.lora.compatible_with.includes("ltx-2.5"));
   const asksMax = tierAsked.tier === "max" && maxReady;
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
+  if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
   const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
   if (ending) {
     const endMaker = maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
     if (!endMaker) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: This computer's video model cannot end on a picture yet." }, data: { refused: "end_frame_unavailable" }, actions: [] } });
     choice.maker = endMaker; choice.quality = "quick"; choice.seconds = Math.min(choice.seconds, endMaker === "ltx25max" ? 10 : 10); choice.note = null;
   }
-  // A style made for Detailed cannot be used without Detailed: say so rather than start a clip the Stack would refuse.
-  if (adapter && qualityOfBase(adapter.base_model) === "detailed" && !detailedVideoReady(engine)) {
-    return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, which are not on this computer yet. An admin can get them in Settings, Models and storage, or I can make the video without the style." }, data: { refused: "style_needs_detailed" }, actions: [] } });
-  }
-  if (image !== undefined && adapter && qualityOfBase(adapter.base_model) === "detailed") {
-    return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, and a Detailed video cannot start from a picture yet. I can animate the picture without the style, or make a Detailed video in that style from words." }, data: { refused: "style_needs_detailed" }, actions: [] } });
+  // A saved style on the retired video base is refused before any maker choice can use it.
+  if (adapter?.base_model === "ltx-2.3") {
+    return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. That style is no longer available. Choose another style or leave it out." }, data: { refused: "retired_style_base" }, actions: [] } });
   }
   // VIDEO-LORA-09: every chosen style must be made for the kind of video this clip is; a style is never dropped to make a clip start. (Design 6.4.)
-  const makerBase = ({ wan: "wan2.2-ti2v-5b", ltx23: "ltx-2.3", ltx25: "ltx-2.5", ltx25max: "ltx-2.5" } as const)[choice.maker];
+  const makerBase = ({ wan: "wan2.2-ti2v-5b", ltx25: "ltx-2.5", ltx25max: "ltx-2.5" } as const)[choice.maker];
   if (adapters.length > 0) {
+    if (adapter?.base_model === "ltx-2.5" && choice.maker === "wan") return styleRefusal(callId, args, "That style needs the newer video model, which is not ready here. An admin can add it in Settings, Models and storage.", "style_needs_model");
     if (adapters.some((a) => !a.lora.compatible_with.includes(makerBase))) {
       const mixed = adapters.length > 1 && adapters.some((a) => a.lora.compatible_with.includes(makerBase));
       return styleRefusal(callId, args, mixed ? STYLE_MIXED_LEVELS_LINE : (ltx25Styles || choice.maker === "ltx25" || choice.maker === "ltx25max") ? LORAS_UNSUPPORTED_LINE : STYLE_NOT_AT_LEVEL_LINE, "style_not_at_level");
@@ -269,10 +268,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const maxMade = choice.maker === "ltx25max";
   // Max asked for and ready, but this clip uses a style, or starts from a picture this Stack cannot start a Max clip from (VIDEO-INPUTS-01): say it was not made at Max.
   const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || (adapters.length > 0 && !ltx25Route)) ? " Max cannot use a style, and cannot start from a picture on this computer yet, so this one was not made at Max; say so in one short sentence." : "";
-  const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? (ltx25 ? " This one has sound and speech; say so in one short sentence." : " This one is a Detailed video, with sound and speech; say so in one short sentence.") : "";
+  const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one has sound and speech; say so in one short sentence." : "";
   const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
-  const longSpeechNote = choice.maker === "ltx23" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
-  const soundNote = choice.maker === "wan" ? (lane === "adult" && ltx25VideoReady(engine) ? " This video has no sound; if they wanted sound or spoken words, offer to make one from words only, which has sound." : " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one.") : "";
+  const soundNote = choice.maker === "wan" ? (lane === "adult" && ltx25VideoReady(engine) ? " This video has no sound; if they wanted sound or spoken words, offer to make one from words only, which has sound." : " A Quick video has no sound; if they wanted sound or spoken words, offer to make a video from words.") : "";
 
   // VIDEO-CREATE-01: a recipe's wording goes to the Stack after the person's words; the card keeps only what they typed. A child gets none.
   // VIDEO-CHAT-01: `camera` is the declared name; `recipe` is what older calls and the Create page send. `camera` wins.
@@ -281,7 +279,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const look = kid ? null : videoLookFor(args.look);
   const voicesChosen = kid ? null : videoVoicesFor(args.voices);
   const voices = choice.maker !== "wan" ? voicesChosen : null;
-  const detailedOffered = !ltx25 && allowedQuality(actor, "video", "detailed", audience.band) === "detailed" && detailedVideoReady(engine);
+  const detailedOffered = ltx25 && allowedQuality(actor, "video", "detailed", audience.band) === "detailed";
   const note = choice.shortened ? `${choice.quality === "quick" ? "Standard" : "This level"} makes ${seconds} seconds at most, so this video is ${seconds} seconds.${choice.quality === "quick" && detailedOffered ? ` Choose Boost for up to ${DETAILED_MAX_SECONDS}.` : ""}` : undefined;
   const create = !kid && (recipe || look || voicesChosen || note || (adapters.length > 0 && styleStrength)) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(adapters.length > 0 && styleStrength ? { strength: styleStrength } : {}), ...(note ? { note } : {}) } : undefined;
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
@@ -308,7 +306,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         seed: typeof args.seed === "number" && Number.isInteger(args.seed) && args.seed > 0 && args.seed < 2_147_483_647 ? args.seed : Math.floor(Math.random() * 2_147_483_647),
         size,
         seconds,
-        ...(maxMade ? { model: LTX25_MAX_MODEL } : ltx25 ? { model: LTX25_MODEL } : choice.maker === "ltx23" ? { model: "detailed" as const } : {}),
+        ...(maxMade ? { model: LTX25_MAX_MODEL } : ltx25 ? { model: LTX25_MODEL } : {}),
         audience: endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? "adult" : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
@@ -321,7 +319,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `A ${seconds} second ${ltx25 ? "" : choice.quality === "detailed" ? "Detailed " : ""}video${ltx25 ? ", with sound," : ""} is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds, choice.maker)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${qualityNote}${maxWordsOnly}${lengthNote}${soundNote}${longSpeechNote}` },
+        reply: { text: `A ${seconds} second ${ltx25 ? "" : choice.quality === "detailed" ? "Detailed " : ""}video${ltx25 ? ", with sound," : ""} is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds, choice.maker)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${qualityNote}${maxWordsOnly}${lengthNote}${soundNote}` },
         data: { videoJobId: job.id },
         actions: [],
       },

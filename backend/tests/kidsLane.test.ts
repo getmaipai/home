@@ -369,7 +369,7 @@ describe("a child and a teen are only ever on the Quick video model", () => {
 describe("VIDEO-LTX-01: Detailed (LTX, sound and speech) is unreachable for a teen or a child, on the server", () => {
   const sentModel = (i = -1) => (video.submitted.at(i) as { model?: string; size?: string; seconds?: number });
   test("the tool: asking for Detailed, a long clip or the household's Detailed default still sends a child the Quick model at the Quick size and the child's length", async () => {
-    video.detailed = "installed";
+    video.ltx25 = "ready";
     setHouseholdSettingValue("generation.video_tier", "boost");
     const o = await vid(kid, { prompt: "a friendly dragon waving", quality: "detailed", seconds: 10 });
     expect(o.status).toBe("succeeded");
@@ -378,7 +378,7 @@ describe("VIDEO-LTX-01: Detailed (LTX, sound and speech) is unreachable for a te
     setHouseholdSettingValue("generation.video_tier", "standard");
   });
   test("the job starter: a teen or a child asking for detailed (or the model's own id) is sent the Quick model; an adult's choice stands", async () => {
-    video.detailed = "installed";
+    video.ltx25 = "ready";
     const start = async (actor: PersonRow, model: string) => {
       const before = video.submitted.length;
       const job = await startVideoJob({ actor, conversationId: null, turnId: null, temporary: true, kind: "generate", prompt: "a friendly dragon", body: { prompt: "a friendly dragon", audience: "all-ages", model } as never });
@@ -397,11 +397,11 @@ describe("VIDEO-LTX-01: Detailed (LTX, sound and speech) is unreachable for a te
     expect(videoModelForLane("teen", "detailed")).toBe(WAN_QUICK_VIDEO_MODEL);
   });
   test("the choice is forced to Quick for a teen or a child whatever was asked, and their card never offers Detailed", async () => {
-    video.detailed = "installed";
+    video.ltx25 = "ready";
     const { chooseVideoQuality } = await import("@/lib/videos/quality");
     const { readyVideoStatusForTests } = await import("@/lib/videos/ready");
     const { videoCardView } = await import("@/routes/videos");
-    const engine = readyVideoStatusForTests({ detailed: "installed" });
+    const engine = readyVideoStatusForTests({ ltx25: "ready" });
     expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, household: "detailed", quickOnly: true })).toMatchObject({ quality: "quick", seconds: 5, note: null });
     expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, requested: "detailed", engine, quickOnly: true })).toMatchObject({ quality: "quick" });
     const o = await vid(teen, { prompt: "a dragon flying over a castle", quality: "detailed", seconds: 8 });

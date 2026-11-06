@@ -31,8 +31,6 @@ export interface FakeVideoStack {
   live: { stage_label: string; eta_seconds: number } | null;
   previewFetches: number;
   loras: StackVideoLora[];
-  /** VIDEO-LTX-01: what the Stack says about Detailed videos (undefined: an older Stack with Quick only). */
-  detailed: "installed" | "missing" | undefined;
   quickMissing: boolean;
   /** VIDEO-TIERS-01: what the Stack says about LTX-2.5 (undefined: a Stack without it). */
   ltx25: "ready" | "missing" | undefined;
@@ -76,7 +74,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -115,13 +113,13 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       if (fake.failWith) { job.state = "failed"; return json({ job: job.id, state: "failed", phase: null, progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: fake.failWith.code, data: [] }); }
       if (job.polls >= fake.pollsToFinish) {
         job.state = "done";
-        return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", ...(job.body.model === "ltx25-max" ? { width: 1024, height: 576, frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25max", audio: true, model: "ltx-2-5-bf16-distilled-mlx-max" } : job.body.model === "detailed" ? { width: 768, height: 448, frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "detailed", audio: true, model: "ltx-2-3-distilled-mlx" } : { width: 832, height: 480, frames: 121, seconds: 5, quality: "quick", audio: false, model: "wan2.2-ti2v-5b-fastwan-mlx" }), fps: 24, seed: 77, mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
+        return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", ...(job.body.model === "ltx25-max" ? { width: 1024, height: 576, frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25max", audio: true, model: "ltx-2-5-bf16-distilled-mlx-max" } : job.body.model === "ltx25-q8" ? { width: Number(String(job.body.size ?? "768x448").split("x")[0] ?? 768), height: Number(String(job.body.size ?? "768x448").split("x")[1] ?? 448), frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25", audio: true, model: "ltx-2-5-q8" } : { width: 832, height: 480, frames: 121, seconds: 5, quality: "quick", audio: false, model: "wan2.2-ti2v-5b-fastwan-mlx" }), fps: 24, seed: 77, mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
       }
       job.state = job.polls <= fake.queuedPolls ? "queued" : "running";
       const liveFields = fake.live && job.state === "running" ? { progress_fraction: job.polls / 4, stage: "frames", stage_label: fake.live.stage_label, step: null, steps: null, eta_seconds: fake.live.eta_seconds, preview_url: job.polls >= 3 ? `/v1/videos/generations/${job.id}/preview.jpg?v=1` : null } : {};
       return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "waiting for memory" : "rendering", progress: job.polls * 25, phase_progress: null, position: job.state === "queued" ? 2 : null, error: null, code: null, data: [], ...liveFields });
     }
-    if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests({ ...(fake.detailed ? { detailed: fake.detailed } : {}), ...(fake.quickMissing ? { quickMissing: true } : {}), ...(fake.ltx25 ? { ltx25: fake.ltx25 } : {}), ...(fake.ltx25max ? { ltx25max: fake.ltx25max } : {}), ...(fake.ltx25maxSeconds ? { ltx25maxSeconds: fake.ltx25maxSeconds } : {}), ...(fake.ltx25Picture ? { ltx25Picture: true } : {}), ...(fake.ltx25maxPicture ? { ltx25maxPicture: true } : {}) }) });
+    if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests({ ...(fake.quickMissing ? { quickMissing: true } : {}), ...(fake.ltx25 ? { ltx25: fake.ltx25 } : {}), ...(fake.ltx25max ? { ltx25max: fake.ltx25max } : {}), ...(fake.ltx25maxSeconds ? { ltx25maxSeconds: fake.ltx25maxSeconds } : {}), ...(fake.ltx25Picture ? { ltx25Picture: true } : {}), ...(fake.ltx25maxPicture ? { ltx25maxPicture: true } : {}) }) });
     if (method === "GET" && path === "/stack/v1/video/loras") return json({ loras: fake.loras });
     if (method === "POST" && path === "/stack/v1/video/loras") {
       const form = init?.body as FormData;

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Home",
   "display": "House",
-  "description": "Find and control permitted home devices. Owners can restart Home Assistant, a listed add-on, or the Home Assistant host; each requires confirmation and cannot be undone.",
+  "description": "Restart Home Assistant devices and listed add-ons with the owner's confirmation.",
   "offer": { "mode": "conditional", "gate": "houseAllowed", "bench_row": "house-tool", "priority": 4 },
   "author": "MaiPai",
   "license": "AGPL-3.0",

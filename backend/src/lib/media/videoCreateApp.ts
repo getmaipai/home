@@ -57,12 +57,12 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
 }
 
-/** The lengths the Length chip offers: five seconds and the longest any level makes here now (10 s: Standard on LTX-2.5, or Boost on LTX-2.3). A level that makes less is cut to fit and says so. */
+/** The lengths the Length chip offers: five seconds and the longest available level makes here now. A level that makes less is cut to fit and says so. */
 function lengthOptions(): number[] {
   const engine = peekVideoEngineStatus();
   const longest = Math.max(
     ltx25VideoReady(engine) ? maxSecondsFor("quick", "ltx25", engine) : QUICK_MAX_SECONDS,
-    ltx25VideoReady(engine) ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS,
+    ltx25VideoReady(engine) ? maxSecondsFor("quick", "ltx25", engine) : DETAILED_MAX_SECONDS,
   );
   return [...new Set([QUICK_MAX_SECONDS, longest])];
 }
