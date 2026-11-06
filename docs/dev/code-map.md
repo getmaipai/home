@@ -487,6 +487,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT, __setFilmPlanCompleterForTests, planFilm |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns |
+| `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilm |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
