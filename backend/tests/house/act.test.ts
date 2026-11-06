@@ -111,4 +111,16 @@ describe("house action executor", () => {
     const fan = await performHouseAction({ ...harness(state("off"), state("on", { percentage: 40 })), token, entity: entity("fan"), action: { name: "set_speed", value: 40 }, sleep: noWait });
     expect(fan.ok && fan.undo).toEqual({ name: "turn_off" });
   });
+
+  test("no inverse when nothing changed, so an Undo can never open what was already closed", async () => {
+    const door = await performHouseAction({ ...harness(state("locked"), state("locked")), token, entity: entity("lock", "lock.front_door"), action: { name: "lock" }, sleep: noWait });
+    expect(door.ok && door.undo).toBeNull();
+    const garage = await performHouseAction({ ...harness(state("closed"), state("closed")), token, entity: entity("cover", "cover.garage"), action: { name: "close" }, sleep: noWait });
+    expect(garage.ok && garage.undo).toBeNull();
+    const light = await performHouseAction({ ...harness(state("off"), state("off")), token, entity: entity("light"), action: { name: "turn_off" }, sleep: noWait });
+    expect(light.ok && light.undo).toBeNull();
+    const unlocked = await performHouseAction({ ...harness(state("locked"), state("unlocked")), token, entity: entity("lock", "lock.front_door"), action: { name: "unlock" }, sleep: noWait });
+    expect(unlocked.ok && unlocked.undo).toEqual({ name: "lock" });
+  });
+
 });

@@ -109,4 +109,51 @@ describe("house tool", () => {
     expect(adultText).toContain("Movie night");
     expect(adultText).toContain("Goodnight");
   });
+
+  test("review fixes: invalid mode asks, find obeys never, tainted asks, scene with a lock member asks, no unlocking undo, band is the stricter of role and band", async () => {
+    const light = entity("light.kitchen_ceiling", "Ceiling", "light");
+    const doorLock = entity("lock.front_door", "Front door", "lock", "h", { sensitive: "lock" });
+    const byeScene = entity("scene.bye", "Bye", "scene", "k", { sceneMembers: ["light.kitchen_ceiling", "lock.front_door"] });
+    const all = [light, doorLock, byeScene];
+    const odd = setup({ brakeMode: () => "off" as never }, all);
+    const asked = await run({ action: "turn_on", targets: [{ name: "Ceiling" }] }, odd.deps);
+    expect(asked.status).not.toBe("succeeded");
+    expect(odd.performed).toHaveLength(0);
+
+    const never = setup({ brakeMode: () => "never" }, all);
+    const listed = await run({ action: "find", targets: [{ kind: "lock" }] }, never.deps);
+    expect((listed.result as { reply?: { text: string } } | undefined)?.reply?.text ?? "").not.toContain("Front door");
+
+    const tainted = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: { action: "turn_on", targets: [{ name: "Ceiling" }] }, callId: "c", tainted: true, deps: setup({}, all).deps });
+    expect(tainted.status).not.toBe("succeeded");
+
+    const scene = setup({}, all);
+    const sceneRun = await run({ action: "activate", targets: [{ name: "Bye" }] }, scene.deps);
+    expect(sceneRun.status).not.toBe("succeeded");
+    expect(scene.performed).toHaveLength(0);
+
+    const door = setup({ perform: async (target) => ({ ok: true, before: { state: "locked", brightness: null, rgb: null, percentage: null, temperature: null }, after: { state: "unlocked", brightness: null, rgb: null, percentage: null, temperature: null }, undo: { name: "lock" } }) }, all);
+    expect(door.undos).toHaveLength(0);
+
+    const teenAsAdult = setup({}, [light]);
+    const strict = await runHouseTool({ actor: { ...person, role: "teen" } as PersonRow, band: "adult", args: { action: "find" }, callId: "c", deps: { ...teenAsAdult.deps, permissionsOf: () => [] } });
+    expect((strict.result as { reply?: { text: string } } | undefined)?.reply?.text ?? "").not.toContain("Ceiling");
+  });
+
+  test("a spec with no visible areas has no empty enum", () => {
+    const spec = houseToolSpec({ visible: [], areas });
+    expect(JSON.stringify(spec)).not.toContain('"enum":[]');
+  });
+
+
+  test("a locked door asks first, runs once approved, and never keeps an unlocking Undo", async () => {
+    const doorLock = entity("lock.front_door", "Front door", "lock", "h", { sensitive: "lock" });
+    const rig = setup({ perform: async () => ({ ok: true, before: { state: "unlocked", brightness: null, rgb: null, percentage: null, temperature: null }, after: { state: "locked", brightness: null, rgb: null, percentage: null, temperature: null }, undo: { name: "unlock" } }) }, [doorLock]);
+    const first = await run({ action: "lock", targets: [{ name: "Front door" }] }, rig.deps);
+    expect(first.status).not.toBe("succeeded");
+    expect(rig.performed).toHaveLength(0);
+    const second = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: { action: "lock", targets: [{ name: "Front door" }] }, callId: "c2", approved: true, deps: rig.deps });
+    expect(second.status).toBe("succeeded");
+    expect(rig.undos).toHaveLength(0);
+  });
 });

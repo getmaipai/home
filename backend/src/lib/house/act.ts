@@ -75,14 +75,14 @@ function expected(entity: HouseEntity, action: HouseActionInput, current: StateS
 }
 function undoFor(action: HouseActionInput, before: StateSnapshot): HouseActionInput | null {
   switch (action.name) {
-    case "turn_on": return before.state === "off" ? { name: "turn_off" } : before.brightness !== null ? { name: "set_brightness", value: Math.max(1, Math.round(before.brightness / 255 * 100)) } : before.rgb ? { name: "set_color", rgb: before.rgb } : null;
-    case "turn_off": return { name: "turn_on" };
+    case "turn_on": return before.state === "on" && before.brightness === null && !before.rgb ? null : before.state === "off" ? { name: "turn_off" } : before.brightness !== null ? { name: "set_brightness", value: Math.max(1, Math.round(before.brightness / 255 * 100)) } : before.rgb ? { name: "set_color", rgb: before.rgb } : null;
+    case "turn_off": return before.state === "off" ? null : { name: "turn_on" };
     case "set_brightness": return before.state === "off" ? { name: "turn_off" } : before.brightness === null ? null : { name: "set_brightness", value: Math.max(1, Math.round(before.brightness / 255 * 100)) };
     case "set_color": return before.state === "off" ? { name: "turn_off" } : before.rgb ? { name: "set_color", rgb: before.rgb } : null;
-    case "lock": return { name: "unlock" };
-    case "unlock": return { name: "lock" };
-    case "open": return { name: "close" };
-    case "close": return { name: "open" };
+    case "lock": return before.state === "locked" ? null : { name: "unlock" };
+    case "unlock": return before.state === "unlocked" ? null : { name: "lock" };
+    case "open": return before.state === "open" || before.state === "opening" ? null : { name: "close" };
+    case "close": return before.state === "closed" || before.state === "closing" ? null : { name: "open" };
     case "set_speed": return before.state === "off" ? { name: "turn_off" } : before.percentage === null ? null : { name: "set_speed", value: Math.max(1, before.percentage) };
     case "set_temperature": return before.temperature === null ? null : { name: "set_temperature", value: before.temperature };
     case "activate": return null;

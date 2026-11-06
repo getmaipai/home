@@ -31,7 +31,8 @@ export function brakeFor(input: ToolBrakeInput): ToolBrakeResult {
   if (input.action === "undo") return { decision: "do" };
 
   if (input.tool === "house") {
-    if (input.mode === "ask") return { decision: "ask", reason: "mode_ask" };
+    // Only an exact "do" acts without a card; any other value (a typo, an empty string, "off") is read as ask.
+    if (input.mode !== "do") return { decision: "ask", reason: "mode_ask" };
     if (input.confirm) return { decision: "ask", reason: "confirmation_required" };
     if (input.tainted || (input.targets ?? 0) > BULK_THRESHOLD) return { decision: "ask", reason: "confirmation_required" };
     return { decision: "do" };

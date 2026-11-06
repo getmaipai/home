@@ -39,4 +39,13 @@ describe("brakeFor", () => {
     }
     expect(getRegistry().find((entry) => entry.key === "tools.house.mode")).toMatchObject({ default: "ask", scope: "household" });
   });
+
+  test("house: any mode other than do is read as ask, never as do", () => {
+    const base = { tool: "house" as const, action: "turn_on", args: {}, actor: { id: "p", role: "adult", band: "adult" as const }, tainted: false };
+    for (const mode of ["", "off", "yes", "DO", undefined as unknown as "do"]) {
+      expect(brakeFor({ ...base, mode: mode as "do" }).decision).toBe("ask");
+    }
+    expect(brakeFor({ ...base, mode: "do" }).decision).toBe("do");
+  });
+
 });
