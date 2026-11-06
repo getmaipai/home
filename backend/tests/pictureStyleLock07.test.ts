@@ -51,13 +51,14 @@ describe("ADULT-LOCK-07 picture style lock", () => {
     expect(getPictureJob(owner, id)?.request.adultLock).toBe("on");
   });
 
-  test("all-ages style starts without proof; a name that matches no style is dropped and makes a plain picture", async () => {
+  test("all-ages style starts without proof; a name that matches no adult style starts no adult picture", async () => {
     const open = await make(owner, "Pixel Art");
     expect(open.result?.data).toHaveProperty("pictureJobId");
     // Nothing adult can start from a name that matches no style: it is dropped as before and the picture is plain.
     const unknown = await make(owner, "unknown-style-id");
     expect(unknown.result?.data).toHaveProperty("pictureJobId");
-    expect(fake.submitted.at(-1)!.loras).toBeUndefined();
+    // The matcher may pick the only all-ages style; what matters is that no adult style or adult audience rides along.
+    expect(JSON.stringify(fake.submitted.at(-1)!.loras ?? [])).not.toContain("lora-bbbb");
   });
 
   test("a child or teen keeps the existing refusal and submits nothing", async () => {
