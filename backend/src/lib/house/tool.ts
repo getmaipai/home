@@ -20,13 +20,51 @@ const kinds = ["light", "switch", "scene", "cover", "lock", "fan", "climate"] as
 /** Audit rows take the action name only from this closed list; anything else the model typed is just "invalid". */
 export function safeHouseAction(value: unknown): string { return typeof value === "string" && (HOUSE_ACTIONS as readonly string[]).includes(value) ? value : "invalid"; }
 export const HOUSE_ACTIONS = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature"] as const;
-const argsSchema = z.object({
+/** Small models often send `target` (one object, or a JSON string of it) or put area, name and kind at the top level instead of a
+ * `targets` list, or say "lights" for kind. This reshapes the MODEL'S OWN ARGUMENTS into the one shape; it never reads the person's words. */
+export function normalizeHouseArgs(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const input = { ...(raw as Record<string, unknown>) };
+  const asObject = (value: unknown): Record<string, unknown> | null => {
+    if (typeof value === "string") {
+      try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null; } catch { return value.trim() ? { name: value.trim() } : null; }
+    }
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  };
+  let targets: unknown = input.targets;
+  if (typeof targets === "string") { try { targets = JSON.parse(targets); } catch { targets = asObject(targets) ? [asObject(targets)] : undefined; } }
+  if (targets && !Array.isArray(targets)) targets = [targets];
+  if (targets === undefined && input.target !== undefined) {
+    const t = Array.isArray(input.target) ? input.target : [asObject(input.target)];
+    targets = t.filter(Boolean);
+  }
+  if (targets === undefined && (typeof input.area === "string" || typeof input.name === "string" || typeof input.kind === "string")) {
+    targets = [{ ...(typeof input.area === "string" ? { area: input.area } : {}), ...(typeof input.name === "string" ? { name: input.name } : {}), ...(typeof input.kind === "string" ? { kind: input.kind } : {}) }];
+  }
+  const cleaned = (Array.isArray(targets) ? targets : []).map((entry) => {
+    const o = asObject(entry);
+    if (!o) return entry;
+    const out: Record<string, unknown> = {};
+    if (typeof o.area === "string" && o.area.trim()) out.area = o.area.trim();
+    if (typeof o.name === "string" && o.name.trim()) out.name = o.name.trim();
+    if (typeof o.kind === "string") { const k = o.kind.trim().toLowerCase(); out.kind = (kinds as readonly string[]).includes(k.replace(/s$/, "")) ? k.replace(/s$/, "") : k; }
+    return out;
+  });
+  const result: Record<string, unknown> = { action: input.action };
+  if (Array.isArray(targets)) result.targets = cleaned;
+  if (input.value !== undefined) result.value = input.value;
+  if (input.rgb !== undefined) result.rgb = input.rgb;
+  return result;
+}
+
+const argsShape = z.object({
   action: z.enum(HOUSE_ACTIONS),
   targets: z.array(z.object({ area: z.string().min(1).optional(), name: z.string().min(1).optional(), kind: z.enum(kinds).optional() }).strict()).max(25).optional(),
   value: z.number().finite().optional(),
   rgb: z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255), z.number().int().min(0).max(255)]).optional(),
 }).strict();
-type HouseArgs = z.infer<typeof argsSchema>;
+const argsSchema = z.preprocess(normalizeHouseArgs, argsShape);
+type HouseArgs = z.infer<typeof argsShape>;
 export type HouseToolDeps = {
   loadRegistry?: () => Promise<{ ok: true; areas: HouseArea[]; entities: HouseEntity[] } | { ok: false; kind: "unreachable" | "refused" | "timeout" }>;
   permissionsOf?: (personId: string) => EffectivePermission[];
@@ -70,7 +108,7 @@ export function visibleHouseEntities({ actor, permissions, entities }: { actor: 
 
 export type HouseCallPlan =
   | { kind: "refuse"; reason: string; text: string; count: number; rejected?: boolean }
-  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[] }
+  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[] }
   | { kind: "run"; input: HouseArgs; actor: HouseActor; permissions: EffectivePermission[]; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; matches: HouseEntity[]; action: HouseActionInput; mode: BrakeMode; count: number };
 
 function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): HouseActor {
@@ -105,12 +143,20 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   const brake = approved ? { decision: "do" as const, reason: undefined } : brakeFor({ tool: "house", action: input.action, confirm: mustAsk, targets: control.length, tainted, mode, actor: { id: houseActor.id!, role: houseActor.role, band: houseActor.band }, args });
   if (brake.decision === "never") return { kind: "refuse", reason: brake.reason ?? "never", text: "Home controls are turned off for this household.", count: control.length };
   const kinds = [...new Set(control.map(({ entity }) => entity.kind))];
-  if (brake.decision === "ask") return { kind: "ask", reason: brake.reason ?? "confirmation_required", action: input.action, count: control.length, kinds };
+  if (brake.decision === "ask") return { kind: "ask", reason: brake.reason ?? "confirmation_required", action: input.action, count: control.length, kinds, labels: control.map(({ entity }) => houseLabel(entity, registry.areas)) };
   return { kind: "run", input, actor: houseActor, permissions: [...permissions], registry, matches: control.map(({ entity }) => entity), action, mode, count: control.length };
 }
 
 /** Only an exact "do" or "never" is believed; anything else (unset, empty, a typo) is ask. */
 function brakeModeOf(value: unknown): BrakeMode { return value === "do" || value === "never" ? value : "ask"; }
+
+/** How a device is named to the person who must approve it: "Wall light in Theater". Shown only in their own confirm card. */
+export function houseLabel(entity: HouseEntity, areas: HouseArea[]): string {
+  const name = entity.name.trim();
+  const hasKind = name.toLocaleLowerCase().includes(entity.kind);
+  const place = entity.area ? areaName(entity, areas) : "";
+  return `${hasKind ? name : `${name} ${entity.kind}`}${place ? ` in ${place}` : ""}`;
+}
 
 function normalize(value: string): string { return value.trim().replace(/\s+/g, " ").toLocaleLowerCase(); }
 function areaName(entity: HouseEntity, areas: HouseArea[]): string { return areas.find((area) => area.id === entity.area)?.name ?? "the home"; }
@@ -156,7 +202,7 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
   const mode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
   const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode });
   // A malformed call is a tool error, not an answer, so the reply cannot claim it worked.
-  if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, {}, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
+  if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, args, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
   if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
   if (plan.kind === "ask" && !approved) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
   if (approved && callId.startsWith("resumed:")) {

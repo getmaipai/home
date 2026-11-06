@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { houseToolSpec, runHouseTool, planHouseCall, safeHouseAction, type HouseToolDeps } from "@/lib/house/tool";
+import { houseToolSpec, runHouseTool, planHouseCall, safeHouseAction, houseLabel, normalizeHouseArgs, type HouseToolDeps } from "@/lib/house/tool";
 import type { HouseEntity, HouseArea } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
@@ -187,6 +187,28 @@ describe("house tool", () => {
       const accepted = filterAnswerBlocks(blocks, "house", ["confirmation", "rows"], "adult", { displayName: "Sage" } as never);
       expect(accepted).toHaveLength(1);
     }
+  });
+
+  test("the ask plan names every device and room so a vague request cannot act on something unseen", () => {
+    const fan = entity("fan.master_ceiling", "Ceiling fan", "fan", "h");
+    const wall = entity("light.theater_wall", "Wall", "light", "k");
+    expect(houseLabel(fan, areas)).toBe("Ceiling fan in Hallway");
+    expect(houseLabel(wall, areas)).toBe("Wall light in Kitchen");
+    const registry = { ok: true as const, areas, entities: [fan, wall] };
+    const plan = planHouseCall({ actor: { id: "o1", role: "owner" } as PersonRow, band: "adult", args: { action: "turn_on", targets: [{ name: "Wall" }, { name: "Ceiling fan" }] }, registry, permissions: [], mode: "ask" });
+    expect(plan.kind).toBe("ask");
+    expect(plan.kind === "ask" && plan.labels).toEqual(["Wall light in Kitchen", "Ceiling fan in Hallway"]);
+  });
+
+  test("a small model's loose arguments are reshaped into one targets list, never read from the person's words", () => {
+    expect(normalizeHouseArgs({ action: "find", target: "{\"area\": \"Theater\"}" })).toEqual({ action: "find", targets: [{ area: "Theater" }] });
+    expect(normalizeHouseArgs({ action: "turn_on", target: { area: "Theater", kind: "lights" } })).toEqual({ action: "turn_on", targets: [{ area: "Theater", kind: "light" }] });
+    expect(normalizeHouseArgs({ action: "turn_on", area: "Kitchen", name: "Ceiling" })).toEqual({ action: "turn_on", targets: [{ area: "Kitchen", name: "Ceiling" }] });
+    expect(normalizeHouseArgs({ action: "turn_on", targets: "{\"name\":\"Wall\"}" })).toEqual({ action: "turn_on", targets: [{ name: "Wall" }] });
+    expect(normalizeHouseArgs({ action: "turn_on", targets: { name: "Wall" } })).toEqual({ action: "turn_on", targets: [{ name: "Wall" }] });
+    expect(normalizeHouseArgs({ action: "turn_on", target: "Wall" })).toEqual({ action: "turn_on", targets: [{ name: "Wall" }] });
+    expect(normalizeHouseArgs({ action: "turn_on", targets: [{ name: "Wall", kind: "light" }], value: 5 })).toEqual({ action: "turn_on", targets: [{ name: "Wall", kind: "light" }], value: 5 });
+    expect(normalizeHouseArgs({ action: "turn_on", targets: [], evil: "x" })).toEqual({ action: "turn_on", targets: [] });
   });
 });
 

@@ -483,9 +483,11 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
           entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });
           continue;
         }
-        const noun = planned.kinds.length === 1 ? planned.kinds[0] : "device";
+        // The card names what will change (up to three, then a count) so a vague request can never act on something unseen.
         const verb = action.replaceAll("_", " ");
-        const prompt = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${planned.count} ${noun}${planned.count === 1 ? "" : "s"}?`;
+        const named = planned.labels.slice(0, 3).join(", ");
+        const more = planned.labels.length > 3 ? ` and ${planned.labels.length - 3} more` : "";
+        const prompt = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${named}${more}?`;
         noteRefusal("confirm_needed");
         entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt, capabilities: [], consequential: true } } });
       } else entries.push({ proposal, decision: { allow: true } });
