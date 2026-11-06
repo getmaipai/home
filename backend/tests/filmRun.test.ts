@@ -73,3 +73,23 @@ describe("film runner", () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe("film runner with a real model's plan (found in the first real run, 2026-11-06)", () => {
+  beforeEach(() => resetDb());
+  test("a cast of two and shot subject_ids that are names, not ids, still run; a failed engine keeps its cause", async () => {
+    const actor = person("film-real-owner"); actorForEngines = actor;
+    const real: FilmPlan = {
+      ...plan,
+      cast: [{ name: "Orange Cat", kind: "character", locked: "Small orange cat." }, { name: "Lighthouse", kind: "place", locked: "Tall white lighthouse." }],
+      shots: [1, 2].map((n) => ({ id: `s0${n}`, subject_ids: ["Orange Cat", "Lighthouse"], framing: "wide", still: "Orange cat by the lighthouse.", motion: "Walks.", seconds: 5 })),
+    };
+    const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];
+    await runFilm({ actor, productionId: production.id, plan: real, engines: fake(calls), signal: new AbortController().signal });
+    expect(calls).toEqual(["cast:Orange Cat", "cast:Lighthouse", "still:s01", "still:s02", "clip:s01", "clip:s02", "music", "assemble"]);
+    const second = createMediaProduction(actor, { title: "Draft two" });
+    const error = await runFilm({ actor, productionId: second.id, plan: real, engines: fake([], "s02"), signal: new AbortController().signal }).catch((e) => e);
+    expect(error).toBeInstanceOf(FilmStepError);
+    expect((error as Error).cause).toBeInstanceOf(Error);
+    expect(((error as Error).cause as Error).message).toBe("engine failed");
+  });
+});

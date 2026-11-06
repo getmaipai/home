@@ -4,7 +4,7 @@ import type { FilmPlan } from "@/lib/films/plan";
 
 export type FilmStage = "cast" | "stills" | "clips" | "music" | "assemble" | "keep";
 export class FilmStepError extends Error {
-  constructor(readonly stage: FilmStage, message: string, readonly shotId?: string) { super(message); this.name = "FilmStepError"; }
+  constructor(readonly stage: FilmStage, message: string, readonly shotId?: string, cause?: unknown) { super(message, cause === undefined ? undefined : { cause }); this.name = "FilmStepError"; }
   get line(): string { return this.message; }
 }
 export interface FilmEngines {
@@ -25,7 +25,7 @@ function lockedForShot(plan: FilmPlan, shot: FilmPlan["shots"][number]): string[
 }
 function storeCast(actor: PersonRow, productionId: string, plan: FilmPlan, ids: string[]): Production {
   const current = getMediaProduction(actor, productionId)!;
-  const cast = plan.cast.map((member, i) => ({ subject_id: ids[i]!, role: member.name, wardrobe_variant_ids: [], voice_choice: null, notes: member.locked }));
+  const cast = plan.cast.slice(0, ids.length).map((member, i) => ({ subject_id: ids[i]!, role: member.name, wardrobe_variant_ids: [], voice_choice: null, notes: member.locked }));
   return updateMediaProduction(actor, productionId, { cast }) ?? current;
 }
 
@@ -36,7 +36,7 @@ async function callEngine<T>(stage: FilmStage, shotId: string | undefined, engin
   try { return await fn(); }
   catch (error) {
     if (signal.aborted) failIfAborted(signal);
-    throw new FilmStepError(stage, "I couldn't finish that part of the film. You can try again.", shotId);
+    throw new FilmStepError(stage, "I couldn't finish that part of the film. You can try again.", shotId, error);
   }
 }
 
@@ -45,7 +45,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
   let production = getMediaProduction(actor, productionId);
   if (!production || production.owner_person_id !== actor.id) throw new Error("That production is not available to you.");
   if (production.episodes.length === 0) {
-    const episodes = [{ id: "film-episode", title: plan.title, scenes: [{ id: "film-scene", title: plan.title, shots: plan.shots.map(({ id, subject_ids }) => ({ id, subject_ids })) }] }];
+    const episodes = [{ id: "film-episode", title: plan.title, scenes: [{ id: "film-scene", title: plan.title, shots: plan.shots.map(({ id }) => ({ id, subject_ids: [] })) }] }];
     production = updateMediaProduction(actor, productionId, { title: plan.title, summary: plan.summary, episodes, cast: [] }) ?? production;
   }
 

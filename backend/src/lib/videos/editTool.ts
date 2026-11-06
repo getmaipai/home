@@ -478,7 +478,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const videoSeconds = sources.map((job) => job.files[0]?.seconds ?? job.request.seconds ?? null);
     const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - (transition === "cut" ? 0 : (sources.length - 1) * duration) : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
     const title = film?.production.title ?? value.title;
-    const subtitle = film ? film.production.summary.trim().slice(0, 160) || undefined : value.subtitle;
+    const subtitle = film ? (film.production.summary.trim().split(/(?<=[.!?])\s/)[0] ?? "").slice(0, 60).trim() || undefined : value.subtitle;
     const creditLines = film?.credits ?? value.credits;
     const added = (title ? 3 : 0) + (creditLines ? Math.max(3, Math.ceil((creditLines.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
     if (baseLength + added > 600) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");

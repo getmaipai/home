@@ -5,6 +5,7 @@ import { storeFile } from "@/lib/attachments";
 import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished } from "@/lib/pictures/laneGate";
 import { submitGeneration, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
+import { fullViewForJob } from "@/lib/stack/fullView";
 import { createMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject, listMediaSubjects } from "@/lib/mediaSubjects";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
@@ -61,19 +62,20 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
     async makeStill({ shot, castLocked }) {
       const prompt = [shot.still, ...castLocked].filter(Boolean).join(" ");
       const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
+      const view = fullViewForJob("adult", actor);
       const submitted = await submitGeneration({ prompt, size: "1024x576", n: 1, seed, audience: "adult", timeout_ms: 1 });
       try {
-        let data = submitted.done;
+        let finished = !!submitted.done?.length;
         const deadline = Date.now() + 8 * 60_000;
-        while (!data?.length && Date.now() < deadline) {
+        while (!finished && Date.now() < deadline) {
           if (signal.aborted) throw signal.reason ?? new Error("Aborted");
-          const job = await getGenerationJob(submitted.job);
+          const job = await getGenerationJob(submitted.job, view);
           if (job.state === "failed" || job.state === "cancelled") throw new Error("The picture could not be made.");
-          if (job.state === "done") data = job.data;
+          if (job.state === "done") finished = true;
           else await sleep(250, signal);
         }
-        if (!data?.length) throw new Error("The picture took too long. Try again.");
-        const bytes = await fetchPicture(submitted.job, 0);
+        if (!finished) throw new Error("The picture took too long. Try again.");
+        const bytes = await fetchPicture(submitted.job, 0, view);
         const meta = await sharp(bytes, { failOn: "error" }).metadata();
         if (meta.format !== "png" || !meta.width || !meta.height) throw new Error("The picture could not be checked.");
         const checks = await checkImages([bytes], "picture");

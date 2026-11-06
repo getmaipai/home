@@ -51,6 +51,7 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       if(!fileId) throw new Error("The finished film is unavailable. Press Resume to try again.");
       updateFilmRun(actor,run.id,{state:"done",stage:"Assemble",done_steps:latest.total_steps,film_file_id:fileId,note:engines.note ?? null,error_line:null});
     } catch(error) {
+      console.error("[film] run failed", run.id, error);
       if(controller.signal.aborted) return;
       updateFilmRun(actor,run.id,{state:"failed",error_line:error instanceof FilmStepError ? error.message : plainFailure});
     } finally { if(active.get(run.id)===controller) active.delete(run.id); }
