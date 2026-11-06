@@ -466,7 +466,12 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const resumedYes = String(call.id ?? "").startsWith("resumed:") && input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
       const planned = planHouseCall({ actor: state.actor, band: band === "child" || band === "teen" ? band : "adult", args, tainted, approved: resumedYes, registry, permissions, mode });
       const action = safeHouseAction(args.action);
-      if (planned.kind === "refuse") {
+      const hardRefusal = planned.kind === "refuse" && (planned.reason === "unknown_speaker" || planned.reason === "mode_never");
+      if (planned.kind === "refuse" && !hardRefusal) {
+        // A name that matched nothing, matched several, or asked for too much is the model's to correct: the tool node re-plans and
+        // answers in plain words (no names it may not see), so the call is allowed through to say so.
+        entries.push({ proposal, decision: { allow: true } });
+      } else if (planned.kind === "refuse") {
         recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: "never", band, count: planned.count });
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });

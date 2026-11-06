@@ -45,8 +45,8 @@ export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[] 
   const areaNames = [...new Set(ctx.areas.filter((area) => areaIds.has(area.id)).map((area) => area.name))].sort((a, b) => a.localeCompare(b)).slice(0, 40);
   return {
     id: HOUSE_TOOL_ID,
-    description: "Find visible home devices and scenes or control devices you are allowed to use. Name an area or device in your arguments; use find to see what is available.",
-    args: { type: "object", required: ["action"], properties: {
+    description: "Find visible home devices and scenes or control devices you are allowed to use. Always pass targets, a list of {area, name, kind}, for example {\"action\":\"turn_on\",\"targets\":[{\"area\":\"Kitchen\",\"name\":\"Ceiling\"}]}. Use action find with an area to see what is there.",
+    args: { type: "object", required: ["action", "targets"], properties: {
       action: { type: "string", enum: HOUSE_ACTIONS },
       targets: { type: "array", maxItems: 25, items: { type: "object", properties: { area: { type: "string", ...(areaNames.length ? { enum: areaNames } : {}) }, name: { type: "string" }, kind: { type: "string", enum: kinds } }, additionalProperties: false } },
       value: { type: "number" }, rgb: { type: "array", minItems: 3, maxItems: 3, items: { type: "integer", minimum: 0, maximum: 255 } },
@@ -114,8 +114,8 @@ function brakeModeOf(value: unknown): BrakeMode { return value === "do" || value
 
 function normalize(value: string): string { return value.trim().replace(/\s+/g, " ").toLocaleLowerCase(); }
 function areaName(entity: HouseEntity, areas: HouseArea[]): string { return areas.find((area) => area.id === entity.area)?.name ?? "the home"; }
-function fail(callId: string, raw: Record<string, unknown>, line: string, status: "failed" | "rejected" = "failed", confirmNeeded = false): ToolExecutionOutcome {
-  return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status, via: "tool_call", args: raw, durationMs: 0, errorCode: "house_tool", failureKind: "unavailable", userMessage: line, ...(confirmNeeded ? { confirmNeeded: true } as object : {}) } as Parameters<typeof outcomeOf>[0]);
+function fail(callId: string, raw: Record<string, unknown>, line: string, status: "failed" | "rejected" = "failed", confirmNeeded = false, failureKind: "unavailable" | "bad_arguments" | "found_nothing" = "unavailable"): ToolExecutionOutcome {
+  return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status, via: "tool_call", args: raw, durationMs: 0, errorCode: "house_tool", failureKind, userMessage: line, ...(confirmNeeded ? { confirmNeeded: true } as object : {}) } as Parameters<typeof outcomeOf>[0]);
 }
 function reply(callId: string, raw: Record<string, unknown>, text: string, blocks: Record<string, unknown>[] = []): ToolExecutionOutcome {
   return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "succeeded", via: "tool_call", args: raw, durationMs: 0, result: { reply: { text }, data: blocks.length ? { blocks } : {}, actions: [] } });
@@ -130,7 +130,15 @@ function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: Ho
   for (const target of targets) {
     const filtered = entities.filter((entity) => (!target.kind || entity.kind === target.kind) && (!target.area || normalize(areaName(entity, areas)) === normalize(target.area)));
     if (target.name) {
-      const matches = filtered.filter((entity) => normalize(entity.name) === normalize(target.name!));
+      let matches = filtered.filter((entity) => normalize(entity.name) === normalize(target.name!));
+      // The model often says "Wall light" for a device named "Wall": if nothing matches exactly, accept the one device whose
+      // area, name and kind words together contain every word the model gave. Arguments only, never the person's sentence.
+      if (matches.length === 0) {
+        const words = normalize(target.name).split(" ").filter((w) => w && !["the", "a", "an"].includes(w));
+        const hay = (entity: HouseEntity): string[] => [...normalize(`${areaName(entity, areas)} ${entity.name} ${entity.kind}`).split(" "), entity.kind + "s", "lamp", "lights"].filter((w) => w !== "lamp" || entity.kind === "light" || entity.kind === "switch");
+        const loose = words.length ? filtered.filter((entity) => { const h = new Set(hay(entity)); return words.every((w) => h.has(w)); }) : [];
+        if (loose.length === 1) matches = loose;
+      }
       if (matches.length > 1) return { matches: [], ambiguous: matches.slice(0, 8).map((entity) => entity.name) };
       if (matches.length === 0) return { matches: [], missing: true };
       selected.push(matches[0]!);
@@ -147,6 +155,8 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
   const permissions = (deps.permissionsOf ?? effectivePermissions)(personId);
   const mode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
   const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode });
+  // A malformed call is a tool error, not an answer, so the reply cannot claim it worked.
+  if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, {}, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
   if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
   if (plan.kind === "ask" && !approved) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
   if (approved && callId.startsWith("resumed:")) {
@@ -204,7 +214,7 @@ async function executeHousePlan({ plan, actor, personId, args, callId, band, dep
   let blocks: Record<string, unknown>[] = [];
   if (undoReceipt) {
     const undo = undoPropsFor(undoReceipt.id) ?? { label: "Undo", action: "undo" };
-    const confirmation = blockEnvelope("confirmation", HOUSE_TOOL_ID, sentence, `house result in turn ${callId}`, { icon: "home", sentence, undo });
+    const confirmation = blockEnvelope("confirmation", HOUSE_TOOL_ID, sentence, `house result in turn ${callId}`, { icon: performed.some(({ entity }) => entity.kind === "lock") ? "lock" : "lightbulb", sentence, undo });
     confirmation.id = undoReceipt.id;
     blocks = [confirmation];
   }

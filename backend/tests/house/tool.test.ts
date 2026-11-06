@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { houseToolSpec, runHouseTool, planHouseCall, safeHouseAction, type HouseToolDeps } from "@/lib/house/tool";
 import type { HouseEntity, HouseArea } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
+import { filterAnswerBlocks } from "@/lib/answerBlocks";
 
 const areas: HouseArea[] = [{ id: "k", name: "Kitchen" }, { id: "h", name: "Hallway" }];
 const entity = (id: string, name: string, kind: HouseEntity["kind"], area: string | null = "k", extra: Partial<HouseEntity> = {}): HouseEntity => ({ id, name, kind, area, state: "off", sensitive: null, deviceClass: null, rgb: null, brightness: null, sceneMembers: null, ...extra });
@@ -20,6 +21,7 @@ function setup(overrides: Partial<HouseToolDeps> = {}, visibleData = data) {
   };
   return { deps, performed, audits, undos };
 }
+const said = (o: { result?: { reply?: { text?: string } }; userMessage?: string }): string => o.result?.reply?.text ?? o.userMessage ?? "";
 const run = (args: Record<string, unknown>, deps: HouseToolDeps, role: string = "owner", band: "adult" | "teen" | "child" = "adult") => runHouseTool({ actor: { ...person, role } as PersonRow, band, args, callId: "call-1", deps });
 
 describe("house tool", () => {
@@ -43,19 +45,19 @@ describe("house tool", () => {
   test("ambiguous name returns options and unknown name returns not_found", async () => {
     const items = [...data, entity("light.astro2", "Astro", "light", "h")];
     const ambiguous = await run({ action: "turn_on", targets: [{ name: "astro" }] }, setup({}, items).deps);
-    expect(ambiguous.result?.reply?.text).toContain("Astro");
+    expect(said(ambiguous)).toContain("Astro");
     const missing = await run({ action: "turn_on", targets: [{ name: "no such device" }] }, setup().deps);
-    expect(missing.result?.reply?.text).toContain("could not find");
+    expect(said(missing)).toContain("could not find");
   });
   test("more than twelve resolved entities is refused", async () => {
     const many = Array.from({ length: 13 }, (_, i) => entity(`light.l${i}`, `Light ${i}`, "light", "k"));
     const out = await run({ action: "turn_on", targets: [{ area: "kitchen", kind: "light" }] }, setup({}, many).deps);
-    expect(out.result?.reply?.text).toContain("too many");
+    expect(said(out)).toContain("too many");
   });
   test("child cannot unlock; refusal does not reveal entity name or perform", async () => {
     const s = setup({ permissionsOf: () => [] });
     const out = await run({ action: "unlock", targets: [{ name: "Front door lock" }] }, s.deps, "child", "child");
-    expect(s.performed).toHaveLength(0); expect(out.result?.reply?.text).not.toContain("Front door");
+    expect(s.performed).toHaveLength(0); expect(said(out)).not.toContain("Front door");
   });
   test("teen explicit lock allow requires confirmation", async () => {
     const s = setup({ permissionsOf: () => [{ action: "house.see:entity:lock.front_door", effect: "allow" }, { action: "house.control:entity:lock.front_door", effect: "allow" }] });
@@ -71,7 +73,7 @@ describe("house tool", () => {
   });
   test("null-member scene not found to a teen", async () => {
     const out = await run({ action: "activate", targets: [{ name: "Evening" }] }, setup({ permissionsOf: () => [] }).deps, "member", "teen");
-    expect(out.result?.reply?.text).toContain("could not find");
+    expect(said(out)).toContain("could not find");
   });
   test("never and ask modes refuse or park without performing", async () => {
     const never = setup({ brakeMode: () => "never" });
@@ -170,6 +172,21 @@ describe("house tool", () => {
     expect(safeHouseAction("unlock light.front_door and more text")).toBe("invalid");
     expect(safeHouseAction("turn_on")).toBe("turn_on");
     expect(safeHouseAction(undefined)).toBe("invalid");
+  });
+
+  test("the receipt block passes the real answer-block validator for a light and for a lock", async () => {
+    const light = entity("light.kitchen_ceiling", "Ceiling", "light");
+    const doorLock = entity("lock.front_door", "Front door", "lock", "h", { sensitive: "lock" });
+    for (const [target, action, args] of [[light, "turn_on", { action: "turn_on", targets: [{ name: "Ceiling" }] }], [doorLock, "lock", { action: "lock", targets: [{ name: "Front door" }] }]] as const) {
+      const undoCalls = [];
+      const rig = setup({ perform: async () => ({ ok: true, before: { state: "off", brightness: null, rgb: null, percentage: null, temperature: null }, after: { state: "on", brightness: null, rgb: null, percentage: null, temperature: null }, undo: { name: target.kind === "lock" ? "unlock" : "turn_off" } }), undo: (value) => { undoCalls.push(value); return { id: "blk-undo123456", expiresAt: new Date().toISOString() }; } }, [target]);
+      const outcome = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args, callId: "resumed:house", approved: true, deps: rig.deps });
+      const blocks = (outcome.result?.data as { blocks?: unknown[] } | undefined)?.blocks ?? [];
+      if (action === "lock") { expect(blocks).toHaveLength(0); continue; }
+      expect(blocks).toHaveLength(1);
+      const accepted = filterAnswerBlocks(blocks, "house", ["confirmation", "rows"], "adult", { displayName: "Sage" } as never);
+      expect(accepted).toHaveLength(1);
+    }
   });
 });
 
