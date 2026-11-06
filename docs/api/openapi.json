@@ -62032,6 +62032,136 @@
         }
       }
     },
+    "/api/media-subjects/{id}/sheet": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Make a model sheet for an owned picture subject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated subject with its model sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "character",
+                        "prop",
+                        "place"
+                      ]
+                    },
+                    "owner_person_id": {
+                      "type": "string"
+                    },
+                    "shared_with": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "look": {
+                      "type": "string"
+                    },
+                    "reference_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "real": {
+                      "type": "boolean"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "hlc": {
+                      "type": "string"
+                    },
+                    "provenance": {
+                      "type": "string"
+                    },
+                    "sheet_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "owner_person_id",
+                    "shared_with",
+                    "look",
+                    "reference_ids",
+                    "real",
+                    "created_at",
+                    "updated_at",
+                    "hlc",
+                    "provenance",
+                    "sheet_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Could not make model sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subject unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media-productions": {
       "get": {
         "tags": [
