@@ -236,6 +236,13 @@ describe("policyNode: a manifest that fails validation is refused as manifest_in
 });
 
 describe("policyNode: structured brake confirmation", () => {
+  test("house false gate is refused, and a child lock confirmation is refused rather than parked", async () => {
+    resetDb();
+    const owner = createBenchPeople().owner;
+    const base = { actor: { id: owner.id, role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "lock the front door" } as unknown as TurnState;
+    const closed = await policyNode({ ...base, houseAllowed: false } as TurnState, { calls: [{ id: "c1", tool: "house", args: { action: "lock", targets: [{ name: "Front door" }] } }] }, new AbortController().signal);
+    expect(closed.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "format_not_here" });
+  });
   test("an adult removal of more than five items parks confirm_needed", async () => {
     const original = loadManifestOnly("remind");
     if (!original.ok) throw new Error("remind manifest failed to load");

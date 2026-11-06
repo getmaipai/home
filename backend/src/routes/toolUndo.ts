@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { runUndo } from "@/lib/toolUndo";
+import { houseUndoRunner } from "@/lib/house/undoRunner";
 
 export const toolUndoRoutes = apiRouter();
 const undo = createRoute({
@@ -25,7 +26,8 @@ const undo = createRoute({
 });
 
 toolUndoRoutes.openapi(undo, async (c) => {
-  const result = await runUndo(c.get("person"), c.req.valid("param").id);
+  const actor = c.get("person");
+  const result = await runUndo(actor, c.req.valid("param").id, new Date(), houseUndoRunner(actor));
   if (result.ok) return c.json({ ok: true as const }, 200);
   if (result.status === 404) return c.json({ error: result.error }, 404);
   return c.json({ error: result.error }, 409);

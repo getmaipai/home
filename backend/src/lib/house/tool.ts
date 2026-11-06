@@ -9,15 +9,19 @@ import { recordUndo, undoPropsFor, type UndoInverse } from "@/lib/toolUndo";
 import { blockEnvelope } from "@/lib/packageBlocks";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { houseLanFetch } from "./connection";
-import { fetchHouseRegistry, type HouseArea, type HouseEntity, type HouseKind } from "./registry";
+import { loadHouseRegistry } from "./cache";
+import type { HouseArea, HouseEntity, HouseKind } from "./registry";
 import { houseAccess, visibleEntities, type EffectivePermission, type HouseActor, type HouseBand } from "./access";
 import { houseServiceCall, performHouseAction, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult } from "./act";
+import { HOUSE_TOOL_ID } from "./ids";
+export { HOUSE_TOOL_ID } from "./ids";
 
-export const HOUSE_TOOL_ID = "house";
 const kinds = ["light", "switch", "scene", "cover", "lock", "fan", "climate"] as const;
-const actions = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature"] as const;
+/** Audit rows take the action name only from this closed list; anything else the model typed is just "invalid". */
+export function safeHouseAction(value: unknown): string { return typeof value === "string" && (HOUSE_ACTIONS as readonly string[]).includes(value) ? value : "invalid"; }
+export const HOUSE_ACTIONS = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature"] as const;
 const argsSchema = z.object({
-  action: z.enum(actions),
+  action: z.enum(HOUSE_ACTIONS),
   targets: z.array(z.object({ area: z.string().min(1).optional(), name: z.string().min(1).optional(), kind: z.enum(kinds).optional() }).strict()).max(25).optional(),
   value: z.number().finite().optional(),
   rgb: z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255), z.number().int().min(0).max(255)]).optional(),
@@ -28,25 +32,13 @@ export type HouseToolDeps = {
   permissionsOf?: (personId: string) => EffectivePermission[];
   perform?: (entity: HouseEntity, action: HouseActionInput) => Promise<HouseActionResult>;
   brakeMode?: () => BrakeMode;
+  neverMode?: () => boolean;
   audit?: (input: { personId: string; tool: string; action: string; decision: string; band: string; count: number }) => void;
   undo?: (input: { personId: string; turnId?: string; tool: string; action: string; inverse: UndoInverse }, now?: Date) => { id: string; expiresAt: string };
   now?: () => Date;
 };
 
-let cachedAt = 0;
-let cachedRegistry: Awaited<ReturnType<typeof loadHouseRegistry>> | undefined;
-let registryFlight: Promise<Awaited<ReturnType<typeof loadHouseRegistry>>> | undefined;
-async function loadHouseRegistry() {
-  const connection = houseLanFetch();
-  if (!connection.ok) return { ok: false as const, kind: "unreachable" as const };
-  return fetchHouseRegistry({ lanFetch: connection.lanFetch, token: connection.token });
-}
-async function defaultLoadRegistry() {
-  const now = Date.now();
-  if (cachedRegistry && now - cachedAt < 30_000) return cachedRegistry;
-  if (!registryFlight) registryFlight = loadHouseRegistry().then((value) => { if (value.ok) { cachedRegistry = value; cachedAt = Date.now(); } else cachedRegistry = undefined; return value; }).finally(() => { registryFlight = undefined; });
-  return registryFlight;
-}
+const defaultLoadRegistry = loadHouseRegistry;
 
 export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[] }): ToolSpec {
   const areaIds = new Set(ctx.visible.flatMap((entity) => entity.area ? [entity.area] : []));
@@ -55,7 +47,7 @@ export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[] 
     id: HOUSE_TOOL_ID,
     description: "Find visible home devices and scenes or control devices you are allowed to use. Name an area or device in your arguments; use find to see what is available.",
     args: { type: "object", required: ["action"], properties: {
-      action: { type: "string", enum: actions },
+      action: { type: "string", enum: HOUSE_ACTIONS },
       targets: { type: "array", maxItems: 25, items: { type: "object", properties: { area: { type: "string", ...(areaNames.length ? { enum: areaNames } : {}) }, name: { type: "string" }, kind: { type: "string", enum: kinds } }, additionalProperties: false } },
       value: { type: "number" }, rgb: { type: "array", minItems: 3, maxItems: 3, items: { type: "integer", minimum: 0, maximum: 255 } },
     }, additionalProperties: false },
@@ -74,6 +66,47 @@ export function visibleHouseEntities({ actor, permissions, entities }: { actor: 
     });
   };
   return visibleEntities({ actor, permissions, entities, level: "see" }).filter((entity) => entity.kind !== "scene" || sceneOk(entity));
+}
+
+export type HouseCallPlan =
+  | { kind: "refuse"; reason: string; text: string; count: number; rejected?: boolean }
+  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[] }
+  | { kind: "run"; input: HouseArgs; actor: HouseActor; permissions: EffectivePermission[]; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; matches: HouseEntity[]; action: HouseActionInput; mode: BrakeMode; count: number };
+
+function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): HouseActor {
+  const roleBand: HouseBand = "role" in actor && (actor.role === "child" || actor.role === "teen") ? actor.role : "adult";
+  const band: HouseBand = bandIn === "child" || roleBand === "child" ? "child" : bandIn === "teen" || roleBand === "teen" ? "teen" : "adult";
+  return { id: actor.id, role: "role" in actor ? String(actor.role) as HouseActor["role"] : "unknown", band };
+}
+
+/** Pure call-time access and brake decision shared by policy and execution. */
+export function planHouseCall({ actor, band, args, tainted = false, approved = false, registry, permissions, mode }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; tainted?: boolean; approved?: boolean; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; permissions: EffectivePermission[]; mode: BrakeMode }): HouseCallPlan {
+  const parsed = argsSchema.safeParse(args);
+  if (!parsed.success) return { kind: "refuse", reason: "invalid", text: "That home request was invalid. Name an area or device and try again.", count: 0 };
+  const houseActor = canonicalActor(actor, band);
+  if (!houseActor.id || houseActor.role === "unknown" || houseActor.role === "guest") return { kind: "refuse", reason: "unknown_speaker", text: "Home controls are not available for this speaker.", count: 0, rejected: true };
+  if (mode === "never") return { kind: "refuse", reason: "mode_never", text: "Home controls are turned off for this household.", count: 0, rejected: true };
+  const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
+  const input = parsed.data;
+  if (input.action === "find") return { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "find" as HouseActionName }, mode, count: 0 };
+  const resolved = resolveTargets(input.targets ?? [], visible, registry.areas);
+  if (resolved.ambiguous) return { kind: "refuse", reason: "ambiguous", text: `That name matches more than one device: ${resolved.ambiguous.join(", ")}. Please be more specific.`, count: resolved.ambiguous.length };
+  if (resolved.missing || resolved.matches.length === 0) return { kind: "refuse", reason: "missing", text: "I could not find a visible device matching that area or name.", count: 0 };
+  const action: HouseActionInput = { name: input.action as HouseActionName, ...(input.value !== undefined ? { value: input.value } : {}), ...(input.rgb ? { rgb: input.rgb } : {}) };
+  if (resolved.matches.length > 12) return { kind: "refuse", reason: "bulk", text: "That would control too many devices at once. Choose a smaller area or name specific devices.", count: resolved.matches.length };
+  if (resolved.matches.some((entity) => !supportedActions(entity).includes(action.name))) return { kind: "refuse", reason: "unsupported", text: "That action is not available for the selected device. Choose a supported action and try again.", count: resolved.matches.length };
+  const control = resolved.matches.map((entity) => ({ entity, access: houseAccess({ actor: houseActor, permissions, entity, level: "control" }) }));
+  if (control.some((item) => !item.access.allowed)) return { kind: "refuse", reason: "access", text: "You are not set up to control that.", count: control.length };
+  const confirm = control.some(({ entity }) => !!entity.sensitive && houseAccess({ actor: houseActor, permissions, entity, level: "confirm" }).confirm);
+  const byId = new Map(registry.entities.map((entity) => [entity.id, entity]));
+  const sceneNeedsAsk = control.some(({ entity }) => entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => !byId.get(id) || !!byId.get(id)!.sensitive)));
+  const mustAsk = sceneNeedsAsk || confirm || control.some(({ entity }) => !!entity.sensitive && houseAccess({ actor: houseActor, permissions, entity, level: "confirm" }).reason === "no_grant");
+  // approved = the speaker answered yes to exactly this parked call; it lifts the ask, never a never and never a minor's need for a parent.
+  const brake = approved ? { decision: "do" as const, reason: undefined } : brakeFor({ tool: "house", action: input.action, confirm: mustAsk, targets: control.length, tainted, mode, actor: { id: houseActor.id!, role: houseActor.role, band: houseActor.band }, args });
+  if (brake.decision === "never") return { kind: "refuse", reason: brake.reason ?? "never", text: "Home controls are turned off for this household.", count: control.length };
+  const kinds = [...new Set(control.map(({ entity }) => entity.kind))];
+  if (brake.decision === "ask") return { kind: "ask", reason: brake.reason ?? "confirmation_required", action: input.action, count: control.length, kinds };
+  return { kind: "run", input, actor: houseActor, permissions: [...permissions], registry, matches: control.map(({ entity }) => entity), action, mode, count: control.length };
 }
 
 /** Only an exact "do" or "never" is believed; anything else (unset, empty, a typo) is ask. */
@@ -108,43 +141,47 @@ function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: Ho
 }
 
 export async function runHouseTool({ actor, band: bandIn, args, callId, tainted = false, approved = false, deps = {} }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; callId: string; tainted?: boolean; approved?: boolean; deps?: HouseToolDeps }): Promise<ToolExecutionOutcome> {
-  const parsed = argsSchema.safeParse(args);
-  if (!parsed.success) return fail(callId, {}, "That home request was invalid. Name an area or device and try again.");
-  const input = parsed.data;
-  const personId = actor.id;
-  const roleBand: HouseBand = "role" in actor && (actor.role === "child" || actor.role === "teen") ? actor.role : "adult";
-  const band: HouseBand = bandIn === "child" || roleBand === "child" ? "child" : bandIn === "teen" || roleBand === "teen" ? "teen" : "adult";
-  const houseActor: HouseActor = { id: personId, role: "role" in actor ? String(actor.role) as HouseActor["role"] : "unknown", band };
-  if (!personId || houseActor.role === "unknown" || houseActor.role === "guest") return fail(callId, {}, "Home controls are not available for this speaker.", "rejected");
+  const personId = actor.id ?? "";
   const registry = await (deps.loadRegistry ?? defaultLoadRegistry)();
   if (!registry.ok) return fail(callId, {}, failureCopy[registry.kind] ?? failureCopy.unreachable!);
   const permissions = (deps.permissionsOf ?? effectivePermissions)(personId);
-  const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
   const mode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
-  if (mode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household.", ...({ confirmNeeded: false } as object) } as Parameters<typeof outcomeOf>[0]);
+  const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode });
+  if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
+  if (plan.kind === "ask" && !approved) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
+  if (approved && callId.startsWith("resumed:")) {
+    const currentMode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
+    if (currentMode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
+    const parsed = argsSchema.safeParse(args);
+    if (!parsed.success) return reply(callId, args, "That home request was invalid. Name an area or device and try again.");
+    const retryPlan = planHouseCall({ actor, band: bandIn, args, tainted: false, approved: true, registry, permissions, mode });
+    if (retryPlan.kind === "refuse") return reply(callId, args, retryPlan.text);
+    if (retryPlan.kind === "run" && (retryPlan.actor.band === "child" || retryPlan.actor.band === "teen")) {
+      const requiresAdult = retryPlan.matches.some((entity) => !!entity.sensitive || entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => registry.entities.find((item) => item.id === id)?.sensitive)));
+      if (requiresAdult) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "A parent needs to approve that home action." } as Parameters<typeof outcomeOf>[0]);
+    }
+    if (retryPlan.kind === "ask") return reply(callId, args, "That home action could not be confirmed.");
+    if (retryPlan.kind === "run") return executeHousePlan({ plan: { ...retryPlan, mode: "do" }, actor, personId, args, callId, band: bandIn, deps });
+  }
+  if (mode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
+  if (plan.kind !== "run") return fail(callId, {}, "That home request was invalid.");
+  return executeHousePlan({ plan, actor, personId, args, callId, band: bandIn, deps });
+}
+
+async function executeHousePlan({ plan, actor, personId, args, callId, band, deps }: { plan: Extract<HouseCallPlan, { kind: "run" }>; actor: PersonRow | HouseActor; personId: string; args: Record<string, unknown>; callId: string; band: HouseBand; deps: HouseToolDeps }): Promise<ToolExecutionOutcome> {
+  const { actor: houseActor, input, registry } = plan;
+  const mode = plan.mode;
+  const permissions = plan.permissions;
+  const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
   if (input.action === "find") {
     const filtered = visible.filter((entity) => (input.targets ?? []).every((target) => (!target.area || normalize(areaName(entity, registry.areas)) === normalize(target.area)) && (!target.kind || target.kind === entity.kind))).slice(0, 26);
     const shown = filtered.slice(0, 25);
     const list = shown.map((entity) => `${entity.name} (${areaName(entity, registry.areas)}, ${entity.kind}, ${entity.state})`).join("; ");
     return reply(callId, args, shown.length ? `Found ${shown.length} visible home ${shown.length === 1 ? "device" : "devices"}${filtered.length > 25 ? "; there are more" : ""}: ${list}.` : "I did not find any visible device there.");
   }
-  const resolved = resolveTargets(input.targets ?? [], visible, registry.areas);
-  if (resolved.ambiguous) return reply(callId, args, `That name matches more than one device: ${resolved.ambiguous.join(", ")}. Please be more specific.`);
-  if (resolved.missing || resolved.matches.length === 0) return reply(callId, args, "I could not find a visible device matching that area or name.");
-  const action: HouseActionInput = { name: input.action as HouseActionName, ...(input.value !== undefined ? { value: input.value } : {}), ...(input.rgb ? { rgb: input.rgb } : {}) };
-  if (resolved.matches.length > 12) return reply(callId, args, "That would control too many devices at once. Choose a smaller area or name specific devices.");
-  if (resolved.matches.some((entity) => !supportedActions(entity).includes(action.name))) return reply(callId, args, "That action is not available for the selected device. Choose a supported action and try again.");
-  const control = resolved.matches.map((entity) => ({ entity, access: houseAccess({ actor: houseActor, permissions, entity, level: "control" }) }));
-  if (control.some((item) => !item.access.allowed)) return reply(callId, args, "You are not set up to control that.");
-  const confirm = control.some(({ entity }) => !!entity.sensitive && houseAccess({ actor: houseActor, permissions, entity, level: "confirm" }).confirm);
-  const byId = new Map(registry.entities.map((entity) => [entity.id, entity]));
-  // A scene can set locks, covers and the alarm: it asks whenever it has unknown members or any sensitive member.
-  const sceneNeedsAsk = control.some(({ entity }) => entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => !byId.get(id) || !!byId.get(id)!.sensitive)));
-  const mustAsk = sceneNeedsAsk || confirm || control.some(({ entity }) => !!entity.sensitive && houseAccess({ actor: houseActor, permissions, entity, level: "confirm" }).reason === "no_grant");
-  const decision = brakeFor({ tool: "house", action: input.action, confirm: mustAsk, targets: control.length, tainted, mode, actor: { id: personId, role: houseActor.role, band }, args });
-  if (decision.decision === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household.", ...({ confirmNeeded: false } as object) } as Parameters<typeof outcomeOf>[0]);
-  // approved is set by the turn engine only when this exact call was parked and the speaker answered yes; it never lifts a never.
-  if (decision.decision === "ask" && !approved) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: `Please confirm ${input.action.replaceAll("_", " ")} for ${control.length} ${control.length === 1 ? "device" : "devices"}.`, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
+  const matches = plan.matches;
+  const action = plan.action;
+  const control = matches.map((entity) => ({ entity }));
   const performed: Array<{ entity: HouseEntity; result: Extract<HouseActionResult, { ok: true }> }> = [];
   const failedKinds: string[] = [];
   for (const { entity } of control) {

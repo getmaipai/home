@@ -68,6 +68,16 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
     expect(toolOfferLabel(showImages!, "enabled")).toBe("not offered: answerImagesAllowed");
   });
 
+  test("house is conditional on its gate and is the first studio shrink candidate", () => {
+    const house = VIRTUAL_TOOL_REGISTRY.find((tool) => tool.id === "house")!;
+    expect(house.offer).toEqual({ mode: "conditional", gate: "houseAllowed", bench_row: "house-tool", priority: 4 });
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    const offered = withTurnToolGates(base, false, false, false, false, false, false, false, false, null, false, false, false, false, true);
+    expect(offered.tools_offered).toContain("house");
+    const cap = withTurnToolGates({ ...base, max_tools: base.tools_offered.length }, false, false, false, false, false, false, false, false, null, false, false, false, false, true);
+    expect(cap.tools_offered).not.toContain("house");
+  });
+
   test("IMG-OFFER-01: offerPassesGate offers show_images only where the turn gate passes, and the turn gate passes an adult alone", () => {
     const { owner, child } = createBenchPeople();
     const teen = db.insert(people).values({ ...owner, id: "teen-offer", displayName: "Teen", role: "teen" }).returning().get()!;

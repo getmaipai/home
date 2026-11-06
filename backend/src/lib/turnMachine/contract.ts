@@ -261,6 +261,8 @@ export interface TurnState {
   writingFormatAllowed?: boolean;
   /** V1/V2 voice tools are offered only for written adult turns while the Stack voice role is ready. */
   voiceoverAllowed?: boolean;
+  houseAllowed?: boolean;
+  houseContext?: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] };
   /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;
   /** MUSIC-STUDIO-EDIT: the made-music object the turn follows ("none": the turn may make a song style but names no object). Decides the make/edit tools. */

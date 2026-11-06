@@ -11,6 +11,8 @@ export type HouseLanFetchSuccess = {
   ok: true;
   lanFetch: ReturnType<typeof createLanFetch>;
   token: string;
+  host: string;
+  port: number;
 };
 
 export type HouseLanFetchResult = HouseLanFetchSuccess | HouseLanFetchFailure;
@@ -58,7 +60,7 @@ export function houseLanFetch(deps: HouseLanFetchDeps = {}): HouseLanFetchResult
   const port = url.port !== "" ? Number(url.port) : explicit80 ? 80 : 8123;
   try {
     const lanFetch = createLanFetch({ host: url.hostname, port }, deps.fetch === undefined ? {} : { fetch: deps.fetch });
-    return { ok: true, lanFetch, token };
+    return { ok: true, lanFetch, token, host: url.hostname, port };
   } catch {
     return { ok: false, reason: "bad_address", message: ADDRESS_MESSAGE };
   }

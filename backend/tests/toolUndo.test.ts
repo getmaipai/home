@@ -165,6 +165,26 @@ describe("tool undo", () => {
     expect(await runUndo(people.owner, live.id, now, async () => true)).toMatchObject({ ok: false, status: 409 });
   });
 
+  test("concurrent house undo taps claim the row once; a failed run keeps the row for a retry and a success spends it", async () => {
+    const receipt = recordUndo({ personId: people.owner.id, tool: "house", action: "restore", inverse: { kind: "house_restore", calls: [{ domain: "light", service: "turn_off", data: { entity_id: "light.x" } }] } });
+    let started!: () => void; const startedPromise = new Promise<void>((resolve) => { started = resolve; });
+    let release!: () => void; const wait = new Promise<void>((resolve) => { release = resolve; });
+    const runFirst = runUndo(people.owner, receipt.id, new Date(), async () => { started(); await wait; return false; });
+    await startedPromise;
+    const second = await runUndo(people.owner, receipt.id, new Date(), async () => true);
+    release();
+    const first = await runFirst;
+    expect(second).toMatchObject({ ok: false, status: 409 });
+    expect(first).toMatchObject({ ok: false, status: 409 });
+    const kept = db.select().from(toolUndo).where(eq(toolUndo.id, receipt.id)).get();
+    expect(kept?.usedAt).toBeNull();
+    expect(kept?.inverseJson).toContain("house_restore");
+    const retry = await runUndo(people.owner, receipt.id, new Date(), async () => true);
+    expect(retry).toMatchObject({ ok: true });
+    expect(db.select().from(toolUndo).where(eq(toolUndo.id, receipt.id)).get()?.inverseJson).toBe('{"kind":"spent"}');
+    expect(await runUndo(people.owner, receipt.id, new Date(), async () => true)).toMatchObject({ ok: false, status: 409 });
+  });
+
   test("remind result returns a schedule card and an Undo confirmation with the receipt id", () => {
     const receipt = recordUndo({
       personId: people.owner.id,

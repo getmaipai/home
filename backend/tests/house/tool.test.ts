@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { houseToolSpec, runHouseTool, type HouseToolDeps } from "@/lib/house/tool";
+import { houseToolSpec, runHouseTool, planHouseCall, safeHouseAction, type HouseToolDeps } from "@/lib/house/tool";
 import type { HouseEntity, HouseArea } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
 
@@ -152,8 +152,24 @@ describe("house tool", () => {
     const first = await run({ action: "lock", targets: [{ name: "Front door" }] }, rig.deps);
     expect(first.status).not.toBe("succeeded");
     expect(rig.performed).toHaveLength(0);
-    const second = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: { action: "lock", targets: [{ name: "Front door" }] }, callId: "c2", approved: true, deps: rig.deps });
+    const second = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: { action: "lock", targets: [{ name: "Front door" }] }, callId: "resumed:house", approved: true, deps: rig.deps });
     expect(second.status).toBe("succeeded");
     expect(rig.undos).toHaveLength(0);
   });
+
+  test("approved lifts the ask for an adult's lock but never for a child or a never mode, and audit action names are closed", () => {
+    const doorLock = entity("lock.front_door", "Front door", "lock", "h", { sensitive: "lock" });
+    const registry = { ok: true as const, areas, entities: [doorLock] };
+    const owner = { id: "o1", role: "owner" } as PersonRow;
+    const args = { action: "lock", targets: [{ name: "Front door" }] };
+    expect(planHouseCall({ actor: owner, band: "adult", args, registry, permissions: [], mode: "do" }).kind).toBe("ask");
+    expect(planHouseCall({ actor: owner, band: "adult", args, approved: true, registry, permissions: [], mode: "do" }).kind).toBe("run");
+    expect(planHouseCall({ actor: owner, band: "adult", args, approved: true, registry, permissions: [], mode: "never" }).kind).toBe("refuse");
+    const child = { id: "c1", role: "child" } as PersonRow;
+    expect(planHouseCall({ actor: child, band: "child", args, approved: true, registry, permissions: [{ action: "house.control:entity:lock.front_door", effect: "allow" }], mode: "do" }).kind).toBe("refuse");
+    expect(safeHouseAction("unlock light.front_door and more text")).toBe("invalid");
+    expect(safeHouseAction("turn_on")).toBe("turn_on");
+    expect(safeHouseAction(undefined)).toBe("invalid");
+  });
 });
+

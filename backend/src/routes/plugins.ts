@@ -23,6 +23,11 @@ import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { appAssetAllowed, appRunAllowed, getAppData, getAppPage, manifestForViewer, warmAppPage } from "@/lib/apps";
 import { assetResponse, cleanAssetPath, packageAssetFile } from "@/lib/packageAssets";
 import { newsRoutes } from "./newsRoutes";
+import { houseLanFetch } from "@/lib/house/connection";
+import { peekHouseRegistry, warmHouseRegistry } from "@/lib/house/cache";
+import { visibleHouseEntities, houseToolSpec } from "@/lib/house/tool";
+import { effectivePermissions } from "@/lib/permissions";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export const pluginsRoutes = apiRouter();
 
@@ -93,15 +98,24 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
   const band = speakerAgeBand(actor, new Date());
   // VOICE-V1/V2: the same gate a real written turn applies to voiceover and change_voice (adult, not a guest, voice engine ready).
   const voiceoverOk = band === "adult" && actor.role !== "guest" && (await roleHealth("voice").then((h) => h.availability === "ready", () => false));
+  const registry = peekHouseRegistry();
+  let houseContext: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] } | undefined;
+  const houseEligible = actor.role !== "guest" && getHouseholdSettingValue("tools.house.mode") !== "never" && houseLanFetch().ok;
+  let houseOk = false;
+  if (houseEligible && registry) {
+    const visible = visibleHouseEntities({ actor: { id: actor.id, role: actor.role as import("@/lib/house/access").HouseActor["role"], band: band === "child" || band === "teen" ? band : "adult" }, permissions: effectivePermissions(actor.id), entities: registry.entities });
+    houseOk = visible.length > 0;
+    if (houseOk) houseContext = { visible, areas: registry.areas };
+  } else if (houseEligible) warmHouseRegistry();
   const budget = withTurnToolGates(
     await resolveTurnBudgetWithStack(undefined, band),
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
     false, false, false, false, false, false, false, null,
     // WRITING-FORMATS-03: the same gate a real written turn applies, so the list matches what the chat sends.
     writingFormatsFor(actor.role).length > 0,
-    false, voiceoverOk,
+    false, voiceoverOk, false, houseOk,
   );
-  return new Set(budget.tools_offered.filter((id) => (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : toolSpecFor(id) !== null)));
+  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : toolSpecFor(id) !== null)));
 }
 
 pluginsRoutes.openapi(skillsRoute, async (c) => {

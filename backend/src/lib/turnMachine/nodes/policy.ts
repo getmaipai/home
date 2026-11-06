@@ -36,6 +36,10 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { LIST_ACTIONS } from "@/lib/listActions";
 import { isAlarmActionCall } from "@/lib/alarmCalls";
+import { HOUSE_TOOL_ID, planHouseCall, safeHouseAction } from "@/lib/house/tool";
+import { houseLanFetch } from "@/lib/house/connection";
+import { loadHouseRegistry } from "@/lib/house/cache";
+import { effectivePermissions } from "@/lib/permissions";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -434,6 +438,50 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       if (!state.voiceoverAllowed) {
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
+      } else entries.push({ proposal, decision: { allow: true } });
+      continue;
+    }
+
+    if (call.tool === HOUSE_TOOL_ID) {
+      const args = (call.args ?? {}) as Record<string, unknown>;
+      const proposal: ActionProposal = { kind: "side_effecting", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
+      if (!state.houseAllowed || !state.houseContext) {
+        noteRefusal("format_not_here");
+        entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
+        continue;
+      }
+      const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
+      const tainted = state.context.some((item) => item.source === "search_result" || item.source === "page");
+      const connection = houseLanFetch();
+      const registry = connection.ok ? await loadHouseRegistry() : { ok: false as const, kind: "unreachable" as const };
+      if (!registry.ok) {
+        noteRefusal("format_not_here");
+        entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
+        continue;
+      }
+      const permissions = effectivePermissions(state.actor.id);
+      const rawMode = getHouseholdSettingValue("tools.house.mode");
+      const mode: BrakeMode = rawMode === "do" || rawMode === "never" ? rawMode : "ask";
+      // Only the call the speaker just said yes to (same tool, same arguments, an id the engine built as resumed:) runs without asking again.
+      const resumedYes = String(call.id ?? "").startsWith("resumed:") && input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
+      const planned = planHouseCall({ actor: state.actor, band: band === "child" || band === "teen" ? band : "adult", args, tainted, approved: resumedYes, registry, permissions, mode });
+      const action = safeHouseAction(args.action);
+      if (planned.kind === "refuse") {
+        recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: "never", band, count: planned.count });
+        noteRefusal("format_not_here");
+        entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
+      } else if (planned.kind === "ask") {
+        const minor = band === "child" || band === "teen";
+        recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: minor ? "never" : "ask", band, count: planned.count });
+        if (minor) {
+          noteRefusal("parent_required");
+          entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });
+          continue;
+        }
+        const noun = planned.kinds.length === 1 ? planned.kinds[0] : "device";
+        const prompt = `${action.replaceAll("_", " ").replace(/^./, (c: string) => c.toUpperCase())} ${planned.count} ${noun}${planned.count === 1 ? "" : "s"}?`;
+        noteRefusal("confirm_needed");
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt, capabilities: [], consequential: true } } });
       } else entries.push({ proposal, decision: { allow: true } });
       continue;
     }

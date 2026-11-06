@@ -193,10 +193,13 @@ export function runUndo(
   const row = db.select().from(toolUndo).where(eq(toolUndo.id, undoId)).get();
   if (!row || row.personId !== actor.id) return { ok: false, status: 404, error: "no such undo" };
   if (row.usedAt || Date.parse(row.expiresAt) <= now.getTime()) return { ok: false, status: 409, error: "undo expired or already used" };
+  const claimed = db.update(toolUndo).set({ usedAt: now.toISOString() }).where(and(eq(toolUndo.id, undoId), isNull(toolUndo.usedAt))).returning({ id: toolUndo.id }).all();
+  if (claimed.length !== 1) return { ok: false, status: 409, error: "undo expired or already used" };
   let inverse: UndoInverse;
   try {
     inverse = JSON.parse(row.inverseJson) as UndoInverse;
   } catch {
+    db.update(toolUndo).set({ inverseJson: JSON.stringify({ kind: "spent" }) }).where(eq(toolUndo.id, undoId)).run();
     return { ok: false, status: 409, error: "invalid undo" };
   }
   const applied = applyInverse(actor, inverse, now, runServiceCall);
@@ -206,12 +209,22 @@ export function runUndo(
 }
 
 function finishUndo(actor: PersonRow, row: typeof toolUndo.$inferSelect, undoId: string, now: Date, ok: boolean): UndoResult {
-  if (!ok) return { ok: false, status: 409, error: "undo action is no longer available" };
+  // A house Undo that failed (Home Assistant unreachable, one call refused) keeps its row until it expires so the person can try again:
+  // its calls set absolute states, so replaying them is safe.
+  if (!ok) {
+    try {
+      if ((JSON.parse(row.inverseJson) as { kind?: string }).kind === "house_restore") {
+        db.update(toolUndo).set({ usedAt: null }).where(eq(toolUndo.id, undoId)).run();
+        return { ok: false, status: 409, error: "undo action is no longer available" };
+      }
+    } catch { /* fall through to the spent path */ }
+  }
   // Once used the row keeps no list items, alarm labels or ids: only the fact that it was spent.
   db.update(toolUndo)
-    .set({ usedAt: now.toISOString(), inverseJson: JSON.stringify({ kind: "spent" }) })
-    .where(and(eq(toolUndo.id, undoId), isNull(toolUndo.usedAt)))
+    .set({ inverseJson: JSON.stringify({ kind: "spent" }) })
+    .where(eq(toolUndo.id, undoId))
     .run();
+  if (!ok) return { ok: false, status: 409, error: "undo action is no longer available" };
   recordToolAudit({ personId: actor.id, tool: row.tool, action: row.action, decision: "undo", band: actor.role });
   return { ok: true };
 }

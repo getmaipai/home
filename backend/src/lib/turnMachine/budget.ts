@@ -176,11 +176,11 @@ function musicObjectOffer(gate: string | undefined, object: MusicObjectGate): bo
   }
 }
 
-function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false): boolean {
+function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false): boolean {
   if (offer.mode === "base") return true;
   if (offer.mode !== "conditional" || !offer.bench_row) return false;
   // IMGGEN-HOME-01: `picturesAllowed` is decided once per turn (pictures/policy.ts and the Stack's picture engine being up).
-  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "pictureEditAllowed" && editPictureOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "filmAllowed" && filmOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "writingFormatAllowed" && writingFormatOk) || (offer.gate === "voiceoverAllowed" && voiceoverOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
+  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "pictureEditAllowed" && editPictureOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "filmAllowed" && filmOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "writingFormatAllowed" && writingFormatOk) || (offer.gate === "voiceoverAllowed" && voiceoverOk) || (offer.gate === "houseAllowed" && houseOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
 }
 
 export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string } }, status: "enabled" | "disabled", usedInChat = false): string | null {
@@ -201,9 +201,9 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
 const MUSIC_SHRINK_ORDER = "writing_format make_song_style make_album edit_band edit_album edit_song_style make_sound edit_music make_band generate_music".split(" ");
 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
-const STUDIO_SHRINK_ORDER = "writing_format make_song_style make_album make_sound edit_music".split(" ");
+const STUDIO_SHRINK_ORDER = "house writing_format make_song_style make_album make_sound edit_music".split(" ");
 
-export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false): TurnBudget {
+export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false): TurnBudget {
   const cap = budget.max_tools ?? 0;
   if (budget === NO_RECORD_BUDGET) return budget;
   if (cap === 0) return budget.tools_offered.length === 0 ? budget : { ...budget, tools_offered: [] };
@@ -213,13 +213,13 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   for (const manifest of listInstalledManifests()) {
     const offer = manifest.offer;
     const forcedForMeasurement = offerOverridesForTests.has(manifest.id);
-    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk))) continue;
+    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk))) continue;
     const status = statuses.get(manifest.id);
     if (status && (status.status !== "enabled" || status.smokeOk === false)) continue;
     candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
   }
   for (const tool of VIRTUAL_TOOL_REGISTRY) {
-    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
+    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 
   // AUDIO-PARITY-01 V1/V2: the two voice tools are the newest and give way first, before any other set, so no existing worst case changes.
