@@ -11,6 +11,8 @@ import { fetchHouseRegistry, type HouseRegistryResult } from "@/lib/house/regist
 import { houseAccess, type HouseActor, type HouseBand, type EffectivePermission } from "@/lib/house/access";
 import { performHouseAction, houseServiceCall, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult } from "@/lib/house/act";
 import { visibleHouseEntities } from "@/lib/house/tool";
+import { requireRoleOrGrant } from "@/middleware/auth";
+import { listActivePeople } from "@/lib/access";
 import type { HouseEntity } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
 
@@ -57,6 +59,64 @@ const roomsRoute = createRoute({
   },
 });
 export const houseRoutes = apiRouter();
+
+const houseTestRoute = createRoute({ method: "post", path: "/test", tags: ["House"], summary: "Test the Home Assistant connection", middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.union([z.object({ ok: z.literal(true), rooms: z.number(), devices: z.number() }), z.object({ ok: z.literal(false), kind: z.enum(["not_configured", "bad_address", "no_token", "refused", "unreachable", "timeout"]), nextStep: z.string() })]) } }, description: "Connection test." }, ...errorResponses({ 401: "Sign in", 403: "Adults with grant rights only" }) } });
+const adminRegistryRoute = createRoute({ method: "get", path: "/admin/registry", tags: ["House"], summary: "All Home Assistant rooms and entities for House settings", middleware: [requireRoleOrGrant(["owner", "admin"], "people.grant")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ rooms: z.array(z.object({ id: z.string(), name: z.string(), entities: z.array(z.object({ id: z.string(), name: z.string(), kind: z.string(), sensitive: z.string().nullable() })) })), people: z.array(z.object({ id: z.string(), name: z.string(), role: z.string() })) }) } }, description: "Complete registry." }, ...errorResponses({ 401: "Sign in", 403: "Not allowed" }) } });
+
+houseRoutes.openapi(houseTestRoute, async (c) => {
+  const actor = c.get("person");
+  if (!(actor.role === "owner" || actor.role === "admin" || effectivePermissions(actor.id).some((p) => p.action === "people.grant" && p.effect === "allow"))) return c.json({ error: "Forbidden" }, 403);
+  const connection = deps().connection();
+  if (!connection.ok) {
+    const kind: "bad_address" | "no_token" | "not_configured" = connection.reason === "bad_address" ? "bad_address" : connection.reason === "no_token" ? "no_token" : "not_configured";
+    const nextStep = kind === "bad_address" ? "Use a numeric address like http://192.0.2.10:8123." : kind === "no_token" ? "Add a long-lived token from your Home Assistant profile." : "Set the Home Assistant address and token in Settings, House.";
+    return c.json({ ok: false as const, kind, nextStep }, 200);
+  }
+  const result = await fetchHouseRegistry({ lanFetch: connection.lanFetch, token: connection.token });
+  if (!result.ok) {
+    const kind = result.kind;
+    const nextStep = kind === "refused" ? "Home Assistant refused the token. Create a new long-lived token in your Home Assistant profile." : kind === "timeout" ? "Check that Home Assistant is responding on your home network, then try again." : "Check that Home Assistant is on and reachable at that address.";
+    return c.json({ ok: false as const, kind, nextStep }, 200);
+  }
+  return c.json({ ok: true as const, rooms: result.areas.length, devices: result.entities.length }, 200);
+});
+
+houseRoutes.openapi(adminRegistryRoute, async (c) => {
+  const result = await deps().loadRegistry();
+  const areas = result.ok ? result.areas : [];
+  const entities = result.ok ? result.entities : [];
+  const rooms = areas.map((area) => ({ id: area.id, name: area.name, entities: entities.filter((entity) => entity.area === area.id).map((entity) => ({ id: entity.id, name: entity.name, kind: entity.kind, sensitive: entity.sensitive })) }));
+  const unassigned = entities.filter((entity) => !entity.area).map((entity) => ({ id: entity.id, name: entity.name, kind: entity.kind, sensitive: entity.sensitive }));
+  if (unassigned.length) rooms.push({ id: "other", name: "Other", entities: unassigned });
+  const people = listActivePeople().filter((person) => person.role !== "guest" && person.role !== "unknown").map((person) => ({ id: person.id, name: person.displayName, role: person.role }));
+  return c.json({ rooms, people }, 200);
+});
+
+const effectiveRoute = createRoute({ method: "get", path: "/admin/effective", tags: ["House"], summary: "Effective House permissions for one person", middleware: [requireRoleOrGrant(["owner", "admin"], "people.grant")] as const,
+  request: { query: z.object({ person: z.string().min(1) }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ rooms: z.record(z.string(), z.object({ see: z.boolean(), control: z.boolean() })), entities: z.record(z.string(), z.object({ see: z.boolean(), control: z.boolean(), confirm: z.boolean(), sensitive: z.boolean() })) }) } }, description: "Effective permissions." }, ...errorResponses({ 401: "Sign in", 403: "Not allowed", 404: "No such person" }) } });
+houseRoutes.openapi(effectiveRoute, async (c) => {
+  const person = listActivePeople().find((row) => row.id === c.req.valid("query").person);
+  if (!person) return c.json({ error: "Person not found" }, 404);
+  const registry = await deps().loadRegistry();
+  if (!registry.ok) return c.json({ rooms: {}, entities: {} }, 200);
+  const actor = actorOf(person); const permissions = deps().permissionsOf(person.id);
+  const rooms = Object.fromEntries(registry.areas.map((area) => {
+    const entities = registry.entities.filter((entity) => entity.area === area.id);
+    const see = entities.length > 0 && entities.every((entity) => houseAccess({ actor, permissions, entity, level: "see" }).allowed);
+    const control = entities.length > 0 && entities.every((entity) => houseAccess({ actor, permissions, entity, level: "control" }).allowed);
+    return [area.id, { see, control }];
+  }));
+  const entities = Object.fromEntries(registry.entities.map((entity) => [entity.id, {
+    see: houseAccess({ actor, permissions, entity, level: "see" }).allowed,
+    control: houseAccess({ actor, permissions, entity, level: "control" }).allowed,
+    confirm: houseAccess({ actor, permissions, entity, level: "confirm" }).allowed,
+    sensitive: !!entity.sensitive,
+  }]));
+  return c.json({ rooms, entities }, 200);
+});
 houseRoutes.openapi(roomsRoute, async (c) => {
   const d = deps(); const person = c.get("person"); const actor = actorOf(person);
   if (inaccessible(actor)) return c.json({ error: "Rooms are unavailable for this speaker. Sign in as a household member." }, 403);

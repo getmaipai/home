@@ -25,6 +25,8 @@ export const SETTINGS_AREAS = [...(areasFile.areas as unknown as SettingsAreaDef
   })),
 }));
 
+SETTINGS_AREAS.push({ id: "house", title: "House", audience: { min_role: "admin" }, groups: [{ label: "House", sections: ["house"] }], sections: [{ id: "house", label: "House", icon: "house", kind: "view", view: "home.house_admin", min_role: "admin" }] } as SettingsAreaDef);
+
 export function settingsArea(id: string | undefined): SettingsAreaDef | undefined {
   return SETTINGS_AREAS.find((area) => area.id === id);
 }

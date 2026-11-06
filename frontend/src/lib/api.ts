@@ -1360,6 +1360,9 @@ export const api = {
   grants: (personId?: string) => request<CodingGrant[]>(`/api/grants${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
   createGrant: (input: { person: string; action: string; effect: "allow" | "deny" }) => request<CodingGrant>("/api/grants", { method: "POST", body: JSON.stringify(input) }),
   revokeGrant: (id: string) => request<{ id: string }>(`/api/grants/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  houseTest: () => request<{ ok: true; rooms: number; devices: number } | { ok: false; kind: string; nextStep: string }>("/api/house/test", { method: "POST" }),
+  houseAdminRegistry: () => request<{ rooms: Array<{ id: string; name: string; entities: Array<{ id: string; name: string; kind: string; sensitive: string | null }> }>; people: Array<{ id: string; name: string; role: string }> }>("/api/house/admin/registry"),
+  houseAdminEffective: (personId: string) => request<{ rooms: Record<string, { see: boolean; control: boolean }>; entities: Record<string, { see: boolean; control: boolean; confirm: boolean; sensitive: boolean }> }>(`/api/house/admin/effective?person=${encodeURIComponent(personId)}`),
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
   settingsValues: (scope: string, key?: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}${key ? `&key=${encodeURIComponent(key)}` : ""}`),

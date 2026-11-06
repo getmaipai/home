@@ -74,6 +74,11 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     // fixture answers what those read (an unconfigured Stack and a small Mac) instead of the bare "{}" below.
     const route = url.split("?")[0]!;
     if (route.endsWith("/api/auth/sessions/away")) return Promise.resolve(Response.json([]));
+    if (route === "/api/apps") return Promise.resolve(Response.json([]));
+    if (route.endsWith("/api/house/admin/registry")) return Promise.resolve(Response.json({ rooms: [{ id: "k", name: "Kitchen", entities: [{ id: "light.k", name: "Light", kind: "light", sensitive: null }, { id: "lock.front", name: "Front lock", kind: "lock", sensitive: "lock" }] }], people: [{ id: "person-owner", name: "Owner", role: "owner" }, { id: "person-teen", name: "Teen", role: "teen" }] }));
+    if (route.endsWith("/api/house/admin/effective")) return Promise.resolve(Response.json({ rooms: { k: { see: false, control: false } }, entities: { "light.k": { see: false, control: false, confirm: false, sensitive: false }, "lock.front": { see: false, control: false, confirm: false, sensitive: true } } }));
+    if (route.endsWith("/api/grants")) return Promise.resolve(Response.json([]));
+    if (route === "/api/house/test" && init?.method === "POST") return Promise.resolve(Response.json({ ok: true, rooms: 2, devices: 4 }));
     if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/search/web")) return Promise.resolve(Response.json({ address: "", works: null, stackOwned: false, sources: ["ddgs"], ddgsReady: true }));

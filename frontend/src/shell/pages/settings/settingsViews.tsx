@@ -34,6 +34,7 @@ import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettin
 import { MediaKidsView, MediaMusicView, MediaPicturesView, MediaStylesView, MediaVideosView } from "@/shell/pages/settings/MediaCardViews";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { CodingKeysSettings } from "@/apps/settings/CodingSettings";
+import { HouseSettings } from "@/shell/pages/settings/HouseSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -124,6 +125,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.devices_admin": HomeDevicesAdminSettings,
   "home.routing_stats": HomeRoutingStatsSettings,
   "home.reference_library": ReferenceLibrarySettings,
+  "home.house_admin": HouseSettings,
   "home.media_pictures": MediaPicturesView,
   "home.media_videos": MediaVideosView,
   "home.media_music": MediaMusicView,
