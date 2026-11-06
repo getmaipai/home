@@ -145,7 +145,8 @@ describe("picture people operations", () => {
     resetDb();
     const actor = addOwner();
     const bytes = await testPng();
-    for (const [id, audience] of [["change-base", "all-ages"], ["ref-one", "all-ages"], ["ref-two", "adult-only"], ["ref-three", "all-ages"]] as const) {
+    // ADULT-LOCK-07: an adult-only temp picture is unreadable without an unlock proof, so the reference-count test uses all-ages pictures.
+    for (const [id, audience] of [["change-base", "all-ages"], ["ref-one", "all-ages"], ["ref-two", "all-ages"], ["ref-three", "all-ages"]] as const) {
       storeTemporaryChatImage({
         id,
         turnId: "turn-1",
