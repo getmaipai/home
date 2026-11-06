@@ -11,6 +11,7 @@ import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory"
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { runEditVideo } from "@/lib/videos/editTool";
 import { getVideoJobFor } from "@/lib/videos/jobs";
+import { getVideoJobByFileFor } from "@/lib/videos/jobs";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
@@ -22,6 +23,7 @@ import type { TurnState } from "@/lib/turnMachine/contract";
 import { __setMusicFetchForTests } from "@/lib/music/stack";
 import { attachmentFilePath } from "@/lib/attachments";
 import { writeFileSync } from "node:fs";
+import { TestClient } from "./client";
 
 let fakeVideo: ReturnType<typeof installFakeVideoStack>; let fakeEdit: FakeEditStack;
 beforeEach(() => { resetDb(); fakeVideo = installFakeVideoStack(); fakeVideo.detailed = "installed"; __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 99, label: "adult", is_nude_or_sexual: false, confidence: 0.99 } }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); fakeEdit = installFakeEditStack(); });
@@ -75,5 +77,28 @@ describe("beat cut planning", () => {
     expect(final.input.ops.at(0)).toEqual({ op: "concat", with: final.input.inputs.slice(1, -1).map((_, i) => i + 1) });
     expect(final.input.ops.slice(1).map((op) => op.op)).toEqual(["mute", "audio_overlay"]);
     expect(final.input.ops.at(-1)).toMatchObject({ op: "audio_overlay", input: final.input.inputs.length - 1, gain_db: 0, clip_gain_db: -60, start_s: 0, duck: false, end_s: 4 });
+  });
+});
+
+describe("cut-to-beat route", () => {
+  test("accepts a Library file id and defaults the chat to the clip's conversation", async () => {
+    await beatReady(); const client = new TestClient(); await client.post("/api/auth/setup", { displayName: "Beat Owner", secret: "correcthorse" });
+    const a = db.select().from(people).where(eq(people.displayName, "Beat Owner")).get() as PersonRow;
+    const made = await makeClip(a); const song = await track(a, made.state);
+    const response = await client.post("/api/videos/cut-to-beat", { clips: [made.job.files[0]!.id], track: song, length_s: 15 });
+    expect(response.status).toBe(200);
+    const card = await response.json() as { conversation_id: string | null };
+    expect(card.conversation_id).toBe(made.job.conversationId);
+    expect(getVideoJobByFileFor(a, made.job.files[0]!.id)?.id).toBe(made.job.id);
+  });
+
+  test("a child receives the minor refusal", async () => {
+    const ownerClient = new TestClient(); await ownerClient.post("/api/auth/setup", { displayName: "Route Owner", secret: "correcthorse" });
+    const made = await ownerClient.post("/api/people", { displayName: "Route Child", role: "child", secret: "0000", birthdate: "2018-03-01" });
+    const child = await made.json() as { id: string };
+    const client = new TestClient(); await client.post("/api/auth/verify-secret", { personId: child.id, secret: "0000" });
+    const response = await client.post("/api/videos/cut-to-beat", { clips: ["anything"], track: "anything" });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "minor", error: "This edit is for adults on their own screen." });
   });
 });

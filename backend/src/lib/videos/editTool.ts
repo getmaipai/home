@@ -64,7 +64,6 @@ export const editVideoArgs = z.object({
   from_s: z.number().min(0).max(600).optional(),
   to_s: z.number().gt(0).max(600).optional(),
   clips: z.array(z.string().trim().min(1).max(80)).min(1).max(MAX_JOIN_CLIPS).optional(),
-  beat_clips: z.array(z.string().trim().min(1).max(80)).min(1).max(MAX_JOIN_CLIPS).optional(),
   beats_per_cut: z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]).optional(),
   length_s: z.number().int().min(5).max(60).optional(),
   transition: z.string().optional(),

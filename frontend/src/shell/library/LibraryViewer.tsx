@@ -14,6 +14,11 @@ import { formatBytes } from "@maipai/ui/src/format";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type LibraryItem, type Roster } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
+import { useCutToBeatDialog } from "./CutToBeatDialog";
+import { Checkbox as KitCheckbox } from "@maipai/ui/src/ui/checkbox";
+import { Label as KitLabel } from "@maipai/ui/src/ui/label";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { canShareFiles, creationOf, fileKind, isAdultRole, kindWord } from "./libraryModel";
@@ -48,6 +53,8 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const [panelOpen, setPanelOpen] = useState(false);
   const navigate = useNavigate();
   const [splitting, setSplitting] = useState(false);
+  const [cutOpen, setCutOpen] = useState(false);
+  const cut = useCutToBeatDialog({ open: cutOpen, onOpenChange: setCutOpen, me, seed: item.kind === "audio" ? { trackId: item.id } : { clipId: item.id } });
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   const origin = libraryOrigin(item, record.data?.origin);
@@ -78,10 +85,17 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
           <Button type="button" variant="secondary" onClick={() => actions.rename(item)}>Rename</Button>
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>Keep</Button> : null}
           {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "The stems could not be made. Try again in a minute.")).finally(() => setSplitting(false)); }}>Split into stems</Button> : null}
+          {isAdultRole(me) && (item.kind === "audio" || item.kind === "video") ? <Button type="button" variant="secondary" onClick={() => setCutOpen(true)}>Cut to the beat</Button> : null}
           {isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <Button type="button" variant="secondary" onClick={() => actions.recheck(item)}>Mark all-ages</Button> : null}
         </div>
       ) : null}
-      {mine && isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <p className="text-sm text-muted-foreground">Stems stay on this home server. Splitting does not make a voice.</p> : null}
+      {mine && isAdultRole(me) && item.kind === "audio" ? <p className="text-sm text-muted-foreground">Cuts your videos on the beat of this song. Everything stays on this home server.</p> : null}
+      <Dialog open={cutOpen} onOpenChange={setCutOpen}><DialogContent><DialogHeader><DialogTitle>Cut to the beat</DialogTitle></DialogHeader>
+        {cut.seededSong ? <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">{cut.clips.length === 0 ? "You have no finished videos to cut yet. Make a video in chat first, then come back." : "Choose up to six videos, in the order you pick them."}</p>{cut.clips.map((clip) => { const index = cut.picked.indexOf(clip.id); const id = `cut-video-${clip.id}`; return <div key={clip.id} className="flex items-center gap-2"><KitCheckbox id={id} checked={index >= 0} disabled={index < 0 && cut.picked.length >= 6} onCheckedChange={(value) => cut.toggle(clip.id, value === true)} /><KitLabel htmlFor={id}>{index >= 0 ? `${index + 1}. ` : ""}{clip.name}</KitLabel></div>; })}</div> : <div className="flex flex-col gap-2"><KitLabel htmlFor="cut-song">Song</KitLabel><Select value={cut.track} onValueChange={(value) => cut.setTrack(value ?? "")}><SelectTrigger id="cut-song"><SelectValue placeholder="Choose a song" /></SelectTrigger><SelectContent>{cut.tracks.map((track) => <SelectItem key={track.id} value={track.id}>{track.name}</SelectItem>)}</SelectContent></Select></div>}
+        <div className="flex flex-col gap-2"><KitLabel htmlFor="cut-beats">Cut every</KitLabel><Select value={cut.beats} onValueChange={(value) => cut.setBeats(value ?? "4")}><SelectTrigger id="cut-beats"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 beat</SelectItem><SelectItem value="2">2 beats</SelectItem><SelectItem value="4">4 beats (one bar)</SelectItem><SelectItem value="8">8 beats</SelectItem></SelectContent></Select></div>
+        <div className="flex flex-col gap-2"><KitLabel htmlFor="cut-length">Length</KitLabel><Select value={cut.length} onValueChange={(value) => cut.setLength(value ?? "30")}><SelectTrigger id="cut-length"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="15">15 seconds</SelectItem><SelectItem value="30">30 seconds</SelectItem><SelectItem value="60">60 seconds</SelectItem></SelectContent></Select></div>
+        <DialogFooter><Button type="button" disabled={cut.busy || cut.picked.length === 0 || !cut.track} onClick={() => void cut.submit()}>Make the cut</Button></DialogFooter>
+      </DialogContent></Dialog>
       {item.can_edit && item.chat_id ? <Button asChild variant="secondary"><Link to={`/chat?conversation=${encodeURIComponent(item.chat_id)}`}>Edit in its chat</Link></Button> : mine && item.kind === "image" && !item.chat_id && record.data?.origin === "made" ? <p className="text-muted-foreground text-base">Its chat was deleted, so it cannot be edited here.</p> : null}
       </div>
     </>

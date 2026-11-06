@@ -55,4 +55,5 @@ export const videosApi = {
   /** Clear the lock (with the ticket) or mark the clip NSFW again (no passcode). */
   adultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => requestJson<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/videos/jobs/${encodeURIComponent(id)}/adult-mark`, json(body)),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),
+  cutToBeat: (input: { clips: string[]; track: string; beats_per_cut?: 1 | 2 | 4 | 8; length_s?: 15 | 30 | 60; conversation_id?: string }) => requestJson<VideoCard>("/api/videos/cut-to-beat", json(input)),
 };
