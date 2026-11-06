@@ -65556,7 +65556,6 @@
                               "nullable": true,
                               "enum": [
                                 "wan",
-                                "ltx23",
                                 "ltx25",
                                 "ltx25max",
                                 null
@@ -65587,7 +65586,6 @@
                               "nullable": true,
                               "enum": [
                                 "wan",
-                                "ltx23",
                                 "ltx25",
                                 "ltx25max",
                                 null
@@ -65618,7 +65616,6 @@
                               "nullable": true,
                               "enum": [
                                 "wan",
-                                "ltx23",
                                 "ltx25",
                                 "ltx25max",
                                 null
@@ -65798,7 +65795,7 @@
                                   "quick",
                                   "detailed"
                                 ],
-                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
                               },
                               "switch_to": {
                                 "type": "string",
@@ -66432,7 +66429,7 @@
                                   "quick",
                                   "detailed"
                                 ],
-                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
                               },
                               "switch_to": {
                                 "type": "string",
@@ -66971,7 +66968,7 @@
                                   "quick",
                                   "detailed"
                                 ],
-                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
                               },
                               "switch_to": {
                                 "type": "string",
@@ -67442,7 +67439,7 @@
                                       "quick",
                                       "detailed"
                                     ],
-                                    "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                    "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
                                   },
                                   "switch_to": {
                                     "type": "string",
@@ -67876,7 +67873,7 @@
                                   "quick",
                                   "detailed"
                                 ],
-                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
                               },
                               "switch_to": {
                                 "type": "string",
@@ -68328,7 +68325,7 @@
                                   "quick",
                                   "detailed"
                                 ],
-                                "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                                "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
                               },
                               "switch_to": {
                                 "type": "string",
@@ -68674,11 +68671,11 @@
                         },
                         "download_bytes": {
                           "type": "number",
-                          "description": "What getting Detailed videos would still download (0 when installed)."
+                          "description": "What getting the newer sound video model would still download (0 when installed)."
                         },
                         "component": {
                           "type": "string",
-                          "description": "The Models and storage id to install it with."
+                          "description": "The Models and storage id for the newer sound video model."
                         },
                         "licence": {
                           "type": "object",
@@ -68713,7 +68710,7 @@
                         "licence",
                         "lora_base_model"
                       ],
-                      "description": "Detailed videos: sound and speech, up to 10 seconds."
+                      "description": "Detailed videos use the newer model for sound and speech, up to 5 seconds."
                     },
                     "enabled": {
                       "type": "boolean"
@@ -69549,8 +69546,6 @@
                     "enum": [
                       "default",
                       "ltx-2.5",
-                      "ltx-2.3",
-                      "wan",
                       "flux2-klein-4b",
                       "z-image-turbo",
                       "ernie-image-turbo",
