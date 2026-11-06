@@ -71,6 +71,7 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/notifications": { icon: NotificationsIcon, label: "Notifications" },
   "/reminders": { icon: RemindersIcon, label: "Reminders" },
   "/clock": { icon: getIcon("clock"), label: "Clock" },
+  "/house": { icon: getIcon("house"), label: "House" },
 };
 
 // Core destinations the app catalog and the sidebar do not list (they sit in the rail's own core group): one row each, the same

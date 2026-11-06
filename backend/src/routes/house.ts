@@ -7,7 +7,7 @@ import { recordToolAudit } from "@/lib/toolAudit";
 import { recordUndo, type UndoInverse } from "@/lib/toolUndo";
 import { HOUSE_TOOL_ID } from "@/lib/house/ids";
 import { houseLanFetch } from "@/lib/house/connection";
-import { loadHouseRegistry } from "@/lib/house/cache";
+import { fetchHouseRegistry, type HouseRegistryResult } from "@/lib/house/registry";
 import { houseAccess, type HouseActor, type HouseBand, type EffectivePermission } from "@/lib/house/access";
 import { performHouseAction, houseServiceCall, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult } from "@/lib/house/act";
 import { visibleHouseEntities } from "@/lib/house/tool";
@@ -15,7 +15,7 @@ import type { HouseEntity } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
 
 export type HouseRoomsDeps = {
-  loadRegistry: typeof loadHouseRegistry;
+  loadRegistry: () => Promise<HouseRegistryResult>;
   connection: typeof houseLanFetch;
   permissionsOf: (id: string) => EffectivePermission[];
   perform: (entity: HouseEntity, action: HouseActionInput) => Promise<HouseActionResult>;
@@ -23,8 +23,17 @@ export type HouseRoomsDeps = {
   undo: typeof recordUndo;
   mode: () => unknown;
 };
+/** The page polls state, so it reads Home Assistant itself instead of the chat tool's cache (up to two minutes old). Calls inside two seconds share one read. */
+let recent: { at: number; value: Promise<HouseRegistryResult> } | null = null;
+function freshRegistry(): Promise<HouseRegistryResult> {
+  if (recent && Date.now() - recent.at < 2000) return recent.value;
+  const connection = houseLanFetch();
+  const value: Promise<HouseRegistryResult> = connection.ok ? fetchHouseRegistry({ lanFetch: connection.lanFetch, token: connection.token }) : Promise.resolve({ ok: false, kind: "unreachable" });
+  recent = { at: Date.now(), value };
+  return value;
+}
 const defaults: HouseRoomsDeps = {
-  loadRegistry: loadHouseRegistry, connection: houseLanFetch, permissionsOf: effectivePermissions,
+  loadRegistry: freshRegistry, connection: houseLanFetch, permissionsOf: effectivePermissions,
   perform: async (entity, action) => { const connection = houseLanFetch(); return connection.ok ? performHouseAction({ lanFetch: connection.lanFetch, token: connection.token, entity, action }) : { ok: false, kind: "unreachable" }; },
   audit: recordToolAudit, undo: recordUndo, mode: () => getHouseholdSettingValue("tools.house.mode"),
 };
@@ -96,6 +105,7 @@ houseRoutes.openapi(actRoute, async (c) => {
   const action = { name: input.action as HouseActionName, ...(input.value !== undefined ? { value: input.value } : {}) };
   if (!supportedActions(entity).includes(action.name)) { d.audit({ personId: person.id, tool: HOUSE_TOOL_ID, action: input.action, decision: "never", band: actor.band }); return c.json({ ok: false as const, kind: "refused" as const }, 200); }
   const result = await d.perform(entity, action);
+  recent = null;
   d.audit({ personId: person.id, tool: HOUSE_TOOL_ID, action: input.action, decision: result.ok ? "do" : "never", band: actor.band });
   if (!result.ok) return c.json({ ok: false as const, kind: result.kind }, 200);
   const inverse = result.undo && (!entity.sensitive || result.undo.name === "lock" || result.undo.name === "close") ? [houseServiceCall(entity, result.undo)] : [];

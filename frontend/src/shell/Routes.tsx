@@ -111,6 +111,7 @@ const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), 
 const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const RemindersPage = lazy(() => import("@/apps/reminders/RemindersPage").then((m) => ({ default: m.RemindersPage })));
 const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ default: m.ClockPage })));
+const HousePage = lazyNamed(() => import("@/shell/pages/HousePage"), "HousePage");
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -459,6 +460,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="companions/:id/edit" element={<CompanionEditRedirect />} />
             <Route path="companions/:id" element={<CompanionDetailPage />} />
             <Route path="people" element={<FamilyPage person={person} />} />
+            <Route path="house" element={<Suspense fallback={null}><HousePage /></Suspense>} />
             <Route path="people/:id" element={location.search.includes("tab=memories") ? <LegacyProfileMemoriesRedirect selfId={person.id} /> : <PersonProfilePage person={person} onPersonChange={onPersonChange} />} />
             <Route path="storage" element={<StoragePage person={person} />} />
             <Route path="performance" element={<PerformancePage />} />
