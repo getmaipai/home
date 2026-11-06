@@ -30,7 +30,7 @@ Higgsfield's Audio tab: a tool switch at the bottom left (Voiceover, Change Voic
 
 - **Create tabs.** Music Create gets two tabs beside Song, Band, Album, Style: **Sounds** (the C7 design: prompt, length, variations, history) and **Voice** (a three-way switch: Voiceover, Change voice, Translate). Same two-pane layout as Video Create (prompt panel left, result feed right, VIDEO-UI-01). Parts: kit `Tabs`, the kit segmented control for the three-way switch, the kit file-upload part; no className and no `*Panel` wrapper (rules 9, 9b). "Use in a video" and "Add to Studio" are `MusicTrack` `actions` and a Sound card: a `commons` change first with a `UI-DECISIONS.md` row (owner: Music, tag ourselves).
 - **Video Studio** keeps video-studio 4.6's lanes. A lane's "+" opens the same generator in the kit `Sheet`; any lane change is a `TrackStudio` prop in `commons` first, owned by Videos.
-- **Beat detection** (Music owns): local, Beat This! with librosa as the fallback; it returns BPM, beat times and sections for any audio. "Cut to the beat" in Studio calls it and cuts chosen clips through the one `media.edit` path (Videos).
+- **Beat detection** (Music owns): local, Beat This with librosa as the fallback; it returns BPM, beat times and sections for any audio. "Cut to the beat" in Studio calls it and cuts chosen clips through the one `media.edit` path (Videos).
 - **Chat (owner rule 2026-11-01, music-listen-create 3.3, not yet in RULES.md).** Conditional tools, offered only when relevant, set stays at 16 or fewer (rule 1): `make_sound`, `voiceover`, `change_voice`, `translate_dub`, `add_music_to_clip`, `cut_to_beat`, `make_music_video`, `make_inspired_voice`. Each has CHAT-AB-01 rows (a positive, a negative, a minor refusal) and code never picks the task from words.
 
 Music video, one screen like Higgsfield's plus the step they lack. Home: Videos Create hosts it (the render is a video job); Music's "Make a video for this song" opens it with the song filled in.
@@ -82,7 +82,7 @@ Voice rules for V1 to V3: until V4 lands, a minor gets preset voices only (house
 
 | Piece | Prebuilt used | Hand-built only where |
 |---|---|---|
-| Beat and section detection | Beat This! (MIT) with librosa (ISC) as fallback; licences read before use | the section merge with lyric sections |
+| Beat and section detection | Beat This (MIT) with librosa (ISC) as fallback; licences read before use | the section merge with lyric sections |
 | Transcription for dub and change voice | mlx-whisper (MIT), already planned in song-remix | none |
 | Recorded speech | Fish Audio Drama 3 as an installable model package behind a Stack role (V6); the existing Stack speech path, model-package install and LICENCE-ACK-01 | the role and its tier fallback |
 | Speech and voice | the existing Chatterbox Turbo TTS and voice manager (V5 blends its own speaker embedding, no new model); Seed-VC or SoulX-Singer only if R0's bench of song-remix wants voice conversion | the speaker-embedding blend and the formant nudge in the Stack's Chatterbox worker |
