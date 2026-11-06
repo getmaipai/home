@@ -13,7 +13,8 @@ export function pictureJobLockItem(job: PictureJob): LockItem | null {
     const item = row ? lockItemOfProvenance(row.owner, row.provenance) : null;
     if (item) return item;
   }
-  return job.request.audience === "adult" ? { ownerPersonId: job.personId, madeAudience: "adult-only", lock: job.request.adultLock === "off" ? "off" : "on" } : null;
+  // request.audience is the lane (an adult asked), not the content: adult-only is decided at finish, or at start by slice 3 setting adultLock.
+  return job.request.adultLock ? { ownerPersonId: job.personId, madeAudience: "adult-only", lock: job.request.adultLock } : null;
 }
 
 export function pictureJobLockState(actor: PersonRow, job: PictureJob): LockResult {
