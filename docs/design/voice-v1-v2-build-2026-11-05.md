@@ -30,4 +30,6 @@ A Make button reads the `voice` (tts) row of `roleHealth` through `/api/health` 
 
 - The V6 design "Chat" bullet of [audio-parity-2026-11-05.md](audio-parity-2026-11-05.md) ("no new tool ... CHAT-AB-01 gets no new row"), which is stale: no speech tool exists, and section 3 of the same note names `voiceover` and `change_voice` as conditional tools with bench rows. This note follows section 3.
 - The V6 design "Expression" line that keeps the tag list "in the voice spec", for now only: the list lives in `backend/src/lib/recordedTags.ts` and moves to `@maipai/spec` when a second client needs it.
+- The parent note's section 5 V2 phrase "with the same timing" ([audio-parity-2026-11-05.md](audio-parity-2026-11-05.md)), narrowed to the same sentences in the same order over the same clip, with the length difference shown to the person.
+- This note's own first approved V2 step 2 (commit 9ad0ad569), "fit the spoken length to the source with one speed factor between 0.8 and 1.25": dropped for now because the Stack's `media.edit` writes only mp4, mov or png and its speech routes take no speed or length, so a voice-only stretch would need a second implementation in Home (principle 1). The deferred work is the backlog row VOICE-FIT-01.
 - Nothing else.
