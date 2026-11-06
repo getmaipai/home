@@ -96741,6 +96741,22 @@
                       "task": {
                         "type": "string"
                       },
+                      "sound": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "loop": {
+                            "type": "boolean"
+                          },
+                          "surprise": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "loop",
+                          "surprise"
+                        ]
+                      },
                       "fit_ask": {
                         "type": "object",
                         "nullable": true,
@@ -96993,6 +97009,7 @@
                       "stage",
                       "stage_label",
                       "task",
+                      "sound",
                       "fit_ask",
                       "cut",
                       "max_seconds",
@@ -97124,6 +97141,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -97376,6 +97409,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -97504,6 +97538,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -97756,6 +97806,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -97902,6 +97953,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -98154,6 +98221,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -98308,6 +98376,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -98560,6 +98644,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -98738,6 +98823,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -98990,6 +99091,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -99066,6 +99168,606 @@
           },
           "503": {
             "description": "No music model is installed or the computer cannot make songs now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/sounds": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Make a sound effect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 600
+                  },
+                  "seconds": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "loop": {
+                    "type": "boolean"
+                  },
+                  "stick_to_words": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "description"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The sound card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "made_from_file": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string"
+                    },
+                    "task": {
+                      "type": "string"
+                    },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
+                    "fit_ask": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "job_id": {
+                          "type": "string"
+                        },
+                        "picked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "actual": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "job_id",
+                        "picked",
+                        "actual"
+                      ],
+                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                    },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "progress": {
+                      "type": "number"
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "number"
+                    },
+                    "making_version": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "stage_label",
+                        "progress",
+                        "eta_seconds",
+                        "position"
+                      ]
+                    },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "secondary": {
+                            "type": "string"
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "t": {
+                                  "type": "number"
+                                },
+                                "end": {
+                                  "type": "number"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "t",
+                                "end",
+                                "text"
+                              ]
+                            },
+                            "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "url"
+                        ]
+                      }
+                    },
+                    "current_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "length": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "full"
+                      ]
+                    },
+                    "quality": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "detailed",
+                        "max"
+                      ]
+                    },
+                    "boost_offered": {
+                      "type": "boolean"
+                    },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                    },
+                    "max_installed": {
+                      "type": "boolean",
+                      "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
+                    },
+                    "title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lyrics": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "duration_s": {
+                      "type": "number",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "stage_label",
+                    "task",
+                    "sound",
+                    "fit_ask",
+                    "cut",
+                    "max_seconds",
+                    "progress",
+                    "eta_seconds",
+                    "position",
+                    "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
+                    "making_version",
+                    "cover_pending",
+                    "cover_url",
+                    "cover_versions",
+                    "timed_lyrics",
+                    "versions",
+                    "current_id",
+                    "length",
+                    "quality",
+                    "boost_offered",
+                    "max_offered",
+                    "max_installed",
+                    "title",
+                    "description",
+                    "lyrics",
+                    "duration_s"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The sound cannot be made as asked."
+          },
+          "503": {
+            "description": "No music model is installed or the computer cannot make sounds now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "List saved sounds",
+        "responses": {
+          "200": {
+            "description": "Saved sound items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "duration_s": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "file_id": {
+                        "type": "string"
+                      },
+                      "src": {
+                        "type": "string"
+                      },
+                      "loop": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "duration_s",
+                      "file_id",
+                      "src",
+                      "loop"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/sounds/{id}/save": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Save a made sound to Sounds",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The saved sound.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "item_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
             "content": {
               "application/json": {
                 "schema": {
@@ -99173,6 +99875,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -99425,6 +100143,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -99574,6 +100293,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -99826,6 +100561,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -99979,6 +100715,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -100231,6 +100983,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -100422,6 +101175,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -100674,6 +101443,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -101000,6 +101770,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -101252,6 +102038,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -101408,6 +102195,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -101660,6 +102463,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
@@ -101820,6 +102624,22 @@
                     "task": {
                       "type": "string"
                     },
+                    "sound": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "loop": {
+                          "type": "boolean"
+                        },
+                        "surprise": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "loop",
+                        "surprise"
+                      ]
+                    },
                     "fit_ask": {
                       "type": "object",
                       "nullable": true,
@@ -102072,6 +102892,7 @@
                     "stage",
                     "stage_label",
                     "task",
+                    "sound",
                     "fit_ask",
                     "cut",
                     "max_seconds",
