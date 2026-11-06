@@ -22,7 +22,7 @@ import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
 import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
 import { likenessRefusal } from "@/lib/likeness";
-import { lockedView } from "@/lib/adultLock";
+import { lockedView, requestProof, unlockedFor } from "@/lib/adultLock";
 import { pictureJobGroupLockState, pictureJobLockState } from "@/lib/pictures/lock";
 import { setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
 import { getCookie } from "hono/cookie";
@@ -239,6 +239,8 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
   // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
   const used = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [a] : []; });
+  const savedStyleLocked = used.some((adapter) => adapter.classification === "adult-only" || getLoraRecord(adapter.id)?.audience === "adult-only");
+  if (savedStyleLocked && !unlockedFor(actor, requestProof())) return c.json({ error: "That is locked. Unlock it with your passcode first, then try again." }, 423) as never;
   // Old saved picture jobs may contain four adapters; the current plan uses the first two in their saved order.
   const plan = buildPromptPlan({ words, styles: used.slice(0, 2).flatMap((adapter) => { const record = getLoraRecord(adapter.id); return record ? [record] : []; }), strength: undefined, negativePrompt: "none", media: "picture" });
   if (!plan.ok) return c.json({ error: plan.line, code: plan.code }, 422) as never;

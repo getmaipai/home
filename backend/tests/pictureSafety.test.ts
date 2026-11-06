@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
+import { __unlockRestOfTest } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -271,6 +272,7 @@ describe("the chat tool, even when a model calls it without being offered it", (
 
   test("with adult-only styles allowed, an adult's named adult-only style rides along with audience adult", async () => {
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a woman by a window", style: "boudoir film" })]), reply: () => "On its way." }, async () => {
+      __unlockRestOfTest(people.owner.id);
       await turn(people.owner, "a woman by a window in boudoir film style");
       expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-bbbbbbbbbbbbbbbb", scale: 0.9 }]);
       expect(fake.submitted[0]!.audience).toBe("adult");

@@ -7,6 +7,13 @@ import { getPictureJob, pictureJobIdsByTurn, pictureJobsForTurn, type PictureJob
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 
+/** The plain chat answer when a picture style is behind the Adult lock. */
+export const LOCKED_PICTURE_STYLE_LINE = "No picture was started because the style asked for is locked. Say that it is locked and the person can unlock it on this page with their passcode, then ask again. Do not name the style.";
+
+export function lockedPictureStyleOutcome(callId: string, packageId: string): ToolExecutionOutcome {
+  return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args: { locked: true }, durationMs: 0, result: { reply: { text: LOCKED_PICTURE_STYLE_LINE }, data: { locked: true }, actions: [] } });
+}
+
 export function pictureJobLockItem(job: PictureJob): LockItem | null {
   if (job.state === "done" && job.files[0]) {
     const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, job.files[0].id)).get();

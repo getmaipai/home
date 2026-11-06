@@ -4,6 +4,7 @@
 // starts a Stack job, and returns at once with a short line for the model to relay. The picture itself arrives
 // on the card (frontend PictureToolRender) when the job finishes, so a slow render never holds the answer.
 import { BACKGROUND_REMOVAL_OP } from "@/lib/mediaOps/ids";
+import { requestProof, unlockedFor } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
@@ -25,6 +26,7 @@ import { subjectsForNames } from "@/lib/mediaSubjects";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture, latestPictureId } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
+import { lockedPictureStyleOutcome } from "./lock";
 
 const KID_MAX_COUNT = 2;
 let templateMediaOpRunner = runMediaOp;
@@ -169,10 +171,13 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const kid = lane === "child";
   // A child never picks a style (the cartoon look is the style).
   const adapter = named && !kid ? matchAdapter(available, named) : null;
+  const adapterRecord = adapter ? loraRecordReader(adapter.id) : null;
+  // An adult-only style (the Stack's class or the record's) starts nothing without this request's live Adult unlock proof.
+  // A name that matches no style is dropped as before, and gives a plain picture, so nothing adult can start from it.
+  if (lane === "adult" && adapter && (adapter.classification === "adult-only" || adapterRecord?.audience === "adult-only") && !unlockedFor(state.actor as PersonRow, requestProof())) return lockedPictureStyleOutcome(callId, GENERATE_IMAGE_TOOL_ID);
   // The absolute line is checked again on what is actually sent, including the style phrases the plan adds.
-  const foundRecord = adapter ? loraRecordReader(adapter.id) : null;
+  const foundRecord = adapter ? adapterRecord : null;
   const record = foundRecord?.media === "picture" ? foundRecord : null;
-  // A missing record is an old/corrupt library state; keep the former single-adapter prompt behavior for that case.
   const fallbackPrompt = adapter && !record && adapter.trigger_words.length > 0
     ? (() => { const missing = adapter.trigger_words.filter((word) => !prompt.toLowerCase().includes(word.toLowerCase())); return missing.length ? `${prompt.trim()}, ${missing.join(", ")}` : prompt; })()
     : prompt;

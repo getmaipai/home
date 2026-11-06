@@ -62,6 +62,10 @@ Picture jobs use `newItemMark` at start. Source files contribute their current `
 
 Image edits carry the current mark of their source through `saveVersion`, including a cleared lock. The picture twin of `/api/videos/jobs/{id}/adult-mark` is `POST /api/pictures/jobs/{id}/adult-mark`; it uses the same fresh ticket, adult own-screen check, owner-only clear, admin re-mark and audit rules. Clearing a picture updates its `image-edit` descendants as well, so the edit chain follows the root picture.
 
+## Pictures slice 4
+
+Chat refuses an adult-only or unknown picture style without a live Adult unlock proof before starting a job. The reply is a plain lock line with no prompt or style name; the tool part is redacted in history. A proof allows the job, which keeps slice 3's adult-only mark and lock. Variations also require a proof when their saved request names an adult-only style.
+
 ## Where it is applied
 
 | Surface | Choke point | Locked answer |
