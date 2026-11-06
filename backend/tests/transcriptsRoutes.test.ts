@@ -103,9 +103,13 @@ describe("transcript routes", () => {
     const token = person("person-sage0001", "adult");
     item("person-sage0001");
 
+    expect((await req("/library/media-caption01/transcript", token)).status).toBe(404);
     const made = await req("/library/media-caption01/transcript", token, "POST", {});
     expect(made.status).toBe(201);
     const record = await made.json() as { id: string };
+    const found = await req("/library/media-caption01/transcript", token);
+    expect(found.status).toBe(200);
+    expect((await found.json() as { id: string }).id).toBe(record.id);
     expect((await req(`/transcripts/${record.id}`, token)).status).toBe(200);
     expect((await req(`/transcripts/${record.id}`, token, "PATCH", {
       ops: [{ kind: "replace_text", segment_id: "seg-sage", text: "Sage speaks clearly" }],

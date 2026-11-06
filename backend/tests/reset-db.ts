@@ -67,6 +67,7 @@ import {
   mediaWatchDays,
   mediaWatchSessions,
   mediaItems,
+  transcripts,
   musicArtistProfiles,
   musicSongFacts,
   musicDjLines,
@@ -242,6 +243,7 @@ export function resetDb(): void {
   db.delete(mediaProgress).run();
   db.delete(mediaWatchSessions).run();
   db.delete(mediaWatchDays).run();
+  db.delete(transcripts).run();
   db.delete(mediaItems).run();
   db.delete(musicArtistProfiles).run();
   db.delete(musicSongFacts).run();

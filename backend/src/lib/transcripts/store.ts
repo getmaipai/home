@@ -1,8 +1,9 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { captionTracks, mediaItems, transcriptRevisions, transcripts } from "@/db/schema";
+import { captionTracks, transcriptRevisions, transcripts } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newCaptionTrackId, newTranscriptId, newTranscriptRevisionId } from "@/lib/id";
+import { getAttachment } from "@/lib/attachments";
 import { readableItem } from "@/lib/media/access";
 import { mediaBandOf } from "@/lib/media/band";
 import type { PersonRow } from "@/types";
@@ -20,9 +21,15 @@ export const CHILD_TRANSCRIPT_ERROR = "Transcripts are available to teens and ad
 
 function gate(actor: PersonRow, itemId: string): void {
   if (mediaBandOf(actor) === "child") throw new TranscriptError(CHILD_TRANSCRIPT_ERROR, 403);
-  if (!readableItem(actor, itemId)) {
+  if (!canSeeItem(actor, itemId)) {
     throw new TranscriptError("That Library item is not available to you.", 404);
   }
+}
+
+/** A Library item is either a media item (music, podcast) or an uploaded or generated file; each keeps its own visibility rule. */
+export function canSeeItem(actor: PersonRow, itemId: string): boolean {
+  if (readableItem(actor, itemId)) return true;
+  return getAttachment(actor, itemId).ok;
 }
 
 function asRecord(row: typeof transcripts.$inferSelect): Transcript {
@@ -79,9 +86,6 @@ export function createTranscript(
   },
 ): Transcript {
   gate(actor, input.itemId);
-  const item = db.select().from(mediaItems)
-    .where(and(eq(mediaItems.id, input.itemId), isNull(mediaItems.deletedAt))).get();
-  if (!item) throw new TranscriptError("That Library item is not available to you.", 404);
 
   const stamp = nextHlc();
   const id = newTranscriptId();

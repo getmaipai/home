@@ -2284,7 +2284,8 @@ export const podcastTranscripts = sqliteTable("podcast_transcripts", {
 });
 
 export const transcripts = sqliteTable("transcripts", {
-  id: text("id").primaryKey(), libraryItemId: text("library_item_id").notNull().references(() => mediaItems.id, { onDelete: "cascade" }),
+  id: text("id").primaryKey(), // A Library item is a media item or an uploaded file, so this id has no single parent table to reference.
+  libraryItemId: text("library_item_id").notNull(),
   ownerId: text("owner_id").notNull().references(() => people.id), language: text("language").notNull(), currentRevision: integer("current_revision").notNull(),
   segments: text("segments").notNull(), speakers: text("speakers").notNull(), vocabulary: text("vocabulary").notNull(), provenance: text("provenance").notNull(), hlc: text("hlc").notNull(),
 }, table => [index("transcripts_item_idx").on(table.libraryItemId)]);

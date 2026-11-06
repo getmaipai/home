@@ -24,6 +24,8 @@ import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { canShareFiles, creationOf, fileKind, isAdultRole, kindWord } from "./libraryModel";
 import { libraryOrigin } from "./libraryOrigin";
 import type { ItemActions } from "./LibraryItems";
+import { useTranscriptWorkspace } from "./TranscriptPanel";
+import { seekViewerMedia, useViewerMediaTime } from "./viewerMedia";
 
 const ShareIcon = getIcon("users");
 const SendIcon = getIcon("arrow-up-right");
@@ -103,6 +105,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
 }
 
 export function LibraryViewer({ items, me, currentId, onCurrentIdChange, onClose, actions, phone }: { phone: boolean; items: readonly LibraryItem[]; me: Roster; currentId: string | null; onCurrentIdChange: (id: string) => void; onClose: () => void; actions: ItemActions }) {
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const viewerItems = useMemo(() => items.map(viewerItemOf), [items]);
   const open = currentId !== null && items.some((item) => item.id === currentId);
   const current = items.find((item) => item.id === currentId);
@@ -112,7 +115,10 @@ export function LibraryViewer({ items, me, currentId, onCurrentIdChange, onClose
     queryFn: ({ signal }) => prepareClip(api.fileContentUrl(current!.id), signal, { type: current!.media_type, name: current!.name }),
     enabled: open && sendable, staleTime: Infinity, gcTime: 60_000, retry: false,
   });
+  const mediaTime = useViewerMediaTime(open);
+  const transcriptNode = useTranscriptWorkspace({ item: current, me, currentTime: mediaTime, onSeek: seekViewerMedia });
   if (!open || !current) return null;
+  const supportsTranscript = (current.kind === "audio" || current.kind === "video") && (me.age_band === "teen" || isAdultRole(me));
   return (
     <>
     <MediaViewer
@@ -122,13 +128,16 @@ export function LibraryViewer({ items, me, currentId, onCurrentIdChange, onClose
       items={viewerItems}
       currentId={currentId}
       onCurrentIdChange={onCurrentIdChange}
-      details={(viewing) => { const item = items.find((entry) => entry.id === viewing.id); return item ? <Details item={item} me={me} actions={actions} /> : null; }}
+      detailsOpen={transcriptOpen}
+      onDetailsOpenChange={setTranscriptOpen}
+      details={(viewing) => { const item = items.find((entry) => entry.id === viewing.id); return item ? <>{supportsTranscript && viewing.id === current.id ? transcriptNode : null}<Details item={item} me={me} actions={actions} /></> : null; }}
       toolbar={(viewing) => {
         const item = items.find((entry) => entry.id === viewing.id);
         if (!item) return null;
         const mine = item.owner.id === me.id;
         return (
           <>
+            {supportsTranscript ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Transcript" onClick={() => setTranscriptOpen(true)}>{phone ? "T" : "Transcript"}</Button> : null}
             {mine && canShareFiles(me) ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Share" onClick={() => actions.share(item)}>{phone ? <ShareIcon aria-hidden /> : "Share"}</Button> : null}
             {canShareFiles(me) ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Send" onClick={() => { void shareClip({ prepared: prepared.data, title: item.name, nav: navigator, fallback: () => saveClip({ url: api.fileContentUrl(item.id), name: item.name, ...(prepared.data ? { blob: prepared.data.blob } : {}) }) }); }}>{phone ? <SendIcon aria-hidden /> : "Send"}</Button> : null}
             <Button asChild variant="secondary" size={phone ? "icon" : "default"}><a href={api.fileContentUrl(item.id)} download={item.name} aria-label="Download">{phone ? <DownloadIcon aria-hidden /> : "Download"}</a></Button>

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { getStackClient } from "@/lib/stackEngine";
+import { readAttachment } from "@/lib/attachments";
 import { readableItem } from "@/lib/media/access";
 import { serveItemBytes } from "@/lib/media/serve";
 import type { PersonRow } from "@/types";
@@ -30,22 +31,29 @@ export function __setTranscriptStackClientForTests(client: TranscriptStackClient
   scripted = client;
 }
 
+/** The audio or video bytes of a media item or of an uploaded or generated file the person can see. */
+async function itemBytes(actor: PersonRow, itemId: string): Promise<Uint8Array> {
+  const item = readableItem(actor, itemId);
+  if (item) {
+    const served = await serveItemBytes(actor, item, undefined);
+    if (!(served instanceof Response)) throw new Error(served.error);
+    if (!served.ok) throw new Error("The audio or video file could not be read.");
+    return new Uint8Array(await served.arrayBuffer());
+  }
+  const file = readAttachment(actor, itemId);
+  if (!file.ok) throw new Error("Library item not found");
+  return file.value.bytes;
+}
+
 export async function transcribeJob(
   actor: PersonRow,
   input: { item_id: string; language?: string; vocabulary?: string[] },
   signal?: AbortSignal,
 ): Promise<TranscriptJobResult> {
-  const item = readableItem(actor, input.item_id);
-  if (!item) throw new Error("Library item not found");
   if (scripted) {
     return scripted.transcribeJob({ item_id: input.item_id, language: input.language, vocabulary: input.vocabulary }, signal);
   }
-
-  const served = await serveItemBytes(actor, item, undefined);
-  if (!(served instanceof Response)) throw new Error(served.error);
-  if (!served.ok) throw new Error("The audio or video file could not be read.");
-
-  const bytes = new Uint8Array(await served.arrayBuffer());
+  const bytes = await itemBytes(actor, input.item_id);
   const source = Buffer.from(bytes).toString("base64");
   const source_sha256 = createHash("sha256").update(bytes).digest("hex");
   const client = getStackClient();
