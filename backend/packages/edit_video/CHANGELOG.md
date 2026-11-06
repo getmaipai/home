@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `cut_to_beat` cuts one to six of your videos to the beat of one of your songs, using the existing video editor job.
+
 ### Changed
 
 - Add film looks and cinema letterbox bars to clips, joins and Production films.

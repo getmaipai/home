@@ -31,7 +31,7 @@ import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack
 import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, filmLookOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
-import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
+import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
 import { resolveStyles } from "./styleChoice";
@@ -39,6 +39,9 @@ import { ltx25LorasSupported } from "./loraWire";
 import { videoAudienceOf, videoRefusalFor, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
 import { getMediaProduction, listMediaProductions, updateMediaProduction } from "@/lib/mediaProductions";
 import { getMediaSubject } from "@/lib/mediaSubjects";
+import { createHash } from "node:crypto";
+import { analyzeBeats, beatsReady } from "@/lib/music/stack";
+import { planBeatCut } from "./beatCut";
 
 export const EDIT_VIDEO_TOOL_ID = "edit_video";
 
@@ -46,7 +49,7 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
   production: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.union([z.enum(ids(VIDEO_LOOKS)), z.enum(FILM_LOOK_PRESETS)]).optional(),
@@ -60,7 +63,10 @@ export const editVideoArgs = z.object({
   keep_seed: z.boolean().optional(),
   from_s: z.number().min(0).max(600).optional(),
   to_s: z.number().gt(0).max(600).optional(),
-  clips: z.array(z.string().trim().min(1).max(80)).min(MIN_JOIN_CLIPS).max(MAX_JOIN_CLIPS).optional(),
+  clips: z.array(z.string().trim().min(1).max(80)).min(1).max(MAX_JOIN_CLIPS).optional(),
+  beat_clips: z.array(z.string().trim().min(1).max(80)).min(1).max(MAX_JOIN_CLIPS).optional(),
+  beats_per_cut: z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]).optional(),
+  length_s: z.number().int().min(5).max(60).optional(),
   transition: z.string().optional(),
   transition_s: z.number().min(MIN_CROSSFADE_S).max(MAX_CROSSFADE_S).optional(),
   title: z.string().trim().min(1).max(120).optional(),
@@ -102,6 +108,9 @@ export const NO_CLIPS_LINE = "I can't find one of those videos. Tell me which vi
 export const JOIN_CLIPS_LINE = `Tell me ${MIN_JOIN_CLIPS} to ${MAX_JOIN_CLIPS} of your videos to join, in the order you want them.`;
 export const MIX_SOUND_LINE = "Tell me what to put over the video: a line to say in a voice, or one of your songs.";
 export const NO_TRACK_LINE = "I can't find that song. Pick one of your own songs or sound files, or ask for a voice line instead.";
+export const BEATS_NOT_READY_LINE = "I can't cut to the beat right now. Beat analysis isn't ready on this computer. Try again later.";
+export const BEATS_FAILED_LINE = "I couldn't find the beat in that song. Try another song with a clearer rhythm.";
+export const BEATS_NOT_FOUND_LINE = "I couldn't find a steady beat in that song. Try a song with a clearer rhythm.";
 export const NO_VOICE_LINE = "I don't know that voice. Pick one from your home's voices, or leave the voice out to use yours.";
 export const SPEECH_FAILED_LINE = "I couldn't change that video. Home can't speak right now, so the line was not added. Try again in a minute.";
 export const CROSSFADE_NOT_SUPPORTED_LINE = "Crossfades are not available yet. I can join the videos with a straight cut now. Ask me to do that if you like.";
@@ -163,6 +172,10 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits"].includes(value.change)) {
+    const editGate = editRefusal(audience, "");
+    if (editGate) return refused(callId, args, editGate.line, editGate.kind === "denied" ? editGate.why : "minor");
+  }
   // The surface and age gate, then the same screening any typed prompt gets (a remix's new words are screened like a first request).
   // A typed voice line is screened like a prompt, before any speech is made.
   const typed = value.change === "remix" || value.change === "continue" || value.change === "retake" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : "";
@@ -172,7 +185,8 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
-  if (["extend", "retake", "trim", "join", "film", "mix", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits"].includes(value.change)) {
+  if (value.change === "cut_to_beat" && (!value.track || (!value.clip && !value.clips))) return refused(callId, args, value.track ? NO_CLIP_LINE : MIX_SOUND_LINE, "missing_argument");
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
@@ -408,9 +422,10 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   const { state, args, callId } = input;
   let sources: VideoJob[];
   if (film) { sources = film.sources; }
-  else if (value.change === "join") {
-    if (!value.clips || value.clips.length < MIN_JOIN_CLIPS) return refused(callId, args, JOIN_CLIPS_LINE, "join_clips");
-    const found = value.clips.map((clip) => ownClip(actor, state, clip, temporary));
+  else if (value.change === "join" || value.change === "cut_to_beat") {
+    const selected = value.change === "cut_to_beat" ? (value.clips?.length ? value.clips : [value.clip!]) : value.clips;
+    if (!selected || selected.length < 1 || (value.change === "join" && selected.length < MIN_JOIN_CLIPS)) return refused(callId, args, JOIN_CLIPS_LINE, "join_clips");
+    const found = selected.map((clip) => ownClip(actor, state, clip, temporary));
     if (found.some((job) => job === null)) return refused(callId, args, NO_CLIPS_LINE, "no_clip");
     sources = found as VideoJob[];
   } else {
@@ -457,6 +472,39 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     if (creditLines) ops.push(creditsOp(creditLines, value.credits_title));
     if (ops.length > MAX_EDIT_OPS) return refused(callId, args, `That edit needs ${ops.length} steps, but the video editor allows up to ${MAX_EDIT_OPS}. Remove a title, credits, look, or letterbox option.`, "too_many_edit_ops");
     describe = `${sources.length} videos joined in order${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${title ? ", with a title" : ""}${creditLines ? ", with rolling credits" : ""}`;
+  } else if (value.change === "cut_to_beat") {
+    if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
+    const track = ownTrackFile(actor, value.track, temporary, state.conversationId);
+    if (!track) return refused(callId, args, NO_TRACK_LINE, "no_track");
+    if (!await beatsReady()) return refused(callId, args, BEATS_NOT_READY_LINE, "beats_not_ready");
+    if (track.mark.madeAudience === "adult-only") marks.push(track.mark);
+    inputs = clipFiles;
+    ops = [];
+    describe = "cut to the beat";
+    const run: EditRun = async (signal) => {
+      try {
+        const bytes = track.file.bytes;
+        const analysis = await analyzeBeats(Buffer.from(bytes).toString("base64"), createHash("sha256").update(bytes).digest("hex"), { origin: "owned_file", signal });
+        if (!analysis) return { ok: false, line: BEATS_FAILED_LINE };
+        const plan = planBeatCut({ beats: analysis.beats, downbeats: analysis.downbeats, beatsPerCut: value.beats_per_cut ?? 4, lengthS: value.length_s ?? 30, clipSeconds: sources.map((job) => job.files[0]?.seconds ?? null) });
+        if (!plan.ok) return { ok: false, line: plan.line };
+        const segments: EditFile[] = [];
+        for (const segment of plan.segments) {
+          if (signal.aborted) return { ok: false, line: BEATS_FAILED_LINE };
+          const trimmed = await runStackEdit({ inputs: [clipFiles[segment.clipIndex]!], ops: [{ op: "trim", in_s: segment.inS, out_s: segment.outS }], name: "beat-segment.mp4", signal });
+          if (!trimmed.ok) return { ok: false, line: trimmed.line };
+          segments.push({ bytes: trimmed.bytes, ext: "mp4" });
+        }
+        if (signal.aborted) return { ok: false, line: BEATS_FAILED_LINE };
+        const final = await runStackEdit({ inputs: [...segments, track.file], ops: [{ op: "concat", with: segments.slice(1).map((_, index) => index + 1) }, { op: "mute" }, { op: "audio_overlay", input: segments.length, gain_db: 0, clip_gain_db: -60, start_s: 0, duck: false, end_s: plan.videoSeconds }], name: "beat-cut.mp4", signal });
+        return final.ok ? { ok: true, clip: { video: final.bytes, seconds: plan.videoSeconds, width: final.width, height: final.height, audio: final.audio, ms: final.ms } } : { ok: false, line: final.line };
+      } catch { return { ok: false, line: BEATS_FAILED_LINE }; }
+    };
+    const edit: NonNullable<VideoRequest["edit"]> = { from: first.id, change: "join", with: sources.slice(1).map((job) => job.id) };
+    const mark = newItemMark(marks, false);
+    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
+    if (!started.ok) return refused(callId, args, started.line, "busy");
+    return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `A new version is being made, cut on the beat every ${value.beats_per_cut ?? 4} beats to your song. The first one is kept.` }, data: { videoJobId: started.job.id }, actions: [] } });
   } else if (value.change === "reframe") {
     if (!value.aspect) return refused(callId, args, "Tell me the shape you want: vertical, square or widescreen.", "missing_aspect");
     inputs = [clipFiles[0]!]; ops = reframeOps(value.aspect, value.fill ?? "crop"); describe = "reframed";

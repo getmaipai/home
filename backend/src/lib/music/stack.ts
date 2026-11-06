@@ -131,6 +131,53 @@ export function voiceConvertReady(status: StackVoiceConvertStatus | null): boole
 export interface StackAlignWord { t: number; end: number; text: string }
 export interface StackAlignData { words: StackAlignWord[]; aligned_words: number; total_words: number; line_starts: number[] }
 export interface StackAlignJob { state: MusicState; code?: string | null; data?: StackAlignData | null }
+export interface StackBeatsData { tempo_bpm: number; meter: 3 | 4; beats: number[]; downbeats: number[]; sections: Array<{ start_s: number; end_s: number; label: string }>; confidence: number; downbeat_confidence: number; duration_s: number; engine: "librosa" }
+export interface StackBeatsJob { state: MusicState; code?: string | null; data?: StackBeatsData | null }
+export interface StackBeatsStatus { available: boolean; state: string; ready?: boolean }
+const beatCache = new Map<string, StackBeatsData>();
+function beatsData(value: unknown): StackBeatsData | null {
+  if (!value || typeof value !== "object") return null;
+  const d = value as Partial<StackBeatsData>;
+  const sorted = (a: unknown): a is number[] => Array.isArray(a) && a.every(Number.isFinite) && a.every((v, i) => i === 0 || v >= (a[i - 1] as number));
+  if (!Number.isFinite(d.tempo_bpm) || !(d.meter === 3 || d.meter === 4) || !sorted(d.beats) || !sorted(d.downbeats) || !Array.isArray(d.sections) || !d.sections.every((s) => Number.isFinite(s.start_s) && Number.isFinite(s.end_s) && s.end_s > s.start_s && typeof s.label === "string") || !Number.isFinite(d.confidence) || !Number.isFinite(d.downbeat_confidence) || !Number.isFinite(d.duration_s) || d.engine !== "librosa") return null;
+  return d as StackBeatsData;
+}
+export async function submitBeats(source: string, source_sha256: string, origin: "made_here" | "owned_file" = "made_here", waitMs = 1): Promise<{ job: string; done: StackBeatsData | null }> {
+  const res = await checked(await request("/v1/audio/beats", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, origin, timeout_ms: waitMs }) }, 120_000));
+  const parsed = await res.json() as { job?: string; data?: unknown };
+  if (!parsed.job) throw new StackMusicError(502, "bad_reply");
+  const data = res.status === 200 ? beatsData(parsed.data) : null;
+  if (res.status === 200 && !data) throw new StackMusicError(502, "bad_reply");
+  return { job: parsed.job, done: data };
+}
+export async function getBeatsJob(job: string): Promise<StackBeatsJob> {
+  const b = await (await checked(await request(`/v1/audio/beats/${encodeURIComponent(job)}`))).json() as { state?: string; code?: string | null; data?: unknown };
+  const data = b.data == null ? null : beatsData(b.data);
+  if (b.data != null && !data) throw new StackMusicError(502, "bad_reply");
+  return { state: (b.state ?? "failed") as MusicState, code: b.code ?? null, data };
+}
+export async function deleteBeats(job: string): Promise<void> { try { await (await request(`/v1/audio/beats/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ } }
+export async function analyzeBeats(source: string, sha: string, opts: { pollMs?: number; maxMs?: number; signal?: AbortSignal; origin?: "made_here" | "owned_file" } = {}): Promise<StackBeatsData | null> {
+  const hit = beatCache.get(sha); if (hit) { beatCache.delete(sha); beatCache.set(sha, hit); return hit; }
+  const { job, done } = await submitBeats(source, sha, opts.origin ?? "made_here", 1);
+  const deadline = Date.now() + (opts.maxMs ?? 15 * 60_000);
+  try {
+    let data = done;
+    if (data) { beatCache.set(sha, data); while (beatCache.size > 20) beatCache.delete(beatCache.keys().next().value!); }
+    while (!data && Date.now() < deadline && !opts.signal?.aborted) {
+      await new Promise((resolve) => setTimeout(resolve, opts.pollMs ?? 2000));
+      const status = await getBeatsJob(job);
+      if (status.state === "done") data = status.data ?? null;
+      else if (status.state === "failed" || status.state === "cancelled") throw new StackMusicError(500, status.code ?? "failed");
+    }
+    if (opts.signal?.aborted || !data) throw new StackMusicError(504, opts.signal?.aborted ? "cancelled" : "timeout");
+    beatCache.set(sha, data); while (beatCache.size > 20) beatCache.delete(beatCache.keys().next().value!);
+    return data;
+  } finally { await deleteBeats(job); }
+}
+export async function beatsReady(): Promise<boolean> {
+  try { const b = await (await checked(await request("/stack/v1/beats", {}, 5_000))).json() as { beats?: StackBeatsStatus }; return b.beats?.available === true && b.beats.ready === true; } catch { return false; }
+}
 /** MUSIC-GEN-20c: align only this stretch of the song (seconds from its start); the reply's times stay on the song's own clock. */
 export interface AlignWindow { from_s: number; to_s: number }
 /** The Stack's longest alignable song. */

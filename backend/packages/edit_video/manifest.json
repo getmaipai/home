@@ -1,6 +1,6 @@
 {
   "id": "edit_video",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Change a Video",
@@ -62,6 +62,7 @@
           "reframe",
           "grade",
           "film_look",
+          "cut_to_beat",
           "letterbox",
           "speed",
           "captions"
@@ -69,7 +70,7 @@
           ,"credits"
         ],
         "grounded": false,
-        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song. reframe changes shape; grade changes the look; film_look applies a preset; letterbox adds cinema bars; speed changes playback; captions adds timed words. title_card adds a title at the start; credits adds rolling names at the end. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
+        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song. cut_to_beat cuts your videos to the beat of your song; set track, clips, beats_per_cut (1, 2, 4 or 8, default 4) and length_s (5 to 60, default 30). reframe changes shape; grade changes the look; film_look applies a preset; letterbox adds cinema bars; speed changes playback; captions adds timed words. title_card adds a title at the start; credits adds rolling names at the end. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
       },
       "prompt": {
         "type": "string",

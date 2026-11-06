@@ -109,7 +109,7 @@ Ask chat to change a video you made. Home keeps the old video and makes a new on
 
 Only videos you made can be changed. Changing, continuing, joining and mixing are for adults. A video in Trash cannot be continued: put it back first. A changed video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
 
-Trim, join and mix need the video editor on the AI engine. If your engine does not have it, Home says it cannot change the video.
+Trim, join and mix need the video editor on the AI engine. You can also ask chat to cut your videos to the beat of one of your songs, choosing how many beats between cuts and how much of the song to use. If beat analysis or the video editor is not ready, Home says so. If your engine does not have the video editor, Home says it cannot change the video.
 
 ## Edit a video in the Studio
 

@@ -119,7 +119,7 @@ describe("C2: edit_video", () => {
   test("the package declares its changes and look presets, the gate, the bench row and a reason", () => {
     const m = manifest(EDIT_VIDEO_TOOL_ID);
     expect(m.args.required).toEqual(["change"]);
-    expect(m.args.properties.change!.enum).toEqual(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "continue", "extend", "retake", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits"]);
+    expect(m.args.properties.change!.enum).toEqual(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "continue", "extend", "retake", "reframe", "grade", "film_look", "cut_to_beat", "letterbox", "speed", "captions", "title_card", "credits"]);
     expect(m.args.properties.look!.enum).toEqual([...ids(VIDEO_LOOKS), "70s_color", "noir", "teal_orange", "bleach_bypass", "technicolor", "faded_vintage", "cool_thriller"]);
     expect(m.args.properties.camera!.enum).toEqual(ids(VIDEO_RECIPES));
     expect(m.args.properties.voices!.enum).toEqual(ids(VIDEO_VOICES));

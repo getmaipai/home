@@ -43,6 +43,8 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
 import { likenessRefusal } from "@/lib/likeness";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
+import { runEditVideo } from "@/lib/videos/editTool";
+import { editVideoArgs, type RunEditVideoInput } from "@/lib/videos/editTool";
 
 export const videosRoutes = apiRouter();
 /** A locked item's media routes never let a cache keep a 404 or a body (ADULT-LOCK-02). */
@@ -480,6 +482,27 @@ videosRoutes.openapi(animateRoute, async (c) => {
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
     return c.json({ error: plainVideoFailure(error), code: error instanceof StackVideoError ? error.code : "failed" }, status) as never;
   }
+});
+
+const cutToBeatRoute = createRoute({
+  method: "post", path: "/cut-to-beat", tags: ["Videos"], summary: "Cut videos to a song's beat", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ conversation_id: z.string().min(1).max(80).optional(), clips: z.array(z.string().trim().min(1).max(80)).min(1).max(6), track: z.string().trim().min(1).max(80), beats_per_cut: z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]).optional(), length_s: z.number().int().min(5).max(60).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The cut video card." }, ...refusals },
+});
+videosRoutes.openapi(cutToBeatRoute, async (c) => {
+  const actor = c.get("person"); const body = c.req.valid("json"); const audience = videoRouteAudience(actor);
+  if (videoDenial(audience)) return c.json({ error: videoDenial(audience), code: "not_allowed" }, 403) as never;
+  if (laneOf(audience) !== "adult") return c.json({ error: "This edit is for adults on their own screen." , code: "minor" }, 422) as never;
+  const turnId = body.conversation_id ? db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.personId, actor.id), eq(conversationTurns.conversationId, body.conversation_id))).orderBy(conversationTurns.createdAt).get()?.id ?? null : null;
+  if (!body.conversation_id || !turnId) return c.json({ error: "Open the chat with your videos and try again.", code: "no_chat" }, 422) as never;
+  const clip = body.clips[0]!;
+  const state = { actor, surface: "chat", conversationId: body.conversation_id, turnId, temporary: false, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as RunEditVideoInput["state"];
+  const outcome = await runEditVideo({ state, args: { clip, clips: body.clips, change: "cut_to_beat", track: body.track, beats_per_cut: body.beats_per_cut, length_s: body.length_s }, callId: "route-cut-to-beat", spoken: false });
+  const id = (outcome.result?.data as { videoJobId?: string; refused?: string } | undefined)?.videoJobId;
+  if (!id) return c.json({ error: outcome.result?.reply?.text ?? "I couldn't cut that video to the beat.", code: String((outcome.result?.data as { refused?: string } | undefined)?.refused ?? "cut_failed") }, 422) as never;
+  const job = getVideoJobFor(actor, id);
+  if (!job) return c.json({ error: "That video is not available any more.", code: "not_found" }, 404) as never;
+  return c.json(videoCardOrLocked(actor, job, true, await readyFlags(actor)) as never, 200);
 });
 
 // ---------------------------------------------------------------- settings page: the household's video LoRA library
