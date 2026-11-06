@@ -67,6 +67,7 @@ import { artifactsByTurn, deleteArtifactsForTurns } from "@/lib/artifacts";
 import { projectsByTurn } from "@/lib/projects/store";
 import { pictureJobIdsByTurnRedacted, redactLockedPictureOutcome } from "@/lib/pictures/lock";
 import { videoJobIdsByTurnRedacted } from "@/lib/videos/lock";
+import { getFilmRun } from "@/lib/films/store";
 import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { Surface } from "@/lib/turnShared";
@@ -2068,6 +2069,20 @@ export function listConversationTurns(
   const pictureByTurn = pictureJobIdsByTurnRedacted(actor, rows.map((r) => r.id));
   // VIDEO-GEN-06: and for a video job the turn started.
   const videoByTurn = videoJobIdsByTurnRedacted(actor, rows.map((r) => r.id));
+  const filmByTurn = new Map<string, string>();
+  for (const row of rows) {
+    if (!row.outcomes) continue;
+    try {
+      const outcomes = JSON.parse(row.outcomes) as ToolExecutionOutcome[];
+      for (const outcome of outcomes) {
+        if (outcome.status !== "succeeded" || outcome.packageId !== "make_film") continue;
+        const data = outcome.result?.data as { filmRunId?: unknown } | undefined;
+        if (typeof data?.filmRunId !== "string") continue;
+        const run = getFilmRun(actor, data.filmRunId);
+        if (run) { filmByTurn.set(row.id, run.id); break; }
+      }
+    } catch { /* unreadable outcomes name no film */ }
+  }
   const musicByTurn = musicJobIdsByTurn(actor, rows.map((r) => r.id));
 
   // MINOR-SEARCH-01m: a child reads no link in a reply and no page address in a source, old rows included (the stored row is untouched).
@@ -2099,7 +2114,7 @@ export function listConversationTurns(
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
     const pictureRef = pictureByTurn.get(r.id);
-    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: outcomesForReader(rawOutcomes as string | null, actor, readsErrorDetail), replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAudio ? { audio: JSON.parse(rawAudio) as ChatAudioPart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureRef && !hideForRefusedChildTurn ? { picture: pictureRef === "locked" ? { locked: true as const } : { id: pictureRef } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: videoByTurn.get(r.id) ? { id: videoByTurn.get(r.id)! } : { locked: true as const } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, ...(researchStepsFor(rawOutcomes as string | null, bandOut) ? { research_steps: researchStepsFor(rawOutcomes as string | null, bandOut) } : {}), outcomes: outcomesForReader(rawOutcomes as string | null, actor, readsErrorDetail), replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAudio ? { audio: JSON.parse(rawAudio) as ChatAudioPart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureRef && !hideForRefusedChildTurn ? { picture: pictureRef === "locked" ? { locked: true as const } : { id: pictureRef } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: videoByTurn.get(r.id) ? { id: videoByTurn.get(r.id)! } : { locked: true as const } } : {}), ...(filmByTurn.has(r.id) && !hideForRefusedChildTurn ? { film: { id: filmByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 

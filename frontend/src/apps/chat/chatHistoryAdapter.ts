@@ -42,6 +42,10 @@ function compareBranchRows(a: ConversationTurnWithMemoryIds, b: ConversationTurn
   return a.id.localeCompare(b.id);
 }
 
+function filmForRow(row: ConversationTurnWithMemoryIds): { id: string } | undefined {
+  return (row as ConversationTurnWithMemoryIds & { film?: { id: string } }).film;
+}
+
 function normalizedRows(rows: ConversationTurnWithMemoryIds[]): Array<{ row: ConversationTurnWithMemoryIds; parentId: string | null }> {
   const orderedRows = [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const parentByRowId = new Map<string, string | null>();
@@ -189,7 +193,7 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.research_steps?.length || row.structured_part || row.artifact || row.confirm || row.project || row.picture || row.video || row.music || row.sources?.length || row.blocks?.length
+        row.reasoning || row.research_steps?.length || row.structured_part || row.artifact || row.confirm || row.project || row.picture || row.video || filmForRow(row) || row.music || row.sources?.length || row.blocks?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               // RESEARCH-TIER-01: the searches of a Thinking or Max turn, as the live stream drew them (the steps persist with the message).
@@ -235,6 +239,7 @@ export function rowsToBranchableMessages(
               ...(row.picture ? [toolCallPart(`${row.id}-picture-progress`, "picture_progress", "locked" in row.picture ? { locked: true as const } : { id: row.picture.id }), toolCallPart(`${row.id}-picture`, "picture", "locked" in row.picture ? { locked: true as const } : { id: row.picture.id })] : []),
               // VIDEO-GEN-06: and the video card, the same part as live.
               ...(row.video ? [toolCallPart(`${row.id}-video`, "video", row.video)] : []),
+              ...(filmForRow(row) ? [toolCallPart(`${row.id}-film`, "film", filmForRow(row)!), toolCallPart(`${row.id}-film-player`, "film-player", filmForRow(row)!)] : []),
               // MUSIC-GEN-04: and the song card, the same part as live.
               ...(row.music ? [toolCallPart(`${row.id}-song`, "song", row.music)] : []),
               ...(row.artifact && row.pluginId === PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),

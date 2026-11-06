@@ -725,6 +725,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             const picture = event.value.picture;
             // VIDEO-GEN-06: and the video job this turn started, drawn as the kit player card.
             const video = event.value.video;
+            const film = event.value.film;
             // MUSIC-GEN-04: and the song job (generate_music or edit_music), drawn as the kit song card.
             music = event.value.music ?? music;
             const musicPart = songPart(event.value.turn_id);
@@ -810,6 +811,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture)] : []),
                 ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video)] : []),
+                ...(film ? [toolCallPart(`${event.value.turn_id}-film`, "film", film)] : []),
+                ...(film ? [toolCallPart(`${event.value.turn_id}-film-player`, "film-player", film)] : []),
                 ...(musicPart ? [musicPart] : []),
                 ...sourceParts,
               ],

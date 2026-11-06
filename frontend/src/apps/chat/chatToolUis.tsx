@@ -22,6 +22,7 @@ import { fitAskActions } from "@/lib/fitAsk";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
+import { filmsApi } from "@/lib/filmsApi";
 import { askRemix } from "@/apps/chat/chatRemix";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { musicApi } from "@/lib/musicApi";
@@ -355,6 +356,47 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
       }}
     />
   );
+};
+
+const FILM_STAGES = ["Plan", "Cast", "Stills", "Clips", "Music", "Assemble"] as const;
+export const FILM_POLL_ACTIVE_MS = 1_000;
+export const FILM_POLL_IDLE_MS = 5_000;
+function useFilmCard(id: string | undefined) {
+  return useQuery({
+    queryKey: ["film", id], queryFn: ({ signal }) => filmsApi.get(id!, signal), enabled: id !== undefined,
+    refetchInterval: (q) => {
+      if (q.state.status === "error") return false;
+      const data = q.state.data;
+      if (!data) return FILM_POLL_ACTIVE_MS;
+      if (["done", "failed", "cancelled"].includes(data.state)) return false;
+      return data.state === "planning" || data.state === "running" ? FILM_POLL_ACTIVE_MS : FILM_POLL_IDLE_MS;
+    },
+  });
+}
+export const FilmToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = useFilmCard(result?.id);
+  const film = query.data;
+  if (!result || film?.state === "done") return null;
+  if (film?.state === "failed" || film?.state === "cancelled") return <JobProgress title={film.plan?.title ?? "Film"} stages={FILM_STAGES.map(name => ({ name, weight: 1 }))} stageIndex={FILM_STAGES.length} stageProgress={0} outcome={{ status: film.state, summary: film.error_line ?? (film.state === "cancelled" ? "This film was cancelled." : "This film did not finish.") }} downloadState={film.state === "failed" ? "failed" : undefined} onRetry={film.state === "failed" ? () => { void filmsApi.resume(film.id).then(() => query.refetch()).catch(() => query.refetch()); } : undefined} copy={{ retry: "Resume" }} />;
+  const stageIndex = Math.max(0, FILM_STAGES.indexOf(film?.stage ?? "Plan"));
+  const ratio = film && film.total_steps > 0 ? Math.max(0, Math.min(1, film.done_steps / film.total_steps)) : 0;
+  const scaled = ratio * FILM_STAGES.length;
+  const index = film?.stage ? stageIndex : Math.min(FILM_STAGES.length - 1, Math.floor(scaled));
+  const progress = film?.stage ? Math.max(0, Math.min(1, scaled - index)) : scaled - index;
+  const plan = film?.plan;
+  const notes = film?.state === "waiting_for_go" && plan ? [plan.summary, ...plan.shots.map((shot, i) => `Shot ${i + 1}: ${shot.still}`)] : film?.note ? [film.note] : undefined;
+  const actions = film?.state === "waiting_for_go"
+    ? [{ id: "go", label: "Go", primary: true, onSelect: () => { void filmsApi.go(film.id).then(() => query.refetch()).catch(() => query.refetch()); } }]
+    : undefined;
+  const summary = query.isError ? "I couldn't find this film. Check that it is still in your Library." : undefined;
+  return <JobProgress title={plan?.title ?? "Film"} stages={FILM_STAGES.map(name => ({ name, weight: 1 }))} stageIndex={index} stageProgress={progress} eta={summary ?? (!film || film.state === "planning" ? "Loading film…" : `${Math.round(ratio * 100)}%`)} notes={notes} actions={actions} onCancel={film?.state === "running" ? () => { void filmsApi.cancel(film.id).then(() => query.refetch()).catch(() => query.refetch()); } : undefined} cancelable={film?.state === "running"} />;
+};
+
+export const FilmPlayerToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = useFilmCard(result?.id);
+  const film = query.data;
+  if (!result || film?.state !== "done" || !film.film_file_id) return null;
+  return <VideoPlayer status="ready" prompt={film.plan?.title ?? "Film"} src={`/api/files/${encodeURIComponent(film.film_file_id)}/content`} actionItems={film.plan ? [...film.plan.shots.slice(0, 6).map((shot, i) => ({ key: shot.id, label: `Redo a shot ${i + 1}`, when: ["ready" as const], onSelect: () => { void filmsApi.redoShot(film.id, shot.id).then(() => query.refetch()).catch(() => query.refetch()); } })), { key: "music", label: "Change the music", when: ["ready" as const], onSelect: () => { void filmsApi.music(film.id).then(() => query.refetch()).catch(() => query.refetch()); } }] : undefined} />;
 };
 
 
