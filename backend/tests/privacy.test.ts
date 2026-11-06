@@ -236,6 +236,8 @@ describe("the hub's own connections", () => {
     const row = privacyConnections().find((r) => r.id === "platform:home-assistant-events");
     expect(row?.what).toContain("sensors or devices you mapped");
     expect(row?.what).toContain("no sensor state is sent to a third party");
+    expect(row?.what).toContain("Home Assistant is told the command and nothing about who asked");
+    expect(row?.retention).toContain("never a device name or who asked");
   });
 
   // PrivacyPage.tsx groups inbound rows under its own clearly-labeled

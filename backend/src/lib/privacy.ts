@@ -291,11 +291,11 @@ export function platformConnections(): PrivacyConnection[] {
       source: "MaiPai Home",
       sourceKind: "platform",
       destination: "your own Home Assistant on your LAN",
-      when: "while Home Assistant sensor updates are configured",
-      what: "Home receives state changes only for Home Assistant sensors or devices you mapped. It reads their current state again after reconnecting. This stays on your LAN; no sensor state is sent to a third party.",
+      when: "while Home Assistant is configured: sensor updates, and when someone asks Home to find or control a device",
+      what: "Home receives state changes only for Home Assistant sensors or devices you mapped, and reads their state again after reconnecting. When a person you allowed asks to turn on a light, run a scene, or lock a door, Home sends that one command to Home Assistant and reads the device back to check it worked. Home Assistant is told the command and nothing about who asked. This stays on your LAN; no sensor state is sent to a third party, and neither is any command.",
       who: "your household's own Home Assistant instance",
       optIn: true,
-      retention: "Home keeps only the current alarm state and its local history; no sensor stream is sent outside the house",
+      retention: "Home keeps only the current alarm state and its local history. Home Assistant keeps whatever its own history records for the commands it receives. Home's own log of a command holds the kind of device and the result, never a device name or who asked.",
       direction: "outbound",
     });
   }
