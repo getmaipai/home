@@ -22,6 +22,7 @@ import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { missingRequired } from "@/lib/capabilities";
 import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID } from "@/lib/voiceTools";
 import { collapseSpaces, isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
 import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
@@ -169,6 +170,7 @@ export type ModelOutput =
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
 export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState): ToolSpec | null {
+  if ((id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID) && !state?.voiceoverAllowed) return null;
   if (id === "edit_picture") return editPictureSpec(id, state);
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json

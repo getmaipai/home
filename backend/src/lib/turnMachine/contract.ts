@@ -257,6 +257,8 @@ export interface TurnState {
   itemReferenceAllowed?: boolean;
   /** WRITING-FORMATS-03: a written, non-bare turn with an installed writing format the person's role may use; `writing_format` is offered only then. */
   writingFormatAllowed?: boolean;
+  /** V1/V2 voice tools are offered only for written adult turns while the Stack voice role is ready. */
+  voiceoverAllowed?: boolean;
   /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;
   /** MUSIC-STUDIO-EDIT: the made-music object the turn follows ("none": the turn may make a song style but names no object). Decides the make/edit tools. */

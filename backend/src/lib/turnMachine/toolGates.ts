@@ -12,6 +12,8 @@ import { videoEngineReady } from "@/lib/videos/ready";
 import { laneOf } from "@/lib/pictures/lane";
 import { itemRefsIn } from "@/lib/items/tool";
 import { writingFormatsFor } from "@/lib/writingFormats";
+import { roleHealth } from "@/lib/roleHealth";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { pictureIdsInConversation } from "@/lib/pictures/editTool";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { withTurnToolGates, type MusicObjectGate } from "./budget";
@@ -74,6 +76,7 @@ export interface TurnToolGateResult {
   musicObjectRef: MusicObjectRef | null;
   /** WRITING-FORMATS-03: a written, non-bare turn and at least one installed format the person's role may use. */
   writingFormatOk: boolean;
+  voiceoverOk: boolean;
 }
 
 /** Calculates the conditional offers for a real turn and for its cache warm-up. */
@@ -141,9 +144,11 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const musicBandOk = objectAllowed && musicObjectRef?.kind === "track";
   const musicObject: MusicObjectGate = !objectAllowed ? null : (musicObjectRef?.kind ?? "none");
   const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
+  const voiceoverOk = !input.bare && !input.spoken && input.surfaceClass === "written" && speakerAgeBand(input.actor, new Date()) === "adult" && input.actor.role !== "guest" && (await readiness(async () => (await roleHealth("voice")).availability === "ready"));
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk),
     writingFormatOk,
+    voiceoverOk,
     answerImagesOk,
     picturesOk,
     editPictureOk,

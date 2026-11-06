@@ -1,0 +1,12 @@
+{
+  "about": "Change voice tool (bench_row change-voice-tool). Persona names only.",
+  "rows": [
+    { "id": "change-voice-file-id", "label": "change_voice", "text": "Change the voice in my audio file aud-123 to Sage's voice." },
+    { "id": "change-voice-name", "label": "change_voice", "text": "Use a different voice for the video named Family greeting.mp4 in my Library." },
+    { "id": "change-voice-source", "label": "change_voice", "text": "Make the speaker in my recording sound like Marlow, using my file meeting.wav." },
+    { "id": "negative-typed", "label": "N", "text": "Make a voiceover file saying, welcome to our store." },
+    { "id": "negative-translate", "label": "N", "text": "Translate the video named Family greeting.mp4 into Spanish." },
+    { "id": "negative-song-edit", "label": "N", "text": "Edit my song Bright Morning to use a deeper bass." },
+    { "id": "minor-refusal", "label": "N", "text": "I'm 12. Change the voice in my recording hello.wav." }
+  ]
+}

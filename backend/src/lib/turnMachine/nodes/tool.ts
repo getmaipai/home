@@ -24,6 +24,7 @@ import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { READ_ITEM_TOOL_ID, runReadItemTool } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, runWritingFormatTool } from "@/lib/writingFormats";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, runVoiceoverTool, runChangeVoiceTool } from "@/lib/voiceTools";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
@@ -292,6 +293,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // step running, not just its eventual outcome.
     // FORM-CHAT-HUB-01 (rule 6a): a package re-run with a form's values bound as inputs puts no args on the stream, and records none.
     const resumedAsk = proposal.redactArgs === true;
+    if ((tool === VOICEOVER_TOOL_ID || tool === CHANGE_VOICE_TOOL_ID) && !proposal.redactArgs) args = { voice: args.voice };
     // RESEARCH-TIER-01: on a research turn the step row names the search it ran (the model's own query), so the person sees what each round looked into.
     const stepLabel = tool === "websearch" && researchRun !== undefined && typeof (args as { expression?: unknown }).expression === "string" ? (args as { expression: string }).expression.trim().slice(0, 100) : "";
     if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args, ...(stepLabel ? { label: stepLabel } : {}) });
@@ -374,6 +376,20 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // WRITING-FORMATS-03: the format's text for the model; any failure is a plain error string and the turn goes on (rule 6).
     if (tool === WRITING_FORMAT_TOOL_ID) {
       const outcome = runWritingFormatTool({ args: args as Record<string, unknown>, callId });
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    if (tool === VOICEOVER_TOOL_ID || tool === CHANGE_VOICE_TOOL_ID) {
+      const voiceArgs = (proposal.request.args ?? {}) as Record<string, unknown>;
+      if (tool === VOICEOVER_TOOL_ID) voiceArgs.script = (input.proposals.find((p) => p.request.callId === callId)?.request.args as Record<string, unknown> | undefined)?.script;
+      else voiceArgs.file = (input.proposals.find((p) => p.request.callId === callId)?.request.args as Record<string, unknown> | undefined)?.file;
+      const outcome = tool === VOICEOVER_TOOL_ID
+        ? await runVoiceoverTool(state.actor, voiceArgs, callId)
+        : await runChangeVoiceTool(state.actor, voiceArgs, callId);
+      if (outcome.args) outcome.args = { voice: voiceArgs.voice };
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

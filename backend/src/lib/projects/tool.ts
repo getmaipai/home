@@ -23,6 +23,7 @@ import { getProjectType, listProjectTypes, type ProjectType, type ProjectTypePar
 import { start as startProject } from "./runner";
 import { READ_ITEM_TOOL_ID, readItemToolSpec } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingFormats";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec } from "@/lib/voiceTools";
 
 export interface VirtualToolOffer {
   mode: "base" | "conditional" | "off";
@@ -44,6 +45,8 @@ export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
   { id: READ_ITEM_TOOL_ID, offer: { mode: "conditional", gate: "itemReferenceAllowed", bench_row: "read-item", priority: 3 }, spec: readItemToolSpec },
   // WRITING-FORMATS-03: offered on a written, non-bare turn when an installed format fits the person's role (lib/writingFormats.ts).
   { id: WRITING_FORMAT_TOOL_ID, offer: { mode: "conditional", gate: "writingFormatAllowed", bench_row: "writing-format", priority: 3 }, spec: writingFormatToolSpec },
+  { id: VOICEOVER_TOOL_ID, offer: { mode: "conditional", gate: "voiceoverAllowed", bench_row: "voiceover-tool", priority: 3 }, spec: voiceoverToolSpec },
+  { id: CHANGE_VOICE_TOOL_ID, offer: { mode: "conditional", gate: "voiceoverAllowed", bench_row: "change-voice-tool", priority: 3 }, spec: changeVoiceToolSpec },
 ];
 export const START_PROJECT_TOOL_ID = VIRTUAL_TOOL_REGISTRY[0]!.id;
 

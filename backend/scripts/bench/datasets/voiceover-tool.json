@@ -1,0 +1,12 @@
+{
+  "about": "Voiceover file tool (bench_row voiceover-tool). Persona names only.",
+  "rows": [
+    { "id": "voiceover-words", "label": "voiceover", "text": "Make a voice recording that says: Welcome home, Marlow." },
+    { "id": "voiceover-reading", "label": "voiceover", "text": "Record these exact words as a voiceover file: The train leaves at noon." },
+    { "id": "voiceover-spoken", "label": "voiceover", "text": "Please make an audio recording of me saying, I will call you tomorrow." },
+    { "id": "negative-script", "label": "N", "text": "Write me a short script for a school announcement." },
+    { "id": "negative-video-view", "label": "N", "text": "Put a voice over the video I just shared." },
+    { "id": "negative-voices-question", "label": "N", "text": "What voices can you speak with?" },
+    { "id": "minor-refusal", "label": "N", "text": "I'm 12. Make a voice recording that says hello." }
+  ]
+}
