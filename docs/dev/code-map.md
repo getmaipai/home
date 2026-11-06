@@ -516,7 +516,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/house/connection.ts` | houseLanFetch |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
-| `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, houseToolSpec, visibleHouseEntities, planHouseCall, runHouseTool |
+| `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, normalizeHouseArgs, houseToolSpec, visibleHouseEntities, planHouseCall |
 | `backend/src/lib/house/undoRunner.ts` | undoDataIsSafe, houseUndoRunner |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
