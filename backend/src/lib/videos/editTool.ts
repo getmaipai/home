@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, frameOps, gradeOps, joinOps, lastFrameAt, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
+import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, filmLookOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -46,15 +46,15 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
   production: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().min(3).max(1200).optional(),
-  look: z.enum(ids(VIDEO_LOOKS)).optional(),
+  look: z.union([z.enum(ids(VIDEO_LOOKS)), z.enum(FILM_LOOK_PRESETS)]).optional(),
   camera: z.enum(ids(VIDEO_RECIPES)).optional(),
   voices: z.enum(ids(VIDEO_VOICES)).optional(),
   /** VIDEO-LORA-10: style names (at most two) the new clip is made with; an empty list takes the style off. Left out, a remix, another take and a continue keep the clip's own. */
   styles: z.array(z.string().trim().min(1).max(60)).max(2).optional(),
-  strength: z.enum(["less", "normal", "more"]).optional(),
+  strength: z.union([z.enum(["less", "normal", "more"]), z.number().min(0.2).max(1)]).optional(),
   tier: z.enum(["standard", "boost", "max"]).optional(),
   seconds: z.number().int().min(1).max(10).optional(),
   keep_seed: z.boolean().optional(),
@@ -67,6 +67,9 @@ export const editVideoArgs = z.object({
   subtitle: z.string().trim().max(160).optional(),
   credits: z.array(z.object({ role: z.string().trim().max(40).optional(), name: z.string().trim().min(1).max(60) })).min(1).max(60).optional(),
   credits_title: z.string().trim().max(120).optional(),
+  preset: z.enum(FILM_LOOK_PRESETS).optional(),
+  ratio: z.enum(LETTERBOX_RATIOS).optional(),
+  letterbox: z.enum(LETTERBOX_RATIOS).optional(),
   sound: z.enum(["voice", "music"]).optional(),
   line: z.string().trim().min(1).max(600).optional(),
   voice: z.string().trim().min(1).max(80).optional(),
@@ -141,6 +144,11 @@ export async function makeItMaxBody(actor: PersonRow, band: Parameters<typeof ti
 
 export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
+  if (args.preset !== undefined && !(FILM_LOOK_PRESETS as readonly unknown[]).includes(args.preset)) return refused(callId, args, `Choose a film look: ${FILM_LOOK_PRESETS.join(", ")}.`, "bad_film_look");
+  if (args.ratio !== undefined && !(LETTERBOX_RATIOS as readonly unknown[]).includes(args.ratio)) return refused(callId, args, `Choose a letterbox ratio: ${LETTERBOX_RATIOS.join(", ")}.`, "bad_letterbox_ratio");
+  if ((args.change === "join" || args.change === "film") && args.look !== undefined && !(FILM_LOOK_PRESETS as readonly unknown[]).includes(args.look)) return refused(callId, args, `Choose a film look: ${FILM_LOOK_PRESETS.join(", ")}.`, "bad_film_look");
+  if ((args.change === "join" || args.change === "film") && args.letterbox !== undefined && !(LETTERBOX_RATIOS as readonly unknown[]).includes(args.letterbox)) return refused(callId, args, `Choose a letterbox ratio: ${LETTERBOX_RATIOS.join(", ")}.`, "bad_letterbox_ratio");
+  if (args.change === "film_look" && args.strength !== undefined && (typeof args.strength !== "number" || args.strength < 0.2 || args.strength > 1)) return refused(callId, args, "Film look strength must be from 0.2 to 1.", "bad_film_strength");
   if ((args.change === "join" || args.change === "film") && args.transition !== undefined && typeof args.transition === "string" && !(JOIN_TRANSITIONS as readonly string[]).includes(args.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
   if (Array.isArray(args.credits) && args.credits.length > 60) return refused(callId, args, "Credits can have up to 60 names. Shorten the list and try again.", "too_many_credits");
   if (Array.isArray(args.credits) && args.credits.some((line) => !line || typeof line !== "object" || typeof (line as { name?: unknown }).name !== "string" || !(line as { name: string }).name.trim() || (line as { name: string }).name.trim().length > 60 || ((line as { role?: unknown }).role !== undefined && (typeof (line as { role?: unknown }).role !== "string" || ((line as { role: string }).role.trim().length > 40))))) return refused(callId, args, "Each credit needs a name up to 60 characters and an optional role up to 40 characters.", "bad_credit_line");
@@ -149,6 +157,8 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const parsed = editVideoArgs.safeParse(args);
   if (!parsed.success) return failed(callId, args, "bad_arguments", "bad_arguments");
   const value = parsed.data;
+  if (typeof value.strength === "number" && value.change !== "film_look") return refused(callId, args, "Numeric strength is only for a film look, from 0.2 to 1.", "bad_film_strength");
+  if (value.look !== undefined && value.change !== "join" && value.change !== "film" && !(ids(VIDEO_LOOKS) as readonly string[]).includes(value.look)) return refused(callId, args, "Choose one of the available video looks.", "bad_video_look");
   if ((value.change === "join" || value.change === "film") && value.transition !== undefined && !(JOIN_TRANSITIONS as readonly string[]).includes(value.transition)) return refused(callId, args, "Choose one of the available transitions between the videos.", "bad_transition");
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
@@ -162,7 +172,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
-  if (["extend", "retake", "trim", "join", "film", "mix", "reframe", "grade", "speed", "captions", "title_card", "credits"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
@@ -192,7 +202,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
       body.styles = picked.adapters.map((a) => a.id);
     }
   }
-  if (value.strength !== undefined && body.styles?.length) body.strength = value.strength;
+  if (typeof value.strength === "string" && body.styles?.length) body.strength = value.strength;
   // A clip that started from a picture (made here or an attached photo) starts from it again, through the same loader and input screening a Make another uses.
   let prepared: RunGenerateVideoInput["prepared"];
   let adultOnly = false;
@@ -200,7 +210,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (continuing) {
     // The new clip starts from the last frame of this one, with the person's new words (else the old ones); level, look, camera and voices stay unless changed.
     if (value.prompt !== undefined) body.prompt = value.prompt;
-    if (value.look !== undefined) body.look = value.look;
+    if (value.look !== undefined) body.look = value.look as typeof body.look;
     if (value.camera !== undefined) body.recipe = value.camera;
     if (value.voices !== undefined) body.voices = value.voices;
     if (value.tier !== undefined) body.tier = value.tier;
@@ -222,7 +232,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     const changed = value.styles !== undefined || value.strength !== undefined || value.prompt !== undefined || value.look !== undefined || value.camera !== undefined || value.voices !== undefined || value.tier !== undefined || value.seconds !== undefined;
     if (!changed) return refused(callId, args, WHAT_TO_CHANGE_LINE, "nothing_to_change");
     if (value.prompt !== undefined) body.prompt = value.prompt;
-    if (value.look !== undefined) body.look = value.look;
+    if (value.look !== undefined) body.look = value.look as typeof body.look;
     if (value.camera !== undefined) body.recipe = value.camera;
     if (value.voices !== undefined) body.voices = value.voices;
     if (value.tier !== undefined) body.tier = value.tier;
@@ -441,8 +451,11 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const added = (title ? 3 : 0) + (creditLines ? Math.max(3, Math.ceil((creditLines.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
     if (baseLength + added > 600) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
     inputs = clipFiles; ops = joinOps(transition, duration);
-    if (title) ops.unshift(titleCardOp(title, subtitle, "start"));
+    if (value.look) ops.push(...filmLookOps(value.look as (typeof FILM_LOOK_PRESETS)[number]));
+    if (value.letterbox) ops.push(...letterboxOps(value.letterbox));
+    if (title) ops.push(titleCardOp(title, subtitle, "start"));
     if (creditLines) ops.push(creditsOp(creditLines, value.credits_title));
+    if (ops.length > MAX_EDIT_OPS) return refused(callId, args, `That edit needs ${ops.length} steps, but the video editor allows up to ${MAX_EDIT_OPS}. Remove a title, credits, look, or letterbox option.`, "too_many_edit_ops");
     describe = `${sources.length} videos joined in order${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${title ? ", with a title" : ""}${creditLines ? ", with rolling credits" : ""}`;
   } else if (value.change === "reframe") {
     if (!value.aspect) return refused(callId, args, "Tell me the shape you want: vertical, square or widescreen.", "missing_aspect");
@@ -452,6 +465,12 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const changes = Object.fromEntries(Object.entries(grade).filter(([, v]) => v !== undefined));
     if (!Object.keys(changes).length) return refused(callId, args, "Tell me what to change in the look, such as warmth, contrast or grain.", "nothing_to_grade");
     inputs = [clipFiles[0]!]; ops = gradeOps(changes); describe = "colour and texture adjusted";
+  } else if (value.change === "film_look") {
+    if (!value.preset) return refused(callId, args, `Choose a film look: ${FILM_LOOK_PRESETS.join(", ")}.`, "missing_film_look");
+    inputs = [clipFiles[0]!]; ops = filmLookOps(value.preset, typeof value.strength === "number" ? value.strength : undefined); describe = "film look applied";
+  } else if (value.change === "letterbox") {
+    if (!value.ratio) return refused(callId, args, `Choose a letterbox ratio: ${LETTERBOX_RATIOS.join(", ")}.`, "missing_letterbox_ratio");
+    inputs = [clipFiles[0]!]; ops = letterboxOps(value.ratio); describe = "letterbox added";
   } else if (value.change === "speed") {
     if (value.factor === undefined) return refused(callId, args, "Tell me how fast to make it, from quarter speed to four times speed.", "missing_speed");
     inputs = [clipFiles[0]!]; ops = speedOps(value.factor); describe = `speed changed to ${value.factor}x`;

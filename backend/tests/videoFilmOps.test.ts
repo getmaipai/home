@@ -44,14 +44,14 @@ async function finish(actor: PersonRow, outcome: Awaited<ReturnType<typeof runEd
 }
 
 describe("film finishing ops", () => {
-  test("join forwards transition, title first, credits last, and keeps every source", async () => {
+  test("join forwards transition before its title and credits, and keeps every source", async () => {
     const actor = person(); const first = await clip(actor); const second = await clip(actor);
     const outcome = await runEditVideo({ state: second.chat, args: { clip: "latest", change: "join", clips: [first.job.id, second.job.id], transition: "wipeleft", transition_s: 0.7, title: "Summer at the Lake", subtitle: "August", credits: [{ role: "Camera", name: "Ari" }], credits_title: "Thanks" }, callId: "film", spoken: false });
     const made = await finish(actor, outcome); expect(made.state, JSON.stringify(made)).toBe("done");
     expect(stack.jobs).toHaveLength(1);
     expect(stack.jobs[0]!.input.ops).toEqual([
-      { op: "title_card", text: "Summer at the Lake", subtitle: "August", duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place: "start" },
       { op: "transition", kind: "wipeleft", duration_s: 0.7 },
+      { op: "title_card", text: "Summer at the Lake", subtitle: "August", duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place: "start" },
       { op: "credits", lines: [{ role: "Camera", name: "Ari" }], background: "black", text_color: "white", title: "Thanks" },
     ]);
     expect(getVideoJobFor(actor, first.job.id)?.state).toBe("done"); expect(getVideoJobFor(actor, second.job.id)?.state).toBe("done");

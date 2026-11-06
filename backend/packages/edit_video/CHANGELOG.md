@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Add film looks and cinema letterbox bars to clips, joins and Production films.
 - `film` joins a Production's finished shots in script order, with its title, cast credits and a fade by default; the finished cut is saved on the Production.
 - VIDEO-LORA-10: `styles` and `strength` for another_take, remix and continue. Left out, the new video keeps the first one's styles; an empty list takes the style off. Names only, never ids; a name the person never said is not matched.
 - Add reframe, grade, speed and timed captions to finished video edits.

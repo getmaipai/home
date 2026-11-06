@@ -1,6 +1,6 @@
 {
   "id": "edit_video",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Change a Video",
@@ -61,13 +61,15 @@
           "retake",
           "reframe",
           "grade",
+          "film_look",
+          "letterbox",
           "speed",
           "captions"
           ,"title_card"
           ,"credits"
         ],
         "grounded": false,
-        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song. reframe changes shape; grade changes the look; speed changes playback; captions adds timed words. title_card adds a title at the start; credits adds rolling names at the end. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
+        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song. reframe changes shape; grade changes the look; film_look applies a preset; letterbox adds cinema bars; speed changes playback; captions adds timed words. title_card adds a title at the start; credits adds rolling names at the end. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
       },
       "prompt": {
         "type": "string",
@@ -83,10 +85,17 @@
           "classic-cartoon",
           "anime",
           "3d-animated",
-          "film"
+          "film",
+          "70s_color",
+          "noir",
+          "teal_orange",
+          "bleach_bypass",
+          "technicolor",
+          "faded_vintage",
+          "cool_thriller"
         ],
         "grounded": false,
-        "description": "For remix and continue: a new look, when the person asks for one."
+        "description": "For remix and continue: a video look. For join or film: one of the film look presets."
       },
       "camera": {
         "type": "string",
@@ -237,14 +246,12 @@
         "description": "Optional, for another_take, remix and continue. The names of up to two of the person's saved video styles, only when the person names one; an empty list takes the style off. Left out, the new video keeps the first one's style. Never invent a name."
       },
       "strength": {
-        "type": "string",
-        "enum": [
-          "less",
-          "normal",
-          "more"
+        "oneOf": [
+          { "type": "string", "enum": ["less", "normal", "more"] },
+          { "type": "number", "minimum": 0.2, "maximum": 1 }
         ],
         "grounded": false,
-        "description": "Optional. How strongly the styles apply: less, normal or more. Set it only when the person asks for a lighter or stronger style."
+        "description": "Optional. Style strength (less, normal or more) or film look strength from 0.2 to 1."
       }
       ,"aspect": { "type": "string", "enum": ["9:16", "1:1", "16:9", "4:5"], "grounded": false, "description": "For reframe: the video's new shape." }
       ,"fill": { "type": "string", "enum": ["crop", "blur"], "grounded": false, "description": "For reframe: crop to fill (default) or blur the empty edges." }
@@ -258,6 +265,9 @@
       ,"captions": { "type": "array", "maxItems": 40, "items": { "type": "object", "required": ["from_s", "to_s", "text"], "properties": { "from_s": { "type": "number", "minimum": 0 }, "to_s": { "type": "number", "exclusiveMinimum": 0 }, "text": { "type": "string", "maxLength": 160 } } }, "grounded": false, "description": "For captions: exact caption text and its start and end times, up to 40 lines." }
       ,"position": { "type": "string", "enum": ["bottom", "middle", "top"], "grounded": false, "description": "For captions: where the words appear; bottom by default." }
       ,"production": { "type": "string", "maxLength": 160, "grounded": false, "description": "For film: the Production id or its exact title, when that title is unique among productions you can see." }
+      ,"preset": { "type": "string", "enum": ["70s_color", "noir", "teal_orange", "bleach_bypass", "technicolor", "faded_vintage", "cool_thriller"], "grounded": false, "description": "For film_look: the film look preset to apply." }
+      ,"ratio": { "type": "string", "enum": ["2.39:1", "2:1", "1.85:1", "1.33:1"], "grounded": false, "description": "For letterbox: the cinema frame ratio." }
+      ,"letterbox": { "type": "string", "enum": ["2.39:1", "2:1", "1.85:1", "1.33:1"], "grounded": false, "description": "Optional for join or film: add cinema bars at this frame ratio." }
     }
   },
   "incognito": "ephemeral",

@@ -36,11 +36,13 @@ describe("film a Production", () => {
     const first = await clip(owner); const second = await clip(owner); const third = await clip(owner);
     const production = createMediaProduction(owner, { title: "Summer at the Lake", summary: "A quiet August", cast: [{ subject_id: subject.id, role: "Mira", wardrobe_variant_ids: [], voice_choice: null, notes: "" }, { subject_id: hidden.id, role: "Guest", wardrobe_variant_ids: [], voice_choice: null, notes: "" }], episodes: [{ id: "ep1", scenes: [{ id: "scene1", shots: [{ id: "s1", subject_ids: [], clip_file_id: first.files[0]!.id }] }, { id: "scene2", shots: [{ id: "s2", subject_ids: [], clip_file_id: second.files[0]!.id }, { id: "s3", subject_ids: [], clip_file_id: third.files[0]!.id }] }] }] });
     shareMediaProduction(owner, production.id, shared.id, true);
-    const ownerCut = await finished(owner, await runEditVideo({ state: state(owner), args: { change: "film", production: production.id }, callId: "film", spoken: false }));
+    const ownerCut = await finished(owner, await runEditVideo({ state: state(owner), args: { change: "film", production: production.id, look: "noir", letterbox: "2:1" }, callId: "film", spoken: false }));
     expect(ownerCut.state).toBe("done");
     expect(stack.jobs[0]!.input.ops).toEqual([
-      { op: "title_card", text: "Summer at the Lake", subtitle: "A quiet August", duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place: "start" },
       { op: "transition", kind: "fade", duration_s: 0.5 },
+      { op: "film_look", preset: "noir" },
+      { op: "letterbox", ratio: "2:1" },
+      { op: "title_card", text: "Summer at the Lake", subtitle: "A quiet August", duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place: "start" },
       { op: "credits", lines: [{ role: "Mira", name: "Mira" }, { role: "Guest", name: "Secret" }, { role: "Made with", name: "MaiPai" }], background: "black", text_color: "white" },
     ]);
     expect(stack.jobs[0]!.staged.map((input) => input.bytes)).toEqual([first.files[0]!.bytes, second.files[0]!.bytes, third.files[0]!.bytes]);

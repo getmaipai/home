@@ -44,8 +44,15 @@ export const CAPTION_POSITIONS = ["bottom", "middle", "top"] as const;
 export type CaptionPosition = (typeof CAPTION_POSITIONS)[number];
 export type CaptionLine = { from_s: number; to_s: number; text: string };
 export type GradeValues = { brightness?: number; contrast?: number; saturation?: number; warmth?: number; grain?: number; vignette?: number };
+export const FILM_LOOK_PRESETS = ["70s_color", "noir", "teal_orange", "bleach_bypass", "technicolor", "faded_vintage", "cool_thriller"] as const;
+export type FilmLookPreset = (typeof FILM_LOOK_PRESETS)[number];
+export const LETTERBOX_RATIOS = ["2.39:1", "2:1", "1.85:1", "1.33:1"] as const;
+export type LetterboxRatio = (typeof LETTERBOX_RATIOS)[number];
+export const MAX_EDIT_OPS = 12;
 export function reframeOps(aspect: VideoAspect, fill: "crop" | "blur" = "crop"): EditOp[] { return [{ op: "reframe", aspect, fill }]; }
 export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade", ...values }]; }
+export function filmLookOps(preset: FilmLookPreset, strength?: number): EditOp[] { return [{ op: "film_look", preset, ...(strength === undefined ? {} : { strength }) }]; }
+export function letterboxOps(ratio: LetterboxRatio): EditOp[] { return [{ op: "letterbox", ratio }]; }
 export function speedOps(factor: number): EditOp[] { return [{ op: "speed", factor }]; }
 export function captionsOps(lines: CaptionLine[], position: CaptionPosition = "bottom"): EditOp[] { return [{ op: "captions", lines, position }]; }
 

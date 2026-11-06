@@ -27,6 +27,8 @@ export type EditOp =
   | { op: "credits"; lines: Array<{ role?: string; name: string }>; duration_s?: number; speed?: number; background: "black" | "white" | string; text_color: "black" | "white" | string; title?: string }
   | { op: "reframe"; aspect: "9:16" | "1:1" | "16:9" | "4:5"; fill: "crop" | "blur" }
   | { op: "grade"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; grain?: number; vignette?: number }
+  | { op: "film_look"; preset: "70s_color" | "noir" | "teal_orange" | "bleach_bypass" | "technicolor" | "faded_vintage" | "cool_thriller"; strength?: number }
+  | { op: "letterbox"; ratio: "2.39:1" | "2:1" | "1.85:1" | "1.33:1" }
   | { op: "speed"; factor: number }
   | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
