@@ -254,6 +254,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
+| `frontend/src/shell/pages/MusicVoiceCreate.tsx` | VoiceCreate |
 | `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
 | `frontend/src/shell/pages/MusicWorkspacePage.tsx` | MAKES, STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
@@ -401,6 +402,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/capabilities.ts` | unavailableCapabilities, missingRequired, missingOptional, capabilityWords, installRefusal |
 | `backend/src/lib/capabilityReconcile.ts` | packagesLosingCapability, removalConfirmation, reconcileCapabilities |
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
+| `backend/src/lib/changeVoice.ts` | changeVoice |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, audioAttachedNote, pictureFailureWords |
 | `backend/src/lib/chatLease.ts` | LEASE_GRACE_MS, DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld, chatLeaseHeldBy |
@@ -804,6 +806,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
 | `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, deleteReceivedBackupsForDevice |
 | `backend/src/lib/recordedSpeech.ts` | __setRecordedSpeechFetchForTests, __setRecordedSpeechReferenceForTests, recordedSpeechReferenceForTest, recordedSpeechStatus, waitForRecordedSpeech, submitRecordedSpeech |
+| `backend/src/lib/recordedTags.ts` | FISH_DRAMA_TAGS, tagsForEngine |
 | `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice, resetReducedTruthForTests, enterStackReducedChat, leaveStackReducedChat |
 | `backend/src/lib/reference/article.ts` | __resetReferenceArticleCacheForTests, loadArticleFor, articlePayloadFor, readArticleImage |
 | `backend/src/lib/reference/keyPoints.ts` | __setReferenceKeyPointsModelForTests, articleText, referenceKeyPoints, referenceItemId, readReferenceArticle |
@@ -993,7 +996,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/trash/sweep.ts` | TRASH_SWEEP_MS, startTrashSweeper, stopTrashSweeper |
 | `backend/src/lib/triviaSource.ts` | runTrivia, checkedOpenTdbHost, __resetTriviaForTests |
 | `backend/src/lib/trustProxy.ts` | TRUST_PROXY |
-| `backend/src/lib/tts.ts` | synthesizeSpeech, synthesizeRecordedSpeech |
+| `backend/src/lib/tts.ts` | plannedRecordedEngine, synthesizeSpeech, synthesizeRecordedSpeech |
 | `backend/src/lib/ttsCapabilities.ts` | readTtsTags, getTtsTags, __setTtsTagsForTests |
 | `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
@@ -1073,6 +1076,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, voiceForSpeech |
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
+| `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, runVoiceoverTool, runChangeVoiceTool |
+| `backend/src/lib/voiceover.ts` | voicesFor, makeVoiceover, speakToBytes, speakAndStore |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
 | `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome |

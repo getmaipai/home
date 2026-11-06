@@ -8513,6 +8513,425 @@
         }
       }
     },
+    "/api/voiceover/options": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Voiceover voices available to the signed-in person",
+        "responses": {
+          "200": {
+            "description": "Available voices and their tags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "preset",
+                              "clip"
+                            ]
+                          },
+                          "engine": {
+                            "type": "string",
+                            "enum": [
+                              "fish-audio-drama-3",
+                              "chatterbox-turbo"
+                            ]
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "kind",
+                          "engine",
+                          "tags"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "voices"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voiceover": {
+      "post": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Create a voiceover in the Library",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "voice": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "script"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved audio file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file_id": {
+                      "type": "string"
+                    },
+                    "seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "engine": {
+                      "type": "string",
+                      "enum": [
+                        "fish-audio-drama-3",
+                        "chatterbox-turbo"
+                      ]
+                    },
+                    "revision": {
+                      "type": "string"
+                    },
+                    "voice": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "preset",
+                        "clip"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "file_id",
+                    "seconds",
+                    "engine",
+                    "voice",
+                    "kind"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid script.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused by the content or age policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown voice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Speech unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voiceover/change": {
+      "post": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Change the voice in an owned Library audio or video file",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "voice": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "file_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed voice Library file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file_id": {
+                      "type": "string"
+                    },
+                    "kind_of_source": {
+                      "type": "string",
+                      "enum": [
+                        "audio",
+                        "video"
+                      ]
+                    },
+                    "seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "spoken_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "source_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "difference_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "engine": {
+                      "type": "string",
+                      "enum": [
+                        "fish-audio-drama-3",
+                        "chatterbox-turbo"
+                      ]
+                    },
+                    "revision": {
+                      "type": "string"
+                    },
+                    "voice": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "preset",
+                        "clip"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "file_id",
+                    "kind_of_source",
+                    "seconds",
+                    "spoken_seconds",
+                    "source_seconds",
+                    "difference_seconds",
+                    "engine",
+                    "voice",
+                    "kind"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The owned audio or video file was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Speech or voice is not usable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Speech or video editing is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/turn/{turn_id}/cancel": {
       "post": {
         "tags": [
