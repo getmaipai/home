@@ -34,7 +34,7 @@ beforeEach(() => {
   resetFitAsksForTests(); resetTierStateForTests(); resetChatActivityForTests(); resetFitMemoryForTests(); resetDownshiftForTests(); resetActivePlanForTests();
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: PLAIN })));
 });
-afterEach(() => { fake.restore(); __setAgeCheckRunnerForTests(null); setBudgetReader(null); });
+afterEach(() => { fake.restore(); setBudgetReader(null); });
 
 const note = (id: string) => db.select().from(attachments).where(eq(attachments.id, id)).get()!.provenance;
 const item = (id: string) => lockItemOfProvenance("owner", note(id));
