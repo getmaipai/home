@@ -246,6 +246,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/EnginesPage.tsx` | EnginesIcon, EnginesConsole |
 | `frontend/src/shell/pages/FamilyPage.tsx` | FamilyPage |
 | `frontend/src/shell/pages/FilesPage.tsx` | FilesPage |
+| `frontend/src/shell/pages/HousePage.tsx` | HousePage |
 | `frontend/src/shell/pages/MakeSongPage.tsx` | MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, songAddress, Field, Shelf |
 | `frontend/src/shell/pages/MarkdownDocument.tsx` | MarkdownDocument |
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |

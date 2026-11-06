@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-06T22:00:39.175Z",
+  "generatedAt": "2026-11-06T22:10:49.821Z",
   "kitTag": "ui-v0.5.502",
   "items": [
     {
@@ -896,7 +896,7 @@
       "group": "light",
       "verdict": "later",
       "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "loading-state.tsx",
@@ -912,7 +912,7 @@
       "group": "lock",
       "verdict": "later",
       "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "lyrics-list.tsx",
@@ -1352,7 +1352,7 @@
       "group": "scene",
       "verdict": "later",
       "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "schedule-card.tsx",
@@ -1524,7 +1524,7 @@
       "group": "switch",
       "verdict": "later",
       "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "task-browser.tsx",
