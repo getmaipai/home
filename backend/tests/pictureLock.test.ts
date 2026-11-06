@@ -90,10 +90,14 @@ describe("stored pictures obey the Adult lock", () => {
     expect(text).not.toContain(job.id);
     expect(text).not.toContain(job.jobId);
     expect(text).not.toContain("Zebraquill history picture prompt");
+    expect(text).toContain('"picture":{"locked":true}');
+    const teenHistory = await h.teen.client.get(`/api/conversations/${job.conversationId}/turns`);
+    expect(await teenHistory.text()).not.toContain('"picture":{"locked":true}');
     const proof = unlockHeader(await unlock(h.adult.client));
     const openHistory = await h.adult.client.get(`/api/conversations/${job.conversationId}/turns`, proof);
     const openText = await openHistory.text();
     expect(openText).toContain(job.jobId);
+    expect(openText).toContain(`"picture":{"id":"${job.jobId}"}`);
   });
 
   test("temporary generated picture reads require the Adult proof", async () => {

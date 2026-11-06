@@ -45,11 +45,12 @@ export function redactLockedPictureOutcome(actor: PersonRow, outcome: ToolExecut
   return outcomeOf({ callId: outcome.callId, packageId: outcome.packageId, status: outcome.status, via: outcome.via, args: { locked: true }, at: outcome.at, durationMs: outcome.durationMs, result: { reply: { text: LOCKED_PICTURE_RESULT_TEXT }, data: { locked: true }, actions: [] } });
 }
 
-export function pictureJobIdsByTurnRedacted(actor: PersonRow, turnIds: readonly string[]): Map<string, string | null> {
-  const out = new Map<string, string | null>();
+export function pictureJobIdsByTurnRedacted(actor: PersonRow, turnIds: readonly string[]): Map<string, string | "locked" | null> {
+  const out = new Map<string, string | "locked" | null>();
   for (const [turnId, id] of pictureJobIdsByTurn(actor, turnIds)) {
     const job = getPictureJob(actor, id);
-    out.set(turnId, job && pictureJobLockState(actor, job) === "open" ? id : null);
+    const state = job ? pictureJobLockState(actor, job) : "hidden";
+    out.set(turnId, state === "open" ? id : state === "locked" ? "locked" : null);
   }
   return out;
 }

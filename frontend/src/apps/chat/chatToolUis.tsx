@@ -2,7 +2,7 @@
 // project, tool timeline), moved verbatim out of ChatPage.tsx
 // (SHARED-THREAD-01). elementBindings.ts maps tool ids to these.
 import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
-import { useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
+import { createElement, useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -29,6 +29,7 @@ import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { useSongByline } from "@/apps/chat/useSongByline";
 import { useVideoAdultMark } from "@/apps/chat/videoAdultMark";
+import { usePictureAdultMark } from "@/apps/chat/pictureAdultMark";
 import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 export { musicFileName, musicHint } from "@/apps/chat/MusicCardView";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
@@ -499,7 +500,7 @@ function usePictureCard(id: string | undefined) {
     queryKey: ["picture", id],
     queryFn: ({ signal }) => picturesApi.card(id!, signal),
     enabled: id !== undefined,
-    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && PICTURE_SETTLED.has(q.state.data.state)) ? false : PICTURE_POLL_MS),
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && ("locked" in q.state.data || PICTURE_SETTLED.has(q.state.data.state))) ? false : PICTURE_POLL_MS),
   });
 }
 
@@ -512,10 +513,10 @@ function galleryImagesOf(card: PictureCard) {
   }));
 }
 
-export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<string, never>, { id?: string; locked?: true }> = ({ result }) => {
   const query = usePictureCard(result?.id);
-  const card = query.data;
-  const active = card !== undefined && (card.state === "queued" || card.state === "running");
+  const card = query.data && "locked" in query.data ? null : query.data;
+  const active = card !== undefined && card !== null && (card.state === "queued" || card.state === "running");
   const [tick, setTick] = useState(() => Date.now());
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
   useEffect(() => { if (card) setFetchedAt(Date.now()); }, [card]);
@@ -545,16 +546,20 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
   );
 };
 
-export const PictureToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+export const PictureToolRender: ToolCallMessagePartComponent<Record<string, never>, { id?: string; locked?: true }> = ({ result }) => {
   const query = usePictureCard(result?.id);
   const [retrying, setRetrying] = useState(false);
   // ENGINE-STATUS-MEDIA-01: the actions that ask for a new picture are greyed out, with the reason as their hint, while the engine cannot take work.
   const making = useMakingAvailability("image");
   const edit = useContext(ImageEditContext);
-  const card = query.data;
+  const card = query.data && "locked" in query.data ? null : query.data;
+  const adultMark = usePictureAdultMark(card ?? { id: result?.id ?? "", adult: null }, () => { void query.refetch(); });
   if (!result) return null;
+  if (result.locked || (query.data && "locked" in query.data)) return createElement(VideoPlayer, { locked: true, making: query.data && "locked" in query.data ? query.data.making : false });
   if (!card) {
-    return query.isError ? <ErrorState layout="inline" title="I couldn't check on that picture" detail="Reload the chat to try again." retrying={false} /> : null;
+    if (!query.isError) return null;
+    const errorCard = <ErrorState layout="inline" title="I couldn't check on that picture" detail="Reload the chat to try again." retrying={false} />;
+    return errorCard;
   }
   if (card.files.length > 0) {
     // The gallery's hover Edit affordance stays useful on a pointer; the explicit gallery action is always visible,
@@ -580,19 +585,23 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
       onSelect: () => { setRetrying(true); void picturesApi.again(card.id, "detailed", undefined, "max").then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
     }] : [];
     const remixActions = card.can_vary ? [{ id: "remix", label: "Remix", hint: making.reason ?? "Change the words and make a new one", disabled: retrying || making.disabled, onSelect: () => { void askRemix("picture", card.prompt).then((words) => { if (!words) return; setRetrying(true); void picturesApi.again(card.id, undefined, words).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }); } }] : [];
-    return (
+    const gallery = (
+      <>
       <ImageGallery
         images={galleryImagesOf(card)}
         maxVisible={4}
         size="large"
         {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: editable, editLabel: edit.label ?? "Edit picture" } : {})}
         /* IMGGEN-QUALITY-01: the on-the-fly choice. A Quick picture offers Detailed (slower, finer); a Detailed one offers Quick. No model names. */
-        {...(editActions.length + qualityActions.length + remixActions.length + maxActions.length > 0 ? { actions: [...editActions, ...remixActions, ...qualityActions, ...maxActions] } : {})}
+        {...(editActions.length + qualityActions.length + remixActions.length + maxActions.length + adultMark.actions.length > 0 ? { actions: [...editActions, ...remixActions, ...qualityActions, ...maxActions, ...adultMark.actions] } : {})}
       />
+      {adultMark.dialog}
+      </>
     );
+    return gallery;
   }
   if (card.state === "failed" || card.state === "cancelled") {
-    return (
+    const failure = (
       <ErrorState
         layout="inline"
         title={card.state === "cancelled" ? "You stopped this picture" : (card.error ?? "I couldn't make that picture. Try again or change the request.")}
@@ -601,6 +610,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
         onRetry={() => { setRetrying(true); void picturesApi.again(card.id).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }}
       />
     );
+    return failure;
   }
   return null;
 };

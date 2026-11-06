@@ -60432,6 +60432,76 @@
                         "stop_id": {
                           "type": "string",
                           "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                        },
+                        "adult": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "made_audience": {
+                              "type": "string",
+                              "enum": [
+                                "all-ages",
+                                "adult-only"
+                              ]
+                            },
+                            "lock": {
+                              "type": "string",
+                              "enum": [
+                                "on",
+                                "off"
+                              ]
+                            },
+                            "can_clear": {
+                              "type": "boolean"
+                            },
+                            "can_mark": {
+                              "type": "boolean"
+                            },
+                            "line": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "history": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "action": {
+                                    "type": "string",
+                                    "enum": [
+                                      "clear",
+                                      "mark"
+                                    ]
+                                  },
+                                  "via": {
+                                    "type": "string",
+                                    "enum": [
+                                      "creator_passcode",
+                                      "creator",
+                                      "admin",
+                                      "auto"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "action",
+                                  "via",
+                                  "at"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "made_audience",
+                            "lock",
+                            "can_clear",
+                            "can_mark",
+                            "line",
+                            "history"
+                          ]
                         }
                       },
                       "required": [
@@ -60458,7 +60528,8 @@
                         "max_offered",
                         "size",
                         "fit_ask",
-                        "stop_id"
+                        "stop_id",
+                        "adult"
                       ]
                     },
                     {
@@ -60816,6 +60887,76 @@
                         "stop_id": {
                           "type": "string",
                           "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                        },
+                        "adult": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "made_audience": {
+                              "type": "string",
+                              "enum": [
+                                "all-ages",
+                                "adult-only"
+                              ]
+                            },
+                            "lock": {
+                              "type": "string",
+                              "enum": [
+                                "on",
+                                "off"
+                              ]
+                            },
+                            "can_clear": {
+                              "type": "boolean"
+                            },
+                            "can_mark": {
+                              "type": "boolean"
+                            },
+                            "line": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "history": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "action": {
+                                    "type": "string",
+                                    "enum": [
+                                      "clear",
+                                      "mark"
+                                    ]
+                                  },
+                                  "via": {
+                                    "type": "string",
+                                    "enum": [
+                                      "creator_passcode",
+                                      "creator",
+                                      "admin",
+                                      "auto"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "action",
+                                  "via",
+                                  "at"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "made_audience",
+                            "lock",
+                            "can_clear",
+                            "can_mark",
+                            "line",
+                            "history"
+                          ]
                         }
                       },
                       "required": [
@@ -60842,7 +60983,8 @@
                         "max_offered",
                         "size",
                         "fit_ask",
-                        "stop_id"
+                        "stop_id",
+                        "adult"
                       ]
                     },
                     {
@@ -61181,6 +61323,76 @@
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    },
+                    "adult": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "made_audience": {
+                          "type": "string",
+                          "enum": [
+                            "all-ages",
+                            "adult-only"
+                          ]
+                        },
+                        "lock": {
+                          "type": "string",
+                          "enum": [
+                            "on",
+                            "off"
+                          ]
+                        },
+                        "can_clear": {
+                          "type": "boolean"
+                        },
+                        "can_mark": {
+                          "type": "boolean"
+                        },
+                        "line": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "history": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "clear",
+                                  "mark"
+                                ]
+                              },
+                              "via": {
+                                "type": "string",
+                                "enum": [
+                                  "creator_passcode",
+                                  "creator",
+                                  "admin",
+                                  "auto"
+                                ]
+                              },
+                              "at": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "via",
+                              "at"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "made_audience",
+                        "lock",
+                        "can_clear",
+                        "can_mark",
+                        "line",
+                        "history"
+                      ]
                     }
                   },
                   "required": [
@@ -61207,7 +61419,8 @@
                     "max_offered",
                     "size",
                     "fit_ask",
-                    "stop_id"
+                    "stop_id",
+                    "adult"
                   ]
                 }
               }

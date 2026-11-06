@@ -434,7 +434,7 @@ export function MakeVariationMenuItem() {
   const [busy, setBusy] = useState(false);
   // ENGINE-STATUS-MEDIA-01: greyed out with the reason while the picture engine cannot take work.
   const making = useMakingAvailability("image");
-  if (!pictureId || !card.data?.can_vary) return null;
+  if (!pictureId || !card.data || "locked" in card.data || !card.data.can_vary) return null;
   return (
     <ActionBarMorePrimitive.Item
       // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
@@ -470,9 +470,10 @@ export function AnimatePictureMenuItem() {
   const status = useQuery({ queryKey: ["video-status"], queryFn: () => videosApi.status(), enabled: pictureId !== undefined, staleTime: 30_000 });
   const [busy, setBusy] = useState(false);
   const making = useMakingAvailability("video");
-  const latest = card.data?.files[card.data.files.length - 1];
-  if (!pictureId || !turnId || hasVideo || !latest || !card.data?.conversation_id || !status.data?.can_make) return null;
-  const conversationId = card.data.conversation_id;
+  const openCard = card.data && !("locked" in card.data) ? card.data : undefined;
+  const latest = openCard?.files[openCard.files.length - 1];
+  if (!pictureId || !turnId || hasVideo || !latest || !openCard?.conversation_id || !status.data?.can_make) return null;
+  const conversationId = openCard.conversation_id;
   return (
     <ActionBarMorePrimitive.Item
       // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility

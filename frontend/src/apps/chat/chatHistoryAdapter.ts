@@ -232,7 +232,7 @@ export function rowsToBranchableMessages(
               // project still running.
               ...(row.project ? [toolCallPart(`${row.id}-project`, "project", row.project)] : []),
               // IMGGEN-UI-01: the same two parts as live, so a reload shows the progress or the finished pictures.
-              ...(row.picture ? [toolCallPart(`${row.id}-picture-progress`, "picture_progress", row.picture), toolCallPart(`${row.id}-picture`, "picture", row.picture)] : []),
+              ...(row.picture ? [toolCallPart(`${row.id}-picture-progress`, "picture_progress", "locked" in row.picture ? { locked: true as const } : { id: row.picture.id }), toolCallPart(`${row.id}-picture`, "picture", "locked" in row.picture ? { locked: true as const } : { id: row.picture.id })] : []),
               // VIDEO-GEN-06: and the video card, the same part as live.
               ...(row.video ? [toolCallPart(`${row.id}-video`, "video", row.video)] : []),
               // MUSIC-GEN-04: and the song card, the same part as live.

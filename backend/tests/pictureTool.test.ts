@@ -157,7 +157,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       expect(card.files[0]!.alt).toContain("red fox");
       // A reload of the thread carries the same job id.
       const turns = listConversationTurns(people.owner, value.conversation_id);
-      expect(turns.ok && turns.value.some((t) => t.picture?.id === value.picture!.id)).toBe(true);
+      expect(turns.ok && turns.value.some((t) => t.picture && "id" in t.picture && t.picture.id === value.picture!.id)).toBe(true);
     });
   });
 

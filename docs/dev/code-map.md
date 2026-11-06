@@ -102,6 +102,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerDraftRestore.tsx` | useComposerDraftRestore |
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, DUPLEX_CONFIRM_MS, REACTION_MIN_WORDS |
+| `frontend/src/apps/chat/pictureAdultMark.tsx` | usePictureAdultMark |
 | `frontend/src/apps/chat/videoAdultMark.tsx` | unmarkExplainer, UNMARK_EXPLAINER, useVideoAdultMark |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
 | `frontend/src/apps/clock/AlarmDays.tsx` | AlarmDays |

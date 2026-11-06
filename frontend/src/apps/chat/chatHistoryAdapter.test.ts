@@ -52,6 +52,16 @@ describe("rowsToBranchableMessages", () => {
     expect(user.metadata?.custom?.quote).toBeUndefined();
   });
 
+  test("a locked picture history marker is replayed as the picture tool result without an id", () => {
+    const row = { ...makeRow("row-locked-picture", "The picture is ready."), picture: { locked: true as const } } as ConversationTurnWithMemoryIds;
+    const reply = flatten(rowsToBranchableMessages([row], "Sage", "conv-example123"))[1]!.message;
+    expect(reply.content).toMatchObject([
+      { type: "text", text: "The picture is ready." },
+      { type: "tool-call", toolName: "picture_progress", result: { locked: true } },
+      { type: "tool-call", toolName: "picture", result: { locked: true } },
+    ]);
+  });
+
   // SAFETY-NOTICE-01: crisis resources a reply carried stay beside it after a reload.
   test("a reply that carried crisis resources gets its support block back on reload; others get none", () => {
     const support = { title: "Support is available", text: "Call or text 988.", actions: [{ label: "Call 988", href: "tel:988" }] };

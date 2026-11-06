@@ -133,9 +133,14 @@ describe("picture lock clear route", () => {
     const h = await household(); const actor = h.row("Marlow"); const source = await makePicture(actor, "adult-only", "source");
     const job = await start(actor, { sourceFileId: source.id, kind: "variation" }); fake.pollsToFinish = 1;
     const done = await finish(actor, job.id); const id = done.files[0]!.id;
+    const withProof = unlockHeader(await unlock(h.adult.client));
+    const openCard = await h.adult.client.get(`/api/pictures/jobs/${job.id}`, withProof);
+    expect((await openCard.json() as { adult: unknown }).adult).toMatchObject({ made_audience: "adult-only", lock: "on", can_clear: true, can_mark: false });
     const ticket = (await (await ticketFor(h.adult.client, job.id)).json() as { ticket: string }).ticket;
     expect((await markRoute(h.adult.client, job.id, { action: "clear", ticket })).status).toBe(200);
     expect(item(id)).toMatchObject({ madeAudience: "adult-only", lock: "off" });
+    const clearedCard = await h.adult.client.get(`/api/pictures/jobs/${job.id}`);
+    expect((await clearedCard.json() as { adult: unknown }).adult).toMatchObject({ made_audience: "adult-only", lock: "off", can_clear: false, can_mark: true });
     expect(__markRowsForTests(id).map((r) => [r.action, r.via])).toEqual([["mark", "auto"], ["clear", "creator_passcode"]]);
     expect((await h.adult.client.get(`/api/files/${id}/content`)).status).toBe(200);
   });

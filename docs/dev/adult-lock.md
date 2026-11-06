@@ -52,7 +52,7 @@ remain video-specific; picture edits use their existing `image-edit:` root relat
 ## Pictures slice 2
 
 Picture job cards, reads and cancellation use `pictureJobLockItem` and the shared `lockState`. A locked adult sees the same tile as videos; a minor or guest
-gets the missing-job answer. Preview is 404 with no-store, and Another take is 423 when locked. Chat history omits a locked picture job id, and the stored
+gets the missing-job answer. Preview is 404 with no-store, and Another take is 423 when locked. Chat history withholds a locked picture job id, and the stored
 tool result is a placeholder without prompt or file ids. Companion activity omits locked picture jobs. Temporary generated images use the same lock check
 for reads and edit sources. Auto-mark and unmark, plus the frontend card, remain for later slices.
 
@@ -65,6 +65,10 @@ Image edits carry the current mark of their source through `saveVersion`, includ
 ## Pictures slice 4
 
 Chat refuses an adult-only or unknown picture style without a live Adult unlock proof before starting a job. The reply is a plain lock line with no prompt or style name; the tool part is redacted in history. A proof allows the job, which keeps slice 3's adult-only mark and lock. Variations also require a proof when their saved request names an adult-only style.
+
+## Pictures slice 5
+
+The open adult picture card carries the same `adult` state as a video card, including `can_clear`, `can_mark`, the state line and the creator's mark history. Its gallery offers Unmark as NSFW with the kit `AdultLockDialog` and a fresh ticket, or Mark as NSFW without a passcode. The picture card uses the same `VideoPlayer` locked branch as video cards, which renders the kit `LockTile`; unlocking resets chat queries so history supplies the job id again and the picture card refetches. Reloaded history returns `picture: { locked: true }` only to an adult who owns the locked job. Hidden jobs for minors and guests still have no picture field.
 
 ## Where it is applied
 

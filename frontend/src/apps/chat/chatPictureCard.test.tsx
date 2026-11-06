@@ -5,12 +5,14 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
+import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
 import { PictureProgressToolRender, PictureToolRender } from "@/apps/chat/chatToolUis";
-import { picturesApi, type PictureCard } from "@/lib/picturesApi";
+import { picturesApi, type PictureCard, type PictureCardOrLocked } from "@/lib/picturesApi";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 
 afterEach(cleanup);
 
-const card = (over: Partial<PictureCard> = {}): PictureCard => ({ id: "pic-1", state: "running", percent: 40, label: "Drawing", position: null, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 3_000, prompt: "a red fox", kind: "generate", conversation_id: "conv-1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1", ...over });
+const card = (over: Partial<PictureCard> = {}): PictureCard => ({ id: "pic-1", state: "running", percent: 40, label: "Drawing", position: null, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 3_000, prompt: "a red fox", kind: "generate", conversation_id: "conv-1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1", adult: null, ...over });
 const FILE = { id: "file-1", url: "https://example.test/api/image-edit/pictures/file-1?conversation_id=conv-1", width: 1024, height: 1024, seed: 7, model: "flux2-klein-4b", steps: 4, ms: 3900, alt: "a red fox" };
 const props = { toolCallId: "t", toolName: "picture", args: {}, argsText: "{}", result: { id: "pic-1" }, isError: false, status: { type: "complete" }, addResult: () => undefined, resume: () => undefined } as unknown as ComponentProps<typeof PictureToolRender>;
 
@@ -23,6 +25,64 @@ function stub(data: PictureCard) {
 }
 
 describe("the picture card", () => {
+  test("a locked picture shows only the lock tile, then refetches and shows the picture after unlock", async () => {
+    const original = { ...picturesApi };
+    let reads = 0;
+    picturesApi.card = mock(async (): Promise<PictureCardOrLocked> => ++reads === 1 ? { locked: true, making: false } : card({ state: "done", percent: 100, files: [FILE] }));
+    const me = { id: "p1", pinDigits: null, hasSecret: true } as never;
+    const view = renderWithQueryClient(
+      <WakeWordPersonContext.Provider value={me}>
+        <AdultLockProvider credentialKind="password" credentialWord="password" unlock={async () => ({ status: "ok", proof: "proof" })} onUnlocked={() => { void view.queryClient.resetQueries({ queryKey: ["picture", "pic-1"] }); }}>
+          <PictureToolRender {...props} />
+        </AdultLockProvider>
+      </WakeWordPersonContext.Provider>,
+    );
+    await waitFor(() => expect(view.getByRole("button", { name: "Locked items. Press to enter your passcode." })).toBeTruthy());
+    expect(view.container.textContent).not.toContain("a red fox");
+    expect(view.container.querySelector("img")).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Locked items. Press to enter your passcode." }));
+    await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-password"]')).toBeTruthy());
+    const input = document.querySelector<HTMLInputElement>('[data-slot="adult-lock-password"]')!;
+    fireEvent.change(input, { target: { value: "secret" } });
+    fireEvent.click(view.getByRole("button", { name: "Unlock" }));
+    await waitFor(() => expect(view.container.querySelector('[data-slot="image-gallery"]')).toBeTruthy());
+    expect(view.container.querySelector("img")?.getAttribute("src")).toBe(FILE.url);
+    Object.assign(picturesApi, original);
+  });
+
+  test("the adult menu offers Unmark only when clear is allowed and uses a fresh ticket", async () => {
+    const original = { ...picturesApi };
+    const confirmUnmark = mock(async () => ({ ticket: "ticket-1", expires_in: 30 }));
+    const adultMark = mock(async () => ({ made_audience: "adult-only" as const, lock: "off" as const }));
+    picturesApi.card = mock(async () => card({ state: "done", percent: 100, files: [FILE], adult: { made_audience: "adult-only", lock: "on", can_clear: true, can_mark: false, line: "Marked NSFW and locked.", history: [] } }));
+    picturesApi.confirmUnmark = confirmUnmark;
+    picturesApi.adultMark = adultMark;
+    const me = { id: "p1", pinDigits: null, hasSecret: true } as never;
+    const view = renderWithQueryClient(<WakeWordPersonContext.Provider value={me}><PictureToolRender {...props} /></WakeWordPersonContext.Provider>);
+    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"]')).toBeTruthy());
+    fireEvent.change(document.querySelector<HTMLInputElement>('[data-slot="adult-lock-password"]')!, { target: { value: "secret" } });
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
+    await waitFor(() => expect(adultMark).toHaveBeenCalledWith("pic-1", { action: "clear", ticket: "ticket-1" }));
+    expect(confirmUnmark).toHaveBeenCalledWith("pic-1", "secret");
+    Object.assign(picturesApi, original);
+  });
+
+  test("the adult menu offers Mark when the lock is already clear", async () => {
+    const original = { ...picturesApi };
+    const adultMark = mock(async () => ({ made_audience: "adult-only" as const, lock: "on" as const }));
+    picturesApi.card = mock(async () => card({ state: "done", percent: 100, files: [FILE], adult: { made_audience: "adult-only", lock: "off", can_clear: false, can_mark: true, line: "Marked NSFW, lock removed.", history: [] } }));
+    picturesApi.adultMark = adultMark;
+    const view = renderWithQueryClient(<PictureToolRender {...props} />);
+    await waitFor(() => expect(view.getByRole("button", { name: "Mark as NSFW" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Unmark as NSFW" })).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Mark as NSFW" }));
+    await waitFor(() => expect(adultMark).toHaveBeenCalledWith("pic-1", { action: "mark" }));
+    Object.assign(picturesApi, original);
+  });
+
   test("while a picture is made it shows the progress card with the engine's line, elapsed seconds and a Stop that stops what is running", async () => {
     const restore = stub(card({ stop_id: "pic-2" }));
     const v = renderWithQueryClient(<PictureProgressToolRender {...props} />);

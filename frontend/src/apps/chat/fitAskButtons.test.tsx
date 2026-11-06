@@ -9,7 +9,7 @@ import { fitAskApi, fitAskActions } from "@/lib/fitAsk";
 
 afterEach(cleanup);
 
-const base = { id: "pic-1", state: "queued", percent: 0, label: "Max is not ready right now. Pick below.", position: 1, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 1000, prompt: "a red fox", kind: "generate", conversation_id: "c1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1" } as PictureCard;
+const base = { id: "pic-1", state: "queued", percent: 0, label: "Max is not ready right now. Pick below.", position: 1, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 1000, prompt: "a red fox", kind: "generate", conversation_id: "c1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1", adult: null } as PictureCard;
 const props = { toolCallId: "t", toolName: "picture", args: {}, argsText: "{}", result: { id: "pic-1" }, isError: false, status: { type: "complete" }, addResult: () => undefined, resume: () => undefined } as unknown as ComponentProps<typeof PictureProgressToolRender>;
 
 function stub(data: PictureCard, answer: () => Promise<{ answered: boolean }> = async () => ({ answered: true })) {

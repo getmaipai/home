@@ -24,7 +24,7 @@ import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCop
 import { likenessRefusal } from "@/lib/likeness";
 import { lockedView, requestProof, unlockedFor } from "@/lib/adultLock";
 import { pictureJobGroupLockState, pictureJobLockState } from "@/lib/pictures/lock";
-import { setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
+import { adultStateOf, setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
 import { getCookie } from "hono/cookie";
 import { sessionKeyOf } from "@/lib/adultLock";
 import { isOwnerOrAdmin } from "@/lib/access";
@@ -59,6 +59,7 @@ const JobSchema = z.object({
   size: z.string().describe("The size being made, like 1024x1024."),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
+  adult: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]), can_clear: z.boolean(), can_mark: z.boolean(), line: z.string().nullable(), history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })) }).nullable(),
 });
 const CardOrLocked = z.union([JobSchema, z.object({ locked: z.literal(true), making: z.boolean() })]);
 
@@ -141,6 +142,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
     can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
     ...qualityFields(last, detailedReadyNow, canVary && root.kind !== "edit" && !active),
     max_offered: canVary && root.kind !== "edit" && !active && !kid && maxOffered(actor, "image"),
+    adult: files[0] && !root.temporary ? adultStateOf(actor, files[0].id) : null,
   };
 }
 
