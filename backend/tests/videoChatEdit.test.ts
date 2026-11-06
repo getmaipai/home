@@ -164,7 +164,8 @@ describe("join", () => {
     expect((await edit(state, { clip: "latest", change: "join", clips: [mine.job.id, theirs.job.id] })).result?.data).toEqual({ refused: "no_clip" });
     expect((await edit(state, { clip: "latest", change: "join", clips: [mine.job.id, "vjob-nothing"] })).result?.reply?.text).toContain(NO_CLIPS_LINE);
     expect((await edit(state, { clip: "latest", change: "join" })).result?.reply?.text).toContain(JOIN_CLIPS_LINE);
-    expect((await edit(state, { clip: "latest", change: "join", clips: [mine.job.id] })).status).toBe("failed");
+    // cut_to_beat takes one clip, so the schema now lets a single clip through: join refuses it in plain words instead of failing the call
+    expect((await edit(state, { clip: "latest", change: "join", clips: [mine.job.id] })).result?.reply?.text).toContain(JOIN_CLIPS_LINE);
     expect((await edit(state, { clip: "latest", change: "join", clips: Array(7).fill(mine.job.id) })).status).toBe("failed");
     expect(stack.jobs).toHaveLength(0);
   });
