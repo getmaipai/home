@@ -29,6 +29,26 @@ export type TtsOpResult =
   | { ok: true; value: TtsSynthesizeValue }
   | { ok: false; status: 400 | 503; code: "invalid_input" | "unavailable"; error: string };
 
+async function recordedReferenceFor(voiceUrl?: string): Promise<{ clip: { bytes: Uint8Array; mimeType: string; transcript?: string | null } | null; transcript: string | null }> {
+  const testReference = recordedSpeechReferenceForTest(voiceUrl);
+  const household = testReference ? true : householdVoiceSpeech(voiceUrl);
+  const match = typeof voiceUrl === "string" ? /(?:\/cloned\/)?(voice-[a-z0-9]{6,})(?:\/file)?/.exec(voiceUrl) : null;
+  const clip = testReference ?? (household && match ? readClonedVoiceClip(match[1]!) : null);
+  let transcript = testReference?.transcript ?? clip?.transcript ?? null;
+  if (clip && !transcript && match) transcript = await transcribeClonedVoiceOnce(match[1]!, clip.bytes, clip.mimeType);
+  return { clip, transcript };
+}
+
+/** Whether the recorded engine will actually be selected for this voice. */
+export async function plannedRecordedEngine(voiceUrl?: string): Promise<RecordedSpeechEngine> {
+  try {
+    const { clip, transcript } = await recordedReferenceFor(voiceUrl);
+    if (!clip || !transcript?.trim()) return "chatterbox-turbo";
+    const status = await waitForRecordedSpeech();
+    return status?.available && status.ready && status.installed ? "fish-audio-drama-3" : "chatterbox-turbo";
+  } catch { return "chatterbox-turbo"; }
+}
+
 /** `voiceUrl` (2026-09-04, "per user selection of voice"): the caller's
  * already-resolved choice (routes/tts.ts reads it from the signed-in
  * actor's `tts.voice_id` person setting) - this function stays a plain
@@ -89,12 +109,7 @@ export async function synthesizeRecordedSpeech(rawText: string, voiceUrl?: strin
   const fallback = async (): Promise<RecordedSpeechResult> => ({ ...(await synthesizeSpeech(rawText, voiceUrl, opts)), engine: "chatterbox-turbo" });
   if (typeof rawText !== "string" || rawText.trim().length === 0 || rawText.length > MAX_TEXT_LENGTH) return { ...(await synthesizeSpeech(rawText, voiceUrl, opts)), engine: "chatterbox-turbo" };
   try {
-    const testReference = recordedSpeechReferenceForTest(voiceUrl);
-    const household = testReference ? true : householdVoiceSpeech(voiceUrl);
-    const match = typeof voiceUrl === "string" ? /(?:\/cloned\/)?(voice-[a-z0-9]{6,})(?:\/file)?/.exec(voiceUrl) : null;
-    const clip = testReference ?? (household && match ? readClonedVoiceClip(match[1]!) : null);
-    let transcript = testReference?.transcript ?? clip?.transcript ?? null;
-    if (clip && !transcript && match) transcript = await transcribeClonedVoiceOnce(match[1]!, clip.bytes, clip.mimeType);
+    const { clip, transcript } = await recordedReferenceFor(voiceUrl);
     if (!clip || !transcript?.trim()) return await fallback();
     const status = await waitForRecordedSpeech();
     if (!status?.available || !status.ready || !status.installed) return await fallback();
