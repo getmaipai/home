@@ -10,7 +10,7 @@
 // its answer to "does this person have this, even though their role
 // alone wouldn't allow it" - a widening mechanism only. It never narrows
 // what the role ladder already allows an owner/admin to do.
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { grants, people } from "@/db/schema";
 import { newGrantId } from "@/lib/id";
@@ -209,7 +209,7 @@ export function personIsGranted(personId: string, action: string): boolean {
   const rows = db
     .select()
     .from(grants)
-    .where(and(eq(grants.person, personId), isNull(grants.deletedAt)))
+    .where(and(eq(grants.person, personId), inArray(grants.action, grantSpellings(wanted)), isNull(grants.deletedAt)))
     .all()
     .filter((r) => isGrantActive(r, now) && normalizeGrantTarget(r.action) === wanted);
   if (rows.length === 0) return false;
@@ -220,6 +220,14 @@ export function personIsGranted(personId: string, action: string): boolean {
 // CONN-INSTANCES-01 (condition C2): one function gives every connector grant target its full instance-prefixed form
 // before any comparison. `house.control:area:kitchen` and `house.control:default/area:kitchen` are the same grant.
 // Stored grants are never rewritten; new grants are written prefixed.
+/** Every stored spelling of one normalised action: the prefixed form and, for the `default` instance, the unprefixed one. */
+function grantSpellings(wanted: string): string[] {
+  const colon = wanted.indexOf(":");
+  if (colon < 0) return [wanted];
+  const verb = wanted.slice(0, colon);
+  const target = wanted.slice(colon + 1);
+  return target.startsWith("default/") ? [wanted, `${verb}:${target.slice("default/".length)}`] : [wanted];
+}
 const INSTANCE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,30}$/;
 const CONNECTOR_VERB_PREFIXES = ["house.", "uptime_kuma.", "gitea.", "immich.", "unifi.", "plex."] as const;
 

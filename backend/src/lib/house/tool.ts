@@ -88,14 +88,14 @@ export type HouseToolDeps = {
 };
 
 const defaultLoadRegistry = loadHouseRegistries;
-const serverCooldowns = new Map<HouseServerAction, number>();
+const serverCooldowns = new Map<string, number>();
 const SERVER_COOLDOWN_MS = 60_000;
 const SERVER_COOLDOWN_SCOPE = "system";
-function storedCooldown(action: HouseServerAction): number {
+function storedCooldown(action: string): number {
   const value = db.select({ value: settingsValues.value }).from(settingsValues).where(and(eq(settingsValues.scope, SERVER_COOLDOWN_SCOPE), eq(settingsValues.key, `house.server.last:${action}`))).get()?.value;
   try { const parsed: unknown = JSON.parse(value ?? "null"); return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : 0; } catch { return 0; }
 }
-function setStoredCooldown(action: HouseServerAction, at: number): void {
+function setStoredCooldown(action: string, at: number): void {
   const key = `house.server.last:${action}`;
   const values = { value: JSON.stringify(at), hlc: nextHlc(), source: "hub" as const, updatedAt: new Date(at).toISOString() };
   const existing = db.select({ key: settingsValues.key }).from(settingsValues).where(and(eq(settingsValues.scope, SERVER_COOLDOWN_SCOPE), eq(settingsValues.key, key))).get();
@@ -182,7 +182,12 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   if (input.action.startsWith("restart_") || input.action === "reboot_host") {
     if (!canRestartServer(houseActor)) return { kind: "refuse", reason: "server_owner_only", text: "That home action is unavailable for this speaker.", count: 0 };
     const action = input.action as HouseServerAction;
-    return approved ? { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "turn_on" }, mode, count: 0 } : { kind: "ask", reason: "confirmation_required", action, count: 1, kinds: [action], labels: [action === "restart_core" ? "Home Assistant" : action === "reboot_host" ? "Home Assistant host" : `Home Assistant add-on ${input.addon}`] };
+    // With several homes a restart is never sent to a guessed one: the speaker must name it, and the card names it too.
+    const homes = visibleInstances(registry.entities);
+    if (homes.length > 1 && input.instance === undefined) return { kind: "refuse", reason: "ambiguous", text: `Which home? ${homes.map((home) => `the ${home.label} one`).join(" or ")}. Say which one to restart.`, count: homes.length };
+    const homeLabel = homes.find((home) => home.instance === input.instance)?.label;
+    const where = homeLabel ? ` (${homeLabel})` : "";
+    return approved ? { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "turn_on" }, mode, count: 0 } : { kind: "ask", reason: "confirmation_required", action, count: 1, kinds: [action], labels: [(action === "restart_core" ? "Home Assistant" : action === "reboot_host" ? "Home Assistant host" : `Home Assistant add-on ${input.addon}`) + where] };
   }
   if (input.action === "find") return { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "find" as HouseActionName }, mode, count: 0 };
   const resolved = resolveTargets(input.targets ?? [], visible, registry.areas);
@@ -271,7 +276,9 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
   if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, args, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
   if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
   if (plan.kind === "ask" && !approved) {
-    const copy = serverKind ? `This cannot be undone. Confirm ${serverKind === "restart_core" ? "restarting Home Assistant" : serverKind === "reboot_host" ? "rebooting the Home Assistant host" : `restarting the Home Assistant add-on ${String(args.addon)}`}?` : `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`;
+    const homeLabel = typeof args.instance === "string" ? visibleInstances(registry.entities).find((home) => home.instance === args.instance)?.label : undefined;
+    const inHome = homeLabel ? ` in the ${homeLabel} home` : "";
+    const copy = serverKind ? `This cannot be undone. Confirm ${serverKind === "restart_core" ? "restarting Home Assistant" : serverKind === "reboot_host" ? "rebooting the Home Assistant host" : `restarting the Home Assistant add-on ${String(args.addon)}`}${inHome}?` : `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`;
     return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: copy, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
   }
   if (approved && callId.startsWith("resumed:")) {
@@ -299,14 +306,15 @@ async function executeHousePlan({ plan, actor, personId, args, callId, band, dep
     const action = input.action as HouseServerAction;
     if (!canRestartServer(houseActor)) return fail(callId, args, "That server action is not available.", "failed", false, "found_nothing");
     const nowMs = (deps.now ?? (() => new Date()))().getTime();
-    const last = Math.max(serverCooldowns.get(action) ?? 0, storedCooldown(action));
+    const cooldownKey = `${action}@${input.instance ?? "default"}`;
+    const last = Math.max(serverCooldowns.get(cooldownKey) ?? 0, storedCooldown(cooldownKey));
     if (last && nowMs - last < SERVER_COOLDOWN_MS) return fail(callId, args, "Home Assistant server controls are cooling down. Try again in a minute.", "failed", false, "unavailable");
     const result = deps.serverAction ? await deps.serverAction(action, input.addon) : await (() => {
       const connection = houseInstanceLanFetch(input.instance ?? "default");
       return connection.ok ? performHouseServerAction({ lanFetch: connection.lanFetch, token: connection.token, action, addon: input.addon }) : Promise.resolve({ ok: false as const, kind: "unreachable" as const });
     })();
     const ok = result.ok || ("disconnected" in result && result.disconnected === true);
-    if (ok) { serverCooldowns.set(action, nowMs); setStoredCooldown(action, nowMs); clearHouseRegistry(); }
+    if (ok) { serverCooldowns.set(cooldownKey, nowMs); setStoredCooldown(cooldownKey, nowMs); clearHouseRegistry(); }
     (deps.audit ?? recordToolAudit)({ personId, tool: HOUSE_TOOL_ID, action, decision: ok ? "do" : "never", band, count: 1 });
     return ok ? reply(callId, args, "Restart sent; Home Assistant will be back in a minute") : fail(callId, args, failureCopy.unreachable!, "failed", false, "unavailable");
   }

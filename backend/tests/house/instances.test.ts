@@ -158,3 +158,26 @@ describe("the instance argument", () => {
     for (const forbidden of ["cabin", "Cabin", "Main house", "default/", "light.ceiling"]) expect(text).not.toContain(forbidden);
   });
 });
+
+describe("server actions with several homes", () => {
+  test("a restart without an instance is refused as ambiguous naming both homes; with one it asks and names it", async () => {
+    const s = setup({ addons: async () => [], serverAction: async () => ({ ok: true }) } as never);
+    const unnamed = await run({ action: "restart_core", targets: [] }, s.deps);
+    expect(unnamed.status).not.toBe("succeeded");
+    expect(said(unnamed)).toContain("Cabin");
+    expect(said(unnamed)).toContain("Main house");
+    const named = await run({ action: "restart_core", targets: [], instance: "cabin" }, s.deps);
+    expect(said(named)).toContain("Cabin");
+    expect(said(named)).toContain("cannot be undone");
+  });
+
+  test("the cooldown is per instance", async () => {
+    const calls: unknown[] = [];
+    const s = setup({ addons: async () => [], serverAction: async (...a: unknown[]) => { calls.push(a); return { ok: true }; } } as never);
+    const go = (instance: string, id: string) => runHouseTool({ actor: owner, band: "adult", args: { action: "restart_core", targets: [], instance }, callId: id, approved: true, deps: s.deps });
+    expect((await go("cabin", "resumed:a")).status).toBe("succeeded");
+    expect((await go("cabin", "resumed:b")).failureKind).toBe("unavailable");
+    expect((await go("lake", "resumed:c")).status).toBe("succeeded");
+    expect(calls).toHaveLength(2);
+  });
+});
