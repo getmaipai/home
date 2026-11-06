@@ -94,12 +94,14 @@ describe("FILM-05 faceless films", () => {
     const music = keep("audio/mpeg", new Uint8Array([1, 2, 3]), "music.mp3");
     updateMediaProduction(actor, production.id, { episodes: [{ id: "episode", scenes: [{ id: "scene", shots: [{ id: "one", subject_ids: [], clip_file_id: clips[0] }, { id: "two", subject_ids: [], clip_file_id: clips[1] }] }] }] });
     const engines = realFilmEngines({ actor, productionId: production.id, signal: new AbortController().signal, faceless: true });
-    const id = await engines.assemble({ plan: { ...plan, look: "noir", letterbox: "2.39:1", shots: plan.shots.map((shot, i) => ({ ...shot, transition: i ? "dissolve" : undefined })) } as never, clipFileIds: clips, musicFileId: music }, { signal: new AbortController().signal });
+    const id = await engines.assemble({ plan: { ...plan, credits: [{ role: "Narrator", name: "Unnamed" }, { role: "Writer", name: "Mira Lane" }, { role: "Art Director", name: "unknown" }], look: "noir", letterbox: "2.39:1", shots: plan.shots.map((shot, i) => ({ ...shot, transition: i ? "dissolve" : undefined })) } as never, clipFileIds: clips, musicFileId: music }, { signal: new AbortController().signal });
     expect(edit.jobs).toHaveLength(1);
     expect(edit.jobs[0]!.input.inputs).toHaveLength(3);
     expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "transition", kind: "dissolve", duration_s: 0.5 });
     expect(edit.jobs[0]!.input.ops.some((op) => op.op === "title_card" && op.text === plan.title)).toBe(true);
     expect(edit.jobs[0]!.input.ops.some((op) => op.op === "credits" && (op.lines as unknown[]).some((line) => (line as { name?: string }).name === "MaiPai"))).toBe(true);
+    const creditNames = edit.jobs[0]!.input.ops.flatMap((op) => op.op === "credits" ? (op.lines as Array<{ name: string }>).map((line) => line.name) : []);
+    expect(creditNames).toEqual(["Mira Lane", "MaiPai"]); // a first real run drew "Unnamed" credits: placeholder names are dropped
     expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "film_look", preset: "noir" });
     expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "letterbox", ratio: "2.39:1" });
     expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "audio_overlay", input: 2, gain_db: -12, clip_gain_db: 0, start_s: 0, duck: false, fade_out_s: 2 });

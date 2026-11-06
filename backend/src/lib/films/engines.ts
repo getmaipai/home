@@ -159,7 +159,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const baseLength = videoSeconds.every((seconds): seconds is number => seconds !== null)
           ? videoSeconds.reduce<number>((sum, seconds) => sum + seconds, 0) - transitionCount * 0.5
           : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
-        const creditLines = [...plan.credits, { role: "Made with", name: "MaiPai" }];
+        const creditLines = [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
         const added = (plan.title ? 3 : 0) + Math.max(3, Math.ceil(creditLines.length * 2 / 2));
         const totalSeconds = baseLength + added;
         if (totalSeconds > MAX_EDIT_SECONDS) throw new Error("That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.");
