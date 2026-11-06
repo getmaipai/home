@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { roleHealth } from "@/lib/roleHealth";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID } from "@/lib/voiceTools";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { resolveTurnBudgetWithStack, toolOfferLabel, withTurnToolGates } from "@/lib/turnMachine/budget";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
@@ -89,14 +91,17 @@ const skillsRoute = createRoute({
 /** The tool ids a written, non-temporary chat of `actor` is offered today. */
 export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>> {
   const band = speakerAgeBand(actor, new Date());
+  // VOICE-V1/V2: the same gate a real written turn applies to voiceover and change_voice (adult, not a guest, voice engine ready).
+  const voiceoverOk = band === "adult" && actor.role !== "guest" && (await roleHealth("voice").then((h) => h.availability === "ready", () => false));
   const budget = withTurnToolGates(
     await resolveTurnBudgetWithStack(undefined, band),
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
     false, false, false, false, false, false, false, null,
     // WRITING-FORMATS-03: the same gate a real written turn applies, so the list matches what the chat sends.
     writingFormatsFor(actor.role).length > 0,
+    false, voiceoverOk,
   );
-  return new Set(budget.tools_offered.filter((id) => toolSpecFor(id) !== null));
+  return new Set(budget.tools_offered.filter((id) => (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : toolSpecFor(id) !== null)));
 }
 
 pluginsRoutes.openapi(skillsRoute, async (c) => {
