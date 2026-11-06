@@ -30,6 +30,7 @@ import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { useSongByline } from "@/apps/chat/useSongByline";
 import { useVideoAdultMark } from "@/apps/chat/videoAdultMark";
 import { usePictureAdultMark } from "@/apps/chat/pictureAdultMark";
+import { adultBlobUrl } from "@/lib/adultLock";
 import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 export { musicFileName, musicHint } from "@/apps/chat/MusicCardView";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
@@ -513,6 +514,25 @@ function galleryImagesOf(card: PictureCard) {
   }));
 }
 
+/** ADULT-LOCK-07: an image tag cannot send the unlock header, so an adult-only picture is fetched with it into a blob URL (until then the gallery shows its placeholder). */
+function useAdultPictureUrls(card: PictureCard | undefined): Map<string, string> {
+  const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
+  const adultOnly = card?.adult?.made_audience === "adult-only";
+  const key = adultOnly && card ? card.files.map((file) => file.url).join("|") : "";
+  useEffect(() => {
+    if (!key) { setUrls((now) => (now.size ? new Map() : now)); return; }
+    let alive = true;
+    void Promise.all(key.split("|").map(async (path) => [path, await adultBlobUrl(path)] as const)).then((pairs) => {
+      if (!alive) return;
+      const next = new Map<string, string>();
+      for (const [path, url] of pairs) if (url) next.set(path, url);
+      setUrls(next);
+    });
+    return () => { alive = false; };
+  }, [key]);
+  return urls;
+}
+
 export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<string, never>, { id?: string; locked?: true }> = ({ result }) => {
   const query = usePictureCard(result?.id);
   const card = query.data && "locked" in query.data ? null : query.data;
@@ -554,6 +574,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
   const edit = useContext(ImageEditContext);
   const card = query.data && "locked" in query.data ? null : query.data;
   const adultMark = usePictureAdultMark(card ?? { id: result?.id ?? "", adult: null }, () => { void query.refetch(); });
+  const adultUrls = useAdultPictureUrls(card ?? undefined);
   if (!result) return null;
   if (result.locked || (query.data && "locked" in query.data)) return createElement(VideoPlayer, { locked: true, making: query.data && "locked" in query.data ? query.data.making : false });
   if (!card) {
@@ -588,7 +609,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
     const gallery = (
       <>
       <ImageGallery
-        images={galleryImagesOf(card)}
+        images={adultUrls.size || card.adult?.made_audience !== "adult-only" ? galleryImagesOf(card).map((image) => ({ ...image, src: adultUrls.get(image.src) ?? image.src })) : galleryImagesOf(card).map((image) => ({ ...image, src: "" }))}
         maxVisible={4}
         size="large"
         {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: editable, editLabel: edit.label ?? "Edit picture" } : {})}

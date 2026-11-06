@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { voiceFailureLine, type VoiceFailureKind } from "@maipai/home-backend/src/lib/failureCopy";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
+import { useLockProof } from "@maipai/ui/src/elements/adult-lock";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { RetryWithCurrentCompanionSetterContext } from "@/apps/chat/chatThreadContexts";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
@@ -757,6 +758,24 @@ function ChatDocumentTitle({ person }: { person: Roster }) {
 function ChatMemoryPoll({ incognito }: { incognito: boolean }) {
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   useMemoryStatusPoll(incognito ? undefined : remoteId);
+  return null;
+}
+
+/** ADULT-LOCK-07: a reload shows a locked picture or clip as the lock tile (the row carries only a marker). When the person unlocks or locks again,
+ * the thread's rows are asked for again, so the tiles open or close without leaving the chat. */
+function ChatLockReload() {
+  const aui = useAui();
+  const { unlocked } = useLockProof();
+  // Only a thread that shows a lock tile has anything to open or close.
+  const hasLockTile = useAuiState((state) => state.thread.messages.some((message) => message.content.some((part) => part.type === "tool-call" && (part.result as { locked?: unknown } | undefined)?.locked === true)));
+  const seen = useRef(unlocked);
+  const tile = useRef(hasLockTile);
+  tile.current = hasLockTile;
+  useEffect(() => {
+    if (seen.current === unlocked) return;
+    seen.current = unlocked;
+    if (tile.current) void Promise.resolve(aui.threads.reloadMainThread()).catch(() => undefined);
+  }, [unlocked, aui]);
   return null;
 }
 
@@ -1654,6 +1673,7 @@ export function ChatPage({ person }: { person: Roster }) {
                 </AlertDialog>
               ) : null}
         <ChatTitleCatchUp incognito={temporaryNext} />
+        <ChatLockReload />
         <ChatMemoryPoll incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} trying={tryActive} person={person} conversationId={temporaryNext ? undefined : draftConversationId} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} inShellBar={barOnPhone} />
         <ProjectResultReload />
