@@ -66,6 +66,30 @@ export function setShotClip(ownerPersonId: string, productionId: string, shotId:
   }) })) }));
   if (found) persist(row, { episodes });
 }
+export function setShotPicture(ownerPersonId: string, productionId: string, shotId: string, fileId: string): void {
+  const row = raw(productionId);
+  if (!row || row.ownerPersonId !== ownerPersonId) return;
+  const production = decode(row);
+  let found = false;
+  const episodes = production.episodes.map((episode) => ({ ...episode, scenes: episode.scenes.map((scene) => ({ ...scene, shots: scene.shots.map((shot) => {
+    if (shot.id !== shotId) return shot;
+    found = true;
+    return { ...shot, picture_file_id: fileId };
+  }) })) }));
+  if (found) persist(row, { episodes });
+}
+export function clearShotArtifacts(ownerPersonId: string, productionId: string, shotId: string): void {
+  const row = raw(productionId);
+  if (!row || row.ownerPersonId !== ownerPersonId) return;
+  const production = decode(row);
+  let found = false;
+  const episodes = production.episodes.map((episode) => ({ ...episode, scenes: episode.scenes.map((scene) => ({ ...scene, shots: scene.shots.map((shot) => {
+    if (shot.id !== shotId) return shot;
+    found = true;
+    return { ...shot, picture_file_id: null, clip_file_id: null };
+  }) })) }));
+  if (found) persist(row, { episodes, finished_cut_file_ids: [] });
+}
 export function updateProductionCast(actor:PersonRow,id:string,cast:CastRole[]) { return updateMediaProduction(actor,id,{cast}); }
 export function updateProductionScript(actor:PersonRow,id:string,episodes:Episode[]) { return updateMediaProduction(actor,id,{episodes}); }
 export function applyCastOperation(actor:PersonRow,id:string,operation:{op:"add"|"replace"|"remove";subject_id:string;entry?:CastRole}):Production|null {
