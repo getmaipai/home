@@ -777,7 +777,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, __resetKeyframeHelperForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
-| `backend/src/lib/pictures/lock.ts` | LOCKED_PICTURE_STYLE_LINE, lockedPictureStyleOutcome, pictureJobLockItem, pictureJobLockState, pictureJobGroupLockState, LOCKED_PICTURE_RESULT_TEXT |
+| `backend/src/lib/pictures/lock.ts` | isAdultPictureStyle, LOCKED_PICTURE_STYLE_LINE, lockedPictureStyleOutcome, pictureJobLockItem, pictureJobLockState, pictureJobGroupLockState |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
 | `backend/src/lib/pictures/people.ts` | __setPeopleRetryPauseForTests, runPictureTool |
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
