@@ -30,6 +30,7 @@ export interface MusicCard {
   versions: MusicVersion[];
   current_id: string | null;
   /** The kind of the version on show: quick (the hook) or full (every part). */
+  sound?: { loop: boolean; surprise: boolean } | null;
   length: "quick" | "full";
   /** The maker the shown version really used: quick is Standard, detailed is Boost, max is Max. A Max song made without the Max models says detailed. */
   quality: "quick" | "detailed" | "max";
@@ -54,6 +55,8 @@ export interface MusicCard {
 export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits: { min_seconds: number; max_seconds: number } | null }
 
 export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; bpm?: number; key?: string; song_style?: string; band?: string }
+export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean }
+export interface SavedSound { id: string; title: string; duration_s: number; src: string; loop: boolean }
 export interface SongDetailChanges { title?: string; lyrics?: string; description?: string; bpm?: number; key?: string }
 export interface FileEditBody { file_id: string; change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; voice?: string; style?: string; parts?: { keep?: string[]; drop?: string[] } }
 
@@ -71,6 +74,9 @@ export const musicApi = {
   revise: (id: string, change: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/revise`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ change, ...(fileId ? { file_id: fileId } : {}) }) }),
   /** Make a song from the Make a song page: the same path the generate_music tool runs. Answers with the card, still being made. */
   makeSong: (body: MakeSongBody) => requestJson<MusicCard>("/api/music/songs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  makeSound: (body: MakeSoundBody) => requestJson<MusicCard>("/api/music/sounds", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  saveSound: (jobId: string) => requestJson<{ id: string }>(`/api/music/sounds/${encodeURIComponent(jobId)}/save`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item_id: jobId }) }),
+  listSounds: () => requestJson<SavedSound[]>("/api/music/sounds"),
   /** A new title, words, style, tempo or key: a new version on the same card. */
   details: (id: string, changes: SongDetailChanges, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/details`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...changes, ...(fileId ? { file_id: fileId } : {}) }) }),
   stems: (id: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/stems`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { file_id: fileId } : {}) }),

@@ -5,6 +5,8 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { MusicWorkspace } from "./MusicWorkspacePage";
+import { MAKES, makeSoundBody } from "./MusicWorkspacePage";
+import { soundCardCopy } from "@/apps/chat/MusicCardView";
 import { RemixSong, remixRequest } from "./MusicRemix";
 import type { MusicCard } from "@/lib/musicApi";
 
@@ -14,12 +16,15 @@ let engine = true;
 let uploadStatus = 200;
 const song = { id: "mus-1", title: "Neon Rain", state: "done", progress: 1, versions: [{ id: "v1", url: "/f/1" }], current_id: "v1" } as unknown as MusicCard;
 
+
 beforeEach(() => {
   calls = []; engine = true; uploadStatus = 200; baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     calls.push({ url, method: init?.method ?? "GET", body: String(init?.body ?? "") });
     if (url.startsWith("/api/music/status")) return Promise.resolve(Response.json({ can_make: engine, engine_ready: engine, limits: {} }));
+    if (url.startsWith("/api/music/sounds") && (init?.method ?? "GET") === "POST") return Promise.resolve(Response.json({ ...song, id: "sound-new", sound: { loop: true, surprise: true } }));
+    if (url === "/api/music/sounds") return Promise.resolve(Response.json([]));
     if (url === "/api/library/upload") return Promise.resolve(new Response(JSON.stringify(uploadStatus === 200 ? { id: "file-audio", name: "song.mp3", kind: "audio", media_type: "audio/mpeg", size_bytes: 5, duplicate: false } : { error: "plain upload refusal" }), { status: uploadStatus === 200 ? 201 : uploadStatus }));
     if (url === "/api/music/from-file/edit") return Promise.resolve(Response.json({ ...song, id: "mus-upload-edit" }));
     if (url.startsWith("/api/music/songs")) return Promise.resolve(Response.json({ ...song, id: "mus-new" }));
@@ -35,6 +40,20 @@ afterEach(() => { cleanup(); globalThis.fetch = baseFetch; });
 const open = (search = "") => renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search={search} /></MemoryRouter></ToastProvider>);
 
 describe("Create controls", () => {
+  test("includes Sound mode, sound body mapping and sound card copy without changing song controls", async () => {
+    expect(MAKES.some(mode => mode.id === "sound" && mode.label === "Sound")).toBe(true);
+    expect(soundCardCopy.saveToLibrary).toBe("Save to Sounds");
+    expect(makeSoundBody({ description: "door creak", seconds: "10", loop: true, stick: "surprise" })).toEqual({ description: "door creak", seconds: 10, loop: true, stick_to_words: false });
+    const view = open();
+    const bar = within(await view.findByTestId("music-docked-bar"));
+    fireEvent.click(bar.getByRole("button", { name: "Sound" }));
+    fireEvent.change(await bar.findByLabelText("Describe the sound"), { target: { value: "A quiet bell" } });
+    fireEvent.click(bar.getByRole("switch", { name: "Loop it" }));
+    fireEvent.click(bar.getByRole("radio", { name: "Surprise me" }));
+    fireEvent.change(bar.getByLabelText("Seconds"), { target: { value: "10" } });
+    fireEvent.click(bar.getByRole("button", { name: "Generate" }));
+    await waitFor(() => expect(calls.some(call => call.url === "/api/music/sounds" && call.body.includes('"loop":true') && call.body.includes('"stick_to_words":false'))).toBe(true));
+  });
   test("adult Edit surface uploads a Library file and offers the supported actions", async () => {
     const view = open("?song=mus-1");
     const input = view.container.querySelector('[data-testid="bring-song"] input[type="file"]')!;

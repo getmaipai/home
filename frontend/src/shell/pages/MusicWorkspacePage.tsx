@@ -10,11 +10,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
+import { Textarea } from "@maipai/ui/src/ui/textarea";
+import { Label } from "@maipai/ui/src/ui/label";
+import { Switch } from "@maipai/ui/src/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { SongResult, MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody } from "./MakeSongPage";
+import { SongResult, MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, Field } from "./MakeSongPage";
+import { MusicTrack } from "@maipai/ui/src/elements/music-track";
+import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { CreatePage } from "./MusicStudioPages";
 import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/media-tiles";
 import { RemixSong } from "./MusicRemix";
@@ -22,8 +28,8 @@ import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { BringSong } from "./BringSong";
 
-type Make = "song" | "band" | "album" | "song_style";
-const MAKES: Array<{ id: Make; label: string }> = [{ id: "song", label: "Song" }, { id: "band", label: "Band" }, { id: "album", label: "Album" }, { id: "song_style", label: "Style" }];
+export type Make = "song" | "band" | "album" | "song_style" | "sound";
+export const MAKES: Array<{ id: Make; label: string }> = [{ id: "song", label: "Song" }, { id: "band", label: "Band" }, { id: "album", label: "Album" }, { id: "song_style", label: "Style" }, { id: "sound", label: "Sound" }];
 const STARTER_STYLES = ["Dreamy indie pop", "Lo-fi beats", "Cinematic score", "Upbeat funk", "Acoustic folk", "Synthwave", "Jazz ballad", "Epic orchestral"];
 const active = (card: MusicCard): boolean => card.state === "queued" || card.state === "running";
 const clock = (seconds: number | null): string => (seconds && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}` : "");
@@ -36,6 +42,10 @@ export const studioAddress = (id: string): string => `/apps/music/studio?song=${
 export const stemsAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}&split=1`;
 /** Opens the song with the Remix panel showing. Nothing is made until the panel's confirm button is pressed. */
 export const remixAddress = (id: string): string => `/apps/music/create?song=${encodeURIComponent(id)}&remix=1`;
+export function makeSoundBody(form: { description: string; seconds: string; loop: boolean; stick: "words" | "surprise" }) {
+  const seconds = Number(form.seconds);
+  return { description: form.description.trim(), ...(form.seconds.trim() && Number.isFinite(seconds) && seconds > 0 ? { seconds } : {}), loop: form.loop, stick_to_words: form.stick === "words" };
+}
 
 /** What a tile says under the title: how far along it is, or its sound. */
 export function songLine(card: MusicCard): string {
@@ -61,6 +71,33 @@ function songTile({ card, selected, onOpen, actions }: { card: MusicCard; select
     progress={active(card) ? card.progress : undefined} pills={<>{length ? <GlassPill>{length}</GlassPill> : null}{active(card) ? <GlassPill>Making</GlassPill> : null}</>}>
     {card.state === "done" ? <div className="flex flex-wrap gap-1">{actions.map((one) => <Button key={one.label} asChild size="sm" variant="secondary"><Link to={one.to}>{one.label}</Link></Button>)}</div> : null}
   </MediaTile>;
+}
+
+function SoundMaker({ onMade }: { onMade: (id: string) => void }) {
+  const { push } = useToast();
+  const status = useQuery({ queryKey: ["music-status"], queryFn: () => musicApi.status(), staleTime: 10_000, retry: false });
+  const [description, setDescription] = useState(""); const [loop, setLoop] = useState(false); const [stick, setStick] = useState<"words" | "surprise">("words"); const [seconds, setSeconds] = useState(""); const [making, setMaking] = useState(false); const [problem, setProblem] = useState("");
+  const engineMissing = status.data ? !status.data.can_make : false;
+  const ready = description.trim().length >= 3 && description.trim().length <= 600 && !making && !engineMissing && !status.isPending;
+  const hint = engineMissing ? NO_MUSIC_ENGINE_LINE : problem || (description.trim().length < 3 ? "Describe the sound in at least 3 characters to turn Generate on." : "Describe the sound and press Generate.");
+  const create = () => {
+    if (!ready) { if (!making) push(hint); return; }
+    setMaking(true); setProblem("");
+    void musicApi.makeSound(makeSoundBody({ description, seconds, loop, stick }))
+      .then(card => { setDescription(""); onMade(card.id); })
+      .catch((error: unknown) => { const line = text(error, "Home could not start the sound. Check the request and try again."); setProblem(line); push(line); })
+      .finally(() => setMaking(false));
+  };
+  return <div className="flex flex-col gap-3" data-testid="sound-maker">
+    <Field label="Describe the sound"><Textarea aria-label="Describe the sound" rows={3} minLength={3} maxLength={600} value={description} onChange={event => setDescription(event.currentTarget.value)} placeholder="A wooden door creaking open in a quiet house" /></Field>
+    <div className="flex flex-wrap items-center gap-4">
+      <Field label="Loop it"><Switch checked={loop} onCheckedChange={setLoop} aria-label="Loop it" /></Field>
+      <Field label="Stick to my words / Surprise me"><ToggleGroup type="single" variant="outline" value={stick} onValueChange={next => { if (next === "words" || next === "surprise") setStick(next); }} aria-label="Sound direction"><ToggleGroupItem value="words">Stick to my words</ToggleGroupItem><ToggleGroupItem value="surprise">Surprise me</ToggleGroupItem></ToggleGroup></Field>
+      <div className="flex flex-col gap-2"><Label htmlFor="sound-seconds">Seconds</Label><Input id="sound-seconds" type="number" min={1} max={600} placeholder="10" value={seconds} onChange={event => setSeconds(event.currentTarget.value)} /></div>
+      <p role={problem || engineMissing ? "alert" : "status"} className="text-muted-foreground text-xs">{hint}</p>
+      <Button type="button" size="lg" aria-disabled={!ready} variant={ready ? "default" : "secondary"} onClick={create} title={hint}>{making ? "Starting" : "Generate"}</Button>
+    </div>
+  </div>;
 }
 
 const TILE_ACTIONS = (card: MusicCard): Array<{ label: string; to: string }> => [
@@ -169,7 +206,7 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
   };
   return <div className="bg-card mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 sm:p-4" data-testid="music-docked-bar" id="music-bar">
     <div className="h-80 min-h-0 overflow-y-auto" data-testid="music-bar-body">
-    {make !== "song" ? <CreatePage kind={make} adult /> : <div className="flex flex-col gap-2">
+    {make === "sound" ? <SoundMaker onMade={onMade} /> : make !== "song" ? <CreatePage kind={make} adult /> : <div className="flex flex-col gap-2">
       <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
         className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
       {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."
@@ -214,7 +251,12 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   const { push } = useToast();
   const [styles, setStyles] = useState<string[]>([]);
   const [stylesOpen, setStylesOpen] = useState(false);
+  const song = new URLSearchParams(search).get("song");
+  const sounds = useQuery({ queryKey: ["music-sounds"], queryFn: () => musicApi.listSounds(), staleTime: 2000 });
   const { shown, list } = useShown("");
+  const openedCard = useQuery({ queryKey: ["music-song", song], queryFn: ({ signal }) => musicApi.card(song!, signal), enabled: !!song, staleTime: 0, refetchInterval: query => query.state.data && active(query.state.data) ? 2000 : false });
+  const soundPlaceholder: MusicCard = { id: song ?? "sound-pending", task: "sound", state: "queued", stage: null, stage_label: "Making the sound", stages: [], stage_index: 0, progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], sound: { loop: false, surprise: false }, cover_pending: false, versions: [], current_id: null, length: "quick", quality: "quick", boost_offered: false, cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: Date.now() };
+  const openedTrackProps = useMusicTrackProps({ card: openedCard.data?.sound ? openedCard.data : soundPlaceholder, navigate, onRefresh: () => { void openedCard.refetch(); } });
   const pickSound = (name: string) => {
     const on = styles.includes(name);
     setStyles(on ? styles.filter((one) => one !== name) : [...styles, name].slice(0, 8));
@@ -222,19 +264,21 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
     push(on ? `${name} taken out of the bar.` : `${name} added to the bar. Describe your song, then press Generate.`);
     document.getElementById("music-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const song = new URLSearchParams(search).get("song");
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
-  return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
+  return <>{song && openedCard.data?.sound ? <MusicTrack {...openedTrackProps} /> : null}<div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
     {song ? <BringSong adult={adult} /> : null}
-    {song ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
+    {song && !openedCard.data?.sound ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
     <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
       <div className="flex flex-col gap-1"><h2 className="text-2xl font-black tracking-wide uppercase">Your songs</h2><p className="text-muted-foreground text-sm">Open one to play it and see everything you can do.</p></div>
-      {shown.length > 0 ? <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label="Your songs">
-        {shown.map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
+      {shown.some(card => !card.sound) ? <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label="Your songs">
+        {shown.filter(card => !card.sound).map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
       </ul> : <p className="text-muted-foreground bg-card rounded-2xl p-6 text-sm" data-testid="music-songs-empty">{list.isPending ? "Loading your songs." : list.isError ? "Your songs could not be loaded. Check your connection and open this page again." : "No songs yet. Describe one in the bar above and press Generate. It shows up here."}</p>}
     </div>
+    <MediaCarousel title="Your sounds" line="Sounds you have saved." label="Your sounds">
+      {sounds.isPending || sounds.isError ? <li className="text-muted-foreground text-base">{sounds.isPending ? "Loading your sounds" : "Your sounds could not be loaded."}</li> : sounds.data.length === 0 ? <li className="text-muted-foreground text-base" data-testid="music-sounds-empty">No sounds yet. Describe one in the bar above and press Generate.</li> : sounds.data.map(sound => <MediaTile key={sound.id} id={sound.id} title={sound.title} line={`${sound.duration_s}s${sound.loop ? " · Loop" : ""}`} coverUrl={null} playable onOpen={() => { const audio = new Audio(sound.src); audio.loop = sound.loop; void audio.play(); }} />)}
+    </MediaCarousel>
     <MediaCarousel title="Start from a sound" line="Pick one and it goes into the bar above." label="Starter sounds">
       {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? "Remove" : "Use"} selected={styles.includes(name)} onOpen={() => pickSound(name)} />)}
     </MediaCarousel>
@@ -244,5 +288,5 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
       <span className="block aspect-video w-full overflow-hidden rounded-2xl transition duration-200 motion-safe:group-hover:-translate-y-1"><Cover id={`tool-${tool.label}`} title={tool.label} url={null} /></span>
       <span className="text-muted-foreground text-sm">{tool.line}</span></Link></li>)}
   </MediaCarousel>
-  </section></div>;
+  </section></div></>;
 }

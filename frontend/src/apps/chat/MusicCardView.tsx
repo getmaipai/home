@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentProps } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { TierSegment } from "@maipai/ui/src/elements/tier-segment";
 import { fitAskActions } from "@/lib/fitAsk";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
+import { Switch } from "@maipai/ui/src/ui/switch";
 import type { MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { prepareClip, shareClip } from "@/lib/shareClip";
@@ -19,6 +20,8 @@ export function musicHint(length: "quick" | "full", cut: MusicCard["cut"] = null
   if (cut === "ceiling" && maxSeconds !== null) return `Longer than this computer's longest song (${maxSeconds / 60} minutes), so it sings the first parts that fit.`;
   return length === "full" ? "Full: every part of the song." : "Quick: the hook. Choose Full song to sing every verse.";
 }
+
+export const soundCardCopy = { saveToLibrary: "Save to Sounds", makeAnother: "Make another take", generating: "Making the sound", failed: "I couldn't make that sound.", queued: "Waiting its turn" };
 
 const descriptionOf = (card: MusicCard) => {
   const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
@@ -44,12 +47,14 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const [editError, setEditError] = useState("");
   const [editing, setEditing] = useState(false);
   const status: MusicTrackStatus = card.state === "done" && card.versions.length ? "ready" : card.state === "queued" ? "queued" : card.state === "running" ? "generating" : card.state === "cancelled" ? "cancelled" : "failed";
+  const isSound = card.sound != null;
+  const queryClient = useQueryClient();
   const shownId = picked && picked.base === card.current_id && card.versions.some(version => version.id === picked.id) ? picked.id : card.current_id;
   const shown = card.versions.find(version => version.id === shownId) ?? card.versions.at(-1);
   const songTitle = card.title ?? "Your song";
   const title = card.task === "stems" && shown ? `${songTitle.replace(/ \([^)]*\)$/, "")} (${shown.label.toLowerCase()})` : songTitle;
   const ready = status === "ready" && shown !== undefined;
-  const prepared = useQuery({ queryKey: ["music-share", shown?.url], queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: musicFileName(title) }), enabled: ready && !onShare, staleTime: Infinity, gcTime: 10 * 60_000, retry: false });
+  const prepared = useQuery({ queryKey: ["music-share", shown?.url], queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: musicFileName(title) }), enabled: ready && !onShare && !isSound, staleTime: Infinity, gcTime: 10 * 60_000, retry: false });
   // The edit dialog covers the card, so it closes once a change is sent and the card shows the new version being made.
   const [editOpen, setEditOpen] = useState(false);
   const refresh = () => { setEditOpen(false); onRefresh?.(); };
@@ -69,7 +74,7 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const changed = Object.keys(detailChanges).length > 0;
   const saveDetails = () => { if (!changed || editing) return; setEditing(true); setEditError(""); void musicApi.details(card.id, detailChanges, shown?.id).then(() => { setDraft({ base: null }); refresh(); }).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
   const detailsMode = { id: "details", label: "Details", content: <><div className="grid gap-3"><div className="grid gap-1"><Label htmlFor={`song-title-${card.id}`}>Title</Label><Input id={`song-title-${card.id}`} value={titleValue} onChange={event => setDraft({ ...mine, title: event.currentTarget.value })} maxLength={200} disabled={editing} /></div><div className="grid gap-1"><Label htmlFor={`song-style-${card.id}`}>Style</Label><Input id={`song-style-${card.id}`} value={styleValue} onChange={event => setDraft({ ...mine, style: event.currentTarget.value })} maxLength={1200} disabled={editing} /></div><div className="grid gap-1"><Label htmlFor={`song-words-${card.id}`}>Lyrics</Label><Textarea id={`song-words-${card.id}`} value={lyricsValue} rows={6} onChange={event => setDraft({ ...mine, lyrics: event.currentTarget.value })} maxLength={4000} disabled={editing} /></div><Button type="button" variant="outline" disabled={editing || !changed} onClick={saveDetails}>Make a new version</Button><p className="text-muted-foreground text-sm">Your earlier version stays on this card.</p></div>{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</>, ...(editing || !changed ? { disabledReason: editing ? "Wait for the current change to finish." : "Change the title, the style or the words to make a new version." } : {}) };
-  const editModes = owner && ready && card.task !== "stems" ? [
+  const editModes = owner && ready && !isSound && card.task !== "stems" ? [
     { id: "song", label: "Remix", content: <><div className="grid gap-2"><Input aria-label="How should it change? For example: heavy metal" placeholder="How should it change? For example: heavy metal" value={songChange} onChange={event => setSongChange(event.currentTarget.value)} maxLength={500} disabled={editing} /><Button type="button" variant="outline" disabled={editing || !songChange.trim()} onClick={makeChange}>Remix</Button></div>{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</>, ...((editing || !songChange.trim()) ? { disabledReason: editing ? "Wait for the current change to finish." : "Describe a song change to enable Remix." } : {}) },
     { id: "cover", label: "New cover", content: <><div className="grid gap-2"><Input aria-label="Describe the new cover" placeholder="Describe the new cover" value={coverChange} onChange={event => setCoverChange(event.currentTarget.value)} maxLength={500} disabled={editing} /><Button type="button" variant="outline" disabled={editing || !coverChange.trim()} onClick={makeCover}>Make new cover</Button></div>{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</>, ...((editing || !coverChange.trim()) ? { disabledReason: editing ? "Wait for the current change to finish." : "Describe a new cover to enable Make new cover." } : {}) },
     { id: "full", label: "Full song", content: <>{card.length !== "full" ? <><Button type="button" variant="outline" onClick={makeFull} disabled={editing}>Full song</Button><p className="text-muted-foreground text-sm">Sings every verse</p></> : <Button type="button" variant="outline" onClick={makeQuick} disabled={editing}>Quick song</Button>}{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</>, ...(editing ? { disabledReason: "Wait for the current change to finish." } : {}) },
@@ -81,14 +86,14 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const elapsedSeconds = Number.isFinite(cardStarted) ? Math.max(0, Math.floor((now - cardStarted) / 1000)) : undefined;
   const lyrics = card.lyrics?.trim() === "[Instrumental]" ? undefined : card.lyrics ?? undefined;
   const pendingActions = status === "queued" ? fitAskActions(card.fit_ask, refresh) : undefined;
-  return { status, width: "full", ...(pendingActions ? { pendingActions } : {}), ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song", editOpen, onEditOpenChange: setEditOpen } : {}), title,
-    ...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {}), ...(descriptionOf(card) ? { description: descriptionOf(card) } : {}), ...(ready ? { src: shown.url } : {}),
+  return { status, width: "full", ...(pendingActions ? { pendingActions } : {}), ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song", editOpen, onEditOpenChange: setEditOpen } : {}), title: isSound ? (card.title ?? "Your sound") : title,
+    ...(!isSound && card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {}), ...(isSound ? { description: card.description ?? undefined } : descriptionOf(card) ? { description: descriptionOf(card) } : {}), ...(ready ? { src: shown.url } : {}),
     stages: card.stages, currentStage: card.stage_index, progress: card.progress, ...(generating && elapsedSeconds !== undefined ? { elapsedSeconds } : {}), ...(card.eta_seconds !== null ? { etaSeconds: card.eta_seconds } : {}),
     ...(card.stage_label ? { phaseLabel: card.stage_label } : {}), waitingForMemory: card.state === "queued" && card.stage !== "longer",
-    queuePosition: card.state === "queued" && card.stage !== "longer" ? null : card.position, ...(card.error_line ? { error: card.error_line } : {}), downloadName: musicFileName(title), timedLyrics: card.timed_lyrics ?? undefined,
-    ...(ready && lyrics ? { lyrics } : {}), ...(ready ? { versions: card.versions.map(version => ({ id: version.id, label: version.label })), ...(shownId ? { currentId: shownId } : {}) } : {}),
-    onSelectVersion: id => setPicked({ base: card.current_id, id }), ...(owner && card.task !== "stems" ? { onUseVersion: (id: string) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); } } : {}), onStop,
-    hint: card.state === "queued" && card.stage === "longer" ? card.stage_label : musicHint(card.length, card.cut, card.max_seconds), ...(card.state === "queued" && card.stage !== "longer" ? { copy: { waitingForMemory: typeof card.position === "number" ? `Waiting for memory, your song starts when there is room. You are number ${card.position} in line.` : "Waiting for memory, your song starts when there is room" } } : {}),
+    queuePosition: card.state === "queued" && card.stage !== "longer" ? null : card.position, ...(card.error_line ? { error: card.error_line } : {}), downloadName: isSound ? "sound.m4a" : musicFileName(title), timedLyrics: isSound ? undefined : card.timed_lyrics ?? undefined,
+    ...(!isSound && ready && lyrics ? { lyrics } : {}), ...(ready ? { versions: card.versions.map(version => ({ id: version.id, label: version.label })), ...(shownId ? { currentId: shownId } : {}) } : {}),
+    ...(!isSound ? { onSelectVersion: (id: string) => setPicked({ base: card.current_id, id }) } : {}), ...(owner && !isSound && card.task !== "stems" ? { onUseVersion: (id: string) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); } } : {}), onStop,
+    hint: isSound ? "Looping is not available yet." : card.state === "queued" && card.stage === "longer" ? card.stage_label : musicHint(card.length, card.cut, card.max_seconds), ...(isSound ? { copy: soundCardCopy, onSaveToLibrary: owner ? () => { void musicApi.saveSound(card.id).then(() => { void queryClient.invalidateQueries({ queryKey: ["music-sounds"] }); onRefresh?.(); }).catch(() => onRefresh?.()); } : undefined, onMakeAnother: navigate ? () => navigate("/apps/music/create") : undefined, actions: <div className="flex items-center gap-2"><Switch checked={!!card.sound?.loop} disabled aria-label="Loop" /><span className="text-muted-foreground text-base">Looping is not available yet</span></div> } : {}), ...(card.state === "queued" && card.stage !== "longer" ? { copy: { waitingForMemory: typeof card.position === "number" ? `Waiting for memory, your song starts when there is room. You are number ${card.position} in line.` : "Waiting for memory, your song starts when there is room" } } : {}),
     ...(card.task === "stems" && ready ? { copy: { versionOf: (n: number, total: number) => `Track ${n} of ${total}` } } : {}),
-    ...(owner && onShare && ready ? { onShare } : owner && navigate && ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {}) };
+    ...(!isSound && owner && onShare && ready ? { onShare } : !isSound && owner && navigate && ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {}) };
 }
