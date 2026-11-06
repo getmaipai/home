@@ -492,7 +492,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
 | `backend/src/lib/forgetCommand.ts` | FORGET_COMMAND_ID, parseForgetCommand, forgetFromConversation |
-| `backend/src/lib/gate/decide.ts` | assertGated, registeredCapabilities, decide |
+| `backend/src/lib/gate/decide.ts` | approverFor, assertGated, registeredCapabilities, decide |
 | `backend/src/lib/gate/pendingAskMigration.ts` | decidePendingAsk, migratePendingAsksThroughGate |
 | `backend/src/lib/gazetteer.ts` | searchLocalPlaces, nearestLocalPlace |
 | `backend/src/lib/genLive.ts` | getLive, clearLive, __clearLiveForTests, previewVersionOf, updateLive, liveCardFields |
@@ -510,6 +510,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hostTune.ts` | HOST_TUNE_IDS, HostTuneItemSchema, detectHostTune, changeHostTune |
 | `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_PROVIDER_NAME, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed |
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
+| `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
