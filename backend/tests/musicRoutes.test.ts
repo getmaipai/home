@@ -52,6 +52,31 @@ async function makeStems(client: TestClient, source: MusicJob) {
   return { response, client };
 }
 describe("music routes", () => {
+  test("creates, saves idempotently, lists sounds, and keeps them out of song cards", async () => {
+    const { actor, client } = await owner();
+    const made = await client.post("/api/music/sounds", { description: "rain on a tin roof", seconds: 8, loop: true });
+    expect(made.status).toBe(201);
+    const card = await made.json() as { id: string; sound: { loop: boolean; surprise: boolean } | null };
+    expect(card.sound).toEqual({ loop: true, surprise: false });
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+    const first = await client.post(`/api/music/sounds/${card.id}/save`, {});
+    const second = await client.post(`/api/music/sounds/${card.id}/save`, {});
+    expect(first.status).toBe(200); expect(second.status).toBe(200);
+    const firstItem = (await first.json() as { item_id: string }).item_id;
+    expect(firstItem).toBe((await second.json() as { item_id: string }).item_id);
+    const sounds = await client.get("/api/music/sounds");
+    expect(await sounds.json()).toMatchObject([{ id: firstItem, loop: true, file_id: getMusicJobFor(actor, card.id)!.fileId }]);
+    expect(await (await client.get("/api/music/jobs")).json()).toEqual([]);
+  });
+  test("music sound creation uses safety refusal and unavailable engine responses", async () => {
+    const { actor, client } = await owner();
+    db.update(people).set({ role: "child" }).where(eq(people.id, actor.id)); invalidateSessionCacheForPerson(actor.id);
+    setHouseholdSettingValue("generation.music.enabled", false);
+    expect((await client.post("/api/music/sounds", { description: "rain on a roof" })).status).toBe(403);
+    setHouseholdSettingValue("generation.music.enabled", true);
+    __setMusicStatusForTests(null);
+    expect((await client.post("/api/music/sounds", { description: "rain on a roof" })).status).toBe(503);
+  });
   test("lists the owner's songs newest first, and nobody else's", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor);
     const mine = await (await client.get("/api/music/jobs")).json() as { id: string; title: string | null }[];

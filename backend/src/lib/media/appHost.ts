@@ -193,7 +193,9 @@ export function madeFiles(person: PersonRow, appId: "music" | "videos"): MadeLib
     files.push(...page.items);
     cursor = page.next_cursor ?? undefined;
   } while (cursor);
-  return files.filter((file) => !savedFileIds.has(file.id));
+  return files.filter((file) => !savedFileIds.has(file.id) && (appId !== "music" || !db.select({ request: musicJobs.request }).from(musicJobs).where(eq(musicJobs.fileId, file.id)).all().some((row) => {
+    try { return !!(JSON.parse(row.request) as { sound?: unknown }).sound; } catch { return false; }
+  })));
 }
 
 /** One made clip as a shelf row (Made at home, and the Create page's creations). */
@@ -958,7 +960,7 @@ export function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaIt
   // A file saved by an earlier press is a media item already (and no longer listed as a made file): reuse it.
   const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
   if (existing) return readableIn(person, "music", existing.id);
-  const file = madeFileFor(person, "music", fileId);
+  const file = madeFiles(person, "music").find((entry) => entry.id === fileId) ?? null;
   if (!file) return null;
   const roots = allowedSources(person).filter((candidate) => candidate.kind === "root");
   // Reuse only a root the person can actually read items from (its `visible_to` is the household or names them).
@@ -993,6 +995,45 @@ export function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaIt
     addedAt: file.created_at, createdAt: now, hlc: nextHlc(), provenance: "music:generated-library",
   }).run();
   return readableIn(person, "music", id);
+}
+
+/** Save a completed sound effect as a private sound media item. */
+export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaItem | null {
+  const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
+  if (existing) return existing.kind === "sound" ? readableItem(person, existing.id) : null;
+  const file = listLibrary(person, { type: "audio", origin: "made", sort: "newest", limit: 100 }).items.find((entry) => entry.id === fileId) ?? null;
+  if (!file) return null;
+  const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, file.id)).get();
+  if (!job || job.personId !== person.id || job.state !== "done") return null;
+  let request: { sound?: { loop?: boolean }; description?: string };
+  try { request = JSON.parse(job.request) as typeof request; } catch { return null; }
+  if (!request.sound) return null;
+  let source = allowedSources(person).find((candidate) => candidate.id === madeSourceId(person.id) && candidate.kind === "root");
+  if (!source) {
+    const sourceId = madeSourceId(person.id), now = new Date().toISOString();
+    db.insert(mediaSources).values({ id: sourceId, kind: "root", scope: "person", ownerPersonId: person.id, label: "Created by you", rootPath: "made-at-home", rootKinds: JSON.stringify(["track"]), paused: true, visibleTo: JSON.stringify([person.id]), createdAt: now, hlc: nextHlc(), provenance: "music:generated-library" }).onConflictDoNothing().run();
+    source = allowedSources(person).find((candidate) => candidate.id === sourceId);
+  }
+  if (!source) return null;
+  const description = request.description?.replace(/\s+/g, " ").trim();
+  const title = description ? description.slice(0, 60).replace(/^./, (c) => c.toUpperCase()) : "Sound";
+  const id = `media-${crypto.randomUUID().replace(/-/g, "")}`;
+  db.insert(mediaItems).values({ id, kind: "sound", title, sourceId: source.id, locFileId: file.id, mediaType: file.media_type, durationS: file.duration_seconds, size: file.size_bytes, playable: "original", bandOk: file.audience === "adult-only" ? "adult" : "child", addedAt: file.created_at, createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: "music:generated-sound" }).run();
+  return readableItem(person, id);
+}
+
+export function savedMadeSounds(person: PersonRow) {
+  const roots = allowedSources(person).filter((source) => source.kind === "root");
+  if (!roots.length) return [];
+  return db.select().from(mediaItems).where(and(isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false), eq(mediaItems.kind, "sound"), inArray(mediaItems.sourceId, roots.map((source) => source.id)), inArray(mediaItems.bandOk, allowedBandsFor(person))))
+    .orderBy(desc(mediaItems.addedAt)).all().flatMap((row) => {
+      const item = readableItem(person, row.id);
+      if (!item || item.kind !== "sound" || !item.location.file_id) return [];
+      const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, item.location.file_id)).get();
+      let loop = false;
+      try { loop = !!(JSON.parse(job?.request ?? "{}") as { sound?: { loop?: boolean } }).sound?.loop; } catch { /* malformed job has no loop flag */ }
+      return [{ id: item.id, title: item.title, duration_s: item.duration_s, file_id: item.location.file_id, src: `/api/files/${encodeURIComponent(item.location.file_id)}/content`, loop }];
+    });
 }
 /** MUSIC-LIKE-01: the finished single files of a made band, newest first (the music jobs that carry its id). */
 export function bandSingles(person: PersonRow, bandId?: string): Array<{ bandId: string; fileId: string }> {

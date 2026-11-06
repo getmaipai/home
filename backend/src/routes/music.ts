@@ -39,6 +39,8 @@ import { refusePrompt } from "@/lib/pictures/policy";
 import { consumeDjLine, deleteCachedDjLine, ensureDjLines, type DjPosition } from "@/lib/music/djLines";
 import { getPersonSettingValue } from "@/lib/settings";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
+import { promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
+import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -83,6 +85,7 @@ const cardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
+  sound: z.object({ loop: z.boolean(), surprise: z.boolean() }).nullable(),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
@@ -187,6 +190,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     conversation_id: root.temporary ? null : root.conversationId, made_from_file: root.request.ownedFile === true,
     id: root.id, task: root.task, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
+    sound: root.request.sound ?? null,
     fit_ask: root.state === "queued" && laneOf(musicRouteAudience(actor)) !== "child" ? answerableFitAsk(actor, root.id) : null,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
@@ -217,7 +221,7 @@ const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], s
 musicRoutes.openapi(listRoute, async (c) => {
   const actor = c.get("person");
   const trashed = new Set(db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNotNull(attachments.deletedAt))).all().map((r) => r.id));
-  return c.json(await Promise.all(jobsForPerson(actor, 40).filter((job) => !job.fileId || !trashed.has(job.fileId)).map((job) => musicCardView(actor, job))), 200);
+  return c.json(await Promise.all(jobsForPerson(actor, 40).filter((job) => !job.request.sound && (!job.fileId || !trashed.has(job.fileId))).map((job) => musicCardView(actor, job))), 200);
 });
 const getRoute = createRoute({ method: "get", path: "/jobs/{id}", tags: ["Music"], summary: "The owner's song card", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "Progress and versions." }, ...refusals } });
@@ -302,6 +306,41 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
   logTurn(actor, "chat", body.title ? `Make a song: ${body.title}` : "Make a song", { reply: { text: "Making your song." }, source: "plugin", plugin_id: "generate_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
   return c.json(await musicCardView(actor, job), 201);
 });
+const makeSoundRoute = createRoute({ method: "post", path: "/sounds", tags: ["Music"], summary: "Make a sound effect", middleware,
+  request: { body: { content: { "application/json": { schema: makeSoundArgs } } } },
+  responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The sound card." }, 422: { description: "The sound cannot be made as asked." }, ...refusals, ...errorResponses({ 503: "No music model is installed or the computer cannot make sounds now" }) } });
+musicRoutes.openapi(makeSoundRoute, async (c) => {
+  const actor = c.get("person"), args = c.req.valid("json");
+  const engine = await musicEngineStatus();
+  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  const refusal = musicRefusalFor(musicRouteAudience(actor), args);
+  if (refusal) return c.json({ error: refusal.line }, 403) as never;
+  const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});
+  if (!conversation.ok) return c.json({ error: plainMusicFailure("failed") }, 503) as never;
+  const turnId = newConversationTurnId();
+  const state = { actor, persona: null, surface: "chat", speakerEvidence: null, planBasis: { surfaceClass: "written" }, plan: undefined, conversationId: conversation.value.id, turnId, temporary: false, ephemeral: false } as unknown as MusicToolInput["state"];
+  const outcome = await runMakeSound({ state, args, callId: `page-${turnId}`, spoken: false });
+  const jobId = (outcome.result?.data as { musicJobId?: string } | undefined)?.musicJobId;
+  const job = jobId ? getMusicJobFor(actor, jobId) : null;
+  if (!job) {
+    const refused = (outcome.result?.data as { refused?: string } | undefined)?.refused;
+    if (refused) return c.json({ error: (outcome.result?.reply?.text ?? "").replace(REFUSED_PREFIX, "") || plainMusicFailure("failed") }, 422) as never;
+    return c.json({ error: plainMusicFailure(outcome.errorCode === "no_engine" ? "not_installed" : outcome.errorCode ?? "failed") }, outcome.failureKind === "bad_arguments" ? 422 : 503) as never;
+  }
+  logTurn(actor, "chat", "Make a sound", { reply: { text: "Making your sound." }, source: "plugin", plugin_id: "make_sound", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  return c.json(await musicCardView(actor, job), 201);
+});
+const saveSoundRoute = createRoute({ method: "post", path: "/sounds/{id}/save", tags: ["Music"], summary: "Save a made sound to Sounds", middleware: viewMiddleware,
+  request: { params }, responses: { 200: { content: { "application/json": { schema: z.object({ item_id: z.string() }) } }, description: "The saved sound." }, ...refusals } });
+musicRoutes.openapi(saveSoundRoute, (c) => {
+  const job = getMusicJobFor(c.get("person"), c.req.valid("param").id);
+  if (!job || job.task === "stems" || !job.request.sound || job.state !== "done" || !job.fileId) return c.json({ error: "No finished sound with that id." }, 404);
+  const item = promoteMadeSoundFile(c.get("person"), job.fileId);
+  return item ? c.json({ item_id: item.id }, 200) : c.json({ error: "That sound cannot be saved." }, 404);
+});
+const soundsRoute = createRoute({ method: "get", path: "/sounds", tags: ["Music"], summary: "List saved sounds", middleware: viewMiddleware,
+  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), title: z.string(), duration_s: z.number().nullable(), file_id: z.string(), src: z.string(), loop: z.boolean() })) } }, description: "Saved sound items." }, ...refusals } });
+musicRoutes.openapi(soundsRoute, (c) => c.json(savedMadeSounds(c.get("person")), 200));
 // Change a song's title, words, style, tempo or key: a new version on the same card; the earlier versions stay.
 const detailsRoute = createRoute({ method: "post", path: "/jobs/{id}/details", tags: ["Music"], summary: "Make a new version of the song with a new title, words, style, tempo or key", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({
