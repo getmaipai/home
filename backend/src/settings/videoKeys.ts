@@ -17,7 +17,8 @@ export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.media_videos",
     honoured_by: ["home"],
   }),
-  // The saved quality values stay readable. Quick is silent; Detailed maps to LTX-2.5 Boost for adults when ready.
+  // VIDEO-LTX-01 (owner ruling 2026-10-17): the same plain choice as pictures. Quick is the silent five second clip and the
+  // default; Detailed makes a sound track with spoken words in the same pass, up to ten seconds, starting from words only.
   SettingsKey.parse({
     key: "generation.video_quality",
     scope: "household",
@@ -25,13 +26,13 @@ export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
     range: { options: ["quick", "detailed"] },
     default: "quick",
     label: "Video quality",
-    help: "Quick makes a short silent clip. Detailed adds sound and spoken words when the newer video model is ready. Anyone who can make videos can ask chat for the other one for a single video.",
+    help: "Quick makes a short silent clip and can start from a picture. Detailed adds sound and spoken words, and makes longer clips from words. Anyone who can make videos can ask chat for the other one for a single video.",
     level: "basic",
     copy: {
       does: "Decides how chat makes a video when nobody asks for a kind.",
       options: {
         quick: "A silent 5 second clip in about two minutes, and it can start from a picture.",
-        detailed: "A clip up to 5 seconds with sound and speech, made from words.",
+        detailed: "A clip up to 10 seconds with sound and speech, made from words, with many more styles.",
       },
     },
     lives_in: "household.ai_videos",
