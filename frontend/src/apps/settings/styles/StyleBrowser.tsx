@@ -97,7 +97,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <Pick id="style-filter-type" label="Type" value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", "Any"], ["style", "Style"], ["character", "Character"]]} />
-      <Pick id="style-filter-base" wide label="Made for" value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", "LTX-2.5 and LTX-2.3"], ["ltx-2.5", "LTX-2.5"], ["ltx-2.3", "LTX-2.3"], ["wan", "Wan"], ["all", "All"]]} />
+      <Pick id="style-filter-base" wide label="Made for" value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", "LTX-2.5 and Wan"], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", "All"]]} />
       <Pick id="style-filter-installed" label="Installed" value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", "Any"], ["not_installed", "Not installed"], ["installed", "Installed"]]} />
       <Pick id="style-filter-source" label="Source" value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? "Civitai" : "Civitai (off)", !civitaiOn], ["both", "Both", !civitaiOn]]} />
       <Pick id="style-filter-sort" label="Sort" value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", "Most downloaded"], ["rating", "Top rated"], ["newest", "Newest"]]} />

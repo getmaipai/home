@@ -44,7 +44,7 @@ export function whatItIs(row: Pick<StyleRow, "kind" | "base_model">): string {
   const kind = row.kind === "character" ? "Character" : row.kind === "motion" ? "Motion" : "Style";
   const base: Record<BaseModelId, string> = {
     "ltx-2.5": "Works at Standard, Boost and Max",
-    "ltx-2.3": "Made the older way, Boost only",
+    "ltx-2.3": "Retired video model, no longer available",
     "wan2.2-ti2v-5b": "Made for the engine behind children's videos, so Home cannot use it",
     unknown: "Waiting for an admin to say what it is made for",
   };

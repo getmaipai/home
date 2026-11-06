@@ -9,6 +9,7 @@ import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { StylesTab } from "@/apps/settings/styles/StylesTab";
 import { StyleConfirm } from "@/apps/settings/styles/StyleConfirm";
+import { StyleEditor } from "@/apps/settings/styles/StyleEditor";
 import { StyleBrowser } from "@/apps/settings/styles/StyleBrowser";
 import { tryStyleState } from "@/apps/settings/styles/StyleEditor";
 import { stylesApi, type BrowseHit, type BrowseQuery, type InstallBody, type SourcesState, type StyleRow } from "@/apps/settings/styles/stylesApi";
@@ -151,6 +152,15 @@ describe("the browser", () => {
     restore();
   });
 
+  test("the Made for filter has no retired base option", async () => {
+    const restore = stub({ browse: mock(async () => page()) as never });
+    const view = mountBrowser();
+    fireEvent.click(await view.findByRole("combobox", { name: "Made for" }));
+    expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
+    expect(view.getByRole("option", { name: "LTX-2.5 and Wan" })).toBeTruthy();
+    restore();
+  });
+
   test("a filter and a sort go to the hub, paging keeps each page's cursor, and an installed hit opens that style instead of starting a download", async () => {
     const browse = mock(async (_query: BrowseQuery) => page());
     const restore = stub({ browse: browse as never });
@@ -197,6 +207,16 @@ describe("the browser", () => {
     restore();
   });
 
+  test("an unknown base offers LTX-2.5 and Wan only", async () => {
+    const restore = stub();
+    const view = renderWithQueryClient(<Page><StyleConfirm hit={hit({ base_model: "unknown", base_unstated: false })} person={person} revealed={false} onClose={() => undefined} onInstalled={() => undefined} onOpenInstalled={() => undefined} /></Page>);
+    fireEvent.click(view.getByRole("combobox", { name: "What was this style made for?" }));
+    expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
+    expect(view.getByRole("option", { name: "LTX-2.5" })).toBeTruthy();
+    expect(view.getByRole("option", { name: "Wan" })).toBeTruthy();
+    restore();
+  });
+
   test("an unknown-age hit is pre-set to Yes, adults only; an adult hit made all ages asks for the passcode again and sends the ticket", async () => {
     const install = mock(async (_body: InstallBody) => ({ job: "j1" }));
     const ticket = mock(async (_secret: string, _item: string) => ({ ticket: "t-1", expires_in: 30 }));
@@ -238,6 +258,17 @@ describe("the browser", () => {
 });
 
 describe("the editor", () => {
+  test("a retired saved style says why and cannot be enabled or picked for a clip", async () => {
+    const retired = row({ base_model: "ltx-2.3", usable: true });
+    const restore = stub({ list: mock(async () => ({ items: [retired], locked: false })) as never });
+    const view = renderWithQueryClient(<Page><StyleEditor row={retired} person={person} onClose={() => undefined} onChanged={() => undefined} /></Page>);
+    expect((await view.findAllByText("Retired video model, no longer available")).length).toBeGreaterThan(0);
+    expect(view.getByRole("button", { name: "Try this style" })).toBeDisabled();
+    expect(view.getByRole("radiogroup", { name: "Who can use this style" })).toHaveAttribute("aria-disabled", "true");
+    expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
+    restore();
+  });
+
   test("Adults only off asks first, and asks for the passcode again when the source said adult; keeping it changes nothing", async () => {
     unlocked = true;
     const allAges = mock(async (id: string) => row({ id, audience: "all-ages" }));

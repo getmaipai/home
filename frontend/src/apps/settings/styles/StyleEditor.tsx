@@ -92,7 +92,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                   </Select>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" disabled={!row.usable} onClick={() => navigate("/apps/videos/create", { state: tryStyleState(row) })}>Try this style</Button>
+                  <Button type="button" disabled={!row.usable || row.base_model === "ltx-2.3"} onClick={() => navigate("/apps/videos/create", { state: tryStyleState(row) })}>Try this style</Button>
                   <Button type="button" variant="outline" onClick={() => setAskRemove(true)}>Remove</Button>
                 </div>
               </DialogSection>
@@ -100,11 +100,12 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                 {row.needs_confirmation ? (
                   <Alert><AlertDescription><span className="flex flex-col items-start gap-2">Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style.<Button type="button" size="sm" variant="outline" onClick={() => void act(() => stylesApi.confirmLicence(row.id), "Confirmed.", "Home could not confirm that. Try again.")}>I have read them</Button></span></AlertDescription></Alert>
                 ) : null}
-                <RadioGroup value={who} onValueChange={(v) => setWho(v as StyleWho)} aria-label="Who can use this style">
+                <RadioGroup value={who} onValueChange={(v) => setWho(v as StyleWho)} aria-label="Who can use this style" disabled={row.base_model === "ltx-2.3"}>
                   {([["admins", "Only admins"], ["adults", "All adults"], ["people", "Chosen people"]] as const).map(([v, text]) => (
                     <div key={v} className="flex items-center gap-2"><RadioGroupItem value={v} id={`se-who-${v}`} disabled={v !== "admins" && row.needs_confirmation} /><Label htmlFor={`se-who-${v}`}>{text}</Label></div>
                   ))}
                 </RadioGroup>
+                {row.base_model === "ltx-2.3" ? <p className="text-sm text-muted-foreground">Retired video model, no longer available</p> : null}
                 {who === "people" ? (
                   <PersonMultiSelect ariaLabel="Chosen people" people={adults} value={people} onValueChange={(ids) => { setPeople(ids); void save({ availability: { who: "people", people: ids } }); }} />
                 ) : null}
@@ -160,7 +161,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                     <Label htmlFor="se-base">What was this style made for?</Label>
                     <Select onValueChange={(v) => void save({ base_model: v as BaseModelId })}>
                       <SelectTrigger id="se-base"><SelectValue placeholder="Pick one" /></SelectTrigger>
-                      <SelectContent><SelectItem value="ltx-2.5">LTX-2.5</SelectItem><SelectItem value="ltx-2.3">LTX-2.3</SelectItem></SelectContent>
+                      <SelectContent><SelectItem value="ltx-2.5">LTX-2.5</SelectItem><SelectItem value="wan2.2-ti2v-5b">Wan</SelectItem></SelectContent>
                     </Select>
                   </div>
                 ) : null}

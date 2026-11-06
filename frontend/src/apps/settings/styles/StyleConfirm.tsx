@@ -32,8 +32,8 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
   const [kind, setKind] = useState<"style" | "character">(hit.kind === "character" ? "character" : "style");
   const [adultsOnly, setAdultsOnly] = useState<"yes" | "no">(hit.adult_check === "normal" ? "no" : "yes");
   const [read, setRead] = useState(false);
-  const needsBase = hit.base_model !== "ltx-2.3" && hit.base_model !== "ltx-2.5";
-  const [base, setBase] = useState<"ltx-2.5" | "ltx-2.3" | "">("");
+  const needsBase = hit.base_model !== "ltx-2.5" && hit.base_model !== "wan2.2-ti2v-5b";
+  const [base, setBase] = useState<"ltx-2.5" | "wan2.2-ti2v-5b" | "">("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
@@ -93,9 +93,9 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
                 {needsBase ? (
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="style-base">What was this style made for?</Label>
-                    <Select value={base} onValueChange={(v) => setBase(v as "ltx-2.5" | "ltx-2.3")}>
+                    <Select value={base} onValueChange={(v) => setBase(v as "ltx-2.5" | "wan2.2-ti2v-5b")}>
                       <SelectTrigger id="style-base"><SelectValue placeholder="Pick one" /></SelectTrigger>
-                      <SelectContent><SelectItem value="ltx-2.5">LTX-2.5</SelectItem><SelectItem value="ltx-2.3">LTX-2.3</SelectItem></SelectContent>
+                      <SelectContent><SelectItem value="ltx-2.5">LTX-2.5</SelectItem><SelectItem value="wan2.2-ti2v-5b">Wan</SelectItem></SelectContent>
                     </Select>
                   </div>
                 ) : null}

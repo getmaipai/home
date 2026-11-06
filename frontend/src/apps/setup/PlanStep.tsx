@@ -55,7 +55,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   // MEM-SPACE-05: jobs no tier can ever run on this computer stay off and download nothing.
   const [cannotRun, setCannotRun] = useState<ReadonlySet<string>>(new Set());
   const [cannotWhy, setCannotWhy] = useState<Record<string, string>>({});
-  // Licensed rows (Detailed video): the notice is shown plainly and the install waits for the accept; unticking the row drops the need.
+  // Licensed model rows: the notice is shown plainly and the install waits for the accept; unticking the row drops the need.
   const [licences, setLicences] = useState<PlanLicence[]>([]);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
 

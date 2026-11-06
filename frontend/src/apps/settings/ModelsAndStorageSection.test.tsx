@@ -109,36 +109,36 @@ describe("Models and storage", () => {
     v.restore();
   });
 
-  test("Detailed video that an upgrade did not pull reads \"Recommended, not installed\" with an Install button, and nothing starts by itself", async () => {
-    const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", group: "video", plan_need: "recommended", download_bytes: 73_600_000_000, full_bytes: 73_600_000_000 })]));
+  test("an upgrade recommended part that it did not pull reads \"Recommended, not installed\" with an Install button, and nothing starts by itself", async () => {
+    const v = mount(overview([row({ id: "ltx-2-5-distilled-mlx", label: "Video: LTX-2.5", group: "video", plan_need: "recommended", download_bytes: 73_600_000_000, full_bytes: 73_600_000_000 })]));
     expect(await v.findByText("Recommended, not installed")).toBeTruthy();
-    expect(v.getByLabelText("Install Video: Detailed (LTX-2.3)")).toBeTruthy();
+    expect(v.getByLabelText("Install Video: LTX-2.5")).toBeTruthy();
     expect((componentsApi.install as ReturnType<typeof mock>).mock.calls.length).toBe(0);
     v.restore();
   });
 
-  test("a part with a licence of its own asks once: the points are shown, nothing installs until I accept, then it installs with that licence", async () => {
-    const licence = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null };
-    const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", licence })]));
-    fireEvent.click(await v.findByLabelText("Install Video: Detailed (LTX-2.3)"));
+  test("a licensed model waits for acceptance, then installs with its licence", async () => {
+    const licence = { id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null };
+    const v = mount(overview([row({ id: "ltx-2-5-distilled-mlx", label: "Video: LTX-2.5", licence })]));
+    fireEvent.click(await v.findByLabelText("Install Video: LTX-2.5"));
     expect(await v.findByText("Free under $10 million a year.")).toBeTruthy();
     expect(componentsApi.install).not.toHaveBeenCalled();
     fireEvent.click(v.getByRole("button", { name: "I accept, get it" }));
-    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", "ltx-2.x-community-2026-08-11"));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-5-distilled-mlx", "video-community-license"));
     v.restore();
   });
 
   test("a licence the household acknowledgement covers installs with one click and no dialog", async () => {
-    const licence = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: true };
-    const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", licence })]));
-    fireEvent.click(await v.findByLabelText("Install Video: Detailed (LTX-2.3)"));
-    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", undefined));
+    const licence = { id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: true };
+    const v = mount(overview([row({ id: "ltx-2-5-distilled-mlx", label: "Video: LTX-2.5", licence })]));
+    fireEvent.click(await v.findByLabelText("Install Video: LTX-2.5"));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-5-distilled-mlx", undefined));
     expect(v.queryByRole("button", { name: "I accept, get it" })).toBeNull();
     v.restore();
   });
 
   test("no acknowledgement: one prompt, it opens the licence list, one Accept records it and the prompt goes away", async () => {
-    licenceData = { stack: "ok", terms_version: "v", acknowledged: null, needs_prompt: true, extras: null, licences: [{ component: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", id: "ltx", name: "LTX licence", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: false }] };
+    licenceData = { stack: "ok", terms_version: "v", acknowledged: null, needs_prompt: true, extras: null, licences: [{ component: "ltx-2-5-distilled-mlx", label: "Video: LTX-2.5", id: "ltx", name: "LTX licence", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: false }] };
     const v = mount(overview([]));
     expect(await v.findByText("Accept the licences for the AI models Home installs")).toBeTruthy();
     fireEvent.click(v.getByRole("button", { name: "See the licences" }));

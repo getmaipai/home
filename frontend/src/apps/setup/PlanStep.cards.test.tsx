@@ -114,7 +114,7 @@ describe("the plan step's job cards", () => {
     expect(within(view.getByTestId("plan-job-pictures")).getByText("Installed")).toBeTruthy();
   });
 
-  const licence = { row_id: "video-detailed", component: "ltx-2-3-distilled-mlx", id: "ltx-2.x-community-2026-08-11", name: "LTX-2 Community License", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
+  const licence = { row_id: "video-detailed", component: "ltx-2-5-distilled-mlx", id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
   const pickDetailed = (view: ReturnType<typeof render>) => fireEvent.click(view.getByRole("radio", { name: /Detailed videos/ }));
 
   test("choosing Detailed videos shows the licence plainly and Install waits for the accept", async () => {

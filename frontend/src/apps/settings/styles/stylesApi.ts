@@ -21,7 +21,7 @@ export interface StyleList { items: StyleRow[]; locked: boolean }
 
 export type BrowseSource = "huggingface" | "civitai" | "both";
 export interface BrowseQuery {
-  source: BrowseSource; q: string; kind: "any" | "style" | "character"; base: "default" | "ltx-2.5" | "ltx-2.3" | "wan" | "all";
+  source: BrowseSource; q: string; kind: "any" | "style" | "character"; base: "default" | "ltx-2.5" | "wan" | "all";
   installed: "any" | "not_installed" | "installed"; sort: "downloads" | "rating" | "newest"; cursor: string | null; adult: boolean;
 }
 /** A hit the caller may see. Adult and unknown hits never appear here: they are the response's one `locked` flag. */
@@ -39,7 +39,7 @@ export interface InstallJob { job: string; state: string; title: string; percent
 
 export interface InstallBody {
   source: "huggingface" | "civitai"; remote_id?: string; version_id?: string | null; url?: string; name?: string; kind?: "style" | "character";
-  audience: "all-ages" | "adult-only"; licence_confirmed: boolean; base_model?: "ltx-2.3" | "ltx-2.5"; confirm_ticket?: string; as_separate?: boolean;
+  audience: "all-ages" | "adult-only"; licence_confirmed: boolean; base_model?: "ltx-2.5" | "wan2.2-ti2v-5b"; confirm_ticket?: string; as_separate?: boolean;
 }
 export interface StylePatch {
   name?: string; description?: string; kind?: StyleKind; availability?: { who: StyleWho; people?: string[] };
@@ -73,4 +73,4 @@ export const stylesApi = {
   addFile: (form: FormData) => requestJson<{ id: string }>("/api/videos/adapters", { method: "POST", body: form }),
 };
 
-export const BASE_WORDS: Record<BaseModelId, string> = { "ltx-2.5": "LTX-2.5", "ltx-2.3": "LTX-2.3", "wan2.2-ti2v-5b": "Wan", unknown: "an unknown base" };
+export const BASE_WORDS: Record<BaseModelId, string> = { "ltx-2.5": "LTX-2.5", "ltx-2.3": "Retired video model, no longer available", "wan2.2-ti2v-5b": "Wan", unknown: "an unknown base" };
