@@ -601,6 +601,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/readiness.ts` | installedBasesNow |
 | `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
+| `backend/src/lib/loras/suggest.ts` | suggestStyles |
 | `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
 | `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
