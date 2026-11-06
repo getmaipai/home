@@ -5,6 +5,15 @@ import { getRegistry } from "@/lib/settingsRegistry";
 describe("brakeFor", () => {
   const base = { tool: "remind" as const, args: {}, actor: { id: "a", role: "adult", band: "adult" as const }, mode: "do" as const, tainted: false };
   const cases = [
+    ["house mode never", { tool: "house", mode: "never" }, "never"],
+    ["house unknown speaker", { tool: "house", actor: { id: "unknown", role: "guest", band: "child" } }, "never"],
+    ["house undo overrides ask", { tool: "house", action: "undo", mode: "ask" }, "do"],
+    ["house mode ask", { tool: "house", mode: "ask" }, "ask"],
+    ["house confirm asks", { tool: "house", confirm: true }, "ask"],
+    ["house tainted asks", { tool: "house", tainted: true }, "ask"],
+    ["house six targets asks", { tool: "house", targets: 6 }, "ask"],
+    ["house single light acts", { tool: "house", targets: 1 }, "do"],
+    ["child single light acts", { tool: "house", targets: 1, actor: { id: "c", role: "child", band: "child" } }, "do"],
     ["delete asks", { action: "delete" }, "ask"],
     ["clear asks", { action: "clear_list", tool: "lists", listScope: "person" }, "ask"],
     ["five items do", { action: "move", itemCount: 5 }, "do"],
@@ -28,5 +37,6 @@ describe("brakeFor", () => {
     for (const key of ["tools.remind.mode", "tools.timer.mode", "tools.lists.mode"]) {
       expect(getRegistry().find((entry) => entry.key === key)).toMatchObject({ default: "do", scope: "household" });
     }
+    expect(getRegistry().find((entry) => entry.key === "tools.house.mode")).toMatchObject({ default: "ask", scope: "household" });
   });
 });

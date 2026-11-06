@@ -31,7 +31,8 @@ export type UndoInverse =
   | { kind: "list_context"; listId: string; itemIds: string[] }
   | { kind: "batch"; inverses: UndoInverse[] }
   | { kind: "restore_reminder"; id: string }
-  | { kind: "reschedule_reminder"; id: string; nextRunAt: string; task?: string };
+  | { kind: "reschedule_reminder"; id: string; nextRunAt: string; task?: string }
+  | { kind: "house_restore"; calls: Array<{ domain: string; service: string; data: Record<string, unknown> }> };
 
 /** How long an expired or used Undo row is kept before it is deleted (a late tap still gets "expired", not "none"). */
 const KEEP_AFTER_EXPIRY_MS = 60 * 60_000;
@@ -104,7 +105,16 @@ function mayTouchList(actor: PersonRow, listId: string): boolean {
   return list !== undefined && (list.person === actor.id || list.scope === "household");
 }
 
-function applyInverse(actor: PersonRow, inverse: UndoInverse, now: Date): boolean {
+function applyInverse(actor: PersonRow, inverse: UndoInverse, now: Date, runServiceCall?: (domain: string, service: string, data: Record<string, unknown>) => Promise<boolean>): boolean | Promise<boolean> {
+  if (inverse.kind === "house_restore") {
+    if (!runServiceCall) return false;
+    return (async () => {
+      for (const call of inverse.calls) {
+        if (!await runServiceCall(call.domain, call.service, call.data)) return false;
+      }
+      return true;
+    })();
+  }
   if (inverse.kind === "cancel_reminder") return cancelJob(actor, inverse.id).ok;
   if (inverse.kind === "restore_reminder") return restoreReminder(actor, inverse.id);
   if (inverse.kind === "reschedule_reminder") return rescheduleReminder(actor, inverse.id, inverse.nextRunAt, inverse.task);
@@ -159,17 +169,26 @@ function applyInverse(actor: PersonRow, inverse: UndoInverse, now: Date): boolea
   if (inverse.kind === "remove_alarm") return deleteAlarm(actor, inverse.alarmId).ok;
   if (inverse.kind === "batch") {
     if (inverse.inverses.length === 0 || inverse.inverses.some((entry) => entry.kind === "batch")) return false;
-    return inverse.inverses.map((entry) => applyInverse(actor, entry, now)).every(Boolean);
+    return inverse.inverses.every((entry) => entry.kind !== "house_restore" && applyInverse(actor, entry, now) === true);
   }
   return false;
 }
 
 export type UndoResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
+export function runUndo(actor: PersonRow, undoId: string, now?: Date): UndoResult;
+export function runUndo(actor: PersonRow, undoId: string, now: Date, runServiceCall?: undefined): UndoResult;
+export function runUndo(
+  actor: PersonRow,
+  undoId: string,
+  now: Date,
+  runServiceCall: (domain: string, service: string, data: Record<string, unknown>) => Promise<boolean>,
+): Promise<UndoResult>;
 export function runUndo(
   actor: PersonRow,
   undoId: string,
   now = new Date(),
-): UndoResult {
+  runServiceCall?: (domain: string, service: string, data: Record<string, unknown>) => Promise<boolean>,
+): UndoResult | Promise<UndoResult> {
   purgeExpiredUndo(now);
   const row = db.select().from(toolUndo).where(eq(toolUndo.id, undoId)).get();
   if (!row || row.personId !== actor.id) return { ok: false, status: 404, error: "no such undo" };
@@ -180,7 +199,13 @@ export function runUndo(
   } catch {
     return { ok: false, status: 409, error: "invalid undo" };
   }
-  const ok = applyInverse(actor, inverse, now);
+  const applied = applyInverse(actor, inverse, now, runServiceCall);
+  if (applied instanceof Promise) return applied.then((ok) => finishUndo(actor, row, undoId, now, ok));
+  const ok = applied;
+  return finishUndo(actor, row, undoId, now, ok);
+}
+
+function finishUndo(actor: PersonRow, row: typeof toolUndo.$inferSelect, undoId: string, now: Date, ok: boolean): UndoResult {
   if (!ok) return { ok: false, status: 409, error: "undo action is no longer available" };
   // Once used the row keeps no list items, alarm labels or ids: only the fact that it was spent.
   db.update(toolUndo)
@@ -200,7 +225,6 @@ export function undoLatest(actor: PersonRow, now = new Date()): { done: boolean;
     .orderBy(desc(toolUndo.expiresAt))
     .get();
   if (!row) return { done: false, reply: "There is nothing to undo." };
-  return runUndo(actor, row.id, now).ok
-    ? { done: true, reply: "Undone." }
-    : { done: false, reply: "I couldn't undo that." };
+  const result = runUndo(actor, row.id, now);
+  return result.ok ? { done: true, reply: "Undone." } : { done: false, reply: "I couldn't undo that." };
 }

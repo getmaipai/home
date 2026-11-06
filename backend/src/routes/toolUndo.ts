@@ -24,8 +24,8 @@ const undo = createRoute({
   },
 });
 
-toolUndoRoutes.openapi(undo, (c) => {
-  const result = runUndo(c.get("person"), c.req.valid("param").id);
+toolUndoRoutes.openapi(undo, async (c) => {
+  const result = await runUndo(c.get("person"), c.req.valid("param").id);
   if (result.ok) return c.json({ ok: true as const }, 200);
   if (result.status === 404) return c.json({ error: result.error }, 404);
   return c.json({ error: result.error }, 409);

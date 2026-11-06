@@ -123,6 +123,48 @@ describe("tool undo", () => {
     expect(undoBlockFor(usedRow)).toBeUndefined();
   });
 
+  test("house restore replays service calls in order through the injected executor", async () => {
+    const receipt = recordUndo({ personId: people.owner.id, tool: "house", action: "turn_on", inverse: {
+      kind: "house_restore", calls: [
+        { domain: "light", service: "turn_off", data: { entity_id: "light.kitchen" } },
+        { domain: "switch", service: "turn_on", data: { entity_id: "switch.fan" } },
+      ],
+    } });
+    const calls: string[] = [];
+    const result = await runUndo(people.owner, receipt.id, new Date(), async (domain, service, data) => {
+      calls.push(`${domain}.${service}:${String(data.entity_id)}`);
+      return true;
+    });
+    expect(result).toMatchObject({ ok: true });
+    expect(calls).toEqual(["light.turn_off:light.kitchen", "switch.turn_on:switch.fan"]);
+    expect(db.select().from(toolUndo).where(eq(toolUndo.id, receipt.id)).get()?.inverseJson).toBe('{"kind":"spent"}');
+  });
+
+  test("house restore fails when a service call fails", async () => {
+    const receipt = recordUndo({ personId: people.owner.id, tool: "house", action: "restore", inverse: {
+      kind: "house_restore", calls: [
+        { domain: "light", service: "turn_off", data: { entity_id: "light.one" } },
+        { domain: "light", service: "turn_on", data: { entity_id: "light.two" } },
+      ],
+    } });
+    const calls: string[] = [];
+    expect(await runUndo(people.owner, receipt.id, new Date(), async (_domain, service) => {
+      calls.push(service);
+      return service !== "turn_on";
+    })).toMatchObject({ ok: false, status: 409 });
+    expect(calls).toEqual(["turn_off", "turn_on"]);
+  });
+
+  test("house restore expires at ten minutes, is single use, and is person scoped", async () => {
+    const now = new Date("2026-11-06T12:00:00.000Z");
+    const expired = recordUndo({ personId: people.owner.id, tool: "house", action: "restore", inverse: { kind: "house_restore", calls: [] } }, now);
+    expect(await runUndo(people.owner, expired.id, new Date(now.getTime() + 10 * 60_000), async () => true)).toMatchObject({ ok: false, status: 409 });
+    const live = recordUndo({ personId: people.owner.id, tool: "house", action: "restore", inverse: { kind: "house_restore", calls: [{ domain: "light", service: "turn_off", data: { entity_id: "light.x" } }] } }, now);
+    expect(await runUndo(people.teen!, live.id, now, async () => true)).toMatchObject({ ok: false, status: 404 });
+    expect(await runUndo(people.owner, live.id, now, async () => true)).toMatchObject({ ok: true });
+    expect(await runUndo(people.owner, live.id, now, async () => true)).toMatchObject({ ok: false, status: 409 });
+  });
+
   test("remind result returns a schedule card and an Undo confirmation with the receipt id", () => {
     const receipt = recordUndo({
       personId: people.owner.id,
