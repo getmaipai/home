@@ -216,6 +216,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/components/dataTableModel.tsx` | useDataTableModel, tableColumns |
 | `frontend/src/shell/drawerSections.tsx` | DrawerSectionsContext, useDrawerSections |
 | `frontend/src/shell/incognitoContext.tsx` | INCOGNITO_DISCARDED_EVENT, IncognitoProvider, useIncognitoContext |
+| `frontend/src/shell/library/CutToBeatDialog.tsx` | useCutToBeatDialog |
 | `frontend/src/shell/library/LibraryItems.tsx` | itemMenu, tileOf, NameCell, LibraryItems |
 | `frontend/src/shell/library/LibraryShareDialog.tsx` | LibraryShareDialog |
 | `frontend/src/shell/library/LibraryStorage.tsx` | LibraryStorage |
@@ -1036,6 +1037,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, adapterOfLora, allVideoAdapters, loraSurfaceOf, videoAdaptersFor |
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
+| `backend/src/lib/videos/beatCut.ts` | planBeatCut |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
 | `backend/src/lib/videos/editPlan.ts` | MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL, MIN_JOIN_CLIPS, MAX_JOIN_CLIPS |
