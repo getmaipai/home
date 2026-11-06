@@ -511,9 +511,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_PROVIDER_NAME, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed |
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
-| `backend/src/lib/house/act.ts` | supportedActions, performHouseAction |
+| `backend/src/lib/house/act.ts` | supportedActions, houseServiceCall, performHouseAction |
 | `backend/src/lib/house/connection.ts` | houseLanFetch |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
+| `backend/src/lib/house/tool.ts` | HOUSE_TOOL_ID, houseToolSpec, visibleHouseEntities, runHouseTool |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
 | `backend/src/lib/householdVoiceCheck.ts` | HOUSEHOLD_PREVIEW_SENTENCE, renderHouseholdVoice, cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio |
