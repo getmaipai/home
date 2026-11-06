@@ -92,7 +92,7 @@ function expected(entity: HouseEntity, action: HouseActionInput, current: StateS
     case "set_speed": return current.percentage === action.value;
   }
 }
-function undoFor(action: HouseActionInput, before: StateSnapshot): HouseActionInput | null {
+export function undoFor(action: HouseActionInput, before: StateSnapshot): HouseActionInput | null {
   switch (action.name) {
     case "turn_on": return before.state === "on" && before.brightness === null && !before.rgb ? null : before.state === "off" ? { name: "turn_off" } : before.brightness !== null ? { name: "set_brightness", value: Math.max(1, Math.round(before.brightness / 255 * 100)) } : before.rgb ? { name: "set_color", rgb: before.rgb } : null;
     case "turn_off": return before.state === "off" ? null : { name: "turn_on" };
