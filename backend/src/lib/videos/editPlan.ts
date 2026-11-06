@@ -54,9 +54,25 @@ export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade",
 export function filmLookOps(preset: FilmLookPreset, strength?: number): EditOp[] { return [{ op: "film_look", preset, ...(strength === undefined ? {} : { strength }) }]; }
 export function letterboxOps(ratio: LetterboxRatio): EditOp[] { return [{ op: "letterbox", ratio }]; }
 export function speedOps(factor: number): EditOp[] { return [{ op: "speed", factor }]; }
+export type VideoEffect = "speed_ramp" | "reverse" | "freeze" | "loop" | "fps_boost" | "flip" | "rotate" | "sharpen" | "denoise" | "pip" | "kenburns";
+export interface VideoEffectValues { from_factor?: number; to_factor?: number; at_s?: number; over_s?: number; hold_s?: number; times?: number; fps?: 30 | 48 | 60; direction?: "horizontal" | "vertical"; degrees?: 90 | 180 | 270; amount?: number; corner?: "top_left" | "top_right" | "bottom_left" | "bottom_right"; size?: number }
+export function effectOps(effect: VideoEffect, values: VideoEffectValues, input = 1): EditOp[] {
+  switch (effect) {
+    case "speed_ramp": return [{ op: effect, from_factor: values.from_factor!, to_factor: values.to_factor!, at_s: values.at_s!, over_s: values.over_s! }];
+    case "reverse": return [{ op: effect }];
+    case "freeze": return [{ op: effect, at_s: values.at_s!, hold_s: values.hold_s! }];
+    case "loop": return [{ op: effect, times: values.times! }];
+    case "fps_boost": return [{ op: effect, fps: values.fps! }];
+    case "flip": return [{ op: effect, direction: values.direction! }];
+    case "rotate": return [{ op: effect, degrees: values.degrees! }];
+    case "sharpen": case "denoise": return [{ op: effect, amount: values.amount! }];
+    case "pip": return [{ op: effect, input, corner: values.corner!, size: values.size!, margin: 0.05 }];
+    case "kenburns": return [{ op: effect, zoom_from: values.from_factor!, zoom_to: values.to_factor!, pan: values.direction === "horizontal" ? "right" : values.direction === "vertical" ? "down" : "none" }];
+  }
+}
 export function captionsOps(lines: CaptionLine[], position: CaptionPosition = "bottom"): EditOp[] { return [{ op: "captions", lines, position }]; }
 
-export const TRANSITION_KINDS = ["fade", "dissolve", "wipeleft", "wiperight", "wipeup", "wipedown", "slideleft", "slideright", "slideup", "slidedown", "circleopen", "circleclose", "radial", "smoothleft", "smoothright", "fadeblack", "fadewhite", "zoomin", "pixelize"] as const;
+export const TRANSITION_KINDS = ["fade", "dissolve", "speckle", "wipeleft", "wiperight", "wipeup", "wipedown", "slideleft", "slideright", "slideup", "slidedown", "circleopen", "circleclose", "radial", "smoothleft", "smoothright", "fadeblack", "fadewhite", "zoomin", "pixelize"] as const;
 export const JOIN_TRANSITIONS = ["cut", "crossfade", ...TRANSITION_KINDS] as const;
 export type JoinTransition = (typeof JOIN_TRANSITIONS)[number];
 export const MIN_CROSSFADE_S = 0.3;

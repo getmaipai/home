@@ -27,7 +27,7 @@ import { TestClient } from "./client";
 
 let fakeVideo: ReturnType<typeof installFakeVideoStack>; let fakeEdit: FakeEditStack;
 beforeEach(() => { resetDb(); fakeVideo = installFakeVideoStack(); fakeVideo.detailed = "installed"; __setVideoStatusForTests(readyVideoStatusForTests({ detailed: "installed" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 99, label: "adult", is_nude_or_sexual: false, confidence: 0.99 } }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); fakeEdit = installFakeEditStack(); });
-afterEach(() => { fakeEdit.restore(); fakeVideo.restore(); __setVideoStatusForTests(undefined); __setKeyframesForTests(null); __setAgeCheckRunnerForTests(null); __setMusicFetchForTests(null); });
+afterEach(() => { fakeEdit.restore(); fakeVideo.restore(); __setVideoStatusForTests(undefined); __setKeyframesForTests(null); __setMusicFetchForTests(null); });
 
 let personN = 0;
 function actor(role = "owner"): PersonRow { const now = new Date().toISOString(); const id = `person-beat${role}${++personN}`; db.insert(people).values({ id, displayName: role, role, avatarSeed: role, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run(); return db.select().from(people).where(eq(people.id, id)).get() as PersonRow; }

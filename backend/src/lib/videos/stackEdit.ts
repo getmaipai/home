@@ -22,7 +22,7 @@ export type EditOp =
   | { op: "frame"; at_s: number }
   /** On the Stack since a23ac89 (2026-11-02): join the working clip and the later files, blending each seam over `duration_s` (0.3 to 1.0, up to 6 clips). */
   | { op: "crossfade"; duration_s: number; with?: number[] }
-  | { op: "transition"; kind: "fade" | "dissolve" | "wipeleft" | "wiperight" | "wipeup" | "wipedown" | "slideleft" | "slideright" | "slideup" | "slidedown" | "circleopen" | "circleclose" | "radial" | "smoothleft" | "smoothright" | "fadeblack" | "fadewhite" | "zoomin" | "pixelize"; duration_s: number; with?: number[] }
+  | { op: "transition"; kind: "fade" | "dissolve" | "speckle" | "wipeleft" | "wiperight" | "wipeup" | "wipedown" | "slideleft" | "slideright" | "slideup" | "slidedown" | "circleopen" | "circleclose" | "radial" | "smoothleft" | "smoothright" | "fadeblack" | "fadewhite" | "zoomin" | "pixelize"; duration_s: number; with?: number[] }
   | { op: "title_card"; text: string; subtitle?: string; duration_s: number; position: "center" | "lower_third" | "top"; background: "black" | "white" | string; text_color: "black" | "white" | string; fade_in_s?: number; fade_out_s?: number; place: "start" | "end" }
   | { op: "credits"; lines: Array<{ role?: string; name: string }>; duration_s?: number; speed?: number; background: "black" | "white" | string; text_color: "black" | "white" | string; title?: string }
   | { op: "reframe"; aspect: "9:16" | "1:1" | "16:9" | "4:5"; fill: "crop" | "blur" }
@@ -30,6 +30,16 @@ export type EditOp =
   | { op: "film_look"; preset: "70s_color" | "noir" | "teal_orange" | "bleach_bypass" | "technicolor" | "faded_vintage" | "cool_thriller"; strength?: number }
   | { op: "letterbox"; ratio: "2.39:1" | "2:1" | "1.85:1" | "1.33:1" }
   | { op: "speed"; factor: number }
+  | { op: "speed_ramp"; from_factor: number; to_factor: number; at_s: number; over_s: number }
+  | { op: "reverse" }
+  | { op: "freeze"; at_s: number; hold_s: number }
+  | { op: "loop"; times: number }
+  | { op: "kenburns"; zoom_from: number; zoom_to: number; pan: "none" | "left" | "right" | "up" | "down"; duration_s?: number }
+  | { op: "fps_boost"; fps: 30 | 48 | 60 }
+  | { op: "flip"; direction: "horizontal" | "vertical" }
+  | { op: "rotate"; degrees: 90 | 180 | 270 }
+  | { op: "sharpen" | "denoise"; amount: number }
+  | { op: "pip"; input: number; corner: "top_left" | "top_right" | "bottom_left" | "bottom_right"; size: number; margin: number }
   | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
 /** One file the Stack reads: its bytes and the extension it is staged with (the Stack looks at the content, not the name). */

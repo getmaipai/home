@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, filmLookOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
+import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, effectOps, filmLookOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -49,7 +49,11 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "continue", "extend", "retake"]),
+  effect: z.enum(["speed_ramp", "reverse", "freeze", "loop", "fps_boost", "flip", "rotate", "sharpen", "denoise", "pip", "kenburns"]).optional(),
+  amount: z.number().min(0).max(1).optional(), times: z.number().int().min(2).max(6).optional(), fps: z.union([z.literal(30), z.literal(48), z.literal(60)]).optional(),
+  direction: z.enum(["horizontal", "vertical"]).optional(), degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).optional(), from_factor: z.number().min(0.25).max(4).optional(), to_factor: z.number().min(0.25).max(4).optional(),
+  at_s: z.number().min(0).max(600).optional(), over_s: z.number().min(0.3).max(10).optional(), hold_s: z.number().min(0.5).max(5).optional(), corner: z.enum(["top_left", "top_right", "bottom_left", "bottom_right"]).optional(), size: z.number().min(0.15).max(0.5).optional(), with_clip: z.string().trim().min(1).max(80).optional(),
   production: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().min(3).max(1200).optional(),
   look: z.union([z.enum(ids(VIDEO_LOOKS)), z.enum(FILM_LOOK_PRESETS)]).optional(),
@@ -152,6 +156,20 @@ export async function makeItMaxBody(actor: PersonRow, band: Parameters<typeof ti
 
 export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
+  if (args.change === "effect") {
+    const effect = args.effect;
+    const bounded: Array<[string, number, number, string]> = [
+      ["amount", 0, 1, "Amounts must be from 0 to 1."], ["times", 2, 6, "Loop count must be from 2 to 6."], ["from_factor", 0.25, 4, "Speed factors must be from 0.25 to 4."], ["to_factor", 0.25, 4, "Speed factors must be from 0.25 to 4."],
+      ["at_s", 0, 600, "Time must be from 0 to 600 seconds."], ["over_s", 0.3, 10, "Speed ramp duration must be from 0.3 to 10 seconds."], ["hold_s", 0.5, 5, "Freeze duration must be from 0.5 to 5 seconds."], ["size", 0.15, 0.5, "Picture-in-picture size must be from 0.15 to 0.5."],
+    ];
+    for (const [key, min, max, line] of bounded) if (args[key] !== undefined && (typeof args[key] !== "number" || (args[key] as number) < min || (args[key] as number) > max)) return refused(callId, args, line, `bad_${key}`);
+    if (effect === "loop" && typeof args.times === "number" && !Number.isInteger(args.times)) return refused(callId, args, "Loop count must be a whole number from 2 to 6.", "bad_times");
+    if (effect === "fps_boost" && ![30, 48, 60].includes(args.fps as number)) return refused(callId, args, "Choose 30, 48 or 60 frames per second.", "bad_fps");
+    if (effect === "flip" && !["horizontal", "vertical"].includes(args.direction as string)) return refused(callId, args, "Choose horizontal or vertical.", "bad_direction");
+    if (effect === "rotate" && ![90, 180, 270].includes(args.degrees as number)) return refused(callId, args, "Choose 90, 180 or 270 degrees.", "bad_degrees");
+    if (effect === "pip" && !["top_left", "top_right", "bottom_left", "bottom_right"].includes(args.corner as string)) return refused(callId, args, "Choose a picture-in-picture corner.", "bad_corner");
+    if (effect === "kenburns" && ((args.from_factor !== undefined && (typeof args.from_factor !== "number" || args.from_factor < 1 || args.from_factor > 2)) || (args.to_factor !== undefined && (typeof args.to_factor !== "number" || args.to_factor < 1 || args.to_factor > 2)))) return refused(callId, args, "Ken Burns zoom values must be from 1 to 2.", "bad_kenburns");
+  }
   if (args.preset !== undefined && !(FILM_LOOK_PRESETS as readonly unknown[]).includes(args.preset)) return refused(callId, args, `Choose a film look: ${FILM_LOOK_PRESETS.join(", ")}.`, "bad_film_look");
   if (args.ratio !== undefined && !(LETTERBOX_RATIOS as readonly unknown[]).includes(args.ratio)) return refused(callId, args, `Choose a letterbox ratio: ${LETTERBOX_RATIOS.join(", ")}.`, "bad_letterbox_ratio");
   if ((args.change === "join" || args.change === "film") && args.look !== undefined && !(FILM_LOOK_PRESETS as readonly unknown[]).includes(args.look)) return refused(callId, args, `Choose a film look: ${FILM_LOOK_PRESETS.join(", ")}.`, "bad_film_look");
@@ -185,7 +203,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
   if (value.change === "cut_to_beat" && (!value.track || (!value.clip && !value.clips))) return refused(callId, args, value.track ? NO_CLIP_LINE : MIX_SOUND_LINE, "missing_argument");
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
@@ -504,6 +522,26 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
     if (!started.ok) return refused(callId, args, started.line, "busy");
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `A new version is being made, cut on the beat every ${value.beats_per_cut ?? 4} beats to your song. The first one is kept.` }, data: { videoJobId: started.job.id }, actions: [] } });
+  } else if (value.change === "effect") {
+    if (!value.effect) return refused(callId, args, "Tell me which effect to use.", "missing_effect");
+    const effect = value.effect;
+    if (effect === "pip" && !value.with_clip) return refused(callId, args, "Tell me which other video to put in the corner.", "missing_pip_clip");
+    const checks: Record<string, [keyof EditArgs, string][]> = {
+      speed_ramp: [["from_factor", "Give a starting speed from 0.25 to 4."], ["to_factor", "Give an ending speed from 0.25 to 4."], ["at_s", "Tell me where the speed change starts, in seconds."], ["over_s", "Choose a speed change lasting 0.3 to 10 seconds."]],
+      freeze: [["at_s", "Tell me which second to freeze on."], ["hold_s", "Choose a freeze lasting 0.5 to 5 seconds."]],
+      loop: [["times", "Choose 2 to 6 plays."],], fps_boost: [["fps", "Choose 30, 48 or 60 frames per second."]], flip: [["direction", "Choose horizontal or vertical."],], rotate: [["degrees", "Choose 90, 180 or 270 degrees."]], sharpen: [["amount", "Choose a sharpening amount from 0 to 1."]], denoise: [["amount", "Choose a denoising amount from 0 to 1."]], pip: [["corner", "Choose a picture-in-picture corner."], ["size", "Choose a picture-in-picture size from 0.15 to 0.5."]], kenburns: []
+    };
+    for (const [key, line] of checks[effect] ?? []) if (value[key] === undefined) return refused(callId, args, line, `missing_${key}`);
+    const numeric = (key: keyof EditArgs) => value[key] as number;
+    if (effect === "speed_ramp" && (numeric("from_factor") < 0.25 || numeric("from_factor") > 4 || numeric("to_factor") < 0.25 || numeric("to_factor") > 4 || numeric("over_s") < 0.3 || numeric("over_s") > 10)) return refused(callId, args, "Speed ramp values must use speeds from 0.25 to 4 and a duration from 0.3 to 10 seconds.", "bad_speed_ramp");
+    if (effect === "reverse" && seconds !== null && seconds > 60) return refused(callId, args, "Reverse works only on clips up to 60 seconds. Trim the clip first.", "reverse_too_long");
+    if (effect === "fps_boost" && seconds !== null && seconds > 30) return refused(callId, args, "Frame smoothing works only on clips up to 30 seconds. Trim the clip first.", "fps_too_long");
+    if (effect === "kenburns" && value.from_factor !== undefined && (value.from_factor < 1 || value.from_factor > 2 || value.to_factor === undefined || value.to_factor < 1 || value.to_factor > 2)) return refused(callId, args, "Ken Burns zoom values must be from 1 to 2.", "bad_kenburns");
+    let pipSource: VideoJob | null = null;
+    if (effect === "pip") { pipSource = ownClip(actor, state, value.with_clip!, temporary); if (!pipSource) return refused(callId, args, NO_CLIPS_LINE, "no_clip"); const otherFile = clipFileOf(actor, pipSource); if (!otherFile) return refused(callId, args, NO_CLIPS_LINE, "no_clip"); inputs = [clipFiles[0]!, otherFile]; marks.push(await clipMarkOf(pipSource)); }
+    else inputs = [clipFiles[0]!];
+    ops = effectOps(effect, { from_factor: effect === "kenburns" ? value.from_factor ?? 1 : value.from_factor, to_factor: effect === "kenburns" ? value.to_factor ?? 1.2 : value.to_factor, at_s: value.at_s, over_s: value.over_s, hold_s: value.hold_s, times: value.times, fps: value.fps, direction: value.direction, degrees: value.degrees, amount: value.amount, corner: value.corner, size: value.size });
+    describe = `${effect.replaceAll("_", " ")} applied`;
   } else if (value.change === "reframe") {
     if (!value.aspect) return refused(callId, args, "Tell me the shape you want: vertical, square or widescreen.", "missing_aspect");
     inputs = [clipFiles[0]!]; ops = reframeOps(value.aspect, value.fill ?? "crop"); describe = "reframed";
@@ -557,7 +595,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     } else return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
   }
 
-  const edit: NonNullable<VideoRequest["edit"]> = { from: first.id, change: value.change as "trim" | "join" | "mix", ...((value.change === "join" || value.change === "film") ? { with: sources.slice(1).map((job) => job.id) } : {}) };
+  const edit: NonNullable<VideoRequest["edit"]> = { from: first.id, change: value.change as NonNullable<VideoRequest["edit"]>["change"], ...((value.change === "join" || value.change === "film") ? { with: sources.slice(1).map((job) => job.id) } : value.change === "effect" && value.effect === "pip" ? { with: [value.with_clip!] } : {}) };
   const run: EditRun = async (signal) => {
     const files = [...inputs];
     if (spoken) {
