@@ -172,6 +172,7 @@ const CARRIES: Record<string, RegExp> = {
 
 const EXEMPT: Record<string, string> = {
   "lib/turnMachine/bareCompare.ts": "bare mode is owner and admin only and refused for a minor (routes/turn.ts)",
+  "lib/films/plan.ts": "writes a JSON shot list for an adult's own film (make_film is offered to adults on their own written screen only); the plan is shown only to that adult, and every picture, clip and the finished film made from it passes the delivery checks before anyone sees it",
   "lib/followUpSuggestions.ts": "suggestions are generated for an adult's own chat only (canGenerateFollowUpSuggestions)",
   "lib/conversationTitle.ts": "a two to five word label, run through the output gate for the owner's band; gives no advice",
   "lib/news/summary.ts": "Key points for a stored article, one per story and age band; a minor's text passes the minor floor, and a child's also the child gate sentence by sentence, before storage and again at release; gives no advice",
