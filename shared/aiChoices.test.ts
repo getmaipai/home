@@ -76,6 +76,39 @@ test("exactly one recommended radio per radio card on every tier", () => {
   }
 });
 
+test("song voice swap and realistic recording voice are optional switches only on tiers with their rows", () => {
+  for (const tier of TIERS_LIST) {
+    const plan = TIERS[tier];
+    const { cards } = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
+    const music = cards.find((card) => card.id === "music")!;
+    const voice = cards.find((card) => card.id === "voice")!;
+    const musicChoice = music.choices.find((choice) => choice.id === "music.voice");
+    const voiceChoice = voice.choices.find((choice) => choice.id === "voice.realistic");
+    expect(Boolean(musicChoice)).toBe(plan.rows.some((row) => row.id === "voice-convert"));
+    expect(Boolean(voiceChoice)).toBe(plan.rows.some((row) => row.id === "recorded-speech"));
+    for (const choice of [musicChoice, voiceChoice]) {
+      if (!choice) continue;
+      expect(choice.kind).toBe("switch");
+      expect(choice.recommended).toBe(false);
+      expect(choice.setting).toBeNull();
+      expect(choice.current).toBe(false);
+    }
+  }
+
+  const plan = planOf([
+    row("voice-convert", { model_ids: ["singer"] }),
+    row("recorded-speech", { model_ids: ["drama"] }),
+    row("music"), row("voice", { need: "required", installed: true }),
+  ]);
+  const { cards } = buildAiCards({
+    copy, plan,
+    components: [component({ id: "singer", state: "installed" }), component({ id: "drama", state: "notInstalled" })],
+    settings: SETTINGS, freeBytes: null,
+  });
+  expect(cards.find((card) => card.id === "music")!.choices.find((choice) => choice.id === "music.voice")!.current).toBe(true);
+  expect(cards.find((card) => card.id === "voice")!.choices.find((choice) => choice.id === "voice.realistic")!.current).toBe(false);
+});
+
 test("pictures: Quick offers ERNIE and Klein as radios, and Klein alone when ERNIE is absent", () => {
   const withErnie = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
   const picturesA = withErnie.cards.find((card) => card.id === "pictures")!;

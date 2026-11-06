@@ -51,7 +51,7 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper" | "vision.reader";
+type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "music.voice" | "voice.standard" | "voice.better" | "voice.realistic" | "coding.helper" | "vision.reader";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
@@ -59,9 +59,9 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "pictures", rows: ["pictures", "pictures-ernie", "image-tools", "tool-look"] },
   { id: "picturesdetailed", rows: ["pictures-zimage"] },
   { id: "videos", rows: ["video", "video-detailed"] },
-  { id: "music", rows: ["music"] },
+  { id: "music", rows: ["music", "voice-convert"] },
   { id: "stems", rows: ["stems", "stems-ft", "stems-6s"] },
-  { id: "voice", rows: ["voice", "voice-better"] },
+  { id: "voice", rows: ["voice", "voice-better", "recorded-speech"] },
   { id: "wakeword", rows: [] },
   { id: "vision", rows: ["vision"] },
   { id: "coding", rows: ["coding"] },
@@ -302,6 +302,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       }
       case "music": {
         if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
+        if (has("voice-convert")) specs.push({ id: "music.voice", job: "music", kind: "switch", row: rows.get("voice-convert")!, current: rowIsInstalled(rows.get("voice-convert")!, components), recommended: false, setting: null });
         break;
       }
       case "stems": {
@@ -314,6 +315,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const betterInstalled = has("voice-better") && rowIsInstalled(rows.get("voice-better")!, components);
         if (has("voice")) specs.push({ id: "voice.standard", job: "voice", kind: "fixed", row: rows.get("voice")!, current: !betterInstalled, recommended: !has("voice-better") || need("voice-better") !== "recommended", setting: null });
         if (has("voice-better")) specs.push({ id: "voice.better", job: "voice", kind: "radio", row: rows.get("voice-better")!, current: betterInstalled, recommended: need("voice-better") === "recommended", setting: null });
+        if (has("recorded-speech")) specs.push({ id: "voice.realistic", job: "voice", kind: "switch", row: rows.get("recorded-speech")!, current: rowIsInstalled(rows.get("recorded-speech")!, components), recommended: false, setting: null });
         break;
       }
       case "vision": {

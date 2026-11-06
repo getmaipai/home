@@ -34,6 +34,8 @@ export const aiCopy: AiCopy = {
     return { title: listed?.label ?? job, summary: listed?.description ?? "" };
   },
   choice(id) {
+    if (id === "music.voice") return { label: "Sing a song in another voice", description: "Let a saved household voice sing a song you made or own." };
+    if (id === "voice.realistic") return { label: "Realistic voice for recordings", description: "Use a more natural voice for recorded work, such as voiceovers and video lines. This is not for live chat and needs a large Mac." };
     const [job = "", name = ""] = id.split(".");
     const listed = cardFor(job as AiJobId)?.choices?.find((choice) => choice.id === `${job}-${name}`)
       ?? glance?.choices?.find((choice) => choice.id === `${job}-${name}`);

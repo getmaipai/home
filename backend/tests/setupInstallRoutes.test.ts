@@ -71,6 +71,16 @@ describe("setup install routes", () => {
     else expect(body.choices ?? null).toBeNull();
   });
 
+  test("GET /api/setup/plan lists the optional song and recorded voice choices from the shared cards", async () => {
+    __setStackClientForTests(stack(async () => plan({ tier: "p64", memory_gb: 64 })));
+    const { client } = await owner();
+    const body = await (await client.get("/api/setup/plan")).json() as { choices: { cards: Array<{ id: string; choices: Array<{ id: string; kind: string; recommended: boolean }> }> } };
+    const music = body.choices.cards.find((card) => card.id === "music")!;
+    const voice = body.choices.cards.find((card) => card.id === "voice")!;
+    expect(music.choices.find((choice) => choice.id === "music.voice")).toMatchObject({ kind: "switch", recommended: false });
+    expect(voice.choices.find((choice) => choice.id === "voice.realistic")).toMatchObject({ kind: "switch", recommended: false });
+  });
+
   test("POST /api/setup/install saves the card choices it was sent, and refuses a key that is not one", async () => {
     __setStackClientForTests(stack(async () => plan()));
     const client = new TestClient();
