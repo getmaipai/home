@@ -100,12 +100,22 @@ export function creditsOp(lines: Array<{ role?: string; name: string }>, title?:
 }
 
 /** The shared sequence used by the `film` change and faceless film assembly. */
+/** The line under a film title: the first sentence when it is short; a long one is cut at its first comma, dash or colon when that leaves a whole phrase, else dropped (a sentence cut mid-clause, as "...WORKS, FOR", reads as a mistake). */
+export function titleSubtitle(summary: string | undefined): string | undefined {
+  const first = (summary ?? "").trim().split(/(?<=[.!?])\s/)[0]?.replace(/[.!?]+$/, "").trim() ?? "";
+  if (!first) return undefined;
+  if (first.length <= 64) return first;
+  const cut = first.slice(0, 65).search(/[,;:\u2013\u2014-][^,;:\u2013\u2014-]*$/);
+  const phrase = cut > 12 ? first.slice(0, cut).trim() : "";
+  return phrase || undefined;
+}
+
 export function filmOps(input: { title?: string; summary?: string; credits?: Array<{ role?: string; name: string }>; creditsTitle?: string; look?: FilmLookPreset; letterbox?: LetterboxRatio; transition?: JoinTransition; duration?: number; includeJoin?: boolean }): EditOp[] {
   const ops: EditOp[] = input.includeJoin === false ? [] : input.transition === undefined ? [] : joinOps(input.transition, input.duration ?? DEFAULT_CROSSFADE_S);
   if (input.look) ops.push(...filmLookOps(input.look));
   if (input.letterbox) ops.push(...letterboxOps(input.letterbox));
   if (input.title) {
-    const subtitle = input.summary?.trim().split(/(?<=[.!?])\s/)[0]?.slice(0, 60).trim() || undefined;
+    const subtitle = titleSubtitle(input.summary);
     ops.push(titleCardOp(input.title, subtitle, "start"));
   }
   if (input.credits) ops.push(creditsOp(input.credits, input.creditsTitle));

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0] - 2026-11-06
+
+### Added
+
+- Optional requested film length, used to size shots and faceless narration.
+
 ## [0.2.0] - 2026-11-06
 
 ### Added

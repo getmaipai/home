@@ -23,6 +23,36 @@ describe("film planner", () => {
     expect(seenFormat).toEqual(FILM_PLAN_RESPONSE_FORMAT);
   });
 
+  test("sends the target length in planner data and accepts a fitting plan untouched", async () => {
+    let calls = 0;
+    let userMessage = "";
+    __setFilmPlanCompleterForTests(async (messages) => { calls++; userMessage = messages[1]?.content ?? ""; return { ok: true, text: JSON.stringify(goodPlan) }; });
+    expect(await planFilm({ idea: "A sailor crosses the sea", targetSeconds: 30 })).toMatchObject({ ok: true, plan: goodPlan });
+    expect(calls).toBe(1);
+    expect(JSON.parse(userMessage)).toMatchObject({ target_seconds: 30 });
+  });
+
+  test("repairs an overlong faceless narration once with measured duration and refuses a still-too-long repair", async () => {
+    const longLine = "Rain gathers along the quiet street as a small paper boat begins its slow journey toward the bright end of the road while evening settles over the rooftops and lights glow in windows.";
+    const veryLong = { ...goodPlan, cast: [], shots: Array.from({ length: 12 }, (_, i) => ({ ...goodPlan.shots[i % 2]!, id: `long-${i}`, motion: "pan left", line: longLine })) };
+    const messages: string[] = [];
+    let calls = 0;
+    __setFilmPlanCompleterForTests(async (request) => { calls++; messages.push(request[0]?.content ?? ""); return { ok: true, text: JSON.stringify(veryLong) }; });
+    const result = await planFilm({ idea: "A narrated boat story", faceless: true, targetSeconds: 30 });
+    expect(result).toMatchObject({ ok: false, line: expect.stringContaining("I couldn't plan that film") });
+    expect(calls).toBe(2);
+    expect(messages[1]).toContain("The narration is about");
+    expect(messages[1]).toContain("seconds; the film must fit about 22 seconds of shots");
+    expect(messages[1]).toContain("Shorten each line to about");
+  });
+
+  test("does not duration-check plans without a requested length", async () => {
+    let calls = 0;
+    __setFilmPlanCompleterForTests(async () => { calls++; return { ok: true, text: JSON.stringify(goodPlan) }; });
+    expect(await planFilm({ idea: "A sailor crosses the sea" })).toMatchObject({ ok: true, plan: goodPlan });
+    expect(calls).toBe(1);
+  });
+
   test.each([
     ["one shot", { ...goodPlan, shots: [goodPlan.shots[0]] }],
     ["seconds 30", { ...goodPlan, shots: goodPlan.shots.map((shot, i) => i ? shot : { ...shot, seconds: 30 }) }],

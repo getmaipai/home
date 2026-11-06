@@ -58,12 +58,12 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
   })();
 }
 export type StartFilmResult = {id:string} | {line:string};
-export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean}): StartFilmResult {
+export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;seconds?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean}): StartFilmResult {
   const {actor}=input;
   if(!allowed(actor)) return {line:"Making a film is for adults on their own written screen."};
   if(listFilmRunsInStates(["planning","running"]).some((r)=>r.person_id===actor.id)) return {line:"A film is already running. Wait for it to finish or cancel it first."};
   const run=createFilmRun(actor,{idea:input.idea,goAhead:input.goAhead,faceless:input.faceless});
-  launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,look:input.look,castHints:input.castHints,faceless:input.faceless}); return {id:run.id};
+  launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,targetSeconds:input.seconds,look:input.look,castHints:input.castHints,faceless:input.faceless}); return {id:run.id};
 }
 function ownedAdult(actor:PersonRow,id:string): FilmRun | null { if(!allowed(actor)) return null; return getFilmRun(actor,id); }
 export function getFilmProgress(actor:PersonRow,id:string): FilmRun | null { return ownedAdult(actor,id); }

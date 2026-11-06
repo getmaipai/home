@@ -47,11 +47,12 @@ describe("FILM-05 faceless films", () => {
   beforeEach(() => resetDb());
 
   test("faceless planner accepts an empty cast with its JSON schema output", async () => {
-    const complete = async (_messages: unknown[], options?: { response_format?: unknown }) => {
+    const complete = async (messages: Array<{ content?: string }>, options?: { response_format?: unknown }) => {
       expect((options?.response_format as { json_schema?: { name?: string } })?.json_schema?.name).toBe("faceless_film_plan");
+      expect(JSON.parse(messages[1]?.content ?? "{}")).toMatchObject({ target_seconds: 30 });
       return { ok: true as const, text: JSON.stringify(plan) };
     };
-    const result = await planFilm({ idea: "A paper boat crossing the street", faceless: true }, complete as never);
+    const result = await planFilm({ idea: "A paper boat crossing the street", faceless: true, targetSeconds: 30 }, complete as never);
     expect(result).toMatchObject({ ok: true, plan: { cast: [] } });
     expect(facelessFilmPlanSchema.safeParse(plan).success).toBe(true);
     __setFilmPlanCompleterForTests(null);

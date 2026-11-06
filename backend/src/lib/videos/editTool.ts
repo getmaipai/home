@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
+import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -478,7 +478,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const videoSeconds = sources.map((job) => job.files[0]?.seconds ?? job.request.seconds ?? null);
     const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - (transition === "cut" ? 0 : (sources.length - 1) * duration) : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
     const title = film?.production.title ?? value.title;
-    const subtitle = film ? (film.production.summary.trim().split(/(?<=[.!?])\s/)[0] ?? "").slice(0, 60).trim() || undefined : value.subtitle;
+    const subtitle = film ? titleSubtitle(film.production.summary) : value.subtitle;
     const creditLines = film?.credits ?? value.credits;
     const added = (title ? 3 : 0) + (creditLines ? Math.max(3, Math.ceil((creditLines.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
     if (baseLength + added > MAX_EDIT_SECONDS) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");

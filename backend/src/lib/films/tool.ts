@@ -9,6 +9,7 @@ export const MAKE_FILM_TOOL_ID = "make_film";
 export const makeFilmArgs = z.object({
   idea: z.string().trim().min(3).max(4000),
   shots: z.number().int().min(4).max(12).optional(),
+  seconds: z.number().int().min(10).max(300).optional(),
   look: z.string().trim().min(1).max(160).optional(),
   characters: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
   go_ahead: z.boolean().optional(),
@@ -36,7 +37,7 @@ export function runMakeFilm(input: { state: FilmState; args: Record<string, unkn
   const idea = parsed.data.idea;
   const refusal = refuseVideoPrompt(idea, { lane: "adult" });
   if (refusal) return refused(callId, args, VIDEO_REFUSAL_LINE[refusal], refusal);
-  const result = starter({ actor: actor as PersonRow, idea, shots: parsed.data.shots, look: parsed.data.look, castHints: parsed.data.characters, faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true });
+  const result = starter({ actor: actor as PersonRow, idea, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castHints: parsed.data.characters, faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true });
   if ("line" in result) return refused(callId, args, result.line, "not_started");
   const awaitingGo = parsed.data.go_ahead !== true;
   return outcomeOf({ callId, packageId: MAKE_FILM_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
