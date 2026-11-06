@@ -133,3 +133,7 @@ file) is not offered. Minors and adult-only access for pictures stay as built un
 ## One table of bases
 
 `backend/src/lib/loras/baseFamilies.ts` is the only place that names a model base, its Civitai labels (`LTXV2` sits on the LTX family row), its text patterns and whether it is supported on this install (`supportedBaseIds()`, fed by `setInstalledBasesProvider`); the browser, install, sync and routes read it.
+
+## Suggesting styles (STYLES-04)
+
+`POST /api/loras/suggest` matches the typed prompt locally against readable styles' names, trigger words and descriptions. It makes no model or network call, returns up to two matches, and uses the same access function as the picker. A child, teen, guest, spoken or shared surface, unavailable or removed style, unusable style, and locked adult-only style never becomes a candidate. The per-style `allow_suggesting` switch defaults on for all-ages styles and off for adult-only styles; an admin may change it. An adult-only style can be suggested only while that person's live unlock proof grants access.

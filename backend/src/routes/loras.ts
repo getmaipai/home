@@ -16,6 +16,9 @@ import { loraUsable, readLora, readLoras, type LoraSurface } from "@/lib/loras/a
 import { confirmLora, markAdultOnly, markAllAges, needsConfirmation, patchLora, removeLora, restoreLora } from "@/lib/loras/admin";
 import { LoraWriteError, type Lora } from "@/lib/loras/store";
 import { syncLoras } from "@/lib/loras/sync";
+import { requestProof } from "@/lib/adultLock";
+import { loraAllowsSuggesting } from "@maipai/spec/records/ts/validate.js";
+import { suggestStyles } from "@/lib/loras/suggest";
 
 export const lorasRoutes = apiRouter();
 
@@ -30,6 +33,7 @@ const Strength = z.object({ default: z.number(), min: z.number(), max: z.number(
 const AdminLoraSchema = z.object({
   id: z.string(), name: z.string(), kind: z.enum(["style", "character", "motion", "other"]), description: z.string(), media: z.enum(["video", "picture"]),
   base_model: z.string(), compatible_with: z.array(z.string()), usable: z.boolean(),
+  allow_suggesting: z.boolean(),
   trigger_words: z.array(z.string()), trigger_position: z.enum(["start", "end"]), positive_addins: z.array(z.string()), negative_addins: z.array(z.string()), avoid_as_positive: z.array(z.string()),
   strength: Strength, audience: z.enum(["all-ages", "adult-only"]), availability: z.object({ who: z.enum(["admins", "adults", "people"]), people: z.array(z.string()) }),
   needs_confirmation: z.boolean(), adult_check: z.enum(["normal", "unknown", "adult"]).describe("What the source said about age, once: evidence only; `audience` is the decision."), licence: z.object({ id: z.string().nullable(), commercial_use: z.string() }),
@@ -44,7 +48,7 @@ const Locked = z.object({ locked: z.boolean().describe("One tile for every locke
 
 export function adminLoraView(l: Lora): z.infer<typeof AdminLoraSchema> {
   return {
-    id: l.id, name: l.name, kind: l.kind, description: l.description, media: l.media, base_model: l.base_model, compatible_with: l.compatible_with, usable: loraUsable(l),
+    id: l.id, name: l.name, kind: l.kind, description: l.description, media: l.media, base_model: l.base_model, compatible_with: l.compatible_with, usable: loraUsable(l), allow_suggesting: loraAllowsSuggesting(l),
     trigger_words: l.trigger_words, trigger_position: l.trigger_position, positive_addins: l.positive_addins, negative_addins: l.negative_addins, avoid_as_positive: l.avoid_as_positive,
     strength: l.strength, audience: l.audience, availability: l.availability, needs_confirmation: needsConfirmation(l), adult_check: l.adult_check?.state ?? "unknown", licence: { id: l.licence.id, commercial_use: l.licence.commercial_use },
     file: { sha256: l.file.sha256, bytes: l.file.bytes, rank: l.file.rank }, source: { site: l.source.site, url: l.source.url },
@@ -74,6 +78,19 @@ const availableRoute = createRoute({
   request: { query: z.object({ media: z.enum(["video", "picture"]).optional() }) },
   responses: { 200: { content: { "application/json": { schema: Locked.extend({ items: z.array(PersonLoraSchema) }) } }, description: "Empty for a child, a teen, a guest or a shared screen." }, ...errorResponses({ 401: "Not signed in" }) },
 });
+
+const SuggestBody = z.object({ media: z.enum(["picture", "video"]), text: z.string().max(2000) });
+const SuggestItem = z.object({ id: z.string(), name: z.string(), kind: z.enum(["style", "character", "motion", "other"]) });
+const suggestRoute = createRoute({
+  method: "post", path: "/suggest", tags: ["LoRAs"], summary: "Suggest styles from this person's prompt", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: SuggestBody } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ items: z.array(SuggestItem) }) } }, description: "Visible matching styles, with no locked style count." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+lorasRoutes.openapi(suggestRoute, async (c) => {
+  const { media, text } = c.req.valid("json");
+  const result = suggestStyles({ person: c.get("person"), media, text, surface: surfaceOf(c), proof: requestProof() });
+  return c.json({ items: result.items.map(({ id, name, kind }) => ({ id, name, kind })) }, 200);
+});
 lorasRoutes.openapi(availableRoute, async (c) => {
   await syncLoras();
   const { media } = c.req.valid("query");
@@ -84,6 +101,7 @@ lorasRoutes.openapi(availableRoute, async (c) => {
 const Words = z.array(z.string().trim().min(1).max(120)).max(8);
 const PatchBody = z.object({
   name: z.string().trim().min(1).max(80).optional(), description: z.string().trim().max(140).optional(), kind: z.enum(["style", "character", "motion", "other"]).optional(),
+  allow_suggesting: z.boolean().optional(),
   availability: z.object({ who: z.enum(["admins", "adults", "people"]), people: z.array(z.string().min(1).max(80)).max(64).optional() }).optional(),
   strength: z.object({ default: z.number().min(0).max(2).optional(), min: z.number().min(0).max(2).optional(), max: z.number().min(0).max(2).optional() }).optional(),
   trigger_words: z.array(z.string().trim().min(1).max(80)).max(12).optional(), trigger_position: z.enum(["start", "end"]).optional(),

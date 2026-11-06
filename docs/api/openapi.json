@@ -70828,6 +70828,9 @@
                           "usable": {
                             "type": "boolean"
                           },
+                          "allow_suggesting": {
+                            "type": "boolean"
+                          },
                           "trigger_words": {
                             "type": "array",
                             "items": {
@@ -70997,6 +71000,7 @@
                           "base_model",
                           "compatible_with",
                           "usable",
+                          "allow_suggesting",
                           "trigger_words",
                           "trigger_position",
                           "positive_addins",
@@ -71038,6 +71042,95 @@
           },
           "403": {
             "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/suggest": {
+      "post": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Suggest styles from this person's prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "media": {
+                    "type": "string",
+                    "enum": [
+                      "picture",
+                      "video"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "media",
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Visible matching styles, with no locked style count.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "style",
+                              "character",
+                              "motion",
+                              "other"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -71232,6 +71325,9 @@
                       "other"
                     ]
                   },
+                  "allow_suggesting": {
+                    "type": "boolean"
+                  },
                   "availability": {
                     "type": "object",
                     "properties": {
@@ -71379,6 +71475,9 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "allow_suggesting": {
+                      "type": "boolean"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -71548,6 +71647,7 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
                     "positive_addins",
@@ -71686,6 +71786,9 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "allow_suggesting": {
+                      "type": "boolean"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -71855,6 +71958,7 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
                     "positive_addins",
@@ -72017,6 +72121,9 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "allow_suggesting": {
+                      "type": "boolean"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -72186,6 +72293,7 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
                     "positive_addins",
@@ -72324,6 +72432,9 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "allow_suggesting": {
+                      "type": "boolean"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -72493,6 +72604,7 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
                     "positive_addins",
@@ -72631,6 +72743,9 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "allow_suggesting": {
+                      "type": "boolean"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -72800,6 +72915,7 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
                     "positive_addins",
@@ -72938,6 +73054,9 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "allow_suggesting": {
+                      "type": "boolean"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -73107,6 +73226,7 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
                     "positive_addins",

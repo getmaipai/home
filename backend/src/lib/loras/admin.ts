@@ -28,6 +28,7 @@ function present(id: string): Lora {
 
 export interface LoraPatch {
   name?: string; description?: string; kind?: Lora["kind"];
+  allow_suggesting?: boolean;
   availability?: { who: "admins" | "adults" | "people"; people?: string[] };
   strength?: { default?: number; min?: number; max?: number };
   trigger_words?: string[]; trigger_position?: "start" | "end";
@@ -43,6 +44,7 @@ export function patchLora(admin: PersonRow, id: string, patch: LoraPatch): Lora 
   if (patch.name !== undefined) next.name = patch.name.trim();
   if (patch.description !== undefined) next.description = patch.description.trim();
   if (patch.kind !== undefined) next.kind = patch.kind;
+  if (patch.allow_suggesting !== undefined) next.allow_suggesting = patch.allow_suggesting;
   if (patch.availability) {
     const who = patch.availability.who;
     // The licence is read before anyone else may use the style (the old pending state kept it off for everyone until an admin had).
