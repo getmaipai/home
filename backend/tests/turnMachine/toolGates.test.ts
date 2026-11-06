@@ -67,6 +67,20 @@ afterEach(() => {
 });
 
 describe("conversation tool gate latch", () => {
+  test("FILM-04: make_film is only offered to an adult on their own written chat with video ready", async () => {
+    setReady(true);
+    const adult = makePerson("owner", "film-adult");
+    expect(await offered(adult)).toContain("make_film");
+    expect(await offered(makePerson("child", "film-child"), { band: "child" })).not.toContain("make_film");
+    expect(await offered(makePerson("teen", "film-teen"), { band: "teen" })).not.toContain("make_film");
+    expect(await offered(makePerson("guest", "film-guest"))).not.toContain("make_film");
+    expect(await offered(adult, { spoken: true, surfaceClass: "spoken" })).not.toContain("make_film");
+    expect(await offered(adult, { surface: "robot", surfaceClass: "written" })).not.toContain("make_film");
+    expect(await offered(adult, { bare: true })).not.toContain("make_film");
+    expect(await offered(adult, { surface: "overlay", surfaceClass: "glance" })).not.toContain("make_film");
+    expect(await offered(adult, { surface: "tv" })).not.toContain("make_film");
+  });
+
   test("offers edit_picture only when this turn has a picture and ready registry operations", async () => {
     const actor = makePerson("owner", "picture-editor-owner");
     __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: [], reason: null }, true);

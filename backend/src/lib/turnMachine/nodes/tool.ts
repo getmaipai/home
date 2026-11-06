@@ -34,6 +34,7 @@ import { ImageEditError } from "@/lib/imageEdit";
 import { GENERATE_VIDEO_TOOL_ID, runGenerateVideo } from "@/lib/videos/tool";
 import { redactLockedVideoOutcome } from "@/lib/videos/lock";
 import { EDIT_VIDEO_TOOL_ID, runEditVideo } from "@/lib/videos/editTool";
+import { MAKE_FILM_TOOL_ID, runMakeFilm } from "@/lib/films/tool";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
@@ -435,6 +436,14 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if (tool === GENERATE_VIDEO_TOOL_ID || tool === EDIT_VIDEO_TOOL_ID) {
       // ADULT-LOCK-02: a locked item's outcome is stored as a placeholder (no prompt, styles or file ids), and so is what the wire carries.
       const outcome = redactLockedVideoOutcome(state.actor, await (tool === EDIT_VIDEO_TOOL_ID ? runEditVideo : runGenerateVideo)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" }));
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    if (tool === MAKE_FILM_TOOL_ID) {
+      const outcome = runMakeFilm({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

@@ -456,6 +456,8 @@ export interface TurnValue {
   picture?: { id: string };
   /** VIDEO-GEN-06: this turn's `generate_video` call started a video job - the id only (composer.ts's `videoForOutcomes()`). The card polls GET /api/videos/jobs/:id for progress, a Stop button and the finished clip. */
   video?: { id: string };
+  /** FILM-04: the background film run started by `make_film`. */
+  film?: { id: string };
   /** MUSIC-GEN-03: the song job; tool result parts also carry musicJobId for the card. */
   music?: { id: string };
   /** APPROVE-CARD-01: set only on the turn that just parked a

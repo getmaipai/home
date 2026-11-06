@@ -1,0 +1,9 @@
+{
+  "description": "Recipe fallback; the native film runner is covered in backend/tests/filmTool.test.ts.",
+  "inputs": { "idea": "A paper boat crosses a rainy street" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Films can only be planned in an adult's own written chat.", "speech": "Films can only be planned in an adult's own written chat." },
+    "actions": [], "scheduled_jobs": [], "home_calls": [], "memory_added": []
+  }
+}

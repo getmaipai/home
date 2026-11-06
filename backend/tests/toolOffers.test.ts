@@ -158,4 +158,18 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
       expect(full).not.toContain("edit_music");
     } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
   });
+  test("FILM-04: make_film counts in the video set and music shrinks first at the cap", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    const link = { ...VIRTUAL_TOOL_REGISTRY[0]!, id: "read_link" };
+    VIRTUAL_TOOL_REGISTRY.push(link);
+    try {
+      const full = withTurnToolGates(base, true, true, true, true, true, false, false, true, null, false, false, false, true).tools_offered;
+      expect(full).toContain("make_film");
+      expect(full).toContain("edit_video");
+      expect(full).toContain("generate_video");
+      expect(full).toContain("read_link");
+      expect(full).not.toContain("make_sound");
+      expect(full.length).toBeLessThanOrEqual(16);
+    } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
+  });
 });

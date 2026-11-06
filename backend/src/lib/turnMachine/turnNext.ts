@@ -60,7 +60,7 @@ import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "./messages";
 import { topicBlockForTurn } from "@/lib/topicPrompt";
 import type { ContextSegmentKey } from "@/wire";
-import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes, videoForOutcomes, musicForOutcomes } from "@/lib/composer";
+import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes, videoForOutcomes, filmForOutcomes, musicForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { getOfferedVoices, voiceMatchesLanguage } from "@/lib/voiceResolve";
@@ -240,6 +240,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     project: projectForOutcomes(state.outcomes) ?? undefined,
     picture: pictureForOutcomes(state.outcomes) ?? undefined,
     video: videoForOutcomes(state.outcomes) ?? undefined,
+    film: filmForOutcomes(state.outcomes) ?? undefined,
     music: musicForOutcomes(state.outcomes) ?? undefined,
     ...(state.bare ? { bare: true } : {}),
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
@@ -674,7 +675,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
-  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk } = gated;
+  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -700,6 +701,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(musicOk ? { musicAllowed: true } : {}),
     ...(musicEditOk ? { musicEditAllowed: true } : {}),
     ...(videoEditOk ? { videoEditAllowed: true } : {}),
+    ...(filmOk ? { filmAllowed: true } : {}),
     ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
     ...(writingFormatOk ? { writingFormatAllowed: true } : {}),
     ...(voiceoverOk ? { voiceoverAllowed: true } : {}),

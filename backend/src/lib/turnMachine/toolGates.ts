@@ -69,6 +69,7 @@ export interface TurnToolGateResult {
   musicOk: boolean;
   musicEditOk: boolean;
   videoEditOk: boolean;
+  filmOk: boolean;
   itemRefOk: boolean;
   musicBandOk: boolean;
   /** The made-music object this turn follows: a gate value for the offers, and the object itself when one is named. */
@@ -125,6 +126,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const videoEditAvailable = videoEditPermission && safeGate(input.videoEditAvailable ?? (() => false));
   if (latch && videoEditAvailable) latch.videoEditOk = true;
   const videoEditOk = videoEditPermission && (videoEditAvailable || latch?.videoEditOk === true);
+  const filmOk = !input.bare && input.actor.role !== "guest" && input.band === "adult" && input.surfaceClass === "written" && input.surface === "chat" && videosOk;
 
   const itemRefPermission = !input.bare && input.actor.role !== "guest" && input.band !== "child" && input.surfaceClass === "written";
   // MUSIC-LIKE-01: a song reference (maipai://music/track/...) offers `make_band` and nothing else; every other reference offers
@@ -146,7 +148,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
   const voiceoverOk = !input.bare && !input.spoken && input.surfaceClass === "written" && speakerAgeBand(input.actor, new Date()) === "adult" && input.actor.role !== "guest" && (await readiness(async () => (await roleHealth("voice")).availability === "ready"));
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk),
     writingFormatOk,
     voiceoverOk,
     answerImagesOk,
@@ -158,6 +160,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     musicOk,
     musicEditOk,
     videoEditOk,
+    filmOk,
     itemRefOk,
     musicBandOk,
     musicObject,

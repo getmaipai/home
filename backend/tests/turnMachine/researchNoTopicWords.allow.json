@@ -25,6 +25,21 @@
       "file": "nodes/model.ts",
       "word": "film",
       "reason": "the answer-pictures feature's own list of picture-worthy kinds of subject (SHOW_IMAGES_REASK_INSTRUCTION); it is not part of the research path"
+    },
+    {
+      "file": "contract.ts",
+      "word": "film",
+      "reason": "the make_film chat tool's own name and module path (a feature of this app), not a subject of research"
+    },
+    {
+      "file": "nodes/tool.ts",
+      "word": "films",
+      "reason": "the make_film chat tool's own name and module path (a feature of this app), not a subject of research"
+    },
+    {
+      "file": "nodes/policy.ts",
+      "word": "films",
+      "reason": "the make_film chat tool's own name and module path (a feature of this app), not a subject of research"
     }
   ]
 }

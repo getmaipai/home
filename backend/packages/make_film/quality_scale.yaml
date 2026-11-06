@@ -1,0 +1,27 @@
+package: make_film
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: backend/tests/filmTool.test.ts covers offer gates, screening, async start and the manifest
+  routing_examples:
+    met: true
+    note: manifest has three film request examples
+  privacy_row_per_data_source:
+    met: true
+    note: no data sources; the film is made on this computer
+  offline_behavior_stated:
+    met: true
+  smoke_test:
+    met: true
+    note: tests/smoke.json
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+gold:
+  real_service_verified:
+    met: false

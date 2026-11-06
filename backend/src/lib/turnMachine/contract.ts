@@ -250,6 +250,8 @@ export interface TurnState {
   videosAllowed?: boolean;
   /** VIDEO-CHAT-01: this turn may make videos and the chat already holds a finished clip; `edit_video` is offered only then. */
   videoEditAllowed?: boolean;
+  /** FILM-04: this turn may start a film on an adult's own written screen. */
+  filmAllowed?: boolean;
   /** MUSIC-GEN-03: age, surface, household switch and Stack readiness; edits also need a made-here song in this chat. */
   musicAllowed?: boolean;
   musicEditAllowed?: boolean;

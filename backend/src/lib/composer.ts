@@ -780,6 +780,15 @@ export function videoForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { i
   return null;
 }
 
+export function filmForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
+  for (const outcome of outcomes) {
+    if (outcome.status !== "succeeded" || outcome.packageId !== "make_film") continue;
+    const id = recordData(outcome.result?.data)?.filmRunId;
+    if (typeof id === "string") return { id };
+  }
+  return null;
+}
+
 /** IMGGEN-UI-01: `TurnValue.picture`, the id of the picture job this turn's `generate_image` call started. */
 export function pictureForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
   for (const outcome of outcomes) {
