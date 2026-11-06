@@ -21,7 +21,7 @@ import { __setVideoStatusForTests, dropVideoStatusCache, readyVideoStatusForTest
 import { until } from "./pictureFixture";
 import type { PersonRow } from "@/types";
 import sharp from "sharp";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { storeFile } from "@/lib/attachments";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
@@ -78,6 +78,18 @@ describe("recipes: one list in one place", () => {
     for (const other of [teen, child]) expect((await other.client.post("/api/plugins/videos/data/recipes", {})).status).toBe(404);
     // VIDEO-UI-06: the scopes of the three old pages are gone (the feed replaced them); an unknown scope answers nothing.
     for (const scope of ["starters", "making", "last", "newest", "nonsense"]) expect(await (await adult.client.post("/api/plugins/videos/data/recipes", { scope })).json()).toEqual([]);
+  });
+  test("STYLES-04: the style-suggestions scope answers matches for the typed words, nothing for empty words or a child", async () => {
+    const { adult, child } = await household();
+    const q = async (text: string) => await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "style-suggestions", q: text })).json() as Array<{ id: string; name: string; kind: string }>;
+    expect(await q("")).toEqual([]);
+    expect(await q("zzzz qqqq")).toEqual([]);
+    expect((await child.client.post("/api/plugins/videos/data/recipes", { scope: "style-suggestions", q: "clay" })).status).toBe(404);
+  });
+  test("STYLES-04: the Create page asks for style suggestions with the prompt", () => {
+    const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "videos", "pages", "create.json"), "utf8"));
+    const find = (n: any): any => (n && typeof n === "object" ? (n.type === "prompt_bar" ? n : Object.values(n).map(find).find(Boolean)) : undefined);
+    expect(find(page.body).style_suggest.rows.params).toEqual({ scope: "style-suggestions", q: "$state.prompt" });
   });
 });
 

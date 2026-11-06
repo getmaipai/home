@@ -58,6 +58,12 @@
           "max_length": 1200,
           "submit_label": "Generate",
           "starts": "video",
+          "style_suggest": {
+            "rows": { "source": "package", "path": "recipes", "params": { "scope": "style-suggestions", "q": "$state.prompt" } },
+            "style_state": "style",
+            "character_state": "character",
+            "max": 2
+          },
           "references": [
             {
               "state": "start_frame",

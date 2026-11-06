@@ -11,6 +11,8 @@ import { studioHeaderRows, studioLevelSteps, studioLimits, studioRows } from "@/
 import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
 import { EDIT_REMOTE_LINE, EDIT_UNAVAILABLE_LINE } from "@/lib/videos/stackEdit";
 import { listLibrary } from "@/lib/library";
+import { suggestStyles } from "@/lib/loras/suggest";
+import { requestProof } from "@/lib/adultLock";
 import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_STARTERS, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
@@ -185,6 +187,8 @@ registerMediaAppData("videos", (person, dataId, params) => {
     case "showcase": return showcaseRows();
     // VIDEO-STUDIO-08: the page header row (the studio `creation_header` reads its title from a bound row). The same for everyone who may open the page.
     case "header": return [{ title: "Make any video" }];
+    // STYLES-04: up to two styles for the words typed so far. The matcher reads the person's own access (a locked or minor list never holds an adult style).
+    case "style-suggestions": return suggestStyles({ person, media: "video", text: params.query ?? "", surface: "own_written", proof: requestProof() }).items.map((l) => ({ id: l.id, name: l.name, kind: l.kind === "character" ? "character" : "style" }));
     case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
     case "clips": return clipRows(person, params.view, Math.min(params.limit ?? 200, 200));

@@ -77,7 +77,7 @@ Rule: a new style feature is built once against the record and the table. Only t
 1. **STYLES-01 media parameter** (after STYLES-00). `media` on browse, install and the base table; picture rows with live-confirmed labels; tests with a fake picture Stack in the real reply shape (`{ job: {...} }`).
 2. **STYLES-02 one prompt plan.** Move the plan to `lib/loras/promptPlan.ts`; both Create pages and both chat tools call it; a test that the same input gives the same words for both media.
 3. **STYLES-03 readiness provider.** Feed `setInstalledBasesProvider` from the Stack roles so the default search is never empty by accident (it returned nothing on the 2026-11-04 run).
-4. **STYLES-04 suggestions** (after ADULT-LOCK-07, so pictures hold the Adult lock before a picture style can be suggested). Backend landed; chips on both Create pages wait for VIDEO-UI-03.
+4. **STYLES-04 suggestions** (after ADULT-LOCK-07, so pictures hold the Adult lock before a picture style can be suggested). Backend landed; the video Create page shows the chips (kit `prompt_bar.style_suggest`, ui-v0.5.504, shown while the Styles chip is usable at the chosen level). There is no picture Create page yet.
 5. **STYLES-05 picture install proof.** One real picture style installed and one picture made with it on a dev hub, the output opened and judged.
 
 ## 7. Open items (measurements, not owner questions)
