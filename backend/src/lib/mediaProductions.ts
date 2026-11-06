@@ -78,6 +78,19 @@ export function setShotPicture(ownerPersonId: string, productionId: string, shot
   }) })) }));
   if (found) persist(row, { episodes });
 }
+/** Record the kept narration file for a shot. */
+export function setShotVoiceLine(ownerPersonId: string, productionId: string, shotId: string, fileId: string): void {
+  const row = raw(productionId);
+  if (!row || row.ownerPersonId !== ownerPersonId) return;
+  const production = decode(row);
+  let found = false;
+  const episodes = production.episodes.map((episode) => ({ ...episode, scenes: episode.scenes.map((scene) => ({ ...scene, shots: scene.shots.map((shot) => {
+    if (shot.id !== shotId) return shot;
+    found = true;
+    return { ...shot, voice_line_id: fileId };
+  }) })) }));
+  if (found) persist(row, { episodes });
+}
 export function clearShotArtifacts(ownerPersonId: string, productionId: string, shotId: string): void {
   const row = raw(productionId);
   if (!row || row.ownerPersonId !== ownerPersonId) return;
@@ -86,7 +99,7 @@ export function clearShotArtifacts(ownerPersonId: string, productionId: string, 
   const episodes = production.episodes.map((episode) => ({ ...episode, scenes: episode.scenes.map((scene) => ({ ...scene, shots: scene.shots.map((shot) => {
     if (shot.id !== shotId) return shot;
     found = true;
-    return { ...shot, picture_file_id: null, clip_file_id: null };
+    return { ...shot, picture_file_id: null, clip_file_id: null, voice_line_id: null };
   }) })) }));
   if (found) persist(row, { episodes, finished_cut_file_ids: [] });
 }

@@ -12,6 +12,7 @@ export const makeFilmArgs = z.object({
   look: z.string().trim().min(1).max(160).optional(),
   characters: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
   go_ahead: z.boolean().optional(),
+  faceless: z.boolean().optional().default(false),
 });
 
 type FilmState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary">;
@@ -35,7 +36,7 @@ export function runMakeFilm(input: { state: FilmState; args: Record<string, unkn
   const idea = parsed.data.idea;
   const refusal = refuseVideoPrompt(idea, { lane: "adult" });
   if (refusal) return refused(callId, args, VIDEO_REFUSAL_LINE[refusal], refusal);
-  const result = starter({ actor: actor as PersonRow, idea, shots: parsed.data.shots, look: parsed.data.look, castHints: parsed.data.characters, goAhead: parsed.data.go_ahead === true });
+  const result = starter({ actor: actor as PersonRow, idea, shots: parsed.data.shots, look: parsed.data.look, castHints: parsed.data.characters, faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true });
   if ("line" in result) return refused(callId, args, result.line, "not_started");
   const awaitingGo = parsed.data.go_ahead !== true;
   return outcomeOf({ callId, packageId: MAKE_FILM_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,

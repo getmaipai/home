@@ -1,6 +1,6 @@
 {
   "id": "make_film",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Film",
@@ -23,7 +23,8 @@
       "shots": { "type": "integer", "minimum": 4, "maximum": 12, "grounded": false, "description": "Optional number of shots, from 4 to 12. Set only when the person asks for a number." },
       "look": { "type": "string", "maxLength": 160, "grounded": false, "description": "Optional look in plain words, such as 1975 35mm, overcast, muted, or cartoon. Set only when the person asks for a look." },
       "characters": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 80 }, "grounded": false, "description": "Optional names of saved characters to use, only when the person names them." },
-      "go_ahead": { "type": "boolean", "grounded": false, "description": "Set true only when the person asked to skip checking the plan first. Otherwise leave out or set false; the person reviews the plan and presses Go." }
+      "go_ahead": { "type": "boolean", "grounded": false, "description": "Set true only when the person asked to skip checking the plan first. Otherwise leave out or set false; the person reviews the plan and presses Go." },
+      "faceless": { "type": "boolean", "default": false, "grounded": false, "description": "a narrated film of pictures with slow zoom and pan, no characters moving" }
     }
   },
   "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"], "min_role": "adult", "consequential": false,

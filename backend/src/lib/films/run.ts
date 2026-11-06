@@ -1,4 +1,4 @@
-import { getMediaProduction, setShotClip, setShotPicture, updateMediaProduction, clearShotArtifacts, type Production, type Shot } from "@/lib/mediaProductions";
+import { getMediaProduction, setShotClip, setShotPicture, setShotVoiceLine, updateMediaProduction, clearShotArtifacts, type Production, type Shot } from "@/lib/mediaProductions";
 import type { PersonRow } from "@/types";
 import type { FilmPlan } from "@/lib/films/plan";
 
@@ -11,7 +11,10 @@ export interface FilmEngines {
   ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string }, options: { signal: AbortSignal }): Promise<string>;
   makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[] }, options: { signal: AbortSignal }): Promise<string>;
   makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string }, options: { signal: AbortSignal }): Promise<string>;
-  makeMusic(input: { brief: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
+  makeNarration?(input: { shot: FilmPlan["shots"][number] }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
+  readNarration?(input: { fileId: string }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
+  makeMotionClip?(input: { shot: FilmPlan["shots"][number]; stillFileId: string; narrationFileId: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
+  makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
   assemble(input: { plan: FilmPlan; clipFileIds: string[]; musicFileId: string }, options: { signal: AbortSignal }): Promise<string>;
   waitForIdle(): Promise<void>;
   note?: string;
@@ -40,8 +43,9 @@ async function callEngine<T>(stage: FilmStage, shotId: string | undefined, engin
   }
 }
 
-export async function runFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; engines: FilmEngines; signal: AbortSignal }): Promise<Production> {
+export async function runFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; engines: FilmEngines; signal: AbortSignal; faceless?: boolean }): Promise<Production> {
   const { actor, productionId, plan, engines, signal } = input;
+  const faceless = input.faceless === true;
   let production = getMediaProduction(actor, productionId);
   if (!production || production.owner_person_id !== actor.id) throw new Error("That production is not available to you.");
   if (production.episodes.length === 0) {
@@ -81,16 +85,27 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     const stored = productionShots(current).find((shot) => shot.id === planned.id);
     if (!stored?.clip_file_id) {
       if (!stored?.picture_file_id) throw new FilmStepError("clips", "The shot's picture is missing.", planned.id);
-      const fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id! }, { signal }));
+      let fileId: string;
+      if (faceless) {
+        if (!engines.makeNarration || !engines.makeMotionClip || (stored.voice_line_id && !engines.readNarration)) throw new FilmStepError("clips", "The narration step is unavailable.", planned.id);
+        const narration = stored.voice_line_id
+          ? await callEngine("clips", planned.id, engines, signal, () => engines.readNarration!({ fileId: stored.voice_line_id! }, { signal }))
+          : await callEngine("clips", planned.id, engines, signal, () => engines.makeNarration!({ shot: planned }, { signal }));
+        if (!stored.voice_line_id) setShotVoiceLine(actor.id, productionId, planned.id, narration.fileId);
+        engines.onProgress?.({ stage: "clips", done: i * 2 + 1, total: plan.shots.length * 2, shotId: planned.id });
+        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeMotionClip!({ shot: planned, stillFileId: stored.picture_file_id!, narrationFileId: narration.fileId, seconds: Math.max(planned.seconds, narration.seconds + 0.6) }, { signal }));
+      } else {
+        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id! }, { signal }));
+      }
       setShotClip(actor.id, productionId, planned.id, fileId);
     }
     current = getMediaProduction(actor, productionId)!;
-    engines.onProgress?.({ stage: "clips", done: i + 1, total: plan.shots.length, shotId: planned.id });
+    engines.onProgress?.({ stage: "clips", done: faceless ? (i + 1) * 2 : i + 1, total: faceless ? plan.shots.length * 2 : plan.shots.length, shotId: planned.id });
   }
   current = getMediaProduction(actor, productionId)!;
   let musicFileId = current.music_line_ids[0];
   if (!musicFileId) {
-    musicFileId = await callEngine("music", undefined, engines, signal, () => engines.makeMusic({ brief: plan.music, seconds: plan.shots.reduce((sum, shot) => sum + shot.seconds, 0) }, { signal }));
+    musicFileId = await callEngine("music", undefined, engines, signal, () => engines.makeMusic({ brief: faceless ? `${plan.music}, soft and underscoring a narrator` : plan.music, seconds: plan.shots.reduce((sum, shot) => sum + shot.seconds, 0), faceless }, { signal }));
     current = updateMediaProduction(actor, productionId, { music_line_ids: [...current.music_line_ids, musicFileId] })!;
   }
   engines.onProgress?.({ stage: "music", done: 1, total: 1 });

@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 import type { PersonRow } from "@/types";
-import { storeFile } from "@/lib/attachments";
+import { readAttachment, storeFile } from "@/lib/attachments";
 import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished } from "@/lib/pictures/laneGate";
 import { submitGeneration, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
@@ -17,6 +17,12 @@ import { makeAudienceOf } from "@/lib/videos/make";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { runEditVideo } from "@/lib/videos/editTool";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
+import { speakToBytes } from "@/lib/voiceover";
+import { refuseVideoPrompt } from "@/lib/videos/policy";
+import { audioSeconds } from "@/lib/videos/audioLength";
+import { extractKeyframes } from "@/lib/pictures/keyframes";
+import { runStackEdit } from "@/lib/videos/stackEdit";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
 import { changeMusic, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
@@ -96,6 +102,41 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       if (!id) throw new Error("The finished video is unavailable.");
       return id;
     },
+    async makeNarration({ shot }) {
+      if (!shot.line || refuseVideoPrompt(shot.line, { lane: "adult" })) throw new Error("The narration line could not be used.");
+      const voice = voiceForSpeech({ actor });
+      const spoken = await speakToBytes(shot.line, voice);
+      if (!spoken.ok || spoken.seconds === null) throw new Error("Home can't speak right now. Try again in a minute.");
+      const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "audio/wav", bytes: spoken.bytes, provenance: `voiceover:${JSON.stringify({ v: 1, source: "film-narration", shot: shot.id, engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}), voice, kind: "household" })}`, retention: "kept", name: `Film narration ${shot.id}`, deduplicate: false });
+      if (!saved.ok) throw new Error("Home could not keep the narration file.");
+      return { fileId: saved.value.id, seconds: spoken.seconds };
+    },
+    async readNarration({ fileId }) {
+      const result = readAttachment(actor, fileId);
+      if (!result.ok) throw new Error("The saved narration could not be read.");
+      const seconds = audioSeconds(result.value.bytes);
+      if (seconds === null) throw new Error("The saved narration length could not be measured.");
+      return { fileId, seconds };
+    },
+    async makeMotionClip({ shot, stillFileId, narrationFileId, seconds }) {
+      const still = readAttachment(actor, stillFileId), narration = readAttachment(actor, narrationFileId);
+      if (!still.ok || !narration.ok) throw new Error("A film picture or narration file is missing.");
+      const direction = shot.motion.toLowerCase();
+      const pan = direction === "pan left" ? "left" : direction === "pan right" ? "right" : "none";
+      const zoomFrom = direction === "zoom out" ? 1.2 : 1;
+      const zoomTo = direction === "zoom out" ? 1 : direction === "zoom in" ? 1.2 : 1;
+      const duration = Math.max(shot.seconds, seconds + 0.6);
+      const edited = await runStackEdit({ inputs: [{ bytes: still.value.bytes, ext: "png" }, { bytes: narration.value.bytes, ext: "wav" }], ops: [{ op: "kenburns", zoom_from: zoomFrom, zoom_to: zoomTo, pan, duration_s: duration }, { op: "audio_overlay", input: 1, gain_db: 0, clip_gain_db: -60, start_s: 0, duck: false, end_s: duration }], name: `film-${shot.id}.mp4`, signal });
+      if (!edited.ok) throw new Error(edited.line);
+      const frames = await extractKeyframes(edited.bytes, edited.seconds);
+      if (!frames?.length) throw new Error("The finished clip could not be checked.");
+      const checks = await checkImages(frames, "video");
+      const decision = await gateFinished({ actor, kind: "video", jobId: `film-motion:${shot.id}`, adultOnly: true, checks, images: frames, prompt: shot.still });
+      if (decision.action === "withhold") throw new Error(decision.line);
+      const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: edited.bytes, provenance: `video-edit:${JSON.stringify({ v: 1, kind: "film-motion", shot: shot.id, still: stillFileId, narration: narrationFileId, seconds: edited.seconds })}`, retention: "kept", name: `Film clip ${shot.id}`, deduplicate: false });
+      if (!saved.ok) throw new Error(saved.error);
+      return saved.value.id;
+    },
     async makeMusic({ brief, seconds }) {
       turn ??= backgroundTurn(actor);
       const result = await runGenerateMusic({ state: { actor, surface: "chat", conversationId: turn.conversationId, turnId: turn.turnId, temporary: false, planBasis: { surfaceClass: "written" }, context: [], utterance: brief, musicAllowed: true, musicEditAllowed: true, crisis: false } as never, args: { description: brief, instrumental: true, seconds, tier: "standard" }, callId: "film-music", spoken: false });
@@ -130,28 +171,28 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
   return engines;
 }
 
-export async function makeFilm(input: { actor: PersonRow; idea: string; shots?: number; look?: string; castHints?: string[]; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }): Promise<{ productionId: string; plan: FilmPlan; filmFileId: string; note?: string } | { line: string }> {
+export async function makeFilm(input: { actor: PersonRow; idea: string; shots?: number; look?: string; castHints?: string[]; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }): Promise<{ productionId: string; plan: FilmPlan; filmFileId: string; note?: string } | { line: string }> {
   if (input.actor.role === "guest" || laneOfPerson(input.actor) !== "adult") return { line: "Making a film is for adults on their own written screen." };
-  const planned = await planFilm({ idea: input.idea, shots: input.shots, look: input.look, castHints: input.castHints });
+  const planned = await planFilm({ idea: input.idea, shots: input.shots, look: input.look, castHints: input.castHints, faceless: input.faceless });
   if (!planned.ok) return { line: planned.line };
   const production = createMediaProduction(input.actor, { title: planned.plan.title, summary: planned.plan.summary });
   const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: production.id });
   engines.onProgress = input.onProgress;
-  const completed = await runFilm({ actor: input.actor, productionId: production.id, plan: planned.plan, engines, signal: input.signal });
+  const completed = await runFilm({ actor: input.actor, productionId: production.id, plan: planned.plan, faceless: input.faceless, engines, signal: input.signal });
   const filmFileId = completed.finished_cut_file_ids.at(-1);
   if (!filmFileId) throw new Error("The film did not finish.");
   return { productionId: production.id, plan: planned.plan, filmFileId, ...(engines.note ? { note: engines.note } : {}) };
 }
 
-export async function resumeFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
+export async function resumeFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
   const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId }); engines.onProgress = input.onProgress;
   return runFilm({ ...input, engines });
 }
-export async function redoFilmShot(input: { actor: PersonRow; productionId: string; plan: FilmPlan; shotId: string; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
+export async function redoFilmShot(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; shotId: string; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
   const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId }); engines.onProgress = input.onProgress;
   return redoShot({ ...input, engines });
 }
-export async function changeFilmMusic(input: { actor: PersonRow; productionId: string; plan: FilmPlan; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
+export async function changeFilmMusic(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
   const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId }); engines.onProgress = input.onProgress;
   return changeMusic({ ...input, engines });
 }

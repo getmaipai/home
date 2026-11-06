@@ -13,10 +13,10 @@ export function __setFilmEnginesForTests(factory: EngineFactory | null): void { 
 const stageName: Record<FilmStage, FilmRun["stage"]> = { cast:"Cast", stills:"Stills", clips:"Clips", music:"Music", assemble:"Assemble", keep:"Assemble" };
 const plainFailure = "The film could not be finished. Press Resume to try the unfinished steps again.";
 function allowed(actor: PersonRow): boolean { return actor.role !== "guest" && laneOfPerson(actor) === "adult"; }
-function total(plan: FilmPlan): number { return plan.cast.length + plan.shots.length * 2 + 3; }
+function total(plan: FilmPlan, faceless = false): number { return plan.cast.length + plan.shots.length * (faceless ? 3 : 2) + 3; }
 function onProgress(actor: PersonRow, id: string) { return (p: {stage:FilmStage;done:number;total:number}) => {
   const row=getFilmRun(actor,id); if(!row || row.state!=="running") return;
-  const stage=stageName[p.stage]; const prior={Cast:0,Stills:row.plan?.cast.length ?? 0,Clips:(row.plan?.cast.length ?? 0)+(row.plan?.shots.length ?? 0),Music:(row.plan?.cast.length ?? 0)+2*(row.plan?.shots.length ?? 0),Assemble:(row.plan?.cast.length ?? 0)+2*(row.plan?.shots.length ?? 0)+1} as Record<string,number>;
+  const cast=row.plan?.cast.length ?? 0, shots=row.plan?.shots.length ?? 0, clipSteps=shots*(row.faceless?2:1); const stage=stageName[p.stage]; const prior={Cast:0,Stills:cast,Clips:cast+shots,Music:cast+shots+clipSteps,Assemble:cast+shots+clipSteps+1} as Record<string,number>;
   updateFilmRun(actor,id,{stage,done_steps:Math.min(row.total_steps,prior[stage ?? ""] ?? 0)+p.done,total_steps:row.total_steps});
 }; }
 function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | "music", shotId?: string, planInput?: PlanFilmInput): void {
@@ -26,12 +26,12 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       let current=getFilmRun(actor,run.id); if(!current) return;
       let plan=current.plan;
       if(mode==="plan" || !plan) {
-        const planned=await planFilm(planInput ?? {idea:current.idea});
+        const planned=await planFilm(planInput ?? {idea:current.idea,faceless:current.faceless});
         if(controller.signal.aborted) return;
         if(!planned.ok){updateFilmRun(actor,run.id,{state:"failed",error_line:planned.line});return;}
         plan=planned.plan;
         const production=createMediaProduction(actor,{title:plan.title,summary:plan.summary},"film");
-        updateFilmRun(actor,run.id,{plan,production_id:production.id,total_steps:total(plan),stage:"Plan",done_steps:1});
+        updateFilmRun(actor,run.id,{plan,faceless:planInput?.faceless ?? current.faceless,production_id:production.id,total_steps:total(plan,planInput?.faceless ?? current.faceless),stage:"Plan",done_steps:1});
         current=getFilmRun(actor,run.id)!;
         if(!current.go_ahead && mode==="plan") { updateFilmRun(actor,run.id,{state:"waiting_for_go"}); return; }
       }
@@ -39,10 +39,10 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       if(!current.production_id || !plan) throw new Error("The film plan is unavailable. Start a new film.");
       updateFilmRun(actor,run.id,{state:"running",error_line:null});
       const engines=engineFactory({actor,signal:controller.signal,productionId:current.production_id}); engines.onProgress=onProgress(actor,run.id);
-      const input={actor,productionId:current.production_id,plan,engines,signal:controller.signal};
+      const input={actor,productionId:current.production_id,plan,faceless:current.faceless,engines,signal:controller.signal};
       if(mode==="redo" && shotId) await redoFilmShot({...input,shotId});
       else if(mode==="music") await changeFilmMusic(input);
-      else if(mode==="run" && engineFactory===realFilmEngines) await resumeFilm({actor,productionId:current.production_id,plan,signal:controller.signal,onProgress:engines.onProgress});
+      else if(mode==="run" && engineFactory===realFilmEngines) await resumeFilm({actor,productionId:current.production_id,plan,faceless:current.faceless,signal:controller.signal,onProgress:engines.onProgress});
       else await runFilm(input);
       if(controller.signal.aborted) return;
       const latest=getFilmRun(actor,run.id)!;
@@ -58,12 +58,12 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
   })();
 }
 export type StartFilmResult = {id:string} | {line:string};
-export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;look?:string;castHints?:string[];goAhead:boolean}): StartFilmResult {
+export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean}): StartFilmResult {
   const {actor}=input;
   if(!allowed(actor)) return {line:"Making a film is for adults on their own written screen."};
   if(listFilmRunsInStates(["planning","running"]).some((r)=>r.person_id===actor.id)) return {line:"A film is already running. Wait for it to finish or cancel it first."};
-  const run=createFilmRun(actor,{idea:input.idea,goAhead:input.goAhead});
-  launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,look:input.look,castHints:input.castHints}); return {id:run.id};
+  const run=createFilmRun(actor,{idea:input.idea,goAhead:input.goAhead,faceless:input.faceless});
+  launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,look:input.look,castHints:input.castHints,faceless:input.faceless}); return {id:run.id};
 }
 function ownedAdult(actor:PersonRow,id:string): FilmRun | null { if(!allowed(actor)) return null; return getFilmRun(actor,id); }
 export function getFilmProgress(actor:PersonRow,id:string): FilmRun | null { return ownedAdult(actor,id); }
