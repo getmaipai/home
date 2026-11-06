@@ -543,8 +543,21 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const surfaceClass = state.planBasis.surfaceClass ?? "spoken";
   const thinking = state.budget.thinking_budget_tokens > 0 && reasoning.emit;
   const summaryItem: ContextItem[] = preview.summaryLine ? [{ id: "window-system-summary", text: preview.summaryLine, source: "window", subjects: [], disclosure: "child_ok" }] : [];
-  const tools = state.budget.tools_offered.slice().sort().map((id) => toolSpecFor(id, laneOfPerson(state.actor), state)).filter((t): t is NonNullable<typeof t> => t !== null);
-  const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName), { tools });
+  const toolsFor = (ids: readonly string[]) => ids.slice().sort().map((id) => toolSpecFor(id, laneOfPerson(state.actor), state)).filter((t): t is NonNullable<typeof t> => t !== null);
+  const countWithTools = (tools: ReturnType<typeof toolsFor>) => countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName), { tools });
+  let tools = toolsFor(state.budget.tools_offered);
+  let rest = await countWithTools(tools);
+  // AUDIO-PARITY-01: the two voice tools are the newest, so on a small window they give way before the tools block (and with it search) is dropped by THIN-3G below.
+  const voiceIds = new Set(["voiceover", "change_voice"]);
+  if (rest !== null && state.budget.context_window_tokens != null && state.budget.context_tokens - replyMaxTokensFor(state, thinking) - rest <= 0 && state.budget.tools_offered.some((id) => voiceIds.has(id))) {
+    const kept = state.budget.tools_offered.filter((id) => !voiceIds.has(id));
+    const lighter = await countWithTools(toolsFor(kept));
+    if (lighter !== null) {
+      state.budget = { ...state.budget, tools_offered: kept };
+      tools = toolsFor(kept);
+      rest = lighter;
+    }
+  }
   // A Stack that reports no context length leaves the window unmeasured
   // too (THIN-3A's named minimum): its 2,048-token stand-in is a floor,
   // not the engine's real size.
@@ -555,7 +568,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // still leaves a search room to land (a review).
   const reply = replyMaxTokensFor(state, thinking);
   const context = state.budget.context_tokens;
-  let left = measured ? context - reply - rest : null;
+  let left = measured ? context - reply - (rest ?? 0) : null;
   let toolRound = tools.length > 0;
   let promptLimit: TurnState["promptLimit"];
   let holdSummary = false;
