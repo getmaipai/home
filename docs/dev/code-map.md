@@ -512,6 +512,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
 | `backend/src/lib/house/act.ts` | supportedActions, performHouseAction |
+| `backend/src/lib/house/connection.ts` | houseLanFetch |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
