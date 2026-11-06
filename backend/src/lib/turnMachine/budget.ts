@@ -198,7 +198,7 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
  * off and unmeasured tools stay out, and exceeding the model cap is a
  * configuration error rather than a silently shortened offer. */
 /** The music tools dropped first, in this order, when `edit_video` would take the offer set past the model cap. */
-const MUSIC_SHRINK_ORDER = "voiceover change_voice writing_format make_song_style make_album edit_band edit_album edit_song_style make_band edit_music make_sound generate_music".split(" ");
+const MUSIC_SHRINK_ORDER = "writing_format make_song_style make_album edit_band edit_album edit_song_style make_band edit_music make_sound generate_music".split(" ");
 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
 const STUDIO_SHRINK_ORDER = "writing_format make_song_style make_album make_sound edit_music".split(" ");
@@ -222,8 +222,10 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
     if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 
+  // AUDIO-PARITY-01 V1/V2: the two voice tools are the newest and give way first, before any other set, so no existing worst case changes.
+  for (const id of ["voiceover", "change_voice"]) { if (candidates.size <= cap) break; candidates.delete(id); }
   // VIDEO-CHAT-01: the video set (at most four tools) keeps its place; when the total would pass the cap, the music set shrinks first.
-  if (candidates.size > cap && (candidates.has("edit_video") || candidates.has("voiceover") || candidates.has("change_voice"))) {
+  if (candidates.size > cap && candidates.has("edit_video")) {
     for (const id of MUSIC_SHRINK_ORDER) { if (candidates.size <= cap) break; candidates.delete(id); }
   }
   // MUSIC-STUDIO-HOME: the studio tools are the newest and the least needed, so they also give way (and only they) when the music set alone would pass the cap.
