@@ -25,6 +25,7 @@ and a proposed design; otherwise the household IP gets blocked.
 
 | Record | Status | Owner row(s) in `docs/BACKLOG.md` |
 |---|---|---|
+| [voice-v1-v2-build-2026-11-05.md](voice-v1-v2-build-2026-11-05.md) | current; how V1 Voiceover and V2 Change voice are built | AUDIO-PARITY-01 (V1, V2) |
 | [DESIGN-chat-memory-yields-to-generators-2026-10-27.md](DESIGN-chat-memory-yields-to-generators-2026-10-27.md) | owner-approved 2026-10-27; video jobs only | RULES.md rule 4 owner decision |
 | [tier-evals-2026-10-30/](tier-evals-2026-10-30/) | raw evaluation data | TIER-EVAL-01 to -08 |
 | [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md) | owner ruling | adult-content-model-decides (RULES.md rule 10) |
