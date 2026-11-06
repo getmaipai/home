@@ -70,6 +70,10 @@ export function newMadeRevisionId(): string {
   return `mrev-${randomSuffix(10)}`;
 }
 
+export const newTranscriptId = (): string => `transcript-${randomSuffix(10)}`;
+export const newTranscriptRevisionId = (): string => `trev-${randomSuffix(10)}`;
+export const newCaptionTrackId = (): string => `caption-${randomSuffix(10)}`;
+
 /** Matches spec/schemas/chat-folder.schema.json's `^folder-[a-z0-9]{6,}$`
  * (PROJECTS-01a: a chat folder, shown as a Project). */
 export function newChatFolderId(): string {

@@ -31,6 +31,7 @@ import { completeBackground, type LlmMessage } from "@/lib/llm";
 import { evaluateReply } from "@/lib/safety";
 import { tryConsume } from "@/lib/rateLimiter";
 import { artProxyAddress, directoryShowForFeed } from "./podcastDirectory";
+import { parseTranscriptDocument as parseTimedTranscript } from "@/lib/transcripts/parse";
 
 const MAX_EPISODES_PER_FEED = 200;
 const MAX_ENCLOSURE_BYTES = 400 * 1024 * 1024;
@@ -450,6 +451,12 @@ function storeTranscript(row: MediaItemRow, transcript: PodcastTranscript): void
   db.insert(podcastTranscripts).values(values).onConflictDoUpdate({ target: podcastTranscripts.itemId, set: values }).run();
 }
 function parseTranscriptDocument(input: string, mime: string): PodcastTranscript {
+  if (!/json/i.test(mime) && !/^\s*\{/.test(input)) {
+    const format = /vtt/i.test(mime) || /^\uFEFF?WEBVTT/i.test(input) ? "vtt" : "srt";
+    const parsed = parseTimedTranscript(input, format);
+    const segments = parsed.segments.map(segment => ({ start_s: Math.floor(segment.start), text: segment.text }));
+    return { text: segments.map(segment => segment.text).join(" ").slice(0, TRANSCRIPT_TEXT_MAX), segments, source: "publisher" };
+  }
   const segments: TranscriptSegment[] = [];
   const clean = (s: string) => plainNotes(s, TRANSCRIPT_TEXT_MAX).replace(/\s+/g, " ").trim();
   if (/json/i.test(mime) || /^\s*\{/.test(input)) {

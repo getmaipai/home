@@ -37792,3 +37792,6 @@ What changed in this slice (the judge, the eligibility gate, the explicit-save p
 - **Trace**: every non-temporary turn's stats JSON carries `memory: { profile: [ids], injected: [{ id, score }] }`. Turn row only: the operator
   diagnose views never select it (`tests/operatorDiagnose.test.ts`).
 - Regression tests for the jacket case: `tests/memoryProfile.test.ts`, `tests/memory.test.ts` (MEM-AUDIT-03) and `tests/turnMachine/context.test.ts`.
+# Transcript backend foundation (CAPTION-01c)
+
+Timed transcripts are stored as append-only revisions attached to a Library media item. Every transcript read and write uses the existing media `readableItem` access gate; child profiles receive the podcast transcript refusal. The backend provides revision operations, timed import, cue building, and SRT, WebVTT, plain text, Markdown, and spec JSON writers. Long-file transcription calls the Stack `/v1/audio/transcriptions/jobs` contract from CAPTION-01b. Transcript text is never logged; generation logs only segment counts and elapsed milliseconds.

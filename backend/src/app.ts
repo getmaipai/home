@@ -1,5 +1,6 @@
 import "@/lib/addedModels";
 import { libraryRoutes } from "@/routes/library";
+import { transcriptRoutes } from "@/routes/transcripts";
 import { musicRoutes } from "@/routes/music";
 import { madeAlbumsRoutes, madeArtistsRoutes, songStylesRoutes } from "@/routes/musicMade";
 import { serveStatic } from "hono/bun";
@@ -318,6 +319,7 @@ app.route("/api/storage", storageRoutes);
 app.route("/api/library/retention", libraryRetentionRoutes);
 app.route("/api/files", filesRoutes);
 app.route("/api/library", libraryRoutes);
+app.route("/api", transcriptRoutes);
 app.route("/api/attachments", attachmentsRoutes);
 app.route("/api/image-edit", imageEditRoutes);
 app.route("/api/pictures/admin", picturesAdminRoutes);

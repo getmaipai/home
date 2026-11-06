@@ -2283,6 +2283,20 @@ export const podcastTranscripts = sqliteTable("podcast_transcripts", {
   hlc: text("hlc").notNull(),
 });
 
+export const transcripts = sqliteTable("transcripts", {
+  id: text("id").primaryKey(), libraryItemId: text("library_item_id").notNull().references(() => mediaItems.id, { onDelete: "cascade" }),
+  ownerId: text("owner_id").notNull().references(() => people.id), language: text("language").notNull(), currentRevision: integer("current_revision").notNull(),
+  segments: text("segments").notNull(), speakers: text("speakers").notNull(), vocabulary: text("vocabulary").notNull(), provenance: text("provenance").notNull(), hlc: text("hlc").notNull(),
+}, table => [index("transcripts_item_idx").on(table.libraryItemId)]);
+export const transcriptRevisions = sqliteTable("transcript_revisions", {
+  id: text("id").primaryKey(), transcriptId: text("transcript_id").notNull().references(() => transcripts.id, { onDelete: "cascade" }), n: integer("n").notNull(),
+  author: text("author").notNull(), reason: text("reason").notNull(), ops: text("ops").notNull(), provenance: text("provenance").notNull(), hlc: text("hlc").notNull(),
+}, table => [uniqueIndex("transcript_revisions_transcript_n_idx").on(table.transcriptId, table.n), index("transcript_revisions_transcript_idx").on(table.transcriptId, table.n)]);
+export const captionTracks = sqliteTable("caption_tracks", {
+  id: text("id").primaryKey(), transcriptId: text("transcript_id").notNull().references(() => transcripts.id, { onDelete: "cascade" }), language: text("language").notNull(), basedOnRevision: integer("based_on_revision").notNull(),
+  cues: text("cues").notNull(), style: text("style").notNull(), provenance: text("provenance").notNull(), hlc: text("hlc").notNull(),
+}, table => [index("caption_tracks_transcript_idx").on(table.transcriptId)]);
+
 export const mediaProgress = sqliteTable(
   "media_progress",
   {

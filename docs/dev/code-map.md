@@ -1014,6 +1014,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
 | `backend/src/lib/topicStances.ts` | resolveTopicStances, topicStancesForPerson |
 | `backend/src/lib/totp.ts` | beginEnrollment, verifyEnrollment, isTotpEnabled, verifyTotp, disableTotp |
+| `backend/src/lib/transcripts/cues.ts` | buildCues |
+| `backend/src/lib/transcripts/import.ts` | importTranscript |
+| `backend/src/lib/transcripts/parse.ts` | parseTranscriptDocument |
+| `backend/src/lib/transcripts/revisions.ts` | applyOps, undo, restoreRevision, __resetAutosavesForTests |
+| `backend/src/lib/transcripts/stack.ts` | __setTranscriptStackClientForTests, transcribeJob |
+| `backend/src/lib/transcripts/store.ts` | TranscriptError, CHILD_TRANSCRIPT_ERROR, getTranscript, transcriptRowForItem, listTranscriptsForItem, getTranscriptDatabaseRow |
+| `backend/src/lib/transcripts/writers.ts` | writeSrt, writeVtt, writeText, writeMarkdown, writeJson |
 | `backend/src/lib/trash/podcastCopies.ts` | isPodcastCopyTrash, mayManagePodcastCopy, trashPodcastCopy |
 | `backend/src/lib/trash/registry.ts` | registerTrashProvider, trashProvider, listTrash, purgeExpired |
 | `backend/src/lib/trash/sweep.ts` | TRASH_SWEEP_MS, startTrashSweeper, stopTrashSweeper |

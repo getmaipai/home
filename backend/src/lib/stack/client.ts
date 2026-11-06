@@ -136,6 +136,8 @@ export interface StackClient {
    * count, never an estimate. */
   tokenize(request: TokenCountRequest, opts?: { signal?: AbortSignal }): Promise<{ data: TokenCountResponse; identity: EngineIdentity }>;
   transcribe(form: FormData, opts?: { signal?: AbortSignal }): Promise<{ data: { text: string }; identity: EngineIdentity }>;
+  /** CAPTION-01b: start a timed long-file transcription job and return its completed result or progress handle. */
+  transcriptionJob?(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ data: { data: { language: string; segments: Array<{ start: number; end: number; text: string; words?: Array<{ start: number; end: number; text: string; confidence?: number }> }> } | null; job: string }; identity: EngineIdentity }>;
   /** POST /v1/audio/endpoint: has the speaker finished? (DUPLEX-02, Smart Turn v3.2 in the Stack). */
   endpoint(form: FormData, opts?: { signal?: AbortSignal }): Promise<{ data: SttEndpointResponse; identity: EngineIdentity }>;
   /** POST /v1/audio/speech; returns the streamed WAV Response. */
@@ -409,6 +411,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     embeddings: (request, opts) => call("/v1/embeddings", jsonInit(request), rawJson<Record<string, unknown>>, opts),
     tokenize: (request, opts) => call("/v1/tokenize", jsonInit(request), rawJson<TokenCountResponse>, opts),
     transcribe: (form, opts) => call("/v1/audio/transcriptions", formInit(form), rawJson<{ text: string }>, opts),
+    transcriptionJob: (body, opts) => call("/v1/audio/transcriptions/jobs", jsonInit(body), rawJson<{ data: { language: string; segments: Array<{ start: number; end: number; text: string; words?: Array<{ start: number; end: number; text: string; confidence?: number }> }> } | null; job: string }>, opts),
     endpoint: (form, opts) => call("/v1/audio/endpoint", formInit(form), rawJson<SttEndpointResponse>, opts),
     async speak(form, opts) {
       let res: Response;
