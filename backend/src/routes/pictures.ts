@@ -22,6 +22,8 @@ import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
 import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
 import { likenessRefusal } from "@/lib/likeness";
+import { lockedView } from "@/lib/adultLock";
+import { pictureJobGroupLockState, pictureJobLockState } from "@/lib/pictures/lock";
 
 export const picturesRoutes = apiRouter();
 
@@ -51,6 +53,7 @@ const JobSchema = z.object({
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
+const CardOrLocked = z.union([JobSchema, z.object({ locked: z.literal(true), making: z.boolean() })]);
 
 
 export function phaseLabel(job: PictureJob, audience: "adult" | "child" = "adult"): string {
@@ -109,6 +112,13 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
   };
 }
 
+export function pictureCardOrLocked(actor: PersonRow, job: PictureJob, canVary: boolean, detailedReadyNow = false) {
+  const group = job.turnId ? pictureJobsForTurn(actor, job.turnId).filter((item) => item.kind !== "edit") : [job];
+  const jobs = group.length ? group : [job];
+  if (pictureJobGroupLockState(actor, job) !== "open") return lockedView(jobs.some((item) => item.state === "queued" || item.state === "running"));
+  return cardView(actor, job, canVary, detailedReadyNow);
+}
+
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const refusals = errorResponses({ 401: "Not signed in", 403: "Pictures are off for this profile", 404: "No such picture job", 409: "A picture is still being made", 422: "That request is not allowed", 502: "Pictures could not be made", 503: "Pictures are not ready" });
 
@@ -135,13 +145,14 @@ picturesRoutes.openapi(statusRoute, async (c) => {
 const getRoute = createRoute({
   method: "get", path: "/jobs/{id}", tags: ["Pictures"], summary: "Progress, then the finished pictures, of one picture job", middleware: [requireAuth] as const,
   request: { params: idParams },
-  responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "The job as its owner sees it." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The job as its owner sees it, or the lock tile." }, ...refusals },
 });
 picturesRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person");
   const job = getPictureJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null, detailedReady(await pictureEngineStatus())), 200);
+  if (pictureJobGroupLockState(actor, job) === "hidden") return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
+  return c.json(pictureCardOrLocked(actor, job, pictureDenial(routeAudience(actor)) === null, detailedReady(await pictureEngineStatus())), 200);
 });
 
 const previewRoute = createRoute({
@@ -152,21 +163,25 @@ const previewRoute = createRoute({
 picturesRoutes.openapi(previewRoute, (c) => {
   const actor = c.get("person");
   const job = getPictureJob(actor, c.req.valid("param").id);
-  const preview = job && laneOfPerson(actor) === "adult" ? getLive(job.id)?.preview : null;
-  if (!job || !preview) return c.json({ error: "There is no preview for that picture." }, 404) as never;
+  const preview = job && laneOfPerson(actor) === "adult" && pictureJobLockState(actor, job) === "open" ? getLive(job.id)?.preview : null;
+  if (!job || !preview) return c.json({ error: "There is no preview for that picture." }, 404, { "cache-control": "private, no-store" }) as never;
   return new Response(preview, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
 const cancelRoute = createRoute({
   method: "post", path: "/jobs/{id}/cancel", tags: ["Pictures"], summary: "Stop a picture that is waiting or being drawn", middleware: [requireAuth] as const,
   request: { params: idParams },
-  responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "The job, now stopped (a finished job stays finished)." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The job, now stopped, or the lock tile." }, ...refusals },
 });
 picturesRoutes.openapi(cancelRoute, async (c) => {
   const actor = c.get("person");
-  const job = await cancelPictureJob(actor, c.req.valid("param").id);
+  const wanted = getPictureJob(actor, c.req.valid("param").id);
+  if (!wanted) return c.json({ error: "That picture isn't available any more." }, 404) as never;
+  if (pictureJobGroupLockState(actor, wanted) === "hidden") return c.json({ error: "That picture isn't available any more." }, 404) as never;
+  if (pictureJobGroupLockState(actor, wanted) !== "open") return c.json(pictureCardOrLocked(actor, wanted, false), 200);
+  const job = await cancelPictureJob(actor, wanted.id);
   if (!job) return c.json({ error: "That picture isn't available any more." }, 404) as never;
-  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null, detailedReady(await pictureEngineStatus())), 200);
+  return c.json(pictureCardOrLocked(actor, job, pictureDenial(routeAudience(actor)) === null, detailedReady(await pictureEngineStatus())), 200);
 });
 
 const variationRoute = createRoute({
@@ -176,10 +191,14 @@ const variationRoute = createRoute({
 });
 picturesRoutes.openapi(variationRoute, async (c) => {
   const actor = c.get("person");
+  const source = getPictureJob(actor, c.req.valid("param").id);
+  if (!source) return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
+  const lock = pictureJobGroupLockState(actor, source);
+  if (lock === "hidden") return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
+  if (lock === "locked") return c.json({ error: "That is locked. Unlock it with your passcode first, then try again." }, 423) as never;
   const denial = pictureDenial(routeAudience(actor));
   if (denial) return c.json({ error: PICTURE_DENIAL_LINE[denial], code: denial }, 403) as never;
-  const source = getPictureJob(actor, c.req.valid("param").id);
-  if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
+  if (source.state === "queued" || source.state === "running") return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
   // One at a time: a card with a picture still being made takes no second one.
   const group = source.turnId ? pictureJobsForTurn(actor, source.turnId) : [source];
   if (group.some((j) => j.state === "queued" || j.state === "running")) return c.json({ error: "A picture is still being made. Wait for it or stop it first.", code: "busy" }, 409) as never;

@@ -402,6 +402,9 @@ export interface TemporaryChatImage {
   edit?: { v: 1; op: string; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number };
 }
 const temporaryChatImages = new Map<string, TemporaryChatImage>();
+function temporaryImageOpen(actor: PersonRow, image: TemporaryChatImage): boolean {
+  return lockState(image.audience === "adult-only" ? { ownerPersonId: image.ownerPersonId, madeAudience: "adult-only", lock: "on" } : null, actor) === "open";
+}
 export function storeTemporaryChatImage(image: Omit<TemporaryChatImage, "createdAt">): void {
   const now = Date.now();
   for (const [id, value] of temporaryChatImages) if (now - value.createdAt > 2 * 60 * 60 * 1000) temporaryChatImages.delete(id);
@@ -409,24 +412,24 @@ export function storeTemporaryChatImage(image: Omit<TemporaryChatImage, "created
 }
 export function getTemporaryChatImage(actor: PersonRow, conversationId: string, id: string): TemporaryChatImage | undefined {
   const image = temporaryChatImages.get(id);
-  if (!image || image.ownerPersonId !== actor.id || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000) return undefined;
+  if (!image || image.ownerPersonId !== actor.id || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000 || !temporaryImageOpen(actor, image)) return undefined;
   return image;
 }
 /** VIDEO-GEN-05: the newest picture of this temporary chat that Home marked as made by the picture engine, or undefined. */
 export function latestGeneratedTemporaryImage(actor: PersonRow, conversationId: string): TemporaryChatImage | undefined {
   let best: TemporaryChatImage | undefined;
-  for (const image of temporaryChatImages.values()) if (image.generated === true && image.ownerPersonId === actor.id && image.conversationId === conversationId && (!best || image.createdAt >= best.createdAt)) best = image;
+  for (const image of temporaryChatImages.values()) if (image.generated === true && image.ownerPersonId === actor.id && image.conversationId === conversationId && temporaryImageOpen(actor, image) && (!best || image.createdAt >= best.createdAt)) best = image;
   return best;
 }
 /** IMGEDIT-01: the newest picture of this temporary chat, whoever made it (an upload, a generated picture or an edit's version). */
 export function latestTemporaryChatImage(actor: PersonRow, conversationId: string): TemporaryChatImage | undefined {
   let best: TemporaryChatImage | undefined;
-  for (const image of temporaryChatImages.values()) if (image.ownerPersonId === actor.id && image.conversationId === conversationId && image.mediaType.startsWith("image/") && (!best || image.createdAt >= best.createdAt)) best = image;
+  for (const image of temporaryChatImages.values()) if (image.ownerPersonId === actor.id && image.conversationId === conversationId && image.mediaType.startsWith("image/") && temporaryImageOpen(actor, image) && (!best || image.createdAt >= best.createdAt)) best = image;
   return best;
 }
 export function getTemporaryChatImageForReader(actor: PersonRow, conversationId: string, id: string): TemporaryChatImage | undefined {
   const image = temporaryChatImages.get(id);
-  if (!image || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000 || !canAccessPerson(actor, image.ownerPersonId)) return undefined;
+  if (!image || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000 || !canAccessPerson(actor, image.ownerPersonId) || !temporaryImageOpen(actor, image)) return undefined;
   return image;
 }
 export function temporaryChatImagesForTurn(actor: PersonRow, conversationId: string, turnId: string): TemporaryChatImage[] {
@@ -435,7 +438,7 @@ export function temporaryChatImagesForTurn(actor: PersonRow, conversationId: str
 /** The editor's versions of one temporary picture, oldest first. */
 export function listTemporaryChatImageVersions(actor: PersonRow, conversationId: string, rootId: string): (TemporaryChatImage & { edit: NonNullable<TemporaryChatImage["edit"]> })[] {
   return [...temporaryChatImages.values()]
-    .filter((image): image is TemporaryChatImage & { edit: NonNullable<TemporaryChatImage["edit"]> } => Boolean(image.edit) && image.conversationId === conversationId && image.edit!.root === rootId && Date.now() - image.createdAt <= 2 * 60 * 60 * 1000 && canAccessPerson(actor, image.ownerPersonId))
+    .filter((image): image is TemporaryChatImage & { edit: NonNullable<TemporaryChatImage["edit"]> } => Boolean(image.edit) && image.conversationId === conversationId && image.edit!.root === rootId && Date.now() - image.createdAt <= 2 * 60 * 60 * 1000 && canAccessPerson(actor, image.ownerPersonId) && temporaryImageOpen(actor, image))
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 /** VIDEO-GEN-05: other in-memory stores of a temporary chat's media (a generated clip) follow the pictures' lifetime. */

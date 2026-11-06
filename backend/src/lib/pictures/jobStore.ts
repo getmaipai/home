@@ -35,6 +35,7 @@ export interface PictureRequest {
   /** A variation or an edit starts from this file in the same conversation. */
   source_file_id: string | null;
   audience: "all-ages" | "adult";
+  adultLock?: "on" | "off";
   /** IMGGEN-QUALITY-01: which maker made it (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
   /** TIER-WIRE-01: the resource tier the job is queued at (absent: Standard). The household queue reads it with `requestTier`. */

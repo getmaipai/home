@@ -323,7 +323,10 @@ describe("the routes", () => {
     await until(() => card().preview_url !== null);
     expect(card()).toMatchObject({ state: "running", label: "Drawing, step 3 of 4", eta_seconds: 2, step: 2, steps: 4, preview_step: 2, preview_url: `/api/pictures/jobs/${job.id}/preview?v=2` });
     expect(fake.previewFetches).toBe(1);
-    const served = await owner.client.get(`/api/pictures/jobs/${job.id}/preview`);
+    expect((await owner.client.get(`/api/pictures/jobs/${job.id}/preview`)).status).toBe(404);
+    const unlockResponse = await owner.client.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "picture-preview" });
+    const proof = { "x-adult-unlock": ((await unlockResponse.json()) as { proof: string }).proof };
+    const served = await owner.client.get(`/api/pictures/jobs/${job.id}/preview`, proof);
     expect(served.status).toBe(200);
     expect(served.headers.get("content-type")).toBe("image/jpeg");
     expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));
@@ -340,7 +343,10 @@ describe("the routes", () => {
     if (!resolved.ok) throw new Error("no conversation");
     const job = await startPictureJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult" } });
     await until(() => getPictureJob(owner.actor, job.id)?.state === "done");
-    const ok = await owner.client.post(`/api/pictures/jobs/${job.id}/variation`, {});
+    expect((await owner.client.post(`/api/pictures/jobs/${job.id}/variation`, {})).status).toBe(423);
+    const unlockResponse = await owner.client.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "picture-variation" });
+    const proof = { "x-adult-unlock": ((await unlockResponse.json()) as { proof: string }).proof };
+    const ok = await owner.client.post(`/api/pictures/jobs/${job.id}/variation`, {}, proof);
     expect(ok.status).toBe(200);
     expect(fake.submitted).toHaveLength(2);
     // The same route for a child while the home switch is off: refused, nothing submitted.
@@ -348,7 +354,7 @@ describe("the routes", () => {
     asRole(owner.actor.id, "child");
     invalidateSessionCacheForPerson(owner.actor.id);
     const refused = await owner.client.post(`/api/pictures/jobs/${job.id}/variation`, {});
-    expect(refused.status).toBe(403);
+    expect(refused.status).toBe(404);
     expect(fake.submitted).toHaveLength(2);
     // A missing job and a stranger's job read the same.
     const missing = await owner.client.get("/api/pictures/jobs/pic-nope");

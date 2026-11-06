@@ -1,7 +1,7 @@
 // ADULT-LOCK-07 slice 1: stored picture fixtures use the same writer notes as
 // pictures/jobs.ts and imageEdit.ts, through createAttachment's file path.
 import { db } from "@/db";
-import { conversationTurns } from "@/db/schema";
+import { conversationTurns, pictureJobs } from "@/db/schema";
 import { createAttachment } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
@@ -30,4 +30,12 @@ export async function makeImageEdit(actor: PersonRow, source: Awaited<ReturnType
     provenance: `image-edit:${JSON.stringify({ v: 1, audience: mark.audience ?? "adult-only", ...(mark.lock ? { lock: mark.lock } : {}), op: "resize", label, source: source.id, source_sha256: source.sha256, root: source.id, width: 1, height: 1 })}` });
   if (!created.ok) throw new Error(created.error);
   return { id: created.value.id, label };
+}
+
+export async function makePictureJob(actor: PersonRow, audience: "adult" | "all-ages", prompt: string) {
+  const picture = await makePicture(actor, audience === "adult" ? "adult-only" : "all-ages", prompt);
+  const now = new Date().toISOString();
+  const id = `picture-job-${++sequence}`;
+  db.insert(pictureJobs).values({ id, personId: actor.id, conversationId: picture.conversationId, turnId: picture.turnId, kind: "generate", state: "done", stackJob: null, percent: 100, phase: null, position: null, prompt, request: JSON.stringify({ size: "1024x1024", n: 1, seed: null, loras: [], source_file_id: null, audience }), error: null, files: JSON.stringify([{ id: picture.id, width: 1, height: 1, seed: null, model: null, steps: null, ms: null }]), createdAt: now, updatedAt: now, hlc: nextHlc() }).run();
+  return { ...picture, jobId: id };
 }

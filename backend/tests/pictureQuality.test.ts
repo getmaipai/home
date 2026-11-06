@@ -214,12 +214,14 @@ describe("the card and its switch", () => {
     if (!resolved.ok) throw new Error("no conversation");
     const job = await startPictureJob({ actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult" } });
     await until(() => getPictureJob(actor, job.id)?.state === "done");
-    const again = await client.post(`/api/pictures/jobs/${job.id}/variation`, { quality: "detailed" });
+    const unlocked = await client.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "picture-quality" });
+    const proof = { "x-adult-unlock": ((await unlocked.json()) as { proof: string }).proof };
+    const again = await client.post(`/api/pictures/jobs/${job.id}/variation`, { quality: "detailed" }, proof);
     expect(again.status).toBe(200);
     expect(fake.submitted.at(-1)!.model).toBe("z-image-turbo");
     await until(() => getPictureJob(actor, job.id)?.state === "done" && fake.jobs.every((j) => j.state === "done"));
     const before = fake.submitted.length;
-    const kept = await client.post(`/api/pictures/jobs/${job.id}/variation`, {});
+    const kept = await client.post(`/api/pictures/jobs/${job.id}/variation`, {}, proof);
     expect(kept.status).toBe(200);
     // The household queue submits a job when its turn comes, so wait for the Stack to receive it.
     await until(() => fake.submitted.length > before);

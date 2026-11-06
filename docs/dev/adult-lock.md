@@ -49,6 +49,13 @@ parts, auto-mark and unmark, and the frontend card remain open for slices 2 to 5
 and video poster notes. The `video-poster:` and `video-gen:` / `video-edit:` lookups in `libraryTrash.ts`, plus the poster association in `library.ts`,
 remain video-specific; picture edits use their existing `image-edit:` root relation.
 
+## Pictures slice 2
+
+Picture job cards, reads and cancellation use `pictureJobLockItem` and the shared `lockState`. A locked adult sees the same tile as videos; a minor or guest
+gets the missing-job answer. Preview is 404 with no-store, and Another take is 423 when locked. Chat history omits a locked picture job id, and the stored
+tool result is a placeholder without prompt or file ids. Companion activity omits locked picture jobs. Temporary generated images use the same lock check
+for reads and edit sources. Auto-mark and unmark, plus the frontend card, remain for later slices.
+
 ## Where it is applied
 
 | Surface | Choke point | Locked answer |

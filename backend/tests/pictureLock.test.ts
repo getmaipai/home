@@ -4,12 +4,16 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { db } from "@/db";
-import { attachments, mediaItems, people } from "@/db/schema";
+import { attachments, conversationTurns, mediaItems, people } from "@/db/schema";
 import { __resetAdultLockForTests, lockItemOfProvenance, lockState } from "@/lib/adultLock";
+import { pictureJobLockItem, redactLockedPictureOutcome } from "@/lib/pictures/lock";
+import { getPictureJob } from "@/lib/pictures/jobs";
 import { scanRoot } from "@/lib/media/scan";
 import { buildMediaTree } from "./support/mediaTree";
 import { household, textOf, unlock, unlockHeader } from "./fixtures/adultLock";
-import { makeImageEdit, makePicture } from "./fixtures/adultLockPicture";
+import { makeImageEdit, makePicture, makePictureJob } from "./fixtures/adultLockPicture";
+import { outcomeOf } from "@/lib/turnContext";
+import { getTemporaryChatImageForReader, storeTemporaryChatImage } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 
 beforeEach(() => { resetDb(); __resetAdultLockForTests(); });
@@ -19,6 +23,89 @@ type Row = Record<string, any>;
 const list = (client: TestClient) => client.get("/api/library");
 
 describe("stored pictures obey the Adult lock", () => {
+  test("picture job routes tile, hide, and open through the Adult lock", async () => {
+    const h = await household();
+    const actor = h.row("Marlow");
+    const adult = await makePictureJob(actor, "adult", "Zebraquill picture prompt secret");
+    const plain = await makePictureJob(actor, "all-ages", "Paper boat picture prompt");
+    const routes = (client: TestClient, id: string) => [
+      () => client.get(`/api/pictures/jobs/${id}`),
+      () => client.post(`/api/pictures/jobs/${id}/cancel`, {}),
+      () => client.get(`/api/pictures/jobs/${id}/preview`),
+      () => client.post(`/api/pictures/jobs/${id}/variation`, {}),
+    ];
+    for (const get of [
+      () => h.adult.client.get(`/api/pictures/jobs/${adult.jobId}`),
+      () => h.adult.client.post(`/api/pictures/jobs/${adult.jobId}/cancel`, {}),
+    ]) {
+      const response = await get();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ locked: true, making: false });
+    }
+    const preview = await h.adult.client.get(`/api/pictures/jobs/${adult.jobId}/preview`);
+    expect(preview.status).toBe(404);
+    expect(preview.headers.get("cache-control")).toBe("private, no-store");
+    expect(await preview.text()).toBe(await (await h.adult.client.get("/api/pictures/jobs/missing/preview")).text());
+    expect((await h.adult.client.post(`/api/pictures/jobs/${adult.jobId}/variation`, {})).status).toBe(423);
+
+    const proof = unlockHeader(await unlock(h.adult.client));
+    expect((await h.adult.client.get(`/api/pictures/jobs/${adult.jobId}`, proof)).status).toBe(200);
+    expect((await h.adult.client.post(`/api/pictures/jobs/${adult.jobId}/cancel`, {}, proof)).status).toBe(200);
+    expect((await h.adult.client.post(`/api/pictures/jobs/${adult.jobId}/variation`, {}, proof)).status).not.toBe(423);
+    for (const minor of [h.teen, h.child]) for (const get of routes(minor.client, adult.jobId)) expect((await get()).status).toBe(404);
+
+    const guestMade = await h.owner.post("/api/people", { displayName: "Visitor", role: "guest", secret: "0000" });
+    const guestId = ((await guestMade.json()) as { id: string }).id;
+    const guest = new TestClient();
+    await guest.post("/api/auth/verify-secret", { personId: guestId, secret: "0000" });
+    for (const get of routes(guest, adult.jobId)) expect((await get()).status).toBe(404);
+
+    for (const get of [
+      () => h.adult.client.get(`/api/pictures/jobs/${plain.jobId}`),
+      () => h.adult.client.post(`/api/pictures/jobs/${plain.jobId}/cancel`, {}),
+    ]) {
+      const response = await get();
+      expect(response.status).toBe(200);
+      expect((await response.text())).not.toContain('"locked":true');
+    }
+    expect((await h.adult.client.get(`/api/pictures/jobs/${plain.jobId}/preview`)).status).toBe(404);
+    expect((await h.adult.client.post(`/api/pictures/jobs/${plain.jobId}/variation`, {})).status).not.toBe(423);
+    const plainJob = getPictureJob(actor, plain.jobId)!;
+    for (const person of [actor, h.row("Nova"), h.row("Sprout"), { ...actor, role: "guest" } as PersonRow]) expect(lockState(pictureJobLockItem(plainJob), person)).toBe("open");
+  });
+
+  test("locked picture jobs leave no prompt or file id in conversation history", async () => {
+    const h = await household();
+    const actor = h.row("Marlow");
+    const job = await makePictureJob(actor, "adult", "Zebraquill history picture prompt");
+    const storedOutcome = outcomeOf({ callId: "picture-call", packageId: "generate_image", status: "succeeded", via: "tool_call", args: { prompt: "Zebraquill history picture prompt", reference: job.id }, durationMs: 1, result: { reply: { text: "Zebraquill history picture prompt" }, data: { pictureJobId: job.jobId, file_id: job.id }, actions: [] } });
+    const redacted = redactLockedPictureOutcome(actor, storedOutcome);
+    expect(JSON.stringify(redacted)).not.toContain(job.id);
+    expect(JSON.stringify(redacted)).not.toContain(job.jobId);
+    expect(JSON.stringify(redacted)).not.toContain("Zebraquill history picture prompt");
+    db.update(conversationTurns).set({ userText: "Make a picture", outcomes: JSON.stringify([storedOutcome]) }).where(eq(conversationTurns.id, job.turnId)).run();
+    const history = await h.adult.client.get(`/api/conversations/${job.conversationId}/turns`);
+    const text = await history.text();
+    expect(history.status).toBe(200);
+    expect(text).not.toContain(job.id);
+    expect(text).not.toContain(job.jobId);
+    expect(text).not.toContain("Zebraquill history picture prompt");
+    const proof = unlockHeader(await unlock(h.adult.client));
+    const openHistory = await h.adult.client.get(`/api/conversations/${job.conversationId}/turns`, proof);
+    const openText = await openHistory.text();
+    expect(openText).toContain(job.jobId);
+  });
+
+  test("temporary generated picture reads require the Adult proof", async () => {
+    const h = await household();
+    const actor = h.row("Marlow");
+    const image = { id: "file-temporaryadult01", turnId: "turn-temporary", conversationId: "temporary:adult-lock", ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/jpeg", width: 1, height: 1, bytes: new Uint8Array([1]), generated: true as const, audience: "adult-only" as const };
+    storeTemporaryChatImage(image);
+    expect(getTemporaryChatImageForReader(actor, image.conversationId, image.id)).toBeUndefined();
+    const proof = unlockHeader(await unlock(h.adult.client));
+    expect((await h.adult.client.get(`/api/attachments/${image.id}?v=full&conversation_id=${image.conversationId}`, proof)).status).toBe(200);
+  });
+
   test("adult-only picture and its image-edit child are omitted or 404 until the owner proves; all-ages remains open", async () => {
     const h = await household();
     const actor = h.row("Marlow");
