@@ -14,13 +14,14 @@ export interface FilmEngines {
   makeMusic(input: { brief: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
   assemble(input: { plan: FilmPlan; clipFileIds: string[]; musicFileId: string }, options: { signal: AbortSignal }): Promise<string>;
   waitForIdle(): Promise<void>;
+  note?: string;
   onProgress?: (progress: { stage: FilmStage; done: number; total: number; shotId?: string }) => void;
 }
 
 function productionShots(production: Production): Shot[] { return production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots)); }
 function failIfAborted(signal: AbortSignal) { if (signal.aborted) throw signal.reason ?? new DOMException("The operation was aborted", "AbortError"); }
 function lockedForShot(plan: FilmPlan, shot: FilmPlan["shots"][number]): string[] {
-  return plan.cast.filter((member) => shot.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase())).map((member) => member.locked);
+  return plan.cast.filter((member) => shot.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase())).map((member) => `${member.name}: ${member.locked}`);
 }
 function storeCast(actor: PersonRow, productionId: string, plan: FilmPlan, ids: string[]): Production {
   const current = getMediaProduction(actor, productionId)!;

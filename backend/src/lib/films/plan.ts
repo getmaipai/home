@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { completeBackground, type LlmCompleteOptions, type LlmMessage } from "@/lib/llm";
+import { FILM_LOOK_PRESETS, LETTERBOX_RATIOS } from "@/lib/videos/editPlan";
 
 // Keep this shape aligned with the production shot validator in routes/mediaProductions.ts.
 const productionShotSchema = z.object({
@@ -32,6 +33,8 @@ export const filmPlanSchema = z.object({
   })).min(1).max(6),
   shots: z.array(filmPlanShotSchema).min(2).max(12),
   music: z.string().min(1).max(300),
+  look: z.enum(FILM_LOOK_PRESETS).optional(),
+  letterbox: z.enum(LETTERBOX_RATIOS).optional(),
   credits: z.array(z.object({ role: z.string().min(1).max(80), name: z.string().min(1).max(80) })).max(20),
 });
 
