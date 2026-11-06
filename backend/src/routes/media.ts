@@ -33,7 +33,7 @@ import { addItem, createCollection, deleteCollection, listCollections, MADE_KIND
 
 export const mediaRoutes = apiRouter();
 
-const ItemKind = z.enum(["video", "episode", "film", "track", "podcast_episode", "book", "audiobook", "chapter"]);
+const ItemKind = z.enum(["video", "episode", "film", "track", "podcast_episode", "book", "audiobook", "chapter", "sound"]);
 const PersonId = z.string().regex(/^person-[a-z0-9]{6,}$/);
 
 const ScanSummarySchema = z.object({

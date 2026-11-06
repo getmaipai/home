@@ -23,7 +23,7 @@ export type Mark = MediaProgress["marks"][number];
 export type ProgressKind = MediaItem["kind"];
 
 export const LATCH_PERCENT: Record<ProgressKind, number | null> = {
-  video: 90, episode: 90, film: 90, podcast_episode: 95, audiobook: 95, chapter: 95, book: null, track: null,
+  video: 90, episode: 90, film: 90, podcast_episode: 95, audiobook: 95, chapter: 95, book: null, track: null, sound: null,
 };
 /** A book is "at the end" from here (percent of the text). */
 export const BOOK_END_PERCENT = 99;

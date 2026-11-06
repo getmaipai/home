@@ -12,7 +12,7 @@ import { itemFromRow, sourcesFromRows, type MediaItem, type MediaItemRow } from 
 import { matchKey } from "./parsers/text";
 import { archivePath, TRASH_DAYS } from "./sources";
 
-export const KINDS: readonly MediaItem["kind"][] = ["video", "episode", "film", "track", "podcast_episode", "book", "audiobook", "chapter"];
+export const KINDS: readonly MediaItem["kind"][] = ["video", "episode", "film", "track", "podcast_episode", "book", "audiobook", "chapter", "sound"];
 
 /** The ids of the live sources `actor` may see. */
 export function visibleSourceIds(actor: PersonRow): string[] {
