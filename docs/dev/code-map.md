@@ -82,7 +82,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/AskHandoff.tsx` | ASK_HANDOFF_MAX, askFromSearch, AskHandoff |
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
-| `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, useMusicTrackProps |
+| `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, soundCardCopy, useMusicTrackProps |
 | `frontend/src/apps/chat/branchInNewChatMenuItem.tsx` | BranchInNewChatMenuItem |
 | `frontend/src/apps/chat/chatActionBar.tsx` | useFeedbackFormStore, createChatFeedbackAdapter, clearSubmittedFeedback |
 | `frontend/src/apps/chat/chatAnswerBlocks.tsx` | ANSWER_BLOCK_PART, placeParts, drawableBlocks, textWithAnswerParts, AnswerBlockDataRender |
@@ -255,7 +255,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
-| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress, remixAddress |
+| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | MAKES, STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
