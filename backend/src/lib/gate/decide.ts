@@ -65,7 +65,7 @@ function capabilityPolicy(id: string): Policy | undefined {
   return rowFor(id)?.policy;
 }
 
-function approverFor(id: string, band: Band, explicitParameter?: string): Approver {
+export function approverFor(id: string, band: Band, explicitParameter?: string): Approver {
   const row = rowFor(id);
   if (!row) return band === "adult" ? "self" : "parent";
   const parameter = explicitParameter ?? (row.id.includes("<") ? id.slice(row.id.indexOf(":") + 1) : "");

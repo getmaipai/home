@@ -10044,6 +10044,4146 @@
     "result": "deny:crisis_state"
   },
   {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.see:<target>",
+    "capability": "house.see:<target>",
+    "parameters": {
+      "house.see:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.control:<target>",
+    "capability": "house.control:<target>",
+    "parameters": {
+      "house.control:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:fixture",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "lock"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "alarm"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "garage"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "entry_cover"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "camera"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.confirm:<target>",
+    "capability": "house.confirm:<target>",
+    "parameters": {
+      "house.confirm:<target>": "server"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "ask_self"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:never_for_band"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
+    "id": "house.server",
+    "capability": "house.server",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:assigned_by_admin"
+  },
+  {
     "id": "notify.person",
     "capability": "notify.person",
     "band": "child",
