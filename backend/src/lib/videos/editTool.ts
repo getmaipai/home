@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, effectOps, filmLookOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
+import { CAPTION_POSITIONS, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -481,12 +481,8 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const subtitle = film ? (film.production.summary.trim().split(/(?<=[.!?])\s/)[0] ?? "").slice(0, 60).trim() || undefined : value.subtitle;
     const creditLines = film?.credits ?? value.credits;
     const added = (title ? 3 : 0) + (creditLines ? Math.max(3, Math.ceil((creditLines.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
-    if (baseLength + added > 600) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
-    inputs = clipFiles; ops = joinOps(transition, duration);
-    if (value.look) ops.push(...filmLookOps(value.look as (typeof FILM_LOOK_PRESETS)[number]));
-    if (value.letterbox) ops.push(...letterboxOps(value.letterbox));
-    if (title) ops.push(titleCardOp(title, subtitle, "start"));
-    if (creditLines) ops.push(creditsOp(creditLines, value.credits_title));
+    if (baseLength + added > MAX_EDIT_SECONDS) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
+    inputs = clipFiles; ops = filmOps({ title, summary: subtitle, credits: creditLines, creditsTitle: value.credits_title, look: value.look as (typeof FILM_LOOK_PRESETS)[number] | undefined, letterbox: value.letterbox, transition, duration });
     if (ops.length > MAX_EDIT_OPS) return refused(callId, args, `That edit needs ${ops.length} steps, but the video editor allows up to ${MAX_EDIT_OPS}. Remove a title, credits, look, or letterbox option.`, "too_many_edit_ops");
     describe = `${sources.length} videos joined in order${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${title ? ", with a title" : ""}${creditLines ? ", with rolling credits" : ""}`;
   } else if (value.change === "cut_to_beat") {

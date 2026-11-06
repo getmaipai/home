@@ -49,6 +49,7 @@ export type FilmLookPreset = (typeof FILM_LOOK_PRESETS)[number];
 export const LETTERBOX_RATIOS = ["2.39:1", "2:1", "1.85:1", "1.33:1"] as const;
 export type LetterboxRatio = (typeof LETTERBOX_RATIOS)[number];
 export const MAX_EDIT_OPS = 12;
+export const MAX_EDIT_SECONDS = 600;
 export function reframeOps(aspect: VideoAspect, fill: "crop" | "blur" = "crop"): EditOp[] { return [{ op: "reframe", aspect, fill }]; }
 export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade", ...values }]; }
 export function filmLookOps(preset: FilmLookPreset, strength?: number): EditOp[] { return [{ op: "film_look", preset, ...(strength === undefined ? {} : { strength }) }]; }
@@ -96,6 +97,19 @@ export function titleCardOp(text: string, subtitle?: string, place: "start" | "e
 }
 export function creditsOp(lines: Array<{ role?: string; name: string }>, title?: string): EditOp {
   return { op: "credits", lines, background: "black", text_color: "white", ...(title ? { title } : {}) };
+}
+
+/** The shared sequence used by the `film` change and faceless film assembly. */
+export function filmOps(input: { title?: string; summary?: string; credits?: Array<{ role?: string; name: string }>; creditsTitle?: string; look?: FilmLookPreset; letterbox?: LetterboxRatio; transition?: JoinTransition; duration?: number; includeJoin?: boolean }): EditOp[] {
+  const ops: EditOp[] = input.includeJoin === false ? [] : input.transition === undefined ? [] : joinOps(input.transition, input.duration ?? DEFAULT_CROSSFADE_S);
+  if (input.look) ops.push(...filmLookOps(input.look));
+  if (input.letterbox) ops.push(...letterboxOps(input.letterbox));
+  if (input.title) {
+    const subtitle = input.summary?.trim().split(/(?<=[.!?])\s/)[0]?.slice(0, 60).trim() || undefined;
+    ops.push(titleCardOp(input.title, subtitle, "start"));
+  }
+  if (input.credits) ops.push(creditsOp(input.credits, input.creditsTitle));
+  return ops;
 }
 
 /** The Stack's `crossfade` op: the working clip then the later files, each seam blending the last `duration_s` of one clip into the first `duration_s` of the next. */

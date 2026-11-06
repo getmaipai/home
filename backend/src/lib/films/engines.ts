@@ -23,6 +23,7 @@ import { refuseVideoPrompt } from "@/lib/videos/policy";
 import { audioSeconds } from "@/lib/videos/audioLength";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { runStackEdit } from "@/lib/videos/stackEdit";
+import { filmOps, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
 import { changeMusic, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
@@ -52,8 +53,8 @@ function backgroundTurn(actor: PersonRow) {
   return { conversationId: conversation.value.id, turnId };
 }
 
-export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; productionId: string }): FilmEngines {
-  const { actor, signal, productionId } = input;
+export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; productionId: string; faceless?: boolean }): FilmEngines {
+  const { actor, signal, productionId, faceless = false } = input;
   let turn: ReturnType<typeof backgroundTurn> | null = null;
   const state = { actor, surface: "chat", planBasis: { surfaceClass: "written" }, conversationId: null, turnId: null, temporary: false, ephemeral: false } as never;
   const engines: FilmEngines = {
@@ -126,7 +127,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const zoomFrom = direction === "zoom out" ? 1.2 : 1;
       const zoomTo = direction === "zoom out" ? 1 : direction === "zoom in" ? 1.2 : 1;
       const duration = Math.max(shot.seconds, seconds + 0.6);
-      const edited = await runStackEdit({ inputs: [{ bytes: still.value.bytes, ext: "png" }, { bytes: narration.value.bytes, ext: "wav" }], ops: [{ op: "kenburns", zoom_from: zoomFrom, zoom_to: zoomTo, pan, duration_s: duration }, { op: "audio_overlay", input: 1, gain_db: 0, clip_gain_db: -60, start_s: 0, duck: false, end_s: duration }], name: `film-${shot.id}.mp4`, signal });
+      const edited = await runStackEdit({ inputs: [{ bytes: still.value.bytes, ext: "png" }, { bytes: narration.value.bytes, ext: "wav" }], ops: [{ op: "kenburns", zoom_from: zoomFrom, zoom_to: zoomTo, pan, duration_s: duration }, { op: "audio_overlay", input: 1, gain_db: 0, clip_gain_db: -60, start_s: 0, duck: false }], name: `film-${shot.id}.mp4`, signal });
       if (!edited.ok) throw new Error(edited.line);
       const frames = await extractKeyframes(edited.bytes, edited.seconds);
       if (!frames?.length) throw new Error("The finished clip could not be checked.");
@@ -146,10 +147,51 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       if (!job.fileId) throw new Error("The finished song is unavailable.");
       return job.fileId;
     },
-    async assemble({ plan, musicFileId }) {
+    async assemble({ plan, clipFileIds, musicFileId }) {
+      if (faceless) {
+        const production = await import("@/lib/mediaProductions").then(({ getMediaProduction }) => getMediaProduction(actor, productionId));
+        if (!production) throw new Error("The film production is unavailable.");
+        const shots = production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));
+        const clipIds = clipFileIds;
+        if (clipIds.length < 2) throw new Error("Make at least two shots first.");
+        const transitionCount = Math.max(0, clipIds.length - 1);
+        const videoSeconds = shots.map((shot) => plan.shots.find((item) => item.id === shot.id)?.seconds ?? null);
+        const baseLength = videoSeconds.every((seconds): seconds is number => seconds !== null)
+          ? videoSeconds.reduce<number>((sum, seconds) => sum + seconds, 0) - transitionCount * 0.5
+          : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
+        const creditLines = [...plan.credits, { role: "Made with", name: "MaiPai" }];
+        const added = (plan.title ? 3 : 0) + Math.max(3, Math.ceil(creditLines.length * 2 / 2));
+        const totalSeconds = baseLength + added;
+        if (totalSeconds > MAX_EDIT_SECONDS) throw new Error("That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.");
+        const clips = clipIds.map((id) => readAttachment(actor, id));
+        const music = readAttachment(actor, musicFileId);
+        if (clips.some((item) => !item.ok) || !music.ok) throw new Error("A film clip or music file is missing.");
+        const credits = creditLines;
+        const transitions = plan.shots.slice(1).map((shot) => (shot.transition ?? "fade") as JoinTransition);
+        const ops: import("@/lib/videos/stackEdit").EditOp[] = [];
+        if (transitions.length) ops.push(...filmOps({ transition: transitions[0], includeJoin: true }));
+        for (let i = 1; i < transitions.length; i++) ops.push(...filmOps({ transition: transitions[i], includeJoin: true }));
+        ops.push(...filmOps({ includeJoin: false, title: plan.title, summary: plan.summary, credits, look: plan.look, letterbox: plan.letterbox }));
+        ops.push(overlayOp(clipIds.length, { gain_db: -12, clip_gain_db: 0, fade_out_s: 2 }, 0, false));
+        if (ops.length > MAX_EDIT_OPS) throw new Error("That film needs too many editing steps.");
+        const editInputs = clips.map((item) => {
+          if (!item.ok) throw new Error("A film clip is missing.");
+          return { bytes: item.value.bytes, ext: "mp4" };
+        });
+        const edited = await runStackEdit({ inputs: [...editInputs, { bytes: music.value.bytes, ext: "mp3" }], ops, name: "film-faceless.mp4", signal });
+        if (!edited.ok) throw new Error(edited.line);
+        const frames = await extractKeyframes(edited.bytes, edited.seconds);
+        if (!frames?.length) throw new Error("The finished film could not be checked.");
+        const checks = await checkImages(frames, "video");
+        const decision = await gateFinished({ actor, kind: "video", jobId: `film-faceless:${productionId}`, adultOnly: true, checks, images: frames, prompt: plan.shots.map((shot) => shot.still).join(" ") });
+        if (decision.action === "withhold") throw new Error(decision.line);
+        const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: edited.bytes, provenance: `video-edit:${JSON.stringify({ v: 1, kind: "film-faceless", clips: clipIds, music: musicFileId })}`, retention: "kept", name: `${plan.title}.mp4`, deduplicate: false });
+        if (!saved.ok) throw new Error(saved.error);
+        return saved.value.id;
+      }
       const film = await runEditVideo({ state, args: { change: "film", production: productionId, ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
       let id = (film.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
-      if (!id) throw new Error("The film could not be assembled.");
+      if (!id) { console.error("[film] assemble refused", JSON.stringify(film.result?.reply ?? film).slice(0, 600)); throw new Error("The film could not be assembled."); }
       let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The film could not be assembled." : null);
       const cut = job.files[0]?.id;
       if (!cut) throw new Error("The assembled film is unavailable.");
@@ -176,7 +218,7 @@ export async function makeFilm(input: { actor: PersonRow; idea: string; shots?: 
   const planned = await planFilm({ idea: input.idea, shots: input.shots, look: input.look, castHints: input.castHints, faceless: input.faceless });
   if (!planned.ok) return { line: planned.line };
   const production = createMediaProduction(input.actor, { title: planned.plan.title, summary: planned.plan.summary });
-  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: production.id });
+  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: production.id, faceless: input.faceless });
   engines.onProgress = input.onProgress;
   const completed = await runFilm({ actor: input.actor, productionId: production.id, plan: planned.plan, faceless: input.faceless, engines, signal: input.signal });
   const filmFileId = completed.finished_cut_file_ids.at(-1);
@@ -185,14 +227,14 @@ export async function makeFilm(input: { actor: PersonRow; idea: string; shots?: 
 }
 
 export async function resumeFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
-  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId }); engines.onProgress = input.onProgress;
+  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId, faceless: input.faceless }); engines.onProgress = input.onProgress;
   return runFilm({ ...input, engines });
 }
 export async function redoFilmShot(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; shotId: string; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
-  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId }); engines.onProgress = input.onProgress;
+  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId, faceless: input.faceless }); engines.onProgress = input.onProgress;
   return redoShot({ ...input, engines });
 }
 export async function changeFilmMusic(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
-  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId }); engines.onProgress = input.onProgress;
+  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId, faceless: input.faceless }); engines.onProgress = input.onProgress;
   return changeMusic({ ...input, engines });
 }

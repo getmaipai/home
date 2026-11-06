@@ -1,12 +1,18 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
+import { createMediaProduction, getMediaProduction, updateMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { facelessFilmPlanSchema, planFilm, __setFilmPlanCompleterForTests } from "@/lib/films/plan";
 import { FilmStepError, runFilm, type FilmEngines } from "@/lib/films/run";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
+import { makeFilm, realFilmEngines } from "@/lib/films/engines";
+import { storeFile } from "@/lib/attachments";
+import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
+import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
+import { installFakeEditStack, type FakeEditStack } from "./videoEditStackFixture";
+import { testJpeg, testMp4 } from "./videoFixture";
 
 function person(id: string): PersonRow {
   const now = new Date().toISOString();
@@ -35,6 +41,9 @@ function engines(calls: string[], options: { blockNarration?: boolean } = {}): F
 }
 
 describe("FILM-05 faceless films", () => {
+  let edit: FakeEditStack;
+  beforeEach(() => { edit = installFakeEditStack(); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); });
+  afterEach(() => { edit.restore(); __setKeyframesForTests(null); });
   beforeEach(() => resetDb());
 
   test("faceless planner accepts an empty cast with its JSON schema output", async () => {
@@ -72,5 +81,55 @@ describe("FILM-05 faceless films", () => {
     await runFilm({ actor, productionId: production.id, plan: { ...plan, cast: [{ name: "Boat", kind: "prop", locked: "A paper boat." }] } as never, engines: regular, signal: new AbortController().signal });
     expect(calls).toContain("clip:one");
     expect(calls.some((call) => call.startsWith("narration:"))).toBe(false);
+  });
+
+  test("assembles a faceless film in one edit with clips then music and shared film operations", async () => {
+    const actor = person("person-filmfacial"), production = createMediaProduction(actor, { title: plan.title, summary: plan.summary });
+    const keep = (mediaType: string, bytes: Uint8Array, name: string) => {
+      const result = storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes, provenance: "test:file", retention: "kept", name, deduplicate: false });
+      if (!result.ok) throw new Error(result.error);
+      return result.value.id;
+    };
+    const clips = [keep("video/mp4", testMp4(), "one.mp4"), keep("video/mp4", testMp4(), "two.mp4")];
+    const music = keep("audio/mpeg", new Uint8Array([1, 2, 3]), "music.mp3");
+    updateMediaProduction(actor, production.id, { episodes: [{ id: "episode", scenes: [{ id: "scene", shots: [{ id: "one", subject_ids: [], clip_file_id: clips[0] }, { id: "two", subject_ids: [], clip_file_id: clips[1] }] }] }] });
+    const engines = realFilmEngines({ actor, productionId: production.id, signal: new AbortController().signal, faceless: true });
+    const id = await engines.assemble({ plan: { ...plan, look: "noir", letterbox: "2.39:1", shots: plan.shots.map((shot, i) => ({ ...shot, transition: i ? "dissolve" : undefined })) } as never, clipFileIds: clips, musicFileId: music }, { signal: new AbortController().signal });
+    expect(edit.jobs).toHaveLength(1);
+    expect(edit.jobs[0]!.input.inputs).toHaveLength(3);
+    expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "transition", kind: "dissolve", duration_s: 0.5 });
+    expect(edit.jobs[0]!.input.ops.some((op) => op.op === "title_card" && op.text === plan.title)).toBe(true);
+    expect(edit.jobs[0]!.input.ops.some((op) => op.op === "credits" && (op.lines as unknown[]).some((line) => (line as { name?: string }).name === "MaiPai"))).toBe(true);
+    expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "film_look", preset: "noir" });
+    expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "letterbox", ratio: "2.39:1" });
+    expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "audio_overlay", input: 2, gain_db: -12, clip_gain_db: 0, start_s: 0, duck: false, fade_out_s: 2 });
+    expect(id).toBeTruthy();
+  });
+
+  test("refuses an overlong faceless film before submitting a job", async () => {
+    const actor = person("person-filmfacelong"), production = createMediaProduction(actor, { title: plan.title, summary: plan.summary });
+    const clipIds = ["clip-one", "clip-two"];
+    const music = storeFile(actor, { conversationId: null, turnId: null, mediaType: "audio/mpeg", bytes: new Uint8Array([1]), provenance: "test:file", retention: "kept", name: "music", deduplicate: false });
+    updateMediaProduction(actor, production.id, { episodes: [{ id: "episode", scenes: [{ id: "scene", shots: clipIds.map((clip_file_id, i) => ({ id: plan.shots[i]!.id, subject_ids: [], clip_file_id })) }] }] });
+    const engines = realFilmEngines({ actor, productionId: production.id, signal: new AbortController().signal, faceless: true });
+    await expect(engines.assemble({ plan: { ...plan, shots: plan.shots.map((shot) => ({ ...shot, seconds: 301 })) } as never, clipFileIds: clipIds, musicFileId: music.ok ? music.value.id : "missing" }, { signal: new AbortController().signal })).rejects.toThrow("longer than 10 minutes");
+    expect(edit.jobs).toHaveLength(0);
+  });
+
+  test("withholds and does not keep a faceless edit when finished-item checks are blocked", async () => {
+    const actor = person("person-filmwithheld"), production = createMediaProduction(actor, { title: plan.title, summary: plan.summary });
+    const keep = (mediaType: string, bytes: Uint8Array, name: string) => {
+      const result = storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes, provenance: "test:file", retention: "kept", name, deduplicate: false });
+      if (!result.ok) throw new Error(result.error);
+      return result.value.id;
+    };
+    const clips = [keep("video/mp4", testMp4(), "one.mp4"), keep("video/mp4", testMp4(), "two.mp4")], music = keep("audio/mpeg", new Uint8Array([1]), "music.mp3");
+    updateMediaProduction(actor, production.id, { episodes: [{ id: "episode", scenes: [{ id: "scene", shots: clips.map((clip_file_id, i) => ({ id: plan.shots[i]!.id, subject_ids: [], clip_file_id })) }] }] });
+    __setAgeCheckRunnerForTests(async () => [{ ok: false as const, why: "unavailable" as const }]);
+    const engines = realFilmEngines({ actor, productionId: production.id, signal: new AbortController().signal, faceless: true });
+    await expect(engines.assemble({ plan: plan as never, clipFileIds: clips, musicFileId: music }, { signal: new AbortController().signal })).rejects.toThrow();
+    expect(edit.jobs).toHaveLength(1);
+    expect(db.select().from(people).all()).toHaveLength(1);
+    expect(getMediaProduction(actor, production.id)?.finished_cut_file_ids).toEqual([]);
   });
 });

@@ -38,7 +38,7 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       current=getFilmRun(actor,run.id)!;
       if(!current.production_id || !plan) throw new Error("The film plan is unavailable. Start a new film.");
       updateFilmRun(actor,run.id,{state:"running",error_line:null});
-      const engines=engineFactory({actor,signal:controller.signal,productionId:current.production_id}); engines.onProgress=onProgress(actor,run.id);
+      const engines=engineFactory({actor,signal:controller.signal,productionId:current.production_id,faceless:current.faceless}); engines.onProgress=onProgress(actor,run.id);
       const input={actor,productionId:current.production_id,plan,faceless:current.faceless,engines,signal:controller.signal};
       if(mode==="redo" && shotId) await redoFilmShot({...input,shotId});
       else if(mode==="music") await changeFilmMusic(input);
