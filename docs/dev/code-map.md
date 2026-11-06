@@ -657,7 +657,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, mediaOpSchema, listMediaOps, runMediaOp, getMediaOpJob |
 | `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, createMediaProduction, updateMediaProduction, updateProductionCast |
-| `backend/src/lib/mediaSubjects.ts` | canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject, deleteMediaSubject |
+| `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
+| `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
 | `backend/src/lib/memory.ts` | validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord, remember |
 | `backend/src/lib/memoryContentPolicy.ts` | CREDENTIAL_SAFE_MESSAGE, CREDENTIAL_REDACTION, detectCredential, hasDeclaredCredentialField, redactCredentials |
 | `backend/src/lib/memoryFraming.ts` | MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE |
