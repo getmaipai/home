@@ -306,7 +306,10 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       const sourceId = job.request.source_file_id;
       const sourceRow = sourceId ? db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, sourceId)).get() : undefined;
       const sourceItem = sourceRow ? lockItemOfProvenance(sourceRow.owner, sourceRow.provenance) : null;
-      const mark = job.request.adultLock === "off"
+      // Fail closed: a job that started adult-only keeps that mark even when its source file is gone by now.
+      const mark = job.request.adultLock !== undefined && !sourceItem
+        ? { madeAudience: "adult-only" as const, lock: job.request.adultLock }
+        : job.request.adultLock === "off"
         ? newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], false)
         : newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], adult);
       if (job.request.edit) {
