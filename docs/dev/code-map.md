@@ -482,6 +482,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
+| `backend/src/lib/films/engines.ts` | realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT, __setFilmPlanCompleterForTests, planFilm |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
