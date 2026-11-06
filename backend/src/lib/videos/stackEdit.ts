@@ -81,8 +81,12 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 async function openEditRoot(root: string): Promise<void> {
   const client = getStackClient();
   const current = await client.mediaRoots();
-  if (current.read.includes(root) && current.write.includes(root)) return;
-  await client.setMediaRoots({ read: [...new Set([...current.read, root])], write: [...new Set([...current.write, root])] });
+  // The Stack refuses a root list that names a folder which no longer exists (a removed worktree or an unplugged drive), and then no edit can start.
+  // Folders that are gone are dropped; the ones still there are kept as they were.
+  const present = (list: string[]) => list.filter((path) => existsSync(path));
+  const stale = current.read.length !== present(current.read).length || current.write.length !== present(current.write).length;
+  if (!stale && current.read.includes(root) && current.write.includes(root)) return;
+  await client.setMediaRoots({ read: [...new Set([...present(current.read), root])], write: [...new Set([...present(current.write), root])] });
 }
 
 /** A private copy of one stored clip inside the folder the Stack may read, so a Stack edit never needs the whole attachments folder opened. Call `cleanup` when the job is over. Null when the Stack is remote or the copy fails. */
