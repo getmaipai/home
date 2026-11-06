@@ -512,9 +512,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
 | `backend/src/lib/house/act.ts` | supportedActions, houseServiceCall, performHouseAction |
+| `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, __setHouseRegistryCacheDepsForTests, clearHouseRegistry |
 | `backend/src/lib/house/connection.ts` | houseLanFetch |
+| `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
-| `backend/src/lib/house/tool.ts` | HOUSE_TOOL_ID, houseToolSpec, visibleHouseEntities, runHouseTool |
+| `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, houseToolSpec, visibleHouseEntities, planHouseCall, runHouseTool |
+| `backend/src/lib/house/undoRunner.ts` | undoDataIsSafe, houseUndoRunner |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
 | `backend/src/lib/householdVoiceCheck.ts` | HOUSEHOLD_PREVIEW_SENTENCE, renderHouseholdVoice, cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio |
