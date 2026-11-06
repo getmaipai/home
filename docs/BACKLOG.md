@@ -2706,7 +2706,7 @@ Chores that were on the plan page; the plan now holds only the current goal.
 - [ ] **BRANCH-SEC1-01: Land machine protection checks and sign-in slowdown** (moved off the plan 2026-10-13). keep/home--home-codex-a-sec1 (19f12bab, ce58f59a) and -sec1-rate (9137951e); security review needed
     Design: [people-roles-and-account-2026-10-17](design/people-roles-and-account-2026-10-17.md)
 - [ ] **BRANCH-APPEAR-01: Compare the appearance branch to what landed** (moved off the plan 2026-10-13). keep/home--home-codex-a-h1-appearance 108b4f80 vs SETTINGS-APPEARANCE-01; land the delta or drop
-- [ ] **BRANCH-MCP-01: Land the MCP client manager** (moved off the plan 2026-10-13). codex/d-prep 6 commits; check against current design rules first
+- [x] **BRANCH-MCP-01: Land the MCP client manager** (moved off the plan 2026-10-13). codex/d-prep 6 commits; check against current design rules first Landed 2026-11-06 (7168506).
     Design: [tools-ecosystem-design-2026-10-03](plans/tools-ecosystem-design-2026-10-03.md)
 - [ ] **FLAKY-TIMING-01: Loosen timing-sensitive flaky tests (conversationHistory link-drop fold, GATE-01 50 ms, rateLimiter, THIN-7C)** (moved off the plan 2026-10-13). Committed in worktree, not landed on main
 - [ ] **LOCALCODER-LIFT-01: Raise coding-agent bench pass rate (Pi and Reika, same model): verify-before-done prompt, loop guard, 3-run pass^k, 35B-A3B model comparison** (moved off the plan 2026-10-13). Issue/oMLX research done 2026-10-11: check swap (6 GB used on 24 GB Mac), pi tool-timeout + output-length limits, oMLX A/B vs llama.cpp (omlx-env already exists in ~/Models/local-coder)
