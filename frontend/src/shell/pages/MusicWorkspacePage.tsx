@@ -27,9 +27,10 @@ import { RemixSong } from "./MusicRemix";
 import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { BringSong } from "./BringSong";
+import { VoiceCreate } from "./MusicVoiceCreate";
 
-export type Make = "song" | "band" | "album" | "song_style" | "sound";
-export const MAKES: Array<{ id: Make; label: string }> = [{ id: "song", label: "Song" }, { id: "band", label: "Band" }, { id: "album", label: "Album" }, { id: "song_style", label: "Style" }, { id: "sound", label: "Sound" }];
+export type Make = "song" | "band" | "album" | "song_style" | "sound" | "voice";
+export const MAKES: Array<{ id: Make; label: string }> = [{ id: "song", label: "Song" }, { id: "band", label: "Band" }, { id: "album", label: "Album" }, { id: "song_style", label: "Style" }, { id: "sound", label: "Sound" }, { id: "voice", label: "Voice" }];
 const STARTER_STYLES = ["Dreamy indie pop", "Lo-fi beats", "Cinematic score", "Upbeat funk", "Acoustic folk", "Synthwave", "Jazz ballad", "Epic orchestral"];
 const active = (card: MusicCard): boolean => card.state === "queued" || card.state === "running";
 const clock = (seconds: number | null): string => (seconds && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}` : "");
@@ -206,7 +207,7 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
   };
   return <div className="bg-card mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 sm:p-4" data-testid="music-docked-bar" id="music-bar">
     <div className="h-80 min-h-0 overflow-y-auto" data-testid="music-bar-body">
-    {make === "sound" ? <SoundMaker onMade={onMade} /> : make !== "song" ? <CreatePage kind={make} adult /> : <div className="flex flex-col gap-2">
+    {make === "sound" ? <SoundMaker onMade={onMade} /> : make === "voice" ? <VoiceCreate /> : make !== "song" ? <CreatePage kind={make} adult /> : <div className="flex flex-col gap-2">
       <textarea aria-label="Describe your song" rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder="Describe any song idea: a dreamy indie pop song about new beginnings..."
         className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
       {withLyrics && !instrumental ? <textarea aria-label="Lyrics" rows={4} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} placeholder="Write your own words with [Verse] and [Chorus] tags, or leave this empty and Home writes them."

@@ -94,6 +94,13 @@ describe("Create controls", () => {
     await waitFor(() => expect(bar.getByRole("button", { name: "Album" }).getAttribute("aria-pressed")).toBe("true"));
   });
 
+  test("Voice chip opens the voiceover form", async () => {
+    const view = open();
+    fireEvent.click(await view.findByRole("button", { name: "Voice" }));
+    expect(await view.findByTestId("music-voice-create")).toBeTruthy();
+    expect(view.getByLabelText("Script")).toBeTruthy();
+  });
+
   test("a starter sound adds a style and opens the styles panel", async () => {
     const view = open();
     const sound = (await view.findAllByRole("button", { name: /Use/ }))[0]!;
