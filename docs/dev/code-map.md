@@ -305,6 +305,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/settings/ChatSkillsSection.tsx` | ChatSkillsSection |
 | `frontend/src/shell/pages/settings/ClockCardRenderer.tsx` | ClockCardRenderer |
 | `frontend/src/shell/pages/settings/DeviceAppearanceControl.tsx` | DeviceAppearanceControl |
+| `frontend/src/shell/pages/settings/HouseSettings.tsx` | HouseSettings |
 | `frontend/src/shell/pages/settings/MediaCardViews.tsx` | STYLES_CARD_KEYS, MediaKidsView, MediaPicturesView, MediaVideosView, MediaMusicView, MediaStylesView |
 | `frontend/src/shell/pages/settings/PersonMultiSelect.tsx` | PersonMultiSelect |
 | `frontend/src/shell/pages/settings/SettingField.tsx` | SettingField |

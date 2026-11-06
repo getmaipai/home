@@ -49833,6 +49833,324 @@
         }
       }
     },
+    "/api/house/test": {
+      "post": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Test the Home Assistant connection",
+        "responses": {
+          "200": {
+            "description": "Connection test.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "rooms": {
+                          "type": "number"
+                        },
+                        "devices": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "rooms",
+                        "devices"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "not_configured",
+                            "bad_address",
+                            "no_token",
+                            "refused",
+                            "unreachable",
+                            "timeout"
+                          ]
+                        },
+                        "nextStep": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "kind",
+                        "nextStep"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Adults with grant rights only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/house/admin/registry": {
+      "get": {
+        "tags": [
+          "House"
+        ],
+        "summary": "All Home Assistant rooms and entities for House settings",
+        "responses": {
+          "200": {
+            "description": "Complete registry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rooms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "entities": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string"
+                                },
+                                "sensitive": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "kind",
+                                "sensitive"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "entities"
+                        ]
+                      }
+                    },
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "role"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "rooms",
+                    "people"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/house/admin/effective": {
+      "get": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Effective House permissions for one person",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "person",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Effective permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rooms": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "see": {
+                            "type": "boolean"
+                          },
+                          "control": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "see",
+                          "control"
+                        ]
+                      }
+                    },
+                    "entities": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "see": {
+                            "type": "boolean"
+                          },
+                          "control": {
+                            "type": "boolean"
+                          },
+                          "confirm": {
+                            "type": "boolean"
+                          },
+                          "sensitive": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "see",
+                          "control",
+                          "confirm",
+                          "sensitive"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "rooms",
+                    "entities"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/house/rooms": {
       "get": {
         "tags": [
