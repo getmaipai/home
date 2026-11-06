@@ -442,6 +442,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
+| `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, INSTANCE_SLUG, listInstances, resolveInstance, instanceLanFetch |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
 | `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant |
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, createContentPolicyResolver, contentPolicyFor, filtersFor |
@@ -514,11 +515,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
 | `backend/src/lib/house/act.ts` | supportedActions, performHouseServerAction, houseServiceCall, undoFor, performHouseAction |
-| `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, __setHouseRegistryCacheDepsForTests, clearHouseRegistry |
-| `backend/src/lib/house/connection.ts` | houseLanFetch |
+| `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, peekHouseRegistries, warmHouseRegistries, loadHouseRegistries |
+| `backend/src/lib/house/connection.ts` | houseLanFetch, houseInstanceLanFetch, houseAnyConnected |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
-| `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, normalizeHouseArgs, houseToolSpec, visibleHouseEntities, planHouseCall |
+| `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, normalizeHouseArgs, houseToolSpec, visibleInstances, visibleHouseEntities |
 | `backend/src/lib/house/undoRunner.ts` | undoDataIsSafe, houseUndoRunner |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
