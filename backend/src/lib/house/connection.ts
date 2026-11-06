@@ -1,5 +1,5 @@
-import { createLanFetch, type LanFetchDeps } from "@/lib/lanFetch";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import type { createLanFetch, LanFetchDeps } from "@/lib/lanFetch";
+import { DEFAULT_INSTANCE, instanceLanFetch, listInstances, resolveInstance } from "@/lib/connectors/instances";
 
 export type HouseLanFetchFailure = {
   ok: false;
@@ -22,46 +22,19 @@ export type HouseLanFetchDeps = {
   fetch?: LanFetchDeps["fetch"];
 };
 
-const ADDRESS_MESSAGE = "The Home Assistant address must be the numeric address of your Home Assistant on your home network, for example http://192.168.1.20:8123. Open Settings, House and fix it.";
-const TOKEN_MESSAGE = "A Home Assistant access token is needed. Open Settings, House and add it.";
-
-function isIpv4Literal(hostname: string): boolean {
-  const parts = hostname.split(".");
-  return parts.length === 4 && parts.every(part => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255);
+/** The default Home Assistant instance, resolved through the connector helper (the settings keys are read through as `default` until an `integration` record exists). */
+export function houseLanFetch(deps: HouseLanFetchDeps = {}): HouseLanFetchResult {
+  return houseInstanceLanFetch(DEFAULT_INSTANCE, deps);
 }
 
-export function houseLanFetch(deps: HouseLanFetchDeps = {}): HouseLanFetchResult {
-  const read = deps.read ?? getHouseholdSettingValue;
-  const baseUrl = read("home.base_url");
-  if (typeof baseUrl !== "string" || baseUrl.trim() === "") {
-    return { ok: false, reason: "not_set", message: "Set the Home Assistant address in Settings, House before connecting." };
-  }
+/** One Home Assistant instance by slug. An unknown or disabled slug reads as not set. */
+export function houseInstanceLanFetch(slug: string, deps: HouseLanFetchDeps = {}): HouseLanFetchResult {
+  const instance = resolveInstance("home_assistant", slug, deps);
+  if (!instance) return { ok: false, reason: "not_set", message: "Set the Home Assistant address in Settings, House before connecting." };
+  return instanceLanFetch(instance, deps);
+}
 
-  let url: URL;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    return { ok: false, reason: "bad_address", message: ADDRESS_MESSAGE };
-  }
-
-  if (url.protocol !== "http:" || !isIpv4Literal(url.hostname) || url.username !== "" || url.password !== "" ||
-      (url.pathname !== "" && url.pathname !== "/") || url.search !== "" || url.hash !== "") {
-    return { ok: false, reason: "bad_address", message: ADDRESS_MESSAGE };
-  }
-
-  const tokenValue = read("home.access_token");
-  const token = typeof tokenValue === "string" ? tokenValue : "";
-  if (token.trim() === "") {
-    return { ok: false, reason: "no_token", message: TOKEN_MESSAGE };
-  }
-
-  // The URL parser drops an explicit :80 (the http default), so check the text before falling back to 8123.
-  const explicit80 = url.port === "" && /^[a-z]+:\/\/[^/]+:80\/?$/i.test(baseUrl.trim());
-  const port = url.port !== "" ? Number(url.port) : explicit80 ? 80 : 8123;
-  try {
-    const lanFetch = createLanFetch({ host: url.hostname, port }, deps.fetch === undefined ? {} : { fetch: deps.fetch });
-    return { ok: true, lanFetch, token, host: url.hostname, port };
-  } catch {
-    return { ok: false, reason: "bad_address", message: ADDRESS_MESSAGE };
-  }
+/** True when at least one enabled Home Assistant instance has a usable address and token. */
+export function houseAnyConnected(deps: HouseLanFetchDeps = {}): boolean {
+  return listInstances("home_assistant", deps).some((instance) => instanceLanFetch(instance, deps).ok);
 }

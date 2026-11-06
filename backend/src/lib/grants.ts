@@ -205,13 +205,34 @@ export function isGrantActive(row: Pick<GrantRow, "validFrom" | "validTo">, now:
  * question an admin-route gate actually needs on every request. */
 export function personIsGranted(personId: string, action: string): boolean {
   const now = new Date().toISOString();
+  const wanted = normalizeGrantTarget(action);
   const rows = db
     .select()
     .from(grants)
-    .where(and(eq(grants.person, personId), eq(grants.action, action), isNull(grants.deletedAt)))
+    .where(and(eq(grants.person, personId), isNull(grants.deletedAt)))
     .all()
-    .filter((r) => isGrantActive(r, now));
+    .filter((r) => isGrantActive(r, now) && normalizeGrantTarget(r.action) === wanted);
   if (rows.length === 0) return false;
   if (rows.some((r) => r.effect === "deny")) return false;
   return rows.some((r) => r.effect === "allow");
+}
+
+// CONN-INSTANCES-01 (condition C2): one function gives every connector grant target its full instance-prefixed form
+// before any comparison. `house.control:area:kitchen` and `house.control:default/area:kitchen` are the same grant.
+// Stored grants are never rewritten; new grants are written prefixed.
+const INSTANCE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,30}$/;
+const CONNECTOR_VERB_PREFIXES = ["house.", "uptime_kuma.", "gitea.", "immich.", "unifi.", "plex."] as const;
+
+/** `verb:target` becomes `verb:<instance>/<target>`; an unprefixed target means the `default` instance. A prefix is only
+ * recognised when the text before the first `/` is a valid slug and something follows it. Actions that are not connector
+ * actions, or carry no target, come back unchanged. The device class `by_parameter` is passed separately, never parsed here. */
+export function normalizeGrantTarget(action: string): string {
+  if (!CONNECTOR_VERB_PREFIXES.some((prefix) => action.startsWith(prefix))) return action;
+  const colon = action.indexOf(":");
+  if (colon < 0) return action;
+  const verb = action.slice(0, colon);
+  const target = action.slice(colon + 1);
+  const slash = target.indexOf("/");
+  if (slash > 0 && slash < target.length - 1 && INSTANCE_SLUG_PATTERN.test(target.slice(0, slash))) return action;
+  return `${verb}:default/${target}`;
 }

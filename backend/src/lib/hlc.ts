@@ -43,6 +43,7 @@ export const HLC_BEARING_TABLES = [
   "transcripts",
   "transcript_revisions",
   "caption_tracks",
+  "integrations",
   "status_events",
   "status_notes",
   "maintenance_windows",

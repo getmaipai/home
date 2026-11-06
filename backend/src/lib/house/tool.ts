@@ -12,8 +12,8 @@ import { db } from "@/db";
 import { settingsValues } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nextHlc } from "@/lib/hlc";
-import { houseLanFetch } from "./connection";
-import { loadHouseRegistry } from "./cache";
+import { houseInstanceLanFetch, houseLanFetch } from "./connection";
+import { loadHouseRegistries } from "./cache";
 import type { HouseArea, HouseEntity, HouseKind } from "./registry";
 import { canRestartServer, houseAccess, visibleEntities, type EffectivePermission, type HouseActor, type HouseBand } from "./access";
 import { houseServiceCall, performHouseAction, performHouseServerAction, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult, type HouseAddon, type HouseServerAction } from "./act";
@@ -60,6 +60,7 @@ export function normalizeHouseArgs(raw: unknown): unknown {
   if (input.value !== undefined) result.value = input.value;
   if (input.rgb !== undefined) result.rgb = input.rgb;
   if (input.addon !== undefined) result.addon = input.addon;
+  if (typeof input.instance === "string" && input.instance.trim()) result.instance = input.instance.trim();
   return result;
 }
 
@@ -69,6 +70,7 @@ const argsShape = z.object({
   value: z.number().finite().optional(),
   rgb: z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255), z.number().int().min(0).max(255)]).optional(),
   addon: z.string().min(1).max(128).optional(),
+  instance: z.string().min(1).max(31).optional(),
 }).strict();
 const argsSchema = z.preprocess(normalizeHouseArgs, argsShape);
 type HouseArgs = z.infer<typeof argsShape>;
@@ -85,7 +87,7 @@ export type HouseToolDeps = {
   serverAction?: (action: HouseServerAction, addon?: string) => Promise<{ ok: boolean; disconnected?: boolean }>;
 };
 
-const defaultLoadRegistry = loadHouseRegistry;
+const defaultLoadRegistry = loadHouseRegistries;
 const serverCooldowns = new Map<HouseServerAction, number>();
 const SERVER_COOLDOWN_MS = 60_000;
 const SERVER_COOLDOWN_SCOPE = "system";
@@ -117,26 +119,37 @@ export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[];
   const areaNames = [...new Set(ctx.areas.filter((area) => areaIds.has(area.id)).map((area) => area.name))].sort((a, b) => a.localeCompare(b)).slice(0, 40);
   const owner = canRestartServer(ctx.actor);
   const actions = owner ? HOUSE_ACTIONS : HOUSE_ACTIONS.filter((action) => !action.startsWith("restart_") && action !== "reboot_host");
+  // Rule 1: the argument exists only when this speaker can see more than one instance; with one it is implied.
+  const instances = visibleInstances(ctx.visible);
   return {
     id: HOUSE_TOOL_ID,
     description: "Find visible home devices and scenes or control devices you are allowed to use. Always pass targets, a list of {area, name, kind}, for example {\"action\":\"turn_on\",\"targets\":[{\"area\":\"Kitchen\",\"name\":\"Ceiling\"}]}. Use action find with an area to see what is there.",
     args: { type: "object", required: ["action", "targets"], properties: {
       action: { type: "string", enum: actions },
       targets: { type: "array", maxItems: 25, items: { type: "object", properties: { area: { type: "string", ...(areaNames.length ? { enum: areaNames } : {}) }, name: { type: "string" }, kind: { type: "string", enum: kinds } }, additionalProperties: false } },
+      ...(instances.length > 1 ? { instance: { type: "string", enum: instances.map((item) => item.instance), description: `Which home: ${instances.map((item) => `${item.instance} is ${item.label}`).join("; ")}. Leave out to search all of them.` } } : {}),
       value: { type: "number" }, rgb: { type: "array", minItems: 3, maxItems: 3, items: { type: "integer", minimum: 0, maximum: 255 } },
       ...(owner ? { addon: { type: "string", enum: (ctx.addons ?? []).map((addon) => addon.id) } } : {}),
     }, additionalProperties: false },
   };
 }
 
+/** The instances this speaker can see anything in, sorted by label; one or none when the household has a single instance. */
+export function visibleInstances(entities: readonly HouseEntity[]): Array<{ instance: string; label: string }> {
+  const seen = new Map<string, string>();
+  for (const entity of entities) if (entity.instance !== undefined && !seen.has(entity.instance)) seen.set(entity.instance, entity.instanceLabel ?? entity.instance);
+  return [...seen].map(([instance, label]) => ({ instance, label })).sort((a, b) => a.label.localeCompare(b.label));
+}
+const keyOf = (entity: Pick<HouseEntity, "id" | "instance">, id: string = entity.id): string => `${entity.instance ?? "default"}/${id}`;
+
 /** Everything this speaker may see, with scenes held to the member rule: a scene is offered only when every entity it sets is
  * one the speaker may control (a scene can set locks, covers and the alarm). A scene whose members are unknown is for adults only. */
 export function visibleHouseEntities({ actor, permissions, entities }: { actor: HouseActor; permissions: readonly EffectivePermission[]; entities: readonly HouseEntity[] }): HouseEntity[] {
-  const byId = new Map(entities.map((entity) => [entity.id, entity]));
+  const byId = new Map(entities.map((entity) => [keyOf(entity), entity]));
   const sceneOk = (scene: HouseEntity): boolean => {
     if (scene.sceneMembers === null) return actor.band === "adult";
     return scene.sceneMembers.every((id) => {
-      const member = byId.get(id);
+      const member = byId.get(keyOf(scene, id));
       return member ? houseAccess({ actor, permissions, entity: member, level: "control" }).allowed : actor.band === "adult";
     });
   };
@@ -161,8 +174,11 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   const houseActor = canonicalActor(actor, band);
   if (!houseActor.id || houseActor.role === "unknown" || houseActor.role === "guest") return { kind: "refuse", reason: "unknown_speaker", text: "Home controls are not available for this speaker.", count: 0, rejected: true };
   if (mode === "never") return { kind: "refuse", reason: "mode_never", text: "Home controls are turned off for this household.", count: 0, rejected: true };
-  const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
   const input = parsed.data;
+  const allVisible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
+  // An instance argument narrows to that instance; one the speaker cannot see reads as nothing found there.
+  const visible = input.instance === undefined ? allVisible : allVisible.filter((entity) => (entity.instance ?? "default") === input.instance);
+  if (input.instance !== undefined && input.action !== "find" && !input.action.startsWith("restart_") && input.action !== "reboot_host" && visible.length === 0) return { kind: "refuse", reason: "missing", text: "I could not find a visible device matching that area or name.", count: 0 };
   if (input.action.startsWith("restart_") || input.action === "reboot_host") {
     if (!canRestartServer(houseActor)) return { kind: "refuse", reason: "server_owner_only", text: "That home action is unavailable for this speaker.", count: 0 };
     const action = input.action as HouseServerAction;
@@ -170,6 +186,7 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   }
   if (input.action === "find") return { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "find" as HouseActionName }, mode, count: 0 };
   const resolved = resolveTargets(input.targets ?? [], visible, registry.areas);
+  if (resolved.acrossInstances) return { kind: "refuse", reason: "ambiguous", text: `That name matches in more than one home: ${resolved.acrossInstances.map((label) => `the ${label} one`).join(" or ")}. Say which one.`, count: resolved.acrossInstances.length };
   if (resolved.ambiguous) return { kind: "refuse", reason: "ambiguous", text: `That name matches more than one device: ${resolved.ambiguous.join(", ")}. Please be more specific.`, count: resolved.ambiguous.length };
   if (resolved.missing || resolved.matches.length === 0) return { kind: "refuse", reason: "missing", text: "I could not find a visible device matching that area or name.", count: 0 };
   const action: HouseActionInput = { name: input.action as HouseActionName, ...(input.value !== undefined ? { value: input.value } : {}), ...(input.rgb ? { rgb: input.rgb } : {}) };
@@ -178,8 +195,8 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   const control = resolved.matches.map((entity) => ({ entity, access: houseAccess({ actor: houseActor, permissions, entity, level: "control" }) }));
   if (control.some((item) => !item.access.allowed)) return { kind: "refuse", reason: "access", text: "You are not set up to control that.", count: control.length };
   const confirm = control.some(({ entity }) => !!entity.sensitive && houseAccess({ actor: houseActor, permissions, entity, level: "confirm" }).confirm);
-  const byId = new Map(registry.entities.map((entity) => [entity.id, entity]));
-  const sceneNeedsAsk = control.some(({ entity }) => entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => !byId.get(id) || !!byId.get(id)!.sensitive)));
+  const byId = new Map(registry.entities.map((entity) => [keyOf(entity), entity]));
+  const sceneNeedsAsk = control.some(({ entity }) => entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => !byId.get(keyOf(entity, id)) || !!byId.get(keyOf(entity, id))!.sensitive)));
   const mustAsk = sceneNeedsAsk || confirm || control.some(({ entity }) => !!entity.sensitive && houseAccess({ actor: houseActor, permissions, entity, level: "confirm" }).reason === "no_grant");
   // approved = the speaker answered yes to exactly this parked call; it lifts the ask, never a never and never a minor's need for a parent.
   const brake = approved ? { decision: "do" as const, reason: undefined } : brakeFor({ tool: "house", action: input.action, confirm: mustAsk, targets: control.length, tainted, mode, actor: { id: houseActor.id!, role: houseActor.role, band: houseActor.band }, args });
@@ -201,7 +218,7 @@ export function houseLabel(entity: HouseEntity, areas: HouseArea[]): string {
 }
 
 function normalize(value: string): string { return value.trim().replace(/\s+/g, " ").toLocaleLowerCase(); }
-function areaName(entity: HouseEntity, areas: HouseArea[]): string { return areas.find((area) => area.id === entity.area)?.name ?? "the home"; }
+function areaName(entity: HouseEntity, areas: HouseArea[]): string { return areas.find((area) => area.id === entity.area && (area.instance ?? "default") === (entity.instance ?? "default"))?.name ?? "the home"; }
 function fail(callId: string, raw: Record<string, unknown>, line: string, status: "failed" | "rejected" = "failed", confirmNeeded = false, failureKind: "unavailable" | "bad_arguments" | "found_nothing" = "unavailable"): ToolExecutionOutcome {
   return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status, via: "tool_call", args: raw, durationMs: 0, errorCode: "house_tool", failureKind, userMessage: line, ...(confirmNeeded ? { confirmNeeded: true } as object : {}) } as Parameters<typeof outcomeOf>[0]);
 }
@@ -213,7 +230,7 @@ const failureCopy: Record<string, string> = {
   refused: "Home Assistant could not complete that request. Check the device and try again.", not_confirmed: "The device did not confirm the change. Check its state and try again.",
 };
 
-function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: HouseEntity[], areas: HouseArea[]): { matches: HouseEntity[]; ambiguous?: string[]; missing?: boolean } {
+function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: HouseEntity[], areas: HouseArea[]): { matches: HouseEntity[]; ambiguous?: string[]; acrossInstances?: string[]; missing?: boolean } {
   const selected: HouseEntity[] = [];
   for (const target of targets) {
     const filtered = entities.filter((entity) => (!target.kind || entity.kind === target.kind) && (!target.area || normalize(areaName(entity, areas)) === normalize(target.area)));
@@ -227,13 +244,16 @@ function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: Ho
         const loose = words.length ? filtered.filter((entity) => { const h = new Set(hay(entity)); return words.every((w) => h.has(w)); }) : [];
         if (loose.length === 1) matches = loose;
       }
+      // The same name in two instances is never guessed: name the instances so the speaker can pick one.
+      const homes = visibleInstances(matches);
+      if (matches.length > 1 && homes.length > 1) return { matches: [], acrossInstances: homes.map((home) => home.label) };
       if (matches.length > 1) return { matches: [], ambiguous: matches.slice(0, 8).map((entity) => entity.name) };
       if (matches.length === 0) return { matches: [], missing: true };
       selected.push(matches[0]!);
     } else if (target.area) selected.push(...filtered);
     else return { matches: [], missing: true };
   }
-  return { matches: [...new Map(selected.map((entity) => [entity.id, entity])).values()] };
+  return { matches: [...new Map(selected.map((entity) => [keyOf(entity), entity])).values()] };
 }
 
 export async function runHouseTool({ actor, band: bandIn, args, callId, tainted = false, approved = false, deps = {} }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; callId: string; tainted?: boolean; approved?: boolean; deps?: HouseToolDeps }): Promise<ToolExecutionOutcome> {
@@ -262,7 +282,7 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
     const retryPlan = planHouseCall({ actor, band: bandIn, args, tainted: false, approved: true, registry, permissions, mode });
     if (retryPlan.kind === "refuse") return reply(callId, args, retryPlan.text);
     if (retryPlan.kind === "run" && (retryPlan.actor.band === "child" || retryPlan.actor.band === "teen")) {
-      const requiresAdult = retryPlan.matches.some((entity) => !!entity.sensitive || entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => registry.entities.find((item) => item.id === id)?.sensitive)));
+      const requiresAdult = retryPlan.matches.some((entity) => !!entity.sensitive || entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => registry.entities.find((item) => item.id === id && (item.instance ?? "default") === (entity.instance ?? "default"))?.sensitive)));
       if (requiresAdult) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "A parent needs to approve that home action." } as Parameters<typeof outcomeOf>[0]);
     }
     if (retryPlan.kind === "ask") return reply(callId, args, "That home action could not be confirmed.");
@@ -282,7 +302,7 @@ async function executeHousePlan({ plan, actor, personId, args, callId, band, dep
     const last = Math.max(serverCooldowns.get(action) ?? 0, storedCooldown(action));
     if (last && nowMs - last < SERVER_COOLDOWN_MS) return fail(callId, args, "Home Assistant server controls are cooling down. Try again in a minute.", "failed", false, "unavailable");
     const result = deps.serverAction ? await deps.serverAction(action, input.addon) : await (() => {
-      const connection = houseLanFetch();
+      const connection = houseInstanceLanFetch(input.instance ?? "default");
       return connection.ok ? performHouseServerAction({ lanFetch: connection.lanFetch, token: connection.token, action, addon: input.addon }) : Promise.resolve({ ok: false as const, kind: "unreachable" as const });
     })();
     const ok = result.ok || ("disconnected" in result && result.disconnected === true);
@@ -292,11 +312,12 @@ async function executeHousePlan({ plan, actor, personId, args, callId, band, dep
   }
   const mode = plan.mode;
   const permissions = plan.permissions;
-  const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
+  const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities }).filter((entity) => input.instance === undefined || (entity.instance ?? "default") === input.instance);
   if (input.action === "find") {
     const filtered = visible.filter((entity) => (input.targets ?? []).every((target) => (!target.area || normalize(areaName(entity, registry.areas)) === normalize(target.area)) && (!target.kind || target.kind === entity.kind))).slice(0, 26);
     const shown = filtered.slice(0, 25);
-    const list = shown.map((entity) => `${entity.name} (${areaName(entity, registry.areas)}, ${entity.kind}, ${entity.state})`).join("; ");
+    const several = visibleInstances(registry.entities).length > 1;
+    const list = shown.map((entity) => `${entity.name} (${areaName(entity, registry.areas)}, ${entity.kind}, ${entity.state}${several && entity.instanceLabel ? `, ${entity.instanceLabel}` : ""})`).join("; ");
     return reply(callId, args, shown.length ? `Found ${shown.length} visible home ${shown.length === 1 ? "device" : "devices"}${filtered.length > 25 ? "; there are more" : ""}: ${list}.` : "I did not find any visible device there.");
   }
   const matches = plan.matches;
@@ -306,7 +327,7 @@ async function executeHousePlan({ plan, actor, personId, args, callId, band, dep
   const failedKinds: string[] = [];
   for (const { entity } of control) {
     const result = await (deps.perform ?? (async (target, act) => {
-      const connection = houseLanFetch();
+      const connection = houseInstanceLanFetch(target.instance ?? "default");
       return connection.ok ? performHouseAction({ lanFetch: connection.lanFetch, token: connection.token, entity: target, action: act }) : { ok: false as const, kind: "unreachable" as const };
     }))(entity, action);
     if (result.ok) performed.push({ entity, result }); else failedKinds.push(entity.kind);

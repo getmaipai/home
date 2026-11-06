@@ -2577,3 +2577,21 @@ export const toolUndo = sqliteTable("tool_undo", {
   expiresAt: text("expires_at").notNull(),
   usedAt: text("used_at"),
 }, (table) => [index("tool_undo_person_idx").on(table.personId)]);
+
+// CONN-INSTANCES-01: spec `integration` record (spec/schemas/integration.schema.json), one row per connected service
+// instance. The pair (type, instance) is unique, tombstoned rows included, so a slug is never reused. The row never holds
+// a secret: credential_ref names where the credentials center keeps it.
+export const integrations = sqliteTable("integrations", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  instance: text("instance").notNull(),
+  label: text("label").notNull(),
+  address: text("address").notNull(),
+  credentialRef: text("credential_ref").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  deletedAt: text("deleted_at"),
+  provenance: text("provenance").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (table) => [uniqueIndex("integrations_type_instance_idx").on(table.type, table.instance)]);

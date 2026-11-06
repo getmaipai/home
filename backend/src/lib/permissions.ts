@@ -22,7 +22,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { grants } from "@/db/schema";
-import { isGrantActive } from "@/lib/grants";
+import { isGrantActive, normalizeGrantTarget } from "@/lib/grants";
 
 export interface EffectivePermission {
   action: string;
@@ -40,12 +40,13 @@ export function effectivePermissions(personId: string): EffectivePermission[] {
 
   const resolved = new Map<string, "allow" | "deny">();
   for (const row of rows) {
-    if (resolved.get(row.action) === "deny") continue; // already denied: nothing can un-deny it
+    const action = normalizeGrantTarget(row.action); // a prefixed and an unprefixed grant are the same target
+    if (resolved.get(action) === "deny") continue; // already denied: nothing can un-deny it
     if (row.effect === "deny") {
-      resolved.set(row.action, "deny");
+      resolved.set(action, "deny");
       continue;
     }
-    if (!resolved.has(row.action)) resolved.set(row.action, "allow");
+    if (!resolved.has(action)) resolved.set(action, "allow");
   }
 
   return [...resolved.entries()].map(([action, effect]) => ({ action, effect })).sort((a, b) => a.action.localeCompare(b.action));

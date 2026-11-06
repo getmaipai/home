@@ -37,8 +37,8 @@ import { recordToolAudit } from "@/lib/toolAudit";
 import { LIST_ACTIONS } from "@/lib/listActions";
 import { isAlarmActionCall } from "@/lib/alarmCalls";
 import { HOUSE_TOOL_ID, planHouseCall, safeHouseAction } from "@/lib/house/tool";
-import { houseLanFetch } from "@/lib/house/connection";
-import { loadHouseRegistry } from "@/lib/house/cache";
+import { houseAnyConnected } from "@/lib/house/connection";
+import { loadHouseRegistries } from "@/lib/house/cache";
 import { effectivePermissions } from "@/lib/permissions";
 
 export interface PolicyInput {
@@ -452,8 +452,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
       const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
       const tainted = state.context.some((item) => item.source === "search_result" || item.source === "page");
-      const connection = houseLanFetch();
-      const registry = connection.ok ? await loadHouseRegistry() : { ok: false as const, kind: "unreachable" as const };
+      const registry = houseAnyConnected() ? await loadHouseRegistries() : { ok: false as const, kind: "unreachable" as const };
       if (!registry.ok) {
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });

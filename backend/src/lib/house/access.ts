@@ -1,5 +1,6 @@
 import type { Role } from "@/middleware/auth";
 import { approverFor } from "@/lib/gate/decide";
+import { normalizeGrantTarget } from "@/lib/grants";
 import type { HouseEntity, SensitiveClass } from "./registry";
 
 export type HouseBand = "child" | "teen" | "adult";
@@ -15,10 +16,11 @@ export function approverCell(actionId: string, band: HouseBand, parameter?: stri
 }
 
 function actionIds(level: HouseLevel, entity: HouseEntity, band: HouseBand): string[] {
-  const ids = [`house.${level}:entity:${entity.id}`];
+  const instance = entity.instance ?? "default";
+  const ids = [`house.${level}:${instance}/entity:${entity.id}`];
   // A room grant never reaches a lock, alarm, garage, entry door or camera for a teen or child: those need a grant on the item itself.
   if (entity.sensitive && band !== "adult") return ids;
-  if (entity.area) ids.push(`house.${level}:area:${entity.area}`);
+  if (entity.area) ids.push(`house.${level}:${instance}/area:${entity.area}`);
   return ids;
 }
 
@@ -36,9 +38,11 @@ export function houseAccess({ actor, permissions, entity, level }: {
 
   if (actor.role === "owner") return { allowed: true, confirm: cell === "self" || cell === "parent", reason: "owner" };
 
+  // One form for every target (C2): a prefixed deny beats an unprefixed allow and the reverse.
   const actions = new Set(actionIds(level, entity, actor.band));
-  if (permissions.some((permission) => actions.has(permission.action) && permission.effect === "deny")) return denied("denied");
-  if (permissions.some((permission) => actions.has(permission.action) && permission.effect === "allow")) {
+  const hits = (effect: EffectivePermission["effect"]): boolean => permissions.some((permission) => permission.effect === effect && actions.has(normalizeGrantTarget(permission.action)));
+  if (hits("deny")) return denied("denied");
+  if (hits("allow")) {
     return { allowed: true, confirm: cell === "self" || cell === "parent", reason: "granted" };
   }
   return denied("no_grant");

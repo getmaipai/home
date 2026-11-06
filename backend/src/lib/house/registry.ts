@@ -15,9 +15,12 @@ export type HouseEntity = {
   rgb: [number, number, number] | null;
   brightness: number | null;
   sceneMembers: string[] | null;
+  /** Set only when the household has several Home Assistant instances: which one this entity lives in (absent means `default`). */
+  instance?: string;
+  instanceLabel?: string;
 };
 
-export type HouseArea = { id: string; name: string };
+export type HouseArea = { id: string; name: string; instance?: string };
 export type HouseRegistryResult =
   | { ok: true; areas: HouseArea[]; entities: HouseEntity[] }
   | { ok: false; kind: "unreachable" | "refused" | "timeout" };

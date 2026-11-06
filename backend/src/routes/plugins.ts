@@ -23,8 +23,8 @@ import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { appAssetAllowed, appRunAllowed, getAppData, getAppPage, manifestForViewer, warmAppPage } from "@/lib/apps";
 import { assetResponse, cleanAssetPath, packageAssetFile } from "@/lib/packageAssets";
 import { newsRoutes } from "./newsRoutes";
-import { houseLanFetch } from "@/lib/house/connection";
-import { peekHouseRegistry, warmHouseRegistry } from "@/lib/house/cache";
+import { houseAnyConnected } from "@/lib/house/connection";
+import { peekHouseRegistries, warmHouseRegistries } from "@/lib/house/cache";
 import { visibleHouseEntities, houseToolSpec } from "@/lib/house/tool";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -98,15 +98,15 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
   const band = speakerAgeBand(actor, new Date());
   // VOICE-V1/V2: the same gate a real written turn applies to voiceover and change_voice (adult, not a guest, voice engine ready).
   const voiceoverOk = band === "adult" && actor.role !== "guest" && (await roleHealth("voice").then((h) => h.availability === "ready", () => false));
-  const registry = peekHouseRegistry();
+  const registry = peekHouseRegistries();
   let houseContext: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] } | undefined;
-  const houseEligible = actor.role !== "guest" && getHouseholdSettingValue("tools.house.mode") !== "never" && houseLanFetch().ok;
+  const houseEligible = actor.role !== "guest" && getHouseholdSettingValue("tools.house.mode") !== "never" && houseAnyConnected();
   let houseOk = false;
   if (houseEligible && registry) {
     const visible = visibleHouseEntities({ actor: { id: actor.id, role: actor.role as import("@/lib/house/access").HouseActor["role"], band: band === "child" || band === "teen" ? band : "adult" }, permissions: effectivePermissions(actor.id), entities: registry.entities });
     houseOk = visible.length > 0;
     if (houseOk) houseContext = { visible, areas: registry.areas };
-  } else if (houseEligible) warmHouseRegistry();
+  } else if (houseEligible) warmHouseRegistries();
   const budget = withTurnToolGates(
     await resolveTurnBudgetWithStack(undefined, band),
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),

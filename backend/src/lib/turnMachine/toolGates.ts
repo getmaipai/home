@@ -19,8 +19,8 @@ import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { withTurnToolGates, type MusicObjectGate } from "./budget";
 import { isMusicObjectRef, musicObjectOf, type MusicObjectRef } from "@/lib/music/objects";
 import type { TurnBudget } from "./contract";
-import { houseLanFetch } from "@/lib/house/connection";
-import { peekHouseRegistry, warmHouseRegistry } from "@/lib/house/cache";
+import { houseAnyConnected } from "@/lib/house/connection";
+import { peekHouseRegistries, warmHouseRegistries } from "@/lib/house/cache";
 import { visibleHouseEntities } from "@/lib/house/tool";
 import { effectivePermissions } from "@/lib/permissions";
 import type { HouseArea, HouseEntity } from "@/lib/house/registry";
@@ -157,16 +157,16 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
   const voiceoverOk = !input.bare && !input.spoken && input.surfaceClass === "written" && speakerAgeBand(input.actor, new Date()) === "adult" && input.actor.role !== "guest" && (await readiness(async () => (await roleHealth("voice")).availability === "ready"));
   let houseContext: { visible: HouseEntity[]; areas: HouseArea[] } | undefined;
-  const registry = peekHouseRegistry();
+  const registry = peekHouseRegistries();
   const houseMode = getHouseholdSettingValue("tools.house.mode");
   let houseOk = !input.bare && !input.spoken && input.surfaceClass === "written" && input.actor.role !== "guest" && houseMode !== "never" && !(input.surface === "robot");
-  if (houseOk && houseLanFetch().ok) {
+  if (houseOk && houseAnyConnected()) {
     if (registry) {
       const band: HouseBand = input.band === "child" || input.band === "teen" ? input.band : "adult";
       const visible = visibleHouseEntities({ actor: { id: input.actor.id, role: input.actor.role as import("@/lib/house/access").HouseActor["role"], band }, permissions: effectivePermissions(input.actor.id), entities: registry.entities });
       houseOk = visible.length > 0;
       if (houseOk) houseContext = { visible, areas: registry.areas };
-    } else { warmHouseRegistry(); houseOk = false; }
+    } else { warmHouseRegistries(); houseOk = false; }
   } else houseOk = false;
   return {
     budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk),
