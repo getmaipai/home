@@ -685,6 +685,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
+| `backend/src/lib/music/soundMaker.ts` | MAKE_SOUND_TOOL_ID, makeSoundArgs, runMakeSound |
 | `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, musicStackConfigured, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/studioTools.ts` | EDIT_BAND_TOOL_ID, STUDIO_TOOL_IDS, isStudioTool, EDIT_TOOL_OBJECT, runStudioTool |
