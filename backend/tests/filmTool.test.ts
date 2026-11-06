@@ -29,14 +29,19 @@ describe("FILM-04 make_film", () => {
     const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../packages/make_film/manifest.json"), "utf8"));
     expect(manifest).toMatchObject({ id: MAKE_FILM_TOOL_ID, kind: "plugin", min_role: "adult", offer: { mode: "conditional", gate: "filmAllowed", bench_row: "make-film-tool" } });
     expect(manifest.args.required).toEqual(["idea"]);
-    expect(Object.keys(manifest.args.properties)).toEqual(["idea", "shots", "look", "characters", "go_ahead", "faceless"]);
+    expect(Object.keys(manifest.args.properties)).toEqual(["idea", "shots", "seconds", "look", "characters", "go_ahead", "faceless"]);
+    expect(manifest.version).toBe("0.3.0");
   });
   test("passes arguments through and returns immediately with the run id", () => {
     let received: Record<string, unknown> | undefined;
     __setStartFilmForTests((input) => { received = input as unknown as Record<string, unknown>; return { id: "run-1" }; });
-    const result = runMakeFilm({ state: state(), args: { idea: "A boat crosses a rainy street", shots: 8, look: "1975 35mm, muted", characters: ["Marlow"], go_ahead: false, faceless: true }, callId: "c", spoken: false });
-    expect(received).toMatchObject({ idea: "A boat crosses a rainy street", shots: 8, look: "1975 35mm, muted", castHints: ["Marlow"], faceless: true, goAhead: false });
+    const result = runMakeFilm({ state: state(), args: { idea: "A boat crosses a rainy street", shots: 8, seconds: 30, look: "1975 35mm, muted", characters: ["Marlow"], go_ahead: false, faceless: true }, callId: "c", spoken: false });
+    expect(received).toMatchObject({ idea: "A boat crosses a rainy street", shots: 8, seconds: 30, look: "1975 35mm, muted", castHints: ["Marlow"], faceless: true, goAhead: false });
     expect(result.result?.data).toEqual({ filmRunId: "run-1", awaitingGo: true });
+  });
+  test.each([9, 301, 10.5])("rejects invalid requested length %s", (seconds) => {
+    const result = runMakeFilm({ state: state(), args: { idea: "A boat crosses", seconds }, callId: "c", spoken: false });
+    expect(result.status).toBe("failed");
   });
   test("go_ahead is false by default and true only when supplied", () => {
     const got: boolean[] = [];
