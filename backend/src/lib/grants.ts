@@ -74,7 +74,7 @@ export interface GrantCreate {
   acknowledged_by_person_id?: string | null;
 }
 
-const OWNER_ONLY_GRANT_ACTIONS = new Set(["backups.restore"]);
+const OWNER_ONLY_GRANT_ACTIONS = new Set(["backups.restore", "house.server"]);
 const ADMIN_HELD_GRANT_ACTIONS = new Set([
   "use:<package>",
   "packages.use_all",
@@ -104,6 +104,9 @@ const ADMIN_HELD_GRANT_ACTIONS = new Set([
   "approvals.decide",
   "tier.max",
   "tier.max:<category>",
+  "house.see:<target>",
+  "house.control:<target>",
+  "house.confirm:<target>",
 ]);
 const GRANT_AUTHORITY_ERROR = "You can't give someone a permission you don't have. Ask the owner to grant it.";
 

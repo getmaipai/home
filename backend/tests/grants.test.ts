@@ -97,6 +97,24 @@ describe("POST /api/grants", () => {
     expect(res.status).toBe(201);
   });
 
+  test("house.server is owner only: an admin cannot grant it, an owner can", async () => {
+    const owner = await ownerSession();
+    const admin = await makeAdmin(owner, "Marlow");
+    const other = await makeAdult(owner, "Iris");
+    const refused = await admin.client.post("/api/grants", { person: other.id, action: "house.server", effect: "allow" });
+    expect(refused.status).toBe(400);
+    const allowed = await owner.post("/api/grants", { person: other.id, action: "house.server", effect: "allow" });
+    expect(allowed.status).toBe(201);
+  });
+
+  test("an admin can grant room and item control for a light, not the server", async () => {
+    const owner = await ownerSession();
+    const admin = await makeAdmin(owner, "Marlow");
+    const other = await makeAdult(owner, "Iris");
+    const res = await admin.client.post("/api/grants", { person: other.id, action: "house.control:area:living_room", effect: "allow" });
+    expect(res.status).toBe(201);
+  });
+
   test("an admin can grant an action the admin holds", async () => {
     const owner = await ownerSession();
     const admin = await makeAdmin(owner, "Marlow");
