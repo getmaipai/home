@@ -60137,218 +60137,240 @@
         ],
         "responses": {
           "200": {
-            "description": "The job as its owner sees it.",
+            "description": "The job as its owner sees it, or the lock tile.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "state": {
-                      "type": "string",
-                      "enum": [
-                        "queued",
-                        "running",
-                        "done",
-                        "failed",
-                        "cancelled"
-                      ]
-                    },
-                    "percent": {
-                      "type": "number"
-                    },
-                    "label": {
-                      "type": "string",
-                      "description": "One plain line for the card: what is happening now."
-                    },
-                    "position": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "stage_label": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
-                    },
-                    "eta_seconds": {
-                      "type": "number",
-                      "nullable": true,
-                      "description": "While running: seconds left, from earlier pictures of this size."
-                    },
-                    "step": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "steps": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "preview_url": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
-                    },
-                    "preview_step": {
-                      "type": "number",
-                      "nullable": true,
-                      "description": "The step the preview shows, out of `steps`."
-                    },
-                    "elapsed_ms": {
-                      "type": "number"
-                    },
-                    "prompt": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "generate",
-                        "variation",
-                        "edit"
-                      ]
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "error": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "files": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "width": {
-                            "type": "number"
-                          },
-                          "height": {
-                            "type": "number"
-                          },
-                          "seed": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "model": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "ms": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "alt": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "url",
-                          "width",
-                          "height",
-                          "seed",
-                          "model",
-                          "steps",
-                          "ms",
-                          "alt"
-                        ]
-                      }
-                    },
-                    "can_vary": {
-                      "type": "boolean"
-                    },
-                    "quality": {
-                      "type": "string",
-                      "enum": [
-                        "quick",
-                        "detailed"
-                      ],
-                      "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
-                    },
-                    "switch_to": {
-                      "type": "string",
-                      "nullable": true,
-                      "enum": [
-                        "quick",
-                        "detailed",
-                        null
-                      ],
-                      "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                    },
-                    "max_offered": {
-                      "type": "boolean",
-                      "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                    },
-                    "size": {
-                      "type": "string",
-                      "description": "The size being made, like 1024x1024."
-                    },
-                    "fit_ask": {
+                  "anyOf": [
+                    {
                       "type": "object",
-                      "nullable": true,
                       "properties": {
-                        "job_id": {
+                        "id": {
                           "type": "string"
                         },
-                        "picked": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "done",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "percent": {
+                          "type": "number"
+                        },
+                        "label": {
+                          "type": "string",
+                          "description": "One plain line for the card: what is happening now."
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "stage_label": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "While running: seconds left, from earlier pictures of this size."
+                        },
+                        "step": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "steps": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "preview_url": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
+                        },
+                        "preview_step": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The step the preview shows, out of `steps`."
+                        },
+                        "elapsed_ms": {
+                          "type": "number"
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "generate",
+                            "variation",
+                            "edit"
+                          ]
+                        },
+                        "conversation_id": {
                           "type": "string",
                           "nullable": true
                         },
-                        "actual": {
+                        "error": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "model": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "alt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "url",
+                              "width",
+                              "height",
+                              "seed",
+                              "model",
+                              "steps",
+                              "ms",
+                              "alt"
+                            ]
+                          }
+                        },
+                        "can_vary": {
+                          "type": "boolean"
+                        },
+                        "quality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "detailed"
+                          ],
+                          "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
+                        },
+                        "switch_to": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "quick",
+                            "detailed",
+                            null
+                          ],
+                          "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                        },
+                        "max_offered": {
+                          "type": "boolean",
+                          "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                        },
+                        "size": {
+                          "type": "string",
+                          "description": "The size being made, like 1024x1024."
+                        },
+                        "fit_ask": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "job_id": {
+                              "type": "string"
+                            },
+                            "picked": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "actual": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "job_id",
+                            "picked",
+                            "actual"
+                          ],
+                          "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                        },
+                        "stop_id": {
+                          "type": "string",
+                          "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
                         }
                       },
                       "required": [
-                        "job_id",
-                        "picked",
-                        "actual"
-                      ],
-                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                        "id",
+                        "state",
+                        "percent",
+                        "label",
+                        "position",
+                        "stage_label",
+                        "eta_seconds",
+                        "step",
+                        "steps",
+                        "preview_url",
+                        "preview_step",
+                        "elapsed_ms",
+                        "prompt",
+                        "kind",
+                        "conversation_id",
+                        "error",
+                        "files",
+                        "can_vary",
+                        "quality",
+                        "switch_to",
+                        "max_offered",
+                        "size",
+                        "fit_ask",
+                        "stop_id"
+                      ]
                     },
-                    "stop_id": {
-                      "type": "string",
-                      "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ]
                     }
-                  },
-                  "required": [
-                    "id",
-                    "state",
-                    "percent",
-                    "label",
-                    "position",
-                    "stage_label",
-                    "eta_seconds",
-                    "step",
-                    "steps",
-                    "preview_url",
-                    "preview_step",
-                    "elapsed_ms",
-                    "prompt",
-                    "kind",
-                    "conversation_id",
-                    "error",
-                    "files",
-                    "can_vary",
-                    "quality",
-                    "switch_to",
-                    "max_offered",
-                    "size",
-                    "fit_ask",
-                    "stop_id"
                   ]
                 }
               }
@@ -60499,218 +60521,240 @@
         ],
         "responses": {
           "200": {
-            "description": "The job, now stopped (a finished job stays finished).",
+            "description": "The job, now stopped, or the lock tile.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "state": {
-                      "type": "string",
-                      "enum": [
-                        "queued",
-                        "running",
-                        "done",
-                        "failed",
-                        "cancelled"
-                      ]
-                    },
-                    "percent": {
-                      "type": "number"
-                    },
-                    "label": {
-                      "type": "string",
-                      "description": "One plain line for the card: what is happening now."
-                    },
-                    "position": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "stage_label": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
-                    },
-                    "eta_seconds": {
-                      "type": "number",
-                      "nullable": true,
-                      "description": "While running: seconds left, from earlier pictures of this size."
-                    },
-                    "step": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "steps": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "preview_url": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
-                    },
-                    "preview_step": {
-                      "type": "number",
-                      "nullable": true,
-                      "description": "The step the preview shows, out of `steps`."
-                    },
-                    "elapsed_ms": {
-                      "type": "number"
-                    },
-                    "prompt": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "generate",
-                        "variation",
-                        "edit"
-                      ]
-                    },
-                    "conversation_id": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "error": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "files": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "width": {
-                            "type": "number"
-                          },
-                          "height": {
-                            "type": "number"
-                          },
-                          "seed": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "model": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "steps": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "ms": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "alt": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "url",
-                          "width",
-                          "height",
-                          "seed",
-                          "model",
-                          "steps",
-                          "ms",
-                          "alt"
-                        ]
-                      }
-                    },
-                    "can_vary": {
-                      "type": "boolean"
-                    },
-                    "quality": {
-                      "type": "string",
-                      "enum": [
-                        "quick",
-                        "detailed"
-                      ],
-                      "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
-                    },
-                    "switch_to": {
-                      "type": "string",
-                      "nullable": true,
-                      "enum": [
-                        "quick",
-                        "detailed",
-                        null
-                      ],
-                      "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
-                    },
-                    "max_offered": {
-                      "type": "boolean",
-                      "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
-                    },
-                    "size": {
-                      "type": "string",
-                      "description": "The size being made, like 1024x1024."
-                    },
-                    "fit_ask": {
+                  "anyOf": [
+                    {
                       "type": "object",
-                      "nullable": true,
                       "properties": {
-                        "job_id": {
+                        "id": {
                           "type": "string"
                         },
-                        "picked": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "done",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "percent": {
+                          "type": "number"
+                        },
+                        "label": {
+                          "type": "string",
+                          "description": "One plain line for the card: what is happening now."
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "stage_label": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "While running: the stage in words (\"Drawing, step 2 of 4\")."
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "While running: seconds left, from earlier pictures of this size."
+                        },
+                        "step": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "steps": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "preview_url": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
+                        },
+                        "preview_step": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The step the preview shows, out of `steps`."
+                        },
+                        "elapsed_ms": {
+                          "type": "number"
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "generate",
+                            "variation",
+                            "edit"
+                          ]
+                        },
+                        "conversation_id": {
                           "type": "string",
                           "nullable": true
                         },
-                        "actual": {
+                        "error": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "model": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "alt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "url",
+                              "width",
+                              "height",
+                              "seed",
+                              "model",
+                              "steps",
+                              "ms",
+                              "alt"
+                            ]
+                          }
+                        },
+                        "can_vary": {
+                          "type": "boolean"
+                        },
+                        "quality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "detailed"
+                          ],
+                          "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
+                        },
+                        "switch_to": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "quick",
+                            "detailed",
+                            null
+                          ],
+                          "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                        },
+                        "max_offered": {
+                          "type": "boolean",
+                          "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                        },
+                        "size": {
+                          "type": "string",
+                          "description": "The size being made, like 1024x1024."
+                        },
+                        "fit_ask": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "job_id": {
+                              "type": "string"
+                            },
+                            "picked": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "actual": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "job_id",
+                            "picked",
+                            "actual"
+                          ],
+                          "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                        },
+                        "stop_id": {
+                          "type": "string",
+                          "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
                         }
                       },
                       "required": [
-                        "job_id",
-                        "picked",
-                        "actual"
-                      ],
-                      "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                        "id",
+                        "state",
+                        "percent",
+                        "label",
+                        "position",
+                        "stage_label",
+                        "eta_seconds",
+                        "step",
+                        "steps",
+                        "preview_url",
+                        "preview_step",
+                        "elapsed_ms",
+                        "prompt",
+                        "kind",
+                        "conversation_id",
+                        "error",
+                        "files",
+                        "can_vary",
+                        "quality",
+                        "switch_to",
+                        "max_offered",
+                        "size",
+                        "fit_ask",
+                        "stop_id"
+                      ]
                     },
-                    "stop_id": {
-                      "type": "string",
-                      "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ]
                     }
-                  },
-                  "required": [
-                    "id",
-                    "state",
-                    "percent",
-                    "label",
-                    "position",
-                    "stage_label",
-                    "eta_seconds",
-                    "step",
-                    "steps",
-                    "preview_url",
-                    "preview_step",
-                    "elapsed_ms",
-                    "prompt",
-                    "kind",
-                    "conversation_id",
-                    "error",
-                    "files",
-                    "can_vary",
-                    "quality",
-                    "switch_to",
-                    "max_offered",
-                    "size",
-                    "fit_ask",
-                    "stop_id"
                   ]
                 }
               }
