@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-06T15:24:54.221Z",
-  "kitTag": "ui-v0.5.501",
+  "generatedAt": "2026-11-06T20:04:45.013Z",
+  "kitTag": "ui-v0.5.504",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -50,6 +50,14 @@
       "verdictReason": "Developer-only story fixture for DataTable row selection (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface.",
       "implemented": false,
       "reading": "Developer-only story fixture for DataTable row selection (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface."
+    },
+    {
+      "file": "DeviceCardsShowcase.tsx",
+      "name": "DeviceCardsShowcase",
+      "group": "DeviceCardsShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for the HOUSE-08a device cards, covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false
     },
     {
       "file": "DraftRestoreComposerShowcase.tsx",
@@ -883,12 +891,28 @@
       "implemented": false
     },
     {
+      "file": "light-tile.tsx",
+      "name": "light-tile",
+      "group": "light",
+      "verdict": "later",
+      "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
+      "implemented": false
+    },
+    {
       "file": "loading-state.tsx",
       "name": "loading-state",
       "group": "errors/states",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "lock-tile.tsx",
+      "name": "lock-tile",
+      "group": "lock",
+      "verdict": "later",
+      "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
+      "implemented": false
     },
     {
       "file": "lyrics-list.tsx",
@@ -1323,6 +1347,14 @@
       "implemented": true
     },
     {
+      "file": "scene-tile.tsx",
+      "name": "scene-tile",
+      "group": "scene",
+      "verdict": "later",
+      "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
+      "implemented": false
+    },
+    {
       "file": "schedule-card.tsx",
       "name": "schedule-card",
       "group": "settings/onboarding",
@@ -1485,6 +1517,14 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
+    },
+    {
+      "file": "switch-tile.tsx",
+      "name": "switch-tile",
+      "group": "switch",
+      "verdict": "later",
+      "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
+      "implemented": false
     },
     {
       "file": "task-browser.tsx",
