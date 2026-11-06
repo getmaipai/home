@@ -484,7 +484,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
           continue;
         }
         const noun = planned.kinds.length === 1 ? planned.kinds[0] : "device";
-        const prompt = `${action.replaceAll("_", " ").replace(/^./, (c: string) => c.toUpperCase())} ${planned.count} ${noun}${planned.count === 1 ? "" : "s"}?`;
+        const verb = action.replaceAll("_", " ");
+        const prompt = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${planned.count} ${noun}${planned.count === 1 ? "" : "s"}?`;
         noteRefusal("confirm_needed");
         entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt, capabilities: [], consequential: true } } });
       } else entries.push({ proposal, decision: { allow: true } });
