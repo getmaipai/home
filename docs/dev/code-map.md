@@ -511,7 +511,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_PROVIDER_NAME, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed |
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
-| `backend/src/lib/house/act.ts` | supportedActions, performHouseServerAction, houseServiceCall, performHouseAction |
+| `backend/src/lib/house/act.ts` | supportedActions, performHouseServerAction, houseServiceCall, undoFor, performHouseAction |
 | `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, __setHouseRegistryCacheDepsForTests, clearHouseRegistry |
 | `backend/src/lib/house/connection.ts` | houseLanFetch |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |

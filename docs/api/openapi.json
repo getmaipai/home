@@ -49833,6 +49833,260 @@
         }
       }
     },
+    "/api/house/rooms": {
+      "get": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Rooms and visible home entities",
+        "responses": {
+          "200": {
+            "description": "Visible rooms and entities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rooms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "entities": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string"
+                                },
+                                "on": {
+                                  "type": "boolean"
+                                },
+                                "brightness": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "swatch": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "locked": {
+                                  "type": "boolean"
+                                },
+                                "unavailable": {
+                                  "type": "boolean"
+                                },
+                                "sensitive": {
+                                  "type": "boolean"
+                                },
+                                "canControl": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "kind",
+                                "on",
+                                "brightness",
+                                "swatch",
+                                "unavailable",
+                                "sensitive",
+                                "canControl"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "entities"
+                        ]
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "not_configured",
+                        "unreachable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "rooms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to view rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This speaker cannot view rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/house/act": {
+      "post": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Control one visible home entity",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "turn_on",
+                      "turn_off",
+                      "set_brightness",
+                      "activate",
+                      "lock",
+                      "unlock",
+                      "open",
+                      "close"
+                    ]
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "entity",
+                  "action"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "undoId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "state"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "refused",
+                            "unreachable",
+                            "timeout",
+                            "not_confirmed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "kind"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid action request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to control home entities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This person cannot control this entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/biometric-prints": {
       "get": {
         "tags": [
