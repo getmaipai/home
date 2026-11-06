@@ -1,4 +1,5 @@
 import { canReadFileAudience, fileAudience } from "@/lib/access";
+import { lockItemOfProvenance, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
 // IMGTOOLS-03/04: the picture editor's server half. The person opens a
 // picture they already have (a chat attachment) in the canvas and runs a
 // tool on it: remove the background, erase an object under a painted mask,
@@ -166,6 +167,8 @@ export interface SourcePicture {
   /** The first picture this chain of edits started from. */
   rootId: string;
   audience?: "all-ages" | "adult-only";
+  adultMark?: MarkSource;
+  ownerPersonId?: string;
 }
 
 const EDIT_NOTE = "image-edit:";
@@ -210,7 +213,7 @@ function loadSourceChecked(actor: PersonRow, conversationId: string, id: string,
   if (isTemporaryConversation(conversationId) || getTemporaryChatImageForReader(actor, conversationId, id)) {
     const image = write ? getTemporaryChatImage(actor, conversationId, id) : getTemporaryChatImageForReader(actor, conversationId, id);
     if (!image || !image.mediaType.startsWith("image/")) throw gone;
-    return { id, conversationId, temporary: true, turnId: null, mediaType: image.mediaType, name: image.name, bytes: image.bytes, sha256: sha(image.bytes), rootId: image.edit?.root ?? image.id, audience: image.audience ?? "all-ages" };
+    return { id, conversationId, temporary: true, turnId: null, mediaType: image.mediaType, name: image.name, bytes: image.bytes, sha256: sha(image.bytes), rootId: image.edit?.root ?? image.id, audience: image.edit?.made_audience ?? image.audience ?? "all-ages", adultMark: image.edit?.made_audience ? { madeAudience: image.edit.made_audience, lock: image.edit.lock ?? "on" } : { madeAudience: image.audience ?? "all-ages", lock: "off" } };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
   if (!row || row.conversationId !== conversationId || !row.mediaType.startsWith("image/")) throw gone;
@@ -221,7 +224,8 @@ function loadSourceChecked(actor: PersonRow, conversationId: string, id: string,
     if (!conversation || conversation.personId !== actor.id) throw new ImageEditError(403, "You can edit pictures from your own chats. Save a copy of this one first.", "not_yours");
   }
   const provenance = parseProvenance(row.provenance);
-  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+  const item = lockItemOfProvenance(row.ownerPersonId, row.provenance);
+  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, ownerPersonId: row.ownerPersonId, name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
 }
 
 export interface PictureVersion { id: string; url: string; label: string; created_at: string; op: EditProvenanceOp | "original"; width: number | null; height: number | null; media_type: string; source: string | null; source_sha256: string | null }
@@ -269,16 +273,20 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
   }
   const bytes = new Uint8Array(clean);
-  const audience = source.audience === "adult-only" || meta.audience === "adult-only" ? "adult-only" : "all-ages";
-  const provenance: EditProvenance & { audience?: "all-ages" | "adult-only" } = { v: 1, audience, op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
+  const sourceMark = source.adultMark ?? { madeAudience: source.audience ?? null, lock: "on" as const };
+  // The caller's audience (a new adult-only result of an all-ages source) still raises the mark; an already adult-only source keeps its own lock state.
+  const mark = newItemMark([sourceMark], meta.audience === "adult-only" && sourceMark.madeAudience !== "adult-only");
+  const audience = mark.madeAudience;
+  const provenance: EditProvenance & ReturnType<typeof markFields> = { v: 1, ...markFields(mark), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
   if (source.temporary) {
     const id = newFileId();
-    storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: provenance });
+    storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: { ...provenance, audience, made_audience: audience } });
     return { id, url: pictureUrl(source.conversationId, id), label: provenance.label, created_at: new Date().toISOString(), op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (!source.turnId) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
   const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "conversation" });
   if (!created.ok) throw new ImageEditError(created.status === 403 ? 403 : created.status === 404 ? 404 : 500, created.status === 403 ? created.error : "The edited picture could not be saved. Try again.", created.status === 403 ? "storage_full" : "save_failed");
+  if (mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(created.value.id, actor.id); }
   return { id: created.value.id, url: pictureUrl(source.conversationId, created.value.id), label: provenance.label, created_at: created.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
 }
 

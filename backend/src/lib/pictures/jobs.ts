@@ -20,6 +20,8 @@ import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PicturePurpose } from "./jobStore";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
+import { lockItemOfProvenance, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
+import { logAutoMark } from "@/lib/adultMarks";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
@@ -89,6 +91,8 @@ export interface StartPictureInput {
   prompt: string;
   body: Omit<GenerationBody, "timeout_ms">;
   sourceFileId?: string | null;
+  /** Current source marks for a variation or edit, resolved by the caller from the source file. */
+  sources?: readonly MarkSource[];
   /** TIER-WIRE-01: the allowed tier (`jobTier`); Standard or absent adds nothing to the request. */
   tier?: "standard" | "boost" | "max";
   /** IMGEDIT-01: this job changes a picture already in the chat; the result is saved as its next version. */
@@ -113,10 +117,23 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
   }
   try {
     const now = new Date().toISOString();
+    const styles = await allAdapters();
+    const styleIds = (input.body.loras ?? []).map((lora) => lora.id);
+    const adultStyle = styleIds.some((id) => {
+      const adapter = styles.find((item) => item.id === id);
+      return !adapter || adapter.classification === "adult-only";
+    });
+    const sourceIds = [...new Set([input.sourceFileId, input.edit?.sourceId].filter((id): id is string => Boolean(id)))];
+    const sourceMarks: MarkSource[] = input.sources ? [...input.sources] : sourceIds.map((id) => {
+      const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, id)).get();
+      const item = row ? lockItemOfProvenance(row.owner, row.provenance) : null;
+      return item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: null, lock: "on" };
+    });
+    const mark = newItemMark(sourceMarks, adultStyle);
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: qualityOfModel(input.body.model) ?? "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
@@ -276,7 +293,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       made.push({ raw, width: info.width, height: info.height, meta: { seed: pic.seed ?? null, model: pic.model ?? null, steps: pic.steps ?? null, ms: pic.ms ?? null } });
     }
     // IMGGEN-SAFE-01: the second, independent check, on the finished pixels, before anything is stored or shown.
-    const adult = await adultOnly(job);
+    const adult = await adultOnly(job) || job.request.adultLock !== undefined;
     const checks = await checkImages(made.map((m) => m.raw), "picture");
     if (stopped(job)) return;
     const decision = await gateFinished({ actor, kind: "picture", jobId: job.id, adultOnly: adult, checks, images: made.map((m) => m.raw), prompt: job.prompt });
@@ -286,6 +303,12 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       const { raw, width, height, meta } = made[index]!;
       const conversationId = job.conversationId;
       if (!conversationId) throw new Error("no conversation");
+      const sourceId = job.request.source_file_id;
+      const sourceRow = sourceId ? db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, sourceId)).get() : undefined;
+      const sourceItem = sourceRow ? lockItemOfProvenance(sourceRow.owner, sourceRow.provenance) : null;
+      const mark = job.request.adultLock === "off"
+        ? newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], false)
+        : newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], adult);
       if (job.request.edit) {
         // IMGEDIT-01: a change to a picture already in the chat is the next version of that picture (its Original and Undo stay in the editor).
         const source = loadSource(actor, conversationId, job.request.edit.source_id, true);
@@ -296,17 +319,18 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       }
       if (job.temporary) {
         const id = newFileId();
-        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, audience: adult ? "adult-only" : "all-ages", generated: true });
+        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, audience: mark.madeAudience, generated: true });
         files.push({ id, width, height, ...meta });
         continue;
       }
       if (!job.turnId || !(await waitForTurnRow(job.turnId, job))) { if (stopped(job)) { discardStored(storedIds); return; } throw new Error("turn row never appeared"); }
-      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, index, ...meta, width, height, ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`, deduplicate: false, retention: "conversation" });
+      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, ...markFields(mark), job: job.id, index, ...meta, width, height, ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`, deduplicate: false, retention: "conversation" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;
       }
       storedIds.push(created.value.id);
+      if (mark.lock === "on") logAutoMark(created.value.id, actor.id);
       files.push({ id: created.value.id, width, height, ...meta });
     }
   } catch (error) {

@@ -24,6 +24,13 @@ import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCop
 import { likenessRefusal } from "@/lib/likeness";
 import { lockedView } from "@/lib/adultLock";
 import { pictureJobGroupLockState, pictureJobLockState } from "@/lib/pictures/lock";
+import { setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
+import { getCookie } from "hono/cookie";
+import { sessionKeyOf } from "@/lib/adultLock";
+import { isOwnerOrAdmin } from "@/lib/access";
+import { pictureJobs } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
 
 export const picturesRoutes = apiRouter();
 
@@ -54,6 +61,31 @@ const JobSchema = z.object({
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
 const CardOrLocked = z.union([JobSchema, z.object({ locked: z.literal(true), making: z.boolean() })]);
+
+const adultMarkRoute = createRoute({
+  method: "post", path: "/jobs/{id}/adult-mark", tags: ["Pictures"], summary: "Mark a picture NSFW again, or remove its Adult lock with a fresh passcode ticket", middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) }), body: { content: { "application/json": { schema: z.object({ action: z.enum(["clear", "mark"]), ticket: z.string().min(1).max(200).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]) }) } }, description: "The state now." }, ...errorResponses({ 403: "Not the adult owner screen, or missing passcode proof", 404: "No such picture", 409: "Not ready or temporary" }) },
+});
+picturesRoutes.openapi(adultMarkRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const { action, ticket } = c.req.valid("json");
+  const own = getPictureJob(actor, id);
+  let fileId: string | undefined;
+  if (own) {
+    if (own.temporary) return c.json({ error: TEMPORARY_LINE }, 409) as never;
+    if (own.state !== "done" || !own.files[0]) return c.json({ error: NOT_READY_LINE }, 409) as never;
+    fileId = own.files[0].id;
+  } else if (action === "mark" && isOwnerOrAdmin(actor)) {
+    const row = db.select({ files: pictureJobs.files, state: pictureJobs.state }).from(pictureJobs).where(eq(pictureJobs.id, id)).get();
+    try { fileId = row?.state === "done" ? (JSON.parse(row.files) as Array<{ id?: string }>)[0]?.id : undefined; } catch { fileId = undefined; }
+  }
+  if (!fileId) return c.json({ error: "That picture isn't available any more." }, 404) as never;
+  const result = setItemLock({ actor, fileId, action, ticket: ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
+  if (!result.ok) return c.json({ error: result.error }, result.status) as never;
+  return c.json({ made_audience: result.made_audience, lock: result.lock }, 200);
+});
 
 
 export function phaseLabel(job: PictureJob, audience: "adult" | "child" = "adult"): string {

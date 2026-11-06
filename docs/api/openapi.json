@@ -60047,6 +60047,114 @@
         }
       }
     },
+    "/api/pictures/jobs/{id}/adult-mark": {
+      "post": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Mark a picture NSFW again, or remove its Adult lock with a fresh passcode ticket",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "clear",
+                      "mark"
+                    ]
+                  },
+                  "ticket": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The state now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "made_audience": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "lock": {
+                      "type": "string",
+                      "enum": [
+                        "on",
+                        "off"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "made_audience",
+                    "lock"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the adult owner screen, or missing passcode proof",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not ready or temporary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pictures/status": {
       "get": {
         "tags": [

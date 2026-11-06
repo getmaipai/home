@@ -56,6 +56,12 @@ gets the missing-job answer. Preview is 404 with no-store, and Another take is 4
 tool result is a placeholder without prompt or file ids. Companion activity omits locked picture jobs. Temporary generated images use the same lock check
 for reads and edit sources. Auto-mark and unmark, plus the frontend card, remain for later slices.
 
+## Pictures slice 3
+
+Picture jobs use `newItemMark` at start. Source files contribute their current `made_audience` and `lock`; an adult-only picture style adds adult-only content and turns the lock on. The request stores `adultLock` only for an adult-only job, so an ordinary adult-lane job has a normal card while it runs. At finish, each stored picture gets `audience`, `made_audience` and `lock` in its provenance note, and a locked stored picture receives an `auto` row in `adult_mark_log`.
+
+Image edits carry the current mark of their source through `saveVersion`, including a cleared lock. The picture twin of `/api/videos/jobs/{id}/adult-mark` is `POST /api/pictures/jobs/{id}/adult-mark`; it uses the same fresh ticket, adult own-screen check, owner-only clear, admin re-mark and audit rules. Clearing a picture updates its `image-edit` descendants as well, so the edit chain follows the root picture.
+
 ## Where it is applied
 
 | Surface | Choke point | Locked answer |

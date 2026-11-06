@@ -90,6 +90,11 @@ function writeLock(row: ItemRow, lock: "on" | "off", raise: boolean): void {
   const jobId = typeof meta.job === "string" ? meta.job : null;
   const apply = (id: string, provenance: string) => { const next = withMark(provenance, { lock, raiseToAdult: raise }); if (next) db.update(attachments).set({ provenance: next }).where(eq(attachments.id, id)).run(); };
   apply(row.id, row.provenance);
+  if (meta.writer === "picture-gen") {
+    const descendants = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `image-edit:%"root":"${row.id}"%`))).all();
+    for (const descendant of descendants) if (libraryProvenance(descendant.provenance).root === row.id) apply(descendant.id, descendant.provenance);
+    return;
+  }
   if (!jobId) return;
   // The clip's poster and any frame continued from it carry its job id in the note; job ids are plain id characters, so the LIKE needs no escaping.
   if (!/^[A-Za-z0-9_-]+$/.test(jobId)) return;
@@ -98,7 +103,7 @@ function writeLock(row: ItemRow, lock: "on" | "off", raise: boolean): void {
 }
 
 /**
- * Clear or set the Adult lock of one stored clip. `ticket` is the single-use fresh-passcode ticket (clear only), `ticketItem` the id it was issued for (the job
+ * Clear or set the Adult lock of one stored picture or clip. `ticket` is the single-use fresh-passcode ticket (clear only), `ticketItem` the id it was issued for (the job
  * id the page named to `/api/adult-lock/confirm`), `sessionKey` the browser session of this request (null on a paired device or a bearer token).
  */
 export function setItemLock(input: { actor: PersonRow; fileId: string; action: MarkAction; ticket?: string | null; ticketItem?: string; sessionKey: string | null }): SetLockResult {

@@ -399,7 +399,7 @@ export interface TemporaryChatImage {
   /** Safety audience recorded when Home generated this temporary picture. */
   audience?: "all-ages" | "adult-only";
   /** Set on a version the picture editor made: where it came from (lib/imageEdit.ts). */
-  edit?: { v: 1; op: string; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number };
+  edit?: { v: 1; op: string; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number; audience?: "all-ages" | "adult-only"; made_audience?: "all-ages" | "adult-only"; lock?: "on" | "off" };
 }
 const temporaryChatImages = new Map<string, TemporaryChatImage>();
 function temporaryImageOpen(actor: PersonRow, image: TemporaryChatImage): boolean {
