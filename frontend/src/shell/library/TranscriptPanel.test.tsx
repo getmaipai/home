@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import type { Transcript } from "@maipai/spec/gen/ts/transcript.js";
 import { transcriptApi } from "@/lib/transcriptApi";
@@ -53,6 +53,11 @@ async function readyView(initialTab?: string) {
   return view;
 }
 
+// The panel asks the hub whether the file already has a transcript; no test may reach a real hub.
+beforeEach(() => {
+  stub(spyOn(transcriptApi, "forItem").mockResolvedValue(null));
+});
+
 afterEach(() => {
   cleanup();
   while (spies.length) spies.pop()!.mockRestore();
@@ -93,6 +98,18 @@ describe("Library transcript workspace states", () => {
     expect(status.textContent).toBe("The transcript could not be made. Check that Home is ready, then try again.");
     expect(view.container.textContent).not.toContain("private raw detail");
     expect((view.getByRole("button", { name: "Make transcript" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("Library transcript workspace: an existing transcript", () => {
+  test("shows the transcript the file already has, with no Make transcript button, and never starts a second one", async () => {
+    stubRevisions();
+    const start = stub(spyOn(transcriptApi, "start"));
+    stub(spyOn(transcriptApi, "forItem").mockResolvedValue(record));
+    const view = render(<Harness />);
+    expect(await view.findByRole("tab", { name: "Search" })).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Make transcript" })).toBeNull();
+    expect(start).not.toHaveBeenCalled();
   });
 });
 

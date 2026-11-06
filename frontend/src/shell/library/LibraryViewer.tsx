@@ -106,7 +106,8 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
 }
 
 export function LibraryViewer({ items, me, currentId, onCurrentIdChange, onClose, actions, phone }: { phone: boolean; items: readonly LibraryItem[]; me: Roster; currentId: string | null; onCurrentIdChange: (id: string) => void; onClose: () => void; actions: ItemActions }) {
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // undefined leaves the viewer on its own default (open on a wide screen) until the person opens or closes the panel.
+  const [transcriptOpen, setTranscriptOpen] = useState<boolean | undefined>(undefined);
   const viewerItems = useMemo(() => items.map(viewerItemOf), [items]);
   const open = currentId !== null && items.some((item) => item.id === currentId);
   const current = items.find((item) => item.id === currentId);

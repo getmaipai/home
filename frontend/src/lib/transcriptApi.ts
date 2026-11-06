@@ -25,7 +25,9 @@ export const transcriptApi = {
   /** The transcript this item already has, or null when it has none yet. */
   forItem: async (item: string): Promise<Transcript | null> => {
     try {
-      return await requestJson<Transcript>(itemPath(item));
+      const found = await requestJson<Transcript>(itemPath(item));
+      // Anything that is not a transcript record (an empty or unexpected answer) means there is none to show.
+      return Array.isArray(found?.segments) ? found : null;
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;
