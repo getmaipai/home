@@ -11,6 +11,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter } from "./adapters";
 import { getLoraRecord } from "@/lib/loras/store";
+import { isAdultPictureStyle } from "@/lib/pictures/lock";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
@@ -174,7 +175,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const adapterRecord = adapter ? loraRecordReader(adapter.id) : null;
   // An adult-only style (the Stack's class or the record's) starts nothing without this request's live Adult unlock proof.
   // A name that matches no style is dropped as before, and gives a plain picture, so nothing adult can start from it.
-  if (lane === "adult" && adapter && (adapter.classification === "adult-only" || adapterRecord?.audience === "adult-only") && !unlockedFor(state.actor as PersonRow, requestProof())) return lockedPictureStyleOutcome(callId, GENERATE_IMAGE_TOOL_ID);
+  if (lane === "adult" && adapter && isAdultPictureStyle(adapter, adapterRecord) && !unlockedFor(state.actor as PersonRow, requestProof())) return lockedPictureStyleOutcome(callId, GENERATE_IMAGE_TOOL_ID);
   // The absolute line is checked again on what is actually sent, including the style phrases the plan adds.
   const foundRecord = adapter ? adapterRecord : null;
   const record = foundRecord?.media === "picture" ? foundRecord : null;

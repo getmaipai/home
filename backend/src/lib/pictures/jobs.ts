@@ -22,6 +22,7 @@ import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, St
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 import { lockItemOfProvenance, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
 import { logAutoMark } from "@/lib/adultMarks";
+import { isAdultPictureStyle } from "@/lib/pictures/lock";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
@@ -121,7 +122,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const styleIds = (input.body.loras ?? []).map((lora) => lora.id);
     const adultStyle = styleIds.some((id) => {
       const adapter = styles.find((item) => item.id === id);
-      return !adapter || adapter.classification === "adult-only";
+      return isAdultPictureStyle(adapter, undefined, true);
     });
     const sourceIds = [...new Set([input.sourceFileId, input.edit?.sourceId].filter((id): id is string => Boolean(id)))];
     const sourceMarks: MarkSource[] = input.sources ? [...input.sources] : sourceIds.map((id) => {

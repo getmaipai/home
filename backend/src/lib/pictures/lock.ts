@@ -6,6 +6,13 @@ import { lockItemOfProvenance, lockState, type LockItem, type LockResult } from 
 import { getPictureJob, pictureJobIdsByTurn, pictureJobsForTurn, type PictureJob } from "@/lib/pictures/jobs";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
+import type { Adapter } from "@/lib/pictures/adapters";
+import type { Lora } from "@/lib/loras/store";
+
+/** The shared adult-only picture style decision. Missing adapters fail closed when requested by job creation. */
+export function isAdultPictureStyle(adapter: Pick<Adapter, "classification"> | null | undefined, record?: Pick<Lora, "audience"> | null, missingAdapterIsAdult = false): boolean {
+  return (!adapter && missingAdapterIsAdult) || adapter?.classification === "adult-only" || record?.audience === "adult-only";
+}
 
 /** The plain chat answer when a picture style is behind the Adult lock. */
 export const LOCKED_PICTURE_STYLE_LINE = "No picture was started because the style asked for is locked. Say that it is locked and the person can unlock it on this page with their passcode, then ask again. Do not name the style.";

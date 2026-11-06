@@ -66,6 +66,9 @@ Image edits carry the current mark of their source through `saveVersion`, includ
 
 Chat refuses an adult-only or unknown picture style without a live Adult unlock proof before starting a job. The reply is a plain lock line with no prompt or style name; the tool part is redacted in history. A proof allows the job, which keeps slice 3's adult-only mark and lock. Variations also require a proof when their saved request names an adult-only style.
 
+The shared adult-style decision is `lib/pictures/lock.ts` `isAdultPictureStyle(adapter, record?)`.
+Job creation passes its missing-adapter fail-closed option to that same helper.
+
 ## Pictures slice 5
 
 The open adult picture card carries the same `adult` state as a video card, including `can_clear`, `can_mark`, the state line and the creator's mark history. Its gallery offers Unmark as NSFW with the kit `AdultLockDialog` and a fresh ticket, or Mark as NSFW without a passcode. The picture card uses the same `VideoPlayer` locked branch as video cards, which renders the kit `LockTile`; unlocking resets chat queries so history supplies the job id again and the picture card refetches. Reloaded history returns `picture: { locked: true }` only to an adult who owns the locked job. Hidden jobs for minors and guests still have no picture field.
