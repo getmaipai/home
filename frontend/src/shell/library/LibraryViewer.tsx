@@ -28,6 +28,7 @@ import { useTranscriptWorkspace } from "./TranscriptPanel";
 import { seekViewerMedia, useViewerMediaTime } from "./viewerMedia";
 
 const ShareIcon = getIcon("users");
+const CaptionsIcon = getIcon("captions");
 const SendIcon = getIcon("arrow-up-right");
 const DownloadIcon = getIcon("download");
 const TrashIcon = getIcon("trash");
@@ -137,7 +138,7 @@ export function LibraryViewer({ items, me, currentId, onCurrentIdChange, onClose
         const mine = item.owner.id === me.id;
         return (
           <>
-            {supportsTranscript ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Transcript" onClick={() => setTranscriptOpen(true)}>{phone ? "T" : "Transcript"}</Button> : null}
+            {supportsTranscript ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Transcript" onClick={() => setTranscriptOpen(true)}>{phone ? <CaptionsIcon aria-hidden="true" /> : "Transcript"}</Button> : null}
             {mine && canShareFiles(me) ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Share" onClick={() => actions.share(item)}>{phone ? <ShareIcon aria-hidden /> : "Share"}</Button> : null}
             {canShareFiles(me) ? <Button type="button" variant="secondary" size={phone ? "icon" : "default"} aria-label="Send" onClick={() => { void shareClip({ prepared: prepared.data, title: item.name, nav: navigator, fallback: () => saveClip({ url: api.fileContentUrl(item.id), name: item.name, ...(prepared.data ? { blob: prepared.data.blob } : {}) }) }); }}>{phone ? <SendIcon aria-hidden /> : "Send"}</Button> : null}
             <Button asChild variant="secondary" size={phone ? "icon" : "default"}><a href={api.fileContentUrl(item.id)} download={item.name} aria-label="Download">{phone ? <DownloadIcon aria-hidden /> : "Download"}</a></Button>
