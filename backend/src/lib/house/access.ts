@@ -44,8 +44,8 @@ export function houseAccess({ actor, permissions, entity, level }: {
   return denied("no_grant");
 }
 
-export function canRestartServer(actor: Pick<HouseActor, "role">): boolean {
-  return actor.role === "owner";
+export function canRestartServer(actor: Pick<HouseActor, "role"> | null | undefined): boolean {
+  return actor?.role === "owner";
 }
 
 export function visibleEntities({ actor, permissions, entities, level }: {

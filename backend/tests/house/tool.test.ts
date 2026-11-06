@@ -147,6 +147,54 @@ describe("house tool", () => {
     expect(JSON.stringify(spec)).not.toContain('"enum":[]');
   });
 
+  test("server controls are owner-only, always confirmed, cooled down, and never undoable", async () => {
+    const addon = { id: "core_mosquitto", name: "Mosquitto" };
+    const spec = houseToolSpec({ visible: data, areas, actor: { id: "owner-1", role: "owner", band: "adult" }, addons: [addon] } as never);
+    expect(JSON.stringify(spec)).toContain("restart_core");
+    expect(JSON.stringify(spec)).toContain("core_mosquitto");
+    const s = setup({ brakeMode: () => "do", addons: async () => [addon], serverAction: async () => ({ ok: true }) } as never, []);
+    const args = { action: "restart_core", targets: [] };
+    const asked = await run(args, s.deps);
+    expect(asked.status).not.toBe("succeeded");
+    expect(asked.userMessage).toContain("This cannot be undone");
+    expect(asked.userMessage).toContain("Home Assistant");
+    expect(s.performed).toHaveLength(0);
+    const done = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args, callId: "resumed:restart", approved: true, deps: s.deps });
+    expect(said(done)).toContain("Restart sent; Home Assistant will be back in a minute");
+    expect(s.undos).toHaveLength(0);
+    const repeat = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args, callId: "again", approved: true, deps: s.deps });
+    expect(repeat.failureKind).toBe("unavailable");
+  });
+
+  test("household mode never blocks server controls too", async () => {
+    const s = setup({ brakeMode: () => "never", addons: async () => [], serverAction: async () => ({ ok: true }) } as never, []);
+    const out = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: { action: "restart_core", targets: [] }, callId: "never", approved: true, deps: s.deps });
+    expect(out.status).not.toBe("succeeded");
+  });
+
+  test("server controls are hidden and refused for adult non-owner, teen, child, and unknown speakers", async () => {
+    const entities = [entity("light.kitchen_ceiling", "Ceiling", "light")];
+    for (const [role, band] of [["member", "adult"], ["teen", "teen"], ["child", "child"], ["unknown", "child"]] as const) {
+      const spec = houseToolSpec({ visible: entities, areas, actor: { id: "person", role, band }, addons: [] } as never);
+      expect(JSON.stringify(spec)).not.toContain("restart_core");
+      const out = await runHouseTool({ actor: (role === "unknown" ? { role: "unknown", band } : { id: "person", role, band }) as never, band, args: { action: "restart_core", targets: [] }, callId: role, deps: setup({ serverAction: async () => ({ ok: true }) } as never, entities).deps });
+      expect(out.failureKind).toBe("found_nothing");
+    }
+  });
+
+  test("server add-on slug must come from registry; dropped connection after send is success", async () => {
+    const calls: unknown[] = [];
+    const deps = setup({ addons: async () => [{ id: "core_mosquitto", name: "Mosquitto" }], serverAction: async (...args: unknown[]) => { calls.push(args); return { ok: true, disconnected: true }; } } as never, []).deps;
+    const bad = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: { action: "restart_addon", targets: [], addon: "made_up" }, callId: "bad", deps });
+    expect(bad.failureKind).toBe("bad_arguments");
+    const goodArgs = { action: "restart_addon", targets: [], addon: "core_mosquitto" };
+    const ask = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: goodArgs, callId: "ask", deps });
+    expect(ask.userMessage).toContain("This cannot be undone");
+    const good = await runHouseTool({ actor: { ...person } as PersonRow, band: "adult", args: goodArgs, callId: "resumed:addon", approved: true, deps });
+    expect(good.status).toBe("succeeded");
+    expect(calls).toHaveLength(1);
+  });
+
 
   test("a locked door asks first, runs once approved, and never keeps an unlocking Undo", async () => {
     const doorLock = entity("lock.front_door", "Front door", "lock", "h", { sensitive: "lock" });

@@ -3,6 +3,9 @@ import type { LanFetchResult } from "../lanFetch.js";
 import type { HouseEntity, HouseKind } from "./registry.js";
 
 export type HouseActionName = "turn_on" | "turn_off" | "set_brightness" | "set_color" | "set_speed" | "open" | "close" | "lock" | "unlock" | "activate" | "set_temperature";
+export type HouseServerAction = "restart_core" | "restart_addon" | "reboot_host";
+export type HouseAddon = { id: string; name: string };
+export type HouseServerResult = { ok: true } | { ok: false; kind: "refused" | "unreachable" | "timeout" };
 export type HouseActionInput = { name: HouseActionName; value?: number; rgb?: [number, number, number] };
 export type StateSnapshot = { state: string; brightness: number | null; rgb: [number, number, number] | null; percentage: number | null; temperature: number | null };
 export type HouseActionResult =
@@ -28,6 +31,22 @@ const byKind: Record<HouseKind, HouseActionName[]> = {
 export function supportedActions(entity: HouseEntity): HouseActionName[] { return [...byKind[entity.kind]]; }
 
 const bad: HouseActionResult = { ok: false, kind: "refused" };
+
+/** Calls a fixed Home Assistant service. The add-on slug is validated against the registry before reaching this function. */
+export async function performHouseServerAction({ lanFetch, token, action, addon }: { lanFetch: Fetch; token: string; action: HouseServerAction; addon?: string }): Promise<HouseServerResult> {
+  const services: Record<Exclude<HouseServerAction, "restart_addon">, { domain: string; service: string }> = {
+    restart_core: { domain: "homeassistant", service: "restart" },
+    reboot_host: { domain: "hassio", service: "host_reboot" },
+  };
+  const call = action === "restart_addon"
+    ? (addon && /^[a-z0-9_]+$/.test(addon) ? { domain: "hassio", service: "addon_restart", data: { addon } } : null)
+    : { ...services[action], data: {} };
+  if (!call) return { ok: false, kind: "refused" };
+  const sent = await lanFetch(`/api/services/${call.domain}/${call.service}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(call.data) });
+  // Core and host restarts commonly close the socket after accepting the command. No post-send read is made.
+  if (sent.ok || sent.kind === "unreachable") return { ok: true };
+  return { ok: false, kind: sent.kind === "timeout" ? "timeout" : "refused" };
+}
 function validAction(entity: HouseEntity, action: HouseActionInput): boolean {
   if (!supportedActions(entity).includes(action.name)) return false;
   if (action.name === "set_brightness" || action.name === "set_speed") return Number.isFinite(action.value) && action.value! >= 1 && action.value! <= 100;

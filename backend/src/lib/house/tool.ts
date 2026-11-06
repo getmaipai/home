@@ -8,18 +8,23 @@ import { recordToolAudit } from "@/lib/toolAudit";
 import { recordUndo, undoPropsFor, type UndoInverse } from "@/lib/toolUndo";
 import { blockEnvelope } from "@/lib/packageBlocks";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { db } from "@/db";
+import { settingsValues } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+import { nextHlc } from "@/lib/hlc";
 import { houseLanFetch } from "./connection";
 import { loadHouseRegistry } from "./cache";
 import type { HouseArea, HouseEntity, HouseKind } from "./registry";
-import { houseAccess, visibleEntities, type EffectivePermission, type HouseActor, type HouseBand } from "./access";
-import { houseServiceCall, performHouseAction, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult } from "./act";
+import { canRestartServer, houseAccess, visibleEntities, type EffectivePermission, type HouseActor, type HouseBand } from "./access";
+import { houseServiceCall, performHouseAction, performHouseServerAction, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult, type HouseAddon, type HouseServerAction } from "./act";
+import { clearHouseRegistry } from "./cache";
 import { HOUSE_TOOL_ID } from "./ids";
 export { HOUSE_TOOL_ID } from "./ids";
 
 const kinds = ["light", "switch", "scene", "cover", "lock", "fan", "climate"] as const;
 /** Audit rows take the action name only from this closed list; anything else the model typed is just "invalid". */
 export function safeHouseAction(value: unknown): string { return typeof value === "string" && (HOUSE_ACTIONS as readonly string[]).includes(value) ? value : "invalid"; }
-export const HOUSE_ACTIONS = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature"] as const;
+export const HOUSE_ACTIONS = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature", "restart_core", "restart_addon", "reboot_host"] as const;
 /** Small models often send `target` (one object, or a JSON string of it) or put area, name and kind at the top level instead of a
  * `targets` list, or say "lights" for kind. This reshapes the MODEL'S OWN ARGUMENTS into the one shape; it never reads the person's words. */
 export function normalizeHouseArgs(raw: unknown): unknown {
@@ -54,6 +59,7 @@ export function normalizeHouseArgs(raw: unknown): unknown {
   if (Array.isArray(targets)) result.targets = cleaned;
   if (input.value !== undefined) result.value = input.value;
   if (input.rgb !== undefined) result.rgb = input.rgb;
+  if (input.addon !== undefined) result.addon = input.addon;
   return result;
 }
 
@@ -62,6 +68,7 @@ const argsShape = z.object({
   targets: z.array(z.object({ area: z.string().min(1).optional(), name: z.string().min(1).optional(), kind: z.enum(kinds).optional() }).strict()).max(25).optional(),
   value: z.number().finite().optional(),
   rgb: z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255), z.number().int().min(0).max(255)]).optional(),
+  addon: z.string().min(1).max(128).optional(),
 }).strict();
 const argsSchema = z.preprocess(normalizeHouseArgs, argsShape);
 type HouseArgs = z.infer<typeof argsShape>;
@@ -74,20 +81,50 @@ export type HouseToolDeps = {
   audit?: (input: { personId: string; tool: string; action: string; decision: string; band: string; count: number }) => void;
   undo?: (input: { personId: string; turnId?: string; tool: string; action: string; inverse: UndoInverse }, now?: Date) => { id: string; expiresAt: string };
   now?: () => Date;
+  addons?: () => Promise<HouseAddon[]>;
+  serverAction?: (action: HouseServerAction, addon?: string) => Promise<{ ok: boolean; disconnected?: boolean }>;
 };
 
 const defaultLoadRegistry = loadHouseRegistry;
+const serverCooldowns = new Map<HouseServerAction, number>();
+const SERVER_COOLDOWN_MS = 60_000;
+const SERVER_COOLDOWN_SCOPE = "system";
+function storedCooldown(action: HouseServerAction): number {
+  const value = db.select({ value: settingsValues.value }).from(settingsValues).where(and(eq(settingsValues.scope, SERVER_COOLDOWN_SCOPE), eq(settingsValues.key, `house.server.last:${action}`))).get()?.value;
+  try { const parsed: unknown = JSON.parse(value ?? "null"); return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : 0; } catch { return 0; }
+}
+function setStoredCooldown(action: HouseServerAction, at: number): void {
+  const key = `house.server.last:${action}`;
+  const values = { value: JSON.stringify(at), hlc: nextHlc(), source: "hub" as const, updatedAt: new Date(at).toISOString() };
+  const existing = db.select({ key: settingsValues.key }).from(settingsValues).where(and(eq(settingsValues.scope, SERVER_COOLDOWN_SCOPE), eq(settingsValues.key, key))).get();
+  if (existing) db.update(settingsValues).set(values).where(and(eq(settingsValues.scope, SERVER_COOLDOWN_SCOPE), eq(settingsValues.key, key))).run();
+  else db.insert(settingsValues).values({ scope: SERVER_COOLDOWN_SCOPE, key, ...values }).run();
+}
+async function availableAddons(deps: HouseToolDeps): Promise<HouseAddon[]> {
+  if (deps.addons) return deps.addons();
+  const connection = houseLanFetch();
+  if (!connection.ok) return [];
+  const response = await connection.lanFetch("/api/hassio/addons", { headers: { Authorization: `Bearer ${connection.token}` } });
+  if (!response.ok || response.status < 200 || response.status >= 300 || response.truncated) return [];
+  try {
+    const parsed = JSON.parse(response.text) as { data?: { addons?: Array<{ slug?: unknown; name?: unknown }> } };
+    return (parsed.data?.addons ?? []).flatMap((item) => typeof item.slug === "string" && typeof item.name === "string" && /^[a-z0-9_]+$/.test(item.slug) ? [{ id: item.slug, name: item.name }] : []);
+  } catch { return []; }
+}
 
-export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[] }): ToolSpec {
+export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[]; actor?: HouseActor; addons?: HouseAddon[] }): ToolSpec {
   const areaIds = new Set(ctx.visible.flatMap((entity) => entity.area ? [entity.area] : []));
   const areaNames = [...new Set(ctx.areas.filter((area) => areaIds.has(area.id)).map((area) => area.name))].sort((a, b) => a.localeCompare(b)).slice(0, 40);
+  const owner = canRestartServer(ctx.actor);
+  const actions = owner ? HOUSE_ACTIONS : HOUSE_ACTIONS.filter((action) => !action.startsWith("restart_") && action !== "reboot_host");
   return {
     id: HOUSE_TOOL_ID,
     description: "Find visible home devices and scenes or control devices you are allowed to use. Always pass targets, a list of {area, name, kind}, for example {\"action\":\"turn_on\",\"targets\":[{\"area\":\"Kitchen\",\"name\":\"Ceiling\"}]}. Use action find with an area to see what is there.",
     args: { type: "object", required: ["action", "targets"], properties: {
-      action: { type: "string", enum: HOUSE_ACTIONS },
+      action: { type: "string", enum: actions },
       targets: { type: "array", maxItems: 25, items: { type: "object", properties: { area: { type: "string", ...(areaNames.length ? { enum: areaNames } : {}) }, name: { type: "string" }, kind: { type: "string", enum: kinds } }, additionalProperties: false } },
       value: { type: "number" }, rgb: { type: "array", minItems: 3, maxItems: 3, items: { type: "integer", minimum: 0, maximum: 255 } },
+      ...(owner ? { addon: { type: "string", enum: (ctx.addons ?? []).map((addon) => addon.id) } } : {}),
     }, additionalProperties: false },
   };
 }
@@ -126,6 +163,11 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   if (mode === "never") return { kind: "refuse", reason: "mode_never", text: "Home controls are turned off for this household.", count: 0, rejected: true };
   const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });
   const input = parsed.data;
+  if (input.action.startsWith("restart_") || input.action === "reboot_host") {
+    if (!canRestartServer(houseActor)) return { kind: "refuse", reason: "server_owner_only", text: "That home action is unavailable for this speaker.", count: 0 };
+    const action = input.action as HouseServerAction;
+    return approved ? { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "turn_on" }, mode, count: 0 } : { kind: "ask", reason: "confirmation_required", action, count: 1, kinds: [action], labels: [action === "restart_core" ? "Home Assistant" : action === "reboot_host" ? "Home Assistant host" : `Home Assistant add-on ${input.addon}`] };
+  }
   if (input.action === "find") return { kind: "run", input, actor: houseActor, permissions, registry, matches: [], action: { name: "find" as HouseActionName }, mode, count: 0 };
   const resolved = resolveTargets(input.targets ?? [], visible, registry.areas);
   if (resolved.ambiguous) return { kind: "refuse", reason: "ambiguous", text: `That name matches more than one device: ${resolved.ambiguous.join(", ")}. Please be more specific.`, count: resolved.ambiguous.length };
@@ -196,15 +238,22 @@ function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: Ho
 
 export async function runHouseTool({ actor, band: bandIn, args, callId, tainted = false, approved = false, deps = {} }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; callId: string; tainted?: boolean; approved?: boolean; deps?: HouseToolDeps }): Promise<ToolExecutionOutcome> {
   const personId = actor.id ?? "";
+  const serverKind = typeof args.action === "string" && ["restart_core", "restart_addon", "reboot_host"].includes(args.action) ? args.action as HouseServerAction : null;
+  const callActor = canonicalActor(actor, bandIn);
+  if (serverKind && !canRestartServer(callActor)) return fail(callId, args, "That server action is not available.", "failed", false, "found_nothing");
   const registry = await (deps.loadRegistry ?? defaultLoadRegistry)();
   if (!registry.ok) return fail(callId, {}, failureCopy[registry.kind] ?? failureCopy.unreachable!);
+  if (serverKind === "restart_addon" && !(await availableAddons(deps)).some((addon) => addon.id === args.addon)) return fail(callId, args, "Choose a Home Assistant add-on from the available list.", "failed", false, "bad_arguments");
   const permissions = (deps.permissionsOf ?? effectivePermissions)(personId);
   const mode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
   const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode });
   // A malformed call is a tool error, not an answer, so the reply cannot claim it worked.
   if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, args, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
   if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
-  if (plan.kind === "ask" && !approved) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
+  if (plan.kind === "ask" && !approved) {
+    const copy = serverKind ? `This cannot be undone. Confirm ${serverKind === "restart_core" ? "restarting Home Assistant" : serverKind === "reboot_host" ? "rebooting the Home Assistant host" : `restarting the Home Assistant add-on ${String(args.addon)}`}?` : `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`;
+    return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: copy, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
+  }
   if (approved && callId.startsWith("resumed:")) {
     const currentMode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
     if (currentMode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
@@ -226,6 +275,21 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
 
 async function executeHousePlan({ plan, actor, personId, args, callId, band, deps }: { plan: Extract<HouseCallPlan, { kind: "run" }>; actor: PersonRow | HouseActor; personId: string; args: Record<string, unknown>; callId: string; band: HouseBand; deps: HouseToolDeps }): Promise<ToolExecutionOutcome> {
   const { actor: houseActor, input, registry } = plan;
+  if (input.action === "restart_core" || input.action === "restart_addon" || input.action === "reboot_host") {
+    const action = input.action as HouseServerAction;
+    if (!canRestartServer(houseActor)) return fail(callId, args, "That server action is not available.", "failed", false, "found_nothing");
+    const nowMs = (deps.now ?? (() => new Date()))().getTime();
+    const last = Math.max(serverCooldowns.get(action) ?? 0, storedCooldown(action));
+    if (last && nowMs - last < SERVER_COOLDOWN_MS) return fail(callId, args, "Home Assistant server controls are cooling down. Try again in a minute.", "failed", false, "unavailable");
+    const result = deps.serverAction ? await deps.serverAction(action, input.addon) : await (() => {
+      const connection = houseLanFetch();
+      return connection.ok ? performHouseServerAction({ lanFetch: connection.lanFetch, token: connection.token, action, addon: input.addon }) : Promise.resolve({ ok: false as const, kind: "unreachable" as const });
+    })();
+    const ok = result.ok || ("disconnected" in result && result.disconnected === true);
+    if (ok) { serverCooldowns.set(action, nowMs); setStoredCooldown(action, nowMs); clearHouseRegistry(); }
+    (deps.audit ?? recordToolAudit)({ personId, tool: HOUSE_TOOL_ID, action, decision: ok ? "do" : "never", band, count: 1 });
+    return ok ? reply(callId, args, "Restart sent; Home Assistant will be back in a minute") : fail(callId, args, failureCopy.unreachable!, "failed", false, "unavailable");
+  }
   const mode = plan.mode;
   const permissions = plan.permissions;
   const visible = visibleHouseEntities({ actor: houseActor, permissions, entities: registry.entities });

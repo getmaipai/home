@@ -172,7 +172,7 @@ export type ModelOutput =
 
 export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState): ToolSpec | null {
   if ((id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID) && !state?.voiceoverAllowed) return null;
-  if (id === HOUSE_TOOL_ID) return state?.houseAllowed && state.houseContext ? houseToolSpec(state.houseContext) : null;
+  if (id === HOUSE_TOOL_ID) return state?.houseAllowed && state.houseContext ? houseToolSpec({ ...state.houseContext, actor: { id: state.actor.id, role: state.actor.role as import("@/lib/house/access").HouseActor["role"], band: state.actor.role === "child" || state.actor.role === "teen" ? state.actor.role : "adult" } }) : null;
   if (id === "edit_picture") return editPictureSpec(id, state);
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json
