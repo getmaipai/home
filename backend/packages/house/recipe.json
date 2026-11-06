@@ -1,0 +1,16 @@
+{
+  "id": "house",
+  "inputs": [
+    {
+      "name": "action",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "House controls are available through the native tool."
+    }
+  ]
+}

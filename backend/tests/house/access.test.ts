@@ -51,4 +51,12 @@ describe("house access", () => {
     expect(visibleEntities({ actor: actor("adult", "adult"), permissions: [grant(`house.see:entity:${light.id}`), grant(`house.see:entity:${scene.id}`)], entities, level: "see" })).toEqual([light, scene]);
     expect(access(actor("adult", "adult"), scene, [grant(`house.control:entity:${scene.id}`)])).toEqual({ allowed: true, confirm: false, reason: "granted" });
   });
+
+  test("a room grant never reaches a lock for a teen, but an item grant does; an adult's room grant still covers it", () => {
+    const roomAllow: EffectivePermission[] = [{ action: "house.control:area:kitchen", effect: "allow" }];
+    const itemAllow: EffectivePermission[] = [{ action: "house.control:entity:lock.front_door", effect: "allow" }];
+    expect(houseAccess({ actor: actor("teen", "teen"), permissions: roomAllow, entity: lock, level: "control" }).reason).toBe("no_grant");
+    expect(houseAccess({ actor: actor("teen", "teen"), permissions: itemAllow, entity: lock, level: "control" })).toMatchObject({ allowed: true, confirm: true });
+    expect(houseAccess({ actor: actor("adult", "adult"), permissions: roomAllow, entity: lock, level: "control" })).toMatchObject({ allowed: true, confirm: true });
+  });
 });

@@ -1,0 +1,1 @@
+{"description":"Fallback recipe stub; the native tool is covered by backend/tests/house/tool.test.ts.","inputs":{"action":"find"},"host_setup":{},"expected":{"reply":{"text":"House controls are available through the native tool.","speech":"House controls are available through the native tool."},"actions":[],"scheduled_jobs":[],"home_calls":[],"memory_added":[]}}

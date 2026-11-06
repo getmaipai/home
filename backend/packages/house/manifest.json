@@ -1,0 +1,17 @@
+{
+  "id": "house",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Home",
+  "display": "House",
+  "description": "Find and control home devices the speaker is allowed to see and use.",
+  "offer": { "mode": "conditional", "gate": "houseAllowed", "bench_row": "house-tool", "priority": 4 },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": { "examples": ["Turn on the kitchen lights", "Is the front door locked?", "Set the fan to 40 percent", "Find the lights in the hallway", "Close the living room blinds"], "patterns": [] },
+  "args": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature"] }, "targets": { "type": "array", "items": { "type": "object", "properties": { "area": { "type": "string" }, "name": { "type": "string" }, "kind": { "type": "string", "enum": ["light", "switch", "scene", "cover", "lock", "fan", "climate"] } }, "additionalProperties": false } }, "value": { "type": "number" }, "rgb": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "integer", "minimum": 0, "maximum": 255 } } }, "additionalProperties": false },
+  "incognito": "unaffected",
+  "requires": [], "optional": [], "platforms": ["home"], "min_role": "child", "consequential": true, "offline": "unavailable", "returns_blocks": ["confirmation"], "config": [], "data_sources": [], "permissions": [], "notifications": [], "backup": "exclude", "background": false, "contributes": {}, "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

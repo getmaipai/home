@@ -14,8 +14,10 @@ export function approverCell(actionId: string, band: HouseBand, parameter?: stri
   return approverFor(actionId, band, parameter);
 }
 
-function actionIds(level: HouseLevel, entity: HouseEntity): string[] {
+function actionIds(level: HouseLevel, entity: HouseEntity, band: HouseBand): string[] {
   const ids = [`house.${level}:entity:${entity.id}`];
+  // A room grant never reaches a lock, alarm, garage, entry door or camera for a teen or child: those need a grant on the item itself.
+  if (entity.sensitive && band !== "adult") return ids;
   if (entity.area) ids.push(`house.${level}:area:${entity.area}`);
   return ids;
 }
@@ -34,7 +36,7 @@ export function houseAccess({ actor, permissions, entity, level }: {
 
   if (actor.role === "owner") return { allowed: true, confirm: cell === "self" || cell === "parent", reason: "owner" };
 
-  const actions = new Set(actionIds(level, entity));
+  const actions = new Set(actionIds(level, entity, actor.band));
   if (permissions.some((permission) => actions.has(permission.action) && permission.effect === "deny")) return denied("denied");
   if (permissions.some((permission) => actions.has(permission.action) && permission.effect === "allow")) {
     return { allowed: true, confirm: cell === "self" || cell === "parent", reason: "granted" };

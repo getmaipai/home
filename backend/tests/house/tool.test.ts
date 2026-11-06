@@ -1,0 +1,112 @@
+import { describe, expect, test } from "bun:test";
+import { houseToolSpec, runHouseTool, type HouseToolDeps } from "@/lib/house/tool";
+import type { HouseEntity, HouseArea } from "@/lib/house/registry";
+import type { PersonRow } from "@/types";
+
+const areas: HouseArea[] = [{ id: "k", name: "Kitchen" }, { id: "h", name: "Hallway" }];
+const entity = (id: string, name: string, kind: HouseEntity["kind"], area: string | null = "k", extra: Partial<HouseEntity> = {}): HouseEntity => ({ id, name, kind, area, state: "off", sensitive: null, deviceClass: null, rgb: null, brightness: null, sceneMembers: null, ...extra });
+const data: HouseEntity[] = [entity("light.kitchen_ceiling", "Ceiling", "light"), entity("light.kitchen_table", "Table", "light"), entity("light.kitchen_sink", "Sink", "light"), entity("switch.hall", "Hall switch", "switch", "h"), entity("light.astro", "Astro", "light", "h"), entity("light.atlas", "Atlas", "light", "h"), entity("light.bramble", "Bramble", "light", "h"), entity("lock.front_door", "Front door lock", "lock", "h", { sensitive: "lock" }), entity("scene.null", "Evening", "scene", "k")];
+const person = { id: "owner-1", role: "owner" } as PersonRow;
+function setup(overrides: Partial<HouseToolDeps> = {}, visibleData = data) {
+  const performed: Array<[HouseEntity, unknown]> = [];
+  const audits: unknown[] = [];
+  const undos: unknown[] = [];
+  const deps: HouseToolDeps = {
+    loadRegistry: async () => ({ ok: true, areas, entities: visibleData }),
+    permissionsOf: () => [],
+    perform: async (target, action) => { performed.push([target, action]); return { ok: true, before: { state: "off", brightness: null, rgb: null, percentage: null, temperature: null }, after: { state: "on", brightness: 100, rgb: null, percentage: null, temperature: null }, undo: { name: "turn_off" } }; },
+    brakeMode: () => "do", audit: (value) => audits.push(value), undo: (value) => { undos.push(value); return { id: "undo-1", expiresAt: new Date().toISOString() }; },
+    ...overrides,
+  };
+  return { deps, performed, audits, undos };
+}
+const run = (args: Record<string, unknown>, deps: HouseToolDeps, role: string = "owner", band: "adult" | "teen" | "child" = "adult") => runHouseTool({ actor: { ...person, role } as PersonRow, band, args, callId: "call-1", deps });
+
+describe("house tool", () => {
+  test("spec lists only speaker-visible areas and never entity ids", () => {
+    const spec = houseToolSpec({ visible: [data[0]!], areas });
+    expect(JSON.stringify(spec)).toContain("Kitchen");
+    expect(JSON.stringify(spec)).not.toContain("Hallway");
+    expect(JSON.stringify(spec)).not.toContain("light.kitchen_ceiling");
+  });
+  test("find filters by area and kind and never includes entities the speaker cannot see", async () => {
+    const visible = data.filter((item) => item.id !== "light.astro");
+    const out = await run({ action: "find", targets: [{ area: "kitchen", kind: "light" }] }, setup({}, visible).deps);
+    expect(JSON.stringify(out.result)).toContain("Ceiling");
+    expect(JSON.stringify(out.result)).not.toContain("Astro");
+    expect(JSON.stringify(out.result)).not.toContain("light.kitchen_ceiling");
+  });
+  test("area-only target expands to visible lights", async () => {
+    const s = setup(); await run({ action: "turn_on", targets: [{ area: "kitchen", kind: "light" }] }, s.deps);
+    expect(s.performed).toHaveLength(3);
+  });
+  test("ambiguous name returns options and unknown name returns not_found", async () => {
+    const items = [...data, entity("light.astro2", "Astro", "light", "h")];
+    const ambiguous = await run({ action: "turn_on", targets: [{ name: "astro" }] }, setup({}, items).deps);
+    expect(ambiguous.result?.reply?.text).toContain("Astro");
+    const missing = await run({ action: "turn_on", targets: [{ name: "no such device" }] }, setup().deps);
+    expect(missing.result?.reply?.text).toContain("could not find");
+  });
+  test("more than twelve resolved entities is refused", async () => {
+    const many = Array.from({ length: 13 }, (_, i) => entity(`light.l${i}`, `Light ${i}`, "light", "k"));
+    const out = await run({ action: "turn_on", targets: [{ area: "kitchen", kind: "light" }] }, setup({}, many).deps);
+    expect(out.result?.reply?.text).toContain("too many");
+  });
+  test("child cannot unlock; refusal does not reveal entity name or perform", async () => {
+    const s = setup({ permissionsOf: () => [] });
+    const out = await run({ action: "unlock", targets: [{ name: "Front door lock" }] }, s.deps, "child", "child");
+    expect(s.performed).toHaveLength(0); expect(out.result?.reply?.text).not.toContain("Front door");
+  });
+  test("teen explicit lock allow requires confirmation", async () => {
+    const s = setup({ permissionsOf: () => [{ action: "house.see:entity:lock.front_door", effect: "allow" }, { action: "house.control:entity:lock.front_door", effect: "allow" }] });
+    const out = await run({ action: "unlock", targets: [{ name: "Front door lock" }] }, s.deps, "member", "teen");
+    expect((out as unknown as { confirmNeeded?: boolean }).confirmNeeded).toBe(true); expect(s.performed).toHaveLength(0);
+  });
+  test("adult action performs each target, audits without names, writes one undo and confirmation block", async () => {
+    const s = setup(); const out = await run({ action: "turn_on", targets: [{ area: "kitchen", kind: "light" }] }, s.deps);
+    expect(s.performed).toHaveLength(3); expect(s.audits).toHaveLength(1); expect(JSON.stringify(s.audits)).not.toContain("kitchen_ceiling");
+    expect(s.undos).toHaveLength(1); expect((s.undos[0] as { inverse: { calls: unknown[] } }).inverse.calls).toHaveLength(3);
+    const blocks = (out.result?.data as { blocks?: Array<{ kind: string }> } | undefined)?.blocks;
+    expect(blocks).toHaveLength(1); expect(blocks?.[0]?.kind).toBe("confirmation");
+  });
+  test("null-member scene not found to a teen", async () => {
+    const out = await run({ action: "activate", targets: [{ name: "Evening" }] }, setup({ permissionsOf: () => [] }).deps, "member", "teen");
+    expect(out.result?.reply?.text).toContain("could not find");
+  });
+  test("never and ask modes refuse or park without performing", async () => {
+    const never = setup({ brakeMode: () => "never" });
+    expect((await run({ action: "turn_on", targets: [{ name: "Ceiling" }] }, never.deps)).userMessage ?? "").toContain("turned off");
+    const ask = setup({ brakeMode: () => "ask" }); const out = await run({ action: "turn_on", targets: [{ name: "Ceiling" }] }, ask.deps);
+    expect((out as unknown as { confirmNeeded?: boolean }).confirmNeeded).toBe(true); expect(ask.performed).toHaveLength(0);
+  });
+  test("perform failure is plain copy and token never appears", async () => {
+    const s = setup({ perform: async () => ({ ok: false, kind: "unreachable" }) });
+    const out = await run({ action: "turn_on", targets: [{ name: "Ceiling" }] }, s.deps);
+    expect(JSON.stringify(out)).toContain("Home Assistant did not answer"); expect(JSON.stringify(out)).not.toContain("super-secret-token");
+  });
+  test("unknown speaker gets nothing", async () => {
+    const out = await runHouseTool({ actor: { role: "unknown", band: "child" }, band: "child", args: { action: "find" }, callId: "x", deps: setup().deps });
+    expect(out.status).toBe("rejected"); expect(out.result).toBeUndefined();
+  });
+
+  test("scene member rule: unknown members are adults only, members must all be controllable by a minor", async () => {
+    const light = entity("light.kitchen_ceiling", "Ceiling", "light");
+    const doorLock = entity("lock.front_door", "Front door", "lock", "h", { sensitive: "lock" });
+    const unknownScene = entity("scene.movie_night", "Movie night", "scene", "k", { sceneMembers: null });
+    const safeScene = entity("scene.reading", "Reading", "scene", "k", { sceneMembers: ["light.kitchen_ceiling"] });
+    const lockScene = entity("scene.goodnight", "Goodnight", "scene", "k", { sceneMembers: ["light.kitchen_ceiling", "lock.front_door"] });
+    const all = [light, doorLock, unknownScene, safeScene, lockScene];
+    const teenGrant = [{ action: "house.control:area:k", effect: "allow" as const }, { action: "house.see:area:k", effect: "allow" as const }, { action: "house.see:area:h", effect: "allow" as const }, { action: "house.control:area:h", effect: "allow" as const }];
+    const teen = setup({ permissionsOf: () => teenGrant }, all);
+    const found = await run({ action: "find", targets: [{ kind: "scene" }] }, teen.deps, "teen", "teen");
+    const text = (found.result as { reply: { text: string } }).reply.text;
+    expect(text).toContain("Reading");
+    expect(text).not.toContain("Movie night");
+    expect(text).not.toContain("Goodnight");
+    const adult = setup({}, all);
+    const adultFound = await run({ action: "find", targets: [{ kind: "scene" }] }, adult.deps);
+    const adultText = (adultFound.result as { reply: { text: string } }).reply.text;
+    expect(adultText).toContain("Movie night");
+    expect(adultText).toContain("Goodnight");
+  });
+});

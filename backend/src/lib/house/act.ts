@@ -44,7 +44,7 @@ function snapshot(text: string): StateSnapshot | null {
   } catch { return null; }
 }
 
-function service(entity: HouseEntity, action: HouseActionInput): { domain: string; service: string; data: Record<string, unknown> } {
+export function houseServiceCall(entity: HouseEntity, action: HouseActionInput): { domain: string; service: string; data: Record<string, unknown> } {
   const basic = { entity_id: entity.id };
   switch (action.name) {
     case "turn_on": case "turn_off": return { domain: entity.kind, service: action.name, data: basic };
@@ -104,7 +104,7 @@ export async function performHouseAction({ lanFetch, token, entity, action, slee
   if ("ok" in first && first.ok === false) return first;
   if ("ok" in first) return bad;
   const before = first;
-  const call = service(entity, action);
+  const call = houseServiceCall(entity, action);
   const sent = await lanFetch(`/api/services/${call.domain}/${call.service}`, { method: "POST", headers, body: JSON.stringify(call.data) });
   if (!sent.ok) return sent;
   if (sent.status < 200 || sent.status >= 300 || sent.truncated) return bad;
