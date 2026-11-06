@@ -14,6 +14,20 @@ export type LanFetchDeps = { fetch?: (input: string, init: RequestInit) => Promi
 const BAD_ADDRESS = "This address is not on your home network. Use the device's local address, for example 192.0.2.10.";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_BYTES = 1024 * 1024;
+const DROPPED_HEADERS = new Set(["host", "content-length", "connection", "transfer-encoding", "upgrade", "te", "keep-alive", "expect"]);
+const REDIRECTS = new Set([301, 302, 303, 307, 308]);
+
+// The caller picks credentials and content type, never the target: framing and routing headers are dropped.
+function safeHeaders(headers: LanFetchInit["headers"]): Headers {
+  const out = new Headers();
+  const pairs = Array.isArray(headers) ? headers : Object.entries(headers ?? {});
+  for (const [name, value] of pairs) {
+    const lower = name.toLowerCase();
+    if (DROPPED_HEADERS.has(lower) || lower.startsWith("proxy-")) continue;
+    out.set(name, value);
+  }
+  return out;
+}
 
 function isAllowedAddress(host: string): boolean {
   const parts = host.split(".");
@@ -42,10 +56,10 @@ export function createLanFetch(allowed: { host: string; port: number }, deps: La
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
     try {
       const response = await fetcher(`http://${allowed.host}:${allowed.port}${path}`, {
-        method, headers: init.headers, body: method === "POST" ? init.body : undefined,
-        redirect: "manual", signal: controller.signal,
-      });
-      if (response.status >= 300 && response.status < 400) return { ok: false, kind: "refused" };
+        method, headers: safeHeaders(init.headers), body: method === "POST" ? init.body : undefined,
+        redirect: "manual", signal: controller.signal, proxy: "",
+      } as RequestInit);
+      if (REDIRECTS.has(response.status)) return { ok: false, kind: "refused" };
       if (!response.body) return { ok: true, status: response.status, text: "", truncated: false };
       const reader = response.body.getReader();
       const chunks: Uint8Array[] = [];

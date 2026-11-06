@@ -52,4 +52,22 @@ describe("createLanFetch", () => {
     expect(JSON.stringify(timeoutResult)).not.toContain(url);
     expect(JSON.stringify(timeoutResult)).not.toContain(message);
   });
+
+  test("drops routing and framing headers but keeps credentials", async () => {
+    let seen: Headers | undefined;
+    const lanFetch = createLanFetch({ host: "192.168.50.20", port: 8123 }, { fetch: async (_url, init) => { seen = init.headers as Headers; return new Response("ok"); } });
+    await lanFetch("/api/", { headers: { Host: "evil.example", "Content-Length": "9", Authorization: "Bearer t", "Proxy-Authorization": "x", "Content-Type": "application/json" } });
+    expect(seen?.get("host")).toBeNull();
+    expect(seen?.get("content-length")).toBeNull();
+    expect(seen?.get("proxy-authorization")).toBeNull();
+    expect(seen?.get("authorization")).toBe("Bearer t");
+    expect(seen?.get("content-type")).toBe("application/json");
+  });
+
+  test("refuses only redirect statuses; 304 passes through", async () => {
+    const mk = (status: number) => createLanFetch({ host: "10.1.2.3", port: 80 }, { fetch: async () => new Response(null, { status }) });
+    expect(await mk(302)("/x")).toEqual({ ok: false, kind: "refused" });
+    expect(await mk(307)("/x")).toEqual({ ok: false, kind: "refused" });
+    expect(await mk(304)("/x")).toEqual({ ok: true, status: 304, text: "", truncated: false });
+  });
 });
