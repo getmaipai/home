@@ -59,7 +59,7 @@ export function ensureProvisionalTitle(conversationId: string): string | null {
   const turns = db
     .select()
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), inArray(conversationTurns.status, ["done", "failed"]), sql`${conversationTurns.id} NOT IN (SELECT supersedes FROM conversation_turns WHERE conversation_id = ${conversationId} AND supersedes IS NOT NULL)`))
+    .where(and(eq(conversationTurns.conversationId, conversationId), or(isNull(conversationTurns.pluginId), ne(conversationTurns.pluginId, "film")), inArray(conversationTurns.status, ["done", "failed"]), sql`${conversationTurns.id} NOT IN (SELECT supersedes FROM conversation_turns WHERE conversation_id = ${conversationId} AND supersedes IS NOT NULL)`))
     .orderBy(asc(conversationTurns.createdAt))
     .limit(20)
     .all();
@@ -138,7 +138,7 @@ export async function generateConversationTitle(conversationId: string): Promise
   const first = db
     .select()
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done"), eq(conversationTurns.source, "model"), isNull(conversationTurns.supersedes)))
+    .where(and(eq(conversationTurns.conversationId, conversationId), or(isNull(conversationTurns.pluginId), ne(conversationTurns.pluginId, "film")), eq(conversationTurns.status, "done"), eq(conversationTurns.source, "model"), isNull(conversationTurns.supersedes)))
     .orderBy(asc(conversationTurns.createdAt))
     .limit(1)
     .get();

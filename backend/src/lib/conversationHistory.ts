@@ -32,7 +32,7 @@ import { musicJobIdsByTurn, deleteMusicJobsForConversation, musicJobStateByTurnI
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
 import { CRISIS_RESOURCES_TEXT, CRISIS_STATE_TURNS, crisisSupportFor } from "@/lib/failureCopy";
-import { eq, and, or, not, lt, gt, gte, isNull, isNotNull, inArray, asc, desc, sql } from "drizzle-orm";
+import { eq, and, or, not, ne, lt, gt, gte, isNull, isNotNull, inArray, asc, desc, sql } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
@@ -728,13 +728,13 @@ export function logTurn(
   value.parent_turn_id = storedRow.parentTurnId;
   value.branch_chosen = storedRow.branchChosen;
   if (branchFrom) value.continued_from_turn_id = branchFrom;
-  // CHAT-TITLE-02: a stored chat is never left untitled; the first message names it until the model does.
+  // CHAT-TITLE-02: a stored chat is never left untitled; internal film rows are not messages to name it from.
   // Failed turns count (the person still sent a message); a title problem never costs the turn.
-  try { if (supersedes) refreshProvisionalTitle(value.conversation_id); else ensureProvisionalTitle(value.conversation_id); } catch (err) { console.error(`[turn] provisional title failed: ${(err as Error).message}`); }
+  try { if (supersedes) refreshProvisionalTitle(value.conversation_id); else if (storedRow.pluginId !== "film") ensureProvisionalTitle(value.conversation_id); } catch (err) { console.error(`[turn] provisional title failed: ${(err as Error).message}`); }
   // A failed turn is not something the household said and heard: it
   // records no episode and retires nothing it might have superseded.
   if (opts.status === "failed") return storedRow;
-  recordEpisodes(storedRow);
+  if (storedRow.pluginId !== "film") recordEpisodes(storedRow);
   // #88: the replaced turn leaves the current branch; the memories the
   // judge extracted from it are retired (archived, never deleted) so the
   // corrected statement's own facts are what the judge extracts next.
@@ -1828,6 +1828,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
       conversationId: conversationTurns.conversationId,
       createdAt: conversationTurns.createdAt,
       userText: conversationTurns.userText,
+      pluginId: conversationTurns.pluginId,
       safetyFlagged: conversationTurns.safetyFlagged,
       safetyAction: conversationTurns.safetyAction,
       crisisSignal: conversationTurns.crisisSignal,
@@ -1843,7 +1844,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
     entry.count++;
     if (!entry.last || t.createdAt > entry.last) entry.last = t.createdAt;
     byConversation.set(t.conversationId, entry);
-    if (t.userText.trim()) {
+    if (t.pluginId !== "film" && t.userText.trim()) {
       const current = latestUserTurn.get(t.conversationId);
       // Match listConversationTurns()' stable timestamp ordering: when
       // rows share a timestamp, the later row in SQLite's returned order wins.
@@ -2031,6 +2032,7 @@ export function listConversationTurns(
   // already seen - slicing by index instead makes "everything after
   // `since`" exact, not an approximation.
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  rows = rows.filter((row) => row.pluginId !== "film");
   if (sinceId) {
     const idx = rows.findIndex((r) => r.id === sinceId);
     if (idx >= 0) rows = rows.slice(idx + 1);
@@ -2083,7 +2085,7 @@ export function listConversationTurns(
       }
     } catch { /* unreadable outcomes name no film */ }
   }
-  const musicByTurn = musicJobIdsByTurn(actor, rows.map((r) => r.id));
+  const musicByTurn = musicJobIdsByTurn(actor, rows.filter((r) => r.pluginId !== "film").map((r) => r.id));
 
   // MINOR-SEARCH-01m: a child reads no link in a reply and no page address in a source, old rows included (the stored row is untouched).
   const bandOut = speakerAgeBand(actor, new Date());
@@ -2652,7 +2654,7 @@ function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary" |
   // ADMIN-COMPARE-01: a caller reconstructing history as it stood AT a
   // given turn names that turn's own createdAt here.
   const scoped = opts.beforeCreatedAt ? rows.filter((r) => r.createdAt < opts.beforeCreatedAt!) : rows;
-  const liveRows = excludeSupersededRows(scoped, opts.supersedes, opts.excludeTurnId);
+  const liveRows = excludeSupersededRows(scoped, opts.supersedes, opts.excludeTurnId).filter((turn) => turn.pluginId !== "film");
   // The anchor is found by POSITION in the fetched rows, superseded ones
   // included (#60: an anchor turn that was later edited is still a real
   // boundary, and same-millisecond turns make a timestamp inexact).
