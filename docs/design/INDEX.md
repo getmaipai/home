@@ -91,7 +91,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [add-a-chat-model-2026-10-27.md](add-a-chat-model-2026-10-27.md) | approved 2026-10-27 (architect) | MODEL-ADD-01 |
 | [image-model-bakeoff-2026-10-25.md](image-model-bakeoff-2026-10-25.md) | current; decided, not built | none yet (slices in section 6) |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
-| [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (to be cut; today the Integrations rows it supersedes) |
+| [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (cut 2026-11-06 in BACKLOG; today the Integrations rows it supersedes) |
 | [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) | current (agreement retired 2026-10-26; short note) | LIKENESS-01; closes the VIDEO-GEN-12 owner question |
 | [music-generation-2026-10-17.md](music-generation-2026-10-17.md) | new 2026-10-17, measured; chat first, studio later | MUSIC-SPEC-01, MUSIC-GEN-01 to -14, MUSIC-STUDIO-01 (Music generation) |
 | [music-studio-2026-10-31.md](music-studio-2026-10-31.md) | proposed (architect ruling pending) | MUSIC-STUDIO-01 |
