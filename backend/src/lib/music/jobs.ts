@@ -77,7 +77,7 @@ async function releaseMusic(job: MusicJob): Promise<void> {
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (!actor) { await cancelOrDeleteMusic(submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
     void watch(job, actor, submitted.done);
-    if (job.task !== "stems") void startSongCover(actor, job).catch(() => {});
+    if (job.task !== "stems" && !job.request.sound) void startSongCover(actor, job).catch(() => {});
   } catch (error) { if (error instanceof StackMusicError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
 }
 export function plainMusicFailure(code: string): string {
@@ -273,9 +273,9 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (signal.aborted) return;
   if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
   // The model comes from the Stack's own result, never from a constant: an unknown one is stamped unknown and never cleared.
-  const stamp = modelStampFor(job.task, song.model, job.parentFileId ? provenanceFor(job.parentFileId) : null);
+  const stamp = modelStampFor(job.request.sound ? "sfx" : job.task, song.model, job.parentFileId ? provenanceFor(job.parentFileId) : null);
   const provenance: GenerationProvenance = {
-    kind: "music", job_id: job.id, task: job.task, ...stamp, seed: song.seed, duration_s: song.duration_s,
+    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.task, ...stamp, seed: song.seed, duration_s: song.duration_s,
     bpm: song.bpm ?? job.request.bpm ?? null, key: song.key ?? job.request.key ?? null,
     parent_file_id: job.request.ownedFile ? null : job.parentFileId, source_kind: job.request.ownedFile ? "upload" : job.parentFileId ? "made_here" : "none",
     made_at: new Date().toISOString(),
@@ -300,9 +300,11 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (stopped(job)) return;
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
-  void startSongCover(actor, job).catch(() => {});
-  // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
-  void startWordTiming(job, bytes).catch(() => {});
+  if (!job.request.sound) {
+    void startSongCover(actor, job).catch(() => {});
+    // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
+    void startWordTiming(job, bytes).catch(() => {});
+  }
 }
 async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
   if (!stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "bad_reply"); return; }

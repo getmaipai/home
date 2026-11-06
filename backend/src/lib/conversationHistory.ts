@@ -2424,7 +2424,7 @@ export function musicContextNote(state: string | null): string {
 }
 function mediaToolNote(pluginId: string | null, turnId?: string): string | null {
   if (pluginId === "generate_image") return "[The Make a Picture tool was called for this message and started the picture the reply speaks of.]";
-  if (pluginId === "generate_music" || pluginId === "edit_music" || pluginId === "make_band" || pluginId === "make_album") {
+  if (pluginId === "generate_music" || pluginId === "make_sound" || pluginId === "edit_music" || pluginId === "make_band" || pluginId === "make_album") {
     return musicContextNote(turnId ? musicJobStateByTurnId(turnId) : null);
   }
   if (pluginId === "generate_video" || pluginId === "edit_video") return "[The Make a Video tool was called for this message and started the video the reply speaks of.]";

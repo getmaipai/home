@@ -1,0 +1,82 @@
+{
+  "id": "make_sound",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make a Sound",
+  "description": "Make a short sound effect or ambience with no melody or singing.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicAllowed",
+    "bench_row": "music-tool",
+    "reason": "adult on their own written screen with music enabled and an available Stack music model"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make a door slam sound",
+      "rain on a window ambience",
+      "a loopable forest background",
+      "make a quiet wind ambience",
+      "create a short thunderclap sound"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "description"
+    ],
+    "properties": {
+      "description": {
+        "type": "string",
+        "grounded": false,
+        "description": "Describe the sound effect or ambience.",
+        "minLength": 3,
+        "maxLength": 600
+      },
+      "seconds": {
+        "type": "number",
+        "grounded": false,
+        "description": "Optional length in seconds, from 1 to 60.",
+        "minimum": 1,
+        "maximum": 60
+      },
+      "loop": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set true when the sound should loop seamlessly."
+      },
+      "stick_to_words": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set false only when you want the model to improvise beyond the words of the request."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

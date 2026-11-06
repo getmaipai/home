@@ -297,14 +297,14 @@ describe("GET /api/plugins", () => {
     const childClient = await child(ownerClient);
     const childResponse = await childClient.get("/api/plugins");
     const childPackages = (await childResponse.json()) as Array<{ id: string }>;
-    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup", "generate_music", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style", "edit_video", "format-email"].includes(id)));
+    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup", "generate_music", "make_sound", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style", "edit_video", "format-email"].includes(id)));
 
     const teenClient = await teen(ownerClient);
     const teenResponse = await teenClient.get("/api/plugins");
     const teenPackages = (await teenResponse.json()) as Array<{ id: string }>;
     // Owner ruling 2026-10-17: teens make pictures and videos, so the teen lists generate_image and generate_video (a child does not, above).
     // Music stays off for teens (music design note section 9; MUSIC-GEN-13 is the later parent switch).
-    expect(teenPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => id !== "generate_music" && id !== "edit_music" && id !== "make_band" && !["make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"].includes(id) && id !== "edit_video"));
+    expect(teenPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => id !== "generate_music" && id !== "make_sound" && id !== "edit_music" && id !== "make_band" && !["make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"].includes(id) && id !== "edit_video"));
     expect(teenPackages.map((manifest) => manifest.id)).toContain("lock-doors");
   });
 });

@@ -1,6 +1,7 @@
 import { MAKE_BAND_TOOL_ID } from "@/lib/music/band";
 import { EDIT_TOOL_OBJECT, isStudioTool } from "@/lib/music/studioTools";
 import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
+import { MAKE_SOUND_TOOL_ID } from "@/lib/music/soundMaker";
 // U2c, the `policy` node (turn-machine-state-record-2026-09-22.md's
 // state table): each ActionProposal against the manifest's min_role,
 // consequential, permissions; the grounding of the arguments against
@@ -462,7 +463,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     }
 
     // MUSIC-GEN-03: the music offer and the minor line bind forged calls too.
-    if (call.tool === GENERATE_MUSIC_TOOL_ID || call.tool === EDIT_MUSIC_TOOL_ID) {
+    if (call.tool === GENERATE_MUSIC_TOOL_ID || call.tool === EDIT_MUSIC_TOOL_ID || call.tool === MAKE_SOUND_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const musicProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
       const offered = call.tool === EDIT_MUSIC_TOOL_ID ? state.musicEditAllowed : state.musicAllowed;

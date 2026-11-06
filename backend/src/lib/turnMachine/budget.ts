@@ -198,10 +198,10 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
  * off and unmeasured tools stay out, and exceeding the model cap is a
  * configuration error rather than a silently shortened offer. */
 /** The music tools dropped first, in this order, when `edit_video` would take the offer set past the model cap. */
-const MUSIC_SHRINK_ORDER = "writing_format make_song_style make_album edit_band edit_album edit_song_style make_band edit_music generate_music".split(" ");
+const MUSIC_SHRINK_ORDER = "writing_format make_song_style make_album edit_band edit_album edit_song_style make_band edit_music make_sound generate_music".split(" ");
 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
-const STUDIO_SHRINK_ORDER = "writing_format make_song_style make_album edit_music".split(" ");
+const STUDIO_SHRINK_ORDER = "writing_format make_song_style make_album make_sound edit_music".split(" ");
 
 export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false): TurnBudget {
   const cap = budget.max_tools ?? 0;

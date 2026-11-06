@@ -1,0 +1,17 @@
+{
+  "description": "Recipe fallback; native chat jobs and gates are covered in backend/src/lib/music/soundMaker.test.ts.",
+  "inputs": {
+    "description": "rain on a window"
+  },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Sounds can only be made through chat on your own screen. Ask chat to make a sound.",
+      "speech": "Sounds can only be made through chat on your own screen. Ask chat to make a sound."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

@@ -11,11 +11,11 @@ export const KNOWN_MUSIC_MODELS: Record<string, KnownMusicModel> = {
   "ace-step-1-5-lm-0-6b": { revision: "148d8ea0225bdab342ee1ae3a354275ccd60ca80", licence: "MIT", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
 };
 /** Tasks that run no model: the result inherits its parent's model fields and clearance. */
-const NO_MODEL_TASKS: readonly MusicTask[] = ["trim", "fade", "loudness"];
+const NO_MODEL_TASKS: readonly (MusicTask | "sfx")[] = ["trim", "fade", "loudness"];
 type Stamp = Pick<GenerationProvenance, "model" | "engine" | "commercial_use" | "commercial_basis">;
 const UNKNOWN_BASIS = "The music model that made this was not recognised, so its licence and training data are unknown and commercial use is not cleared.";
 
-export function modelStampFor(task: MusicTask, modelId: unknown, parent: GenerationProvenance | null): Stamp {
+export function modelStampFor(task: MusicTask | "sfx", modelId: unknown, parent: GenerationProvenance | null): Stamp {
   if (NO_MODEL_TASKS.includes(task)) {
     if (parent) return { model: { ...parent.model }, engine: { ...parent.engine }, commercial_use: parent.commercial_use, commercial_basis: parent.commercial_basis };
     return { model: { id: "unknown", revision: "unknown", licence: "unknown" }, engine: { ...MUSIC_ENGINE }, commercial_use: "unknown", commercial_basis: UNKNOWN_BASIS };

@@ -7,6 +7,7 @@ export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake"
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; /** On a split of an audio file the person owns: the source is theirs, not a made song. */ ownedFile?: boolean; max_seconds?: number; retried?: boolean;
+  sound?: { loop: boolean; surprise: boolean };
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed" | "max"; /** TIER-HOME-03: read by the household queue. MUSIC-MAX-01: Max is the engine's XL SFT maker. */ tier?: "standard" | "boost" | "max"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
@@ -30,5 +31,5 @@ export interface MusicJob {
 export const MUSIC_NOTE = "music-gen:";
 export function generationOf(note: string | null): GenerationProvenance | null {
   if (!note?.startsWith(MUSIC_NOTE)) return null;
-  try { const value = JSON.parse(note.slice(MUSIC_NOTE.length)) as GenerationProvenance; return value && value.kind === "music" ? value : null; } catch { return null; }
+  try { const value = JSON.parse(note.slice(MUSIC_NOTE.length)) as GenerationProvenance; return value && (value.kind === "music" || value.kind === "sound") ? value : null; } catch { return null; }
 }

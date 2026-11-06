@@ -128,10 +128,10 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
     expect(withTurnToolGates(base, false, false, false, false, true).tools_offered).not.toContain("edit_music");
     const make = withTurnToolGates(base, false, false, false, true, false).tools_offered;
-    expect(make).toContain("generate_music"); expect(make).not.toContain("edit_music");
+    expect(make).toContain("generate_music"); expect(make).toContain("make_sound"); expect(make).not.toContain("edit_music");
     const both = withTurnToolGates(base, true, true, true, true, true).tools_offered;
-    expect(both).toContain("generate_music"); expect(both).toContain("edit_music");
-    expect(both).toHaveLength(15);
+    expect(both).toContain("generate_music"); expect(both).toContain("make_sound"); expect(both).toContain("edit_music");
+    expect(both).toHaveLength(16);
   });
   test("the real worst case plus the planned link reader is exactly sixteen, and a seventeenth still throws", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
@@ -141,6 +141,7 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
       const full = withTurnToolGates(base, true, true, true, true, true);
       expect(full.tools_offered).toHaveLength(16);
       expect(full.tools_offered).toEqual(expect.arrayContaining([...BASE_TOOL_IDS, "show_images", "generate_image", "generate_video", "generate_music", "edit_music", "read_link"]));
+      expect(full.tools_offered).not.toContain("make_sound");
       expect(() => withTurnToolGates({ ...base, max_tools: 15 }, true, true, true, true, true)).toThrow(/exceeds the model cap/);
     } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
   });

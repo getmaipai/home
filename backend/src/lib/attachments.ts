@@ -132,7 +132,7 @@ export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
     provenance: {
       conversation_id: row.conversationId,
       turn_id: row.turnId,
-      package_id: generation ? "generate_music" : null,
+      package_id: generation ? (generation.kind === "sound" ? "make_sound" : "generate_music") : null,
       job_id: generation?.job_id ?? null,
       requested_by_person_id: null,
       media_source_id: row.origin === "fetched" ? (row.mediaSourceId ?? null) : null,

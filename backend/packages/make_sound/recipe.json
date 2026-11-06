@@ -1,0 +1,16 @@
+{
+  "id": "make_sound",
+  "inputs": [
+    {
+      "name": "description",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Sounds can only be made through chat on your own screen. Ask chat to make a sound."
+    }
+  ]
+}

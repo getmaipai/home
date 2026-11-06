@@ -1,6 +1,7 @@
 import { MAKE_BAND_TOOL_ID, runMakeBand } from "@/lib/music/band";
 import { isStudioTool, runStudioTool } from "@/lib/music/studioTools";
 import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMusic } from "@/lib/music/tool";
+import { MAKE_SOUND_TOOL_ID, runMakeSound } from "@/lib/music/soundMaker";
 // U2c, the `tool` node (turn-machine-state-record-2026-09-22.md's state
 // table): "runPlugin under the tool deadline; the outcome recorded in
 // model order." The node's signal reaches runPlugin() so search requests
@@ -405,8 +406,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     }
 
     // MUSIC-GEN-03: both music tools start a Stack job and return its card id at once.
-    if (tool === GENERATE_MUSIC_TOOL_ID || tool === EDIT_MUSIC_TOOL_ID) {
-      const outcome = await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : runGenerateMusic)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+    if (tool === GENERATE_MUSIC_TOOL_ID || tool === EDIT_MUSIC_TOOL_ID || tool === MAKE_SOUND_TOOL_ID) {
+      const outcome = await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : tool === MAKE_SOUND_TOOL_ID ? runMakeSound : runGenerateMusic)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
       outcomes.push(outcome);
       const data = outcome.result?.data as { musicJobId?: string } | undefined;
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
