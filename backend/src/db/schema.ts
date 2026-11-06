@@ -2379,6 +2379,15 @@ export const mediaProductions = sqliteTable(
   (table) => [index("media_productions_owner_idx").on(table.ownerPersonId)],
 );
 
+export const filmRuns = sqliteTable("film_runs", {
+  id: text("id").primaryKey(), personId: text("person_id").notNull().references(() => people.id),
+  productionId: text("production_id"), idea: text("idea").notNull(), planJson: text("plan_json"),
+  state: text("state").notNull(), stage: text("stage"), doneSteps: integer("done_steps").notNull().default(0),
+  totalSteps: integer("total_steps").notNull().default(0), filmFileId: text("film_file_id"), note: text("note"),
+  errorLine: text("error_line"), goAhead: integer("go_ahead", { mode: "boolean" }).notNull(),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (table) => [index("film_runs_person_idx").on(table.personId), index("film_runs_state_idx").on(table.state)]);
+
 export const newsInterests = sqliteTable(
   "news_interests",
   {

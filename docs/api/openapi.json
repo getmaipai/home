@@ -64853,6 +64853,665 @@
         }
       }
     },
+    "/api/films/{id}": {
+      "get": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Get film progress",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Film progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "done_steps": {
+                      "type": "number"
+                    },
+                    "total_steps": {
+                      "type": "number"
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "film_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "production_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "done_steps",
+                    "total_steps",
+                    "film_file_id",
+                    "note",
+                    "error_line",
+                    "production_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/films/{id}/go": {
+      "post": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Start a planned film",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Film progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "done_steps": {
+                      "type": "number"
+                    },
+                    "total_steps": {
+                      "type": "number"
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "film_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "production_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "done_steps",
+                    "total_steps",
+                    "film_file_id",
+                    "note",
+                    "error_line",
+                    "production_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Film is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/films/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Cancel a film",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Film progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "done_steps": {
+                      "type": "number"
+                    },
+                    "total_steps": {
+                      "type": "number"
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "film_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "production_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "done_steps",
+                    "total_steps",
+                    "film_file_id",
+                    "note",
+                    "error_line",
+                    "production_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/films/{id}/resume": {
+      "post": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Resume a stopped film",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Film progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "done_steps": {
+                      "type": "number"
+                    },
+                    "total_steps": {
+                      "type": "number"
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "film_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "production_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "done_steps",
+                    "total_steps",
+                    "film_file_id",
+                    "note",
+                    "error_line",
+                    "production_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Film cannot be resumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/films/{id}/redo-shot": {
+      "post": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Redo a film shot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "shot_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "shot_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Film progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "done_steps": {
+                      "type": "number"
+                    },
+                    "total_steps": {
+                      "type": "number"
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "film_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "production_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "done_steps",
+                    "total_steps",
+                    "film_file_id",
+                    "note",
+                    "error_line",
+                    "production_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid shot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/films/{id}/music": {
+      "post": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Change film music",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Film progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "done_steps": {
+                      "type": "number"
+                    },
+                    "total_steps": {
+                      "type": "number"
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "film_file_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "production_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "done_steps",
+                    "total_steps",
+                    "film_file_id",
+                    "note",
+                    "error_line",
+                    "production_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Film is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [
