@@ -606,6 +606,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
+| `backend/src/lib/mcp/connector.ts` | createConnector |
 | `backend/src/lib/mcp/nameMap.ts` | MAX_TOOL_NAME, createNameMap |
 | `backend/src/lib/mcp/schemaSanitiser.ts` | sanitiseSchema |
 | `backend/src/lib/mdns.ts` | mdnsHostLabel, advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising |
