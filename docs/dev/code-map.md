@@ -484,7 +484,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, startFilm, getFilmProgress, goFilm, cancelFilm, resumeFilmRun |
 | `backend/src/lib/films/engines.ts` | realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
-| `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT, __setFilmPlanCompleterForTests, planFilm |
+| `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilm |
