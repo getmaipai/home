@@ -130,6 +130,18 @@
         "grounded": false,
         "description": "Optional. Names of the person's saved characters, places or props the video should show; only names they gave."
       },
+      "production": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional. Set both only when the person asked to make a shot of their film; the finished video is kept on that shot."
+      },
+      "shot": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional. Set both only when the person asked to make a shot of their film; the finished video is kept on that shot."
+      },
       "strength": {
         "type": "string",
         "enum": [

@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Added
+- `generate_video` can target an owned Production shot, use its saved picture as the start frame, and record the finished Library clip on that shot.
+
 ## [0.2.129] - 2026-10-25
 
 Companions can be added and removed, chosen for each chat, and called with an @mention. News and media pages get a simpler phone layout. New pictures use ERNIE-Image-Turbo for Quick when it is installed. Pictures, videos and songs wait in one household queue. No database migrations.

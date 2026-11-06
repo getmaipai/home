@@ -15,7 +15,7 @@ import { lockedStyleOutcome } from "@/lib/videos/lock";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, resolveStyles, strengthWord, styleNamesOf } from "./styleChoice";
 import { LORAS_UNSUPPORTED_LINE, ltx25LorasSupported } from "./loraWire";
-import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
+import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadLibraryPicture, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
 import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 
@@ -30,6 +30,7 @@ import { StackVideoError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
 import { subjectsForNames } from "@/lib/mediaSubjects";
+import { getMediaProduction } from "@/lib/mediaProductions";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 
@@ -125,6 +126,17 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
 
   const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
   if (prompt.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
+  const productionId = typeof args.production === "string" ? args.production.trim() : "";
+  const shotId = typeof args.shot === "string" ? args.shot.trim() : "";
+  if (!!productionId !== !!shotId) return styleRefusal(callId, args, "Set both the production and shot, or leave both out.", "shot_arguments");
+  let shotPictureId: string | null = null;
+  if (productionId && shotId) {
+    const production = getMediaProduction(state.actor as PersonRow, productionId);
+    if (!production || production.owner_person_id !== state.actor.id) return styleRefusal(callId, args, "Only the owner can make a video for this production.", "production_access");
+    const shot = production.episodes.flatMap((episode) => episode.scenes).flatMap((scene) => scene.shots).find((item) => item.id === shotId);
+    if (!shot) return styleRefusal(callId, args, "I couldn't find that shot in this production.", "unknown_shot");
+    shotPictureId = shot.picture_file_id ?? null;
+  }
   const names = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
   const resolvedSubjects = subjectsForNames(state.actor as PersonRow, names);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
@@ -176,6 +188,13 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     }
     image = ref.base64;
     sourceFileId = ref.id;
+    if (ref.width && ref.height) portrait = ref.height > ref.width;
+  } else if (shotPictureId) {
+    const ref = loadLibraryPicture(actor, shotPictureId);
+    if (!ref.ok) return styleRefusal(callId, args, ref.line, "shot_picture");
+    const screened = await screenInputImage(ref.bytes, subjectPrompt, viewerOf(actor, audience.band));
+    if (!screened.ok) return styleRefusal(callId, args, screened.line, "shot_picture");
+    image = ref.base64; imageSource = "generated"; sourceFileId = ref.id;
     if (ref.width && ref.height) portrait = ref.height > ref.width;
   }
   if (!image && resolvedSubjects.length) {
@@ -277,6 +296,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       kind: image ? "animate" : "generate",
       prompt: subjectPrompt,
       sourceFileId,
+      ...(productionId && shotId ? { productionId, shotId } : {}),
       endFileId,
       ...(endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),

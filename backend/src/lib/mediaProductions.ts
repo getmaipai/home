@@ -53,6 +53,19 @@ export function updateMediaProduction(actor: PersonRow,id:string,patch:Partial<P
   if(!validSubjectIds(actor,references({...decode(row),...patch}))) throw new Error("Choose subjects you can use in this production.");
   persist(row,patch); return getMediaProduction(actor,id);
 }
+/** Record a finished video on a shot. Missing productions or shots are harmless because jobs can outlive their source shot. */
+export function setShotClip(ownerPersonId: string, productionId: string, shotId: string, fileId: string): void {
+  const row = raw(productionId);
+  if (!row || row.ownerPersonId !== ownerPersonId) return;
+  const production = decode(row);
+  let found = false;
+  const episodes = production.episodes.map((episode) => ({ ...episode, scenes: episode.scenes.map((scene) => ({ ...scene, shots: scene.shots.map((shot) => {
+    if (shot.id !== shotId) return shot;
+    found = true;
+    return { ...shot, clip_file_id: fileId };
+  }) })) }));
+  if (found) persist(row, { episodes });
+}
 export function updateProductionCast(actor:PersonRow,id:string,cast:CastRole[]) { return updateMediaProduction(actor,id,{cast}); }
 export function updateProductionScript(actor:PersonRow,id:string,episodes:Episode[]) { return updateMediaProduction(actor,id,{episodes}); }
 export function applyCastOperation(actor:PersonRow,id:string,operation:{op:"add"|"replace"|"remove";subject_id:string;entry?:CastRole}):Production|null {

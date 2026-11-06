@@ -9,6 +9,7 @@ import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { setShotClip } from "@/lib/mediaProductions";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PersonRow } from "@/types";
@@ -58,6 +59,8 @@ export interface VideoRequest {
   /** The generated picture a clip starts from (an attachment id in this conversation), or null. */
   source_file_id: string | null;
   end_file_id?: string | null;
+  production_id?: string;
+  shot_id?: string;
   audience: "all-ages" | "adult";
   /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
@@ -413,6 +416,8 @@ export interface StartVideoInput {
   body: Omit<VideoBody, "timeout_ms">;
   sourceFileId?: string | null;
   endFileId?: string | null;
+  productionId?: string;
+  shotId?: string;
   /** TIER-WIRE-01: the allowed tier (`jobTier`); Standard or absent adds nothing to the request. */
   tier?: "standard" | "boost" | "max";
   /** VIDEO-CREATE-01 (V1b): kept on the request for Another take. */
@@ -440,7 +445,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" || ((model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max")) ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -604,6 +609,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.phase = "ready";
   job.error = null;
   saveVideoJob(job);
+  if (writer === "video-gen" && job.files[0] && job.request.production_id && job.request.shot_id) setShotClip(actor.id, job.request.production_id, job.request.shot_id, job.files[0].id);
 }
 
 async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signal: AbortSignal): Promise<void> {
