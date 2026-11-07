@@ -163,6 +163,24 @@
             }
           },
           {
+            "label": "Spatial sound with 5.1 file",
+            "action": {
+              "call": {
+                "target": "/api/plugins/videos/actions/spatial-sound",
+                "method": "POST",
+                "args": {
+                  "id": "{id}",
+                  "surround": true
+                },
+                "then": {
+                  "navigate": {
+                    "to": "/apps/videos/create"
+                  }
+                }
+              }
+            }
+          },
+          {
             "label": "Open in My clips",
             "action": {
               "navigate": {
