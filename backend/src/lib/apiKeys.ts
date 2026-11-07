@@ -80,8 +80,14 @@ export function mayHoldSettingsKey(person: PersonRow): boolean {
 }
 /** The longest a settings key lives. It changes household behaviour, so it is short-lived. */
 export const SETTINGS_KEY_MAX_DAYS = 90;
+/** A person who is gone, disabled, memorialized or a guest past their stay holds no working key of any scope. */
+function personMayHoldKeys(person: PersonRow): boolean {
+  if (person.deletedAt || !person.enabled || person.memorializedAt) return false;
+  if (person.role === "guest" && person.guestExpiresAt && Date.parse(person.guestExpiresAt) <= Date.now()) return false;
+  return true;
+}
 function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
-  if (person.deletedAt || !person.enabled || person.memorializedAt || (person.role === "guest" && person.guestExpiresAt && Date.parse(person.guestExpiresAt) <= Date.now())) return false;
+  if (!personMayHoldKeys(person)) return false;
   if (scope === "settings") return mayHoldSettingsKey(person);
   if (scope === "diagnose") return mayHoldDiagnoseKey(person);
   if (scope === "engine") return mayHoldEngineKey(person);
@@ -200,8 +206,7 @@ export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?
   const valid = constantTimeHashEqual(digest, row?.secretHash ?? "0".repeat(64));
   if (!row || (!valid && !legacy)) return invalid;
   const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
-  if (!person || person.deletedAt || !row.scopes.includes(scope) || usable(row)) return invalid;
-  if (!person.enabled || person.memorializedAt || (person.role === "guest" && person.guestExpiresAt && Date.parse(person.guestExpiresAt) <= Date.now())) return invalid;
+  if (!person || !personMayHoldKeys(person) || !row.scopes.includes(scope) || usable(row)) return invalid;
   if (scope === "code") {
     const admission = codeAdmission(person);
     if (admission !== "ok") return { ok: false, reason: admission };

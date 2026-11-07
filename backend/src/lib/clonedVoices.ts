@@ -25,7 +25,7 @@ import type { ClonedVoiceInfo } from "@/wire";
 import type { StackVoice } from "@/lib/stack/types";
 import { appendLogLine } from "@/lib/log";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
-import { getOrCreateHexKey } from "@/lib/keystore";
+import { householdKeyBytes } from "@/lib/secrets";
 
 export type ClonedVoiceOpResult<T> =
   | { ok: true; value: T }
@@ -273,9 +273,7 @@ export function isClonedVoiceTokenValid(id: string, token: string | undefined): 
 }
 
 function clonedVoiceToken(id: string, expiry: number): string {
-  const keyHex = process.env.MAIPAI_SECRETS_KEY ?? getOrCreateHexKey("secrets_key", 32);
-  const householdKey = Buffer.from(keyHex, "hex");
-  const signingKey = createHmac("sha256", householdKey).update("maipai-cloned-voice-url-v1").digest();
+  const signingKey = createHmac("sha256", householdKeyBytes()).update("maipai-cloned-voice-url-v1").digest();
   return createHmac("sha256", signingKey).update(`${id}:${expiry}`).digest("hex");
 }
 
