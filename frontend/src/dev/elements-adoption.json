@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-06T23:00:46.149Z",
-  "kitTag": "ui-v0.5.505",
+  "generatedAt": "2026-11-07T00:54:16.601Z",
+  "kitTag": "ui-v0.5.506",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -920,7 +920,7 @@
       "group": "lyrics-list",
       "verdict": "later",
       "verdictReason": "Kit lyrics list for the media detail work (MEDIA-DETAIL-02); Home wires it with the audio detail page.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "map-answer.tsx",
