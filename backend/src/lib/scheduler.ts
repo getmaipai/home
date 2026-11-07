@@ -27,6 +27,7 @@ import { recomputeNightlyMixes, pruneReads } from "@/lib/news/records";
 // (kept behaviorally identical, spec/fixtures/recipes/) and this file's
 // own `host.schedule` real implementation (packageHost.ts) now carry a
 // recipe's own `schedule` step's `inputs` field through for real.
+import { fireHubDeviceTask } from "@/lib/schedules/executor";
 import { sweepLiveViews } from "@/lib/liveView";
 import { dispatchRobotOffers, sweepRobotOffers } from "@/lib/robotOffers";
 import { eq, and, lte, isNull, inArray, notInArray } from "drizzle-orm";
@@ -449,6 +450,8 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
       }
     }
   },
+  // SCHED-02: a device schedule the hub runs itself (executor hub); the creator's access is rechecked each run.
+  "schedules.device.fire": async (row) => { await fireHubDeviceTask(row); },
   "timers.fire": async (row) => {
     const { label } = JSON.parse(row.inputs) as { label: string };
     await trigger("timer.done", { duration_text: label }, { personId: row.personId ?? undefined });
@@ -475,7 +478,7 @@ let inFlight: Promise<{ ran: number; errors: number }> | null = null;
 // A person's alarm, reminder or timer must go off on time, so these jobs run in their own lane with their own in-flight guard: a
 // background job that is slow or stuck (on 2026-10-29 the news poll held the one shared loop and an alarm waited behind it) never
 // holds one back. The general loop leaves them out so a job is never run by both lanes.
-const TIME_CRITICAL_JOBS = ["alarms.fire", "reminders.fire", "timers.fire"] as const;
+const TIME_CRITICAL_JOBS = ["alarms.fire", "reminders.fire", "timers.fire", "schedules.device.fire"] as const;
 let criticalInFlight: Promise<{ ran: number; errors: number }> | null = null;
 
 /** Runs only the due alarms, reminders and timers. Safe to call often and while the general loop is busy. */

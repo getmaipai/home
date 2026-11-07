@@ -2598,3 +2598,29 @@ export const integrations = sqliteTable("integrations", {
   updatedAt: text("updated_at").notNull(),
   hlc: text("hlc").notNull(),
 }, (table) => [uniqueIndex("integrations_type_instance_idx").on(table.type, table.instance)]);
+
+// SCHED-02: spec `scheduled_task` record (spec/schemas/scheduled-task.schema.json), one row per thing a person asked to
+// happen later: this slice stores device_action and scene tasks. `external_ref` is the opaque random id of the Home
+// Assistant automation that runs the task and is never derived from `id`. Targets are `<instance>/<native id>`.
+export const scheduledTasks = sqliteTable("scheduled_tasks", {
+  id: text("id").primaryKey(),
+  person: text("person").notNull(),
+  kind: text("kind").notNull(),
+  executor: text("executor").notNull(),
+  onceAt: text("once_at"),
+  time: text("time"),
+  days: text("days"),
+  zone: text("zone"),
+  what: text("what").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  state: text("state").notNull(),
+  pausedReason: text("paused_reason"),
+  externalRef: text("external_ref"),
+  grantSnapshot: text("grant_snapshot").notNull(),
+  deliverOn: text("deliver_on"),
+  provenance: text("provenance").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+  deletedAt: text("deleted_at"),
+}, (table) => [index("scheduled_tasks_person_idx").on(table.person), index("scheduled_tasks_external_ref_idx").on(table.externalRef)]);

@@ -112,6 +112,7 @@ import {
   replyFeedback,
   grants,
   integrations,
+  scheduledTasks,
   approvals,
   routingEmbeddings,
   backupHealth,
@@ -172,6 +173,7 @@ export function resetDb(): void {
   db.delete(memoryConsolidationCursor).run();
   db.delete(grants).run();
   db.delete(integrations).run(); // CONN-INSTANCES-01
+  db.delete(scheduledTasks).run(); // SCHED-02
   db.delete(openQuestions).run(); // ASK-01: references people
   db.delete(replyConstraints).run(); // CONS-01: conversation-scoped constraints
   db.delete(replyFeedback).run(); // FEED-01: references people and turns

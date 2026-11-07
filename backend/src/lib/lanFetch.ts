@@ -3,7 +3,7 @@ export type LanFetchSuccess = { ok: true; status: number; text: string; truncate
 export type LanFetchResult = LanFetchSuccess | LanFetchFailure;
 
 export type LanFetchInit = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "DELETE";
   headers?: Record<string, string> | [string, string][];
   body?: string | Uint8Array | null;
 };
@@ -50,7 +50,8 @@ export function createLanFetch(allowed: { host: string; port: number }, deps: La
       return { ok: false, kind: "refused" };
     }
     const method = init.method ?? "GET";
-    if (method !== "GET" && method !== "POST") return { ok: false, kind: "refused" };
+    // DELETE is for Home Assistant's own config API (SCHED-02 removes an automation Home made); callers choose the path, never the host.
+    if (method !== "GET" && method !== "POST" && method !== "DELETE") return { ok: false, kind: "refused" };
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);

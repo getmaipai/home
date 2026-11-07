@@ -3,6 +3,7 @@
 // filtering happens here before any subscriber sees an event.
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { emitHouseConnected } from "@/lib/house/connectHooks";
 
 export interface HomeAssistantState {
   entity_id: string;
@@ -131,6 +132,8 @@ function connected(sequence: number, ws: SocketLike): void {
   const connectedAt = new Date().toISOString();
   publishHealth({ state: "connected", subscribedEntities: desiredEntities().size, lastConnectedAt: connectedAt, lastError: null });
   resolveIssue("home-assistant-events", "connection");
+  // SCHED-02: every connect reconciles the schedules Home made in Home Assistant (the default instance's address is this socket's).
+  emitHouseConnected("default", { force: true });
   const config = settings();
   if (!config) return;
   // Re-read each current value after every connection. These reads seed the

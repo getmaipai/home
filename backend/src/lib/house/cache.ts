@@ -1,5 +1,6 @@
 import { DEFAULT_INSTANCE, listInstances } from "@/lib/connectors/instances";
 import { houseInstanceLanFetch } from "./connection";
+import { emitHouseConnected } from "./connectHooks";
 import { fetchHouseRegistry, type HouseRegistryResult } from "./registry";
 import type { HouseLanFetchDeps } from "./connection";
 
@@ -42,7 +43,11 @@ export function warmHouseRegistry(instance: string = DEFAULT_INSTANCE): void {
       if (!connection.ok) return;
       const key = connectionKey(instance);
       const result = await fetchHouseRegistry({ lanFetch: connection.lanFetch, token: connection.token });
-      if (result.ok && connectionKey(instance) === key) { entry.value = result; entry.loadedAt = Date.now(); entry.key = key; }
+      if (result.ok && connectionKey(instance) === key) {
+        entry.value = result; entry.loadedAt = Date.now(); entry.key = key;
+        // SCHED-02: a fresh registry means Home Assistant answered; the schedule reconciler rechecks (it throttles itself).
+        emitHouseConnected(instance);
+      }
     } catch { /* background warming never escapes */ }
   })().finally(() => { entry.flight = null; });
 }

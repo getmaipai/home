@@ -19,6 +19,7 @@ import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs, runTimeCriticalJobs } from "@/lib/scheduler";
+import { registerScheduleReconcile } from "@/lib/schedules/reconcile";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
 import { reverifyStoredLists } from "@/lib/blocklists/listStore";
 import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProjectTypes, runDueWarmJobs } from "@/lib/plugins";
@@ -159,6 +160,8 @@ recoverInterruptedJobsAtBoot();
 // supports). Seeds the one core job memory.ts's runMaintenance has
 // wanted since it shipped ("no scheduler exists yet... manually-
 // triggered for now"): daily, idempotent, safe to call on every boot.
+// SCHED-02: reconcile the Home Assistant automations Home made, on every Home Assistant connect.
+registerScheduleReconcile();
 ensureCoreJob("memory.maintenance", "every:1d");
 ensureCoreJob("conversation.retention", "every:1d");
 ensureCoreJob("notifications.deliver_held", "every:1m");
