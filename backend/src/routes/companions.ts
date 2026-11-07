@@ -61,6 +61,8 @@ import { topicMessages } from "@/lib/topicPrompt";
 import { COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline } from "@/lib/companionPersonality";
 import { evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { serveBytes } from "@/lib/media/serve";
+import { listMediaProductions } from "@/lib/mediaProductions";
+import type { PersonRow } from "@/types";
 
 const pendingKeyframeJobs = new Map<string, { state: string; instruction: string; style: string }>();
 let backstoryCompleteForTests: typeof complete | null = null;
@@ -69,9 +71,10 @@ export function __setBackstoryCompleteForTests(value: typeof complete | null) { 
 export const companionsRoutes = apiRouter();
 
 const Type = z.enum(["child", "teen", "adult"]);
+const SynthSummary = z.object({ based_on: z.object({ kind: z.enum(["none", "household_member", "real_person"]), name: z.string().nullable() }), forked_from: z.string().nullable(), forked_from_name: z.string().nullable(), yours: z.boolean(), shows: z.array(z.object({ production_id: z.string(), title: z.string(), part: z.string() })) });
 const Card = z.object({
   id: z.string(), name: z.string(), type: Type, type_label: z.string(), tagline: z.string(), who_can_use: z.string(),
-  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), portrait: z.string().nullable(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(), latest_activity_at: z.string().nullable().describe("The ISO time of the latest task or chat on this companion; latest_activity is its title."),
+  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), portrait: z.string().nullable(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(), latest_activity_at: z.string().nullable().describe("The ISO time of the latest task or chat on this companion; latest_activity is its title."), synth: SynthSummary.nullable().optional(),
 });
 const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
@@ -99,6 +102,21 @@ function needsYou(state: string, waitingReason: string | null): boolean {
   return state === "waiting" || Boolean(waitingReason) || state === "needs_you";
 }
 
+function synthSummary(person: PersonRow, id: string) {
+  const synth = synthById(id);
+  if (!synth || !maySeeSynth(person, synth)) return null;
+  const base = synth.forked_from ? synthById(synth.forked_from) : null;
+  const basedName = synth.based_on.kind === "household_member" && synth.based_on.person_id
+    ? db.select({ displayName: people.displayName }).from(people).where(eq(people.id, synth.based_on.person_id)).get()?.displayName ?? synth.based_on.name
+    : synth.based_on.name;
+  const shows = listMediaProductions(person)
+    .filter((production) => production.show !== null && production.cast.some((entry) => entry.synth_id === id))
+    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+    .slice(0, 5)
+    .map((production) => ({ production_id: production.id, title: production.title, part: production.cast.find((entry) => entry.synth_id === id)?.part ?? "" }));
+  return { based_on: { kind: synth.based_on.kind, name: basedName ?? null }, forked_from: synth.forked_from, forked_from_name: base?.persona.display_name ?? null, yours: synth.private_to === person.id, shows };
+}
+
 const listRoute = createRoute({
   method: "get", path: "/", tags: ["Companions"], summary: "The companions I may use, and for an admin which companion each robot has",
   middleware: [requireAuth] as const,
@@ -115,7 +133,7 @@ const listRoute = createRoute({
 companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
-  const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, ...companionCounts(person.id, card.id), can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) });
+  const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, ...companionCounts(person.id, card.id), can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin), synth: synthSummary(person, card.id) });
   return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).filter((card) => !!getSynth(person, card.id)).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
 });
 
@@ -233,7 +251,7 @@ companionsRoutes.openapi(detailRoute, (c) => {
   const persona = found && mayUseCompanion(person, found) ? found : found ? null : draftPersonaFor(person, id, isOwnerOrAdmin(person));
   if (!persona) return c.json({ error: "No such companion" }, 404);
   const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
-  return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person) }, 200);
+  return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person), synth: synthSummary(person, detail.id) }, 200);
 });
 
 const activityRow = z.object({ id: z.string(), kind: z.string(), title: z.string(), state: z.string(), created_at: z.string(), updated_at: z.string(), conversation_id: z.string().nullable().optional(), placement: z.enum(["chat", "side"]).optional(), waiting_reason: z.string().nullable().optional(), progress: z.string().max(200).nullable().optional(), result_ref: z.string().nullable().optional(), needs_you: z.boolean().optional() });

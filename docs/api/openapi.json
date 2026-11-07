@@ -78490,6 +78490,73 @@
                             "type": "string",
                             "nullable": true,
                             "description": "The ISO time of the latest task or chat on this companion; latest_activity is its title."
+                          },
+                          "synth": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "based_on": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "household_member",
+                                      "real_person"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "name"
+                                ]
+                              },
+                              "forked_from": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "forked_from_name": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "yours": {
+                                "type": "boolean"
+                              },
+                              "shows": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "production_id": {
+                                      "type": "string"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    },
+                                    "part": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "production_id",
+                                    "title",
+                                    "part"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "based_on",
+                              "forked_from",
+                              "forked_from_name",
+                              "yours",
+                              "shows"
+                            ]
                           }
                         },
                         "required": [
@@ -78608,6 +78675,73 @@
                             "type": "string",
                             "nullable": true,
                             "description": "The ISO time of the latest task or chat on this companion; latest_activity is its title."
+                          },
+                          "synth": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "based_on": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "household_member",
+                                      "real_person"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "name"
+                                ]
+                              },
+                              "forked_from": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "forked_from_name": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "yours": {
+                                "type": "boolean"
+                              },
+                              "shows": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "production_id": {
+                                      "type": "string"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    },
+                                    "part": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "production_id",
+                                    "title",
+                                    "part"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "based_on",
+                              "forked_from",
+                              "forked_from_name",
+                              "yours",
+                              "shows"
+                            ]
                           }
                         },
                         "required": [
@@ -79472,6 +79606,73 @@
                       "type": "string",
                       "nullable": true,
                       "description": "The ISO time of the latest task or chat on this companion; latest_activity is its title."
+                    },
+                    "synth": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "based_on": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "household_member",
+                                "real_person"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name"
+                          ]
+                        },
+                        "forked_from": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "forked_from_name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "yours": {
+                          "type": "boolean"
+                        },
+                        "shows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "production_id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "part": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "production_id",
+                              "title",
+                              "part"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "based_on",
+                        "forked_from",
+                        "forked_from_name",
+                        "yours",
+                        "shows"
+                      ]
                     },
                     "about": {
                       "type": "string"

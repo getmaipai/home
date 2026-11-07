@@ -103,7 +103,7 @@ msgid "‘{name}’ moved to Trash. Kept 30 days"
 msgstr "‘{name}’ se movió a la Papelera. Se guarda 30 días"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:304
+#: src/shell/pages/CompanionsPage.tsx:327
 #, needs-review
 msgid "“{line}”"
 msgstr "“{line}”"
@@ -1567,8 +1567,7 @@ msgid "{what} for your animations..."
 msgstr "{what} para tus animaciones..."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:135
-#: src/shell/pages/CompanionsPage.tsx:144
+#: src/shell/pages/CompanionsPage.tsx:92
 #, needs-review
 msgid "{working} working · {waiting} waiting on you"
 msgstr "{working} en marcha · {waiting} esperando por ti"
@@ -2122,9 +2121,9 @@ msgstr "Una puerta de madera que cruje al abrirse en una casa silenciosa"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:80
-#: src/shell/pages/CompanionsPage.tsx:281
-#: src/shell/pages/CompanionsPage.tsx:288
-#: src/shell/pages/CompanionsPage.tsx:289
+#: src/shell/pages/CompanionsPage.tsx:304
+#: src/shell/pages/CompanionsPage.tsx:311
+#: src/shell/pages/CompanionsPage.tsx:312
 #, needs-review
 msgid "About"
 msgstr "Acerca de"
@@ -2240,8 +2239,8 @@ msgid "Active"
 msgstr "Activa"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:281
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:304
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "Activity"
 msgstr "Actividad"
@@ -2251,7 +2250,7 @@ msgstr "Actividad"
 #: src/apps/chat/composerAddMenu.tsx:306
 #: src/apps/chat/composerAddMenu.tsx:315
 #: src/apps/reminders/ListMain.tsx:77
-#: src/shell/pages/CompanionsPage.tsx:144
+#: src/shell/pages/CompanionsPage.tsx:167
 #, needs-review
 msgid "Add"
 msgstr "Añadir"
@@ -2948,7 +2947,7 @@ msgstr "Alertas"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:101
-#: src/shell/pages/CompanionsPage.tsx:140
+#: src/shell/pages/CompanionsPage.tsx:163
 #: src/shell/reader/SearchResults.tsx:40
 #, needs-review
 msgid "All"
@@ -2979,7 +2978,7 @@ msgid "All apps"
 msgstr "Todas las apps"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:221
+#: src/shell/pages/CompanionsPage.tsx:244
 #, needs-review
 msgid "All companions"
 msgstr "Todas las compañías"
@@ -3265,13 +3264,13 @@ msgid "notification.jobs.admin_stopped"
 msgstr "Un administrador detuvo esta tarea."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:208
+#: ../backend/src/lib/failureCopy.ts:215
 #, needs-review
 msgid "failure.composer.paused_by_admin.adult"
 msgstr "Un administrador desactivó el chat por ahora."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:209
+#: ../backend/src/lib/failureCopy.ts:216
 msgid "failure.composer.paused_by_admin.teen"
 msgstr ""
 
@@ -3281,7 +3280,7 @@ msgid "An encyclopedia written for children."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:206
+#: ../backend/src/lib/failureCopy.ts:213
 #, needs-review
 msgid "failure.composer.gpu.more"
 msgstr "Un propietario puede reiniciar la Mac cuando esté en silencio."
@@ -3809,7 +3808,7 @@ msgid "Attention needed"
 msgstr "Atención necesaria"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:71
+#: src/shell/pages/CompanionsPage.tsx:75
 #, needs-review
 msgid "Audience"
 msgstr "Público"
@@ -3953,7 +3952,7 @@ msgid "Back 10 seconds"
 msgstr "Retroceder 10 segundos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:70
+#: src/shell/pages/CompanionsPage.tsx:74
 #, needs-review
 msgid "Back to draft"
 msgstr "Volver al borrador"
@@ -3997,7 +3996,7 @@ msgid "Back to start"
 msgstr "Volver al inicio"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Back to tasks"
 msgstr "Volver a tareas"
@@ -4133,6 +4132,11 @@ msgstr "Modo base activado"
 #, needs-review
 msgid "Bare model"
 msgstr "Modelo básico"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:87
+msgid "Based on {name}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:219
@@ -4710,7 +4714,7 @@ msgid "Built in"
 msgstr "Integrado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:221
+#: src/shell/pages/CompanionsPage.tsx:244
 #, needs-review
 msgid "Built-in companion"
 msgstr "Compañía integrada"
@@ -4841,7 +4845,7 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/shell/pages/ChatPage.tsx:1665
 #: src/shell/pages/ChatPage.tsx:1681
 #: src/shell/pages/CompanionAudienceDialog.tsx:63
-#: src/shell/pages/CompanionsPage.tsx:154
+#: src/shell/pages/CompanionsPage.tsx:177
 #: src/shell/pages/FilesPage.tsx:402
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
@@ -5167,8 +5171,8 @@ msgstr "Charles"
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:92
 #: src/shell/pages/ChatPage.tsx:1735
-#: src/shell/pages/CompanionsPage.tsx:135
-#: src/shell/pages/CompanionsPage.tsx:140
+#: src/shell/pages/CompanionsPage.tsx:158
+#: src/shell/pages/CompanionsPage.tsx:163
 #: src/shell/pages/settings/settingsBackLink.ts:52
 #: src/shell/pages/UiShowcasePage.tsx:90
 #, needs-review
@@ -5242,7 +5246,7 @@ msgid "area.Chat can look at pictures"
 msgstr "El chat puede ver imágenes"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:205
+#: ../backend/src/lib/failureCopy.ts:212
 #, needs-review
 msgid "failure.composer.reduced_swap.more"
 msgstr "El chat vuelve solo en unos segundos."
@@ -5297,7 +5301,7 @@ msgid "Chat is down"
 msgstr "Chat caído"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:210
+#: ../backend/src/lib/failureCopy.ts:217
 msgid "failure.composer.paused_by_admin.child"
 msgstr ""
 
@@ -5334,13 +5338,13 @@ msgid "Chat models"
 msgstr "Modelos de chat"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:206
+#: ../backend/src/lib/failureCopy.ts:213
 #, needs-review
 msgid "failure.composer.gpu.adult"
 msgstr "El chat necesita un reinicio de la Mac."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:206
+#: ../backend/src/lib/failureCopy.ts:213
 msgid "failure.composer.gpu.teen"
 msgstr ""
 
@@ -5394,7 +5398,7 @@ msgid "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other
 msgstr "Ventana de chat: {tokens} tokens por hueco ({slots, plural, one {# hueco} other {# huecos}})."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:223
+#: src/shell/pages/CompanionsPage.tsx:246
 #, needs-review
 msgid "Chat with {name}"
 msgstr "Chatear con {name}"
@@ -5443,7 +5447,7 @@ msgid "Check my computers again"
 msgstr "Revisa mis computadoras de nuevo"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:165
+#: ../backend/src/lib/failureCopy.ts:172
 #, needs-review
 msgid "failure.composer.repairs.check"
 msgstr "Revisa Reparaciones"
@@ -5480,7 +5484,7 @@ msgid "Check that the engine is running, then try again."
 msgstr "Asegúrate de que el motor esté funcionando e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:355
+#: ../backend/src/lib/failureCopy.ts:362
 #, needs-review
 msgid "failure.advice.unreachable.next_step"
 msgstr "Comprueba que el Stack de MaiPai se ejecuta en Reparaciones."
@@ -5691,8 +5695,7 @@ msgid "api.error.companion_choose"
 msgstr "Elige una compañía de la lista."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:135
-#: src/shell/pages/CompanionsPage.tsx:144
+#: src/shell/pages/CompanionsPage.tsx:95
 #, needs-review
 msgid "Choose a conversation to get started"
 msgstr "Elige una conversación para empezar"
@@ -5789,7 +5792,7 @@ msgid "Choose a style"
 msgstr "Elige un estilo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Choose a task to see its details."
 msgstr "Elige una tarea para ver sus detalles."
@@ -6670,12 +6673,12 @@ msgstr ""
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
-#: src/shell/pages/CompanionsPage.tsx:172
+#: src/shell/pages/CompanionsPage.tsx:195
 msgid "Companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:63
+#: src/shell/pages/CompanionsPage.tsx:65
 #, needs-review
 msgid "Companion actions"
 msgstr "Acciones de compañía"
@@ -6705,7 +6708,7 @@ msgstr "Vista previa de la compañía"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:172
-#: src/shell/pages/CompanionsPage.tsx:311
+#: src/shell/pages/CompanionsPage.tsx:334
 #, needs-review
 msgid "Companion settings"
 msgstr "Configuración de la compañía"
@@ -6716,7 +6719,7 @@ msgid "Companions in the companion selector"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:121
+#: src/shell/pages/CompanionsPage.tsx:144
 #, needs-review
 msgid "Companions are turned off for you. Ask an owner or admin to turn them on."
 msgstr "Las compañías están desactivadas para ti. Pide a un propietario o administrador que las active."
@@ -6734,7 +6737,7 @@ msgid "Compare with the bare model"
 msgstr "Comparar con el modelo base"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Completed"
 msgstr "Completado"
@@ -6830,7 +6833,7 @@ msgstr ""
 #: src/apps/setup/SetupWizard.tsx:501
 #: src/shell/AmbientCompanionPane.tsx:256
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
-#: src/shell/pages/CompanionsPage.tsx:135
+#: src/shell/pages/CompanionsPage.tsx:158
 #: src/shell/pages/dashboard/HomeShelves.tsx:63
 #: src/shell/pages/SignInPage.tsx:161
 #, needs-review
@@ -6900,8 +6903,8 @@ msgid "setting.companions.allowed.does"
 msgstr "Controla quién puede ver y usar las compañías disponibles."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:263
-#: src/shell/pages/CompanionsPage.tsx:269
+#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:292
 #, needs-review
 msgid "Conversation"
 msgstr "Conversación"
@@ -7020,7 +7023,7 @@ msgid "Could not add that person."
 msgstr "No se pudo añadir a esa persona."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:95
+#: src/shell/pages/CompanionsPage.tsx:115
 #, needs-review
 msgid "Could not add this companion. Check your connection and try again."
 msgstr "No se pudo añadir esta compañía. Revisa tu conexión e inténtalo de nuevo."
@@ -7103,7 +7106,7 @@ msgid "Could not change this chat's companion."
 msgstr "No se pudo cambiar la compañía de este chat."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:99
+#: src/shell/pages/CompanionsPage.tsx:122
 #, needs-review
 msgid "Could not change this companion's status. Check your connection and try again."
 msgstr "No se pudo cambiar el estado de esta compañía. Revisa tu conexión e inténtalo de nuevo."
@@ -7233,7 +7236,7 @@ msgid "Could not delete this chat. Try again."
 msgstr "No se pudo eliminar este chat. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:94
+#: src/shell/pages/CompanionsPage.tsx:114
 #, needs-review
 msgid "Could not delete this companion. Check your connection and try again."
 msgstr "No se pudo eliminar esta compañía. Revisa tu conexión e inténtalo de nuevo."
@@ -7300,7 +7303,7 @@ msgid "Could not load access rules. Check your connection and try again."
 msgstr "No se pudieron cargar las reglas de acceso. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "Could not load activity. Check your connection and try again."
 msgstr "No se pudo cargar la actividad. Revisa tu conexión e inténtalo de nuevo."
@@ -7444,7 +7447,7 @@ msgid "Could not load storage."
 msgstr "No se pudo cargar el almacenamiento."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Could not load tasks. Check your connection and try again."
 msgstr "No se pudieron cargar las tareas. Revisa tu conexión e inténtalo de nuevo."
@@ -7456,7 +7459,7 @@ msgid "Could not load the clock. Check your connection and try again."
 msgstr "No se pudo cargar el reloj. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:115
+#: src/shell/pages/CompanionsPage.tsx:138
 #, needs-review
 msgid "Could not load the companions. Check your connection and try again."
 msgstr "No se pudieron cargar las compañías. Revisa tu conexión e inténtalo de nuevo."
@@ -7528,7 +7531,7 @@ msgid "Could not load this article."
 msgstr "No se pudo cargar este artículo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:180
+#: src/shell/pages/CompanionsPage.tsx:203
 #, needs-review
 msgid "Could not load this companion. Check your connection and try again."
 msgstr "No se pudo cargar esta compañía. Revisa tu conexión e inténtalo de nuevo."
@@ -7664,7 +7667,7 @@ msgid "Could not log out. Try again."
 msgstr "No se pudo cerrar la sesión. Intenta de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:98
+#: src/shell/pages/CompanionsPage.tsx:121
 #, needs-review
 msgid "Could not make a copy. Check your connection and try again."
 msgstr "No se pudo hacer una copia. Revisa tu conexión e inténtalo de nuevo."
@@ -7687,6 +7690,11 @@ msgstr "No se pudo crear esta clave. Inténtalo de nuevo."
 #, needs-review
 msgid "Could not make this voice. Try again."
 msgstr "No se pudo crear esta voz. Inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:117
+msgid "Could not make this your companion. Try again from the Synths list."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:53
@@ -7738,14 +7746,14 @@ msgstr "No se pudo contactar a {name}. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/errors.ts:4
-#: src/shell/pages/CompanionsPage.tsx:229
+#: src/shell/pages/CompanionsPage.tsx:252
 #: src/shell/pages/useCompanionStates.ts:9
 #, needs-review
 msgid "Could not reach Home. Check your connection and try again."
 msgstr "No pudimos llegar a Home. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:366
+#: ../backend/src/lib/failureCopy.ts:373
 #, needs-review
 msgid "failure.tool.unavailable.verb"
 msgstr "no pudo llegar a su servicio"
@@ -7769,7 +7777,7 @@ msgid "Could not remove that person."
 msgstr "No se pudo eliminar a esa persona."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:96
+#: src/shell/pages/CompanionsPage.tsx:116
 #, needs-review
 msgid "Could not remove this companion. Check your connection and try again."
 msgstr "No se pudo quitar esta compañía. Revisa tu conexión e inténtalo de nuevo."
@@ -7952,7 +7960,7 @@ msgid "Could not save this sample."
 msgstr "No se pudo guardar esta muestra."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:356
+#: src/shell/pages/CompanionsPage.tsx:379
 #, needs-review
 msgid "Could not save this voice. Check your connection and try again."
 msgstr "No se pudo guardar esta voz. Revisa tu conexión e inténtalo de nuevo."
@@ -7964,7 +7972,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:51
-#: src/shell/pages/CompanionsPage.tsx:227
+#: src/shell/pages/CompanionsPage.tsx:250
 #, needs-review
 msgid "Could not save this. Check your connection and try again."
 msgstr "No se pudo guardar esto. Revisa tu conexión e inténtalo de nuevo."
@@ -8021,10 +8029,15 @@ msgid "Could not send that to {name}. Check that it is switched on, then try aga
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:93
+#: src/shell/pages/CompanionsPage.tsx:113
 #, needs-review
 msgid "Could not set your default. Check your connection and try again."
 msgstr "No se pudo establecer tu predeterminado. Revisa tu conexión e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:118
+msgid "Could not share this synth. Try again from the Synths list."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AwaySessionsSection.tsx:32
@@ -8045,7 +8058,7 @@ msgid "Could not start {name}."
 msgstr "No se pudo iniciar {name}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:214
+#: src/shell/pages/CompanionsPage.tsx:237
 #, needs-review
 msgid "Could not start a chat with this companion. Check your connection and try again."
 msgstr "No se pudo iniciar un chat con esta compañía. Revisa tu conexión e inténtalo de nuevo."
@@ -8055,6 +8068,11 @@ msgstr "No se pudo iniciar un chat con esta compañía. Revisa tu conexión e in
 #, needs-review
 msgid "Could not start a new chat from this reply."
 msgstr "No se pudo iniciar un nuevo chat desde esta respuesta."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:119
+msgid "Could not start fresh from the base. Try again from the Synths list."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:62
@@ -8345,8 +8363,8 @@ msgid "Current PIN or password"
 msgstr "PIN o contraseña actual"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:306
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "Current work"
 msgstr "Trabajo actual"
@@ -8394,7 +8412,7 @@ msgid "Customize"
 msgstr "Personalizar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:224
+#: src/shell/pages/CompanionsPage.tsx:247
 #, needs-review
 msgid "Customize a copy"
 msgstr "Personalizar una copia"
@@ -8660,8 +8678,8 @@ msgstr "Grados Fahrenheit, como 72 F."
 #: src/shell/library/LibraryItems.tsx:38
 #: src/shell/library/LibraryViewer.tsx:159
 #: src/shell/library/LibraryViewer.tsx:159
-#: src/shell/pages/CompanionsPage.tsx:73
-#: src/shell/pages/CompanionsPage.tsx:154
+#: src/shell/pages/CompanionsPage.tsx:77
+#: src/shell/pages/CompanionsPage.tsx:177
 #: src/shell/pages/FilesPage.tsx:332
 #: src/shell/pages/MusicStudioPages.tsx:194
 #: src/shell/pages/SoundExtras.tsx:46
@@ -8678,7 +8696,7 @@ msgstr "¿Borrar ‘{name}’?"
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:184
 #: src/apps/reminders/RemindersPage.tsx:174
-#: src/shell/pages/CompanionsPage.tsx:153
+#: src/shell/pages/CompanionsPage.tsx:176
 #, needs-review
 msgid "Delete {name}?"
 msgstr "¿Eliminar {name}?"
@@ -9139,7 +9157,7 @@ msgid "Discarding"
 msgstr "Descartando"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:129
+#: src/shell/pages/CompanionsPage.tsx:152
 #, needs-review
 msgid "Discover"
 msgstr "Descubrir"
@@ -9438,9 +9456,9 @@ msgid "setting.install.recommended_auto_on_upgrade.does"
 msgstr "Descarga los extras recomendados justo después de aceptar las licencias en un Home existente."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:135
-#: src/shell/pages/CompanionsPage.tsx:144
-#: src/shell/pages/CompanionsPage.tsx:221
+#: src/shell/pages/CompanionsPage.tsx:158
+#: src/shell/pages/CompanionsPage.tsx:167
+#: src/shell/pages/CompanionsPage.tsx:244
 #, needs-review
 msgid "Draft · needs a portrait"
 msgstr "Borrador · necesita un retrato"
@@ -9572,8 +9590,8 @@ msgstr "Facilidad de uso"
 #: src/apps/settings/UsersSection.tsx:406
 #: src/shell/library/TranscriptPanel.tsx:288
 #: src/shell/library/TranscriptPanel.tsx:554
-#: src/shell/pages/CompanionsPage.tsx:66
-#: src/shell/pages/CompanionsPage.tsx:225
+#: src/shell/pages/CompanionsPage.tsx:68
+#: src/shell/pages/CompanionsPage.tsx:248
 #: src/shell/pages/PersonProfilePage.tsx:178
 #, needs-review
 msgid "Edit"
@@ -10324,7 +10342,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr "Fallo salto {id}: {detail}. Solución: {fix}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:369
+#: ../backend/src/lib/failureCopy.ts:376
 #, needs-review
 msgid "failure.tool.errored.verb"
 msgstr "falló"
@@ -10342,7 +10360,7 @@ msgid "Fall-through rate"
 msgstr "Tasa de desvío"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:106
+#: src/shell/pages/CompanionsPage.tsx:129
 #, needs-review
 msgid "Familiar faces. Different ways to help."
 msgstr "Rostros conocidos. Formas distintas de ayudar."
@@ -10596,8 +10614,8 @@ msgid "Finish your character on the first screen before making animations."
 msgstr "Termina tu personaje en la primera pantalla antes de hacer animaciones."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:263
-#: src/shell/pages/CompanionsPage.tsx:278
+#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:301
 #, needs-review
 msgid "Finished"
 msgstr "Terminado"
@@ -10819,7 +10837,7 @@ msgid "Forward 30 seconds"
 msgstr "Avanzar 30 segundos"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:368
+#: ../backend/src/lib/failureCopy.ts:375
 #, needs-review
 msgid "failure.tool.found_nothing.verb"
 msgstr "no encontró nada"
@@ -10837,7 +10855,7 @@ msgid "Free memory"
 msgstr "Memoria libre"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:352
+#: ../backend/src/lib/failureCopy.ts:359
 #, needs-review
 msgid "failure.advice.memory.next_step"
 msgstr "Libera algo de memoria e inténtalo de nuevo."
@@ -11193,18 +11211,18 @@ msgid "Getting it ready…"
 msgstr "Preparándolo…"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:204
+#: ../backend/src/lib/failureCopy.ts:211
 #, needs-review
 msgid "failure.composer.mode_change.adult"
 msgstr "Preparando. Vuelvo en un minuto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:204
+#: ../backend/src/lib/failureCopy.ts:211
 msgid "failure.composer.mode_change.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:204
+#: ../backend/src/lib/failureCopy.ts:211
 msgid "failure.composer.mode_change.child"
 msgstr ""
 
@@ -11416,7 +11434,7 @@ msgid "Good morning, {displayName}"
 msgstr "Buenos días, {displayName}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:370
+#: ../backend/src/lib/failureCopy.ts:377
 #, needs-review
 msgid "failure.tool.bad_arguments.verb"
 msgstr "recibió una solicitud que no podía usar"
@@ -11777,7 +11795,7 @@ msgstr "Home no te oye ahora mismo. Escribe tu mensaje o abre Reparaciones para 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:94
 #: src/apps/settings/VoiceManagerSection.tsx:101
-#: src/shell/pages/CompanionsPage.tsx:359
+#: src/shell/pages/CompanionsPage.tsx:382
 #, needs-review
 msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr "Home no puede conectar con su servicio de voz. Revisa Reparaciones y vuelve."
@@ -12046,13 +12064,13 @@ msgid "Home could not make that voiceover. Try again."
 msgstr "Home no pudo crear ese doblaje. Vuelve a intentarlo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:355
+#: ../backend/src/lib/failureCopy.ts:362
 #, needs-review
 msgid "failure.advice.unreachable.cause"
 msgstr "Home no pudo llegar al motor de chat."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:356
+#: ../backend/src/lib/failureCopy.ts:363
 #, needs-review
 msgid "failure.advice.engine_computer.cause"
 msgstr "Home no pudo llegar al ordenador del motor."
@@ -12398,7 +12416,7 @@ msgid "Home is checking that everything is ready."
 msgstr "Home está comprobando que todo esté listo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:204
+#: ../backend/src/lib/failureCopy.ts:211
 #, needs-review
 msgid "failure.composer.mode_change.more"
 msgstr "Home se prepara para otra tarea. El chat vuelve solo."
@@ -12673,7 +12691,7 @@ msgid "Household commands"
 msgstr "Comandos del hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:221
+#: src/shell/pages/CompanionsPage.tsx:244
 #, needs-review
 msgid "Household companion"
 msgstr "Compañía del hogar"
@@ -12769,7 +12787,7 @@ msgid "setting.resources.preset.help"
 msgstr "Cómo comparte Home el ordenador cuando una tarea grande necesita más espacio. Un preset define el tiempo de silencio, la espera y si Home pregunta antes de reducir una tarea. Si cambias uno manualmente, se muestra Personalizado."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:295
+#: src/shell/pages/CompanionsPage.tsx:318
 #, needs-review
 msgid "How it talks"
 msgstr "Cómo habla"
@@ -13095,12 +13113,12 @@ msgid "setting.person.voice_print.enrollment.consent_teen_self"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:124
+#: ../backend/src/lib/failureCopy.ts:131
 msgid "failure.unreachable.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:129
+#: ../backend/src/lib/failureCopy.ts:136
 msgid "failure.engine_computer.minor"
 msgstr ""
 
@@ -13120,19 +13138,19 @@ msgid "failure.voice.listening_engine.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:128
+#: ../backend/src/lib/failureCopy.ts:135
 #, needs-review
 msgid "failure.engine_computer.adultAway"
 msgstr "No puedo llegar al ordenador de IA desde aquí. Tu mensaje está a salvo; envíalo de nuevo cuando estés en casa o cuando vuelva la conexión."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:127
+#: ../backend/src/lib/failureCopy.ts:134
 #, needs-review
 msgid "failure.engine_computer.adult"
 msgstr "No puedo llegar al ordenador de IA ahora mismo. Tu mensaje está a salvo; envíalo de nuevo cuando el chat vuelva."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:123
+#: ../backend/src/lib/failureCopy.ts:130
 #, needs-review
 msgid "failure.unreachable.adult"
 msgstr "No puedo llegar a la IA de este ordenador. Comprueba que se ejecuta e inténtalo de nuevo."
@@ -13163,13 +13181,13 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:427
+#: ../backend/src/lib/failureCopy.ts:434
 #, needs-review
 msgid "failure.ask_form.unreachable"
 msgstr "No pude enviar el formulario. Revisa tu conexión y envía el formulario de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:428
+#: ../backend/src/lib/failureCopy.ts:435
 #, needs-review
 msgid "failure.ask_form.other"
 msgstr "No pude enviar el formulario. Envíalo de nuevo en un momento."
@@ -13193,30 +13211,30 @@ msgid "I couldn't check on that video"
 msgstr "No pude revisar ese video"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:132
+#: ../backend/src/lib/failureCopy.ts:139
 #, needs-review
 msgid "failure.context_too_large.adult"
 msgstr "No pude retener todo eso en mi cabeza a la vez. Envíalo de nuevo y lo intentaré otra vez."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:395
 #, needs-review
 msgid "failure.partial.slow"
 msgstr "Tuve que parar ahí porque la IA dejó de responder. Pídeme que continúe si quieres el resto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:389
+#: ../backend/src/lib/failureCopy.ts:396
 #, needs-review
 msgid "failure.partial.other"
 msgstr "Tuve que parar ahí porque la IA dejó de funcionar. Pídeme que continúe si quieres el resto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:387
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.partial.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:116
+#: ../backend/src/lib/failureCopy.ts:123
 msgid "failure.stopped.minor"
 msgstr ""
 
@@ -13263,12 +13281,12 @@ msgid "I looked at the starting picture and every animation."
 msgstr "Miré la imagen inicial y todas las animaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:206
+#: ../backend/src/lib/failureCopy.ts:213
 msgid "failure.composer.gpu.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:195
+#: ../backend/src/lib/failureCopy.ts:202
 msgid "failure.composer.memory.child"
 msgstr ""
 
@@ -13279,17 +13297,17 @@ msgid "I understand"
 msgstr "Entendido"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:201
+#: ../backend/src/lib/failureCopy.ts:208
 msgid "failure.composer.not_installed.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:171
+#: ../backend/src/lib/failureCopy.ts:178
 msgid "failure.composer.paused.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:216
+#: ../backend/src/lib/failureCopy.ts:223
 msgid "failure.composer.offline.child"
 msgstr ""
 
@@ -13300,7 +13318,7 @@ msgid "I'm taking a break. Ask a grown-up."
 msgstr "Estoy en pausa. Pregunta a un adulto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:177
+#: ../backend/src/lib/failureCopy.ts:184
 msgid "failure.composer.starting.child"
 msgstr ""
 
@@ -13845,7 +13863,7 @@ msgid "Its file moves to Recently removed for 30 days, then it is deleted. Clips
 msgstr "Su archivo se mueve a Eliminados recientemente durante 30 días y luego se elimina. Los clips ya creados con él permanecen."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:340
+#: src/shell/pages/CompanionsPage.tsx:363
 #, needs-review
 msgid "Its own voice"
 msgstr "Su propia voz"
@@ -14278,7 +14296,7 @@ msgid "area.Keyboard shortcuts"
 msgstr "Atajos de teclado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:140
+#: src/shell/pages/CompanionsPage.tsx:163
 #, needs-review
 msgid "Kids"
 msgstr "Niños"
@@ -14467,8 +14485,7 @@ msgid "Last 90 days: no data yet."
 msgstr "Últimos 90 días: aún no hay datos."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:135
-#: src/shell/pages/CompanionsPage.tsx:144
+#: src/shell/pages/CompanionsPage.tsx:94
 #, needs-review
 msgid "Last active {when} · {chats, plural, one {# chat} other {# chats}}"
 msgstr "Última actividad {when} · {chats, plural, one {# chat} other {# chats}}"
@@ -15024,7 +15041,7 @@ msgid "Lights"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:292
+#: src/shell/pages/CompanionsPage.tsx:315
 #, needs-review
 msgid "Likes: {list}."
 msgstr "Le gusta: {list}."
@@ -15295,7 +15312,7 @@ msgid "Loading"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "Loading activity…"
 msgstr "Cargando actividad…"
@@ -15346,7 +15363,7 @@ msgstr "Cargando configuración de Coding"
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:22
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:23
-#: src/shell/pages/CompanionsPage.tsx:181
+#: src/shell/pages/CompanionsPage.tsx:204
 #, needs-review
 msgid "Loading companion"
 msgstr "Cargando compañía"
@@ -15354,7 +15371,7 @@ msgstr "Cargando compañía"
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:18
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:19
-#: src/shell/pages/CompanionsPage.tsx:116
+#: src/shell/pages/CompanionsPage.tsx:139
 #, needs-review
 msgid "Loading companions"
 msgstr "Cargando compañías"
@@ -15573,7 +15590,7 @@ msgid "Loading styles"
 msgstr "Cargando estilos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Loading tasks…"
 msgstr "Cargando tareas…"
@@ -16129,7 +16146,7 @@ msgid "Make a band"
 msgstr "Hacer una banda"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:68
+#: src/shell/pages/CompanionsPage.tsx:72
 #, needs-review
 msgid "Make a copy"
 msgstr "Hacer una copia"
@@ -16335,6 +16352,11 @@ msgstr "Hacer el corte"
 #, needs-review
 msgid "Make the remix"
 msgstr "Haz el remix"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:69
+msgid "Make this my companion"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:64
@@ -16557,7 +16579,7 @@ msgid "Mark all-ages"
 msgstr "Marcar para todas las edades"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:69
+#: src/shell/pages/CompanionsPage.tsx:73
 #, needs-review
 msgid "Mark ready"
 msgstr "Marcar como listo"
@@ -17085,7 +17107,7 @@ msgid "More Coding settings"
 msgstr "Más ajustes de Coding"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:146
+#: src/shell/pages/CompanionsPage.tsx:169
 #, needs-review
 msgid "More companions from the catalog are coming soon."
 msgstr "Pronto llegarán más compañías del catálogo."
@@ -17496,16 +17518,16 @@ msgid "Needs setup"
 msgstr "Necesita configuración"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
-#: src/shell/pages/CompanionsPage.tsx:286
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:306
+#: src/shell/pages/CompanionsPage.tsx:309
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Needs you"
 msgstr "Necesita de ti"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:277
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:300
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "Needs your choice"
 msgstr "Necesita tu elección"
@@ -17642,7 +17664,7 @@ msgid "New Coding key"
 msgstr "Nueva clave de Coding"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:108
+#: src/shell/pages/CompanionsPage.tsx:131
 #, needs-review
 msgid "New companion"
 msgstr "Nueva compañía"
@@ -17844,7 +17866,7 @@ msgid "No active sessions."
 msgstr "No hay sesiones activas."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "No activity for {name} yet."
 msgstr "Aún no hay actividad para {name}."
@@ -17940,7 +17962,7 @@ msgid "No commands yet."
 msgstr "Aún no hay comandos."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:123
+#: src/shell/pages/CompanionsPage.tsx:146
 #, needs-review
 msgid "No companions are installed yet."
 msgstr "Aún no hay compañías instaladas."
@@ -18360,7 +18382,7 @@ msgid "No. Everything you say to MaiPai, everything it remembers, and everyone i
 msgstr "No. Todo lo que le dices a MaiPai, todo lo que recuerda y todas las personas de tu hogar se quedan en esta computadora. Nunca se nos envía. No tenemos un servidor por donde pase la información de tu familia, y nada en MaiPai nos reporta cómo lo usas."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:310
+#: src/shell/pages/CompanionsPage.tsx:333
 #, needs-review
 msgid "nobody yet"
 msgstr "nadie todavía"
@@ -18404,7 +18426,7 @@ msgid "api.error.list_move_none"
 msgstr "Ninguno de esos elementos está en la lista. Actualiza la lista e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:311
+#: src/shell/pages/CompanionsPage.tsx:334
 #, needs-review
 msgid "none yet"
 msgstr "ninguna todavía"
@@ -18669,7 +18691,7 @@ msgid "Note"
 msgstr "Nota"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Nothing has finished yet."
 msgstr "Nada ha terminado todavía."
@@ -18722,7 +18744,7 @@ msgid "Nothing is loaded right now."
 msgstr "Ahora mismo no hay nada cargado."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Nothing is running."
 msgstr "Nada está en marcha."
@@ -18734,7 +18756,7 @@ msgid "Nothing listed."
 msgstr "Nada listado."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Nothing needs you right now."
 msgstr "Nada necesita de ti ahora mismo."
@@ -19285,6 +19307,11 @@ msgid "On"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:89
+msgid "On {titles}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:253
 #, needs-review
 msgid "On a call with {name}"
@@ -19381,7 +19408,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr "Cuando el almacenamiento total de copias de seguridad supera esto, se eliminan primero las copias más antiguas. Se comprueba tras el calendario habitual de siete diarios, cuatro semanales y tres mensuales. 0 significa sin límite extra."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:426
+#: ../backend/src/lib/failureCopy.ts:433
 #, needs-review
 msgid "failure.ask_form.invalid"
 msgstr "Una respuesta no encajaba. Revisa cada campo y envía el formulario de nuevo."
@@ -19393,50 +19420,50 @@ msgid "One computer"
 msgstr "Un ordenador"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:109
+#: ../backend/src/lib/failureCopy.ts:116
 msgid "failure.memory.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:205
+#: ../backend/src/lib/failureCopy.ts:212
 #, needs-review
 msgid "failure.composer.reduced_swap.adult"
 msgstr "Un momento. Vuelvo en unos 15 segundos."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:205
+#: ../backend/src/lib/failureCopy.ts:212
 msgid "failure.composer.reduced_swap.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:205
+#: ../backend/src/lib/failureCopy.ts:212
 msgid "failure.composer.reduced_swap.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:187
+#: ../backend/src/lib/failureCopy.ts:194
 #, needs-review
 msgid "failure.composer.restarting.adult"
 msgstr "Un momento. Vuelvo pronto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:188
+#: ../backend/src/lib/failureCopy.ts:195
 msgid "failure.composer.restarting.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:189
+#: ../backend/src/lib/failureCopy.ts:196
 msgid "failure.composer.restarting.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:193
+#: ../backend/src/lib/failureCopy.ts:200
 #, needs-review
 msgid "failure.composer.memory.adult"
 msgstr "Un momento. Vuelvo pronto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:194
+#: ../backend/src/lib/failureCopy.ts:201
 msgid "failure.composer.memory.teen"
 msgstr ""
 
@@ -19455,19 +19482,19 @@ msgid "One moment. Home will be back in about a minute."
 msgstr "Un momento. Home volverá en un minuto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:104
+#: ../backend/src/lib/failureCopy.ts:111
 #, needs-review
 msgid "failure.busy.adult"
 msgstr "Un momento. Envía eso de nuevo en un rato."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:108
+#: ../backend/src/lib/failureCopy.ts:115
 #, needs-review
 msgid "failure.memory.adult"
 msgstr "Un momento. Inténtalo de nuevo en un rato."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:105
+#: ../backend/src/lib/failureCopy.ts:112
 msgid "failure.busy.minor"
 msgstr ""
 
@@ -19622,7 +19649,7 @@ msgid "Open a song from your list, then choose Studio."
 msgstr "Abre una canción de tu lista y luego elige Estudio."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:269
+#: src/shell/pages/CompanionsPage.tsx:292
 #, needs-review
 msgid "Open chat"
 msgstr "Abrir chat"
@@ -19717,7 +19744,7 @@ msgid "Open one to play it and see everything you can do."
 msgstr "Abre una para reproducirla y ver todo lo que puedes hacer."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:164
+#: ../backend/src/lib/failureCopy.ts:171
 #, needs-review
 msgid "failure.composer.repairs.open"
 msgstr "Abrir Reparaciones"
@@ -19729,7 +19756,7 @@ msgid "Open Repairs"
 msgstr "Abrir Reparaciones"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Open result"
 msgstr "Abrir resultado"
@@ -19747,7 +19774,7 @@ msgid "Open song"
 msgstr "Abrir canción"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Open source conversation"
 msgstr "Abrir conversación original"
@@ -20278,7 +20305,7 @@ msgid "People with access can use Coding again."
 msgstr "Las personas con acceso pueden usar Coding de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:310
+#: src/shell/pages/CompanionsPage.tsx:333
 #, needs-review
 msgid "People: {list}."
 msgstr "Personas: {list}."
@@ -20863,7 +20890,7 @@ msgid "Play"
 msgstr "Reproducir"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:343
+#: src/shell/pages/CompanionsPage.tsx:366
 #, needs-review
 msgid "Play a sample"
 msgstr "Reproducir muestra"
@@ -21231,8 +21258,8 @@ msgstr "Perfil no encontrado"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/AnimateStep.tsx:129
-#: src/shell/pages/CompanionsPage.tsx:286
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Progress"
 msgstr "Progreso"
@@ -21257,7 +21284,7 @@ msgid "Projects keep related chats together."
 msgstr "Los proyectos mantienen juntos los chats relacionados."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:291
+#: src/shell/pages/CompanionsPage.tsx:314
 #, needs-review
 msgid "Pronouns: {pronouns}"
 msgstr "Pronombres: {pronouns}"
@@ -21550,7 +21577,7 @@ msgstr "Leyendo los detalles…"
 #: src/apps/setup/CheckGrid.tsx:31
 #: src/apps/setup/SetupWizard.tsx:478
 #: src/shell/pages/companionFlow/AnimateStep.tsx:29
-#: src/shell/pages/CompanionsPage.tsx:221
+#: src/shell/pages/CompanionsPage.tsx:244
 #: src/shell/pages/EnginesPage.tsx:34
 msgid "Ready"
 msgstr ""
@@ -21909,7 +21936,7 @@ msgid "Remove and apply"
 msgstr "Eliminar y aplicar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:72
+#: src/shell/pages/CompanionsPage.tsx:76
 #, needs-review
 msgid "Remove from Yours"
 msgstr "Quitar de Tus"
@@ -22228,7 +22255,7 @@ msgid "setting.chat.search_assist.option_label.rescue"
 msgstr "Rescate"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:140
+#: src/shell/pages/CompanionsPage.tsx:163
 #, needs-review
 msgid "Research"
 msgstr "Investigación"
@@ -22453,13 +22480,13 @@ msgid "Retry"
 msgstr "Reintentar"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:366
+#: ../backend/src/lib/failureCopy.ts:373
 #, needs-review
 msgid "failure.tool.unavailable.next_step"
 msgstr "Inténtalo de nuevo cuando el servicio vuelva. Si sigue caído, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:356
+#: ../backend/src/lib/failureCopy.ts:363
 #, needs-review
 msgid "failure.advice.engine_computer.next_step"
 msgstr "Inténtalo de nuevo cuando vuelva la conexión. Si sigue caído, revisa Reparaciones."
@@ -22471,37 +22498,37 @@ msgid "Retry with current companion"
 msgstr "Reintenta con la compañía actual"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:357
+#: ../backend/src/lib/failureCopy.ts:364
 #, needs-review
 msgid "failure.advice.context_too_large.next_step"
 msgstr "Inténtalo con menos texto o empieza un chat nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:370
+#: ../backend/src/lib/failureCopy.ts:377
 #, needs-review
 msgid "failure.tool.bad_arguments.next_step"
 msgstr "Inténtalo de nuevo; el modelo puede redactar la solicitud de otra manera."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:367
+#: ../backend/src/lib/failureCopy.ts:374
 #, needs-review
 msgid "failure.tool.timed_out.next_step"
 msgstr "Inténtalo de nuevo; el servicio tardó mucho en responder."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:354
+#: ../backend/src/lib/failureCopy.ts:361
 #, needs-review
 msgid "failure.advice.slow.next_step"
 msgstr "Inténtalo de nuevo. Si sigue pasando, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:358
+#: ../backend/src/lib/failureCopy.ts:365
 #, needs-review
 msgid "failure.advice.other.next_step"
 msgstr "Inténtalo de nuevo. Si sigue pasando, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:369
+#: ../backend/src/lib/failureCopy.ts:376
 #, needs-review
 msgid "failure.tool.errored.next_step"
 msgstr "Inténtalo de nuevo. Si sigue pasando, revisa Reparaciones."
@@ -22521,13 +22548,13 @@ msgid "Reverting"
 msgstr "Des haciendo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:269
+#: src/shell/pages/CompanionsPage.tsx:292
 #, needs-review
 msgid "Review"
 msgstr "Revisión"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:306
 #, needs-review
 msgid "Review task"
 msgstr "Revisar tarea"
@@ -22817,7 +22844,7 @@ msgid "Robots found on your network"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:311
+#: src/shell/pages/CompanionsPage.tsx:334
 msgid "Robots: {list}."
 msgstr ""
 
@@ -22955,7 +22982,7 @@ msgstr "Nivel:"
 #: src/apps/settings/CodingSettings.tsx:139
 #: src/apps/settings/CodingSettings.tsx:139
 #: src/apps/setup/SetupWizard.tsx:481
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:309
 #: src/shell/pages/status/StatusComponents.tsx:39
 #: src/shell/pages/status/StatusComponents.tsx:49
 #: src/shell/pages/status/StatusComponents.tsx:114
@@ -23522,8 +23549,8 @@ msgid "Search cities"
 msgstr "Buscar ciudades"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:131
-#: src/shell/pages/CompanionsPage.tsx:131
+#: src/shell/pages/CompanionsPage.tsx:154
+#: src/shell/pages/CompanionsPage.tsx:154
 #, needs-review
 msgid "Search companions"
 msgstr "Buscar compañías"
@@ -23973,7 +24000,7 @@ msgid "Set as default"
 msgstr "Establecer como predeterminado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:67
+#: src/shell/pages/CompanionsPage.tsx:69
 #, needs-review
 msgid "Set as my default"
 msgstr "Establecer como mi predeterminado"
@@ -24293,6 +24320,11 @@ msgid "Share"
 msgstr "Compartir"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:70
+msgid "Share with the household"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:149
 #, needs-review
 msgid "Shared"
@@ -24329,7 +24361,7 @@ msgstr "Estanterías"
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/reminderTypes.ts:16
-#: src/shell/pages/CompanionsPage.tsx:140
+#: src/shell/pages/CompanionsPage.tsx:163
 #, needs-review
 msgid "Shopping"
 msgstr "Compras"
@@ -25130,7 +25162,7 @@ msgid "Something went wrong opening the camera. Try again."
 msgstr "Algo salió mal al abrir la cámara. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:136
+#: ../backend/src/lib/failureCopy.ts:143
 #, needs-review
 msgid "failure.other.adult"
 msgstr "Algo salió mal al escribir eso. Envíalo de nuevo o revisa Reparaciones."
@@ -25142,7 +25174,7 @@ msgid "Something went wrong. Try again."
 msgstr "Algo salió mal. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:137
+#: ../backend/src/lib/failureCopy.ts:144
 msgid "failure.other.minor"
 msgstr ""
 
@@ -25590,6 +25622,11 @@ msgid "Start"
 msgstr "Iniciar"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:71
+msgid "Start fresh from the base"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:295
 #, needs-review
 msgid "Start from a sound"
@@ -25617,7 +25654,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr "Vuelve a iniciar sesión con tu PIN o passkey."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:353
+#: ../backend/src/lib/failureCopy.ts:360
 #, needs-review
 msgid "failure.advice.stopped.next_step"
 msgstr "Inicia el motor de chat en Reparaciones."
@@ -25698,7 +25735,7 @@ msgid "Starting {title}…"
 msgstr "Iniciando {title}…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:223
+#: src/shell/pages/CompanionsPage.tsx:246
 #, needs-review
 msgid "Starting chat…"
 msgstr "Iniciando chat…"
@@ -25721,13 +25758,13 @@ msgid "Starting up"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:175
+#: ../backend/src/lib/failureCopy.ts:182
 #, needs-review
 msgid "failure.composer.starting.adult"
 msgstr "Arrancando. Envía en un momento."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:176
+#: ../backend/src/lib/failureCopy.ts:183
 msgid "failure.composer.starting.teen"
 msgstr ""
 
@@ -25869,7 +25906,7 @@ msgstr "Piedra"
 #: src/shell/pages/companionFlow/AnimateStep.tsx:146
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:267
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:117
-#: src/shell/pages/CompanionsPage.tsx:343
+#: src/shell/pages/CompanionsPage.tsx:366
 #: src/shell/pages/EnginesPage.tsx:236
 #: src/shell/pages/status/StatusComponents.tsx:129
 #: src/shell/pages/UiShowcasePage.tsx:96
@@ -25931,8 +25968,8 @@ msgid "Stop this robot's installation."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:263
-#: src/shell/pages/CompanionsPage.tsx:278
+#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:301
 #: src/shell/pages/MusicWorkspacePage.tsx:58
 #: src/shell/pages/SoundExtras.tsx:42
 #: src/shell/pages/status/StatusComponents.tsx:44
@@ -26040,7 +26077,7 @@ msgid "Storage usage by person"
 msgstr "Uso de almacenamiento por persona"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:140
+#: src/shell/pages/CompanionsPage.tsx:163
 #, needs-review
 msgid "Stories"
 msgstr "Historias"
@@ -26214,7 +26251,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:15
-#: src/shell/pages/CompanionsPage.tsx:81
+#: src/shell/pages/CompanionsPage.tsx:101
 #: src/shell/phoneMenuLinks.tsx:14
 #, needs-review
 msgid "Companions"
@@ -26289,14 +26326,14 @@ msgid "Tap to turn the sound on"
 msgstr "Toca para activar el sonido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:269
+#: src/shell/pages/CompanionsPage.tsx:292
 #, needs-review
 msgid "Task"
 msgstr "Tarea"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:281
-#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:304
+#: src/shell/pages/CompanionsPage.tsx:309
 #, needs-review
 msgid "Tasks"
 msgstr "Tareas"
@@ -26654,7 +26691,7 @@ msgid "api.error.companion_unavailable"
 msgstr "Esa compañía no está disponible para ti. Elige otra de la lista."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:180
+#: src/shell/pages/CompanionsPage.tsx:203
 #, needs-review
 msgid "That companion is not on your list. Go back and pick one from the gallery."
 msgstr "Esa compañía no está en tu lista. Vuelve y elige una de la galería."
@@ -26784,7 +26821,7 @@ msgid "api.error.list_missing"
 msgstr "Esa lista ya no está. Actualiza tus listas e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:411
+#: ../backend/src/lib/failureCopy.ts:418
 #, needs-review
 msgid "failure.prompt_limit.too_big.adult"
 msgstr "Ese mensaje es más grande de lo que puedo leer de una vez en este ordenador, así que no pude responderlo."
@@ -26796,7 +26833,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr "Ese mensaje ya no está disponible. Este chat se abre al final."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:412
+#: ../backend/src/lib/failureCopy.ts:419
 msgid "failure.prompt_limit.too_big.minor"
 msgstr ""
 
@@ -26866,7 +26903,7 @@ msgid "api.error.project_missing"
 msgstr "No se encontró ese proyecto. Actualiza Proyectos e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:115
+#: ../backend/src/lib/failureCopy.ts:122
 #, needs-review
 msgid "failure.stopped.adult"
 msgstr "Esa respuesta no terminó. Envíala de nuevo en un momento."
@@ -26933,12 +26970,12 @@ msgid "api.error.coming_up_timer_missing"
 msgstr "No se encontró ese temporizador. Actualiza Próximos e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:120
+#: ../backend/src/lib/failureCopy.ts:127
 msgid "failure.slow.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:119
+#: ../backend/src/lib/failureCopy.ts:126
 #, needs-review
 msgid "failure.slow.adult"
 msgstr "Tardó demasiado. Envíalo de nuevo."
@@ -26968,7 +27005,7 @@ msgid "api.error.voice_not_on_hub"
 msgstr "Esa voz no está en este hub. Elige una de la lista."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:133
+#: ../backend/src/lib/failureCopy.ts:140
 msgid "failure.context_too_large.minor"
 msgstr ""
 
@@ -27010,7 +27047,7 @@ msgid "The AI is waiting for its helper to start. The Status page shows what is 
 msgstr "La IA espera a que su asistente inicie. La página Estado muestra lo que ocurre."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:214
+#: ../backend/src/lib/failureCopy.ts:221
 #, needs-review
 msgid "failure.composer.offline.adult"
 msgstr "La IA no responde."
@@ -27022,18 +27059,18 @@ msgid "The AI isn't answering."
 msgstr "La IA no responde."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:215
+#: ../backend/src/lib/failureCopy.ts:222
 msgid "failure.composer.offline.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:199
+#: ../backend/src/lib/failureCopy.ts:206
 #, needs-review
 msgid "failure.composer.not_installed.adult"
 msgstr "La IA no está instalada. Pregunta a un propietario."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:200
+#: ../backend/src/lib/failureCopy.ts:207
 msgid "failure.composer.not_installed.teen"
 msgstr ""
 
@@ -27050,7 +27087,7 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr "La IA se reinició mientras respondía. Intenta de nuevo en un minuto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:425
+#: ../backend/src/lib/failureCopy.ts:432
 #, needs-review
 msgid "failure.ask_form.field"
 msgstr "La respuesta para \"{label}\" no encajaba. Corrige ese campo y envía el formulario de nuevo."
@@ -27092,6 +27129,11 @@ msgid "The bare reply was refused by the same safety pass a real turn uses."
 msgstr "La respuesta base fue rechazada por la misma revisión de seguridad que usa un turno real."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:119
+msgid "The base synth is missing. Refresh the Synths list and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiJobSummary.tsx:19
 #, needs-review
 msgid "The best this computer can do. It takes the computer while it runs."
@@ -27121,19 +27163,19 @@ msgid "The character could not be made ready. Try again."
 msgstr "No se pudo preparar al personaje. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:354
+#: ../backend/src/lib/failureCopy.ts:361
 #, needs-review
 msgid "failure.advice.slow.cause"
 msgstr "El motor de chat dejó de responder antes de que terminara la respuesta."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:351
+#: ../backend/src/lib/failureCopy.ts:358
 #, needs-review
 msgid "failure.advice.busy.cause"
 msgstr "El motor de chat aún estaba arrancando o ocupado, así que la respuesta nunca empezó."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:353
+#: ../backend/src/lib/failureCopy.ts:360
 #, needs-review
 msgid "failure.advice.stopped.cause"
 msgstr "El motor de chat estaba detenido, así que la respuesta nunca empezó."
@@ -27172,7 +27214,7 @@ msgid "setting.companions.enabled.help"
 msgstr "Las compañías que conservas en Tus cosas."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:352
+#: ../backend/src/lib/failureCopy.ts:359
 #, needs-review
 msgid "failure.advice.memory.cause"
 msgstr "El ordenador tenía poca memoria para ejecutar el motor de chat."
@@ -27715,13 +27757,13 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr "El remix no pudo empezar. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:358
+#: ../backend/src/lib/failureCopy.ts:365
 #, needs-review
 msgid "failure.advice.other.cause"
 msgstr "La respuesta falló y el motor no dijo por qué."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:357
+#: ../backend/src/lib/failureCopy.ts:364
 #, needs-review
 msgid "failure.advice.context_too_large.cause"
 msgstr "La solicitud era demasiado grande para la ventana de contexto del motor de chat."
@@ -28068,7 +28110,7 @@ msgid "setting.robot.voice.id.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:340
+#: src/shell/pages/CompanionsPage.tsx:363
 #, needs-review
 msgid "The voice you chose in Settings"
 msgstr "La voz que elegiste en Ajustes"
@@ -28145,7 +28187,7 @@ msgid "They lose access now."
 msgstr "Ahora pierden el acceso."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:302
+#: src/shell/pages/CompanionsPage.tsx:325
 #, needs-review
 msgid "Things it might say"
 msgstr "Cosas que podría decir"
@@ -28235,13 +28277,13 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr "No se puede deshacer. El archivo desaparece de la Biblioteca. Una copia que un chat aún muestre se queda en ese chat."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:407
+#: ../backend/src/lib/failureCopy.ts:414
 #, needs-review
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr "Este chat se ha vuelto demasiado largo para recordarlo junto con ese mensaje. Empieza un chat nuevo con Nuevo chat: traeré un resumen de este y lo usaré desde tu próximo mensaje allí."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:408
+#: ../backend/src/lib/failureCopy.ts:415
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
@@ -28264,7 +28306,7 @@ msgid "setting.generation.kid_enabled.label"
 msgstr "Este niño puede crear dibujos animados y videos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:230
+#: src/shell/pages/CompanionsPage.tsx:253
 #, needs-review
 msgid "This companion comes with Home, so it can't be changed. Make a copy and edit that."
 msgstr "Esta compañía viene con Home, así que no se puede cambiar. Haz una copia y edita esa."
@@ -28379,7 +28421,7 @@ msgid "api.error.file_belongs_to_item"
 msgstr "Este archivo pertenece a otro elemento. Borra ese elemento en su lugar."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:424
+#: ../backend/src/lib/failureCopy.ts:431
 #, needs-review
 msgid "failure.ask_form.stale"
 msgstr "Este formulario expiró o ya se envió. Pregúntame de nuevo para obtener un formulario nuevo."
@@ -28498,7 +28540,7 @@ msgid "api.error.passkey_registration_expired"
 msgstr "Este intento de registro ha caducado. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:153
+#: src/shell/pages/CompanionsPage.tsx:176
 #, needs-review
 msgid "This removes it for the whole home."
 msgstr "Esto lo elimina para todo el hogar."
@@ -28654,7 +28696,7 @@ msgid "Time remaining"
 msgstr "Tiempo restante"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:367
+#: ../backend/src/lib/failureCopy.ts:374
 #, needs-review
 msgid "failure.tool.timed_out.verb"
 msgstr "excedió el tiempo de espera"
@@ -28727,7 +28769,7 @@ msgstr ""
 #: src/apps/reminders/SmartListView.tsx:15
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
-#: src/shell/pages/CompanionsPage.tsx:259
+#: src/shell/pages/CompanionsPage.tsx:282
 #: src/shell/pages/dashboard/TodaySection.tsx:81
 #: src/shell/pages/dashboard/TodaySection.tsx:82
 #: src/shell/pages/dashboard/TodaySection.tsx:103
@@ -29069,7 +29111,7 @@ msgid "api.next.internal"
 msgstr "Inténtalo de nuevo. Si sigue pasando, abre Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:368
+#: ../backend/src/lib/failureCopy.ts:375
 #, needs-review
 msgid "failure.tool.found_nothing.next_step"
 msgstr "Prueba a preguntar de otra manera."
@@ -29479,7 +29521,7 @@ msgid "Understanding"
 msgstr "Comprensión"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:278
+#: src/shell/pages/CompanionsPage.tsx:301
 #, needs-review
 msgid "Understood the request"
 msgstr "Entendió la solicitud"
@@ -30262,7 +30304,7 @@ msgid "area.Videos with sound"
 msgstr "Vídeos con sonido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:269
+#: src/shell/pages/CompanionsPage.tsx:292
 #, needs-review
 msgid "View"
 msgstr "Ver"
@@ -30274,7 +30316,7 @@ msgid "View history"
 msgstr "Ver historial"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:135
+#: src/shell/pages/CompanionsPage.tsx:158
 #, needs-review
 msgid "View profile"
 msgstr "Ver perfil"
@@ -30318,7 +30360,7 @@ msgstr "Voces"
 #: src/shell/AmbientCompanionPane.tsx:175
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:107
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:114
-#: src/shell/pages/CompanionsPage.tsx:307
+#: src/shell/pages/CompanionsPage.tsx:330
 #: src/shell/pages/MusicVoiceCreate.tsx:118
 #: src/shell/pages/MusicVoiceCreate.tsx:120
 #: src/shell/pages/MusicVoiceCreate.tsx:139
@@ -30395,7 +30437,7 @@ msgid "Voice for {who}"
 msgstr "Voz para {who}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:349
+#: src/shell/pages/CompanionsPage.tsx:372
 #, needs-review
 msgid "Voice for this companion"
 msgstr "Voz para esta compañía"
@@ -30509,7 +30551,7 @@ msgid "Volume of {name}"
 msgstr "Volumen de {name}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:351
+#: ../backend/src/lib/failureCopy.ts:358
 #, needs-review
 msgid "failure.advice.busy.next_step"
 msgstr "Espera un momento e inténtalo de nuevo."
@@ -30580,13 +30622,13 @@ msgid "Waiting for the robot to check in."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:263
+#: src/shell/pages/CompanionsPage.tsx:286
 #, needs-review
 msgid "Waiting for you"
 msgstr "Esperando por ti"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:278
+#: src/shell/pages/CompanionsPage.tsx:301
 #, needs-review
 msgid "Waiting for your choice"
 msgstr "Esperando tu elección"
@@ -31294,7 +31336,7 @@ msgid "Who may hear this"
 msgstr "Quién puede escuchar esto"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:309
+#: src/shell/pages/CompanionsPage.tsx:332
 #, needs-review
 msgid "Who uses it"
 msgstr "Quién lo usa"
@@ -31411,9 +31453,9 @@ msgstr "Trabajó durante {seconds, plural, one {# segundo} other {# segundos}}, 
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:139
-#: src/shell/pages/CompanionsPage.tsx:263
-#: src/shell/pages/CompanionsPage.tsx:278
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:286
+#: src/shell/pages/CompanionsPage.tsx:301
+#: src/shell/pages/CompanionsPage.tsx:306
 #: src/shell/pages/status/StatusApps.tsx:51
 #: src/shell/pages/status/StatusComponents.tsx:151
 #: src/shell/pages/StatusPage.tsx:25
@@ -31607,7 +31649,7 @@ msgstr "Sí, cerrar su sesión"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:47
-#: src/shell/pages/CompanionsPage.tsx:260
+#: src/shell/pages/CompanionsPage.tsx:283
 #, needs-review
 msgid "Yesterday"
 msgstr "Ayer"
@@ -31920,6 +31962,7 @@ msgstr "Tus claves de Coding"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
+#: src/shell/pages/CompanionsPage.tsx:86
 #: src/shell/VoiceStage.tsx:26
 #, needs-review
 msgid "Your companion"
@@ -31961,9 +32004,9 @@ msgid "area.Your data and apps"
 msgstr "Tus datos y apps"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:135
-#: src/shell/pages/CompanionsPage.tsx:144
-#: src/shell/pages/CompanionsPage.tsx:221
+#: src/shell/pages/CompanionsPage.tsx:158
+#: src/shell/pages/CompanionsPage.tsx:167
+#: src/shell/pages/CompanionsPage.tsx:244
 #, needs-review
 msgid "Your default"
 msgstr "Tu predeterminado"
@@ -32046,13 +32089,13 @@ msgid "YOUR LIST"
 msgstr "TU LISTA"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:169
+#: ../backend/src/lib/failureCopy.ts:176
 #, needs-review
 msgid "failure.composer.paused.adult"
 msgstr "Tu mensaje está guardado. Vuelvo pronto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:170
+#: ../backend/src/lib/failureCopy.ts:177
 msgid "failure.composer.paused.teen"
 msgstr ""
 
@@ -32238,7 +32281,7 @@ msgid "Your upload"
 msgstr "Tu carga"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:128
+#: src/shell/pages/CompanionsPage.tsx:151
 #, needs-review
 msgid "Yours"
 msgstr "Tus"
@@ -32248,6 +32291,11 @@ msgstr "Tus"
 #, needs-review
 msgid "area.Yours"
 msgstr "Tuyo"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:88
+msgid "Yours, from {name}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1625

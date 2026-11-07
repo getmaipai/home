@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { copyCompanion: api.copyCompanion, setCompanionStatus: api.setCompanionStatus, setCompanionAudience: api.setCompanionAudience, editCompanion: api.editCompanion, companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { copyCompanion: api.copyCompanion, forkCompanion: api.forkCompanion, shareCompanion: api.shareCompanion, setCompanionStatus: api.setCompanionStatus, setCompanionAudience: api.setCompanionAudience, editCompanion: api.editCompanion, companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -103,6 +103,30 @@ test("card actions set a default without opening the card", async () => {
   fireEvent.click(await view.findByRole("menuitem", { name: "Set as my default" }));
   await waitFor(() => expect(saved).toEqual(["lively-child"]));
   expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
+});
+
+test("synth cards show whose synth it is and the base", async () => {
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [
+    card({ id: "atlas", name: "Atlas", is_default: true, synth: { based_on: { kind: "real_person", name: "Ada Lovelace" }, forked_from: null, forked_from_name: null, yours: false, shows: [] } }),
+    card({ id: "atlas-fork", name: "Atlas copy", synth: { based_on: { kind: "none", name: null }, forked_from: "atlas", forked_from_name: "Atlas", yours: true, shows: [] } }),
+  ], discover: [], robots: null, default_id: "atlas" });
+  const view = open("/companions");
+  await view.findByRole("heading", { name: "Atlas" });
+  expect(view.getByText("Your companion")).toBeTruthy();
+  expect(view.getByText("Based on Ada Lovelace")).toBeTruthy();
+  expect(view.getByText("Yours, from Atlas")).toBeTruthy();
+});
+
+test("Make this my companion forks the synth and selects the new id", async () => {
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ id: "atlas", name: "Atlas", synth: { based_on: { kind: "none", name: null }, forked_from: null, forked_from_name: null, yours: false, shows: [] } })], discover: [], robots: null, default_id: "" });
+  const calls: string[] = [];
+  api.forkCompanion = async (id) => { calls.push(`fork:${id}`); return { id: "my-atlas" }; };
+  api.setDefaultCompanion = async (id) => { calls.push(`default:${id}`); return { default_id: id }; };
+  const view = open("/companions");
+  await view.findByRole("heading", { name: "Atlas" });
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Make this my companion" }));
+  await waitFor(() => expect(calls).toEqual(["fork:atlas", "default:my-atlas"]));
 });
 
 test("Add moves a discovered companion into Yours", async () => {

@@ -365,6 +365,7 @@ export interface CompanionCard {
   id: string; name: string; type: "child" | "teen" | "adult"; type_label: string; tagline: string; who_can_use: string;
   dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; portrait?: string | null; status: string; chats: number; can_edit: boolean; can_copy: boolean;
   task_count?: number; chat_count?: number; working_count?: number; waiting_count?: number; latest_activity?: string | null; latest_activity_at?: string | null;
+  synth?: { based_on: { kind: "none" | "household_member" | "real_person"; name: string | null }; forked_from: string | null; forked_from_name: string | null; yours: boolean; shows: Array<{ production_id: string; title: string; part: string }> } | null;
 }
 export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string; conversation_id?: string | null; placement?: "chat" | "side"; waiting_reason?: string | null; progress?: string | null; result_ref?: string | null; needs_you?: boolean }> }
 export interface CompanionDetail extends CompanionCard {
@@ -1579,6 +1580,8 @@ export const api = {
   removeCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/remove`, { method: "POST" }),
   createCompanion: (fields: CompanionFields) => request<{ id: string }>("/api/companions", { method: "POST", body: JSON.stringify(fields) }),
   copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
+  forkCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/fork`, { method: "POST", body: "{}" }),
+  shareCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/share`, { method: "POST", body: "{}" }),
   editCompanion: (id: string) => request<CompanionEditable>(`/api/companions/${encodeURIComponent(id)}/edit`),
   companionLook: (id: string) => request<CompanionLook>(`/api/companions/${encodeURIComponent(id)}/look`),
   companionLookPrompt: (id: string) => request<CompanionPromptPack>(`/api/companions/${encodeURIComponent(id)}/look/prompt`),
