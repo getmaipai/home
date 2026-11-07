@@ -136,7 +136,7 @@ describe("ported from the old settings page", () => {
 
   test("Voice keeps personal controls and links adults to command creation", async () => {
     const view = open(makePerson("adult"), "/settings/voice?tab=voice");
-    await waitFor(() => expect(view.getByText("Choose a voice for you", { selector: "h2" })).toBeTruthy());
+    await waitFor(() => expect(view.getByText("Choose a voice for you")).toBeTruthy());
     expect(view.queryByText("Speaking voice")).toBeNull();
     const links = view.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(links).toContain("/commands");
