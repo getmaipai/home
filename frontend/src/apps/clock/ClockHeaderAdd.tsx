@@ -23,6 +23,7 @@ export function ClockHeaderAdd() {
   const addAction = tab === "alarms" ? openClockAlarmEditor : openClockAdd;
 
   return (
+    <span data-slot="header-add" className="flex shrink-0 items-center">
     <Button
       type="button"
       variant="ghost"
@@ -30,5 +31,6 @@ export function ClockHeaderAdd() {
       aria-label={addLabel}
       onClick={addAction}
     ><PlusIcon aria-hidden="true" /></Button>
+    </span>
   );
 }
