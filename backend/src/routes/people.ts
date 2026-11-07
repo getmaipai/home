@@ -275,7 +275,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
 
   // localOnly remains owner/admin-only, including self-edits. Legacy
   // birthdate input is ignored for every actor.
-  if (actor.id === id && actor.role !== "owner" && actor.role !== "admin") {
+  if (actor.id === id && !isOwnerOrAdmin(actor)) {
     if (body.localOnly !== undefined) {
       return c.json({ error: "localOnly can only be changed by an owner or admin" }, 403);
     }

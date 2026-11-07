@@ -33,6 +33,7 @@ import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
 import { codingModeReadiness } from "@/lib/codingMode";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const aiChoicesRoutes = apiRouter();
 
@@ -228,7 +229,7 @@ aiChoicesRoutes.openapi(jobAskRoute, (c) => {
   const id = c.req.valid("param").id;
   const ask = pendingFitAsk(id);
   // Only the person who made the job, or an admin, can answer for it.
-  if (ask && ask.personId !== person.id && person.role !== "owner" && person.role !== "admin") return c.json({ error: "Only the person who made this, or an admin, can answer.", code: "forbidden" }, 403) as never;
+  if (ask && ask.personId !== person.id && !isOwnerOrAdmin(person)) return c.json({ error: "Only the person who made this, or an admin, can answer.", code: "forbidden" }, 403) as never;
   return c.json({ answered: ask ? answerFitAsk(id, c.req.valid("json").answer) : false }, 200);
 });
 
@@ -278,7 +279,7 @@ const leaseReleaseRoute = createRoute({
 aiChoicesRoutes.openapi(leaseReleaseRoute, async (c) => {
   const person = c.get("person");
   const snap = getChatLease().snapshot();
-  const admin = person.role === "owner" || person.role === "admin";
+  const admin = isOwnerOrAdmin(person);
   if (snap.state === "held" && (snap.holderId === person.id || admin)) await getChatLease().release();
   return c.json(leaseView(person), 200);
 });

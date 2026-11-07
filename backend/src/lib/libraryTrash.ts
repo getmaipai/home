@@ -23,6 +23,7 @@ import { deleteMusicJobsForFiles } from "@/lib/music/store";
 import { deletePictureJobsForFiles } from "@/lib/pictures/jobStore";
 import type { PersonRow } from "@/types";
 import type { Result } from "@/lib/result";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 type Row = typeof attachments.$inferSelect;
 export type TrashResult<T> = Result<T, 403 | 404>;
@@ -76,7 +77,7 @@ function titleOf(row: Row): string {
 /** Move one of the caller's own Library files, with its companions, into Trash. */
 /** Issue 213: an owner or admin may delete a file whose owner has left the household (their shared files stay household-held). */
 export function canDeleteInherited(actor: PersonRow, ownerPersonId: string): boolean {
-  if (actor.role !== "owner" && actor.role !== "admin") return false;
+  if (!isOwnerOrAdmin(actor)) return false;
   return Boolean(db.select({ deletedAt: people.deletedAt }).from(people).where(eq(people.id, ownerPersonId)).get()?.deletedAt);
 }
 

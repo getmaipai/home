@@ -361,7 +361,7 @@ export function resolveForResponse(
     { ...keyDef, copy: keyDef.copy ?? { does: keyDef.label } },
     {
       subjectBand: band,
-      viewer: !viewer || !subject || viewer.id === subject.id ? "self" : viewer.role === "owner" || viewer.role === "admin" ? "admin" : "guardian",
+      viewer: !viewer || !subject || viewer.id === subject.id ? "self" : isOwnerOrAdmin(viewer) ? "admin" : "guardian",
       value: descriptionValue,
       source,
       effective: descriptionValue,

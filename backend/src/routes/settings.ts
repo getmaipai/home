@@ -34,6 +34,7 @@ import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const settingsRoutes = apiRouter();
 
@@ -449,5 +450,5 @@ settingsRoutes.openapi(createRoute({
 });
 
 function isOwnerOrAdminActor(actor: { role: string }): boolean {
-  return actor.role === "owner" || actor.role === "admin";
+  return isOwnerOrAdmin(actor);
 }

@@ -10,6 +10,8 @@ import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { listRelationships, createRelationship, updateRelationship, deleteRelationship } from "@/lib/relationships";
 import { personIsGranted } from "@/lib/grants";
 import { Relationship } from "@maipai/spec/gen/ts/relationship.js";
+import { isOwnerOrAdmin } from "@/lib/access";
+import { conflictStatus } from "@/lib/result";
 
 export const relationshipsRoutes = apiRouter();
 
@@ -107,12 +109,12 @@ relationshipsRoutes.openapi(patchRoute, (c) => {
   const { id } = c.req.valid("param");
   const edit = c.req.valid("json");
   const confirmOnly = edit.confirm === true && edit.status === undefined && edit.valid_to === undefined && edit.note === undefined;
-  if (!confirmOnly && !["owner", "admin"].includes(actor.role) && !personIsGranted(actor.id, "relationships.manage")) {
+  if (!confirmOnly && !isOwnerOrAdmin(actor) && !personIsGranted(actor.id, "relationships.manage")) {
     return c.json({ error: "Forbidden" }, 403);
   }
   const result = updateRelationship(actor, id, edit);
   if (!result.ok || !result.value) {
-    const status = result.status === 404 ? 404 : result.status === 403 ? 403 : result.status === 409 ? 409 : 400;
+    const status = conflictStatus(result.status);
     return c.json({ error: result.error ?? "invalid edit" }, status);
   }
   return c.json(result.value, 200);

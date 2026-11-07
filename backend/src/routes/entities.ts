@@ -6,6 +6,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { listEntities, getEntity, createEntity, updateEntity, deleteEntity } from "@/lib/entities";
 import { Entity } from "@maipai/spec/gen/ts/entity.js";
+import { conflictStatus } from "@/lib/result";
 
 export const entitiesRoutes = apiRouter();
 
@@ -140,7 +141,7 @@ entitiesRoutes.openapi(patchRoute, (c) => {
   const { id } = c.req.valid("param");
   const result = updateEntity(actor, id, c.req.valid("json"));
   if (!result.ok || !result.value) {
-    const status = result.status === 404 ? 404 : result.status === 403 ? 403 : result.status === 409 ? 409 : 400;
+    const status = conflictStatus(result.status);
     return c.json({ error: result.error ?? "invalid edit" }, status);
   }
   return c.json(result.value, 200);

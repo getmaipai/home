@@ -22,6 +22,7 @@ import { guardedFetch, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { lookup } from "node:dns/promises";
 import { mediaItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -31,7 +32,7 @@ export async function podcastDirectoryRows(person: PersonRow, q: string, scope =
   const band = mediaBandOf(person);
   const allowed = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
   const words = q.trim();
-  const admin = (person.role === "owner" || person.role === "admin") && band === "adult";
+  const admin = (isOwnerOrAdmin(person)) && band === "adult";
   const local = words.length >= 2 ? queryItems(person, "podcasts", { limit: 200 }).filter((item) => `${item.title} ${item.subtitle ?? ""} ${item.description ?? ""}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())).slice(0, 12).map((item) => ({ id: item.id, title: item.title, author: item.subtitle ?? "", summary: item.description ?? "", thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, feed_url: "", ...(admin ? { action_label: "Listen" } : {}) })) : [];
   if (scope === "search" && words === "") return [];
   if (!allowed || words !== "" && minorQueryHit(words, band)) return local;
@@ -44,7 +45,7 @@ export async function podcastDirectoryRows(person: PersonRow, q: string, scope =
 /** One existing directory data id serves both directory previews and followed show details. */
 export async function podcastShowRows(person: PersonRow, id: string, scope: string): Promise<unknown[]> {
   const adult = mediaBandOf(person) === "adult";
-  const canFollow = adult && (person.role === "owner" || person.role === "admin");
+  const canFollow = adult && isOwnerOrAdmin(person);
   const source = allowedSources(person).find((row) => row.id === id && row.kind === "feed");
   if (source) {
     const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 }).sort((a, b) => (b.external?.published_at ?? "").localeCompare(a.external?.published_at ?? ""));
@@ -262,7 +263,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.get("/opml/export", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (person.role !== "owner" && person.role !== "admin") return c.json({ error: "Only an admin can export the show list." }, 403);
+    if (!isOwnerOrAdmin(person)) return c.json({ error: "Only an admin can export the show list." }, 403);
     return new Response(exportOpml(), { status: 200, headers: { "content-type": "text/x-opml; charset=utf-8", "content-disposition": 'attachment; filename="podcasts.opml"', "cache-control": "no-store" } });
   });
 

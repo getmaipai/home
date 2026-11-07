@@ -21,6 +21,7 @@ import { apiRouter, errorResponses, idParamSchema, refuseWith } from "@/lib/open
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { install, rollback, uninstall, setChannel, type StoreResult } from "@/lib/store";
 import { getActiveInstall } from "@/lib/packageResolve";
+import { isOwnerOrAdminRole } from "@/wire";
 
 export const storeRoutes = apiRouter();
 export const UNINSTALL_CONFIRMATION = "The following will be uninstalled and users will lose access. Your pictures stay in Library.";
@@ -158,7 +159,7 @@ storeRoutes.openapi(uninstallPreviewRoute, (c) => {
 });
 storeRoutes.openapi(uninstallRoute, async (c) => {
   const role = c.get("person").role;
-  if (role !== "owner" && role !== "admin") return c.json({ error: "Only a household owner or admin can uninstall packages. Ask one of them to do it." }, 403);
+  if (!isOwnerOrAdminRole(role)) return c.json({ error: "Only a household owner or admin can uninstall packages. Ask one of them to do it." }, 403);
   const result = await uninstall(c.req.valid("param").id);
   // lib/store.ts's uninstall() only ever fails with 404 ("no active
   // install") - the cast narrows fail()'s general 400|404 (rollback's

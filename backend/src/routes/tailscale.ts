@@ -5,6 +5,7 @@ import { requireAuth } from "@/middleware/auth";
 import { getTailscaleStatus, turnOnTailscaleAccess } from "@/lib/tailscale";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { listHubEndpoints } from "@/lib/hubEndpoints";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const tailscaleRoutes = apiRouter();
 tailscaleRoutes.use("/status", async (c, next) => authorizeAway(c, next));
@@ -17,7 +18,7 @@ const Status = z.object({ installed: z.boolean(), signedIn: z.boolean(), httpsEn
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Setup"], summary: "Tailscale setup status", middleware: [] as const, responses: { 200: { content: { "application/json": { schema: Status } }, description: "This hub's Tailscale state." }, ...errorResponses({ 401: "Not signed in", 403: "Only owner/admin may view away setup" }) } });
 tailscaleRoutes.openapi(statusRoute, async (c) => {
   const actor = c.get("person");
-  if (actor.role !== "owner" && actor.role !== "admin") return c.json({ error: "Only the owner or an admin can set up away access. Ask one of them." }, 403);
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "Only the owner or an admin can set up away access. Ask one of them." }, 403);
   const status = await getTailscaleStatus();
   const endpoints = await listHubEndpoints();
   const endpoint = endpoints.find((item) => item.kind === "overlay");
@@ -28,7 +29,7 @@ tailscaleRoutes.openapi(statusRoute, async (c) => {
 const enableRoute = createRoute({ method: "post", path: "/enable", tags: ["Setup"], summary: "Enable Home's Tailscale HTTPS address", middleware: [] as const, responses: { 200: { content: { "application/json": { schema: z.object({ url: z.string(), qrPayload: z.string() }) } }, description: "Away address and QR payload." }, ...errorResponses({ 400: "Tailscale is not ready", 401: "Not signed in", 403: "Only owner or admin may enable away access" }) } });
 tailscaleRoutes.openapi(enableRoute, async (c) => {
   const actor = c.get("person");
-  if (actor.role !== "owner" && actor.role !== "admin") return c.json({ error: "Only the owner or an admin can set up away access. Ask one of them." }, 403);
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "Only the owner or an admin can set up away access. Ask one of them." }, 403);
   try {
     const cert = await turnOnTailscaleAccess(actor);
     const url = `https://${cert.name}`;

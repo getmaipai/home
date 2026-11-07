@@ -7,6 +7,7 @@ import { checkTargets, scheduleActor, type TargetReason } from "@/lib/schedules/
 import { adminScheduleCount, cancelSchedule, createDeviceSchedule, defaultZone, listOwnSchedules, type PublicSchedule, type ScheduleDeps } from "@/lib/schedules/store";
 import type { EffectivePermission, HouseActor } from "./access";
 import type { HouseArea, HouseEntity } from "./registry";
+import { isOwnerOrAdminRole } from "@/wire";
 
 export const SCHEDULE_ACTIONS = ["schedule", "list_schedules", "cancel_schedule"] as const;
 export type ScheduleActionName = (typeof SCHEDULE_ACTIONS)[number];
@@ -218,7 +219,7 @@ export async function runScheduleAction(ctx: {
     const own = listOwnSchedules(personId).filter(isLive);
     // Others' live schedules as a count only; done and failed rows are history.
     const all = adminScheduleCount();
-    const others = ctx.role === "owner" || ctx.role === "admin" ? all.active + all.paused - own.length : 0;
+    const others = isOwnerOrAdminRole(ctx.role) ? all.active + all.paused - own.length : 0;
     const lines = own.map((row) => listLine(row, names, zone));
     const count = others > 0 ? `${others} ${others === 1 ? "schedule belongs" : "schedules belong"} to other people.` : "";
     if (lines.length === 0) return { ok: true, text: `You have no device schedules.${count ? ` ${count}` : ""}` };

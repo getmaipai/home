@@ -17,8 +17,14 @@ import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@/wire";
 // frontend client can share it too (a code review, 2026-09-04, found a
 // third hand-copy of this exact expression); this wrapper is what every
 // existing PersonRow-based call site here keeps using.
-export function isOwnerOrAdmin(actor: PersonRow): boolean {
+export function isOwnerOrAdmin(actor: Pick<PersonRow, "role">): boolean {
   return isOwnerOrAdminRole(actor.role);
+}
+
+/** AUDIT-DUP-ROUTES-01: a child cannot make a companion (an owner or admin account always may, whatever its age band). */
+export const COMPANION_BAND_LINE = "Only teens and adults can make a companion.";
+export function canMakeCompanion(actor: PersonRow): boolean {
+  return !(speakerAgeBand(actor, new Date()) === "child" && !isOwnerOrAdmin(actor));
 }
 
 // TEMP-CHAT-01: the PersonRow-taking wrapper isOwnerOrAdmin() already is

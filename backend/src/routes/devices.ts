@@ -38,6 +38,7 @@ import { robotSelfTestPartsFor } from "@/wire";
 import { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
 import { forgetRobotHost } from "@/lib/robotHost";
 import { getRobotCheckin, recordRobotCheckin, type RobotCheckin } from "@/lib/robotCheckin";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const devicesRoutes = apiRouter();
 
@@ -107,7 +108,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const { kind } = c.req.valid("query");
   const devices = listDevicesForPerson(actor.id).filter((device) => kind === undefined || device.kind === kind);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(d.kind === "robot" && (actor.role === "owner" || actor.role === "admin") && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(d.kind === "robot" && isOwnerOrAdmin(actor) && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
     200,
   );
 });
@@ -127,7 +128,7 @@ const listRobotsRoute = createRoute({
 });
 devicesRoutes.openapi(listRobotsRoute, (c) => {
   const viewer = c.get("person");
-  const admin = viewer.role === "owner" || viewer.role === "admin";
+  const admin = isOwnerOrAdmin(viewer);
   const robots = listDevicesByKind("robot");
   const ownerNames = new Map(db.select({ id: people.id, name: people.displayName }).from(people).all().map((row) => [row.id, row.name] as const));
   return c.json(
@@ -229,7 +230,7 @@ devicesRoutes.openapi(selfTestRoute, async (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
-  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) return c.json({ error: "No such robot" }, 404);
+  if (!device || (device.personId !== actor.id && !isOwnerOrAdmin(actor))) return c.json({ error: "No such robot" }, 404);
   if (device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
   const { part } = c.req.valid("json");
   if (!robotSelfTestPartsFor(device).includes(part)) return c.json({ error: "This robot did not report that part." }, 400);
@@ -447,8 +448,8 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const mayMuteAnyRobot = kind === "mute" && actor.role !== "child" && actor.role !== "guest";
   const companion = device?.kind === "robot" ? robotCompanionOf(device.id) : null;
   const mayFind = kind === "find_me" && actor.role !== "guest" && !!companion && mayUseCompanion(actor, resolvePersona(companion.id));
-  if (kind === "find_me" && device?.kind === "robot" && !mayFind && device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin") return c.json({ error: "You cannot use this robot." }, 403);
-  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin" && !(mayMuteAnyRobot && device.kind === "robot") && !mayFind)) {
+  if (kind === "find_me" && device?.kind === "robot" && !mayFind && device.personId !== actor.id && !isOwnerOrAdmin(actor)) return c.json({ error: "You cannot use this robot." }, 403);
+  if (!device || (device.personId !== actor.id && !isOwnerOrAdmin(actor) && !(mayMuteAnyRobot && device.kind === "robot") && !mayFind)) {
     return c.json({ error: "No such device" }, 404);
   }
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
@@ -478,7 +479,7 @@ devicesRoutes.openapi(motorRebootRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
-  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) {
+  if (!device || (device.personId !== actor.id && !isOwnerOrAdmin(actor))) {
     return c.json({ error: "No such device" }, 404);
   }
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
@@ -622,7 +623,7 @@ devicesRoutes.openapi(deleteRoute, async (c) => {
   const { id } = c.req.valid("param");
   const current = getDeviceById(id);
   // ROBOT-ADMIN-PLACE-01: a robot belongs to the household, so any admin may forget it, not only the admin who paired it.
-  const adminForgetsRobot = current?.kind === "robot" && (actor.role === "owner" || actor.role === "admin");
+  const adminForgetsRobot = current?.kind === "robot" && isOwnerOrAdmin(actor);
   if (!current || (current.personId !== actor.id && !adminForgetsRobot)) return c.json({ error: "No such device" }, 404);
   if (current.kind === "robot") await forgetRobotHost(id);
   if (!deleteDevice(id, current.personId)) return c.json({ error: "No such device" }, 404);
@@ -795,9 +796,9 @@ devicesRoutes.openapi(offlineScopeRoute, (c) => {
   if (!session || !resolveHumanSession(session)) return c.json({ error: "A paired device cannot change offline permissions. Sign in on your own browser to change them." }, 403);
   const actor = c.get("person");
   const device = getDeviceById(c.req.valid("param").id);
-  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) return c.json({ error: "This device is not yours to change. Choose your own device or ask an admin." }, 404);
+  if (!device || (device.personId !== actor.id && !isOwnerOrAdmin(actor))) return c.json({ error: "This device is not yours to change. Choose your own device or ask an admin." }, 404);
   // A child's or teen's keep permission is a guardian's to give: they cannot grant it to themselves.
-  if (actor.role !== "owner" && actor.role !== "admin" && mediaBandOf(actor) !== "adult") return c.json({ error: "A grown-up sets this. Ask a grown-up to allow keeping media on this device." }, 403);
+  if (!isOwnerOrAdmin(actor) && mediaBandOf(actor) !== "adult") return c.json({ error: "A grown-up sets this. Ask a grown-up to allow keeping media on this device." }, 403);
   const requested = c.req.valid("json").offline_scope;
   if (requested.length > 0 && !mayHoldMediaOffline(device)) return c.json({ error: "A shared device such as a robot, TV or pod cannot keep copies. Use a phone, computer or browser." }, 400);
   setDeviceOfflineScope(device.id, requested);

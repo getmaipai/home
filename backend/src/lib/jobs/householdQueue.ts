@@ -5,6 +5,7 @@ import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackReducedChat } from "@/lib/reducedChat";
 import { stackMaxWindow } from "./stackWindow";
 import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLevels, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
+import { isOwnerOrAdmin } from "@/lib/access";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -308,7 +309,7 @@ export function pendingFitAsk(jobId: string, now = Date.now()): { personId: stri
 export function answerableFitAsk(person: { id: string; role: string }, jobId: string): { job_id: string; picked: string | null; actual: string | null } | null {
   const ask = pendingFitAsk(jobId);
   if (!ask) return null;
-  return ask.personId === person.id || person.role === "owner" || person.role === "admin" ? { job_id: jobId, picked: fitAsks.get(jobId)?.levels?.picked ?? null, actual: fitAsks.get(jobId)?.levels?.actual ?? null } : null;
+  return ask.personId === person.id || isOwnerOrAdmin(person) ? { job_id: jobId, picked: fitAsks.get(jobId)?.levels?.picked ?? null, actual: fitAsks.get(jobId)?.levels?.actual ?? null } : null;
 }
 /** The person's answer: Allow runs the job at the lower tier now, Wait keeps it queued for the tier they picked. False when no question is open. */
 export function answerFitAsk(jobId: string, answer: "allow" | "wait"): boolean {

@@ -10,6 +10,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { personIsGranted } from "@/lib/grants";
 import { getHouseholdSettingSource, getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type Tier = "standard" | "boost" | "max";
 export type TierCategory = "chat" | "image" | "video" | "music" | "voice";
@@ -49,7 +50,7 @@ export const slotIsOff = (category: TierCategory, tier: Tier): boolean => tier !
 
 /** An owner or admin holds Max by role; anyone else needs an allow grant, for every category or for this one. */
 export function holdsMax(person: Pick<PersonRow, "id" | "role">, category: TierCategory): boolean {
-  if (person.role === "owner" || person.role === "admin") return true;
+  if (isOwnerOrAdmin(person)) return true;
   if (person.role === "child" || person.role === "guest") return false;
   // The bare grant is never a teen's: a teen holds Max only per category (grant-actions.json).
   return (person.role !== "teen" && personIsGranted(person.id, TIER_GRANT)) || personIsGranted(person.id, tierGrantFor(category));
@@ -80,7 +81,7 @@ export function clampTier(input: { person: Pick<PersonRow, "id" | "role">; band:
   if (input.person.role === "guest") lower("standard", "not_for_this_person");
   if (tier === "max" && !deps.holdsMax(category)) lower("boost", "max_not_granted");
   while (tier !== "standard" && deps.slotOff(category, tier)) lower(LADDER[LADDER.indexOf(tier) - 1]!, "slot_off");
-  const admin = input.person.role === "owner" || input.person.role === "admin";
+  const admin = isOwnerOrAdmin(input.person);
   // Max is opened by the grant alone (the slot's default `who` for Max is "admins" because the grant starts with them); Boost follows its slot's `who`.
   while (tier === "boost") {
     const who = deps.who(category, tier);
