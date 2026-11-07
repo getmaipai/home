@@ -326,7 +326,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/status/StatusApps.tsx` | StatusApps |
 | `frontend/src/shell/pages/status/StatusBanner.tsx` | StatusBanner |
 | `frontend/src/shell/pages/status/StatusBoard.tsx` | STATUS_BOARD_QUERY_KEY, StatusBoardNotes, StatusMaintenanceBody, MaintenanceDialog, PostNoteControl |
-| `frontend/src/shell/pages/status/StatusComponents.tsx` | ENGINE_ROWS, engineState, formatUptime, StatusLegend, StatusPartsBody |
+| `frontend/src/shell/pages/status/StatusComponents.tsx` | engineRows, engineState, formatUptime, StatusLegend, StatusPartsBody |
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
 | `frontend/src/shell/pages/useDataTableControls.tsx` | useDataTableControls |
 | `frontend/src/shell/phoneMenuLinks.tsx` | PhoneMenuLinks, coreAppsGroup, searchWithCoreApps |
