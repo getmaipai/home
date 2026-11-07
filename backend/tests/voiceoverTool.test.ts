@@ -1,3 +1,4 @@
+import { VOICEOVER_INTENT } from "@/lib/turnMachine/toolGates";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
@@ -34,6 +35,10 @@ describe("voice chat tools", () => {
   test("all gates fit the cap and voiceover tools shrink first", () => {
     const full = withTurnToolGates(resolveTurnBudgetBase("qwen3-8b-instruct-q4-k-m", "adult"), true, true, true, true, true, false, false, true, "none", true, true, true);
     expect(full.tools_offered.length).toBeLessThanOrEqual(16);
+  });
+  test("a plain ask for a recording is recognised as voiceover intent", () => {
+    for (const text of ["Please make a voiceover recording of me saying: hi", "Read this aloud as a recording: hi", "Record a voiceover: Welcome home", "can you narrate this paragraph"]) expect(VOICEOVER_INTENT.test(text)).toBe(true);
+    for (const text of ["make a rain sound", "write a song about cats", "what is the weather"]) expect(VOICEOVER_INTENT.test(text)).toBe(false);
   });
   test("policy denies a call that was not offered", async () => {
     const actor = person("owner", 40); const state = { ...input(actor), voiceoverAllowed: false, context: [], crisis: false } as unknown as TurnState;
