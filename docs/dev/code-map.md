@@ -675,7 +675,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, __resetRadioStreamsForTests |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, startMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
-| `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
+| `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveBytes, serveItemBytes, serveItemArtwork, itemByteMetadata |
 | `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
 | `backend/src/lib/media/templates.ts` | listTemplates, getTemplate |
@@ -731,6 +731,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |
 | `backend/src/lib/nasMounts.ts` | listNasMounts, createNasMount, deleteNasMount |
 | `backend/src/lib/nativeFolderDialog.ts` | runCommand, chooseNativeFolder |
+| `backend/src/lib/net/readBody.ts` | readStreamLimited, readBodyLimited |
 | `backend/src/lib/networkSettings.ts` | LAN_EXPOSURE_SETTING, HUB_PORT_SETTING, configuredHubPort, configuredLanExposure, canBindHubPort, HUB_PORT_IN_USE_MESSAGE |
 | `backend/src/lib/news/actions.ts` | NEWS_ACTIONS, runNewsAction |
 | `backend/src/lib/news/article.ts` | stableBlockId, __resetNewsArticleForTests, __setPaceWaitForTests, sourceIconUrlOf, pictureKey, keepFigures |
@@ -772,7 +773,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/operatorEngine.ts` | ENGINE_SETTING_KEY, ENGINE_CHOICES, ENGINE_CHANGES_PER_DAY, __resetOperatorEngineForTests, operatorEngineView, setOperatorEngine |
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
 | `backend/src/lib/otherApps.ts` | readOtherApps |
-| `backend/src/lib/outbound.ts` | HOME_USER_AGENT |
+| `backend/src/lib/outbound.ts` | HOME_USER_AGENT, RateLimited, RedirectLimitError, GuardedStop, guardedGet |
 | `backend/src/lib/packageAssets.ts` | ASSET_TYPES, MAX_ASSET_BYTES, cleanAssetPath, packageAssetFile, assetResponse |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |
 | `backend/src/lib/packageCache.ts` | LEGACY_ENTRY_GRACE_S, CACHE_NOT_MODIFIED, PACKAGE_CACHE_RESPONSE, packageCacheResponse, __setTestCacheBudgetBytes, OTHER_CACHE_SOURCE |
@@ -963,7 +964,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/shelf/shelfJobs.ts` | runShelfTick, pruneShelf |
 | `backend/src/lib/shelf/shelfNews.ts` | SHELF_EMPTY_TEXT, SHELF_NO_LISTS_TEXT, shelfNewsResult |
 | `backend/src/lib/shelf/shelfPolicy.ts` | BANDS, FEED_LISTS, isBand, audienceOf, bandOkAllowedFor, listIdForPackage |
-| `backend/src/lib/shelf/shelfPoller.ts` | MAX_BACKOFF_S, MAX_FEEDS_PER_TICK, MAX_FEEDS_PER_HOST_PER_TICK, backoffSeconds, RedirectLimitError, guardedGet |
+| `backend/src/lib/shelf/shelfPoller.ts` | MAX_BACKOFF_S, MAX_FEEDS_PER_TICK, MAX_FEEDS_PER_HOST_PER_TICK, backoffSeconds, guardedGet, extractEntries |
 | `backend/src/lib/shelf/shelfRead.ts` | __resetFloorMemoForTests, visibleFeedIds, feedIsOfferedTo, releaseShelfItems, releaseShelfItem |
 | `backend/src/lib/shelf/shelfStore.ts` | openShelfStore, sharedShelfStore, __resetSharedShelfStoreForTests |
 | `backend/src/lib/sidecars.ts` | blockedPortReason, blockedPortDetails, stopBlockedPortHolder, blockedPortHolderAlive, __recordOwnedPortForTests, __blockPortForTests |
@@ -978,6 +979,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/errors.ts` | StackError |
 | `backend/src/lib/stack/fullView.ts` | fullViewForJob, StackViewError, VIEW_KEY_LINE, sendWithView |
 | `backend/src/lib/stack/homeViewToken.ts` | MIN_TOKEN_CHARS, VIEW_HEADER, HOME_TOKEN_HEADER, __setHomeViewTokenForTests, readRemoteViewToken, storeRemoteViewToken |
+| `backend/src/lib/stack/http.ts` | STACK_TEST_BASE, createStackHttp |
 | `backend/src/lib/stack/httpErrors.ts` | StackFailureSchema, classifyStackError, STACK_ERROR_RESPONSES |
 | `backend/src/lib/stack/link.ts` | LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_CONNECT_WINDOW_MS, LINK_CONNECT_RETRY_MS, LINK_BACKOFF_BASE_MS, LINK_BACKOFF_CAP_MS |
 | `backend/src/lib/stack/linkKeys.ts` | normalizePairingCode, derivePairingLookup, issuePairingCode, getPairingPublicKey, verifyPairingPayload, knownHostsName |
