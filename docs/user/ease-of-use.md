@@ -11,30 +11,24 @@ not change what is safe or allowed for anyone.
 
 ## Pick a style
 
-1. Open **Settings**, then **Appearance**.
+1. Open **Settings**, then **Look and ease**.
 2. Find the **Ease of use** card.
 3. Pick one of the four styles in the box called **Comfort style**:
    - **Standard** is MaiPai as it comes.
    - **Comfortable** has bigger words and more room.
    - **Large** has bigger words, bigger buttons and stronger contrast.
-   - **Simple** has bigger words and buttons, calm colors and helpers.
+   - **Simple** has bigger words and buttons, calm colors and helpers. It shows fewer choices.
 
 Your choice shows right away. Under it you see a line such as "Large + 2 changes" when you changed single settings on top, and **Back to Large** puts them back. If an admin set one of your settings, it is greyed out and says so; ask them to change it.
 
 ## Change one thing
 
-Each row on the card lets you change one setting, like text size or motion.
+Each row on the card lets you change one setting. The rows are **Text size**, **Spacing**, **Button size**, **Contrast**, **Motion and color**, **Simple mode**, **Reading level**, **Short explainers**, **Word help** and **Read aloud**.
 A row set to **Preset** follows your style. Change a row and only that row
 changes. The rest keep following your style.
 
 ## If a row will not change
 
-A household owner or admin can set a row for you and lock it. If you try to
-change it, you will see a message that says who to ask. They can change it or
-unlock it for you.
-
-## For owners and admins
-
-You can set a row for another person from their page. Setting it locks it, so
-they cannot change it until you reset it. Resetting a row hands it back to
-them. You cannot change an owner's or another admin's rows.
+A household owner or admin can set a row for you and lock it. A locked row is
+greyed out and says "An admin set this for you. Ask them if you want it
+changed." They can change it or unlock it for you.

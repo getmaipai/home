@@ -9,9 +9,8 @@ Owners and admins receive an in-hub alert when a paired robot has been offline f
 
 ## See your notifications
 
-Tap the bell in the header. It shows your recent alerts, and you stay on the page you're on. Tap "View history" for the full list. It goes back 30 days.
+Tap the bell in the header. It shows your recent alerts, and you stay on the page you're on. Tap **View history** for the full list. It goes back 30 days, and each line shows **New**, **Read** or **Dismissed**.
 
-- Tap an alert to open what it's about.
 - Tap **Dismiss** to remove one from the list.
 - Tap **Dismiss all** in the bell to clear everything at once. On the history page, tap **Select** to pick several and dismiss them together.
 
@@ -19,9 +18,10 @@ Tap the bell in the header. It shows your recent alerts, and you stay on the pag
 
 To also get notifications on your phone, set up Telegram:
 
-1. Open **Settings**, then **Notifications** (under Household).
-2. An owner or admin sets this up once for the household.
-3. After that, each person links their own Telegram chat. Do this from your own notification settings.
+1. An owner or admin sets this up once for the household. Open **Settings**, then **Apps and devices**, then the **Integrations** tab, and find the **Telegram** card to add the bot token.
+2. After that, each person links their own Telegram chat. Open **Settings**, then **Notifications**, and find the **Telegram** card. Choose which alerts you want on Telegram.
+
+On the same **Notifications** page, **Alerts** lets you show alerts on this device and set quiet hours.
 
 ## Still need help?
 

@@ -29,13 +29,15 @@ day the hub arrives; the rest are for when you need them.
 - [Let Home close apps](close-apps.md): pick the apps Home may close when a big job needs room.
 - [Watch videos](watch-videos.md): open the Videos app, play a video from your hub, pick up where you stopped, and save videos for later.
 - [What MaiPai remembers](memory.md): see, export, or forget what MaiPai has remembered from your conversations.
-- [People and parental controls](people.md): see who is in your household, manage accounts, and check in on a child.
+- [People and parental controls](people.md): see who is in the Family page, manage accounts, and check in on a child.
 - [Settings](settings.md): find your way around MaiPai's settings, for the household and for you.
 - [Offline data](reference-library.md): choose and manage offline books (Wikipedia, health and more) for your household.
 - [Ease of use](ease-of-use.md): make words bigger, buttons roomier and colors clearer for yourself.
 
 - [Lists, reminders and alarms](lists-reminders-alarms.md): what to say to add to your shopping list, set a reminder, set an alarm or start a timer.
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.
+- [Trash](trash.md): bring back or delete for good the files, videos, songs and playlists you deleted.
+- [Set up voice recognition](voice-enrollment.md): record a few samples so MaiPai can tell who is speaking.
 - [Privacy](privacy.md): see exactly what, if anything, leaves your house.
 - [What Home looks up for you](what-home-looks-up.md): every outside service a feature can ask, what it sends, and how to clear what it saved.
 - [Set up web search](web-search.md): connect MaiPai to your own SearXNG search server, use it away from home, and fix it if it stops.

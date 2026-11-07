@@ -17,41 +17,33 @@ A note you ask it to keep is always saved. Say "make a note that..." or "remembe
 
 ## See what's remembered
 
-Open **Memory** in the sidebar. Each entry shows one thing MaiPai learned from a conversation.
+Open **Settings**, then **Your data and apps**. The **Data and privacy** tab lists what MaiPai remembered from your conversations. Each entry is one thing MaiPai learned. A memory a robot keeps about you is listed under the robot's name.
 
 ## Forget one memory
 
-Find the memory you want gone. Tap the small icon next to it. The words are wiped out right away, and MaiPai won't use it again. A blank marker stays behind so a robot or a second hub that was offline knows to forget it too.
+Find the memory you want gone. Tap the small archive icon next to it. MaiPai won't use it again.
 
 ## Forget several at once
 
-Tap **Select memories** at the top of the page. Check the ones you want gone, then tap **Forget selected**. Confirm, and their words are wiped out. Only a blank marker stays. This cannot be undone.
+Tap **Select memories** at the top of the list. Check the ones you want gone, then tap **Forget selected**. Confirm with **Yes, forget**, and their words are wiped out. Only a blank marker stays, so a robot or a second hub that was offline knows to forget it too. This cannot be undone.
 
 ## Clear everything
 
-Tap **Clear all**. Confirm how many memories you're about to erase, and the words of every one of them are wiped out. Only blank markers stay. This cannot be undone.
-
-## Export your memories
-
-Tap **Export**. This downloads everything MaiPai remembers about you. Keep the file, or move it somewhere else.
+Tap **Clear all**. Confirm with **Yes, forget all**, and every one of your memories is wiped out. Only blank markers stay. This cannot be undone.
 
 ## Check a child's memories
 
-Owners and admins can switch to another household member. Use the person picker at the top of the page. You'll see their memories the same way. You can view or forget entries there too. This helps you manage what MaiPai keeps about a child.
+Owners and admins can see a child's memories. Open **Settings**, then **Household and people**, then the **People** tab, and choose **Users**. Under **Memories for** the child's name you can:
+
+- Press **Export** with their name, like **Export Nova's memories**, to save a file of them.
+- Press **Forget everything about** with their name, then confirm with **Yes, forget everything**.
+- Tap the archive icon on one memory to forget only that one.
+
+This helps you manage what MaiPai keeps about a child. A teen's memories are not open to an owner or admin.
 
 ## Who may hear a household memory
 
-A household memory can be limited to some of the house. An adult can set **Who may hear this** on a memory to Everyone, Teens and adults, or Adults only. The choice, and who made it, are recorded on the memory itself. Children and teens see no control and cannot change it; the memory just isn't shown to them when it's set above their level.
-
-## People and things
-
-MaiPai also keeps a list of who and what it knows about: people, pets, places, groups, and things, plus how they connect ("Sage's coworker Marsh," "Bramble's dog Rover"). Open **Memory**, then tap **People and things** at the top.
-
-Tap **Add** to add someone or something new. Give it a name and pick what kind it is. You can also say how it connects to someone in your household.
-
-To fix a name, tap **Edit name** under it. To remove something MaiPai shouldn't have, tap **Remove**, or **Select** to remove several at once.
-
-Sometimes a connection is marked **Unconfirmed**. That means MaiPai guessed it from a conversation and no one has said it's true yet. If it's right, an adult can tap **Confirm** to mark it as true. If it's wrong, tap the small **×** next to it to remove it.
+A household memory can be limited to some of the house. An adult can set **Who may hear this** on a memory to Everyone, Teens and adults, or Adults only. The choice, and who made it, are recorded on the memory itself. Children and teens see no control and cannot change it; the memory is not shown to them when it's set above their level.
 
 ## Passwords and keys
 

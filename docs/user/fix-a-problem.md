@@ -5,7 +5,7 @@ description: What to check first when something isn't working right.
 
 ## Start here
 
-Open **Settings**, then **Repairs** under Manage. MaiPai lists anything that needs attention, its status, and the available action. This is the fastest way to find out what's wrong.
+Open **Settings**, then **Backups, storage and updates**, then the **Maintenance** tab, and choose **Repairs**. Owners and admins also see a **Repairs** button on the Home screen. MaiPai lists anything that needs attention, its status, and the available action. This is the fastest way to find out what's wrong.
 
 On a Mac, the **Status** page also shows whether its self-check is working. If the Mac restarted itself, open Status to see the latest check.
 
@@ -15,21 +15,19 @@ Owners and admins can choose **Check my computers again** to refresh the compute
 
 ## If MaiPai won't load at all
 
-If your device shows a plain dark screen saying "Can't reach MaiPai right now," it isn't connected to your home network - the hub itself may be off, or you're away from home. Nothing works without that connection, since everything MaiPai does lives on your own hub. Reconnect to your home Wi-Fi, or try again once you're back in range.
+If your device shows a page saying "Home is restarting or updating," the hub is off for a minute, or your device is away from your home network. The page checks every few seconds and opens Home by itself when the hub answers. If you are away from home, reconnect to your home Wi-Fi.
 
 ## If a reply says "Something went wrong"
 
 If it shows up right after an update or a restart, the AI engine was probably still starting. Wait a minute and press **Retry**. If it comes back, open Repairs.
 
-## If it says "Getting ready" or a picture waits for memory
+## If it says "Getting ready" or a picture is waiting
 
-"Getting ready, one moment" means the AI is warming up. Pictures and videos wait when another big job holds the memory. Both clear by themselves. See [Pictures](pictures.md) and [Videos](videos.md).
+"Getting ready, one moment" means the AI is warming up. It clears by itself. See [Pictures](pictures.md) and [Videos](videos.md).
 
 ## Why is my picture, video or song slow?
 
-If the card says "Paused while chat is working", the job is waiting while someone chats or talks to Home. It carries on by itself after the reply. The wait is not counted against the job. You do not need to do anything.
-
-"Waiting for memory to free up" means another big job holds the memory. Wait for it to finish. Home makes one big job at a time, so your job may wait for another picture, video or song.
+If the card says "Waiting for its turn," another job is ahead of yours, or someone is chatting or talking to Home. Your job starts by itself, or you can tap **Cancel**. Home makes one big job at a time, so your job may wait for another picture, video or song.
 
 ## If MaiPai looks out of date
 
@@ -38,7 +36,7 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 ## If Chat won't send a message or answer
 
 - Check Repairs first. MaiPai may have already spotted the problem.
-- Make sure an AI model is set up. Open **Settings**, then **AI models**, and confirm one is selected.
+- Make sure an AI model is set up. Open **Settings**, then **AI and models**, and confirm one is selected.
 - Try reloading the page.
 
 ## If voice input doesn't work
@@ -53,8 +51,8 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 
 - Double check your PIN or password. A PIN shows as one box per digit, and Home signs you in when the last box is full.
 - After 5 wrong tries the account locks, first for 30 seconds, then longer each time. A countdown shows. Wait for it to end, then try the right code. See [Sign in](sign-in.md).
-- Ask an owner or admin to check your account. They can do this under **Settings** > **Users**, or reset your PIN there.
-- If you're signed in on another device that's misbehaving, open **Settings**, then **Devices & sessions** (under Me), and sign that device out.
+- Ask an owner or admin to check your account. They can do this under **Settings**, **Household and people**, **People**, then **Users**.
+- If you're signed in on another device that's misbehaving, open **Settings**, then **Profile and sign-in**. Under **Signed-in sessions**, choose **Sign out** next to that device.
 
 ## If a setting won't save
 
