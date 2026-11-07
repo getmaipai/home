@@ -168,6 +168,7 @@ describe("a package app at /apps/<id>", () => {
     await view.findByText("Video details.");
     controls = await view.findByTestId("page-controls");
     expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
+    expect(controls.getAttribute("data-header-flat")).toBe(""); // the shell bar with the companion is flat on a detail page too
     expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).not.toBeNull();
   });
 
