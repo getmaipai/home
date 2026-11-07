@@ -41,7 +41,7 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
   if (!cookie) throw new Error("setup response carried no session cookie");
 
   const settings: [string, unknown][] = [];
-  if (options.stackUrl) settings.push(["engines.stack.url", options.stackUrl], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]);
+  if (options.stackUrl) settings.push(["engines.stack.url", options.stackUrl]);
   if (options.searxngUrl) settings.push(["search.searxng_url", options.searxngUrl]);
   for (const [key, value] of settings) {
     await requireOk(await request(options.baseUrl, "/api/settings", {
