@@ -37,7 +37,7 @@ describe("admin chat pause", () => {
     expect(refused.headers.get("Retry-After")).toBe("300");
     const body = (await refused.json()) as { error: string; code: string };
     expect(body.code).toBe("chat_paused");
-    expect(body.error).toBe("Chat is paused by an admin until it is turned back on. Back after dinner.");
+    expect(body.error).toBe("An admin turned chat off for now. Back after dinner.");
     expect((await app().request("/api/turn/t1/cancel", { method: "POST" })).status).toBe(200);
     expect((await app().request("/api/turn/x")).status).toBe(200);
   });
@@ -52,22 +52,24 @@ describe("admin chat pause", () => {
     const chat = (await collectHealth()).engines.chat;
     expect(chat.availability).toBe("unavailable");
     expect(chat.cause).toBe("paused_by_admin");
-    expect(chat.notice?.adult).toContain("paused by an admin");
+    // Copy since 02bbe2e24 (2026-11-02, no engine or system words for non-admins): the admin line names the admin, nothing else.
+    expect(chat.notice?.adult).toBe("An admin turned chat off for now.");
     expect(chat.notice?.child).not.toContain("admin");
   });
 });
 
 describe("pause causes", () => {
   test("each cause has its own words on the same notice", () => {
-    expect(composerNotice("unavailable", "restarting")?.adult).toBe("The AI is restarting. Chat will start again by itself in a minute.");
-    expect(composerNotice("unavailable", "memory")?.adult).toContain("low on memory");
+    // Since 02bbe2e24 the restarting and memory causes share one short adult line; the child line and the offline line still differ.
+    expect(composerNotice("unavailable", "restarting")?.adult).toBe("One moment. Back soon.");
+    expect(composerNotice("unavailable", "memory")?.child).toBe("I need a rest. Try again soon.");
     expect(composerNotice("unavailable", "offline")?.adult).toBe("The AI isn't answering.");
     expect(composerNotice("ready", "restarting")).toBeNull();
   });
 
   test("a Stack that stays unreachable past a minute reads as not answering", async () => {
     __setRoleHealthForTests({ chat: { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" } });
-    expect((await collectHealth()).engines.chat.notice?.adult).toContain("restarting");
+    expect((await collectHealth()).engines.chat.notice?.adult).toBe("One moment. Back soon.");
     const realNow = Date.now;
     Date.now = () => realNow() + 61_000;
     try { expect((await collectHealth()).engines.chat.notice?.adult).toBe("The AI isn't answering."); } finally { Date.now = realNow; }
