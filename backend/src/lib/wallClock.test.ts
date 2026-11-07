@@ -11,8 +11,8 @@ import { validateSelectorValue } from "@/lib/settings";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 test("time.time_zone is validated where it is set", () => {
-  const key = { key: "time.time_zone", selector: "text" } as unknown as SettingsKey;
-  expect(validateSelectorValue(key, "America/Chicago").ok).toBe(true);
-  const bad = validateSelectorValue(key, "Mars/Olympus");
+  const zoneSetting = { key: "time.time_zone", selector: "text" } as unknown as SettingsKey;
+  expect(validateSelectorValue(zoneSetting, "America/Chicago").ok).toBe(true);
+  const bad = validateSelectorValue(zoneSetting, "Mars/Olympus");
   expect(bad.ok).toBe(false);
 });
