@@ -149,7 +149,12 @@ function turnsPanel(days: number, rows: readonly { createdAt: string; stats: Tur
   const routeRows = sqlite.query("SELECT source, COUNT(*) AS count FROM conversation_turns WHERE created_at >= ? GROUP BY source").all(since) as Array<{ source: string; count: number }>;
   const byRoute = routeRows.map((r) => ({ route: r.source, count: r.count })).sort((a, b) => b.count - a.count);
 
-  return { window_days: days, by_day: byDayOut, by_engine: byEngineOut, by_route: byRoute };
+  const offered = rows.flatMap((row) => row.stats.tools_offered ? [row.stats.tools_offered] : []);
+  const counts = offered.map((o) => o.count).sort((a, b) => a - b);
+  const sizes = offered.map((o) => o.chars).sort((a, b) => a - b);
+  const toolsOffered = { turns: offered.length, median_count: median(counts), median_chars: median(sizes), p95_chars: p95(sizes), max_chars: sizes.length > 0 ? sizes[sizes.length - 1]! : null };
+
+  return { window_days: days, by_day: byDayOut, by_engine: byEngineOut, by_route: byRoute, tools_offered: toolsOffered };
 }
 
 function layersPanel(days: number, rows: readonly { createdAt: string; stats: TurnStats }[]): PerformanceLayers {

@@ -184,6 +184,18 @@ describe("turnNext.ts: a plain question, no tools", () => {
     }
   });
 
+  test("AUDIT-TOOLS-01: the stored stats record how many tools were offered and their schema size", async () => {
+    const result = await withStub({ reply: () => "Hello! How can I help?" }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { tools_offered?: { count: number; chars: number } };
+    expect(stats.tools_offered).toBeDefined();
+    expect(stats.tools_offered!.count).toBeGreaterThan(0);
+    // Each schema is at least its id, description and argument shell.
+    expect(stats.tools_offered!.chars).toBeGreaterThan(stats.tools_offered!.count * 40);
+  });
+
   test("a valid mention stamps the answerer as a mention", async () => {
     const companion = (await import("@/lib/persona")).PERSONAS.find((persona) => persona.id !== "default");
     if (!companion) return;

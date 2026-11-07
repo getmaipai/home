@@ -72,7 +72,7 @@ import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
-import { resolveTurnBudgetAndEngineModel } from "./budget";
+import { resolveTurnBudgetAndEngineModel, toolsOfferedStat } from "./budget";
 import { budgetWithTurnToolGates } from "./toolGates";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
@@ -80,7 +80,8 @@ import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { PARENT_REQUIRED_LINE } from "./nodes/answer";
 import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, settleAnswerBlocks, settleAnswerImages, startAnswerImages } from "@/lib/answerImages/turn";
-import { reAskForShowImages } from "./nodes/model";
+import { reAskForShowImages, toolSpecFor } from "./nodes/model";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import { recordToolAudit } from "@/lib/toolAudit";
@@ -222,7 +223,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.
     // MEM-AUDIT-05: the memory trace rides here too (ids and scores, no text).
-    stats: { ...stats, nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}), ...(state.weatherAssist ? { weather_assist: state.weatherAssist } : {}), ...(state.memoryTrace ? { memory: state.memoryTrace } : {}) },
+    stats: { ...stats, tools_offered: toolsOfferedStat(state.budget, (id) => toolSpecFor(id, laneOfPerson(state.actor), state)), nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}), ...(state.weatherAssist ? { weather_assist: state.weatherAssist } : {}), ...(state.memoryTrace ? { memory: state.memoryTrace } : {}) },
     // REASONING-02's own field, populated only when `context` allowed
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.

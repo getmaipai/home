@@ -12,7 +12,7 @@ afterEach(() => {
 
 function makePerformance(overrides: Partial<Performance> = {}): Performance {
   return {
-    turns: { window_days: 30, by_day: [{ date: "2026-09-22", count: 0, median_ttft_ms: null, p95_ttft_ms: null, median_total_ms: null, p95_total_ms: null, median_tokens_per_second: null }], by_engine: [], by_route: [] },
+    turns: { window_days: 30, by_day: [{ date: "2026-09-22", count: 0, median_ttft_ms: null, p95_ttft_ms: null, median_total_ms: null, p95_total_ms: null, median_tokens_per_second: null }], by_engine: [], by_route: [], tools_offered: { turns: 0, median_count: null, median_chars: null, p95_chars: null, max_chars: null } },
     queues: { judge: { pending: 0, oldest_created_at: null }, embedding: { pending: 0 }, ingestion: { pending: 0, by_reason: [] } },
     labels: { window_days: 30, turns: 0, guard_hits: [], rule_hits: [], rungs: [], retire_eligible: [] },
     layers: { window_days: 30, turns_with_trace: 0, nodes: [] },
@@ -71,6 +71,7 @@ describe("PerformancePage", () => {
           by_day: [{ date: "2026-09-22", count: 3, median_ttft_ms: 400, p95_ttft_ms: 600, median_total_ms: 2000, p95_total_ms: 3000, median_tokens_per_second: 25 }],
           by_engine: [{ engine: "local b1 qwen3-8b-instruct-q4-k-m", count: 3, median_ttft_ms: 400, p95_ttft_ms: 600, median_total_ms: 2000, p95_total_ms: 3000, median_tokens_per_second: 25 }],
           by_route: [{ route: "model", count: 3 }],
+          tools_offered: { turns: 3, median_count: 11, median_chars: 6400, p95_chars: 21000, max_chars: 21500 },
         },
         labels: { window_days: 30, turns: 3, guard_hits: [{ key: "limit", count: 2 }], rule_hits: [], rungs: [], retire_eligible: [] },
         layers: { window_days: 30, turns_with_trace: 3, nodes: [{ node: "model", count: 3, median_ms: 210, p95_ms: 400 }] },
@@ -94,6 +95,27 @@ describe("PerformancePage", () => {
     }
   });
 
+  test("AUDIT-TOOLS-01: the tools-offered panel shows the median and largest schema size, or says nothing was recorded", async () => {
+    let restore = mockPerformanceFetch(makePerformance());
+    try {
+      renderWithQueryClient(<MemoryRouter><PerformancePage /></MemoryRouter>);
+      await waitFor(() => expect(document.body.textContent).toContain("No turn in this window has recorded its tools yet."));
+    } finally {
+      restore();
+    }
+    document.body.innerHTML = "";
+    restore = mockPerformanceFetch(makePerformance({
+      turns: { window_days: 30, by_day: [], by_engine: [], by_route: [], tools_offered: { turns: 3, median_count: 11, median_chars: 6400, p95_chars: 21000, max_chars: 21500 } },
+    }));
+    try {
+      renderWithQueryClient(<MemoryRouter><PerformancePage /></MemoryRouter>);
+      await waitFor(() => expect(document.body.textContent).toContain("6,400"));
+      expect(document.body.textContent).toContain("21,500");
+    } finally {
+      restore();
+    }
+  });
+
   test("the kit route table sorts its existing aggregate rows", async () => {
     const restore = mockPerformanceFetch(makePerformance({
       turns: {
@@ -101,6 +123,7 @@ describe("PerformancePage", () => {
         by_day: [],
         by_engine: [],
         by_route: [{ route: "zeta", count: 1 }, { route: "alpha", count: 2 }],
+        tools_offered: { turns: 0, median_count: null, median_chars: null, p95_chars: null, max_chars: null },
       },
     }));
     try {

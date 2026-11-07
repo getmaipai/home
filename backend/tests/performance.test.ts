@@ -100,6 +100,25 @@ describe("GET /api/performance", () => {
     expect(modelRoute.count).toBe(3);
   });
 
+  test("AUDIT-TOOLS-01: the turns panel reports the tool schema offered per turn, and skips turns stored before the field", async () => {
+    const { client, row } = await owner();
+    const today = new Date().toISOString();
+    insertTurn(row.id, today, stats());
+    insertTurn(row.id, today, stats({ tools_offered: { count: 4, chars: 2000 } }));
+    insertTurn(row.id, today, stats({ tools_offered: { count: 10, chars: 6000 } }));
+    insertTurn(row.id, today, stats({ tools_offered: { count: 16, chars: 40000 } }));
+    const res = await client.get("/api/performance");
+    const body = (await res.json()) as Record<string, any>;
+    expect(body.turns.tools_offered).toEqual({ turns: 3, median_count: 10, median_chars: 6000, p95_chars: 40000, max_chars: 40000 });
+  });
+
+  test("AUDIT-TOOLS-01: with no recorded tools the panel says so with nulls, not zeros", async () => {
+    const { client } = await owner();
+    const res = await client.get("/api/performance");
+    const body = (await res.json()) as Record<string, any>;
+    expect(body.turns.tools_offered).toEqual({ turns: 0, median_count: null, median_chars: null, p95_chars: null, max_chars: null });
+  });
+
   test("layers panel is empty until a turn carries U2's per-node trace, then groups by node", async () => {
     const { client, row } = await owner();
     const today = new Date().toISOString();

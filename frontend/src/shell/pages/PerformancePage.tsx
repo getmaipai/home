@@ -7,6 +7,7 @@ import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboa
 import { TurnsChartBody } from "@/shell/pages/performance/TurnsChartBody";
 import { TurnsByEngineBody } from "@/shell/pages/performance/TurnsByEngineBody";
 import { RoutesBody } from "@/shell/pages/performance/RoutesBody";
+import { ToolsOfferedBody } from "@/shell/pages/performance/ToolsOfferedBody";
 import { LayersBody } from "@/shell/pages/performance/LayersBody";
 import { QueuesBody } from "@/shell/pages/performance/QueuesBody";
 import { LabelsBody } from "@/shell/pages/performance/LabelsBody";
@@ -22,6 +23,7 @@ const icons = {
   filter: getIcon("filter"),
   server: getIcon("server"),
   database: getIcon("database"),
+  wrench: getIcon("wrench"),
 };
 
 /** /performance (ADMIN-PERF-01, docs/dev.md's own design note): how
@@ -110,6 +112,19 @@ export function PerformancePage() {
                 </CardHeader>
                 <CardContent>
                   <RoutesBody byRoute={data.turns.by_route} />
+                </CardContent>
+              </Card>
+            </div>
+            <div className="lg:col-span-6 col-span-12">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <icons.wrench size={16} className="mr-2 inline text-muted-foreground" />
+                    Tools offered per turn
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ToolsOfferedBody offered={data.turns.tools_offered} />
                 </CardContent>
               </Card>
             </div>

@@ -240,3 +240,20 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   }
   return { ...budget, tools_offered: ordered.map(({ id }) => id) };
 }
+
+/** AUDIT-TOOLS-01 (efficiency audit 2026-11-06, item 4): how many tools a turn offered the model and how many characters their schemas
+ * (`{ id, description, args }` as `toolSpecFor` returns them, the same JSON the engine receives) came to, recorded in the turn's `stats`.
+ * A turn whose budget runs no tool round (the robot's Pi, a model with no record, `rounds: 0`) offered none. `specFor` is passed in
+ * so this file keeps importing no node. */
+export function toolsOfferedStat(budget: Pick<TurnBudget, "tools_offered" | "model_transitions" | "rounds">, specFor: (id: string) => { id: string; description: string; args: unknown } | null): { count: number; chars: number } {
+  if (!budget.model_transitions || budget.rounds <= 0) return { count: 0, chars: 0 };
+  let count = 0;
+  let chars = 0;
+  for (const id of budget.tools_offered) {
+    const spec = specFor(id);
+    if (spec === null) continue;
+    count += 1;
+    chars += JSON.stringify({ id: spec.id, description: spec.description, args: spec.args }).length;
+  }
+  return { count, chars };
+}

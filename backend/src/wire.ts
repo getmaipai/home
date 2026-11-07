@@ -133,6 +133,8 @@ export interface TurnStats {
   thinking: boolean;
   /** RESEARCH-TIER-01: the answer style this reply came from, recorded for Thinking and Max (absent means Instant). */
   answer_style?: "thinking" | "max";
+  /** AUDIT-TOOLS-01: the tools the model was offered on this turn: how many, and the characters of their schemas (absent on turns stored before this field). */
+  tools_offered?: { count: number; chars: number };
   /** LAT-00: every real model call this turn made, oldest first - the
    * fields above summarize the LAST one (unchanged shape/meaning for
    * every existing reader); this is the full history, so a turn that
@@ -1157,6 +1159,8 @@ export interface PerformanceTurns {
   /** Count of turns whose stored route (source: model | plugin | command
    * | safety_refuse | ...) matches each value, over the whole window. */
   by_route: Array<{ route: string; count: number }>;
+  /** AUDIT-TOOLS-01: the tool schemas offered per turn over the window, from `stats.tools_offered` (turns stored before it are not counted). */
+  tools_offered: { turns: number; median_count: number | null; median_chars: number | null; p95_chars: number | null; max_chars: number | null };
 }
 
 export interface PerformanceQueues {
