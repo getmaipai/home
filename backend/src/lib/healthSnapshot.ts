@@ -1,4 +1,5 @@
 import { emptyLengthRetryCount } from "@/lib/reasoningReserve";
+import { stackEpoch } from "@/lib/stackEngine";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 import { roleHealth, roleHealthEntry, localRoleHealthEntry, voiceCallReady } from "@/lib/roleHealth";
@@ -11,12 +12,23 @@ import { chatPausedByAdmin, chatPauseMessage } from "@/lib/chatPause";
 // "restarting"; the line then sends the person to Repairs.
 const RESTART_GRACE_MS = 60_000;
 let unreachableSince: number | null = null;
-export function __resetChatPauseTrackingForTests(): void { unreachableSince = null; }
+export function __resetChatPauseTrackingForTests(): void { unreachableSince = null; snapshot = null; }
+
+// AUDIT-PERF-01: every tab, the status sampler and the call check ask for the same snapshot; it is built at most once per 2 s.
+const SNAPSHOT_MS = 2_000;
+let snapshot: { at: number; epoch: number; value: Promise<HealthSnapshot> } | null = null;
+export function collectHealth(): Promise<HealthSnapshot> {
+  if (snapshot && snapshot.epoch === stackEpoch() && Date.now() - snapshot.at < SNAPSHOT_MS) return snapshot.value;
+  const entry = { at: Date.now(), epoch: stackEpoch(), value: buildHealth() };
+  snapshot = entry;
+  entry.value.catch(() => { if (snapshot === entry) snapshot = null; });
+  return entry.value;
+}
 
 // This is the single live health snapshot used by both /api/health and
 // status history. Keep its payload aligned with frontend chatAvailability
 // and backend statusHistory.componentStatesFrom, which mirror that rule.
-export async function collectHealth() {
+async function buildHealth() {
   const roles = ["chat", "embed", "background", "voice", "image", "video"] as const;
   const [locals, states, callReady] = await Promise.all([
     Promise.all(roles.map((role) => localRoleHealthEntry(role))),
@@ -65,4 +77,4 @@ export async function collectHealth() {
   return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", voice_call_ready: callReady, ok, engines: { chat, embed, background, voice, image, video }, uptimeSeconds: process.uptime() };
 }
 
-export type HealthSnapshot = Awaited<ReturnType<typeof collectHealth>>;
+export type HealthSnapshot = Awaited<ReturnType<typeof buildHealth>>;

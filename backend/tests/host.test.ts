@@ -147,6 +147,18 @@ describe("GET /api/host/chat-capabilities (VISION-02c, 02d)", () => {
     }
   });
 
+  test("one request makes one Stack role-list read (AUDIT-PERF-01)", async () => {
+    const owner = await ownerClient();
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    let reads = 0;
+    __setStackClientForTests({ roles: async () => { reads++; return { roles: [{ id: "chat", state: { state: "ready", since: "" }, model: { id: "m1", imageInput: true }, picture_tokens_max: 1024, models: [{ id: "m1", name: "one" }] }] }; } } as never);
+    try {
+      const res = await owner.get("/api/host/chat-capabilities");
+      expect(res.status).toBe(200);
+      expect(reads).toBe(1);
+    } finally { __resetStackEngineForTests(); }
+  });
+
   test("a child's thinking control reads none, whatever the model", async () => {
     const owner = await ownerClient();
     const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });

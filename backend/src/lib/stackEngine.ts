@@ -125,7 +125,12 @@ export function getStackClient(): StackClient {
 /** Test-only: the scripted client every rewired module's own tests
  * inject, the same `__set*ForTests` shape llmSupervisor.ts/stt.ts
  * already use. */
+/** AUDIT-PERF-01: bumped whenever the Stack client is swapped (tests), so the 2 s health memos never outlive their fixture. */
+let stackClientEpoch = 0;
+export function stackEpoch(): number { return stackClientEpoch; }
+
 export function __setStackClientForTests(client: StackClient | null): void {
+  stackClientEpoch++;
   testClient = client;
   defaultTestClientEnabled = false;
   cachedClient = null;
@@ -141,6 +146,7 @@ export function __setDefaultStackClientForTests(client: StackClient): void {
 }
 
 export function __enableDefaultStackClientForTests(): void {
+  stackClientEpoch++;
   testClient = defaultTestClient;
   defaultTestClientEnabled = true;
   cachedClient = null;
@@ -152,6 +158,7 @@ export function __hasInjectedStackClientForTests(): boolean {
 }
 
 export function __resetStackEngineForTests(): void {
+  stackClientEpoch++;
   testClient = defaultTestClient;
   defaultTestClientEnabled = false;
   cachedClient = null;

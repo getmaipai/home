@@ -12,7 +12,8 @@
 import type { PersonRow } from "@/types";
 import type { ChatImagePart } from "@/wire";
 import type { LlmImagePart } from "@/lib/llm";
-import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { isStackConfigured } from "@/lib/stackEngine";
+import { sharedStackRoles } from "@/lib/roleHealth";
 import { getTemporaryChatImage, readAttachmentForConversation } from "@/lib/attachments";
 import { getPersonSettingSource, getPersonSettingValue } from "@/lib/settings";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
@@ -42,7 +43,7 @@ export async function chatModelReadsPictures(): Promise<ChatPictureCapability> {
   if (forTests) return forTests;
   if (!isStackConfigured()) return OFF;
   try {
-    const { roles } = await getStackClient().roles();
+    const { roles } = await sharedStackRoles();
     const row = roles.find((role) => role.id === "chat");
     const state = row?.state.state;
     if (!row || (state !== "ready" && state !== "loaded" && state !== "installed")) return OFF;

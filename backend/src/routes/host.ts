@@ -9,6 +9,7 @@ import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { AppEnv } from "@/types";
 import type { ChatCapabilities } from "@/wire";
 import { chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
+import { sharedStackRoles } from "@/lib/roleHealth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { startChatModelChoice, chatModelChoiceState } from "@/lib/chatModelSwitch";
@@ -75,7 +76,7 @@ hostRoutes.get("/models/selection", requireRole("owner", "admin"), async (c) => 
 
 async function readStackChatRole() {
   if (!isStackConfigured()) return null;
-  try { return (await getStackClient().roles()).roles.find((role) => role.id === "chat") ?? null; }
+  try { return (await sharedStackRoles()).roles.find((role) => role.id === "chat") ?? null; }
   catch { return null; }
 }
 
