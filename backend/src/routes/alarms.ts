@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { Alarm } from "@maipai/spec/gen/ts/alarm.js";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, refuseWith, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createAlarm, deleteAlarm, listAlarms, skipNext, updateAlarm } from "@/lib/alarms";
 
@@ -12,8 +12,8 @@ alarmsRoutes.openapi(list, (c) => c.json(listAlarms(c.get("person")), 200));
 const create = createRoute({ method: "post", path: "/", tags: ["Alarms"], summary: "Create an alarm", middleware: [requireAuth] as const, request: { body: { content: { "application/json": { schema: editSchema } } } }, responses: { 201: { content: { "application/json": { schema: responseSchema } }, description: "Created" }, ...errorResponses({ 400: "Invalid alarm", 401: "Not signed in" }) } });
 alarmsRoutes.openapi(create, (c) => { const r = createAlarm(c.get("person"), c.req.valid("json")); return r.ok ? c.json({ ...r.value, next_at: listAlarms(c.get("person")).find((a) => a.id === r.value.id)?.next_at ?? null }, 201) : c.json({ error: r.error }, 400); });
 const patch = createRoute({ method: "patch", path: "/{id}", tags: ["Alarms"], summary: "Edit my alarm", middleware: [requireAuth] as const, request: { params: idParamSchema("id", "alarm-a1b2c3"), body: { content: { "application/json": { schema: editSchema } } } }, responses: { 200: { content: { "application/json": { schema: responseSchema } }, description: "Updated" }, ...errorResponses({ 400: "Invalid alarm", 401: "Not signed in", 404: "No such alarm" }) } });
-alarmsRoutes.openapi(patch, (c) => { const r = updateAlarm(c.get("person"), c.req.valid("param").id, c.req.valid("json")); return r.ok ? c.json({ ...r.value, next_at: listAlarms(c.get("person")).find((a) => a.id === r.value.id)?.next_at ?? null }, 200) : c.json({ error: r.error }, r.status); });
+alarmsRoutes.openapi(patch, (c) => { const r = updateAlarm(c.get("person"), c.req.valid("param").id, c.req.valid("json")); return r.ok ? c.json({ ...r.value, next_at: listAlarms(c.get("person")).find((a) => a.id === r.value.id)?.next_at ?? null }, 200) : refuseWith(c, r); });
 const del = createRoute({ method: "delete", path: "/{id}", tags: ["Alarms"], summary: "Delete my alarm", middleware: [requireAuth] as const, request: { params: idParamSchema("id", "alarm-a1b2c3") }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Deleted" }, ...errorResponses({ 401: "Not signed in", 404: "No such alarm" }) } });
-alarmsRoutes.openapi(del, (c) => { const r = deleteAlarm(c.get("person"), c.req.valid("param").id); return r.ok ? c.json(r.value, 200) : c.json({ error: r.error }, 404); });
+alarmsRoutes.openapi(del, (c) => { const r = deleteAlarm(c.get("person"), c.req.valid("param").id); return respond(c, r); });
 const skip = createRoute({ method: "post", path: "/{id}/skip-next", tags: ["Alarms"], summary: "Skip the next occurrence", middleware: [requireAuth] as const, request: { params: idParamSchema("id", "alarm-a1b2c3") }, responses: { 200: { content: { "application/json": { schema: responseSchema } }, description: "Skipped" }, ...errorResponses({ 400: "No next occurrence", 401: "Not signed in", 404: "No such alarm" }) } });
-alarmsRoutes.openapi(skip, (c) => { const r = skipNext(c.get("person"), c.req.valid("param").id); return r.ok ? c.json({ ...r.value, next_at: listAlarms(c.get("person")).find((a) => a.id === r.value.id)?.next_at ?? null }, 200) : c.json({ error: r.error }, r.status); });
+alarmsRoutes.openapi(skip, (c) => { const r = skipNext(c.get("person"), c.req.valid("param").id); return r.ok ? c.json({ ...r.value, next_at: listAlarms(c.get("person")).find((a) => a.id === r.value.id)?.next_at ?? null }, 200) : refuseWith(c, r); });

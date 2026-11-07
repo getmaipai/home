@@ -5,7 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
-import { apiRouter } from "@/lib/openapi";
+import { apiRouter, respond } from "@/lib/openapi";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { resolveHumanSession } from "@/middleware/auth";
@@ -80,7 +80,7 @@ setupFolderRoutes.openapi(listRoute, (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
   const result = listFolder(c.req.valid("query").path);
-  return result.ok ? c.json(result.value, 200) : (c.json({ error: result.error }, result.status) as never);
+  return respond(c, result);
 });
 
 const createRouteDef = createRoute({
@@ -93,7 +93,7 @@ setupFolderRoutes.openapi(createRouteDef, (c) => {
   if (refusal) return refusal as never;
   const { parent, name } = c.req.valid("json");
   const result = createFolder(parent, name);
-  return result.ok ? c.json(result.value, 200) : (c.json({ error: result.error }, result.status) as never);
+  return respond(c, result);
 });
 
 const nativeRoute = createRoute({

@@ -34,10 +34,9 @@ import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
-export type ShareOpResult<T, S extends number = 400 | 403 | 404> =
-  | { ok: true; value: T }
-  | { ok: false; status: S; error: string };
+export type ShareOpResult<T, S extends number = 400 | 403 | 404> = Result<T, S>;
 
 export interface CreateShareInput {
   fileId: string;

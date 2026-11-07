@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { listPlayableVoices, isPlayableVoiceId } from "@/lib/voiceList";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { db } from "@/db";
@@ -218,7 +218,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
   }
   if (body.scope === "household" && body.key === "coding.home_mode") return c.json({ error: "Coding mode is now Max chat. Pick Max in a chat, or connect a coding app, and Home loads the big model for you." }, 400);
   const refusal = await applySettingSideEffects(body.scope, body.key, body.value, actor, true);
-  if (refusal) return c.json({ error: refusal.error }, refusal.status);
+  if (refusal) return refuseWith(c, refusal);
   const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
@@ -277,7 +277,7 @@ settingsRoutes.openapi(resetRoute, async (c) => {
     if (refusal) return c.json({ error: refusal }, 400);
   }
   const refusal = await applySettingSideEffects(body.scope, body.key, getRegistry().find((key) => key.key === body.key)?.default, actor, true);
-  if (refusal) return c.json({ error: refusal.error }, refusal.status);
+  if (refusal) return refuseWith(c, refusal);
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);

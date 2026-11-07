@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { refuseWith } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { detectHardware } from "@/lib/hardware";
 import { recommend, CATALOG, thinkingModeFor } from "@/lib/modelCatalog";
@@ -84,7 +85,7 @@ async function readStackChatRole() {
 // existing job feed, a load is read back from GET .../select-status.
 hostRoutes.post("/models/:id/select", requireRole("owner", "admin"), async (c) => {
   const result = await startChatModelChoice(c.req.param("id"));
-  if ("error" in result) return c.json({ error: result.error }, result.status);
+  if ("error" in result) return refuseWith(c, result);
   return c.json(result, result.status === "ready" ? 200 : 202);
 });
 

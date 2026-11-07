@@ -17,25 +17,13 @@
 // route can fall back to it when the request omits these; nothing here
 // forecloses that.
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, refuseWith } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { install, rollback, uninstall, setChannel, type StoreResult } from "@/lib/store";
 import { getActiveInstall } from "@/lib/packageResolve";
 
 export const storeRoutes = apiRouter();
 export const UNINSTALL_CONFIRMATION = "The following will be uninstalled and users will lose access. Your pictures stay in Library.";
-
-// The same small local shape routes/commands.ts, routes/memory.ts,
-// routes/conversations.ts, and routes/scheduler.ts already each factor
-// their own StoreResult-shaped failure branch into - a real gap found
-// by code review: this file used to hand-write `{error: result.error},
-// 400` three separate times instead of reusing lib/store.ts's own
-// per-failure `status` (404 for "no such install," 400 for a real
-// request problem), the exact distinction routes/repairs.ts's own
-// fixIssue/dismissIssue already make for "no such issue."
-function fail(result: Extract<StoreResult<unknown>, { ok: false }>) {
-  return { body: { error: result.error }, status: result.status } as const;
-}
 
 const IdParamSchema = idParamSchema("id", "weather");
 
@@ -134,10 +122,7 @@ const rollbackRoute = createRoute({
 });
 storeRoutes.openapi(rollbackRoute, async (c) => {
   const result = await rollback(c.req.valid("param").id);
-  if (!result.ok) {
-    const f = fail(result);
-    return c.json(f.body, f.status);
-  }
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value, 200);
 });
 
@@ -178,7 +163,7 @@ storeRoutes.openapi(uninstallRoute, async (c) => {
   // lib/store.ts's uninstall() only ever fails with 404 ("no active
   // install") - the cast narrows fail()'s general 400|404 (rollback's
   // own wider case) to what this route actually declares.
-  if (!result.ok) return c.json(fail(result).body, 404);
+  if (!result.ok) return c.json({ error: result.error }, 404);
   return c.json({ ok: true as const, confirmation: UNINSTALL_CONFIRMATION }, 200);
 });
 
@@ -202,6 +187,6 @@ storeRoutes.openapi(channelRoute, (c) => {
   const result = setChannel(id, channel);
   // lib/store.ts's setChannel() only ever fails with 404, same reason
   // as uninstallRoute above.
-  if (!result.ok) return c.json(fail(result).body, 404);
+  if (!result.ok) return c.json({ error: result.error }, 404);
   return c.json({ ok: true as const }, 200);
 });

@@ -35,6 +35,7 @@ import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
 import { songFactFor } from "./songFacts";
 import { getMade } from "@/lib/music/madeRecords";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
+import type { Result } from "@/lib/result";
 
 export type MediaKind = MediaItem["kind"];
 
@@ -809,7 +810,7 @@ export function coerceNumber(value: unknown): number | undefined {
 
 export const PROGRESS_REASONS = ["interval", "pause", "seek", "unload", "ended"] as const;
 
-export type ActionResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 422; error: string };
+export type ActionResult<T> = Result<T, 400 | 403 | 404 | 422>;
 
 export interface ProgressArgs {
   media_id?: unknown;

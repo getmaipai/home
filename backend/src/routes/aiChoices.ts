@@ -16,7 +16,7 @@ import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } fro
 import { rowHasModel, type DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
 import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from "@/lib/aiUnused";
-import { installStackComponent, listStackComponents, listTierCandidates, type TierStackCategory, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
+import { componentFailure, installStackComponent, listStackComponents, listTierCandidates, type TierStackCategory, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
@@ -73,14 +73,6 @@ async function loadAiState(): Promise<AiState> {
 }
 
 // The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).
-function failure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
-  if (error instanceof StackComponentError) {
-    const status = error.status === 404 ? 404 : error.status === 409 ? 409 : 503;
-    return c.json({ error: error.message, code: error.code }, status as never);
-  }
-  throw error;
-}
-
 // The Stack's own in-use guard is the removal guard; after a part moves, the readiness and install reads
 // that cache the Stack's answer must see it gone (or back) on the next read.
 function dropModelCaches(): void {
@@ -328,7 +320,7 @@ aiChoicesRoutes.openapi(unusedRoute, async (c) => {
   try {
     const { items, totalBytes } = findUnused(unusedInput(await loadAiState()));
     return c.json({ items, total_bytes: totalBytes }, 200);
-  } catch (error) { return failure(c, error) as never; }
+  } catch (error) { return componentFailure(c, error) as never; }
 });
 
 const chooseRoute = createRoute({
@@ -408,7 +400,7 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
       return c.json({ ok: true as const, started: [], removed }, 200);
     }
     return c.json({ error: choice.blockedReason ?? (choice.state === "installing" ? "It is still installing." : "It is already the choice."), code: "no_action" }, 409);
-  } catch (error) { return failure(c, error) as never; }
+  } catch (error) { return componentFailure(c, error) as never; }
 });
 
 const recommendedRoute = createRoute({
@@ -455,7 +447,7 @@ aiChoicesRoutes.openapi(recommendedRoute, async (c) => {
     }
     if (started.length > 0) dropModelCaches();
     return c.json({ ok: true as const, changed, started, already, skipped: plan.skipped, needs_licence: needsLicence }, 200);
-  } catch (error) { return failure(c, error) as never; }
+  } catch (error) { return componentFailure(c, error) as never; }
 });
 
 const cleanupRoute = createRoute({
@@ -480,7 +472,7 @@ aiChoicesRoutes.openapi(cleanupRoute, async (c) => {
   for (const id of ids) {
     // Fresh state for every id: the one before it may have moved a part, and a part that became used since
     // the list was read must be seen as used.
-    try { state = await loadAiState(); } catch (error) { return failure(c, error) as never; }
+    try { state = await loadAiState(); } catch (error) { return componentFailure(c, error) as never; }
     // The unused test runs again per id at removal time: a part that became used since the list was read
     // is kept, and said so.
     const reason = whyKept(unusedInput(state), id);

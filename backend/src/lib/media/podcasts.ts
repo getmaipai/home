@@ -35,6 +35,7 @@ import { artProxyAddress, directoryShowForFeed } from "./podcastDirectory";
 import { parseTranscriptDocument as parseTimedTranscript } from "@/lib/transcripts/parse";
 import { insertTranscript, storedTranscriptForItem, type Segment } from "@/lib/transcripts/store";
 import { applyOps } from "@/lib/transcripts/revisions";
+import type { Result } from "@/lib/result";
 
 const MAX_EPISODES_PER_FEED = 200;
 const MAX_ENCLOSURE_BYTES = 400 * 1024 * 1024;
@@ -94,7 +95,7 @@ export function previewEpisodeView(actor: PersonRow, id: string, nowMs = Date.no
   return { id, kind: "podcast_episode", title: episode.title, channel: held.show.title, subtitle: held.show.title, src: `/api/plugins/podcasts/preview/${encodeURIComponent(id)}`, live: false, poster, art: poster, description: episode.description, chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [] };
 }
 
-export type Outcome<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409 | 422 | 502; error: string };
+export type Outcome<T> = Result<T, 400 | 403 | 404 | 409 | 422 | 502>;
 
 // ---- what a route-triggered poll or save uses -------------------------------------------------------------------------------------
 

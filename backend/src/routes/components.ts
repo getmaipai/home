@@ -6,7 +6,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent } from "@/lib/stackComponents";
+import { componentFailure, installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent } from "@/lib/stackComponents";
 import { licenceCovered } from "@/lib/licenceAcceptance";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
@@ -36,14 +36,6 @@ const ListSchema = z.object({
 });
 const idParams = z.object({ id: z.string().min(1).max(200) });
 const refusals = errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such component", 409: "It cannot be installed or removed right now (the message says why)", 503: "The engine is not answering" });
-
-function failure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
-  if (error instanceof StackComponentError) {
-    const status = error.status === 404 ? 404 : error.status === 409 ? 409 : 503;
-    return c.json({ error: error.message, code: error.code }, status as never);
-  }
-  throw error;
-}
 
 const listRoute = createRoute({
   method: "get", path: "/", tags: ["Components"], summary: "Every installable part of the AI, its size and state", middleware: [requireRole("owner", "admin")] as const,
@@ -88,7 +80,7 @@ componentsRoutes.openapi(installRoute, async (c) => {
     const started = await installStackComponent(c.req.valid("param").id, typeof consent.accepted_licence === "string" ? { acceptedLicence: consent.accepted_licence, ...(person?.id ? { acceptedBy: person.id } : {}) } : {});
     resetInstallStatusCache();
     return started.job ? c.json({ job: started.job, component: started.component }, 202) : c.json({ job: null, component: started.component }, 200);
-  } catch (error) { return failure(c, error) as never; }
+  } catch (error) { return componentFailure(c, error) as never; }
 });
 
 const removeRoute = createRoute({
@@ -112,5 +104,5 @@ componentsRoutes.openapi(removeRoute, async (c) => {
     dropMusicStatusCache();
     resetInstallStatusCache();
     return c.json(removed, 200);
-  } catch (error) { return failure(c, error) as never; }
+  } catch (error) { return componentFailure(c, error) as never; }
 });

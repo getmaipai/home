@@ -21,6 +21,7 @@ import { installRefusal } from "@/lib/capabilities";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { appPackageProblems } from "@/lib/apps";
 import { killLiveProcessForInstallChange } from "@/lib/denoHost";
+import type { Result } from "@/lib/result";
 import {
   fetchRawIndex,
   verifyIndex,
@@ -38,7 +39,7 @@ import {
 // package simply doesn't exist (404, routes/repairs.ts's own convention
 // for "no such issue") or a real request problem (400). The function
 // that actually knows which case it hit is the one that should say so.
-export type StoreResult<T> = { ok: true; value: T } | { ok: false; error: string; status: 400 | 404 };
+export type StoreResult<T> = Result<T, 400 | 404>;
 
 // Serializes every install()/rollback()/uninstall() call for the SAME
 // package id - a real gap found by code review: two concurrent installs

@@ -10,14 +10,13 @@ import { pictureDenial } from "@/lib/pictures/policy";
 import type { PersonRow } from "@/types";
 import { bandBlockFromRecord, startBandPicture } from "./band";
 import { deleteMade, getMade, reviseMade, updateMade } from "./madeRecords";
+import type { Result } from "@/lib/result";
 
 export const BAND_ACTION_NAMES = ["keep", "remake", "remake_portrait", "remake_logo", "discard", "edit"] as const;
 /** What an edit may change. `sound` is the band's style words; `look` starts a new portrait from those words (the band record has no look field). */
 export interface BandPatchInput { name?: string; backstory?: string; look?: string; sound?: string; genres?: string[] }
 export type BandActionName = (typeof BAND_ACTION_NAMES)[number];
-export type BandActionResult =
-  | { ok: true; value: { action: BandActionName; done: string; mediaId?: string | null; seedMediaId?: string | null; pending?: boolean; band?: Record<string, unknown> } }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+export type BandActionResult = Result<{ action: BandActionName; done: string; mediaId?: string | null; seedMediaId?: string | null; pending?: boolean; band?: Record<string, unknown> }, 400 | 403 | 404>;
 
 type Band = { id: string; name: string; style?: { description?: string; genres?: string[] }; owner_person_id?: string | null; backstory?: string | null; genres?: string[]; members?: { name: string; role: string }[]; seed?: { media_id?: string } | null };
 

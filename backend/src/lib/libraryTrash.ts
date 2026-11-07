@@ -22,9 +22,10 @@ import { syncFileReferences } from "@/lib/fileContent";
 import { deleteMusicJobsForFiles } from "@/lib/music/store";
 import { deletePictureJobsForFiles } from "@/lib/pictures/jobStore";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
 type Row = typeof attachments.$inferSelect;
-export type TrashResult<T> = { ok: true; value: T } | { ok: false; status: 403 | 404; error: string };
+export type TrashResult<T> = Result<T, 403 | 404>;
 const DAY = 86_400_000;
 
 export function trashDays(): number {

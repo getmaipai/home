@@ -12,7 +12,7 @@ import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { canManage, checkRoleChange, commitPersonUpdate, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
 import { requiresCredential, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { effectivePermissions } from "@/lib/permissions";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { blocklistIds } from "@/lib/blocklists/policy";
 import { backToUserDefaults, changeOverrides, resetBlocklistRow, hiddenOwnChoice, siteBlocksView } from "@/lib/settingsLayers";
 import { Person } from "@maipai/spec/gen/ts/person.js";
@@ -286,7 +286,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   let nextRole = target.role;
   if (body.role !== undefined && body.role !== target.role) {
     const check = checkRoleChange(actor, target, body.role, requiresCredential(id));
-    if (!check.ok) return c.json({ error: check.error }, check.status);
+    if (!check.ok) return respond(c, check);
     nextRole = check.value;
   }
 
@@ -364,7 +364,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // same error the early check above would have, instead of silently
   // leaving the household with zero owners.
   const committed = commitPersonUpdate(id, personToDbValues(candidate.data), target.role === "owner" && nextRole !== "owner");
-  if (!committed.ok) return c.json({ error: committed.error }, committed.status);
+  if (!committed.ok) return respond(c, committed);
   // A cached session carries the whole PersonRow, role included, so a
   // demotion would not take effect until the cache expired: the other
   // case auth.ts's invalidateSessionCacheForPerson was written for.
@@ -393,11 +393,11 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // own result gets above.
   if (rawBody.sessionLockRequired !== undefined) {
     const result = setValue(actor, `person:${id}`, SESSION_LOCK_REQUIRED_KEY, rawBody.sessionLockRequired);
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return respond(c, result);
   }
   if (rawBody.sessionLockTimeoutMinutes !== undefined) {
     const result = setValue(actor, `person:${id}`, SESSION_LOCK_TIMEOUT_KEY, rawBody.sessionLockTimeoutMinutes);
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return respond(c, result);
   }
 
   const roster = toRoster(db.select().from(people).where(eq(people.id, id)).get()!);
@@ -584,7 +584,7 @@ const memorializeRoute = createRoute({
 peopleRoutes.openapi(memorializeRoute, (c) => {
   const actor = c.get("person");
   const result = memorializePerson(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 

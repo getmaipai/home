@@ -38,6 +38,7 @@ import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { PersonRow } from "@/types";
 import { wallClockMinutes } from "@/lib/wallClock";
+import type { Result } from "@/lib/result";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
@@ -397,7 +398,7 @@ export function listHistory(actor: PersonRow): NotificationDeliveryView[] {
 // routes/notifications.ts's converted @hono/zod-openapi handlers need
 // each function's response `responses` map to describe what it can
 // really return, not a broader shared type's ceiling.
-export type NotificationOpResult<T, S extends number = 403 | 404> = { ok: true; value: T } | { ok: false; status: S; error: string };
+export type NotificationOpResult<T, S extends number = 403 | 404> = Result<T, S>;
 
 function ownedDelivery(actor: PersonRow, id: string): NotificationOpResult<typeof notificationDeliveries.$inferSelect> {
   const row = db.select().from(notificationDeliveries).where(eq(notificationDeliveries.id, id)).get();

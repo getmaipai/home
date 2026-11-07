@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { QuickTimer } from "@maipai/spec/gen/ts/quick-timer.js";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createQuickTimer, deleteQuickTimer, listQuickTimers, updateQuickTimer } from "@/lib/quickTimers";
 
@@ -59,7 +59,7 @@ const patch = createRoute({
 });
 quickTimersRoutes.openapi(patch, (c) => {
   const result = updateQuickTimer(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
-  return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+  return respond(c, result);
 });
 
 const del = createRoute({

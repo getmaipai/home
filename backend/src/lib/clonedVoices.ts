@@ -26,10 +26,9 @@ import type { StackVoice } from "@/lib/stack/types";
 import { appendLogLine } from "@/lib/log";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 import { householdKeyBytes } from "@/lib/secrets";
+import type { Result } from "@/lib/result";
 
-export type ClonedVoiceOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+export type ClonedVoiceOpResult<T> = Result<T, 400 | 403 | 404>;
 
 // A person's actual voice, so kept smaller than a generic upload cap
 // would need to be - a few minutes of audio is already far more than

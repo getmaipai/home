@@ -26,6 +26,7 @@ import { createMade, deleteMade, getMade, updateMade } from "./madeRecords";
 import { musicDenial } from "./policy";
 import { resolveSound, type SoundStyle } from "./sound";
 import { musicAudienceOf, runGenerateMusic } from "./tool";
+import type { Result } from "@/lib/result";
 
 export const MAKE_ALBUM_TOOL_ID = "make_album";
 export const EDIT_ALBUM_TOOL_ID = "edit_album";
@@ -221,9 +222,7 @@ export async function runMakeAlbum(input: { state: BandState; args: Record<strin
 export const ALBUM_ACTION_NAMES = ["keep", "remake_cover", "discard", "edit", "play_all"] as const;
 export type AlbumActionName = (typeof ALBUM_ACTION_NAMES)[number];
 export interface AlbumPatchInput { title?: string; blurb?: string; look?: string; sound?: string; genres?: string[]; track_ids?: string[] }
-export type AlbumActionResult =
-  | { ok: true; value: { action: AlbumActionName; done: string; album?: Record<string, unknown>; media_id?: string | null } }
-  | { ok: false; status: 400 | 403 | 404 | 503; error: string };
+export type AlbumActionResult = Result<{ action: AlbumActionName; done: string; album?: Record<string, unknown>; media_id?: string | null }, 400 | 403 | 404 | 503>;
 
 /** The record fields a card edit changes. `sound` and `genres` live in the album's style; the track list keeps only ids already on it (a removed song stays in the library). */
 export function albumFieldsFromPatch(album: AlbumBody, patch: AlbumPatchInput): Record<string, unknown> {

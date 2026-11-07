@@ -53,9 +53,7 @@ function decodeStoredRow(keyDef: SettingsKey, storedText: string): unknown {
   return JSON.parse(jsonText);
 }
 
-export type SettingsOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: 400 | 403; error: string };
+export type SettingsOpResult<T> = Result<T, 400 | 403>;
 
 // Recover HLC monotonicity across a restart (see lib/hlc.ts's seedHlc
 // comment for the failure this prevents): seed from every hlc already on
@@ -330,6 +328,7 @@ export function validateSelectorValue(keyDef: SettingsKey, value: unknown): Sett
 // code review, shell/kit/Chat slice); re-exported here since this is
 // where callers already look for it.
 import type { ResolvedSetting } from "@/wire";
+import type { Result } from "@/lib/result";
 export type { ResolvedSetting } from "@/wire";
 
 // CLAUDE.md > Credentials and secrets is a hard rule: "No secret value in

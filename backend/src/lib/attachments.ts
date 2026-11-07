@@ -25,10 +25,9 @@ import { contentFor, dropFileReferences, ensureContent, releaseContent, syncFile
 import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
-export type AttachmentOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404 | 500; error: string };
+export type AttachmentOpResult<T> = Result<T, 400 | 403 | 404 | 500>;
 
 export interface CreateAttachmentInput {
   retention?: "conversation" | "kept";

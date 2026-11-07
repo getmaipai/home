@@ -5,6 +5,7 @@
 // must be one their role reaches (`appRouteAllowed` / `appImageAllowed`, lib/apps.ts). A failed gate is a 404 and never says why,
 // so a child or a guest learns nothing about what exists. Age and surface stay on the data path (the shelf's release, the block
 // filter, the child gate), not here. Log lines are typed counters only: no title, URL or person id (RULES 6a).
+import { respond } from "@/lib/openapi";
 import { Hono } from "hono";
 import { requireAuth } from "@/middleware/auth";
 import type { AppEnv } from "@/types";
@@ -67,7 +68,7 @@ newsRoutes.post("/actions/:action", requireAuth, async (c) => {
   const action = c.req.param("action");
   if (!isAction(action) || !appRouteAllowed(person, "news", "actions", action)) { bumpNewsCounter("route_refused"); return c.json({ error: "no such action" }, 404); }
   const result = await runNewsAction(person, action, await jsonBody(c));
-  return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+  return respond(c, result);
 });
 
 // NEWS-ARTICLE-FIGURES-01: one picture inside an article. The number is looked up in the requester's own age-band copy of the

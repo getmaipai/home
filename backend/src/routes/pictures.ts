@@ -3,7 +3,7 @@
 // gate as the chat tool and the same prompt check, so a route is never a way around either (IMGGEN-SAFE-01).
 import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { routeAudience } from "@/lib/pictures/audience";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
@@ -84,7 +84,7 @@ picturesRoutes.openapi(adultMarkRoute, (c) => {
   }
   if (!fileId) return c.json({ error: "That picture isn't available any more." }, 404) as never;
   const result = setItemLock({ actor, fileId, action, ticket: ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
-  if (!result.ok) return c.json({ error: result.error }, result.status) as never;
+  if (!result.ok) return refuseWith(c, result) as never;
   return c.json({ made_audience: result.made_audience, lock: result.lock }, 200);
 });
 

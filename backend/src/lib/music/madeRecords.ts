@@ -21,9 +21,10 @@ import { newMadeAlbumId, newMadeArtistId, newMadeRevisionId, newSongStyleId } fr
 import { readableItem } from "@/lib/media/access";
 import { evaluateSafety } from "@/lib/safety";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
 export type MadeKind = "song_style" | "made_artist" | "made_album";
-export type StoreResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
+export type StoreResult<T> = Result<T, 400 | 403 | 404>;
 
 type Row = typeof songStyles.$inferSelect;
 type Rec = Record<string, unknown> & { id: string; owner_person_id?: string | null; shared_to?: unknown };

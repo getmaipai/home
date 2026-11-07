@@ -3,7 +3,7 @@
 // the HTTP boundary, the same split every other routes/*.ts file here
 // takes over its own lib module.
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { listWidgets, getWidgetData, orderHomeCards } from "@/lib/widgets";
 import type { WidgetDescriptor } from "@/lib/widgets";
@@ -91,6 +91,6 @@ widgetsRoutes.openapi(dataRoute, async (c) => {
   const actor = c.get("person");
   const { package: packageId, id } = c.req.valid("param");
   const result = await getWidgetData(actor, packageId, id);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });

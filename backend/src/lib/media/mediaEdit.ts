@@ -10,8 +10,9 @@ import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
 import { readableIn, type MediaAppId } from "./appHost";
 import { mediaBandOf, trips } from "./band";
+import type { Result as SharedResult } from "@/lib/result";
 
-type Result = { ok: true; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404; error: string };
+type Result = SharedResult<Record<string, unknown>, 400 | 403 | 404>;
 type Field = "title" | "description" | "artist" | "artwork";
 
 const fail = (status: 400 | 403 | 404, error: string): Result => ({ ok: false, status, error });

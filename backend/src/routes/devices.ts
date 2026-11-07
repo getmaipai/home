@@ -10,7 +10,7 @@ import { upgradeWebSocket } from "hono/bun";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond, refuseWith } from "@/lib/openapi";
 import { acceptFrame, MAX_FRAME_BYTES } from "@/lib/robotVision";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession, resolveHumanSession } from "@/middleware/auth";
@@ -512,7 +512,7 @@ const startLiveViewRoute = createRoute({
 });
 devicesRoutes.openapi(startLiveViewRoute, (c) => {
   const started = startLiveView(c.get("person"), c.req.valid("param").id);
-  if (!started.ok) return c.json({ error: started.error }, started.status);
+  if (!started.ok) return respond(c, started);
   return c.json({ view_id: started.viewId, stream: `/api/devices/live-view/${started.viewId}` }, 200);
 });
 
@@ -533,7 +533,7 @@ devicesRoutes.openapi(watchLiveViewRoute, (c) => {
   const view = getLiveView(c.req.valid("param").viewId);
   if (!view || view.personId !== actor.id) return c.json({ error: "That live view is not open. Start it again from the robot's card." }, 404);
   const admitted = liveViewAdmits(actor);
-  if (!admitted.ok) { stopLiveView(view.viewId); return c.json({ error: admitted.error }, admitted.status); }
+  if (!admitted.ok) { stopLiveView(view.viewId); return refuseWith(c, admitted); }
   return new Response(liveViewStream(view), { status: 200, headers: { "Content-Type": LIVE_VIEW_CONTENT_TYPE, "Cache-Control": "no-store" } });
 });
 

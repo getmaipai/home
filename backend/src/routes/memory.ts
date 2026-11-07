@@ -19,7 +19,7 @@ import {
 } from "@/lib/memory";
 import { runLegacyImport, LegacyImportError } from "@/lib/legacyImport";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
-import { apiRouter, errorResponses, ErrorSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, ErrorSchema, refuseWith } from "@/lib/openapi";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { AppEnv, PersonRow } from "@/types";
 import { db } from "@/db";
@@ -35,10 +35,6 @@ import { savedFromTurnSource } from "@/lib/conversationHistory";
 // converted" the org standard actually asks for when the touch is one
 // new endpoint, not a rewrite of a whole file's already-working routes.
 export const memoryRoutes = apiRouter();
-
-function fail(c: Context<AppEnv>, result: Extract<MemoryOpResult<unknown>, { ok: false }>) {
-  return c.json({ error: result.error }, result.status as 400 | 401 | 403 | 404 | 409);
-}
 
 // SEC-4 (code review, 2026-09-06): remember(actor, body) used to trust
 // EVERY field of the request body - `pinned` (rides in every household
@@ -174,7 +170,7 @@ memoryRoutes.post("/", requireAuth, async (c) => {
     pinned: sanitizedPinned(actor, body.pinned),
     record_kind: sanitizedRecordKind(actor, body.record_kind),
   });
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value, 201);
 });
 
@@ -255,7 +251,7 @@ memoryRoutes.get("/export", requireAuth, async (c) => {
   const personId = new URL(c.req.url).searchParams.get("personId");
   if (!personId) return c.json({ error: "personId is required" }, 400);
   const result = exportPerson(actor, personId);
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 
@@ -264,7 +260,7 @@ memoryRoutes.post("/forget", requireAuth, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { personId?: string };
   if (!body.personId) return c.json({ error: "personId is required" }, 400);
   const result = forget(actor, body.personId);
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 
@@ -311,7 +307,7 @@ memoryRoutes.post("/maintenance/run", requireRole("owner", "admin"), async (c) =
 memoryRoutes.post("/:id/archive", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = archive(actor, c.req.param("id"));
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 
@@ -329,7 +325,7 @@ memoryRoutes.post("/:id/audience", requireAuth, async (c) => {
   const parsed = AudienceBodySchema.safeParse(rawBody);
   if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
   const result = setChildDisclosure(actor, c.req.param("id"), parsed.data.child_disclosure);
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 
@@ -351,7 +347,7 @@ memoryRoutes.post("/:id/supersede", requireAuth, async (c) => {
     source: `api:${actor.id}`,
     pinned: sanitizedPinned(actor, body.pinned),
   }, { enforcePrivilegedRoute: true });
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 

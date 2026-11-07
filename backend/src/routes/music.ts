@@ -13,7 +13,7 @@ import { dropMusicJob, memory, pruneMusicJobs } from "@/lib/music/store";
 // MUSIC-GEN-03: private chat cards and exports, every entrance behind the same age and surface gate.
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
@@ -255,7 +255,7 @@ musicRoutes.openapi(reviseRoute, async (c) => {
     input: (source) => { description = `${source.request.description.trim()}. Change: ${change}`.slice(0, 1200); return { change: "remake", description }; },
     // The revised prompt is the source of truth for both the stored request and the Stack body.
     patch: (plan) => { plan.request.description = description; plan.body.caption = description; } });
-  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
 });
 // MUSIC-STUDIO-SONG: the Make a song page. It runs the same runGenerateMusic path as the generate_music tool, in a chat of its own
 // (so the song shows in chat history like any song made there), and answers with the song card the page polls.
@@ -341,7 +341,7 @@ musicRoutes.openapi(detailsRoute, async (c) => {
   const actor = c.get("person"); const { file_id, ...changes } = c.req.valid("json");
   if (!Object.values(changes).some((v) => v !== undefined)) return c.json({ error: "Change at least one thing: the title, the words, the style, the tempo or the key." }, 422) as never;
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, skipStems: true, input: () => ({ change: "remake", ...changes }) });
-  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
 });
 const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags: ["Music"], summary: "Split the shown song into stems", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80).optional() }) } } } },
@@ -440,7 +440,7 @@ const lyricsRealignRoute = createRoute({ method: "post", path: "/library/{id}/ly
   responses: { 202: { content: { "application/json": { schema: z.object({ ok: z.literal(true), state: z.literal("queued") }) } }, description: "Lining the words up again; the lyrics improve in a moment." }, 422: { description: "These lyrics have no timing." }, 429: { description: "Asked again within a minute." }, ...errorResponses({ 401: "Not signed in", 404: "No such song" }) } });
 musicRoutes.openapi(lyricsRealignRoute, (c) => {
   const { result } = requestRealign(c.get("person"), c.req.valid("param").id);
-  return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : c.json({ error: result.error }, result.status) as never;
+  return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : refuseWith(c, result) as never;
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });
@@ -485,7 +485,7 @@ const lengthRoute = createRoute({ method: "post", path: "/jobs/{id}/length", tag
 musicRoutes.openapi(lengthRoute, async (c) => {
   const actor = c.get("person"); const { length, file_id } = c.req.valid("json");
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, input: () => ({ change: length === "full" ? "make_full" : "make_quick" }) });
-  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
 });
 // Make it Boost / Make it Standard (TIER-HOME-03): the same song made again with the engine's Detailed or Quick maker, as a new version on the same card.
 const qualityRoute = createRoute({ method: "post", path: "/jobs/{id}/quality", tags: ["Music"], summary: "Make the shown song again at Standard, Boost or Max", middleware,
@@ -502,7 +502,7 @@ musicRoutes.openapi(qualityRoute, async (c) => {
       plan.request.quality = musicQualityFor(engine, tier); plan.request.tier = musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
       return null;
     } });
-  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
 });
 /** Audio seeking uses the one Range server (`serveBytes`); the slice is read from the file on demand. */
 function audioResponse(file: MusicFileHandle, rangeHeader?: string): Response {

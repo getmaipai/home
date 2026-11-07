@@ -17,7 +17,7 @@ import { fetchRadioArt } from "@/lib/media/radioArt";
 import { radioRecordingRows, startRadioRecording, stopRadioRecording } from "@/lib/media/radioRecordings";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { apiRouter } from "@/lib/openapi";
+import { apiRouter, respond, refuseWith } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 
 type Body = Record<string, unknown>;
@@ -106,7 +106,7 @@ export function radioRoutes() {
     if (!allowed) return c.json({ error: NOT_ON }, 403);
     const result = await findStations({ kind: "popular" });
     if (result.ok) rememberPreviewStations("household", result.stations);
-    return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : refuseWith(c, result);
   });
 
   routes.get("/search", requireAuth, async (c, next) => {
@@ -125,7 +125,7 @@ export function radioRoutes() {
     if (minorQueryHit([name, tag].filter(Boolean).join(" "), band)) return c.json({ ok: true as const, stations: [], note: MINOR_QUERY_PERSONAL_NOTE }, 200);
     const result = await findStations({ kind: "search", name, country, tag });
     if (result.ok) rememberPreviewStations("household", result.stations);
-    return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : refuseWith(c, result);
   });
 
   routes.get("/stations", requireAuth, async (c, next) => {
@@ -138,13 +138,13 @@ export function radioRoutes() {
     const station = savedStationFor(person, c.req.param("id"));
     if (!station) return c.json({ error: "That station is not in your list." }, 404);
     const result = await startRadioRecording(person, station, str((await jsonBody(c)).length));
-    return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+    return respond(c, result);
   });
 
   routes.post("/recordings/:id/stop", requireAuth, async (c, next) => {
     const person = c.get("person");
     const result = await stopRadioRecording(person, c.req.param("id"));
-    return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+    return respond(c, result);
   });
 
   routes.post("/stations", requireAuth, async (c, next) => {
@@ -166,7 +166,7 @@ export function radioRoutes() {
       language: typeof body.language === "string" ? body.language : null, homepage: typeof body.homepage === "string" ? body.homepage : null,
       bitrate_kbps: typeof body.bitrate_kbps === "number" ? body.bitrate_kbps : typeof body.bitrate_kbps === "string" && /^\d+$/.test(body.bitrate_kbps) ? Number(body.bitrate_kbps) : null, for_person_id: typeof body.for_person_id === "string" ? body.for_person_id : null, fromDirectory,
     });
-    return result.ok ? c.json({ ok: true as const, station: result.value, label: "Added to Your stations" }, 200) : c.json({ error: result.error }, result.status as 400);
+    return result.ok ? c.json({ ok: true as const, station: result.value, label: "Added to Your stations" }, 200) : refuseWith(c, result);
   });
 
   // RADIO-03: playing a saved station. Same-origin audio; the person's own saved list decides what plays (a child: what a parent saved),
@@ -177,10 +177,10 @@ export function radioRoutes() {
     if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
     if (station.hls) {
       const opened = await openHlsResource(person.id, station, station.url, streamDeps, c.req.raw.signal);
-      return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+      return opened.ok ? opened.response : refuseWith(c, opened);
     }
     const opened = await openStationStream(person.id, station, streamDeps, c.req.raw.signal);
-    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+    return opened.ok ? opened.response : refuseWith(c, opened);
   });
 
   routes.get("/preview/:id", requireAuth, async (c, next) => {
@@ -191,7 +191,7 @@ export function radioRoutes() {
     const opened = station.hls
       ? await openHlsResource(person.id, { ...station, for_person_id: null, added_by_person_id: null }, station.url, streamDeps, c.req.raw.signal)
       : await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
-    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+    return opened.ok ? opened.response : refuseWith(c, opened);
   });
   routes.post("/preview", requireAuth, async (c, next) => {
     const person = c.get("person");
@@ -202,7 +202,7 @@ export function radioRoutes() {
     const opened = station.hls
       ? await openHlsResource(person.id, { ...station, for_person_id: null, added_by_person_id: null }, station.url, streamDeps, c.req.raw.signal)
       : await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
-    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+    return opened.ok ? opened.response : refuseWith(c, opened);
   });
 
   // RADIO-06: playlists and segment bytes remain same-origin. The token is a URL rewritten into a playlist; the route
@@ -217,7 +217,7 @@ export function radioRoutes() {
     const address = decodeHlsResource(c.req.param("token"));
     if (!address) return c.json({ error: "That playlist resource is not available." }, 404);
     const opened = await openHlsResource(person.id, station, address, streamDeps, c.req.raw.signal);
-    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+    return opened.ok ? opened.response : refuseWith(c, opened);
   });
 
   // The song the station says is on now, kept in memory while a stream is open. Same gate as the stream; nothing is stored.
@@ -232,7 +232,7 @@ export function radioRoutes() {
   routes.delete("/stations/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
     const result = removeStation(person, c.req.param("id"));
-    return result.ok ? c.json({ ok: true as const }, 200) : c.json({ error: result.error }, result.status as 404);
+    return result.ok ? c.json({ ok: true as const }, 200) : refuseWith(c, result);
   });
 
   return routes;

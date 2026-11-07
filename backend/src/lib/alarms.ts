@@ -9,8 +9,9 @@ import { nextOccurrence } from "@/lib/scheduler";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { validTimeZone } from "@/lib/wallClock";
 import type { PersonRow } from "@/types";
+import type { Result as SharedResult } from "@/lib/result";
 
-type Result<T> = { ok: true; value: T } | { ok: false; status: 400 | 404; error: string };
+type Result<T> = SharedResult<T, 400 | 404>;
 type AlarmRow = typeof alarms.$inferSelect;
 function shape(row: AlarmRow): AlarmT { return Alarm.parse({ id: row.id, person: row.person, time: row.time, days: JSON.parse(row.days), label: row.label, tag: row.tag, enabled: row.enabled, skip_until: row.skipUntil, sound: row.sound, snooze_minutes: row.snoozeMinutes, source: row.source, created_at: row.createdAt, updated_at: row.updatedAt, deleted_at: row.deletedAt, hlc: row.hlc }); }
 function rowOf(a: AlarmT) { return { id: a.id, person: a.person, time: a.time, days: JSON.stringify(a.days), label: a.label, tag: a.tag, enabled: a.enabled, skipUntil: a.skip_until, sound: a.sound, snoozeMinutes: a.snooze_minutes, source: a.source, createdAt: a.created_at, updatedAt: a.updated_at, deletedAt: a.deleted_at, hlc: a.hlc }; }

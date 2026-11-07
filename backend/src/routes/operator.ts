@@ -1,5 +1,6 @@
 // OPS-KEY-01: bearer-only routes for an assistant session holding a `settings` API key (made by an owner or admin in Settings).
 // Never accepts a cookie session: the same reasoning as the turn and coding doors (middleware/auth.ts requireApiKey).
+import { respond, refuseWith } from "@/lib/openapi";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiKey } from "@/middleware/auth";
@@ -28,7 +29,7 @@ operatorRoutes.put("/settings", requireApiKey("settings"), bodyLimit({ maxSize: 
   const { key, value } = (body ?? {}) as { key?: unknown; value?: unknown };
   if (typeof key !== "string" || value === undefined) return c.json({ error: "Send both a key and a value, like {\"key\": \"chat.search_assist\", \"value\": \"rescue\"}." }, 400);
   const result = setOperatorSetting(c.get("apiKey")?.id ?? "unknown", key, value);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ key: result.key, previous: result.previous, value: result.value });
 });
 
@@ -65,7 +66,7 @@ operatorRoutes.get("/diagnose/engines", async (c) => {
 operatorRoutes.post("/diagnose/cache-probe", async (c) => {
   const limited = slow(c as never); if (limited) return limited;
   const result = await runCacheProbe();
-  return result.ok ? c.json({ calls: result.calls }) : c.json({ error: result.error }, result.status);
+  return result.ok ? c.json({ calls: result.calls }) : refuseWith(c, result);
 });
 
 // SPLASH-KEY-01 (docs/dev/engine-key-api.md): an `engine` key chooses the chat engine and applies it, nothing else.
@@ -82,5 +83,5 @@ operatorRoutes.put("/engine", requireApiKey("engine"), bodyLimit({ maxSize: 1024
   let body: unknown;
   try { body = await c.req.json(); } catch { return c.json({ error: "Send JSON like {\"engine\": \"splash\"}." }, 400); }
   const result = await setOperatorEngine(c.get("apiKey")?.id ?? "unknown", (body as { engine?: unknown } | null)?.engine);
-  return result.ok ? c.json({ key: result.key, previous: result.previous, value: result.value }) : c.json({ error: result.error }, result.status);
+  return result.ok ? c.json({ key: result.key, previous: result.previous, value: result.value }) : refuseWith(c, result);
 });

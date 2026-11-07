@@ -3,7 +3,8 @@
 // own Hono Env instead of a hardcoded product type). Home's own
 // apiRouter() below pins that generic to AppEnv once, here, so every
 // existing call site keeps calling apiRouter() with no type argument.
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
+import type { Result } from "@/lib/result";
 import type { AppEnv } from "@/types";
 import { OpenAPIHono } from "@hono/zod-openapi";
 
@@ -34,3 +35,15 @@ export const emptyJsonBodyAsObject: MiddlewareHandler<AppEnv> = async (c, next) 
   }
   await next();
 };
+
+/** AUDIT-DUP-ROUTES-01: refuse a route with `{ error }` and the refusal's own status. Returns `never` the way the routes' old
+ * `as never` casts did: a typed OpenAPI route declares its statuses, and the lib's `Result<T, S>` already names the ones it can
+ * refuse with, so the one cast lives here instead of at 100 call sites. */
+export function refuseWith(c: Context, failure: { status: number; error: string }): never {
+  return c.json({ error: failure.error }, failure.status as never) as never;
+}
+
+/** Answer a route from a lib `Result`: the value with `okStatus`, or the refusal. */
+export function respond<T, S extends number>(c: Context, result: Result<T, S>, okStatus: 200 | 201 = 200): never {
+  return (result.ok ? c.json(result.value as never, okStatus) : refuseWith(c, result)) as never;
+}

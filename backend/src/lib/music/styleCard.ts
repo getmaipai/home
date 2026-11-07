@@ -10,6 +10,7 @@ import { createMade, deleteMade, getMade, updateMade } from "./madeRecords";
 import { musicDenial } from "./policy";
 import type { SoundStyle } from "./sound";
 import { musicAudienceOf } from "./tool";
+import type { Result } from "@/lib/result";
 
 export const MAKE_SONG_STYLE_TOOL_ID = "make_song_style";
 export const EDIT_SONG_STYLE_TOOL_ID = "edit_song_style";
@@ -54,9 +55,7 @@ export function styleFieldsFromPatch(rec: StyleRecord, patch: StylePatchInput): 
 
 export type StyleActionName = "save" | "discard" | "edit" | "make_song";
 export const STYLE_ACTION_NAMES = ["save", "discard", "edit", "make_song"] as const;
-export type StyleActionResult =
-  | { ok: true; value: { action: StyleActionName; done: string; style?: Record<string, unknown> } }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+export type StyleActionResult = Result<{ action: StyleActionName; done: string; style?: Record<string, unknown> }, 400 | 403 | 404>;
 
 export function runStyleAction(actor: PersonRow, styleId: string, action: StyleActionName, opts: { patch?: StylePatchInput; conversationId?: string | null; turnId?: string | null } = {}): StyleActionResult {
   const found = getMade("song_style", actor, styleId);

@@ -7,7 +7,7 @@ import { coerceNumber } from "@/lib/media/appHost";
 import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, searchPodcastTranscripts, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
 import { jsonBody } from "@/lib/validation";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
-import { apiRouter } from "@/lib/openapi";
+import { apiRouter, refuseWith } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import { mediaBandOf } from "@/lib/media/band";
@@ -23,7 +23,6 @@ import { lookup } from "node:dns/promises";
 import { mediaItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const fail = (c: Context, result: { status: number; error: string }) => c.json({ error: result.error }, result.status as 400);
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
 
@@ -125,7 +124,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   routes.get("/transcript/:media_id", requireAuth, async (c, next) => {
     const person = c.get("person");
     const result = await getPodcastTranscript(person, c.req.param("media_id"));
-    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : fail(c, result);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
   });
 
   routes.get("/transcripts/search", requireAuth, async (c, next) => {
@@ -141,7 +140,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     if (!readableIn(person, "podcasts", id)) return c.json({ error: "That episode is not in your podcasts." }, 404);
     const off = body.on === false || body.on === "false";
     const result = off ? unsaveEpisode(person, id) : await saveEpisode(person, id);
-    return result.ok ? c.json({ ok: true as const, on: !off, label: off ? "Not saved" : "Saved" }, 200) : fail(c, result);
+    return result.ok ? c.json({ ok: true as const, on: !off, label: off ? "Not saved" : "Saved" }, 200) : refuseWith(c, result);
   });
 
   routes.post("/bookmark", requireAuth, async (c, next) => {
@@ -201,7 +200,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const person = c.get("person");
     const body = await jsonBody(c);
     const result = subscribePodcast(person, { url: typeof body.url === "string" ? body.url : "", visibleTo: Array.isArray(body.visible_to) ? (body.visible_to as string[]) : "household" });
-    if (!result.ok) return fail(c, result);
+    if (!result.ok) return refuseWith(c, result);
     void pollPodcastNow(result.value.feed.id);
     return c.json({ ok: true as const, source_id: result.value.source.id, label: "Added to Shows" }, 200);
   });
@@ -210,7 +209,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const person = c.get("person");
     const body = await jsonBody(c);
     const result = unsubscribePodcast(person, typeof body.source_id === "string" ? body.source_id : "");
-    return result.ok ? c.json({ ok: true as const }, 200) : fail(c, result);
+    return result.ok ? c.json({ ok: true as const }, 200) : refuseWith(c, result);
   });
 
   routes.post("/source", requireAuth, async (c, next) => {
@@ -225,7 +224,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
       ...(body.visible_to === "household" || Array.isArray(body.visible_to) ? { visible_to: body.visible_to as "household" | string[] } : {}),
       ...(auto ? { auto: { ...(auto.save === "none" || auto.save === "audio" ? { save: auto.save } : {}), ...(auto.keep_latest !== undefined ? { keep_latest: auto.keep_latest === null ? null : coerceNumber(auto.keep_latest) ?? NaN } : {}), ...(typeof auto.remove_watched === "boolean" ? { remove_watched: auto.remove_watched } : {}) } } : {}),
     });
-    if (!result.ok) return fail(c, result);
+    if (!result.ok) return refuseWith(c, result);
     // A changed keep rule takes effect now, not at the next poll.
     if (auto) queuePodcastAutoRules(result.value.id);
     return c.json({ ok: true as const }, 200);
@@ -241,7 +240,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   routes.post("/filters", requireAuth, async (c, next) => {
     const person = c.get("person");
     const result = saveFilter(person, await jsonBody(c));
-    return result.ok ? c.json({ ok: true as const, filter: result.filter, label: "Filter saved" }, 200) : fail(c, result);
+    return result.ok ? c.json({ ok: true as const, filter: result.filter, label: "Filter saved" }, 200) : refuseWith(c, result);
   });
 
   routes.delete("/filters/:id", requireAuth, async (c, next) => {
@@ -256,7 +255,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const person = c.get("person");
     const body = await jsonBody(c);
     const result = importOpml(person, typeof body.opml === "string" ? body.opml : "");
-    if (!result.ok) return fail(c, result);
+    if (!result.ok) return refuseWith(c, result);
     // createFeed marks every imported feed due. The normal tick takes at most ten.
     return c.json({ ok: true as const, added: result.value.added, already: result.value.already, skipped: result.value.skipped }, 200);
   });
@@ -283,19 +282,19 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const q = (c.req.query("q") ?? "").trim();
     if (minorQueryHit(q, band)) return c.json({ ok: true as const, shows: [], note: MINOR_QUERY_PERSONAL_NOTE }, 200);
     const result = await searchDirectory(q);
-    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : refuseWith(c, result);
   });
 
   routes.get("/directory/top", requireAuth, async (c, next) => {
     if (!directoryGate(c).allowed) return c.json({ error: NOT_ON }, 403);
     const result = await topShows();
-    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : refuseWith(c, result);
   });
 
   routes.post("/directory/add", requireAuth, async (c, next) => {
     const body = await jsonBody(c);
     const result = subscribePodcast(c.get("person"), { url: typeof body.url === "string" ? body.url : "" });
-    if (!result.ok) return fail(c, result);
+    if (!result.ok) return refuseWith(c, result);
     void pollPodcastNow(result.value.feed.id);
     return c.json({ ok: true as const, source_id: result.value.source.id, label: "Added to Shows" }, 200);
   });

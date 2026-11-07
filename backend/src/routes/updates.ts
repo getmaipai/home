@@ -1,7 +1,7 @@
 // Step 10: the updates projection (app only - see lib/updates.ts's own
 // header for scope and why packages/models/sidecars aren't here).
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { cachedUpdateProjection, cachedRobotUpdates, checkForUpdates, type RobotUpdates } from "@/lib/updates";
 import { isStackConfigured } from "@/lib/stackEngine";
@@ -136,7 +136,7 @@ const stackCheckRoute = createRoute({
 });
 updatesRoutes.openapi(stackCheckRoute, async (c) => {
   const result = await checkStackUpdates();
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ checksEnabled: result.value.checksEnabled, engines: result.value.engines, models: result.value.models }, 200);
 });
 
@@ -154,7 +154,7 @@ const stackApplyRoute = createRoute({
 });
 updatesRoutes.openapi(stackApplyRoute, async (c) => {
   const result = await applyStackEngineUpdate(c.req.valid("param").name);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
@@ -174,7 +174,7 @@ updatesRoutes.openapi(stackRollbackRoute, async (c) => {
   const { name } = c.req.valid("param");
   const { tag } = c.req.valid("json");
   const result = await rollbackStackEngine(name, tag);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
@@ -191,7 +191,7 @@ const stackSweepRoute = createRoute({
 });
 updatesRoutes.openapi(stackSweepRoute, async (c) => {
   const result = await sweepStackStorage();
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
@@ -208,6 +208,6 @@ const stackReadinessCheckRoute = createRoute({
 });
 updatesRoutes.openapi(stackReadinessCheckRoute, async (c) => {
   const result = await runStackReadinessCheck();
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ at: result.value.at, ok: result.value.ok, reason: result.value.reason }, 200);
 });

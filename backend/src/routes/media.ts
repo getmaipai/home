@@ -11,7 +11,7 @@ import { db, sqlite } from "@/db";
 import { mediaItems, mediaSources, people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond, refuseWith } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { MediaItem } from "@maipai/spec/gen/ts/media-item.js";
 import { MediaSource } from "@maipai/spec/gen/ts/media-source.js";
@@ -123,7 +123,7 @@ const addRootRoute = createRoute({
 mediaRoutes.openapi(addRootRoute, (c) => {
   const body = c.req.valid("json");
   const result = createRootSource(c.get("person"), { label: body.label, path: body.path, mountId: body.mount_id ?? null, kinds: body.kinds, visibleTo: body.visible_to, pollMinutes: body.poll_minutes, prune: body.prune });
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   syncMediaScanner();
   trackBackgroundWork(scanRoot(result.source.id).catch(() => undefined));
   return c.json(sourceView(db.select().from(mediaSources).where(eq(mediaSources.id, result.source.id)).get()!, c.get("person")), 201);
@@ -280,7 +280,7 @@ mediaRoutes.openapi(contentRoute, async (c) => {
   if (timeUp) return c.json(timeUp, 403);
   const served = await serveItemBytes(actor, item, c.req.header("Range"));
   if (served instanceof Response) return served as never;
-  return c.json({ error: served.error }, served.status);
+  return refuseWith(c, served);
 });
 
 const artworkRoute = createRoute({
@@ -298,7 +298,7 @@ mediaRoutes.openapi(artworkRoute, async (c) => {
   if (!item) return c.json({ error: "That title is not in the library." }, 404);
   const served = await serveItemArtwork(actor, item);
   if (served instanceof Response) return served as never;
-  return c.json({ error: served.error }, served.status);
+  return refuseWith(c, served);
 });
 
 const artistPhotoRoute = createRoute({
