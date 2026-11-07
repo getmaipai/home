@@ -411,14 +411,15 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const synth = !anonymous && !temporary ? getSynth(state.actor, state.persona.id) : null;
     if (synth) {
       const companionId = synth.id;
+      // A synth with no life written yet costs the turn nothing: no card, no second recall.
       if (listMemory(state.actor, { scope: "companion", companionId }).length > 0) {
         const cardText = synthCard(companionId, state.actor, now);
         if (cardText) items.push({ id: "synth-card", text: cardText, source: "profile", subjects: [], disclosure: "child_ok" });
-      }
-      const beats = recall(state.actor, input.utterance, { scope: "companion", companionId, queryVector: recallVector, selfOnly: true, bumpUsage: false }).slice(0, 4);
-      for (const match of beats) {
-        const record = match.record;
-        items.push({ id: `synth-${record.id}`, text: record.text, source: "profile", subjects: [], disclosure: record.child_disclosure ?? "adult_only" });
+        const beats = recall(state.actor, input.utterance, { scope: "companion", companionId, queryVector: recallVector, selfOnly: true, bumpUsage: false }).slice(0, 4);
+        for (const match of beats) {
+          const record = match.record;
+          items.push({ id: `synth-${record.id}`, text: record.text, source: "profile", subjects: [], disclosure: record.child_disclosure ?? "adult_only" });
+        }
       }
     }
     // MEM-AUDIT-05: what reached the prompt, by id and score, for the
