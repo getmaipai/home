@@ -1,0 +1,79 @@
+{
+  "id": "news_briefing",
+  "label": "News briefing",
+  "parts": [
+    {
+      "id": "anchor",
+      "label": "Anchor",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "formal",
+        "filler_density": "none",
+        "hedging": "low",
+        "clock_style": "formal",
+        "engagement": "brief",
+        "social": {
+          "humor": "low"
+        }
+      }
+    },
+    {
+      "id": "reporter",
+      "label": "Reporter",
+      "min": 0,
+      "max": 2,
+      "leads": false,
+      "dials": {
+        "formality": "formal",
+        "filler_density": "none",
+        "hedging": "low",
+        "clock_style": "formal",
+        "engagement": "brief",
+        "social": {
+          "humor": "low"
+        }
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "hook",
+      "share": 0.05,
+      "repeat": false
+    },
+    {
+      "kind": "intro",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "segment",
+      "share": 0.7,
+      "repeat": true
+    },
+    {
+      "kind": "closing",
+      "share": 0.15,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 180,
+    "default": 300,
+    "max": 480
+  },
+  "talk_over": "none",
+  "gap_ms": 350,
+  "sources_allowed": [
+    "news",
+    "weather",
+    "household"
+  ],
+  "min_audience": "all",
+  "substitute": "stand_in",
+  "stingers": true,
+  "words_per_minute": 150,
+  "first_app": "news"
+}

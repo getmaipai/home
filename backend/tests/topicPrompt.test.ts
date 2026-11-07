@@ -198,7 +198,8 @@ const EXEMPT: Record<string, string> = {
   "lib/music/lyricsTranslate.ts": "translates stored lyric lines for the lyrics view; a translation with any line that trips the same text check lyrics pass at ingest (band outranks the toggle) is dropped and never stored, and it is never a chat reply",
   "routes/imageEdit.ts": "the Studio words box: one forced tool call that picks a picture operation and its arguments; no text reaches the person (the result is a picture card), and every gate runs inside the operation it picks",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
-  "lib/talent/life.ts": "writes a synth's origin and daily life beats as JSON memory records; each beat passes evaluateReply at the synth's floor before it is stored, and it is never a chat reply (the chat turn carries the topic block when a beat is recalled)",
+  "lib/talent/writer.ts": "writes a show's outline and spoken lines as JSON; every line passes checkLines (evaluateReply at the show's audience band, plus the minor check when a cast synth is based on a minor) before it is kept, and it is never a chat reply",
+  "lib/talent/life.ts":"writes a synth's origin and daily life beats as JSON memory records; each beat passes evaluateReply at the synth's floor before it is stored, and it is never a chat reply (the chat turn carries the topic block when a beat is recalled)",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",
 };

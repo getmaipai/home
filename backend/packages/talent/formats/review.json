@@ -1,0 +1,50 @@
+{
+  "id": "review",
+  "label": "Review",
+  "parts": [
+    {
+      "id": "critic",
+      "label": "Critic",
+      "min": 1,
+      "max": 2,
+      "leads": true,
+      "dials": {
+        "formality": "neutral",
+        "engagement": "curious",
+        "hedging": "medium"
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "intro",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "segment",
+      "share": 0.75,
+      "repeat": true
+    },
+    {
+      "kind": "closing",
+      "share": 0.15,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 240,
+    "default": 420,
+    "max": 720
+  },
+  "talk_over": "light",
+  "gap_ms": 250,
+  "sources_allowed": [
+    "media_item"
+  ],
+  "min_audience": "all",
+  "substitute": "stand_in",
+  "stingers": true,
+  "words_per_minute": 170,
+  "first_app": "podcasts"
+}

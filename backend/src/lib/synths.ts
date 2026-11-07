@@ -13,6 +13,7 @@ import { getPersonSettingValue, getSettingValueForPerson, setValue } from "@/lib
 import { canManage } from "@/lib/personLifecycle";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { nextHlc } from "@/lib/hlc";
+import { registerCastSynthGate } from "@/lib/mediaProductions";
 
 export type SynthRecord = SynthShape;
 type Companion = NonNullable<PackageManifest["companion"]>;
@@ -152,3 +153,6 @@ export function isCompanionFork(id: string): boolean {
   if (!synth?.forked_from) return false;
   return db.select().from(people).where(isNull(people.deletedAt)).all().some((person) => getPersonSettingValue(person, "persona.active_id") === id);
 }
+
+// A production may cast a synth's subject when the actor may use the synth (TALENT-02; mediaProductions.ts never imports this module).
+registerCastSynthGate((actor, synthId, subjectId) => { const synth = synthById(synthId); return !!synth && maySeeSynth(actor, synth) && synth.subject_id === subjectId; });

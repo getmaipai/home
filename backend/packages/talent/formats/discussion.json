@@ -1,0 +1,51 @@
+{
+  "id": "discussion",
+  "label": "Discussion",
+  "parts": [
+    {
+      "id": "host",
+      "label": "Host",
+      "min": 2,
+      "max": 2,
+      "leads": true,
+      "dials": {
+        "formality": "casual",
+        "engagement": "curious",
+        "complexity": "standard"
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "intro",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "exchange",
+      "share": 0.8,
+      "repeat": true
+    },
+    {
+      "kind": "closing",
+      "share": 0.1,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 360,
+    "default": 600,
+    "max": 1200
+  },
+  "talk_over": "lively",
+  "gap_ms": 180,
+  "sources_allowed": [
+    "documents",
+    "media_item"
+  ],
+  "min_audience": "all",
+  "substitute": "skip",
+  "stingers": true,
+  "words_per_minute": 175,
+  "first_app": "podcasts"
+}

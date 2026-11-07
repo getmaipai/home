@@ -1,0 +1,77 @@
+{
+  "id": "kids_news",
+  "label": "Kids news",
+  "parts": [
+    {
+      "id": "host",
+      "label": "Host",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "casual",
+        "complexity": "simple",
+        "filler_density": "light",
+        "clock_style": "loose",
+        "social": {
+          "warmth": "high"
+        }
+      }
+    },
+    {
+      "id": "sidekick",
+      "label": "Sidekick",
+      "min": 0,
+      "max": 1,
+      "leads": false,
+      "dials": {
+        "formality": "casual",
+        "complexity": "simple",
+        "filler_density": "light",
+        "clock_style": "loose",
+        "social": {
+          "warmth": "high"
+        }
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "hook",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "intro",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "segment",
+      "share": 0.6,
+      "repeat": true
+    },
+    {
+      "kind": "closing",
+      "share": 0.2,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 120,
+    "default": 180,
+    "max": 300
+  },
+  "talk_over": "light",
+  "gap_ms": 300,
+  "sources_allowed": [
+    "news",
+    "weather",
+    "household"
+  ],
+  "min_audience": "all",
+  "substitute": "stand_in",
+  "stingers": true,
+  "words_per_minute": 140,
+  "first_app": "news"
+}

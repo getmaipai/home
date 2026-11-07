@@ -691,7 +691,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob, runPictureEdit |
-| `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, createMediaProduction, updateMediaProduction, setShotClip |
+| `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction, updateMediaProduction |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
 | `backend/src/lib/memory.ts` | registerCompanionReadGate, validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord |
@@ -1034,7 +1034,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/tailnetNode.ts` | whoisViaSocket, selfLoginViaSocket, __setSelfLoginForTests, __setWhoisForTests, tailnetServeAllows |
 | `backend/src/lib/tailscale.ts` | isTailscaleRequest, interpretTailscaleStatusJson, getTailscaleStatus, getTailscaleLeafForServer, ensureTailscaleCert, setTailscaleRenewalActive |
 | `backend/src/lib/tailscaleTls.ts` | onTsLeafRenewed, notifyTsLeafRenewed |
+| `backend/src/lib/talent/brief.ts` | buildBrief |
+| `backend/src/lib/talent/formats.ts` | loadFormats, formatById |
 | `backend/src/lib/talent/life.ts` | LIFE_SOURCE, ORIGIN_SCHEMA, TICK_SCHEMA, ORIGIN_PROMPT, TICK_PROMPT, __setTalentLifeCompleterForTests |
+| `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |
+| `backend/src/lib/talent/writer.ts` | TalentWriteError, __setTalentWriterSafetyForTests, __setTalentWriterMinorCheckForTests, OUTLINE_PROMPT, SEGMENT_PROMPT, checkText |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |

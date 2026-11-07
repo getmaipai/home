@@ -2048,6 +2048,7 @@ export const mediaSources = sqliteTable(
     feedId: text("feed_id"),
     url: text("url"),
     station: text("station"), // JSON (spec MediaSource.station), kind station only (RADIO-02)
+    productionId: text("production_id"), // the show's media_productions row, kind production only (TALENT-02)
     extractor: text("extractor"),
     auto: text("auto").notNull().default("{}"), // JSON (spec MediaSource.auto)
     speed: real("speed"),
@@ -2395,6 +2396,7 @@ export const mediaProductions = sqliteTable(
     musicLineIds: text("music_line_ids").notNull().default("[]"),
     voiceLineIds: text("voice_line_ids").notNull().default("[]"),
     finishedCutFileIds: text("finished_cut_file_ids").notNull().default("[]"),
+    show: text("show").notNull().default("null"), // JSON (spec MediaProduction.show), null for a production that is not a spoken show (TALENT-02)
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     hlc: text("hlc").notNull(),

@@ -1,0 +1,43 @@
+{
+  "id": "announcer",
+  "label": "Announcer",
+  "parts": [
+    {
+      "id": "announcer",
+      "label": "Announcer",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "casual",
+        "engagement": "brief",
+        "filler_density": "none",
+        "social": {
+          "humor": "medium"
+        }
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "segment",
+      "share": 1,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 5,
+    "default": 10,
+    "max": 30
+  },
+  "talk_over": "none",
+  "gap_ms": 0,
+  "sources_allowed": [
+    "household"
+  ],
+  "min_audience": "all",
+  "substitute": "stand_in",
+  "stingers": false,
+  "words_per_minute": 160,
+  "first_app": "games"
+}

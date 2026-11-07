@@ -1,0 +1,39 @@
+{
+  "id": "dj_links",
+  "label": "DJ links",
+  "parts": [
+    {
+      "id": "dj",
+      "label": "Dj",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "casual",
+        "filler_density": "light"
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "segment",
+      "share": 1,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 10,
+    "default": 20,
+    "max": 40
+  },
+  "talk_over": "none",
+  "gap_ms": 0,
+  "sources_allowed": [
+    "household"
+  ],
+  "min_audience": "all",
+  "substitute": "skip",
+  "stingers": false,
+  "words_per_minute": 170,
+  "first_app": "music"
+}
