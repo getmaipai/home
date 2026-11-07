@@ -3937,6 +3937,11 @@ msgid "Built-in companion"
 msgstr "Built-in companion"
 
 #. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:124
+msgid "Burn into video"
+msgstr "Burn into video"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:648
 msgid "setting.news.default_topics.adult.option_label.business"
 msgstr "Business"
@@ -4154,18 +4159,18 @@ msgid "setting.coding.person.daily_tokens.does"
 msgstr "Caps your use each day within the home limit."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:60
+#: src/shell/library/TranscriptCaptionTracks.tsx:80
 msgid "Caption track made."
 msgstr "Caption track made."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:67
+#: src/shell/library/TranscriptCaptionTracks.tsx:87
 msgid "Caption track refreshed. Captions you fixed by hand were kept."
 msgstr "Caption track refreshed. Captions you fixed by hand were kept."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:79
-#: src/shell/library/TranscriptCaptionTracks.tsx:80
+#: src/shell/library/TranscriptCaptionTracks.tsx:99
+#: src/shell/library/TranscriptCaptionTracks.tsx:100
 msgid "Caption tracks"
 msgstr "Caption tracks"
 
@@ -13594,7 +13599,7 @@ msgid "Make any song"
 msgstr "Make any song"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:111
+#: src/shell/library/TranscriptCaptionTracks.tsx:141
 msgid "Make caption track"
 msgstr "Make caption track"
 
@@ -14621,6 +14626,11 @@ msgstr "Needs attention"
 #: src/apps/setup/CheckGrid.tsx:31
 msgid "Needs fixing"
 msgstr "Needs fixing"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:104
+msgid "Needs refreshing"
+msgstr "Needs refreshing"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:78
@@ -18198,7 +18208,7 @@ msgid "setting.reference.update.max_mbps.label"
 msgstr "Reference update speed limit (MB/s)"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:105
+#: src/shell/library/TranscriptCaptionTracks.tsx:135
 msgid "Refresh"
 msgstr "Refresh"
 
@@ -24008,12 +24018,12 @@ msgid "Transcript tools"
 msgstr "Transcript tools"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:127
+#: src/shell/library/TranscriptCaptionTracks.tsx:157
 msgid "Translate"
 msgstr "Translate"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:116
+#: src/shell/library/TranscriptCaptionTracks.tsx:146
 msgid "Translate captions to"
 msgstr "Translate captions to"
 
@@ -24023,7 +24033,7 @@ msgid "setting.music.lyrics_translate.label"
 msgstr "Translate lyrics"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:84
+#: src/shell/library/TranscriptCaptionTracks.tsx:104
 msgid "Translated"
 msgstr "Translated"
 
@@ -24651,6 +24661,7 @@ msgstr "Up to {minutes, plural, one {# minute} other {# minutes}} on this comput
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/apps/settings/HouseholdRobotsSection.tsx:178
+#: src/shell/library/TranscriptCaptionTracks.tsx:104
 #: src/shell/pages/UpdatesPage.tsx:62
 #: src/shell/pages/UpdatesPage.tsx:64
 msgid "Up to date"
@@ -26149,7 +26160,7 @@ msgstr "Working on the picture"
 #: src/apps/settings/DevicesSection.tsx:138
 #: src/apps/settings/DevicesSection.tsx:219
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
-#: src/shell/library/TranscriptCaptionTracks.tsx:46
+#: src/shell/library/TranscriptCaptionTracks.tsx:66
 #: src/shell/library/TranscriptFindReplace.tsx:45
 #: src/shell/library/TranscriptFindReplace.tsx:60
 msgid "Working…"

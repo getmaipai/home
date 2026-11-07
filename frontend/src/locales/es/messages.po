@@ -4608,6 +4608,11 @@ msgid "Built-in companion"
 msgstr "Compañía integrada"
 
 #. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:124
+msgid "Burn into video"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:648
 #, needs-review
 msgid "setting.news.default_topics.adult.option_label.business"
@@ -4855,20 +4860,20 @@ msgid "setting.coding.person.daily_tokens.does"
 msgstr "Limita tu uso diario dentro del límite del hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:60
+#: src/shell/library/TranscriptCaptionTracks.tsx:80
 #, needs-review
 msgid "Caption track made."
 msgstr "Pista de subtítulos creada."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:67
+#: src/shell/library/TranscriptCaptionTracks.tsx:87
 #, needs-review
 msgid "Caption track refreshed. Captions you fixed by hand were kept."
 msgstr "Pista de subtítulos actualizada. Se conservaron los cambios que hiciste a mano."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:79
-#: src/shell/library/TranscriptCaptionTracks.tsx:80
+#: src/shell/library/TranscriptCaptionTracks.tsx:99
+#: src/shell/library/TranscriptCaptionTracks.tsx:100
 #, needs-review
 msgid "Caption tracks"
 msgstr "Pistas de subtítulos"
@@ -15934,7 +15939,7 @@ msgid "Make any song"
 msgstr "Crear cualquier canción"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:111
+#: src/shell/library/TranscriptCaptionTracks.tsx:141
 #, needs-review
 msgid "Make caption track"
 msgstr "Crear pista de subtítulos"
@@ -17141,6 +17146,11 @@ msgstr "Requiere atención"
 #, needs-review
 msgid "Needs fixing"
 msgstr "Necesita reparación"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:104
+msgid "Needs refreshing"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:78
@@ -21331,7 +21341,7 @@ msgid "setting.reference.update.max_mbps.label"
 msgstr "Límite de velocidad de actualización de referencias (MB/s)"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:105
+#: src/shell/library/TranscriptCaptionTracks.tsx:135
 #, needs-review
 msgid "Refresh"
 msgstr "Actualizar"
@@ -28089,13 +28099,13 @@ msgid "Transcript tools"
 msgstr "Herramientas de transcripción"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:127
+#: src/shell/library/TranscriptCaptionTracks.tsx:157
 #, needs-review
 msgid "Translate"
 msgstr "Traducir"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:116
+#: src/shell/library/TranscriptCaptionTracks.tsx:146
 #, needs-review
 msgid "Translate captions to"
 msgstr "Traducir subtítulos a"
@@ -28107,7 +28117,7 @@ msgid "setting.music.lyrics_translate.label"
 msgstr "Traducir letras"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:84
+#: src/shell/library/TranscriptCaptionTracks.tsx:104
 #, needs-review
 msgid "Translated"
 msgstr "Traducido"
@@ -28844,6 +28854,7 @@ msgstr "Hasta {minutes, plural, one {# minuto} other {# minutos}} en este equipo
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/apps/settings/HouseholdRobotsSection.tsx:178
+#: src/shell/library/TranscriptCaptionTracks.tsx:104
 #: src/shell/pages/UpdatesPage.tsx:62
 #: src/shell/pages/UpdatesPage.tsx:64
 msgid "Up to date"
@@ -30604,7 +30615,7 @@ msgstr "Trabajando en la imagen"
 #: src/apps/settings/DevicesSection.tsx:138
 #: src/apps/settings/DevicesSection.tsx:219
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
-#: src/shell/library/TranscriptCaptionTracks.tsx:46
+#: src/shell/library/TranscriptCaptionTracks.tsx:66
 #: src/shell/library/TranscriptFindReplace.tsx:45
 #: src/shell/library/TranscriptFindReplace.tsx:60
 msgid "Working…"

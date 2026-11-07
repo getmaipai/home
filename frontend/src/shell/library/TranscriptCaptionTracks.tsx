@@ -101,7 +101,7 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
       {tracks.map((track) => (
         <div key={track.id} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{languageName(track.language, languages)}</span>
-          <span>{track.translated ? i18n._({ id: "Translated", message: "Translated" }) : track.needs_refreshing ? "Needs refreshing" : "Up to date"}</span>
+          <span>{track.translated ? i18n._({ id: "Translated", message: "Translated" }) : track.needs_refreshing ? i18n._({ id: "Needs refreshing", message: "Needs refreshing" }) : i18n._({ id: "Up to date", message: "Up to date" })}</span>
           {(["srt", "vtt"] as const).map((format) => (
             <Button key={format} asChild variant="secondary" size="sm">
               <a
@@ -121,7 +121,7 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
             disabled={busy}
             onClick={() => void burn(track)}
           >
-            Burn into video
+            {i18n._({ id: "Burn into video", message: "Burn into video" })}
           </Button>
           {track.needs_refreshing && !track.translated ? (
             <Button
