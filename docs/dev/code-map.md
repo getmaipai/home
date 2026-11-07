@@ -1069,7 +1069,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/transcripts/parse.ts` | parseTranscriptDocument |
 | `backend/src/lib/transcripts/revisions.ts` | applyOps, undo, restoreRevision, __resetAutosavesForTests |
 | `backend/src/lib/transcripts/rework.ts` | NO_SPEECH_IN_RANGE, RANGE_PAST_END, RANGE_ORDER, speakerByOverlap, detectSpeakers, regenerateRange |
-| `backend/src/lib/transcripts/stack.ts` | __setTranscriptStackClientForTests, transcribeJob |
+| `backend/src/lib/transcripts/stack.ts` | __setTranscriptStackClientForTests, isSupportedTranscriptLanguage, transcribeJob |
 | `backend/src/lib/transcripts/store.ts` | TranscriptError, CHILD_TRANSCRIPT_ERROR, canSeeItem, getTranscript, transcriptRowForItem, listTranscriptsForItem |
 | `backend/src/lib/transcripts/writers.ts` | writeSrt, writeVtt, writeText, writeMarkdown, writeJson |
 | `backend/src/lib/trash/podcastCopies.ts` | isPodcastCopyTrash, mayManagePodcastCopy, trashPodcastCopy |
