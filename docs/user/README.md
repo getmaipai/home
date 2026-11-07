@@ -65,4 +65,9 @@ day the hub arrives; the rest are for when you need them.
 - [The news shelf](news-shelf.md): how MaiPai keeps recent headlines for the news answer, and how to choose which lists each person sees.
 - [Sensitive subjects](sensitive-subjects.md): choose how MaiPai talks with a child about bodies, health, risk and violence.
 - [Install, upgrade, uninstall and fix the install](install-upgrade-uninstall.md): put MaiPai Home on a Mac, update it, go back a version, remove it, and fix install problems.
+- [Make a backup and bring one back](backups.md): make a backup, save your backup key and restore an older backup.
+- [See what has an update](updates.md): see which parts of Home have a newer version, and update or go back an engine part.
+- [See how much space your home is using](storage.md): see each person's storage use, set the limits, open Trash and clear saved online data.
+- [Fix what Home says needs attention](repairs.md): run a fix, dismiss a problem, check your computers again.
+- [Check that Home is working](status.md): read the Status page to see which apps and parts are working.
 - [Fix a problem](fix-a-problem.md): what to check first when something is not working right.

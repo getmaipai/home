@@ -25,6 +25,6 @@ Home does not install a coding app. Each person chooses a tool and connects it w
 
 ## Limits and away access
 
-The limits set how many requests can run, how often a key can call Home and how much thinking a request can use. A quiet model unloads after the set time. Chat always comes first. Coding waits or slows down, never chat. Open the [Status page](/status) to see what is running.
+The limits set how many requests can run, how often a key can call Home and how much thinking a request can use. A quiet model unloads after the set time. Chat always comes first. Coding waits or slows down, never chat. Open [Check that Home is working](status.md) to see what is running.
 
 Coding keys work on the home network. You can allow them away from home through your household's Tailscale connection.
