@@ -344,12 +344,11 @@ describe("Library transcript workspace: translated captions", () => {
   test("Translate makes a separate track in the chosen language and labels it Translated", async () => {
     stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([original]));
     stub(spyOn(transcriptApi, "translationLanguages").mockResolvedValue([{ code: "en", name: "English" }, { code: "es", name: "Spanish" }]));
-    const translate = stub(
-      spyOn(transcriptApi, "translateCaptionTrack").mockResolvedValue({ ...original, id: "cap-2", language: "es", translated: true }),
-    );
+    const translate = stub(spyOn(transcriptApi, "startTranslation").mockResolvedValue({ id: "job-t", state: "running", progress: 0 }));
+    stub(spyOn(transcriptApi, "translationJob").mockResolvedValue({ id: "job-t", state: "done", progress: 1, track: { ...original, id: "cap-2", language: "es", translated: true } }));
     const view = await readyView("export");
     fireEvent.click(await view.findByRole("button", { name: "Translate" }));
-    expect(await view.findByText("Translated")).toBeTruthy();
+    expect(await view.findByText("Translated", {}, { timeout: 4000 })).toBeTruthy();
     expect(translate).toHaveBeenCalledWith("tx-1", "cap-1", "es");
     expect(view.getAllByRole("status").some((node) => node.textContent?.startsWith("Translated to Spanish"))).toBe(true);
     expect(view.queryByRole("button", { name: /Refresh Spanish/ })).toBeNull();
@@ -358,7 +357,7 @@ describe("Library transcript workspace: translated captions", () => {
   test("a failed translation says what to do and shows no raw detail", async () => {
     stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([original]));
     stub(spyOn(transcriptApi, "translationLanguages").mockResolvedValue([{ code: "es", name: "Spanish" }]));
-    stub(spyOn(transcriptApi, "translateCaptionTrack").mockRejectedValue(new Error("private raw detail")));
+    stub(spyOn(transcriptApi, "startTranslation").mockRejectedValue(new Error("private raw detail")));
     const view = await readyView("export");
     fireEvent.click(await view.findByRole("button", { name: "Translate" }));
     await waitFor(() => expect(view.container.textContent).toContain("The captions could not be translated. Check that the language model is running, then try again."));

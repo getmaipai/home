@@ -35,7 +35,7 @@ Open **Export**. Press **Download SRT**, **Download VTT**, **Download Text**, **
 
 ## Translate the captions
 
-Under **Caption tracks**, pick a language next to **Translate captions to** and press **Translate**. Your home's own language model makes a new caption track in that language. The first track stays as it is, and each language is its own track. If you fix the transcript later, refresh the first track and translate again. The words pass the same age filter as chat, and nothing is saved if any part is held back.
+Under **Caption tracks**, pick a language next to **Translate captions to** and press **Translate**. Your home's own language model makes a new caption track in that language, and a percentage shows while it works. It handles up to 2000 captions. The first track stays as it is, and each language is its own track. If you fix the transcript later, refresh the first track and translate again. The words pass the same age filter as chat, and nothing is saved if any part is held back.
 
 ## Burn the captions into the video
 

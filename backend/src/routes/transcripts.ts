@@ -7,7 +7,7 @@ import { applyOps, restoreRevision, undo } from "@/lib/transcripts/revisions";
 import { importTranscript } from "@/lib/transcripts/import";
 import { buildCues } from "@/lib/transcripts/cues";
 import { writeSrt, writeVtt, writeText, writeMarkdown, writeJson } from "@/lib/transcripts/writers";
-import { translateCaptionTrack, TRANSLATION_LANGUAGES } from "@/lib/transcripts/captionTranslate";
+import { startCaptionTranslation, translationJob, TRANSLATION_LANGUAGES } from "@/lib/transcripts/captionTranslate";
 import { burnJob, startBurnIn } from "@/lib/transcripts/burnIn";
 import { captionTrackCues, createCaptionTrack, listCaptionTracks, refreshCaptionTrack } from "@/lib/transcripts/captions";
 import { applyFindReplace, previewFindReplace } from "@/lib/transcripts/findReplace";
@@ -100,12 +100,20 @@ transcriptRoutes.openapi(createRoute({
 transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/caption-tracks/{track}/translate", tags: ["Transcripts"], summary: "Translate a caption track into another language as its own track",
   middleware: [requireAuth] as const, request: { params: trackParam, body: { content: { "application/json": { schema: z.object({ language: z.string().min(2).max(8) }) } } } },
-  responses: { 201: jsonAnswer("The new translated caption track"), ...errorResponses({ 400: "Unknown or same language", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript or caption track unavailable", 413: "Too many captions", 422: "Held back by the age filter", 502: "The language model could not translate" }) },
+  responses: { 202: jsonAnswer("The running translation job"), ...errorResponses({ 400: "Unknown or same language", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript or caption track unavailable", 413: "Too many captions" }) },
 }), async (c) => {
   try {
     const { id, track } = c.req.valid("param");
-    return c.json(await translateCaptionTrack(c.get("person"), id, track, c.req.valid("json").language), 201);
+    return c.json(startCaptionTranslation(c.get("person"), id, track, c.req.valid("json").language), 202);
   } catch (e) { return handle(e, c); }
+});
+
+transcriptRoutes.openapi(createRoute({
+  method: "get", path: "/transcript-translations/{job}", tags: ["Transcripts"], summary: "Progress of a caption translation and the new track when done",
+  middleware: [requireAuth] as const, request: { params: z.object({ job: z.string().min(1).max(64) }) },
+  responses: { 200: jsonAnswer("Translation state, progress 0 to 1, track when done"), ...errorResponses({ 401: "Not signed in", 404: "Translation not found" }) },
+}), (c) => {
+  try { return c.json(translationJob(c.get("person"), c.req.valid("param").job), 200); } catch (e) { return handle(e, c); }
 });
 
 transcriptRoutes.openapi(createRoute({

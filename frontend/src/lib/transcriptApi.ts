@@ -27,6 +27,8 @@ export type CaptionTrackSummary = {
   translated: boolean;
 };
 
+export type TranslationJob = { id: string; state: "running" | "done" | "failed"; progress: number; track?: CaptionTrackSummary; error?: string };
+
 export type BurnJob = { id: string; state: "running" | "done" | "failed"; progress: number; file_id?: string; error?: string };
 
 export type FindReplaceOptions = { find: string; replace: string; match_case: boolean; whole_word: boolean };
@@ -88,8 +90,9 @@ export const transcriptApi = {
   refreshCaptionTrack: (id: string, track: string) =>
     post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/refresh`),
   translationLanguages: () => requestJson<Array<{ code: string; name: string }>>("/api/transcript-languages"),
-  translateCaptionTrack: (id: string, track: string, language: string) =>
-    post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/translate`, { language }),
+  startTranslation: (id: string, track: string, language: string) =>
+    post<TranslationJob>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/translate`, { language }),
+  translationJob: (job: string) => requestJson<TranslationJob>(`/api/transcript-translations/${encodeURIComponent(job)}`),
   startBurnIn: (id: string, track: string, position: "bottom" | "middle" | "top") =>
     post<BurnJob>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/burn-in`, { position }),
   burnJob: (job: string) => requestJson<BurnJob>(`/api/transcript-burn-ins/${encodeURIComponent(job)}`),

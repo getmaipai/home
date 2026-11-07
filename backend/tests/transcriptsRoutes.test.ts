@@ -386,9 +386,20 @@ describe("regenerate range", () => {
         const lines = JSON.parse(messages[1]!.content as string) as string[];
         return { ok: true, text: JSON.stringify(lines.map((line) => `ES ${line}`)) };
       });
+      const waitJob = async (jobId: string) => {
+        for (let i = 0; i < 100; i += 1) {
+          const state = await (await req(`/transcript-translations/${jobId}`, token)).json() as { state: string; progress: number; track?: { id: string; language: string; cue_count: number }; error?: string };
+          if (state.state !== "running") return state;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        throw new Error("translation did not finish");
+      };
       const made = await req(`${path}/translate`, token, "POST", { language: "es" });
-      expect(made.status).toBe(201);
-      const spanish = await made.json() as { id: string; language: string; cue_count: number };
+      expect(made.status).toBe(202);
+      const finished = await waitJob((await made.json() as { id: string }).id);
+      expect(finished.state).toBe("done");
+      expect(finished.progress).toBe(1);
+      const spanish = finished.track!;
       expect(spanish).toMatchObject({ language: "es", cue_count: track.cue_count });
       const srt = await (await req(`${path.replace("/caption-tracks/" + track.id, "")}/export?format=srt&track=${spanish.id}`, token)).text();
       expect(srt).toContain("ES ");
@@ -402,8 +413,11 @@ describe("regenerate range", () => {
 
       __setTranslationCompleterForTests(async () => ({ ok: true, text: "[\"only one\", \"two\", \"three\", \"four\", \"five\", \"six\", \"seven\", \"eight\", \"nine\", \"ten\", \"eleven\", \"twelve\", \"x\", \"y\", \"z\", \"a\", \"b\", \"c\", \"d\", \"e\", \"f\"]" }));
       const bad = await req(`${path}/translate`, token, "POST", { language: "fr" });
-      expect(bad.status).toBe(502);
-      expect((await bad.json() as { error: string }).error).toContain("try again");
+      expect(bad.status).toBe(202);
+      const badDone = await waitJob((await bad.json() as { id: string }).id);
+      expect(badDone.state).toBe("failed");
+      expect(badDone.error).toContain("try again");
+      expect((await req("/transcript-translations/nope", token)).status).toBe(404);
       const after = await (await req(`/transcripts/${record.id}/caption-tracks`, token)).json() as unknown[];
       expect(after.length).toBe(2);
     } finally { __setTranslationCompleterForTests(null); }

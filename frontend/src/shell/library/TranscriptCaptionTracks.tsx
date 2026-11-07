@@ -87,13 +87,30 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
       setMessage(i18n._({ id: "Caption track refreshed. Captions you fixed by hand were kept.", message: "Caption track refreshed. Captions you fixed by hand were kept." }));
     }, REFRESH_FAILED);
 
-  const translate = () =>
-    run(async () => {
-      if (!original) return;
-      const made = await transcriptApi.translateCaptionTrack(transcript.id, original.id, target);
-      setTracks((old) => [...old, made]);
-      setMessage(`Translated to ${languageName(made.language, languages)}. It is its own track.`);
-    }, TRANSLATE_FAILED);
+  const translate = async () => {
+    if (!original) return;
+    setBusy(true);
+    setMessage("Translating the captions…");
+    try {
+      let job = await transcriptApi.startTranslation(transcript.id, original.id, target);
+      while (job.state === "running") {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        job = await transcriptApi.translationJob(job.id);
+        setMessage(`Translating the captions… ${Math.round(job.progress * 100)}%`);
+      }
+      const made = job.track;
+      if (job.state === "done" && made) {
+        setTracks((old) => [...old, made]);
+        setMessage(`Translated to ${languageName(made.language, languages)}. It is its own track.`);
+      } else {
+        setMessage(job.error ?? TRANSLATE_FAILED);
+      }
+    } catch (error) {
+      setMessage(error instanceof ApiError && [400, 403, 404, 413].includes(error.status) ? error.message : TRANSLATE_FAILED);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <section aria-label={i18n._({ id: "Caption tracks", message: "Caption tracks" })} className="flex flex-col gap-2">

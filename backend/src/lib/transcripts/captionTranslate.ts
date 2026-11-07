@@ -1,5 +1,6 @@
 // Translated caption tracks: each language is its own CaptionTrack, made by the household's model from an existing track.
 // Output is model text, so it passes the reader's age floor before it is stored (rule 10).
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { captionTracks } from "@/db/schema";
@@ -16,7 +17,7 @@ export const TRANSLATION_LANGUAGES: Record<string, string> = {
   pl: "Polish", sv: "Swedish", tr: "Turkish", ru: "Russian", uk: "Ukrainian", ja: "Japanese", ko: "Korean",
   zh: "Chinese", ar: "Arabic", hi: "Hindi",
 };
-export const MAX_TRANSLATED_CUES = 600;
+export const MAX_TRANSLATED_CUES = 2000;
 const BATCH = 20;
 
 type Completer = (messages: LlmMessage[]) => Promise<{ ok: true; text: string } | { ok: false }>;
@@ -53,11 +54,18 @@ async function translateBatch(texts: string[], from: string, to: string, band: "
   return fail("The language model could not translate these captions. Check that it is running, then try again.");
 }
 
-/** A new caption track in `language`, translated from `trackId`. Nothing is stored unless every cue translated and passed the filter. */
-export async function translateCaptionTrack(actor: PersonRow, transcriptId: string, trackId: string, language: string): Promise<CaptionTrackSummary> {
+export type TranslationJob = { id: string; person: string; state: "running" | "done" | "failed"; progress: number; track?: CaptionTrackSummary; error?: string };
+const jobs = new Map<string, TranslationJob>();
+export function __resetTranslationJobsForTests(): void { jobs.clear(); }
+
+/**
+ * Checks the request, then translates in the background and returns at once. Progress is the share of captions done.
+ * Nothing is stored unless every cue translated and passed the filter.
+ */
+export function startCaptionTranslation(actor: PersonRow, transcriptId: string, trackId: string, language: string): TranslationJob {
   const target = TRANSLATION_LANGUAGES[language];
   if (!target) return fail("That language is not in the list yet. Pick one of the listed languages.", 400);
-  const transcript = getTranscriptDatabaseRow(actor, transcriptId);
+  getTranscriptDatabaseRow(actor, transcriptId);
   const source = db.select().from(captionTracks).where(eq(captionTracks.id, trackId)).get();
   if (!source || source.transcriptId !== transcriptId) return fail("That caption track was not found. Reload the transcript and try again.", 404);
   if (source.language === language) return fail(`That track is already in ${target}. Pick a different language.`, 400);
@@ -67,18 +75,38 @@ export async function translateCaptionTrack(actor: PersonRow, transcriptId: stri
   if (cues.length === 0) return fail("That caption track has no captions to translate.", 400);
   if (cues.length > MAX_TRANSLATED_CUES) return fail(`This track has ${cues.length} captions and translation handles up to ${MAX_TRANSLATED_CUES} at a time. Translate a shorter transcript.`, 413);
   const from = TRANSLATION_LANGUAGES[source.language] ?? "the original language";
-  const translated: Cue[] = [];
-  for (let at = 0; at < cues.length; at += BATCH) {
-    const slice = cues.slice(at, at + BATCH);
-    const lines = await translateBatch(slice.map((cue) => cue.text), from, target, band);
-    slice.forEach((cue, index) => translated.push({ ...cue, id: `${cue.id}-${language}`, text: lines[index]!, text_overridden: false }));
-  }
-  const row = addCaptionTrack(actor, transcriptId, {
-    language,
-    basedOnRevision: source.basedOnRevision,
-    cues: translated,
-    provenance: { source_kind: "translated", engine: "home-llm" },
-  });
-  console.info(JSON.stringify({ event: "transcript.captions_translated", cues: translated.length }));
-  return listCaptionTracks(actor, transcriptId).find((track) => track.id === row.id)!;
+
+  const job: TranslationJob = { id: randomUUID(), person: actor.id, state: "running", progress: 0 };
+  jobs.set(job.id, job);
+  void (async () => {
+    try {
+      const translated: Cue[] = [];
+      for (let at = 0; at < cues.length; at += BATCH) {
+        const slice = cues.slice(at, at + BATCH);
+        const lines = await translateBatch(slice.map((cue) => cue.text), from, target, band);
+        slice.forEach((cue, index) => translated.push({ ...cue, id: `${cue.id}-${language}`, text: lines[index]!, text_overridden: false }));
+        job.progress = translated.length / cues.length;
+      }
+      const row = addCaptionTrack(actor, transcriptId, {
+        language,
+        basedOnRevision: source.basedOnRevision,
+        cues: translated,
+        provenance: { source_kind: "translated", engine: "home-llm" },
+      });
+      console.info(JSON.stringify({ event: "transcript.captions_translated", cues: translated.length }));
+      job.track = listCaptionTracks(actor, transcriptId).find((track) => track.id === row.id);
+      job.progress = 1;
+      job.state = "done";
+    } catch (error) {
+      job.state = "failed";
+      job.error = error instanceof TranscriptError ? error.message : "The captions could not be translated. Check that the language model is running, then try again.";
+    }
+  })();
+  return { ...job };
+}
+
+export function translationJob(actor: PersonRow, id: string): TranslationJob {
+  const job = jobs.get(id);
+  if (!job || job.person !== actor.id) return fail("That translation was not found. Start it again.", 404);
+  return { ...job };
 }
