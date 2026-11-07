@@ -26003,6 +26003,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Home is already set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -26472,6 +26482,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Home is already set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -26515,6 +26535,16 @@
                     "terms_version",
                     "licences"
                   ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Home is already set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -27377,6 +27407,16 @@
                     "cudaDevices",
                     "chatFit"
                   ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Home is already set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
