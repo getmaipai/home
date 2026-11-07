@@ -165,6 +165,8 @@ registerScheduleReconcile();
 registerScheduleRecheck();
 ensureCoreJob("schedules.reconcile", "every:5m");
 ensureCoreJob("memory.maintenance", "every:1d");
+// AUDIT-PERF-01: finished one-shot jobs older than 30 days are deleted once a week.
+ensureCoreJob("scheduler.prune", "every:7d");
 ensureCoreJob("conversation.retention", "every:1d");
 ensureCoreJob("notifications.deliver_held", "every:1m");
 ensureCoreJob("robot.offers.tick", "every:1m");

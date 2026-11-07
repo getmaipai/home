@@ -2863,3 +2863,15 @@ describe("MEM-AUDIT-02: the preview fixes (judge failure class, one try per tick
     expect(activeTexts()).toHaveLength(1);
   });
 });
+
+describe("an empty judge tick is silent (AUDIT-PERF-01)", () => {
+  test("processed=0 logs nothing and reports the batch as empty", async () => {
+    resetDb();
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const result = await runJudgeBatch();
+      expect(result.processed).toBe(0);
+      expect(log.mock.calls.filter((call) => String(call[0]).includes("[memory.judge]"))).toHaveLength(0);
+    } finally { log.mockRestore(); }
+  });
+});
