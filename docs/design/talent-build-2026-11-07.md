@@ -238,12 +238,15 @@ Five keys, each with `copy.does` and `copy.does_child`, `copy.does_teen` (plain 
 | `talent.life.enabled` | household | boolean | true | basic | Synths have lives |
 | `talent.minors.make` | household | boolean | true | advanced | Children and teens can make shows |
 | `synths.of_me` | person | boolean | true | basic | Synths can be based on me |
-| `synths.real_people` | person | boolean | true | basic | Can use synths based on real people |
+| `synths.real_people` | person | select `off \| ask \| all` | ask | basic | Synths based on real people |
+| `synths.real_people_allowed` | person | entity (a list of synth ids) | [] | advanced | Real-person synths a parent allowed |
 
 `synths.of_me`'s copy: `does_child` and `does_teen` say a parent sets it. `synths.real_people` is a parental control in the exact shape of
-the precedent in RULES.md rule 0: a per-band user default (on), an admin's global default, a per-person override by a parent or admin,
-and the child or teen never writes it (the key's `self_service` is false for the child and teen bands); its `copy.does_child` and
-`copy.does_teen` say a parent decides it. The who-sets-it text lives in `copy`, never in the label (rule S5).
+the precedent in RULES.md rule 0: a per-band user default (`ask` for child and teen, `all` for adults, where it is never shown), an
+admin's global default, a per-person override by a parent or admin, and the child or teen never writes it (the key's `self_service` is
+false for the child and teen bands); a child's band never offers `all` (`band_default` and the range for the child band are `off |
+ask`); its `copy.does_child` and `copy.does_teen` say a parent decides it. `synths.real_people_allowed` is the lasting-yes list: written
+only by the Ask's Allow (below) and by a parent on the child's Settings page, never by the minor. The who-sets-it text lives in `copy`, never in the label (rule S5).
 
 ### 2.6 Wrap up the commons slice
 
@@ -273,13 +276,16 @@ export type SynthRecord = Synth;
 export function listSynths(actor: PersonRow): SynthRecord[]         // household + bundled synths the actor may use (mayUseCompanion on persona; and, for a child or teen, no real-person synth when their `synths.real_people` is off, read with the per-person settings reader the other parental keys use), minus forks private to someone else unless canManage(actor, thatPerson) && speakerAgeBand(thatPerson, now) != "adult" (lib/personLifecycle.ts l.122; an adult's private fork is never listed to an admin, rule 6a), newest first
 export function forkSynth(actor: PersonRow, baseId: string): WriteResult   // "Make it mine": calls the existing copier (copyBundledCompanion or copyHouseholdCompanion, extended with options { keepAudience: true, keepStatus: true, copyLook: true, synth: { forked_from: baseId, private_to: actor.id, owner_person_id: actor.id, life: base.life, based_on: base.based_on, pins: base.pins, subject_id: null } }); never a second copier; writes one durable beat "<base display name>'s life so far: ..." from synthCard(base) as the fork's first beat; sets persona.active_id for the actor to the fork; refused when the actor may not use the base (the same sentence the companion picker uses)
 export function shareFork(actor: PersonRow, id: string): WriteResult       // the fork's owner, or canManage(actor, owner) when the owner is a child or teen: clears private_to (the fork becomes a household synth)
+export function requestSynthAccess(actor: PersonRow, id: string): AskResult   // child or teen at "ask": creates one Ask on the existing Ask record (notifications-and-asks-2026-10-17.md; the same record and parent surface KID-MODE-06 uses), kind "synth.real_person", summary "<child name> wants to talk with <synth display name>, a synth based on <based_on.name>", one open Ask per child and synth; the parent's Allow appends id to that child's `synths.real_people_allowed` (a lasting yes), Deny closes it; the child sees "Asked your parent" through the existing ask status on the synth page; never for an adult or a synth the actor may already see
 export function isCompanionFork(id: string): boolean                      // forked_from != null AND (some person's persona.active_id equals id); a base someone picked directly before forks existed keeps working as today and is not a fork (it ticks only when on air)
 export function getSynth(actor: PersonRow, id: string): SynthRecord | null
 export function synthById(id: string): SynthRecord | null            // no gate; for jobs
 export function maySeeSynth(actor: PersonRow, synth: SynthRecord, now = new Date()): boolean
 // THE one gate (architect, 2026-11-07): mayUseCompanion(actor, synthPersona(synth)) AND (synth.private_to is null OR equals actor.id OR
 // (canManage(actor, personById(private_to)) AND speakerAgeBand(that person) != "adult")) AND (based_on.kind != "household_member" OR that
-// person's `synths.of_me` is on) AND (based_on.kind != "real_person" OR speakerAgeBand(actor) == "adult" OR actor's `synths.real_people` is on).
+// person's `synths.of_me` is on) AND (based_on.kind != "real_person" OR speakerAgeBand(actor) == "adult" OR actor's `synths.real_people` == "all" OR (it is "ask" AND synth.id is in actor's `synths.real_people_allowed`)).
+// A real-person synth that fails only the last clause while `synths.real_people` is "ask" is "askable": `getSynth` returns it with
+// `pending_ask: true` and nothing else (no beats, no chat, no fork), and `requestSynthAccess(actor, id)` below sends the Ask.
 // Used by listSynths, getSynth, forkSynth, shareFork, the Chat and @mention paths (`conversationPersona` and `mentionedConversationPersona`
 // in turnNext.ts l.1071 to l.1084 call it after mayUseCompanion), createShow's cast check, the robot pick, and the read gate of 15.7.
 export function synthPersona(synth: SynthRecord): Persona | null      // personaFromManifest(id, manifestOf(synth), true /* allowDraft */); null means the manifest is broken: jobs skip the synth, routes answer 404
@@ -987,8 +993,10 @@ scripted result writes 3 facts with sources and confidence, 2 views, and sets 3 
 date for one fact supersedes the old record (one active, one superseded); (3) a fact the owner forgot is not re-added on the next run;
 (4) a pinned dial and a pinned phrase survive a run that returns different values; (5) web search off means `skipped: "web search is
 off"` and no search call; (6) a `household_member` synth is skipped; (7) the log line carries counts only (capture the logger); (8) a real-person synth with audience `all`: a fact the child floor
-refuses is not stored, a birth date under 18 sets `based_on.minor`; a child with `synths.real_people` off gets 404 for it and does not
-list it; (9) an admin cannot list or read an adult member's private fork
+refuses is not stored, a birth date under 18 sets `based_on.minor`; a child with `synths.real_people` `off` gets 404 for it and does not
+list it; at `ask` the child's `getSynth` answers `pending_ask: true` with no beats until a parent's Allow lands the id in
+`synths.real_people_allowed`, after which chat and fork work; a teen at `all` needs no Ask; a child's `synths.real_people` cannot be set
+to `all` (400 from the settings write); (9) an admin cannot list or read an adult member's private fork
 (404, no beats), a parent can read a child's.
 
 ## 15. Decisions the coder dry run asked for (2026-11-07)
