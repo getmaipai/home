@@ -315,3 +315,23 @@ describe("media index empty states", () => {
     }
   });
 });
+
+describe("the weather page while its places load (AUDIT-UI-01)", () => {
+  test("shows the loading skeleton, not a blank page, until the places answer", async () => {
+    rows = [{ package: "weather", page: "index", label: "Weather", icon: "cloud-sun", description: "Weather.", category: "Info", keywords: [], sections: [], to: "/apps/weather", incognito: "unaffected" }];
+    let releasePlaces: (value: Response) => void = () => {};
+    const places = new Promise<Response>((resolve) => { releasePlaces = resolve; });
+    const before = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/plugins/weather/pages/index")) return Promise.resolve(Response.json(indexPage));
+      if (url.startsWith("/api/plugins/weather/data/places")) return places;
+      return before(input, init);
+    }) as typeof fetch;
+    const view = open("/apps/weather");
+    expect(await view.findByRole("status", { name: "Loading weather" }, { timeout: 8000 })).toBeTruthy();
+    await act(async () => { releasePlaces(Response.json({ as_of: "x", rows: [] })); });
+    await waitFor(() => expect(view.queryByRole("status", { name: "Loading weather" })).toBeNull());
+    globalThis.fetch = before;
+  }, 30000);
+});

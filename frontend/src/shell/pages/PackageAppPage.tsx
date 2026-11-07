@@ -18,6 +18,7 @@ import { MinimizeButton } from "@/shell/media/MinimizeButton";
 import { MusicVisualizerSection } from "@/shell/media/MusicVisualizerSection";
 import { appHomeLabel, isMediaApp, isMediaPlayPage, usesFamilyHeader } from "@/shell/mediaApps";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@maipai/ui/src/elements/weather-forecast-page";
 import { navigateOf, useAppSidebar } from "@/shell/useAppSidebar";
 import { rememberMode, rememberedMode, resolveMode, sidebarInMode } from "@/shell/appHeaderModes";
@@ -174,6 +175,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   })) });
   const weatherSearchQuery = useQuery({ queryKey: ["weather-search", weatherSearch], queryFn: () => api.searchPlaces(weatherSearch), enabled: packageId === "weather" && pageId === "index" && weatherSearch.trim().length > 1 });
   const weatherLocations = dedupeLocations(weatherVisiblePlaces.map((place, index) => weatherForecasts[index]?.data?.location ?? weatherLocation(place, {})).filter((place) => place.detail));
+  // AUDIT-UI-01: until the places and the first forecast answer there is nothing to draw; show the loading skeleton, never a blank page.
+  const weatherPage = packageId === "weather" && pageId === "index";
+  const weatherLoading = weatherPage && (weatherPlaces.isPending || weatherEntities.isPending || (weatherLocations.length === 0 && weatherForecasts.some((query) => query.isPending)));
   const weatherSelectedPlace = weatherLocations.find((place) => place.id === weatherSelectedId) ?? weatherLocations[0];
   const weatherSelectedForecast = weatherForecasts.find((query) => query.data?.location.id === weatherSelectedPlace?.id)?.data;
   const weatherSelectedAdvice = weatherSelectedForecast?.advice;
@@ -283,7 +287,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
-            <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {
+            {weatherLoading ? <RouteSkeleton label="Loading weather" /> : <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {
               setWeatherMessage("");
               const latitude = Number(result.latitude!.toFixed(2)); const longitude = Number(result.longitude!.toFixed(2));
               const sameSpot = (geo: { lat?: number; lon?: number } | null | undefined) => geo?.lat !== undefined && geo.lon !== undefined && geo.lat.toFixed(2) === latitude.toFixed(2) && geo.lon.toFixed(2) === longitude.toFixed(2);
@@ -309,7 +313,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
                 await queryClient.invalidateQueries({ queryKey: ["weather-place-entities", person.id] });
                 setWeatherMessage(`${location?.city ?? "Place"} removed from your list.`);
               }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : "Could not remove this place."));
-            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} summary={weatherSelectedForecast?.summary} />
+            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} summary={weatherSelectedForecast?.summary} />}
           </> : null}
         </>); }}
       </AsyncState>
