@@ -17,6 +17,7 @@ export interface FakeEditStack {
   /** The Stack's current media roots; a test seeds it before the edit runs. */
   roots: { read: string[]; write: string[] };
   pollsToFinish: number;
+  progressPercent: number;
   /** When set, the job ends failed with this reason. */
   failWith: string | null;
   /** When true, the submit itself is refused (an unreachable Stack). */
@@ -32,10 +33,10 @@ export interface FakeEditStack {
 export function installFakeEditStack(): FakeEditStack {
   const base = getStackClient();
   const roots = { read: [] as string[], write: [] as string[] };
-  const fake: FakeEditStack = { jobs: [], speech: [], rootsSet: [], roots, pollsToFinish: 2, failWith: null, refuseSubmit: false, speechFails: false, durationS: 6, transcribedText: "A harmless sentence.", restore() { __setStackEditTimingForTests(null); __setStackClientForTests(null); } };
+  const fake: FakeEditStack = { jobs: [], speech: [], rootsSet: [], roots, pollsToFinish: 2, progressPercent: 0, failWith: null, refuseSubmit: false, speechFails: false, durationS: 6, transcribedText: "A harmless sentence.", restore() { __setStackEditTimingForTests(null); __setStackClientForTests(null); } };
   __setStackEditTimingForTests({ pollMs: 5, deadlineMs: 5_000 });
   const stamp = (job: FakeEditJob) => ({
-    id: job.id, kind: "media.edit", role: null, state: job.state, percent: 0, completedBytes: 0, totalBytes: 0, status: "", position: null, input: null, result: null, reason: null,
+    id: job.id, kind: "media.edit", role: null, state: job.state, percent: fake.progressPercent, completedBytes: 0, totalBytes: 0, status: "", position: null, input: null, result: null, reason: null,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   });
   const client = {

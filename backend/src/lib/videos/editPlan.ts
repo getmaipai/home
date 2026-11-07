@@ -51,6 +51,7 @@ export type LetterboxRatio = (typeof LETTERBOX_RATIOS)[number];
 export const MAX_EDIT_OPS = 12;
 export const MAX_EDIT_SECONDS = 600;
 export function reframeOps(aspect: VideoAspect, fill: "crop" | "blur" = "crop"): EditOp[] { return [{ op: "reframe", aspect, fill }]; }
+export function upscaleOps(): EditOp[] { return [{ op: "upscale", factor: 2 }]; }
 export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade", ...values }]; }
 export function filmLookOps(preset: FilmLookPreset, strength?: number): EditOp[] { return [{ op: "film_look", preset, ...(strength === undefined ? {} : { strength }) }]; }
 export function letterboxOps(ratio: LetterboxRatio): EditOp[] { return [{ op: "letterbox", ratio }]; }

@@ -40,11 +40,12 @@ export type EditOp =
   | { op: "rotate"; degrees: 90 | 180 | 270 }
   | { op: "sharpen" | "denoise"; amount: number }
   | { op: "pip"; input: number; corner: "top_left" | "top_right" | "bottom_left" | "bottom_right"; size: number; margin: number }
+  | { op: "upscale"; factor: 2 }
   | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
 /** One file the Stack reads: its bytes and the extension it is staged with (the Stack looks at the content, not the name). */
 export interface EditFile { bytes: Uint8Array; ext: string }
-export interface StackEditRequest { inputs: EditFile[]; ops: EditOp[]; name: string; signal?: AbortSignal }
+export interface StackEditRequest { inputs: EditFile[]; ops: EditOp[]; name: string; signal?: AbortSignal; onProgress?: (progress: number) => void }
 export type StackEditResult =
   | { ok: true; bytes: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number }
   | { ok: false; code: "unavailable" | "remote" | "failed" | "timeout" | "cancelled" | "unreadable"; line: string };
@@ -135,6 +136,7 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
       await sleep(POLL_MS, request.signal);
       if (request.signal?.aborted) continue;
       job = await client.job(job.id);
+      request.onProgress?.(job.percent);
     }
     if (job.state !== "done") {
       const reason = stackReason(job.reason);

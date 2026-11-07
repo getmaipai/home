@@ -73,7 +73,7 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
-  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions"; with?: string[] };
+  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale"; with?: string[] };
 }
 
 export interface VideoJob {
@@ -635,11 +635,11 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
 /** What an edit hands back: the new clip's bytes and what the Stack measured. Frame 0 of the clip is its poster. */
 export interface EditedClip { video: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number }
 /** The work of one edit (the Stack call, and any speech made first). It never throws: a failure is one plain line. */
-export type EditRun = (signal: AbortSignal) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
+export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
+export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; phase?: string; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -649,7 +649,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const from = input.source.request;
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
-    percent: 5, phase: "editing", position: null, prompt: input.source.prompt,
+    percent: 5, phase: input.phase ?? "editing", position: null, prompt: input.source.prompt,
     request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
@@ -663,7 +663,7 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
   const controller = new AbortController();
   watching.set(job.id, controller);
   try {
-    const made = await run(controller.signal);
+    const made = await run(controller.signal, (percent) => { job.percent = Math.max(0, Math.min(99, Math.round(percent))); saveVideoJob(job); });
     if (controller.signal.aborted) return;
     if (!made.ok) { job.state = "failed"; job.error = made.line; saveVideoJob(job); return; }
     const { clip } = made;

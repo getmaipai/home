@@ -4,6 +4,7 @@
 
 ### Added
 
+- `upscale` makes a clip sharper and twice as big, for clips up to a minute and under 2048 pixels wide.
 - `cut_to_beat` cuts one to six of your videos to the beat of one of your songs, using the existing video editor job.
 
 ### Changed

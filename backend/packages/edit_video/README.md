@@ -6,6 +6,8 @@ You can also cut one or more videos to the beat of one of your songs. Choose how
 
 Grade changes its color and texture.
 
+Upscale makes the clip sharper and twice as big.
+
 Make a movie from a Production's finished shots.
 
 Adults can use this on their own written chat screen. Children, teens and guests cannot. A video model must be installed on this computer. Max needs an admin's OK. Nothing leaves your home.
