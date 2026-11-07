@@ -56,6 +56,7 @@ async function readyView(initialTab?: string, transcript: Transcript = record, c
 // The panel asks the hub whether the file already has a transcript; no test may reach a real hub.
 beforeEach(() => {
   stub(spyOn(transcriptApi, "forItem").mockResolvedValue(null));
+  stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([]));
 });
 
 afterEach(() => {
@@ -296,5 +297,125 @@ describe("detect speakers and redo a range", () => {
     fireEvent.change(view.getByLabelText("To"), { target: { value: "0:12" } });
     fireEvent.click(view.getByRole("button", { name: "Redo" }));
     expect(await view.findByText(/That range could not be redone\. Check the times/)).toBeTruthy();
+  });
+});
+
+describe("Library transcript workspace: caption tracks needing a refresh", () => {
+  const track = { id: "cap-1", language: "en", based_on_revision: 1, needs_refreshing: true, cue_count: 2 };
+
+  test("a stale track says Needs refreshing; Refresh runs once, is disabled meanwhile, then it is Up to date", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([track]));
+    let finish: (value: typeof track) => void = () => {};
+    const refresh = stub(
+      spyOn(transcriptApi, "refreshCaptionTrack").mockReturnValue(new Promise<typeof track>((resolve) => (finish = resolve))),
+    );
+    const view = await readyView("export");
+    expect(await view.findByText("Needs refreshing")).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Refresh en captions" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Refresh en captions" }).hasAttribute("disabled")).toBe(true));
+    expect(refresh).toHaveBeenCalledWith("tx-1", "cap-1");
+    finish({ ...track, based_on_revision: 2, needs_refreshing: false });
+    expect(await view.findByText("Up to date")).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Refresh en captions" })).toBeNull();
+    expect(view.getAllByRole("status").some((node) => node.textContent?.startsWith("Caption track refreshed"))).toBe(true);
+  });
+
+  test("a fresh track says Up to date and offers no Refresh button", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([{ ...track, needs_refreshing: false }]));
+    const view = await readyView("export");
+    expect(await view.findByText("Up to date")).toBeTruthy();
+    expect(view.queryByRole("button", { name: /Refresh/ })).toBeNull();
+  });
+
+  test("a failed refresh says what to do", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([track]));
+    stub(spyOn(transcriptApi, "refreshCaptionTrack").mockRejectedValue(new Error("private raw detail")));
+    const view = await readyView("export");
+    fireEvent.click(await view.findByRole("button", { name: "Refresh en captions" }));
+    await waitFor(() => expect(view.container.textContent).toContain("The caption track could not be refreshed. Check that Home is ready, then try again."));
+    expect(view.container.textContent).not.toContain("private raw detail");
+  });
+});
+
+describe("Library transcript workspace: find and replace", () => {
+  const preview = {
+    matches: [
+      { segment_id: "seg-1", start: 0, before: "Hello world", after: "Hello planet", count: 1 },
+      { segment_id: "seg-2", start: 3, before: "Goodbye world", after: "Goodbye planet", count: 1 },
+    ],
+    total_lines: 2,
+    total_matches: 2,
+    more: false,
+  };
+  const wanted = { find: "world", replace: "planet", match_case: false, whole_word: false };
+
+  async function previewed() {
+    const previewCall = stub(spyOn(transcriptApi, "previewFindReplace").mockResolvedValue(preview));
+    const view = await readyView("edit");
+    fireEvent.change(view.getByRole("textbox", { name: "Find" }), { target: { value: "world" } });
+    fireEvent.change(view.getByRole("textbox", { name: "Replace with" }), { target: { value: "planet" } });
+    fireEvent.click(view.getByRole("button", { name: "Preview" }));
+    await view.findByText("after: Hello planet");
+    return { view, previewCall };
+  }
+
+  test("Preview lists before and after for each line, with every line ticked, and changes nothing", async () => {
+    const edit = stub(spyOn(transcriptApi, "edit"));
+    const { view, previewCall } = await previewed();
+    expect(previewCall).toHaveBeenCalledWith("tx-1", wanted);
+    expect(view.getByText("after: Goodbye planet")).toBeTruthy();
+    expect(view.getByRole("checkbox", { name: "Replace on line at 0:03" }).getAttribute("aria-checked")).toBe("true");
+    expect(view.getAllByRole("status").some((node) => node.textContent === "2 matches on 2 lines.")).toBe(true);
+    expect(edit).not.toHaveBeenCalled();
+  });
+
+  test("Apply sends only the ticked lines, shows the new transcript and says Undo reverts it", async () => {
+    const changed = {
+      ...record,
+      current_revision: 2,
+      segments: [{ ...record.segments[0]!, text: "Hello planet" }, record.segments[1]!],
+    } as Transcript;
+    const apply = stub(
+      spyOn(transcriptApi, "applyFindReplace").mockResolvedValue({ transcript: changed, replaced_lines: 1, replaced_matches: 1 }),
+    );
+    const { view } = await previewed();
+    fireEvent.click(view.getByRole("checkbox", { name: "Replace on line at 0:03" }));
+    fireEvent.click(view.getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("tx-1", wanted, ["seg-1"]));
+    expect(await view.findByText("Replaced on 1 line. Undo puts it back.")).toBeTruthy();
+    expect(view.getByText("Hello planet")).toBeTruthy();
+  });
+
+  test("the match case and whole word boxes reach the preview request", async () => {
+    const previewCall = stub(spyOn(transcriptApi, "previewFindReplace").mockResolvedValue(preview));
+    const view = await readyView("edit");
+    fireEvent.change(view.getByRole("textbox", { name: "Find" }), { target: { value: "world" } });
+    fireEvent.click(view.getByRole("checkbox", { name: "Match case" }));
+    fireEvent.click(view.getByRole("checkbox", { name: "Whole word" }));
+    fireEvent.click(view.getByRole("button", { name: "Preview" }));
+    await waitFor(() => expect(previewCall).toHaveBeenCalledWith("tx-1", { find: "world", replace: "", match_case: true, whole_word: true }));
+  });
+
+  test("nothing to replace says so, and an empty find asks for text without calling the hub", async () => {
+    const previewCall = stub(
+      spyOn(transcriptApi, "previewFindReplace").mockResolvedValue({ matches: [], total_lines: 0, total_matches: 0, more: false }),
+    );
+    const view = await readyView("edit");
+    fireEvent.click(view.getByRole("button", { name: "Preview" }));
+    expect(await view.findByText("Type the text to find, then press Preview.")).toBeTruthy();
+    expect(previewCall).not.toHaveBeenCalled();
+    fireEvent.change(view.getByRole("textbox", { name: "Find" }), { target: { value: "zebra" } });
+    fireEvent.click(view.getByRole("button", { name: "Preview" }));
+    expect(await view.findByText("Nothing to replace. No line has that text.")).toBeTruthy();
+    expect((view.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test("a failed preview says what to do and shows no raw error", async () => {
+    stub(spyOn(transcriptApi, "previewFindReplace").mockRejectedValue(new Error("private raw detail")));
+    const view = await readyView("edit");
+    fireEvent.change(view.getByRole("textbox", { name: "Find" }), { target: { value: "world" } });
+    fireEvent.click(view.getByRole("button", { name: "Preview" }));
+    expect(await view.findByText("The matches could not be listed. Check that Home is ready, then try again.")).toBeTruthy();
+    expect(view.container.textContent).not.toContain("private raw detail");
   });
 });

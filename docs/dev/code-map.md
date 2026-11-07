@@ -224,6 +224,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/LibraryTrash.tsx` | LibraryTrash |
 | `frontend/src/shell/library/LibraryUploads.tsx` | useLibraryUploads, UploadTray |
 | `frontend/src/shell/library/LibraryViewer.tsx` | viewerItemOf, LibraryViewer |
+| `frontend/src/shell/library/TranscriptCaptionTracks.tsx` | CaptionTracks |
+| `frontend/src/shell/library/TranscriptFindReplace.tsx` | FindReplace |
 | `frontend/src/shell/library/TranscriptPanel.tsx` | timeLabel, parseClock, useTranscriptWorkspace |
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, getVisualizerEnabled, setVisualizerEnabled, useVisualizerEnabled |
 | `frontend/src/shell/media/MinimizeButton.tsx` | MinimizeButton |
@@ -1024,7 +1026,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
 | `backend/src/lib/topicStances.ts` | resolveTopicStances, topicStancesForPerson |
 | `backend/src/lib/totp.ts` | beginEnrollment, verifyEnrollment, isTotpEnabled, verifyTotp, disableTotp |
+| `backend/src/lib/transcripts/captions.ts` | listCaptionTracks, createCaptionTrack, refreshedCues, refreshCaptionTrack |
 | `backend/src/lib/transcripts/cues.ts` | buildCues |
+| `backend/src/lib/transcripts/findReplace.ts` | MAX_PREVIEW_LINES, EMPTY_FIND, previewFindReplace, applyFindReplace |
 | `backend/src/lib/transcripts/import.ts` | importTranscript |
 | `backend/src/lib/transcripts/parse.ts` | parseTranscriptDocument |
 | `backend/src/lib/transcripts/revisions.ts` | applyOps, undo, restoreRevision, __resetAutosavesForTests |

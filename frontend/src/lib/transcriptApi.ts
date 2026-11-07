@@ -17,6 +17,20 @@ export type DetectSpeakersResult = {
   note: string | null;
 };
 
+/** One caption track made from a transcript; needs_refreshing is true when the transcript changed after it was made. */
+export type CaptionTrackSummary = {
+  id: string;
+  language: string;
+  based_on_revision: number;
+  needs_refreshing: boolean;
+  cue_count: number;
+};
+
+export type FindReplaceOptions = { find: string; replace: string; match_case: boolean; whole_word: boolean };
+export type FindReplaceMatch = { segment_id: string; start: number; before: string; after: string; count: number };
+export type FindReplacePreview = { matches: FindReplaceMatch[]; total_lines: number; total_matches: number; more: boolean };
+export type FindReplaceResult = { transcript: Transcript; replaced_lines: number; replaced_matches: number };
+
 const JSON_HEADERS = { "content-type": "application/json" };
 
 function post<T>(path: string, body?: unknown): Promise<T> {
@@ -66,5 +80,15 @@ export const transcriptApi = {
     post<Transcript>(`${transcriptPath(id)}/regenerate-range`, { start, end }),
   import: (item: string, format: ImportFormat, text: string) =>
     post<Transcript>(`${itemPath(item)}/import`, { format, text }),
+  captionTracks: (id: string) => requestJson<CaptionTrackSummary[]>(`${transcriptPath(id)}/caption-tracks`),
+  makeCaptionTrack: (id: string) => post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks`),
+  refreshCaptionTrack: (id: string, track: string) =>
+    post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/refresh`),
+  /** The lines a find and replace would change. Nothing is changed. */
+  previewFindReplace: (id: string, options: FindReplaceOptions) =>
+    post<FindReplacePreview>(`${transcriptPath(id)}/find-replace/preview`, options),
+  /** Apply a find and replace as one revision, to the listed lines only when segmentIds is given. */
+  applyFindReplace: (id: string, options: FindReplaceOptions, segmentIds: readonly string[]) =>
+    post<FindReplaceResult>(`${transcriptPath(id)}/find-replace`, { ...options, segment_ids: segmentIds }),
   exportUrl: (id: string, format: TranscriptFormat) => `${transcriptPath(id)}/export?format=${format}`,
 };

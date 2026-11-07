@@ -335,4 +335,38 @@ describe("regenerate range", () => {
     __setTranscriptStackClientForTests({ transcribeJob: async () => { throw new Error("engine down"); } });
     expect((await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 5, end: 9 })).status).toBe(502);
   });
+
+  test("caption tracks go stale after an edit and refresh on request; find and replace previews then applies", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const record = await (await req("/library/media-caption01/transcript", token, "POST", {})).json() as { id: string };
+
+    const created = await req(`/transcripts/${record.id}/caption-tracks`, token, "POST");
+    expect(created.status).toBe(201);
+    const track = await created.json() as { id: string; needs_refreshing: boolean };
+    expect(track.needs_refreshing).toBe(false);
+
+    await req(`/transcripts/${record.id}`, token, "PATCH", { ops: [{ kind: "edit_text", segment_id: "seg-sage", text: "Sage speaks clearly" }] });
+    const listed = await (await req(`/transcripts/${record.id}/caption-tracks`, token)).json() as Array<{ needs_refreshing: boolean }>;
+    expect(listed[0]?.needs_refreshing).toBe(true);
+    const read = await (await req(`/transcripts/${record.id}`, token)).json() as { caption_tracks: Array<{ needs_refreshing: boolean }> };
+    expect(read.caption_tracks[0]?.needs_refreshing).toBe(true);
+
+    const refreshed = await req(`/transcripts/${record.id}/caption-tracks/${track.id}/refresh`, token, "POST");
+    expect(refreshed.status).toBe(200);
+    expect((await refreshed.json() as { needs_refreshing: boolean }).needs_refreshing).toBe(false);
+    expect((await req(`/transcripts/${record.id}/caption-tracks/nope/refresh`, token, "POST")).status).toBe(404);
+
+    const preview = await req(`/transcripts/${record.id}/find-replace/preview`, token, "POST", { find: "clearly", replace: "loudly" });
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({ total_lines: 1, more: false, matches: [{ segment_id: "seg-sage", after: "Sage speaks loudly" }] });
+    expect((await req(`/transcripts/${record.id}/find-replace/preview`, token, "POST", { find: "", replace: "x" })).status).toBe(400);
+    expect((await req(`/transcripts/${record.id}/find-replace`, token, "POST", { find: "", replace: "x" })).status).toBe(400);
+
+    const applied = await req(`/transcripts/${record.id}/find-replace`, token, "POST", { find: "clearly", replace: "loudly" });
+    expect(applied.status).toBe(200);
+    expect(await applied.json()).toMatchObject({ replaced_lines: 1, transcript: { current_revision: 3 } });
+    const undone = await (await req(`/transcripts/${record.id}/undo`, token, "POST")).json() as { segments: Array<{ text: string }> };
+    expect(undone.segments[0]?.text).toBe("Sage speaks clearly");
+  });
 });

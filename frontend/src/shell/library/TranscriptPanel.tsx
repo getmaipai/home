@@ -9,6 +9,8 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import type { LibraryItem, Roster } from "@/lib/api";
 import { transcriptApi, type ImportFormat, type TranscriptFormat } from "@/lib/transcriptApi";
+import { CaptionTracks } from "./TranscriptCaptionTracks";
+import { FindReplace } from "./TranscriptFindReplace";
 import { isAdultRole } from "./libraryModel";
 import { addCaptionTrack } from "./viewerMedia";
 
@@ -368,6 +370,7 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
         labels={{ label: "Transcript lines", empty: "No lines for this speaker" }}
         renderLine={renderLine}
       />
+      <FindReplace transcript={transcript} onChange={onChange} />
       <section aria-label="Speakers" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Speakers</h3>
         {transcript.speakers.map((speaker) => {
@@ -477,6 +480,7 @@ function ExportTab({ transcript, item, onChange }: { transcript: Transcript; ite
           </Button>
         ))}
       </div>
+      <CaptionTracks transcript={transcript} />
       <label className="flex flex-col gap-2 text-sm">
         Import SRT, VTT or text
         <input
