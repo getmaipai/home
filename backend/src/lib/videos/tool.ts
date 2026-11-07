@@ -13,6 +13,7 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { unlockedFor } from "@/lib/adultLock";
 import { lockedStyleOutcome } from "@/lib/videos/lock";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
+import { isUnofferedOldBase, runsOn } from "@/lib/loras/access";
 import { STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, resolveStyles, strengthWord, styleNamesOf } from "./styleChoice";
 import { LORAS_UNSUPPORTED_LINE, ltx25LorasSupported } from "./loraWire";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadLibraryPicture, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
@@ -234,7 +235,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const maxReady = lane === "adult" && ltx25MaxReady(engine);
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "video", arg: args.tier, band: audience.band, maxAvailable: maxReady });
   // VIDEO-LORA-09: a style made for LTX-2.5 rides the LTX-2.5 levels once the Stack reports it can (Max, or Standard and Boost); the Stack's own report decides, nothing is assumed.
-  const ltx25Styles = lane === "adult" && adapters.length > 0 && adapters.every((a) => a.lora.compatible_with.includes("ltx-2.5"));
+  const ltx25Styles = lane === "adult" && adapters.length > 0 && adapters.every((a) => runsOn(a.lora, "ltx-2.5"));
   const asksMax = tierAsked.tier === "max" && maxReady;
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
   if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
@@ -245,15 +246,15 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     choice.maker = endMaker; choice.quality = "quick"; choice.seconds = Math.min(choice.seconds, endMaker === "ltx25max" ? 10 : 10); choice.note = null;
   }
   // A saved style on the retired video base is refused before any maker choice can use it.
-  if (adapter?.base_model === "ltx-2.3") {
+  if (adapter && isUnofferedOldBase(adapter.lora)) {
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. That style is no longer available. Choose another style or leave it out." }, data: { refused: "retired_style_base" }, actions: [] } });
   }
   // VIDEO-LORA-09: every chosen style must be made for the kind of video this clip is; a style is never dropped to make a clip start. (Design 6.4.)
   const makerBase = ({ wan: "wan2.2-ti2v-5b", ltx25: "ltx-2.5", ltx25max: "ltx-2.5" } as const)[choice.maker];
   if (adapters.length > 0) {
     if (adapter?.base_model === "ltx-2.5" && choice.maker === "wan") return styleRefusal(callId, args, "That style needs the newer video model, which is not ready here. An admin can add it in Settings, Models and storage.", "style_needs_model");
-    if (adapters.some((a) => !a.lora.compatible_with.includes(makerBase))) {
-      const mixed = adapters.length > 1 && adapters.some((a) => a.lora.compatible_with.includes(makerBase));
+    if (adapters.some((a) => !runsOn(a.lora, makerBase))) {
+      const mixed = adapters.length > 1 && adapters.some((a) => runsOn(a.lora, makerBase));
       return styleRefusal(callId, args, mixed ? STYLE_MIXED_LEVELS_LINE : (ltx25Styles || choice.maker === "ltx25" || choice.maker === "ltx25max") ? LORAS_UNSUPPORTED_LINE : STYLE_NOT_AT_LEVEL_LINE, "style_not_at_level");
     }
     if ((choice.maker === "ltx25" || choice.maker === "ltx25max") && !ltx25LorasSupported(engine, choice.maker === "ltx25max" ? LTX25_MAX_MODEL : LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");

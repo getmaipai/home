@@ -3,7 +3,7 @@
 // the person may not see is not here; adult-only ones are one lock tile on the Styles chip until their unlock proof is live (the host refetches the page when
 // the lock changes, and this runs again with the proof). The words each card adds come from `buildPromptPlan`, the same function that builds the prompt.
 import { readLoras } from "@/lib/loras/access";
-import { loraUsable } from "@/lib/loras/access";
+import { loraUsable, runsOn } from "@/lib/loras/access";
 import type { Lora } from "@/lib/loras/store";
 import { MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
@@ -49,7 +49,7 @@ export interface StyleChipsInput { person: PersonRow; engine: StackVideoStatus |
 export function styleChips({ person, engine, offered }: StyleChipsInput): Array<Record<string, unknown>> {
   const { items, locked } = readLoras(person, "own_written", { media: "video" });
   // A style appears here only when it can ride the newest model: that is where the Stack reports LoRA support (older bases are the chat tool's).
-  const usable = items.filter((l) => loraUsable(l) && l.compatible_with.includes("ltx-2.5"));
+  const usable = items.filter((l) => loraUsable(l) && runsOn(l, "ltx-2.5"));
   const styles = usable.filter((l) => l.kind !== "character");
   const characters = usable.filter((l) => l.kind === "character");
   if (styles.length === 0 && characters.length === 0 && !locked) return [];

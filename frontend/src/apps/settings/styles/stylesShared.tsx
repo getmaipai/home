@@ -40,11 +40,11 @@ export const messageOf = (error: unknown, fallback: string): string => (error in
 export const sizeWords = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : "Size unknown");
 
 /** "Style, Videos, Works at Standard, Boost and Max" and its siblings (settings-media 4.4). */
-export function whatItIs(row: Pick<StyleRow, "kind" | "base_model">): string {
+export function whatItIs(row: Pick<StyleRow, "kind" | "base_model"> & { base_note?: string | null }): string {
   const kind = row.kind === "character" ? "Character" : row.kind === "motion" ? "Motion" : "Style";
   const base: Record<BaseModelId, string> = {
     "ltx-2.5": "Works at Standard, Boost and Max",
-    "ltx-2.3": "Retired video model, no longer available",
+    "ltx-2.3": row.base_note ?? "Made for an older video model, tested on the newer one",
     "wan2.2-ti2v-5b": "Made for the engine behind children's videos, so Home cannot use it",
     unknown: "Waiting for an admin to say what it is made for",
   };

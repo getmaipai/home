@@ -92,7 +92,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                   </Select>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" disabled={!row.usable || row.base_model === "ltx-2.3"} onClick={() => navigate("/apps/videos/create", { state: tryStyleState(row) })}>Try this style</Button>
+                  <Button type="button" disabled={!row.usable} onClick={() => navigate("/apps/videos/create", { state: tryStyleState(row) })}>Try this style</Button>
                   <Button type="button" variant="outline" onClick={() => setAskRemove(true)}>Remove</Button>
                 </div>
               </DialogSection>
@@ -100,12 +100,12 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                 {row.needs_confirmation ? (
                   <Alert><AlertDescription><span className="flex flex-col items-start gap-2">Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style.<Button type="button" size="sm" variant="outline" onClick={() => void act(() => stylesApi.confirmLicence(row.id), "Confirmed.", "Home could not confirm that. Try again.")}>I have read them</Button></span></AlertDescription></Alert>
                 ) : null}
-                <RadioGroup value={who} onValueChange={(v) => setWho(v as StyleWho)} aria-label="Who can use this style" disabled={row.base_model === "ltx-2.3"}>
+                <RadioGroup value={who} onValueChange={(v) => setWho(v as StyleWho)} aria-label="Who can use this style" disabled={!!row.base_note}>
                   {([["admins", "Only admins"], ["adults", "All adults"], ["people", "Chosen people"]] as const).map(([v, text]) => (
                     <div key={v} className="flex items-center gap-2"><RadioGroupItem value={v} id={`se-who-${v}`} disabled={v !== "admins" && row.needs_confirmation} /><Label htmlFor={`se-who-${v}`}>{text}</Label></div>
                   ))}
                 </RadioGroup>
-                {row.base_model === "ltx-2.3" ? <p className="text-sm text-muted-foreground">Retired video model, no longer available</p> : null}
+                {row.base_note ? <p className="text-sm text-muted-foreground">{row.base_note}</p> : null}
                 {who === "people" ? (
                   <PersonMultiSelect ariaLabel="Chosen people" people={adults} value={people} onValueChange={(ids) => { setPeople(ids); void save({ availability: { who: "people", people: ids } }); }} />
                 ) : null}

@@ -12,7 +12,7 @@ import { getCookie } from "hono/cookie";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { consumeTicket, sessionKeyOf } from "@/lib/adultLock";
-import { loraUsable, readLora, readLoras, type LoraSurface } from "@/lib/loras/access";
+import { loraUsable, untestedLine, readLora, readLoras, type LoraSurface } from "@/lib/loras/access";
 import { confirmLora, markAdultOnly, markAllAges, needsConfirmation, patchLora, removeLora, restoreLora } from "@/lib/loras/admin";
 import { LoraWriteError, type Lora } from "@/lib/loras/store";
 import { syncLoras } from "@/lib/loras/sync";
@@ -33,6 +33,8 @@ const Strength = z.object({ default: z.number(), min: z.number(), max: z.number(
 const AdminLoraSchema = z.object({
   id: z.string(), name: z.string(), kind: z.enum(["style", "character", "motion", "other"]), description: z.string(), media: z.enum(["video", "picture"]),
   base_model: z.string(), compatible_with: z.array(z.string()), usable: z.boolean(),
+  base_note: z.string().nullable().describe("LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."),
+  tested_on_25: z.enum(["tested", "no_effect"]).nullable(),
   allow_suggesting: z.boolean(),
   trigger_words: z.array(z.string()), trigger_position: z.enum(["start", "end"]), positive_addins: z.array(z.string()), negative_addins: z.array(z.string()), avoid_as_positive: z.array(z.string()),
   strength: Strength, audience: z.enum(["all-ages", "adult-only"]), availability: z.object({ who: z.enum(["admins", "adults", "people"]), people: z.array(z.string()) }),
@@ -48,7 +50,7 @@ const Locked = z.object({ locked: z.boolean().describe("One tile for every locke
 
 export function adminLoraView(l: Lora): z.infer<typeof AdminLoraSchema> {
   return {
-    id: l.id, name: l.name, kind: l.kind, description: l.description, media: l.media, base_model: l.base_model, compatible_with: l.compatible_with, usable: loraUsable(l), allow_suggesting: loraAllowsSuggesting(l),
+    id: l.id, name: l.name, kind: l.kind, description: l.description, media: l.media, base_model: l.base_model, compatible_with: l.compatible_with, usable: loraUsable(l), base_note: untestedLine(l), tested_on_25: l.tested_on_25 ?? null, allow_suggesting: loraAllowsSuggesting(l),
     trigger_words: l.trigger_words, trigger_position: l.trigger_position, positive_addins: l.positive_addins, negative_addins: l.negative_addins, avoid_as_positive: l.avoid_as_positive,
     strength: l.strength, audience: l.audience, availability: l.availability, needs_confirmation: needsConfirmation(l), adult_check: l.adult_check?.state ?? "unknown", licence: { id: l.licence.id, commercial_use: l.licence.commercial_use },
     file: { sha256: l.file.sha256, bytes: l.file.bytes, rank: l.file.rank }, source: { site: l.source.site, url: l.source.url },

@@ -139,3 +139,31 @@ file) is not offered. Minors and adult-only access for pictures stay as built un
 `POST /api/loras/suggest` matches the typed prompt locally against readable styles' names, trigger words and descriptions. It makes no model or network call, returns up to two matches, and uses the same access function as the picker. A child, teen, guest, spoken or shared surface, unavailable or removed style, unusable style, and locked adult-only style never becomes a candidate. The per-style `allow_suggesting` switch defaults on for all-ages styles and off for adult-only styles; an admin may change it. An adult-only style can be suggested only while that person's live unlock proof grants access.
 
 On the video Create page the kit `prompt_bar.style_suggest` asks the package data scope `style-suggestions` (`q` is the prompt, answered by the same matcher) about half a second after typing stops. Up to two removable chips ("Style: Clay look") show under the prompt. A chip left on adds its id to the Make request; a removed one sends nothing; a style or character the person picked by hand is never replaced; the ids stay out of the address. The chips are hidden while the Styles chip cannot be used at the chosen level, since Make would drop the style anyway.
+
+## Old-base styles on LTX-2.5 (LTXD-18B)
+
+The Stack runs an LTX-2.3 style on an LTX-2.5 clip with a warning, and keeps the bench result on the file as `tested_on_25` (`"tested"`, `"no_effect"` or null).
+Home copies both `tested_on_25` and the derived `untested_on_25` onto the `Lora` record (`recordFromStack`, and every `syncLoras` pass replaces the copy, so the Stack stays
+the one owner of the mark). The offer rule is `loraUsable` in `lib/loras/access.ts`, read by the Create picker (`styleChips`), the chat tool's names (`listableStyleNames`,
+the tool spec), suggestions and the id and name resolver (`resolveStyles`):
+
+| Style | Offered by default | Library (admin) |
+|---|---|---|
+| made for LTX-2.5 | yes | yes |
+| LTX-2.3, `tested_on_25` = `tested` | yes (runs on 2.5 through `runsOn`) | yes |
+| LTX-2.3, not tested | no | yes, with "Made for an older video model. It is untested on the newer one, so it is not offered yet." |
+| LTX-2.3, `no_effect` | never (the Stack refuses it with 422 `lora_no_effect`) | yes, with "...showed no change, so it is not used." |
+
+The library line is `base_note` on the admin view (`untestedLine`), drawn in the style editor's existing muted line; no banner is added. A clip's `lora_warnings` from the
+Stack are joined into the job's `request.create.note`, the same muted line the cut-length note already uses. A refusal reaches the person inside the failed job's own error
+line, written by `plainVideoFailure` from the Stack's plain text.
+
+To mark Claymation tested once a hub has the file (on the hub's machine, after `GET /stack/v1/video/loras` shows its `id` with `untested_on_25: true`; `<id>` is that id):
+
+```
+curl -sS -X PATCH http://127.0.0.1:8770/stack/v1/video/loras/<id> -H 'content-type: application/json' -d '{"tested_on_25":"tested"}'
+```
+
+The reply shows `"tested_on_25":"tested","untested_on_25":false`. Home picks the mark up on its next sync (within 10 seconds) and the style appears in the picker. Send
+`{"tested_on_25":"no_effect"}` for a file whose bench clip did not change, and `{"tested_on_25":null}` to clear a mark. The Stack answers 422 `bad_mark` for a record that
+is not LTX-2.3. Changing a file's base model clears its mark.

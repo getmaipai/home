@@ -610,7 +610,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/llmSupervisor.ts` | __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, setWarmupPrompt, sweepOrphanEngineProcesses, reportChatBackendUnreachable |
 | `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
-| `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
+| `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
 | `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, NO_EVIDENCE, cleanTriggerWords |
 | `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, INSTALLABLE_BASE_IDS, installableBaseIds, mediaOfBase |

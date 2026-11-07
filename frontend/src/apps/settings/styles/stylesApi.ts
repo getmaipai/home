@@ -10,7 +10,7 @@ export type BaseModelId = "ltx-2.3" | "ltx-2.5" | "wan2.2-ti2v-5b" | "unknown";
 export interface StyleStrength { default: number; min: number; max: number }
 /** One style as an owner or admin sees it once the lock is open (the server sends a locked style as nothing but the list's `locked` flag). */
 export interface StyleRow {
-  id: string; name: string; kind: StyleKind; description: string; media: "video" | "picture"; base_model: BaseModelId; compatible_with: string[]; usable: boolean;
+  id: string; name: string; kind: StyleKind; description: string; media: "video" | "picture"; base_model: BaseModelId; compatible_with: string[]; usable: boolean; /** LTXD-18B: the library line for an old-base style that is not offered; null otherwise. */ base_note?: string | null; tested_on_25?: "tested" | "no_effect" | null;
   trigger_words: string[]; trigger_position: "start" | "end"; positive_addins: string[]; negative_addins: string[]; avoid_as_positive: string[];
   strength: StyleStrength; audience: "all-ages" | "adult-only"; availability: { who: StyleWho; people: string[] };
   needs_confirmation: boolean; adult_check: AdultCheckState; licence: { id: string | null; commercial_use: string };
@@ -73,4 +73,4 @@ export const stylesApi = {
   addFile: (form: FormData) => requestJson<{ id: string }>("/api/videos/adapters", { method: "POST", body: form }),
 };
 
-export const BASE_WORDS: Record<BaseModelId, string> = { "ltx-2.5": "LTX-2.5", "ltx-2.3": "Retired video model, no longer available", "wan2.2-ti2v-5b": "Wan", unknown: "an unknown base" };
+export const BASE_WORDS: Record<BaseModelId, string> = { "ltx-2.5": "LTX-2.5", "ltx-2.3": "Older video model (LTX 2.3)", "wan2.2-ti2v-5b": "Wan", unknown: "an unknown base" };
