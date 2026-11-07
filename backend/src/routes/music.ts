@@ -24,10 +24,11 @@ import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "@/lib/music/ready";
 import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, readMusicFile, resolveSongSource, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { authorizeTier, maxOffered } from "@/lib/tiers";
-import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareMusicEdit, prepareOwnedMusicEdit, runGenerateMusic, startOwnedMusicPartsJob, type MusicToolInput } from "@/lib/music/tool";
+import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareOwnedMusicEdit, runGenerateMusic, startOwnedMusicPartsJob, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { likenessRefusal } from "@/lib/likeness";
+import { runSongEdit } from "@/lib/music/songEdit";
 import { StackMusicError } from "@/lib/music/stack";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
@@ -248,25 +249,13 @@ const reviseRoute = createRoute({ method: "post", path: "/jobs/{id}/revise", tag
   request: { params, body: { content: { "application/json": { schema: z.object({ change: z.string().trim().min(3).max(600), file_id: z.string().min(1).max(80).optional() }) } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(reviseRoute, async (c) => {
-  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { change, file_id } = c.req.valid("json");
-  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId) : [];
-  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
-  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  const engine = await musicEngineStatus();
-  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
-  const description = `${source.request.description.trim()}. Change: ${change}`.slice(0, 1200);
-  const plan = prepareMusicEdit(source, { track: source.fileId!, change: "remake", description }, engine!.limits);
-  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
-  // The revised prompt is the source of truth for both the stored request and the Stack body.
-  plan.request.description = description;
-  plan.body.caption = description;
-  const refusal = refuseMusicPrompt([description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "));
-  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
-  { const likeness = likenessRefusal(actor, [description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
-  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
-  try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
-  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
-  return c.json(await musicCardView(actor, root), 200);
+  const actor = c.get("person"); const { change, file_id } = c.req.valid("json");
+  let description = "";
+  const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id,
+    input: (source) => { description = `${source.request.description.trim()}. Change: ${change}`.slice(0, 1200); return { change: "remake", description }; },
+    // The revised prompt is the source of truth for both the stored request and the Stack body.
+    patch: (plan) => { plan.request.description = description; plan.body.caption = description; } });
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
 });
 // MUSIC-STUDIO-SONG: the Make a song page. It runs the same runGenerateMusic path as the generate_music tool, in a chat of its own
 // (so the song shows in chat history like any song made there), and answers with the song card the page polls.
@@ -349,22 +338,10 @@ const detailsRoute = createRoute({ method: "post", path: "/jobs/{id}/details", t
     bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).regex(/^[A-G][#b]?\s?(major|minor|maj|min|m)?$/i).optional(), file_id: z.string().min(1).max(80).optional() }) } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(detailsRoute, async (c) => {
-  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id, ...changes } = c.req.valid("json");
+  const actor = c.get("person"); const { file_id, ...changes } = c.req.valid("json");
   if (!Object.values(changes).some((v) => v !== undefined)) return c.json({ error: "Change at least one thing: the title, the words, the style, the tempo or the key." }, 422) as never;
-  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
-  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
-  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  const engine = await musicEngineStatus();
-  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
-  const plan = prepareMusicEdit(source, { track: source.fileId!, change: "remake", ...changes }, engine!.limits);
-  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
-  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "));
-  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
-  { const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
-  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
-  try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
-  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
-  return c.json(await musicCardView(actor, root), 200);
+  const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, skipStems: true, input: () => ({ change: "remake", ...changes }) });
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
 });
 const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags: ["Music"], summary: "Split the shown song into stems", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80).optional() }) } } } },
@@ -506,53 +483,26 @@ const lengthRoute = createRoute({ method: "post", path: "/jobs/{id}/length", tag
   request: { params, body: { content: { "application/json": { schema: z.object({ length: z.enum(["quick", "full"]), file_id: z.string().min(1).max(80).optional() }) } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(lengthRoute, async (c) => {
-  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { length, file_id } = c.req.valid("json");
-  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId) : [];
-  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
-  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  const engine = await musicEngineStatus();
-  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
-  const plan = prepareMusicEdit(source, { track: source.fileId!, change: length === "full" ? "make_full" : "make_quick" }, engine!.limits);
-  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
-  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
-  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
-  { const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
-  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
-  try {
-    await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId });
-  } catch (error) {
-    return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never;
-  }
-  return c.json(await musicCardView(actor, root), 200);
+  const actor = c.get("person"); const { length, file_id } = c.req.valid("json");
+  const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, input: () => ({ change: length === "full" ? "make_full" : "make_quick" }) });
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
 });
 // Make it Boost / Make it Standard (TIER-HOME-03): the same song made again with the engine's Detailed or Quick maker, as a new version on the same card.
 const qualityRoute = createRoute({ method: "post", path: "/jobs/{id}/quality", tags: ["Music"], summary: "Make the shown song again at Standard, Boost or Max", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ tier: z.enum(["standard", "boost", "max"]), file_id: z.string().min(1).max(80).optional() }) } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(qualityRoute, async (c) => {
-  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { tier, file_id } = c.req.valid("json");
-  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId) : [];
-  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
-  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  const engine = await musicEngineStatus();
-  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  const actor = c.get("person"); const { tier, file_id } = c.req.valid("json");
   const granted = authorizeTier({ person: actor, category: "music", requested: tier }).tier;
-  if (tier === "boost" && (granted !== "boost" || !engine!.quality.includes("detailed"))) return c.json({ error: "A better maker is not available for this song. Make it again at Standard." }, 422) as never;
-  const plan = prepareMusicEdit(source, { track: source.fileId!, change: "remake" }, engine!.limits);
-  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
-  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
-  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
-  { const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" ")); if (likeness) return c.json({ error: likeness }, 403) as never; }
-  if (tier === "max" && (granted !== "max" || !musicMaxOffered(engine))) return c.json({ error: "Max is not available for this song. Make it again at Boost or Standard." }, 422) as never;
-  if (tier === "max" && !musicMaxInstalled(engine)) return c.json({ error: MUSIC_MAX_NOT_INSTALLED_LINE }, 422) as never;
-  plan.request.quality = musicQualityFor(engine, tier); plan.request.tier = musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
-  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
-  try {
-    await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId });
-  } catch (error) {
-    return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never;
-  }
-  return c.json(await musicCardView(actor, root), 200);
+  const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, input: () => ({ change: "remake" }),
+    beforePlan: (engine) => tier === "boost" && (granted !== "boost" || !engine.quality.includes("detailed")) ? { status: 422, error: "A better maker is not available for this song. Make it again at Standard." } : null,
+    extraChecks: (plan, engine) => {
+      if (tier === "max" && (granted !== "max" || !musicMaxOffered(engine))) return { status: 422, error: "Max is not available for this song. Make it again at Boost or Standard." };
+      if (tier === "max" && !musicMaxInstalled(engine)) return { status: 422, error: MUSIC_MAX_NOT_INSTALLED_LINE };
+      plan.request.quality = musicQualityFor(engine, tier); plan.request.tier = musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
+      return null;
+    } });
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.error }, result.status) as never;
 });
 /** Audio seeking uses the one Range server (`serveBytes`); the slice is read from the file on demand. */
 function audioResponse(file: MusicFileHandle, rangeHeader?: string): Response {
