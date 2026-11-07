@@ -80,13 +80,16 @@ const ARMS = (() => {
   const at = process.argv.indexOf("--arms");
   if (at < 0) return null;
   const list = (process.argv[at + 1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  for (const a of list) if (!["A", "A2", "AP", "AT", "APT", "APM", "B"].includes(a)) throw new Error(`--arms: unknown arm ${a}`);
+  for (const a of list) if (!["A", "A2", "AL", "AP", "AT", "APT", "APM", "B"].includes(a)) throw new Error(`--arms: unknown arm ${a}`);
   return list as Arm[];
 })();
+// I18N-C1: MAIPAI_AB_ITEMS names a file of {items:[{id,category,prompt}]} that replaces the shipped single-turn items for this run
+// (the Spanish adult set); MAIPAI_AB_LOCALE sets household.locale so arm B builds the prompt for that locale.
+const SINGLE_ITEMS: typeof dataset.items = process.env.MAIPAI_AB_ITEMS ? (JSON.parse(readFileSync(process.env.MAIPAI_AB_ITEMS, "utf-8")) as { items: typeof dataset.items }).items : dataset.items;
 const SEARCH_PACE_MS = 30_000;
 const MAX_TOKENS = 1536;
 
-type Arm = "A" | "A2" | "AP" | "AT" | "APT" | "APM" | "B" | "C" | "S";
+type Arm = "A" | "A2" | "AL" | "AP" | "AT" | "APT" | "APM" | "B" | "C" | "S";
 type Category = "knowledge" | "reasoning" | "formatting" | "writing" | "world" | "multiturn" | "fresh";
 
 interface SearchQuery {
@@ -191,7 +194,7 @@ function render(runs: RunRecord[], env: unknown): string {
       if (turn !== null && ![1, 8, 9].includes(turn)) continue;
       const first = forItem.find((r) => r.turn === turn && r.rep === 1) ?? forItem.find((r) => r.turn === turn)!;
       lines.push(turn === null ? `**Prompt:** ${first.prompt}` : `**Turn ${turn} prompt:** ${first.prompt}`, "");
-      for (const arm of ["A", "A2", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
+      for (const arm of ["A", "A2", "AL", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
         const r = forItem.find((x) => x.arm === arm && x.turn === turn && x.rep === 1);
         if (!r) continue;
         const meta = `${r.words} words, TTFT ${fmt(r.ttftMs)} ms, total ${fmt(r.totalMs)} ms, finish ${r.finishReason ?? "n/a"}` + (r.correct !== null ? `, contains expected answer: ${r.correct}` : "") + (r.factsRecalled ? `, facts recalled: ${r.factsRecalled.filter((f) => f.recalled).length}/${r.factsRecalled.length}` : "") + (r.stream ? `, first word ${fmt(r.stream.firstWordMs)} ms, cue ${fmt(r.stream.spokenCueMs)} ms, searched ${r.stream.searched}` : "") + (r.b ? `, model calls ${r.b.engineRequests}, search fired ${r.b.searchFired}${r.b.searchForced ? " (forced)" : ""}` : "") + (r.error ? `, ERROR: ${r.error}` : "");
@@ -204,7 +207,7 @@ function render(runs: RunRecord[], env: unknown): string {
   lines.push("Medians over every run of the category (single-turn items: 2 runs each; multi-turn: all 9 turns of both scripts). Checkable-correct counts the reasoning items only. Multi-turn recall counts stated facts recalled at turns 8 and 9 (3 facts x 2 scripts = 6 per turn).", "");
   lines.push("| Category | Arm | Runs | Median words | Median TTFT ms | Median total ms | Checkable correct | Recall turn 8 | Recall turn 9 |", "|---|---|---:|---:|---:|---:|---|---|---|");
   for (const category of ["knowledge", "reasoning", "formatting", "writing", "world", "multiturn", "fresh"] as Category[]) {
-    for (const arm of ["A", "A2", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
+    for (const arm of ["A", "A2", "AL", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
       const rs = runs.filter((r) => r.category === category && r.arm === arm);
       if (rs.length === 0) continue;
       const ok = rs.filter((r) => r.error === null);
@@ -422,6 +425,7 @@ const { startBench, finishBench } = setup;
 const runner = await import("./conversationRunner");
 const { benchChatSampling } = await import("@/lib/benchSampling");
 const { setHouseholdSettingValue } = await import("@/lib/settings");
+const { LANGUAGE_LINES } = await import("@/lib/turnMachine/languageLine");
 
 // ==== arms A and A2 ====
 
@@ -679,6 +683,10 @@ async function main(): Promise<void> {
     const applied = setHouseholdSettingValue(key, value as never);
     if (!applied.ok) throw new Error(`could not set ${key}: ${applied.error}`);
   }
+  if (process.env.MAIPAI_AB_LOCALE) {
+    const located = setHouseholdSettingValue("household.locale", process.env.MAIPAI_AB_LOCALE as never);
+    if (!located.ok) throw new Error(`could not set household.locale: ${located.error}`);
+  }
   const set = setHouseholdSettingValue("search.searxng_url", teeUrl);
   if (!set.ok) throw new Error(`could not point search at the tee: ${set.error}`);
 
@@ -794,7 +802,7 @@ async function main(): Promise<void> {
       const armLoads = loadavg();
       const armStart = { one: armLoads[0]!, five: armLoads[1]!, fifteen: armLoads[2]!, uptimeSeconds: uptime() };
       console.log(`[chat-ab-01] starting arm ${arm}; uptime ${Math.round(armStart.uptimeSeconds)} s; load ${armStart.one.toFixed(2)} ${armStart.five.toFixed(2)} ${armStart.fifteen.toFixed(2)}`);
-      for (const item of dataset.items.filter((i) => wanted(i.id))) {
+      for (const item of SINGLE_ITEMS.filter((i) => wanted(i.id))) {
         const category = item.category as Category;
         for (let rep = 1; rep <= SINGLE_RUNS; rep++) {
           console.log(`[chat-ab-01] block ${arm} ${item.id} run ${rep}`);
@@ -815,7 +823,10 @@ async function main(): Promise<void> {
           } else {
             const withP = arm === "AP" || arm === "APT" || arm === "APM";
             const withT = arm === "AT" || arm === "APT" || arm === "APM";
-            const messages = [...(withP ? captured.system : []), { role: "user", content: item.prompt }];
+            // AL (I18N-C1): A2 plus the one fixed language line for MAIPAI_AB_LOCALE as the only system message, the bare model given the same line Home sends.
+            const languageLine = arm === "AL" ? (Object.hasOwn(LANGUAGE_LINES, process.env.MAIPAI_AB_LOCALE ?? "") ? LANGUAGE_LINES[process.env.MAIPAI_AB_LOCALE!] : undefined) : undefined;
+            if (arm === "AL" && !languageLine) throw new Error("arm AL needs MAIPAI_AB_LOCALE set to a locale with a language line (es)");
+            const messages = [...(languageLine ? [{ role: "system", content: languageLine }] : []), ...(withP ? captured.system : []), { role: "user", content: item.prompt }];
             const tools = arm === "APM" ? captured.tools.map((tool) => {
               const copy = structuredClone(tool) as { function: { name: string; description: string; parameters: unknown } };
               const concise: Record<string, string> = {
@@ -849,7 +860,7 @@ async function main(): Promise<void> {
       }
     }
   }
-  if (GROUP === "adult" && !ARMS) for (const item of dataset.items.filter((i) => wanted(i.id))) {
+  if (GROUP === "adult" && !ARMS) for (const item of SINGLE_ITEMS.filter((i) => wanted(i.id))) {
     const category = item.category as Category;
     for (let rep = 1; rep <= SINGLE_RUNS; rep++) {
       for (const arm of ["A", "A2", "B"] as Arm[]) {

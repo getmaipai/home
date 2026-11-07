@@ -1,0 +1,14 @@
+{
+  "id": "chat-ab-01-es",
+  "note": "I18N-C1: Spanish adult written set. Search-free questions of the shipped categories; run with MAIPAI_AB_LOCALE=es MAIPAI_AB_ITEMS=<this file> and --arms AL,B (AL is the bare model given the same fixed language line).",
+  "items": [
+    { "id": "es-k1-heat-pump", "category": "knowledge", "prompt": "¿Cómo funciona una bomba de calor y por qué gasta menos que una calefacción eléctrica normal?" },
+    { "id": "es-k2-seasons", "category": "knowledge", "prompt": "¿Por qué hay estaciones del año?" },
+    { "id": "es-r1-trains", "category": "reasoning", "prompt": "Un tren sale a las 9:15 y tarda 2 horas y 50 minutos. ¿A qué hora llega?" },
+    { "id": "es-f1-checklist", "category": "formatting", "prompt": "Dame una lista de cinco cosas que revisar antes de salir de viaje en coche." },
+    { "id": "es-w1-story", "category": "writing", "prompt": "Escribe un cuento corto sobre un faro que se queda sin luz una noche de tormenta." },
+    { "id": "es-w2-email", "category": "writing", "prompt": "Ayúdame a escribir un correo para pedir a mi casero que arregle el grifo de la cocina." },
+    { "id": "es-k3-sleep", "category": "knowledge", "prompt": "Explícame qué pasa en el cuerpo mientras dormimos." },
+    { "id": "es-f2-recipe", "category": "writing", "prompt": "¿Cómo hago una tortilla de patatas jugosa?" }
+  ]
+}

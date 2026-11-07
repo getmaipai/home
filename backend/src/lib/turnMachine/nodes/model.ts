@@ -939,7 +939,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // RESEARCH-PIPELINE-01: the question the stages work on (an answer to our clarifying question reads as the original question).
   const rq = researching ? researchQuestion(state.messages, input.utterance) : input.utterance;
   const continuing = researching && state.outcomes.length > 0 && toolsAllowed && !input.retry;
-  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName);
+  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName, state.languageLine);
   if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
   let tools: ToolSpec[];
   let tool_choice: "auto" | "none" | undefined;

@@ -544,7 +544,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const thinking = state.budget.thinking_budget_tokens > 0 && reasoning.emit;
   const summaryItem: ContextItem[] = preview.summaryLine ? [{ id: "window-system-summary", text: preview.summaryLine, source: "window", subjects: [], disclosure: "child_ok" }] : [];
   const toolsFor = (ids: readonly string[]) => ids.slice().sort().map((id) => toolSpecFor(id, laneOfPerson(state.actor), state)).filter((t): t is NonNullable<typeof t> => t !== null);
-  const countWithTools = (tools: ReturnType<typeof toolsFor>) => countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName), { tools });
+  const countWithTools = (tools: ReturnType<typeof toolsFor>) => countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName, state.languageLine), { tools });
   let tools = toolsFor(state.budget.tools_offered);
   let rest = await countWithTools(tools);
   // AUDIO-PARITY-01: the two voice tools are the newest, so on a small window they give way before the tools block (and with it search) is dropped by THIN-3G below.
@@ -580,7 +580,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // written chat offer a new chat carrying the summary; a spoken turn
     // never hears it and answers from the message alone.
     const core = items.filter((item) => item.source === "utterance" || item.source === "attachment" || item.source === "profile" || item.source === "roster");
-  const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName));
+  const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName, state.languageLine));
     const withSummary = await countCore(true);
     const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await countCore(false);
     const written = surfaceClass === "written";

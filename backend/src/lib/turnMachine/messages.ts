@@ -209,7 +209,7 @@ function isStableContext(source: ContextItem["source"]): boolean {
  * prefix NEXT-CACHE-01 needed. The plan line follows labelled context
  * and precedes the raw words, as the approved CHAT-LATE-SYSTEM-01
  * verdict requires for every model and surface class. */
-export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = [], cutAfterMemory = false, topicBlock = "", identityName?: string): LlmMessage[] {
+export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = [], cutAfterMemory = false, topicBlock = "", identityName?: string, languageLine = ""): LlmMessage[] {
   // VISION-02c: pictures ride with the person's raw words on the final
   // user message; the labelled text section never replaces the image parts.
   const windowItems = context.filter((item) => item.source === "window");
@@ -248,7 +248,8 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // role "system" on every surface class; the coordinator's own
   // follow-up ruling named the volatile message's own plan line as the
   // real suspect instead - see below.
-  messages.push({ role: "system", content: `${buildStablePrefix(persona, promptSurfaceClass, topicBlock, identityName)}${stableContextLines}` });
+  // I18N-C1: the fixed language line closes the stable prefix (after the persona sections and the topic block), ahead of the stable context lines. turnNext.ts decides it once per turn; "" for every English locale and every turn that is not a written adult one, and a bare turn never reaches this function.
+  messages.push({ role: "system", content: `${buildStablePrefix(persona, promptSurfaceClass, topicBlock, identityName)}${languageLine ? `\n\n${languageLine}` : ""}${stableContextLines}` });
   // The window already alternates user/assistant/tool roles correctly
   // (buildConversationWindow()'s own job); this machine never rebuilds
   // that ordering, only replays the window's own roles verbatim.

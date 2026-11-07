@@ -283,6 +283,8 @@ export interface TurnState {
   persona: Persona;
   /** MINOR-TOPICS-01c: the sensitive-subject prompt block, decided once per turn; "" for an adult. */
   topicBlock: string;
+  /** I18N-C1: the fixed language line (languageLine.ts), decided once per turn; "" unless this is a written adult turn in a locale with an entry. */
+  languageLine?: string;
   plan: ReplyPlan;
   /** U4c: the exact non-evidence `planFor()` inputs `turnNext.ts`
    * resolved once, up front (signal, surface, surfaceClass, companion,

@@ -1078,6 +1078,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/documents.ts` | attachDocuments |
 | `backend/src/lib/turnMachine/entityPin.ts` | __setEntityPinForTests, articleFromBlocks, articleFromExtract, defaultCandidateFinder, pickPrompt, parsePickDetail |
 | `backend/src/lib/turnMachine/fabrication.ts` | NOT_IN_SOURCES, withoutLabels, SENTENCE_BREAK, SENTENCE_OR_LINE_BREAK, squashText, namesIn |
+| `backend/src/lib/turnMachine/languageLine.ts` | LANGUAGE_LINES, languageLineFor |
 | `backend/src/lib/turnMachine/machine.ts` | turnMachine |
 | `backend/src/lib/turnMachine/messages.ts` | contextToMessages, bareMessages, continuationMessages |
 | `backend/src/lib/turnMachine/nodes/answer.ts` | PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine, __setClaimJudgeForTests |

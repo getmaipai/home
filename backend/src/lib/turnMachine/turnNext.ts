@@ -52,13 +52,15 @@ import { FAILURE_COPY } from "@/lib/failureCopy";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
-import { surfaceClassOf } from "@/lib/surfaceClass";
+import { isWrittenAdultTurn, surfaceClassOf } from "@/lib/surfaceClass";
+import { languageLineFor } from "@/lib/turnMachine/languageLine";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
 import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "./messages";
 import { topicBlockForTurn } from "@/lib/topicPrompt";
+import { resolveLocale } from "@/lib/locale";
 import type { ContextSegmentKey } from "@/wire";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes, videoForOutcomes, filmForOutcomes, musicForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
@@ -278,8 +280,8 @@ export function answeredByFor(persona: Persona, via: import("@/wire").AnsweredBy
 async function measuredContextSegments(state: TurnState): Promise<Partial<Record<ContextSegmentKey, number>> | undefined> {
   if (state.bare || state.generations.length === 0) return undefined;
   try {
-  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName);
-  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true, state.topicBlock, state.robotName);
+  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName, state.languageLine);
+  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true, state.topicBlock, state.robotName, state.languageLine);
   const windowEnd = 1 + state.context.filter((item) => item.source === "window").length;
   const [prefix, withTools, withHistory, withMemory] = await Promise.all([
     countTokens(base.slice(0, 1)),
@@ -720,6 +722,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     persona,
     answerVia,
     topicBlock: topicBlockForTurn(actor, band),
+    languageLine: isWrittenAdultTurn(surfaceClass, band) ? languageLineFor(resolveLocale(actor), surfaceClass, band) : "",
     plan,
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
