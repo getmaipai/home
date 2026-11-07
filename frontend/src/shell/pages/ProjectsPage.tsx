@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { EmptyState, EmptyStateGreeting } from "@maipai/ui/src/elements/empty-state";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { formatRelative } from "@maipai/ui/src/relativeTime";
+import { formatRelative } from "@/lib/time";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";

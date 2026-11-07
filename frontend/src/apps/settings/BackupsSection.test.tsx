@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
 import type { BackupInfo, PendingRestore, Roster } from "@/lib/api";
 import { waitForGone } from "../../../tests/waitForGone";
+import { formatDateTime } from "@/lib/format";
 
 afterEach(cleanup);
 
@@ -147,7 +148,7 @@ describe("restoring a backup", () => {
     try {
       const { findByText } = render(<BackupsSection person={makePerson("owner")} />);
       const banner = await findByText(/will replace everything in MaiPai Home/);
-      expect(banner.textContent).toContain(new Date(BACKUPS[0]!.createdAt).toLocaleString());
+      expect(banner.textContent).toContain(formatDateTime(BACKUPS[0]!.createdAt));
       expect(banner.textContent).not.toContain(new Date(pending.stagedAt).toLocaleString());
     } finally {
       restore();

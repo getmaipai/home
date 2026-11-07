@@ -24,6 +24,7 @@ import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { useTabItem } from "@/shell/tabIdentity";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDate, formatTime } from "@/lib/format";
 
 
 function statusText(device: DeviceInfo): string {
@@ -37,7 +38,7 @@ function robotOnline(device: DeviceInfo): boolean {
 }
 
 function robotLastSeen(device: DeviceInfo): string {
-  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(device.lastSeenAt!));
+  return formatTime(device.lastSeenAt!);
 }
 
 /** ROBOT-ADMIN-PLACE-01: Home settings, Devices. The list opens a robot's route detail. Admin only; the section's area gate and the hub enforce it. */
@@ -147,13 +148,13 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
       <div className="flex flex-col gap-4">
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         {activeTab === "overview" ? <>
-        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._(softwareQuery.data.checkin.ip ? { id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen)), ip: softwareQuery.data.checkin.ip } } : { id: "Last seen {format}", message: "Last seen {format}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen)) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(device.lastSeenAt)) } })}</> : null}</p>
+        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._(softwareQuery.data.checkin.ip ? { id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }), ip: softwareQuery.data.checkin.ip } } : { id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(device.lastSeenAt, { dateStyle: "medium", timeStyle: "short" }) } })}</> : null}</p>
         <RobotSelfTests device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading={i18n._({ id: "Software", message: "Software" })}>
           <ItemGroup variant="card" aria-label={i18n._({ id: "Robot software", message: "Robot software" })}>
             <Item size="setting">
               <ItemContent><ItemTitle>{i18n._({ id: "Connection", message: "Connection" })}</ItemTitle><ItemDescription>{softwareQuery.data.checkin || softwareQuery.data.lastSeenAt
-                ? [softwareQuery.data.checkin?.online ? null : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!)) } }),
+                ? [softwareQuery.data.checkin?.online ? null : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: formatTime(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!) } }),
                   softwareQuery.data.checkin?.signal ? i18n._({ id: "Wi-Fi {signal}", message: "Wi-Fi {signal}", values: { signal: softwareQuery.data.checkin.signal } }) : null,
                   softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? (softwareQuery.data.checkin.battery.charging ? i18n._({ id: "Battery {level}%, charging", message: "Battery {level}%, charging", values: { level: softwareQuery.data.checkin.battery.level } }) : i18n._({ id: "Battery {level}%", message: "Battery {level}%", values: { level: softwareQuery.data.checkin.battery.level } })) : null,
                   softwareQuery.data.checkin?.ip ? i18n._({ id: "IP address {ip}", message: "IP address {ip}", values: { ip: softwareQuery.data.checkin.ip } }) : null].filter(Boolean).join(" · ") || i18n._({ id: "No connection details reported.", message: "No connection details reported." })
@@ -164,7 +165,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
               <ItemContent>
                 <ItemTitle>{i18n._({ id: "Robot firmware", message: "Robot firmware" })}</ItemTitle>
                 <ItemDescription>{softwareQuery.data.firmware.installed
-                  ? i18n._({ id: "Installed {version}, recorded {date}. Ready to install: {available}.", message: "Installed {version}, recorded {date}. Ready to install: {available}.", values: { version: softwareQuery.data.firmware.installed.version, date: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(softwareQuery.data.firmware.installed.at)), available: softwareQuery.data.firmware.available } })
+                  ? i18n._({ id: "Installed {version}, recorded {date}. Ready to install: {available}.", message: "Installed {version}, recorded {date}. Ready to install: {available}.", values: { version: softwareQuery.data.firmware.installed.version, date: formatDate(softwareQuery.data.firmware.installed.at, { month: "short", day: "numeric" }), available: softwareQuery.data.firmware.available } })
                   : i18n._({ id: "Not recorded. Ready to install: {available}. Install the update from here to keep track.", message: "Not recorded. Ready to install: {available}. Install the update from here to keep track.", values: { available: softwareQuery.data.firmware.available } })}</ItemDescription>
               </ItemContent>
               <Badge variant="secondary">{softwareQuery.data.firmware.status === "up_to_date" ? i18n._({ id: "Up to date", message: "Up to date" }) : softwareQuery.data.firmware.status === "update_available" ? i18n._({ id: "Update available", message: "Update available" }) : i18n._({ id: "Unknown", message: "Unknown" })}</Badge>

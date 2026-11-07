@@ -1,4 +1,3 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +15,7 @@ import { api, type NotificationDeliveryView } from "@/lib/api";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import { getIcon } from "@maipai/ui/src/icons";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDateTime } from "@/lib/format";
 
 /** The page's one icon choice; the header title reads it too. */
 export const NotificationsIcon = getIcon("bell");
@@ -23,7 +23,7 @@ export const NotificationsIcon = getIcon("bell");
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 function whenText(iso: string): string {
-  return new Date(iso).toLocaleString(activeLocale());
+  return formatDateTime(iso);
 }
 
 // "The thirty-day history page" (session E step 5). GET /api/notifications

@@ -66,9 +66,12 @@ function AliasRedirect({ path, person }: { path: string; person: SignedInPerson 
 /** Strings read through the global `i18n._`, so a language switch remounts the tree below once (the URL, the session lock and server data
  * stay; local screen state resets) and every string on the screen updates without a reload. */
 /** Activates the person's language (the signed-out page's, before one is known). It needs the query client, so it sits inside the provider. */
-function PersonLocale({ person }: { person: SignedInPerson | null | undefined }) {
-  usePersonLocale(person, !__SETUP_PREVIEW__);
-  return null;
+export function PersonLocale({ person, children }: { person: SignedInPerson | null | undefined; children: ReactNode }) {
+  // Nothing below draws until the first language is active: /setup, the sign-in page and a full page load all start in the
+  // household's or the person's language, not in English that flips a moment later (and remounts the page).
+  const ready = usePersonLocale(person, !__SETUP_PREVIEW__);
+  if (ready) return <>{children}</>;
+  return <div className="flex h-screen items-center justify-center"><Progress mode="spinner" label={i18n._({ id: "Loading MaiPai Home", message: "Loading MaiPai Home" })} /></div>;
 }
 
 function LocaleKey({ children }: { children: ReactNode }) {
@@ -131,7 +134,7 @@ export function App() {
     <ErrorBoundary>
       <I18nProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
-          <PersonLocale person={person} />
+          <PersonLocale person={person}>
           <ToastProvider>
             <TooltipProvider>
               <SessionLockGate person={person ?? null}>
@@ -204,6 +207,7 @@ export function App() {
               </SessionLockGate>
             </TooltipProvider>
           </ToastProvider>
+          </PersonLocale>
         </QueryClientProvider>
       </I18nProvider>
     </ErrorBoundary>

@@ -1,6 +1,6 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
+import { formatDate } from "@/lib/format";
 
 export const LIST_ICONS = ["cart", "check", "sparkle", "briefcase", "home", "heart", "book", "star", "gift", "plane", "leaf", "sun"] as const;
 export type ListIcon = typeof LIST_ICONS[number];
@@ -23,5 +23,5 @@ export function itemCount(list: ListRecord): number {
 }
 
 export function dueLabel(value: string): string {
-  return new Intl.DateTimeFormat(activeLocale(), { weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  return formatDate(value, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }

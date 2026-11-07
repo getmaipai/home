@@ -28,6 +28,7 @@ import { api, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/l
 import { useTabItem } from "@/shell/tabIdentity";
 import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDateTime } from "@/lib/format";
 
 /** /updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through the kit's
@@ -69,7 +70,7 @@ function toRow(row: UpdateRow): Row {
     name: row.detail ? `${row.name} (${row.detail.charAt(0).toLowerCase()}${row.detail.slice(1)})` : row.name,
     installed: row.installed ?? (row.kind === "robot" ? i18n._({ id: "Unknown", message: "Unknown" }) : "-"),
     available: row.available ?? (row.kind === "engine" ? i18n._({ id: "Unknown", message: "Unknown" }) : "-"),
-    lastChecked: row.lastChecked ? new Date(row.lastChecked).toLocaleString() : i18n._({ id: "Never", message: "Never" }),
+    lastChecked: row.lastChecked ? formatDateTime(row.lastChecked) : i18n._({ id: "Never", message: "Never" }),
     status: statusFor(row),
   };
 }

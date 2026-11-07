@@ -52,6 +52,7 @@ import { api, type StructuredPart, type TurnStats, type ProjectView } from "@/li
 import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, AskFormSubmitContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { parseTurnAsk, ASK_FORM_SUBMIT_TEXT, type AskAnswerArm, type AskFormValues, type AskSettled } from "@/apps/chat/chatAsk";
 import { faviconUrl } from "@/apps/chat/chatThreadSlots";
+import { formatTime, formatUnit } from "@/lib/format";
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
 // almanac-date's own structured result (chatModelAdapter.ts's own
@@ -152,7 +153,7 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
   const ShieldCheckIcon = getIcon("shield-check");
   const createdAtDate = createdAt instanceof Date ? createdAt : createdAt ? new Date(createdAt) : undefined;
   const waitingSince = createdAtDate && !Number.isNaN(createdAtDate.getTime())
-    ? ` Waiting since ${createdAtDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    ? ` Waiting since ${formatTime(createdAtDate)}`
     : "";
   return (
     <ApprovalCard
@@ -495,14 +496,14 @@ export const ToolTimelineIcon = getIcon("wrench");
 export function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | undefined, siteCount = 0): string {
   const totalTimeMs = stats?.total_time_ms;
   // RESEARCH-TIER-01: counts only ("5 steps, 12 sites"), never a query or an address.
-  const sites = siteCount > 0 ? `, ${siteCount} site${siteCount === 1 ? "" : "s"}` : "";
-  if (totalTimeMs == null) return `${stepCount} tool call${stepCount === 1 ? "" : "s"}${sites}`;
+  const sites = siteCount;
+  if (totalTimeMs == null) return i18n._({ id: "{count, plural, one {# tool call} other {# tool calls}}{sites, plural, =0 {} one {, # site} other {, # sites}}", message: "{count, plural, one {# tool call} other {# tool calls}}{sites, plural, =0 {} one {, # site} other {, # sites}}", values: { count: stepCount, sites } });
   if (totalTimeMs < 60_000) {
     const seconds = Math.round(totalTimeMs / 1000);
-    return `Worked for ${seconds} second${seconds === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}${sites}`;
+    return i18n._({ id: "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}", message: "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}", values: { seconds, steps: stepCount, sites } });
   }
   const minutes = Math.round(totalTimeMs / 60_000);
-  return `Worked for ${minutes} minute${minutes === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}${sites}`;
+  return i18n._({ id: "Worked for {minutes, plural, one {# minute} other {# minutes}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}", message: "Worked for {minutes, plural, one {# minute} other {# minutes}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}", values: { minutes, steps: stepCount, sites } });
 }
 
 export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>, TimelineCall[]> = ({ result }) => {
@@ -600,7 +601,7 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
       size="large"
       progress={Math.max(2, card.percent)}
       statusLabel={card.label || "Making your picture"}
-      elapsedLabel={`${elapsedSeconds}s`}
+      elapsedLabel={formatUnit(elapsedSeconds, "second", { unitDisplay: "narrow" })}
       sizeLabel={card.size.replace("x", " × ")}
       {...(card.preview_url ? { previewSrc: card.preview_url, ...(card.preview_step !== null ? { previewStep: card.preview_step } : {}), ...(card.steps !== null ? { steps: card.steps } : {}) } : {})}
       {...(etaLabel(card.eta_seconds, { short: true }) ? { etaLabel: etaLabel(card.eta_seconds, { short: true })! } : {})}

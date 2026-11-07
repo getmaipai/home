@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // The Library page's pure rules: sections, the address that remembers the view, and how an item reads in words.
 import type { LibraryItem, LibraryQuery, Roster } from "@/lib/api";
 import type { FileKind } from "@maipai/ui/src/primitives/FileTile";
@@ -108,7 +109,7 @@ export function secondaryLine(item: LibraryItem, me: Pick<Roster, "id">, now = D
   const parts = [ownerName(item, me), megabytes(item.size_bytes)];
   if (item.expires_at) {
     const days = Math.max(0, Math.ceil((Date.parse(item.expires_at) - now) / 86_400_000));
-    parts.push(days === 0 ? "Removed soon" : `Removed in ${days} ${days === 1 ? "day" : "days"}`);
+    parts.push(days === 0 ? i18n._({ id: "Removed soon", message: "Removed soon" }) : i18n._({ id: "Removed in {count, plural, one {# day} other {# days}}", message: "Removed in {count, plural, one {# day} other {# days}}", values: { count: days } }));
   }
   return parts.join(" · ");
 }
@@ -117,7 +118,7 @@ export function spokenDetail(item: LibraryItem, me: Pick<Roster, "id">): string 
   const parts = [`${megabytes(item.size_bytes)}`];
   if (item.owner.id !== me.id) parts.push(`from ${item.owner.display_name}`);
   if (item.shared_with.household) parts.push("shared with everyone in the home");
-  else if (item.shared_with.count > 0) parts.push(`shared with ${item.shared_with.count} ${item.shared_with.count === 1 ? "person" : "people"}`);
+  else if (item.shared_with.count > 0) parts.push(i18n._({ id: "shared with {count, plural, one {# person} other {# people}}", message: "shared with {count, plural, one {# person} other {# people}}", values: { count: item.shared_with.count } }));
   if (item.audience === "adult-only") parts.push("adults only");
   if (item.version_count > 1) parts.push(`${item.version_count} versions`);
   return parts.join(", ");

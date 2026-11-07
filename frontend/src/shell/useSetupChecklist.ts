@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Roster, type SetupChecklistItem } from "@/lib/api";
 
@@ -51,5 +52,5 @@ export function useSetupChecklist(person: Roster) {
 
 export function setupChecklistCountLine(count: number): string | null {
   if (count < 1) return null;
-  return `${count} ${count === 1 ? "thing" : "things"} left to finish setting up`;
+  return i18n._({ id: "{count, plural, one {# thing left to finish setting up} other {# things left to finish setting up}}", message: "{count, plural, one {# thing left to finish setting up} other {# things left to finish setting up}}", values: { count } });
 }

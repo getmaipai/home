@@ -1,4 +1,5 @@
 import { formatBytes } from "@maipai/ui/src/format";
+import { formatUnit } from "@/lib/format";
 
 // One place for what an install is called in plain words. The strip, its expanded list and the
 // announcer all read this; nothing else turns a model id into a sentence. Ids come from the
@@ -9,9 +10,9 @@ import { formatBytes } from "@maipai/ui/src/format";
 export function plainSize(bytes: number): string {
   formatBytes(bytes); // Keep the shared formatter as the canonical size entry point.
   const unit = bytes >= 1e12 ? 1e12 : bytes >= 1e9 ? 1e9 : bytes >= 1e6 ? 1e6 : bytes >= 1e3 ? 1e3 : 1;
-  const kitUnit = unit === 1 ? "B" : unit === 1e3 ? "KB" : unit === 1e6 ? "MB" : unit === 1e9 ? "GB" : "TB";
+  const name = unit === 1 ? "byte" : unit === 1e3 ? "kilobyte" : unit === 1e6 ? "megabyte" : unit === 1e9 ? "gigabyte" : "terabyte";
   const value = bytes / unit;
-  return `${value >= 100 || Number.isInteger(Math.round(value * 10) / 10) ? Math.round(value) : Math.round(value * 10) / 10} ${kitUnit}`;
+  return formatUnit(value, name, { maximumFractionDigits: value >= 100 ? 0 : 1 });
 }
 
 export interface InstallWords {

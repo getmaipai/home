@@ -47,7 +47,7 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
       const found = await transcriptApi.previewFindReplace(transcript.id, options());
       setPreview(found);
       setUnchecked(new Set());
-      setMessage(found.total_lines === 0 ? NOTHING : `${found.total_matches} ${found.total_matches === 1 ? "match" : "matches"} on ${found.total_lines} ${found.total_lines === 1 ? "line" : "lines"}.`);
+      setMessage(found.total_lines === 0 ? NOTHING : i18n._({ id: "{matches, plural, one {# match} other {# matches}} on {lines, plural, one {# line} other {# lines}}.", message: "{matches, plural, one {# match} other {# matches}} on {lines, plural, one {# line} other {# lines}}.", values: { matches: found.total_matches, lines: found.total_lines } }));
     } catch {
       setMessage(PREVIEW_FAILED);
     } finally {
@@ -65,7 +65,7 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
       setMessage(
         result.replaced_lines === 0
           ? NOTHING
-          : `Replaced on ${result.replaced_lines} ${result.replaced_lines === 1 ? "line" : "lines"}. Undo puts ${result.replaced_lines === 1 ? "it" : "them all"} back.`,
+          : i18n._({ id: "Replaced on {count, plural, one {# line. Undo puts it back.} other {# lines. Undo puts them all back.}}", message: "Replaced on {count, plural, one {# line. Undo puts it back.} other {# lines. Undo puts them all back.}}", values: { count: result.replaced_lines } }),
       );
     } catch {
       setMessage(APPLY_FAILED);

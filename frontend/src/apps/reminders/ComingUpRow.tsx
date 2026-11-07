@@ -1,4 +1,3 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
@@ -7,9 +6,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { api, type ComingUpItem } from "@/lib/api";
 import { SNOOZE_OPTIONS } from "@/lib/comingUp";
 import { useHubMutation } from "@/lib/useHubMutation";
+import { formatDate, formatDateParts } from "@/lib/format";
 
 function describeTime(date: Date) {
-  return new Intl.DateTimeFormat(activeLocale(), { weekday: "long", hour: "numeric", minute: "2-digit" }).format(date);
+  return formatDate(date, { weekday: "long", hour: "numeric", minute: "2-digit" });
 }
 
 export function TimerCountdown({ at }: { at: string }) {
@@ -28,10 +28,10 @@ export function ComingUpRow({ item, onChanged, presentation = "default" }: { ite
   function snooze(input: { minutes?: number; until?: "tomorrow_morning" }) { void action.run({ snooze: input }); }
   if (presentation === "alarm") {
     const date = new Date(item.at);
-    const time = new Intl.DateTimeFormat(activeLocale(), { hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(date);
+    const time = formatDateParts(date, { hour: "numeric", minute: "2-digit" });
     const hourMinute = time.filter((part) => part.type === "hour" || part.type === "minute" || part.type === "literal").map((part) => part.value).join("").trim();
     const dayPeriod = time.find((part) => part.type === "dayPeriod")?.value ?? "";
-    const weekday = new Intl.DateTimeFormat(activeLocale(), { weekday: "short" }).format(date);
+    const weekday = formatDate(date, { weekday: "short" });
     return <li aria-label={i18n._({ id: "{hourMinute} {dayPeriod}, once, {text}", message: "{hourMinute} {dayPeriod}, once, {text}", values: { hourMinute, dayPeriod, text: item.text } })} className="flex flex-col gap-3 border-b py-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0" aria-label={i18n._({ id: "{hourMinute} {dayPeriod}, once, {text}", message: "{hourMinute} {dayPeriod}, once, {text}", values: { hourMinute, dayPeriod, text: item.text } })} role="group">
         <div className="flex items-baseline gap-2 tabular-nums"><time dateTime={item.at} className="text-4xl font-light tracking-tight">{hourMinute}</time><span className="text-sm text-muted-foreground">{dayPeriod}</span></div>

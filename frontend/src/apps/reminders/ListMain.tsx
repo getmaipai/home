@@ -1,4 +1,3 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import { useState, type FormEvent } from "react";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
@@ -10,6 +9,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { dueLabel, labelFor } from "./reminderTypes";
 import { ListMenu } from "./ListMenu";
 import type { ListIcon } from "./reminderTypes";
+import { formatDate } from "@/lib/format";
 
 export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, onClearDone, onRename, onChangeIcon, onDelete }: {
   list: ListRecord;
@@ -29,7 +29,7 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
   const doneItems = list.items.filter((item) => item.done);
   const EmptyIcon = getIcon("sparkles");
   const tagline = list.kind === "shopping" ? i18n._({ id: "A few things to pick up", message: "A few things to pick up" }) : list.kind === "todo" ? i18n._({ id: "What needs doing", message: "What needs doing" }) : i18n._({ id: "Your own list", message: "Your own list" });
-  const date = new Intl.DateTimeFormat(activeLocale(), { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+  const date = formatDate(new Date(), { weekday: "long", month: "long", day: "numeric" });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

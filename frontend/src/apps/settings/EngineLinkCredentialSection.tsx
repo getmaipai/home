@@ -12,6 +12,7 @@ import { ApiError, api } from "@/lib/api";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { errorLine } from "@/lib/hubReachability";
 import { useHubMutation } from "@/lib/useHubMutation";
+import { formatTime } from "@/lib/format";
 
 // ENGINES-AI-01: pairing is a wizard, one screen per step, with Back and Next, in the kit Dialog as it ships. The step
 // state lives here, in the section; there is no wizard component of its own. The kit's `Wizard` primitive is a
@@ -251,7 +252,7 @@ export function EngineLinkCredentialSection() {
                 <>
                   <p className="text-base">{i18n._({ id: "On the engine computer, open a terminal and run this one command. Copy it with the button.", message: "On the engine computer, open a terminal and run this one command. Copy it with the button." })}</p>
                   <CopyLine label={i18n._({ id: "Pairing command", message: "Pairing command" })} text={pairCommand(origin, pairing.code)} />
-                  <p className="text-sm text-muted-foreground">{i18n._({ id: "One-time code:", message: "One-time code:" })} <code>{groupCode(pairing.code)}</code>{". "}{i18n._({ id: "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", message: "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", values: { toLocaleTimeString: new Date(pairing.expires_at).toLocaleTimeString() } })}</p>
+                  <p className="text-sm text-muted-foreground">{i18n._({ id: "One-time code:", message: "One-time code:" })} <code>{groupCode(pairing.code)}</code>{". "}{i18n._({ id: "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", message: "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", values: { toLocaleTimeString: formatTime(pairing.expires_at) } })}</p>
                 </>
               ) : (
                 <Button variant="outline" disabled={busy} onClick={() => void run(async () => setPairing(await api.issueEngineLinkPairing()))}>{i18n._({ id: "Get a one-time code", message: "Get a one-time code" })}</Button>

@@ -8,9 +8,10 @@ import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, type SessionInfo } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDateTime } from "@/lib/format";
 
 function whenText(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatDateTime(iso);
 }
 
 /** The authenticated person's own sessions issued through Home's away address. */

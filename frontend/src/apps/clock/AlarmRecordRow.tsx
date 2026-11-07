@@ -1,17 +1,17 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import type { AlarmView } from "@/lib/api";
 import { AlarmDays } from "@/apps/clock/AlarmDays";
+import { formatDate, formatList } from "@/lib/format";
 
 function daysLabel(days: number[], at: string | null) {
-  if (!days.length) return at ? i18n._({ id: "Once · {day}", message: "Once · {day}", values: { day: new Intl.DateTimeFormat(activeLocale(), { weekday: "short" }).format(new Date(at)) } }) : i18n._({ id: "Once", message: "Once" });
+  if (!days.length) return at ? i18n._({ id: "Once · {day}", message: "Once · {day}", values: { day: formatDate(at, { weekday: "short" }) } }) : i18n._({ id: "Once", message: "Once" });
   if (days.length === 7) return i18n._({ id: "Every day", message: "Every day" });
   if ([1, 2, 3, 4, 5].every((day) => days.includes(day)) && days.length === 5) return i18n._({ id: "Weekdays", message: "Weekdays" });
   if ([6, 7].every((day) => days.includes(day)) && days.length === 2) return i18n._({ id: "Weekends", message: "Weekends" });
-  return new Intl.ListFormat(activeLocale(), { style: "narrow", type: "unit" }).format(days.map((day) => new Intl.DateTimeFormat(activeLocale(), { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2024, 0, day)))));
+  return formatList(days.map((day) => formatDate(Date.UTC(2024, 0, day), { weekday: "short", timeZone: "UTC" })), { style: "narrow", type: "unit" });
 }
 
 export function alarmTime(time: string) {

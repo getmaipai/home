@@ -1,5 +1,4 @@
 import { i18n } from "@lingui/core";
-import { listWords } from "@/shell/pages/listWords";
 import { useContext, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -34,6 +33,7 @@ import { ActivityFeed, type ActivityFeedGroup } from "@maipai/ui/src/elements/ac
 import { TaskBrowser } from "@maipai/ui/src/elements/task-browser";
 import { Card } from "@maipai/ui/src/primitives/Card";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDate, formatList } from "@/lib/format";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -258,7 +258,7 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
     const date = new Date(iso); const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
     if (start === today) return i18n._({ id: "Today", message: "Today" });
     if (start === today - 86400000) return i18n._({ id: "Yesterday", message: "Yesterday" });
-    return new Intl.DateTimeFormat(i18n.locale, { weekday: "long", month: "long", day: "numeric" }).format(date);
+    return formatDate(date, { weekday: "long", month: "long", day: "numeric" });
   };
   const stateLine = (row: typeof rows[number]) => row.kind === "chat" ? i18n._({ id: "Conversation", message: "Conversation" }) : row.needs_you ? row.waiting_reason || i18n._({ id: "Waiting for you", message: "Waiting for you" }) : row.state === "running" || row.state === "queued" ? i18n._({ id: "Working", message: "Working" }) : row.state === "done" ? i18n._({ id: "Finished", message: "Finished" }) : row.state === "failed" ? i18n._({ id: "Stopped", message: "Stopped" }) : row.state;
   const tone = (row: typeof rows[number]) => row.needs_you ? "needs_you" as const : row.state === "running" || row.state === "queued" ? "working" as const : row.state === "done" ? "done" as const : "plain" as const;
@@ -289,7 +289,7 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
       <Section heading={i18n._({ id: "About", message: "About" })}>
         <p>{companion.about}</p>
         {companion.pronouns ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Pronouns: {pronouns}", message: "Pronouns: {pronouns}", values: { pronouns: companion.pronouns } })}</p> : null}
-        {companion.interests.length > 0 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Likes: {list}.", message: "Likes: {list}.", values: { list: listWords(companion.interests) } })}</p> : null}
+        {companion.interests.length > 0 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Likes: {list}.", message: "Likes: {list}.", values: { list: formatList(companion.interests) } })}</p> : null}
         <p className="text-sm text-muted-foreground">{companion.who_can_use}</p>
       </Section>
       <Section heading={i18n._({ id: "How it talks", message: "How it talks" })}>
@@ -307,8 +307,8 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
       <Section heading={i18n._({ id: "Voice", message: "Voice" })}><VoiceRow companion={companion} /></Section>
       {companion.used_by ? (
         <Section heading={i18n._({ id: "Who uses it", message: "Who uses it" })}>
-          <p>{i18n._({ id: "People: {list}.", message: "People: {list}.", values: { list: companion.used_by.people.length ? listWords(companion.used_by.people.map((person) => person.name)) : i18n._({ id: "nobody yet", message: "nobody yet" }) } })}</p>
-          <p>{i18n._({ id: "Robots: {list}.", message: "Robots: {list}.", values: { list: companion.used_by.robots.length ? listWords(companion.used_by.robots.map((robot) => robot.name)) : i18n._({ id: "none yet", message: "none yet" }) } })}{" "}<Link to={ROBOT_SETTINGS} className="underline">{i18n._({ id: "Companion settings", message: "Companion settings" })}</Link></p>
+          <p>{i18n._({ id: "People: {list}.", message: "People: {list}.", values: { list: companion.used_by.people.length ? formatList(companion.used_by.people.map((person) => person.name)) : i18n._({ id: "nobody yet", message: "nobody yet" }) } })}</p>
+          <p>{i18n._({ id: "Robots: {list}.", message: "Robots: {list}.", values: { list: companion.used_by.robots.length ? formatList(companion.used_by.robots.map((robot) => robot.name)) : i18n._({ id: "none yet", message: "none yet" }) } })}{" "}<Link to={ROBOT_SETTINGS} className="underline">{i18n._({ id: "Companion settings", message: "Companion settings" })}</Link></p>
         </Section>
       ) : null}
         </section> : null}

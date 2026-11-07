@@ -70,6 +70,7 @@ import { AnswerStyleSelect } from "@maipai/ui/src/elements/answer-style-select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
+import { formatNumber, formatUnit } from "@/lib/format";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -566,7 +567,7 @@ export function ChatThinkingIndicator() {
       role="status"
       aria-live="polite"
       label={slow ? "Still working. This is taking longer than usual." : (activity ?? "Thinking…")}
-      elapsed={elapsedSeconds === undefined ? undefined : `${elapsedSeconds}s`}
+      elapsed={elapsedSeconds === undefined ? undefined : formatUnit(elapsedSeconds, "second", { unitDisplay: "narrow" })}
     />
   );
 }
@@ -763,8 +764,8 @@ export function FailedTurnActionBarExtras() {
 
 export function buildTimingStats(stats: TurnStats): TimingStat[] {
   const list: TimingStat[] = [];
-  if (stats.time_to_first_token_ms !== null) list.push({ label: "First token", value: `${(stats.time_to_first_token_ms / 1000).toFixed(1)}s` });
-  if (stats.total_time_ms !== null) list.push({ label: "Total", value: `${(stats.total_time_ms / 1000).toFixed(1)}s` });
+  if (stats.time_to_first_token_ms !== null) list.push({ label: "First token", value: formatUnit(stats.time_to_first_token_ms / 1000, "second", { unitDisplay: "narrow", minimumFractionDigits: 1 }) });
+  if (stats.total_time_ms !== null) list.push({ label: "Total", value: formatUnit(stats.total_time_ms / 1000, "second", { unitDisplay: "narrow", minimumFractionDigits: 1 }) });
   if (stats.tokens_per_second !== null) list.push({ label: "Speed", value: `${stats.tokens_per_second.toFixed(0)} tok/s` });
   if (stats.engine) list.push({ label: "Engine", value: stats.engine });
   if (stats.answer_style) list.push({ label: "Answered with", value: stats.answer_style === "max" ? "Max" : "Thinking" });
@@ -775,7 +776,7 @@ export function buildContextSegmentStats(stats: TurnStats): TimingStat[] {
   const labels: Record<ContextSegmentKey, string> = { prefix: "Prefix", tools: "Tools", memory: "Memory", history: "History", message: "This message", reply: "Reply" };
   return Object.entries(stats.context_segments ?? {}).flatMap(([key, tokens]) => {
     if (!(CONTEXT_SEGMENT_KEYS as readonly string[]).includes(key) || typeof tokens !== "number" || !Number.isFinite(tokens) || tokens < 0) return [];
-    return [{ label: labels[key as keyof typeof labels], value: `${tokens.toLocaleString()} tokens` }];
+    return [{ label: labels[key as keyof typeof labels], value: i18n._({ id: "{tokens} tokens", message: "{tokens} tokens", values: { tokens: formatNumber(tokens) } }) }];
   });
 }
 

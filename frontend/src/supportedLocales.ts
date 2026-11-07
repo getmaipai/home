@@ -7,10 +7,6 @@ export const FALLBACK_LOCALES: Record<string, string | string[]> = {
   "en-US-x-teen": "en-US", "en-GB-x-teen": ["en-GB", "en-US"], "es-x-teen": ["es", "en-US"],
 };
 
-export const LOCALE_DISPLAY_NAMES = Object.fromEntries(
-  SUPPORTED_LOCALES.map((locale) => [locale, new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale]),
-) as Record<SupportedLocale, string>;
-
 export function localeChain(locale: string): string[] {
   if (!(SUPPORTED_LOCALES as readonly string[]).includes(locale)) return ["en-US"];
   const fallback = FALLBACK_LOCALES[locale];

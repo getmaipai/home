@@ -7,6 +7,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { api, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { formatBytes } from "@maipai/ui/src/format";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDateTime } from "@/lib/format";
 
 interface BackupsSectionProps {
   person: Roster;
@@ -96,7 +97,7 @@ function EmergencyBackupKeyRow() {
 }
 
 function whenText(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatDateTime(iso);
 }
 
 // 2.5's backup mechanism, with restore (2026-09-05). Restore is staged,

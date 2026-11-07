@@ -4,6 +4,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import type { statusSummary } from "@/shell/statusSummary";
 import { formatUptime } from "@/shell/pages/status/StatusComponents";
 import { joinNames } from "@/shell/pages/status/statusBoardFormat";
+import { formatTime } from "@/lib/format";
 import "@/shell/pages/status/statusBanner.css";
 
 type Summary = ReturnType<typeof statusSummary>;
@@ -16,7 +17,7 @@ export function StatusBanner({ summary, uptimeSeconds, maintenanceEndsAt, messag
   const body = message ?? (summary.level === "online" ? (uptimeSeconds === undefined ? i18n._({ id: "Everything is running.", message: "Everything is running." }) : i18n._({ id: "Everything is running. Up for {uptime}.", message: "Everything is running. Up for {uptime}.", values: { uptime: formatUptime(uptimeSeconds ?? 0) } }))
     : summary.level === "degraded" ? i18n._({ id: "It should be back in a moment.", message: "It should be back in a moment." })
       : summary.level === "offline" ? i18n._({ id: "We're looking into it.", message: "We're looking into it." })
-        : maintenanceEndsAt ? i18n._({ id: "Until {time}", message: "Until {time}", values: { time: new Intl.DateTimeFormat(i18n.locale, { hour: "numeric", minute: "2-digit" }).format(new Date(maintenanceEndsAt)) } }) : i18n._({ id: "Scheduled work is underway.", message: "Scheduled work is underway." }));
+        : maintenanceEndsAt ? i18n._({ id: "Until {time}", message: "Until {time}", values: { time: formatTime(maintenanceEndsAt) } }) : i18n._({ id: "Scheduled work is underway.", message: "Scheduled work is underway." }));
   return <section aria-label={i18n._({ id: "Overall status", message: "Overall status" })} data-status-banner={summary.level} className="w-full overflow-hidden rounded-xl border border-border">
     <div className={`flex min-h-20 items-center gap-4 border-b px-5 py-4 ${color}`}>
       <Icon className="size-8 shrink-0" aria-label={summary.level === "online" ? i18n._({ id: "Operational", message: "Operational" }) : summary.level === "maintenance" ? i18n._({ id: "Maintenance", message: "Maintenance" }) : i18n._({ id: "Attention needed", message: "Attention needed" })} />

@@ -17,11 +17,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maip
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { api, type PersonalApiKey } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDate } from "@/lib/format";
 
 const KEYS = ["settings-api-keys"] as const;
 type Kind = "settings" | "diagnose" | "engine";
 const kindOf = (key: PersonalApiKey): Kind => key.scopes.includes("engine") ? "engine" : key.scopes.includes("diagnose") ? "diagnose" : "settings";
-const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : i18n._({ id: "Never", message: "Never" });
+const dateText = (date: string | null) => date ? formatDate(date) : i18n._({ id: "Never", message: "Never" });
 const messageOf = (error: unknown, fallback: string) => errorLine(error, fallback);
 
 export function AssistantKeysSettings() {

@@ -21,13 +21,14 @@ import { api, type CodingGrant, type CodingModeReadinessItemId, type CodingModeV
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
 const messageOf = (error: unknown, fallback: string) => errorLine(error, fallback);
 const sizeText = (bytes: number | null) => bytes == null ? i18n._({ id: "Size not reported", message: "Size not reported" }) : bytes >= 1024 ** 3 ? i18n._({ id: "{size} GB", message: "{size} GB", values: { size: (bytes / 1024 ** 3).toFixed(1) } }) : i18n._({ id: "{size} MB", message: "{size} MB", values: { size: Math.ceil(bytes / 1024 ** 2) } });
-const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : i18n._({ id: "Never", message: "Never" });
-const timeText = (date: string | null) => date ? new Date(date).toLocaleString() : i18n._({ id: "Never", message: "Never" });
+const dateText = (date: string | null) => date ? formatDate(date) : i18n._({ id: "Never", message: "Never" });
+const timeText = (date: string | null) => date ? formatDateTime(date) : i18n._({ id: "Never", message: "Never" });
 const isAdult = (entry: PersonRosterEntry) => entry.age_band === "adult" || entry.role === "owner" || entry.role === "admin" || entry.role === "adult";
 const isMinor = (entry: PersonRosterEntry) => entry.age_band === "child" || entry.age_band === "teen" || entry.role === "child" || entry.role === "teen";
 

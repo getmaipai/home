@@ -38,7 +38,7 @@ export function LibraryTrash({ rows, busy, onRestore, onPurge }: { rows: readonl
               {row.thumb_url ? <img src={row.thumb_url} alt="" loading="lazy" className="size-14 shrink-0 rounded-md bg-muted object-cover" /> : null}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-medium">{row.title}</p>
-                <p className="text-base text-muted-foreground">{left === null ? i18n._({ id: "Held until you delete it", message: "Held until you delete it" }) : left === 0 ? "Removed today" : `${left} ${left === 1 ? "day" : "days"} left`}</p>
+                <p className="text-base text-muted-foreground">{left === null ? i18n._({ id: "Held until you delete it", message: "Held until you delete it" }) : left === 0 ? i18n._({ id: "Removed today", message: "Removed today" }) : i18n._({ id: "{count, plural, one {# day left} other {# days left}}", message: "{count, plural, one {# day left} other {# days left}}", values: { count: left } })}</p>
               </div>
               {row.can_restore ? <Button type="button" variant="secondary" disabled={busy} aria-label={`Restore ${row.title}`} onClick={() => onRestore([row.id])}>{i18n._({ id: "Restore", message: "Restore" })}</Button> : null}
               {row.can_purge ? <Button type="button" variant="ghost" disabled={busy} aria-label={`Delete ${row.title} forever`} onClick={() => setConfirm([row.id])}>{i18n._({ id: "Delete forever", message: "Delete forever" })}</Button> : null}

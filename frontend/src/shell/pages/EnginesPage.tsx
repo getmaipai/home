@@ -18,6 +18,7 @@ import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 import { useMutation } from "@tanstack/react-query";
 import { severityLabel } from "@/shell/pages/severityLabel";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDateTime } from "@/lib/format";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and
  * `GET /api/engines/health`, through the kit DataTable and its slots. */
@@ -93,7 +94,7 @@ const HEALTH_COLUMNS = (): readonly DataTableColumn<HealthRow>[] => [
 ];
 
 function toHealthRow(item: StackHealthItem): HealthRow {
-  return { item: item.title, status: severityLabel(item.severity), since: new Date(item.since).toLocaleString() };
+  return { item: item.title, status: severityLabel(item.severity), since: formatDateTime(item.since) };
 }
 
 /** ENGINES-AI-01: the engines console (roles, installed engines, health, the connection check), drawn inside Home

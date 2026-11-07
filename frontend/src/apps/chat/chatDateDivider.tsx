@@ -2,8 +2,10 @@
 // (day-separator.tsx) in the kit Thread's MessageBefore slot. A line opens
 // the conversation and marks each new day or a return after an hour away,
 // labelled the way the major chat apps do ("Today 1:53 AM").
+import { i18n } from "@lingui/core";
 import { useAuiState } from "@assistant-ui/react";
 import { DayDivider } from "@maipai/ui/src/elements/day-separator";
+import { formatDate, formatTime } from "@/lib/format";
 
 /** A pause this long between two messages earns its own line. */
 export const DATE_DIVIDER_GAP_MS = 60 * 60 * 1000;
@@ -20,17 +22,16 @@ export function needsDateDivider(previous: Date | undefined, at: Date): boolean 
 /** "Today 1:53 AM", "Yesterday 9:05 PM", "Monday 8:00 AM" within the week,
  * "Oct 5 8:00 AM" this year, "Oct 5, 2025 8:00 AM" before it. */
 export function dateDividerLabel(at: Date, now: Date = new Date()): string {
-  const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const time = formatTime(at);
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const startOfThatDay = new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
   const daysAgo = Math.round((startOfToday - startOfThatDay) / 86_400_000);
-  if (daysAgo === 0) return `Today ${time}`;
-  if (daysAgo === 1) return `Yesterday ${time}`;
-  if (daysAgo > 1 && daysAgo < 7) return `${at.toLocaleDateString(undefined, { weekday: "long" })} ${time}`;
-  const date = at.toLocaleDateString(undefined, at.getFullYear() === now.getFullYear()
-    ? { month: "short", day: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric" });
-  return `${date} ${time}`;
+  if (daysAgo === 0) return i18n._({ id: "Today {time}", message: "Today {time}", values: { time } });
+  if (daysAgo === 1) return i18n._({ id: "Yesterday {time}", message: "Yesterday {time}", values: { time } });
+  const day = daysAgo > 1 && daysAgo < 7
+    ? formatDate(at, { weekday: "long" })
+    : formatDate(at, at.getFullYear() === now.getFullYear() ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+  return i18n._({ id: "{day} {time}", message: "{day} {time}", values: { day, time } });
 }
 
 /** The kit Thread's MessageBefore slot: one DayDivider where a line belongs. */

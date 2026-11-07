@@ -13,6 +13,7 @@ import { api, isOwnerOrAdminRole, request, type EngineComputerStatus as EngineCo
 import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryFormat";
 import "@/shell/pages/status/statusLegend.css";
 import { errorLine } from "@/lib/hubReachability";
+import { formatNumber } from "@/lib/format";
 
 interface StatusPartsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; engineComputer?: EngineComputerStatusData; }
 // The Status page lists the four engines that make up "is Home up"; the picture and video rows (ENGINE-STATUS-MEDIA-01) are read by the making controls instead.
@@ -116,7 +117,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
 
   return <>
       {health.engines.chat.context_message ? <p className="py-2 text-sm text-muted-foreground">{health.engines.chat.context_message}</p> : null}
-      {health.engines.chat.context_per_slot ? <p className="py-2 text-sm text-muted-foreground">{i18n._({ id: "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}}).", message: "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}}).", values: { tokens: health.engines.chat.context_per_slot.toLocaleString(i18n.locale), slots: health.engines.chat.context_slots } })}</p> : null}
+      {health.engines.chat.context_per_slot ? <p className="py-2 text-sm text-muted-foreground">{i18n._({ id: "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}}).", message: "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}}).", values: { tokens: formatNumber(health.engines.chat.context_per_slot), slots: health.engines.chat.context_slots } })}</p> : null}
       {rows.map((row) => {
         const Icon = getIcon(row.icon ?? "activity");
         const underMaintenance = maintenance.includes(row.key);

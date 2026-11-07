@@ -5,6 +5,7 @@ import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
 import type { PerformanceEngines } from "@/lib/api";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 const ServerIcon = getIcon("server");
 
@@ -25,8 +26,8 @@ export function EnginesHealthBody({ engines }: { engines: PerformanceEngines }) 
   const rows: IssueRow[] = engines.recent_issues.map((i) => ({
     issue: i.key,
     severity: i.severity,
-    since: new Date(i.createdAt).toLocaleString(),
-    status: i.resolvedAt ? i18n._({ id: "Resolved {date}", message: "Resolved {date}", values: { date: new Date(i.resolvedAt).toLocaleDateString() } }) : i18n._({ id: "Open", message: "Open" }),
+    since: formatDateTime(i.createdAt),
+    status: i.resolvedAt ? i18n._({ id: "Resolved {date}", message: "Resolved {date}", values: { date: formatDate(i.resolvedAt) } }) : i18n._({ id: "Open", message: "Open" }),
   }));
   const model = useDataTableModel(rows, tableColumns<IssueRow>(["issue", "severity", "since", "status"], {
     issue: 180,

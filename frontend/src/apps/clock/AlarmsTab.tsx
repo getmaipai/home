@@ -1,4 +1,3 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +10,7 @@ import { Sheet, SheetContent } from "@maipai/ui/src/ui/sheet";
 import { CLOCK_ADD_ALARM_EVENT } from "@/apps/clock/clockHeader";
 import { Button } from "@maipai/ui/src/ui/button";
 import { useHubMutation } from "@/lib/useHubMutation";
+import { formatDate, formatTime } from "@/lib/format";
 
 const comingUpKey = ["household-coming-up"];
 const alarmsKey = ["household-alarms"];
@@ -24,8 +24,8 @@ function untilText(at: string, now: number) {
 
 function nextLabel(at: string, now: number) {
   const date = new Date(at);
-  const day = new Intl.DateTimeFormat(activeLocale(), { weekday: "short" }).format(date);
-  const time = new Intl.DateTimeFormat(activeLocale(), { hour: "numeric", minute: "2-digit" }).format(date);
+  const day = formatDate(date, { weekday: "short" });
+  const time = formatTime(date);
   return i18n._({ id: "Next: {day} {time}, in {untilText}", message: "Next: {day} {time}, in {untilText}", values: { day, time, untilText: untilText(at, now) } });
 }
 

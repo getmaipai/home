@@ -45,3 +45,33 @@ export function baselineProblems(findings: Finding[], baseline: Baseline): strin
   for (const [file, count] of Object.entries(baseline)) if ((counts[file] ?? 0) < count) problems.push(`${file} shrank from ${count} to ${counts[file] ?? 0}; shrink its baseline`);
   return problems;
 }
+
+// I18N-F6: dates, times, numbers, lists and relative times are formatted in `lib/format.ts` only, so they follow the active language.
+const FORMAT_HOME = "lib/format.ts";
+const LOCALE_STRING_METHODS = new Set(["toLocaleDateString", "toLocaleTimeString", "toLocaleString"]);
+
+function codeFiles(root: string, dir = root): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return ["dev", "tests", "locales", "node_modules"].includes(entry.name) ? [] : codeFiles(root, path);
+    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+/** `toLocaleDateString`, `toLocaleTimeString`, `toLocaleString` and `Intl.X(...)` / `new Intl.X(...)` outside `lib/format.ts`. Types such as `Intl.DateTimeFormatOptions` are fine. */
+export function formatCallFindings(srcRoot: string, overrides?: Record<string, string>): Finding[] {
+  const sources = overrides ?? Object.fromEntries(codeFiles(srcRoot).map((file) => [relative(srcRoot, file), readFileSync(file, "utf8")]));
+  const findings: Finding[] = [];
+  for (const [file, text] of Object.entries(sources)) {
+    if (file === FORMAT_HOME) continue;
+    const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const report = (node: ts.Node) => findings.push({ file, line: ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1, text: node.getText(ast).slice(0, 80) });
+    const visit = (node: ts.Node) => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && LOCALE_STRING_METHODS.has(node.expression.name.text)) report(node);
+      if ((ts.isNewExpression(node) || ts.isCallExpression(node)) && ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === "Intl") report(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(ast);
+  }
+  return findings;
+}

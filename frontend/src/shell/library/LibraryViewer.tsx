@@ -29,6 +29,7 @@ import { libraryOrigin } from "./libraryOrigin";
 import type { ItemActions } from "./LibraryItems";
 import { useTranscriptWorkspace } from "./TranscriptPanel";
 import { seekViewerMedia, useViewerMediaTime } from "./viewerMedia";
+import { formatDate } from "@/lib/format";
 
 const ShareIcon = getIcon("users");
 const CaptionsIcon = getIcon("captions");
@@ -36,7 +37,7 @@ const SendIcon = getIcon("arrow-up-right");
 const DownloadIcon = getIcon("download");
 const TrashIcon = getIcon("trash");
 const SEND_PREPARE_MAX_BYTES = 64 * 1024 * 1024;
-const date = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+const date = (iso: string) => formatDate(iso, { year: "numeric", month: "short", day: "numeric" });
 
 export function viewerItemOf(item: LibraryItem): MediaViewerItem {
   const kind = fileKind(item.kind);

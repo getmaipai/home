@@ -12,7 +12,7 @@ import { ActivityFeed } from "@maipai/ui/src/elements/activity-feed";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Badge } from "@maipai/ui/src/elements/ui/badge";
 import { Button } from "@maipai/ui/src/elements/ui/button";
-import { formatRelative } from "@maipai/ui/src/relativeTime";
+import { formatRelative } from "@/lib/time";
 import { toast } from "sonner";
 import { CompanionStage, type CompanionStageHistoryItem, type StageMode } from "@maipai/ui/src/elements/companion-stage";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
@@ -36,6 +36,7 @@ import { translateDescriptor } from "@/apps/chat/serverLines";
 import { Suggestions } from "@maipai/ui/src/elements/suggestions";
 import { useAmbientPageContext } from "@/shell/pageContext";
 import { useSpokenReply } from "@/shell/spokenReply";
+import { formatTime, formatUnit } from "@/lib/format";
 
 export const AMBIENT_QUICK_ACTIONS = ["Help with this page", "Find something", "Take an action"] as const;
 const QUICK_ACTION_PROMPTS: Record<(typeof AMBIENT_QUICK_ACTIONS)[number], string> = {
@@ -108,7 +109,7 @@ export function ambientHistoryItems(messages: Array<Record<string, unknown>>, sp
     if (!text) continue;
     const sources = role === "companion" ? sourcesFromMessage(message as never) : [];
     const created = message.createdAt ? new Date(message.createdAt as string | number | Date) : null;
-    const time = created && !Number.isNaN(created.getTime()) ? created.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : undefined;
+    const time = created && !Number.isNaN(created.getTime()) ? formatTime(created) : undefined;
     items.push({
       id,
       role,
@@ -315,7 +316,7 @@ export function useAmbientCompanionPane({ person, companionName, companionId, av
   const toggleReadAloud = () => { const next = !side.readAloud; side.setReadAloud(next); if (next && !side.ttsAvailable) toast.error(i18n._({ id: "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again.", message: "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again." }), { id: "voice-problem" }); };
   const ReadIcon = side.readAloud ? SpeakerIcon : SpeakerOffIcon;
   const settingsTab = { id: "settings", label: i18n._({ id: "Settings", message: "Settings" }), content: <><div className="flex items-center justify-between gap-3 px-4 py-3"><span>{i18n._({ id: "Read replies aloud", message: "Read replies aloud" })}</span><TooltipIconButton tooltip={side.readAloud ? "Turn off read replies aloud" : "Read replies aloud"} aria-label={i18n._({ id: "Read replies aloud", message: "Read replies aloud" })} aria-pressed={side.readAloud} onClick={toggleReadAloud}><ReadIcon aria-hidden="true" /></TooltipIconButton></div><CompanionSettings person={person} companionId={companionId} bot={bot} /></> };
-  const roomLine = bot ? (bot.online ? bot.area ? `In the ${bot.area.toLowerCase()}${bot.state?.battery_level != null ? `, on battery ${bot.state.battery_level}%` : bot.state?.on_battery === false ? ", plugged in" : ""}` : "Online" : `Offline since ${new Date(bot.lastSeenAt ?? bot.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`) : undefined;
+  const roomLine = bot ? (bot.online ? bot.area ? `In the ${bot.area.toLowerCase()}${bot.state?.battery_level != null ? `, on battery ${formatUnit(bot.state.battery_level, "percent")}` : bot.state?.on_battery === false ? ", plugged in" : ""}` : "Online" : `Offline since ${formatTime(bot.lastSeenAt ?? bot.createdAt, { hour: "numeric", minute: "2-digit" })}`) : undefined;
   const paneTitle = companionName;
   const companionTab = { id: "companion", label: i18n._({ id: "Talk", message: "Talk" }), content: companionId ? <>{openError ? <p role="alert">{i18n._({ id: "Could not open that conversation. Check your connection and try again.", message: "Could not open that conversation. Check your connection and try again." })}</p> : null}{roomLine ? <p className="px-4 py-2 text-sm text-muted-foreground">{roomLine}</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} bot={bot} incognito={incognito} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} finding={finding} findMe={findMe} /></> : null };
   return { open: state.open, onOpenChange: (open: boolean) => onStateChange({ ...state, open }), pinned: state.pinned, onPinnedChange: (pinned: boolean) => onStateChange({ ...state, pinned }), companionTab, tabs: [historyTab, settingsTab], activeTab: tab, onActiveTabChange: setTab, title: paneTitle, control: { ask, newChat, load, continueInChat, startCall: () => { openCompanionPane(); askQueueRef.current?.startCall(); } } satisfies AmbientPaneControl, headerActions: <>{wake ? <Button type="button" variant="ghost" size="icon-sm" aria-label={`${wake.listening}. Turn off`} title={`${wake.listening}. Turn off`} onClick={wake.onTurnOff}><MicIcon aria-hidden="true" /></Button> : null}{action ? <Button type="button" variant="ghost" size="icon-sm" onClick={action.onClick}>{action.label}</Button> : null}<Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "New conversation", message: "New conversation" })} title={i18n._({ id: "New conversation", message: "New conversation" })} onClick={newChat}><PlusIcon aria-hidden="true" /></Button><Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Continue in Chat", message: "Continue in Chat" })} title={i18n._({ id: "Continue in Chat", message: "Continue in Chat" })} onClick={continueInChat}><ContinueIcon aria-hidden="true" /></Button></>, avatar, pinLabel: "Pin pane", closeLabel: "Close pane", label: i18n._({ id: "{name} companion pane", message: "{name} companion pane", values: { name: companionName } }) };

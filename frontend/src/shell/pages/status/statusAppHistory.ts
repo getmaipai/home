@@ -1,5 +1,6 @@
 import { i18n } from "@lingui/core";
 import type { StatusApp } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 
 type StatusAppDay = StatusApp["history"][number];
 
@@ -17,7 +18,7 @@ export function statusForAppDay(day: StatusAppDay): "up" | "degraded" | "down" {
 
 function dayLabel(date: string, locale?: string): string {
   const [year, month, day] = date.split("-").map(Number);
-  return new Intl.DateTimeFormat(locale ?? i18n.locale, { month: "short", day: "numeric" }).format(new Date(year!, month! - 1, day!, 12));
+  return formatDate(new Date(year!, month! - 1, day!, 12), { month: "short", day: "numeric", ...(locale ? { locale } : {}) });
 }
 
 function durationWords(minutes: number): string {

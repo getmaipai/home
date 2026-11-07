@@ -1,4 +1,3 @@
-import { activeLocale } from "@/lib/activeLocale";
 import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,13 +8,14 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { api, type WorldPlaceView } from "@/lib/api";
 import { CLOCK_ADD_EVENT } from "@/apps/clock/clockHeader";
+import { deviceTimeZone, formatDate, formatDateParts, formatTime } from "@/lib/format";
 
 const worldPlacesKey = ["world-places"];
 
 type ClockPlace = WorldPlaceView & { isHome: boolean };
 
 function zoneOffsetMinutes(zone: string, date: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(date);
+  const parts = formatDateParts(date, { locale: "en-US", timeZone: zone, timeZoneName: "longOffset" });
   const offset = parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT";
   const match = offset.match(/GMT([+-])(\d{2}):(\d{2})/);
   if (!match) return 0;
@@ -41,12 +41,7 @@ function offsetText(zone: string, homeZone: string, date: Date) {
 }
 
 function dayMarker(zone: string, homeZone: string, date: Date) {
-  const localDay = (timeZone: string) => new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  const localDay = (timeZone: string) => formatDate(date, { locale: "en-CA", timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
   const difference = (Date.parse(`${localDay(zone)}T00:00:00Z`) - Date.parse(`${localDay(homeZone)}T00:00:00Z`)) / 86_400_000;
   if (difference > 0) return i18n._({ id: "Tomorrow", message: "Tomorrow" });
   if (difference < 0) return i18n._({ id: "Yesterday", message: "Yesterday" });
@@ -55,9 +50,9 @@ function dayMarker(zone: string, homeZone: string, date: Date) {
 
 function localClock(place: ClockPlace, now: number, homeZone: string) {
   const date = new Date(now);
-  const time = new Intl.DateTimeFormat(activeLocale(), { timeZone: place.zone, hour: "numeric", minute: "2-digit" }).format(date);
-  const dateText = new Intl.DateTimeFormat(activeLocale(), { timeZone: place.zone, weekday: "long", month: "long", day: "numeric" }).format(date);
-  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: place.zone, hour: "numeric", hourCycle: "h23" }).format(date));
+  const time = formatTime(date, { timeZone: place.zone });
+  const dateText = formatDate(date, { timeZone: place.zone, weekday: "long", month: "long", day: "numeric" });
+  const hour = Number(formatDate(date, { locale: "en-US", timeZone: place.zone, hour: "numeric", hourCycle: "h23" }));
   return { time, dateText, day: dayMarker(place.zone, homeZone, date), offset: offsetText(place.zone, homeZone, date), daytime: hour >= 6 && hour < 18 };
 }
 
@@ -69,7 +64,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Awaited<ReturnType<typeof api.localSearchPlaces>>>([]);
   const [limitMessage, setLimitMessage] = useState("");
-  const homeZone = providedZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const homeZone = providedZone || deviceTimeZone() || "UTC";
   const saved = useMemo(() => query.data ?? [], [query.data]);
   const places: ClockPlace[] = useMemo(() => [
     { id: "home", name: i18n._({ id: "Home", message: "Home" }), country: "", zone: homeZone, position: -1, isHome: true },

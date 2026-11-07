@@ -5,6 +5,7 @@ import { ArticleCard } from "./ArticleCard";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { List } from "@maipai/ui/src/primitives/List";
 import { api, type ReferenceBookView } from "@/lib/api";
+import { formatNumber } from "@/lib/format";
 
 const RELATED_STALE_MS = 10 * 60 * 1000;
 const RELATED_MAX = 5;
@@ -32,7 +33,7 @@ export function SearchResults({ q, book, books, routeFor, onBook, onSearch }: Se
     <section aria-label={i18n._({ id: "Search results", message: "Search results" })} className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-xl font-semibold">{i18n._({ id: "Search results for “{query}”", message: "Search results for “{query}”", values: { query: q } })}</h2>
-        {results.data ? <p className="text-muted-foreground text-sm">{total > hits.length ? `About ${total.toLocaleString()} results` : `${hits.length.toLocaleString()} ${hits.length === 1 ? "result" : "results"}`}</p> : null}
+        {results.data ? <p className="text-muted-foreground text-sm">{total > hits.length ? i18n._({ id: "About {count} results", message: "About {count} results", values: { count: formatNumber(total) } }) : i18n._({ id: "{count, plural, one {# result} other {# results}}", message: "{count, plural, one {# result} other {# results}}", values: { count: hits.length } })}</p> : null}
       </div>
       {books.length > 1 ? (
         <div role="group" aria-label={i18n._({ id: "Filter results by book", message: "Filter results by book" })} className="flex flex-wrap gap-2">

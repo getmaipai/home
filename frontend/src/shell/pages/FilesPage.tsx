@@ -64,7 +64,7 @@ function useWide(): boolean {
   );
 }
 const editable = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName));
-const itemsWord = (count: number) => `${count} ${count === 1 ? "item" : "items"}`;
+const itemsWord = (count: number) => i18n._({ id: "{count, plural, one {# item} other {# items}}", message: "{count, plural, one {# item} other {# items}}", values: { count } });
 const CHILD_ADD = () => i18n._({ id: "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile.", message: "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile." });
 
 /** The Library: a Dropbox-style page. Sections, search, filters and sort are all in the address; the hub does the filtering

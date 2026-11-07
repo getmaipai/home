@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // EASE-OF-USE-01c polish: the display data for the Ease of use card's rows, passed to the kit renderer as
 // `rowExtras`. Pure: a summary under the Look row ("Large + 2 changes") with a way back, and a lock reason
 // on each row an admin set for the person. Home draws nothing itself.
@@ -34,7 +35,7 @@ export function easeRowExtras(values: readonly EaseValue[], viewingSelf: boolean
     const free = changed.filter((k) => !(viewingSelf && values.find((v) => v.key === k)?.locked));
     out["ease.preset"] = {
       ...out["ease.preset"],
-      note: `${name} + ${changed.length} ${changed.length === 1 ? "change" : "changes"}`,
+      note: i18n._({ id: "{name} + {count, plural, one {# change} other {# changes}}", message: "{name} + {count, plural, one {# change} other {# changes}}", values: { name, count: changed.length } }),
       action: free.length > 0 ? { label: `Back to ${name}`, onPress: () => resetKeys(free) } : undefined,
     };
   }

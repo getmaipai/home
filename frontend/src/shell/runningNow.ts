@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // ACTIVITY-01d: map /api/jobs into the safe activity rows rendered by the
 // chat's shipped TaskCard and BackgroundInbox Elements. Copy follows
 // UI-STUDY.md 8.4: children get friendly words, nobody reads engine names,
@@ -65,18 +66,17 @@ function progressOf(progress: Record<string, unknown> | null | undefined): numbe
 }
 
 function etaWords(seconds: number): string {
-  if (seconds < 60) return "Less than a minute left";
+  if (seconds < 60) return i18n._({ id: "Less than a minute left", message: "Less than a minute left", values: {  } });
   const minutes = Math.round(seconds / 60);
-  return minutes === 1 ? "About a minute left" : `About ${minutes} minutes left`;
+  return i18n._({ id: "{minutes, plural, one {About a minute left} other {About # minutes left}}", message: "{minutes, plural, one {About a minute left} other {About # minutes left}}", values: { minutes } });
 }
 
 function elapsedWords(seconds: number): string {
-  if (seconds < 10) return "Just started";
-  const plural = (n: number, unit: string) => `Started ${n} ${unit}${n === 1 ? "" : "s"} ago`;
-  if (seconds < 60) return plural(Math.round(seconds), "second");
+  if (seconds < 10) return i18n._({ id: "Just started", message: "Just started", values: {  } });
+  if (seconds < 60) return i18n._({ id: "Started {count, plural, one {# second} other {# seconds}} ago", message: "Started {count, plural, one {# second} other {# seconds}} ago", values: { count: Math.round(seconds) } });
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return plural(minutes, "minute");
-  return plural(Math.round(minutes / 60), "hour");
+  if (minutes < 60) return i18n._({ id: "Started {count, plural, one {# minute} other {# minutes}} ago", message: "Started {count, plural, one {# minute} other {# minutes}} ago", values: { count: minutes } });
+  return i18n._({ id: "Started {count, plural, one {# hour} other {# hours}} ago", message: "Started {count, plural, one {# hour} other {# hours}} ago", values: { count: Math.round(minutes / 60) } });
 }
 
 function detailFor(job: HomeJobView, viewer: RunningNowViewer, now: number): string | undefined {

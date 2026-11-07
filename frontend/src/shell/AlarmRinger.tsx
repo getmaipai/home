@@ -12,12 +12,13 @@ import { ALARM_LOOP_MAX_MS, startAlarmLoop, unlockAlarmAudio, type AlarmPlayback
 import { NOTIFICATIONS_HISTORY_QUERY_KEY, NOTIFICATIONS_QUERY_KEY, useNotificationsQuery } from "@/shell/NotificationBell";
 import { useHubMutation } from "@/lib/useHubMutation";
 import styles from "@/shell/alarmRinger.module.css";
+import { formatTime } from "@/lib/format";
 
 const RECENT_MS = 2 * 60_000;
 type AlarmDelivery = NotificationDeliveryView & { subjectJobId?: string | null };
 
 function formattedTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  return formatTime(value);
 }
 
 function lineFor(item: AlarmDelivery) {

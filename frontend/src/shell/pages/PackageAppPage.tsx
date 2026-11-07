@@ -28,6 +28,7 @@ import { useMediaHubActive } from "@/shell/mediaHubSession";
 import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { MusicStudioPage, isStudioPage } from "@/shell/pages/MusicStudioPages";
+import { formatDate, formatTime } from "@/lib/format";
 import "./packageAppNews.css";
 
 
@@ -68,7 +69,7 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
   const clock = (value: string) => {
     const match = /T(\d{2}):(\d{2})/.exec(value);
     if (!match) return value;
-    return new Intl.DateTimeFormat(i18n.locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2020, 0, 1, Number(match[1]), Number(match[2]))));
+    return formatDate(Date.UTC(2020, 0, 1, Number(match[1]), Number(match[2])), { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
   };
   const hasWeather = number(current, "temp") !== undefined && string(current, "condition") !== undefined;
   return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), state: place.geo?.area ?? undefined, latitude: place.geo?.lat, longitude: place.geo?.lon, timezone: string(details, "timezone"), isMyLocation: place.label.endsWith(" (home)"), detail: hasWeather ? {
@@ -81,7 +82,7 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
     pressure: number(details, "pressure"), visibility: number(details, "visibility") === undefined ? undefined : number(details, "visibility")! / 1000,
     sunrise: string(details, "sunrise") ? clock(string(details, "sunrise")!) : undefined, sunset: string(details, "sunset") ? clock(string(details, "sunset")!) : undefined, uvIndex: number(details, "uv_index"),
     moon: moonDetail(details.moon),
-  } : undefined, localTime: string(details, "timezone") ? new Intl.DateTimeFormat(i18n.locale, { hour: "numeric", minute: "2-digit", timeZone: string(details, "timezone") }).format(new Date()) : undefined };
+  } : undefined, localTime: string(details, "timezone") ? formatTime(new Date(), { timeZone: string(details, "timezone") }) : undefined };
 }
 
 /** The Weather moon tile's data from a page document's `moon` object; the next full and new moon dates ride along only when they are strings. */

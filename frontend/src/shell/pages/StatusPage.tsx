@@ -19,6 +19,7 @@ import { statusTimelineEvents } from "@/shell/pages/status/statusTimelineEvents"
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Status } from "@maipai/ui/src/ui/status";
 import type { EngineComputerStatus as EngineComputerStatusData } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 
 const engineComputerLabel = (state: EngineComputerStatusData["state"]): string => ({
   working: i18n._({ id: "Working", message: "Working" }), connecting: i18n._({ id: "Connecting", message: "Connecting" }), slow_to_answer: i18n._({ id: "Slow to answer", message: "Slow to answer" }), reconnecting: i18n._({ id: "Reconnecting", message: "Reconnecting" }), not_reachable: i18n._({ id: "Not reachable", message: "Not reachable" }),
@@ -70,7 +71,7 @@ export function StatusPage({ person }: { person: Roster }) {
           {engineComputerQuery.data.reason ? <p className="mt-2 text-sm text-muted-foreground">{engineComputerQuery.data.reason}</p> : null}
           {canSeeParts && engineComputerQuery.data.details ? <dl className="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
             <div><dt className="inline font-medium">{i18n._({ id: "Path:", message: "Path:" })} </dt><dd className="inline">{engineComputerQuery.data.details.path === "tailnet" ? i18n._({ id: "Through your Tailscale network", message: "Through your Tailscale network" }) : engineComputerQuery.data.details.path === "home" ? i18n._({ id: "Through your home network", message: "Through your home network" }) : i18n._({ id: "Not connected yet", message: "Not connected yet" })}</dd></div>
-            <div><dt className="inline font-medium">{i18n._({ id: "Last probe:", message: "Last probe:" })} </dt><dd className="inline">{engineComputerQuery.data.details.lastProbeAt ? new Date(engineComputerQuery.data.details.lastProbeAt).toLocaleString() : i18n._({ id: "No successful probe yet", message: "No successful probe yet" })}</dd></div>
+            <div><dt className="inline font-medium">{i18n._({ id: "Last probe:", message: "Last probe:" })} </dt><dd className="inline">{engineComputerQuery.data.details.lastProbeAt ? formatDateTime(engineComputerQuery.data.details.lastProbeAt) : i18n._({ id: "No successful probe yet", message: "No successful probe yet" })}</dd></div>
             <div><dt className="inline font-medium">{i18n._({ id: "Stack contract:", message: "Stack contract:" })} </dt><dd className="inline">{engineComputerQuery.data.details.contract ?? i18n._({ id: "Not reported", message: "Not reported" })}</dd></div>
           </dl> : null}
         </CardContent>

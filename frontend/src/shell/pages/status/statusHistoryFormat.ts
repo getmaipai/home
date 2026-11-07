@@ -1,5 +1,6 @@
 import { i18n } from "@lingui/core";
 import type { StatusHistoryDay, StatusHistoryIncident, StatusHistoryMinutes } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 
 export function durationWords(minutes: number): string {
   if (minutes <= 0) return i18n._({ id: "just now", message: "just now" });
@@ -41,7 +42,7 @@ export function daySummary(minutes: StatusHistoryMinutes): string {
 }
 
 export function dateWords(value: string, options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }): string {
-  return new Intl.DateTimeFormat(i18n.locale, { ...options, timeZone: "UTC" }).format(new Date(value));
+  return formatDate(value, { ...options, timeZone: "UTC" });
 }
 
 export function dayData(day: StatusHistoryDay) {

@@ -53,4 +53,27 @@ describe("usePersonLocale", () => {
     renderHook(() => usePersonLocale({ id: "p1" }), { wrapper });
     await waitFor(() => expect(i18n.locale).toBe("en-US"));
   });
+
+  test("returns false while who is signed in is unknown, true once the first language is active", async () => {
+    const { wrapper } = wrap();
+    const { result, rerender } = renderHook(({ person }: { person: { id: string } | null | undefined }) => usePersonLocale(person), { wrapper, initialProps: { person: undefined as { id: string } | null | undefined } });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(result.current).toBe(false);
+    expect(i18n.locale).toBe("en-US");
+    rerender({ person: null });
+    await waitFor(() => expect(result.current).toBe(true));
+    expect(i18n.locale).toBe("en-GB");
+  });
+
+  test("a newer choice wins even when an older language's catalog is slower", async () => {
+    const { wrapper } = wrap();
+    // The household answers es slowly; the person's own setting (en-GB) is read after it and must be the one left active.
+    (api.locale as unknown as ReturnType<typeof spyOn>).mockImplementation(async () => ({ locale: "es" }));
+    values = { person: "en-GB", household: "es" };
+    const { rerender } = renderHook(({ person }: { person: { id: string } | null }) => usePersonLocale(person), { wrapper, initialProps: { person: null as { id: string } | null } });
+    rerender({ person: { id: "p1" } });
+    await waitFor(() => expect(i18n.locale).toBe("en-GB"));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 100)); });
+    expect(i18n.locale).toBe("en-GB");
+  });
 });

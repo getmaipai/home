@@ -158,7 +158,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                   ) : null}
                   {pendingToken || usePassword ? (
                     <Button type="submit" size="lg" disabled={busy || locked}>
-                      {busy ? i18n._({ id: "Signing in…", message: "Signing in…" }) : pendingToken ? "Continue" : "Sign in"}
+                      {busy ? i18n._({ id: "Signing in…", message: "Signing in…" }) : pendingToken ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Sign in", message: "Sign in" })}
                     </Button>
                   ) : null}
                   {!pendingToken && pinDigits !== null ? (

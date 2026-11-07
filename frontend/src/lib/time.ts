@@ -1,7 +1,12 @@
-import { dateMs, formatRelative as kitFormatRelative } from "@maipai/ui/src/relativeTime";
+import { dateMs } from "@maipai/ui/src/relativeTime";
+import { formatRelative as relativeWords } from "@/lib/format";
 
-/** The kit's relative time, safe for a value that is not a date: "" instead of "undefined NaN NaN" (AUDIT-UI-01). */
+/**
+ * How long ago a date was, in the active language ("now", "hace 3 min", "ayer", "7 nov"); "" for a value that is not a date (AUDIT-UI-01).
+ * Kit gap: `@maipai/ui/src/relativeTime` words ("now", "Yesterday", "Oct 5") are English only and take no locale, so Home words them
+ * through `lib/format`. `dateMs` is the kit's and stays.
+ */
 export function formatRelative(value: string | null | undefined, now: Date = new Date()): string {
-  if (typeof value !== "string" || dateMs(value) === undefined) return "";
-  return kitFormatRelative(value, now);
+  const ms = typeof value === "string" ? dateMs(value) : undefined;
+  return ms === undefined ? "" : relativeWords(ms, now);
 }

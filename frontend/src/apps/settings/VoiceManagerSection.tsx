@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@maipai/ui/src/ui/input";
 import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { errorLine } from "@/lib/hubReachability";
+import { languageName as formatLanguageName } from "@/lib/format";
+import { activeLocale } from "@/lib/activeLocale";
 
 const genderLabel = (gender: StackVoice["gender"]): string => gender === "female" ? i18n._({ id: "Female", message: "Female" }) : gender === "male" ? i18n._({ id: "Male", message: "Male" }) : gender === "neutral" ? i18n._({ id: "Neutral", message: "Neutral" }) : i18n._({ id: "Not stated", message: "Not stated" });
 // AUDIT-UI-01: the five columns need about 640 px; the settings content pane is 728 px at most and about 470 px beside the 1024 px column, so
@@ -22,7 +24,7 @@ const MUTED = "text-sm text-muted-foreground";
 
 function languageName(code: string): string {
   if (!code || code === "unknown") return i18n._({ id: "Not stated", message: "Not stated" });
-  try { return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code; } catch { return code; }
+  return formatLanguageName(code, activeLocale());
 }
 const isEngineVoice = (voice: Pick<StackVoice, "id">) => presetNameForVoice(voice.id, ["default"]) === "default";
 const isHomeDefault = (voice: StackVoice, homeDefault: string) => homeDefault === "default" ? isEngineVoice(voice) : voice.id === homeDefault || presetNameForVoice(voice.id, [homeDefault]) === homeDefault;

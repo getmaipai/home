@@ -69,6 +69,7 @@ import { useSideChat } from "@/shell/useSideChat";
 import { AmbientHeaderProvider } from "@/shell/ambientHeaderContext";
 import { AmbientPageContextProvider, ambientPageContextForRoute } from "@/shell/pageContext";
 import { routeTitle } from "@/shell/routeHeader";
+import { formatTime, formatUnit } from "@/lib/format";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
@@ -295,7 +296,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     name={ambientName!}
     trigger={ambientTrigger}
     ready={chatAvailability === "ready"}
-    context={ambient.kind === "bot" ? (ambient.online ? ambient.room ? `In the ${ambient.room.toLowerCase()}${ambient.battery != null ? `, on battery ${ambient.battery}%` : ambient.onBattery === false ? ", plugged in" : ""}` : "Online" : `Offline since ${new Date(ambient.device.lastSeenAt ?? ambient.device.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`) : appName ? `You're on ${appName}` : undefined}
+    context={ambient.kind === "bot" ? (ambient.online ? ambient.room ? `In the ${ambient.room.toLowerCase()}${ambient.battery != null ? `, on battery ${formatUnit(ambient.battery, "percent")}` : ambient.onBattery === false ? ", plugged in" : ""}` : "Online" : `Offline since ${formatTime(ambient.device.lastSeenAt ?? ambient.device.createdAt, { hour: "numeric", minute: "2-digit" })}`) : appName ? `You're on ${appName}` : undefined}
     lastLine={lastLine || undefined}
     askPlaceholder={`Ask ${ambientName}`}
     onAsk={(text) => {

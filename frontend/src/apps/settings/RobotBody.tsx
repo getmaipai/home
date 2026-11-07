@@ -11,6 +11,7 @@ import { NO_VENDOR_LOGIN, robotCapabilityLabel } from "@/apps/settings/capabilit
 import { isOwnerOrAdminRole } from "@/lib/api";
 import type { Role } from "@maipai/ui/src/settings/settingsAudience";
 import { errorLine } from "@/lib/hubReachability";
+import { formatDateTime } from "@/lib/format";
 
 const activityLabels = (): Record<RobotDeviceState["activity"], string> => ({
   starting: i18n._({ id: "Starting up", message: "Starting up" }),
@@ -23,7 +24,7 @@ const activityLabels = (): Record<RobotDeviceState["activity"], string> => ({
 });
 
 function whenText(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatDateTime(iso);
 }
 
 function batteryText(state: RobotDeviceState): string {

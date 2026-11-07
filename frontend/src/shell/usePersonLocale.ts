@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type SignedInPerson } from "@/lib/api";
 import { activateLocale } from "@/i18n";
@@ -13,22 +13,40 @@ export function chooseLocale(personValue: unknown, householdValue: unknown): str
   return typeof householdValue === "string" ? householdValue : "en-US";
 }
 
-/** Signed out: the household language from the public GET /api/auth/locale. Signed in: the person's `person.locale`, else
- * `household.locale`; activated again, without a reload, whenever either setting's cached values change. */
-export function usePersonLocale(person: Pick<SignedInPerson, "id"> | null | undefined, enabled = true): void {
+// One activation at a time, in call order, and only the newest request runs: a slow catalog chunk for an older choice (the household's)
+// can never land after a newer one (the person's). Shared by every run of the hook, so a re-run on sign-in joins the same line.
+let queue: Promise<void> = Promise.resolve();
+let newest = 0;
+function activateNewest(locale: string): Promise<void> {
+  const mine = ++newest;
+  queue = queue.then(() => (mine === newest ? activateLocale(locale) : undefined));
+  return queue;
+}
+const FIRST_ACTIVATION_WAIT_MS = 4000;
+
+/** Signed out (`null`): the household language from the public GET /api/auth/locale. Signed in: the person's `person.locale`, else
+ * `household.locale`; activated again, without a reload, whenever either setting's cached values change. `undefined` means "not known
+ * yet" and waits. Returns true once the first language is active (or after a short wait, or at once when `enabled` is false), so the
+ * root can hold the router back and no page, `/setup` and the sign-in page included, first shows English and then flips. */
+export function usePersonLocale(person: Pick<SignedInPerson, "id"> | null | undefined, enabled = true): boolean {
   const queryClient = useQueryClient();
   const personId = person?.id;
+  const unknown = person === undefined;
+  const [ready, setReady] = useState(!enabled);
   // The kit draws registry text as sent; this keeps the shared settings caches in the active language.
   useEffect(() => installSettingCopyCache(queryClient), [queryClient]);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || unknown) return;
     let current = true;
-    // One activation at a time, in call order, so a slow chunk can never land after a newer choice.
-    let queue: Promise<void> = Promise.resolve();
-    const activate = (locale: string) => { queue = queue.then(() => activateLocale(locale)); };
+    let first = true;
+    const timer = setTimeout(() => setReady(true), FIRST_ACTIVATION_WAIT_MS);
+    const activate = (locale: string) => {
+      const done = activateNewest(locale);
+      if (first) { first = false; void done.then(() => { if (current) setReady(true); }); }
+    };
     if (!personId) {
       void api.locale().then(({ locale }) => { if (current) activate(locale); }).catch(() => { if (current) activate("en-US"); });
-      return () => { current = false; };
+      return () => { current = false; clearTimeout(timer); };
     }
     const personScope = `person:${personId}`;
     let personValue: unknown;
@@ -62,6 +80,7 @@ export function usePersonLocale(person: Pick<SignedInPerson, "id"> | null | unde
         apply();
       }
     });
-    return () => { current = false; unsubscribe(); };
-  }, [personId, enabled, queryClient]);
+    return () => { current = false; clearTimeout(timer); unsubscribe(); };
+  }, [personId, unknown, enabled, queryClient]);
+  return ready;
 }

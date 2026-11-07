@@ -1,11 +1,9 @@
 import { Toggle } from "@maipai/ui/src/ui/toggle";
-import { activeLocale } from "@/lib/activeLocale";
+import { formatDate } from "@/lib/format";
 
 // 2024-01-01 is a Monday, so day 1 to 7 (Monday to Sunday) maps to January 1 to 7 in UTC; the names follow the active language.
 const daysOfWeek = (): Array<[number, string, string]> => {
-  const letter = new Intl.DateTimeFormat(activeLocale(), { weekday: "narrow", timeZone: "UTC" });
-  const name = new Intl.DateTimeFormat(activeLocale(), { weekday: "long", timeZone: "UTC" });
-  return [1, 2, 3, 4, 5, 6, 7].map((day) => [day, letter.format(new Date(Date.UTC(2024, 0, day))), name.format(new Date(Date.UTC(2024, 0, day)))]);
+  return [1, 2, 3, 4, 5, 6, 7].map((day) => [day, formatDate(Date.UTC(2024, 0, day), { weekday: "narrow", timeZone: "UTC" }), formatDate(Date.UTC(2024, 0, day), { weekday: "long", timeZone: "UTC" })]);
 };
 
 export function AlarmDays({ days, onToggle }: { days: number[]; onToggle: (day: number) => void }) {

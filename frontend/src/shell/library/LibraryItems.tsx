@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { SafeImage, type ImageFallbackKind } from "@maipai/ui/src/primitives/SafeImage";
 import { getIcon } from "@maipai/ui/src/icons";
 import { formatBytes } from "@maipai/ui/src/format";
-import { formatRelative } from "@maipai/ui/src/relativeTime";
+import { formatRelative } from "@/lib/time";
 import { api, type LibraryItem, type Roster } from "@/lib/api";
 import { canShareFiles, extensionOf, fileKind, hasThumbnail, isAdultRole, ownerName, secondaryLine, spokenDetail, type SortId } from "./libraryModel";
 
@@ -117,7 +117,7 @@ export function LibraryItems({ items, me, layout, phone, selectedIds, onSelectio
     { id: "type", header: "Type", minWidth: 80, cell: (item) => extensionOf(item) ?? fileKind(item.kind) },
     { id: "size", header: "Size", align: "end", sortable: true, minWidth: 88, cell: (item) => formatBytes(item.size_bytes) },
     { id: "owner", header: "Owner", minWidth: 96, cell: (item) => ownerName(item, me) },
-    { id: "shared", header: "Shared with", minWidth: 120, cell: (item) => item.shared_with.household ? "Everyone in the home" : item.shared_with.count > 0 ? `${item.shared_with.count} ${item.shared_with.count === 1 ? "person" : "people"}` : "Only the owner" },
+    { id: "shared", header: "Shared with", minWidth: 120, cell: (item) => item.shared_with.household ? "Everyone in the home" : item.shared_with.count > 0 ? i18n._({ id: "{count, plural, one {# person} other {# people}}", message: "{count, plural, one {# person} other {# people}}", values: { count: item.shared_with.count } }) : "Only the owner" },
     // The menu lives in the last cell: the table gives the header no matching actions cell, so a separate one would push every column out of line.
     { id: "modified", header: "Added", sortable: true, minWidth: 168, cell: (item) => (
       <span className="flex items-center justify-between gap-2">

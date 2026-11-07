@@ -4,6 +4,7 @@ import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
 import { textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
+import { formatUnit } from "@/lib/format";
 
 export type FeedbackVerdict = "positive" | "negative";
 
@@ -136,7 +137,7 @@ function sentPictureAttachments(images: NonNullable<ConversationTurnWithMemoryId
 
 type TurnWithAudio = ConversationTurnWithMemoryIds & { audio?: { id: string; name: string; media_type: string; duration_ms?: number }[] };
 function sentAudioAttachments(audio: NonNullable<TurnWithAudio["audio"]>): CompleteAttachment[] {
-  return audio.map((item) => ({ id: item.id, type: "file", name: item.name, contentType: item.media_type, status: { type: "complete" }, content: [{ type: "text", text: `Audio: ${item.name}${item.duration_ms === undefined ? "" : ` (${Math.round(item.duration_ms / 1000)}s)`}` }] }));
+  return audio.map((item) => ({ id: item.id, type: "file", name: item.name, contentType: item.media_type, status: { type: "complete" }, content: [{ type: "text", text: `Audio: ${item.name}${item.duration_ms === undefined ? "" : ` (${formatUnit(Math.round(item.duration_ms / 1000), "second", { unitDisplay: "narrow" })})`}` }] }));
 }
 
 export function rowsToBranchableMessages(

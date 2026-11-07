@@ -15,6 +15,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { request, type Roster } from "@/lib/api";
 import { baseViewer } from "@/shell/pages/settings/settingsViewer";
 import { useTabItem } from "@/shell/tabIdentity";
+import { formatDate } from "@/lib/format";
 import "@/shell/pages/settings/settingsTokens.css";
 
 export interface TrashRow {
@@ -55,7 +56,7 @@ export function TrashPage({ person }: { person: Roster }) {
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription><Button onClick={() => void query.refetch()}>{i18n._({ id: "Refresh Trash", message: "Refresh Trash" })}</Button></Alert> : null}
       <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Home could not load Trash. Try again.", message: "Home could not load Trash. Try again." })} loadingLabel={i18n._({ id: "Loading Trash", message: "Loading Trash" })}>{() => rows.length === 0 ? <Empty><EmptyHeader><EmptyDescription>{search ? i18n._({ id: "No items match your search.", message: "No items match your search." }) : i18n._({ id: "Trash is empty. Things you delete stay here for 30 days.", message: "Trash is empty. Things you delete stay here for 30 days." })}</EmptyDescription></EmptyHeader></Empty> :
         <ItemGroup>{rows.map((row) => <Item key={`${row.kind}:${row.id}`}>
-          <ItemContent><ItemTitle>{row.title}</ItemTitle><ItemDescription>{row.trash_until ? i18n._({ id: "Kept until {date}", message: "Kept until {date}", values: { date: new Date(row.trash_until).toLocaleDateString() } }) : i18n._({ id: "Waiting for removal", message: "Waiting for removal" })}</ItemDescription></ItemContent>
+          <ItemContent><ItemTitle>{row.title}</ItemTitle><ItemDescription>{row.trash_until ? i18n._({ id: "Kept until {date}", message: "Kept until {date}", values: { date: formatDate(row.trash_until) } }) : i18n._({ id: "Waiting for removal", message: "Waiting for removal" })}</ItemDescription></ItemContent>
           <ItemActions><Button disabled={busy || !row.can_restore} onClick={() => void act(row, true)}>{i18n._({ id: "Restore", message: "Restore" })}</Button><Button variant="destructive" disabled={busy || !row.can_purge} onClick={() => setPending(row)}>{i18n._({ id: "Delete forever", message: "Delete forever" })}</Button></ItemActions>
         </Item>)}</ItemGroup>}</AsyncState>
     </SettingsShell>

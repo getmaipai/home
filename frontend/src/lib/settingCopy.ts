@@ -2,6 +2,7 @@
 // English; this looks the same text up by id and uses the translation only while the English still matches the generated source.
 import { i18n } from "@lingui/core";
 import { AREA_COPY, SETTING_COPY, SETTING_REASONS } from "./settingCopy.generated";
+import { languageName as formatLanguageName } from "@/lib/format";
 
 type Def = { key: string; label: string; help?: string; copy?: Record<string, unknown> };
 
@@ -46,11 +47,4 @@ export function settingState(english: string | undefined): string | undefined {
 export const areaText = (english: string): string => AREA_COPY[english]?.() ?? english;
 
 /** A language named in its own language (Español, English (United Kingdom)), so a person finds theirs whatever language is on screen. */
-export function languageName(tag: string): string {
-  try {
-    const name = new Intl.DisplayNames([tag], { type: "language" }).of(tag);
-    return name ? name.charAt(0).toLocaleUpperCase(tag) + name.slice(1) : tag;
-  } catch {
-    return tag;
-  }
-}
+export const languageName = (tag: string): string => formatLanguageName(tag);
