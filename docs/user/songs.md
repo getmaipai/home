@@ -9,6 +9,10 @@ Home can write and sing a song on your own computer. Nothing is sent to anyone.
 
 A Mac with 64 GB of memory or more, and the music model. An owner or admin gets the model once in **Settings**, **Models and storage**, under **Music** (about 11 GB). On a smaller computer, Home says songs are not available and why.
 
+## Make a song in Music
+
+Adults can also open **Music**, then **Create**, choose **Song**, and describe the song in the box. Pick **Lyrics** or **Instrumental**, **Quick** or **Full**, and any **Styles**, then press **Generate**. The song lands in **Library** in Music. For bands, albums, sounds and voices, see [Play music](music.md).
+
 ## Quick and full songs
 
 A song is as long as its words. There are two kinds:

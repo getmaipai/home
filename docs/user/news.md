@@ -7,7 +7,7 @@ description: Read stories from the feeds your home chose.
 
 Open **News** from your apps. It reads the same [news shelf](news-shelf.md) that MaiPai uses when you ask for headlines.
 
-On a wide screen News has a sidebar on the left, like the one in Chat. It holds the search box, **Today**, **My Mix** (teens and adults) and **Saved**, then every **Topic** you can open, then the sources you follow, with **Manage** at the end of that list. Choose a topic or a source to see its stories. On a phone the same choices are in the menu drawer.
+On a wide screen News has a sidebar on the left, like the one in Chat. It holds **Search News**, **Today**, **My Mix** (teens and adults) and **Saved**, then every **Topics** entry you can open, then **Following**, the sources you follow. Choose a topic or a source to see its stories. Open the **Following** page to manage what you follow. On a phone the same choices are in the menu drawer.
 
 Each topic page is laid out for its subject, the way Apple News does it. World, Business, Sports and Kids open on **Top Stories**: three tall cards, three cards with the picture on the right, then the rest as a list. Science, Health and Environment open with two large cards, then two cards with the picture on the right. Local, Technology and Entertainment open on **Today's News**: three tall cards, then **More for you** with one wide card. A source you follow keeps one wide lead card over a list.
 

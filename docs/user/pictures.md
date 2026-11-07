@@ -13,6 +13,8 @@ You can ask for up to 4 pictures at once ("give me three options") and for a sha
 
 When it is done, the picture appears in the chat. Tap it to see it bigger. A Standard picture takes a few seconds on a fast computer and longer on a slower one.
 
+Every picture you make also lands in your [Library](library.md), under **Pictures**. You can find it there later, share it and open it big.
+
 If someone is chatting or talking to Home while a picture is being made, the card says "Paused while chat is working". It carries on after the reply. The wait is not counted against the picture.
 
 ## Standard or Boost
@@ -54,12 +56,11 @@ Home blocks CSAM. The model decides whether to make other adult content, includi
 Open **Settings**, **Pictures, videos and music**.
 
 - **Adults can make pictures.** Turn it off to stop all picture making.
-- **Adult-only styles.** Choose whether styles marked adults only can be used.
 - **Level when nobody says.** Choose **Standard** or **Boost** for the pictures chat makes when nobody names a level. Anyone can pick a level for one picture.
 - **Picture models.** Press **Choose models** to open **AI and models**, where you choose which models make Standard and Boost pictures. Installing a model happens there and in **Models and storage**, not on this page.
 - **Children and teens.** Choose whether children can make cartoons, and how many a day. See [cartoon controls](people.md#cartoon-pictures-and-videos).
 
-- **Styles.** A style gives pictures and videos a look, like old film or clay. Styles have their own tab, **Styles**. Only admins add them. A new style is for admins only until you choose **All adults** or **Chosen people** for it. Adult-only styles stay behind one **Locked items** row until you enter your own passcode. They lock again when you leave the tab.
+- **Styles.** A style gives pictures and videos a look, like old film or clay. Styles have their own tab, **Styles**. Only admins add them. A new style is for admins only until you choose **All adults** or **Chosen people** for it. Adult-only styles stay behind one **Locked items** row until you enter your own passcode. They lock again when you leave the tab or after 2 minutes without a touch. The **Adult-only styles** choice on that tab can hide every adult-only style from all adults until you switch it back. Nothing is deleted.
 
 ### Add a style
 
@@ -85,7 +86,7 @@ The picture engine checks that the file is supported and safe to process. Conten
 | The reply says it is coming but no picture shows yet | The picture started and the reply did not finish | Wait a minute. The card fills in |
 | You asked chat to change a picture and got a new one | The picture tool cannot change an existing picture | Press **Edit** on the picture instead |
 | A style file is refused | Over 120 MB in the form, or it was made for another picture model (Pony, Illustrious and SDXL styles do not fit yet) | For a big file, type its path on this computer instead. Otherwise use a different style |
-| You cannot find **Edit** | The picture may not be in this chat | Open the picture in this chat and choose **Edit**. If it is in **Files**, open it there |
+| You cannot find **Edit** | The picture may not be in this chat | Open the picture in this chat and choose **Edit**. If it is in the Library, open it there and choose **Edit in its chat** |
 
 ## Private chats
 

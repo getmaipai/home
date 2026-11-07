@@ -7,14 +7,16 @@ The **Podcasts** app plays the shows your home follows. It works like Apple Podc
 
 ## Open it
 
-Open **Podcasts** from the apps list or from your favorites. At the top you see the app's name and five tabs: **Listen now**, **Shows**, **Episodes**, **Queue** and **Saved**.
+Open **Podcasts** from the apps list or from your favorites. The app has these pages: **Podcasts** (the first page), **Shows**, **Episodes**, **Filters**, **Stats**, **Queue** and **Saved**.
 
-## Listen now
+## The first page
 
-- **Up next** is your queue. Press a picture to play it.
-- **Continue listening** shows episodes you started and did not finish. A thin bar under each picture shows how far you got.
+- A big picture at the top shows a few popular shows, when your home may look for podcasts online. Press **Open show** to read about one.
+- **Search podcasts** finds shows in a public list, when your home allows it.
+- **Up Next** shows episodes you started and did not finish. A thin bar under each picture shows how far you got.
 - **New episodes** shows the newest episodes from your shows.
 - **Your shows** lists each show and what Home does for it, such as "Keeps the newest 3", "Streams only" or "Skips first 30 s". Press a show to see its episodes.
+- **Top shows** lists popular shows. Press **Follow** beside one to add it (admins only).
 
 A row with nothing in it does not show.
 
@@ -24,21 +26,31 @@ A badge on a picture says **Saved** when the episode is stored on your hub. **No
 
 Press a picture. The episode opens with its title. Press the big play button.
 
-- The speed button picks a slower or faster speed. Home remembers it for podcasts (Settings, Voice).
-- The sleep timer stops the sound after a time you pick, or at the end of the episode.
+- The speed button picks a slower or faster speed. Home remembers it for podcasts (**Settings**, **Voice**).
+- The moon button on the small player at the bottom is the sleep timer. It stops the sound after 15, 30, 45 or 60 minutes, or at the end of this episode.
 - If the show lists chapters, the chapter button lets you jump to one.
 
 When you come back to an episode, it starts where you stopped. A show can also skip its first seconds the first time you play an episode, and count the last seconds as played. When you leave an episode, its mini player stays at the bottom of the app.
 
 Under the player you see three buttons:
 
-- **Add to queue** puts the episode in **Up next**. Press it again to take it out. A finished episode leaves your queue by itself.
+- **Add to queue** puts the episode on your **Queue** page. Press it again to take it out. A finished episode leaves your queue by itself.
 - **Save on the hub** keeps a copy on the hub for people who may see that episode. It plays with the internet off. Only grown-ups can save a copy. The person who saved it or a grown-up admin can remove it. Press it again to move the copy to Trash for 30 days. You can restore it from Settings, Storage, Trash. The episode still plays from the show's website.
-- **Bookmark** marks the place you are at. Your bookmarks show on the **Saved** tab.
+- **Bookmark** marks the place you are at. Your bookmarks show on the **Saved** page.
 
-## Saved
+If the episode is yours to change, an **Edit** button lets you change its title, description and cover.
 
-**Saved** lists the episodes stored on your hub, and your bookmarks. Saved episodes stay when the internet is down. If Home says the internet is down, everything saved still plays.
+## Queue and Saved
+
+**Queue** lists the episodes you added, in order.
+
+**Saved** lists the episodes stored on your hub, and your bookmarks. Snips, short clips with a note, show here too when you have them. Saved episodes stay when the internet is down. If Home says the internet is down, everything saved still plays.
+
+## Episodes and Stats
+
+**Episodes** lists every episode. Use **Show** to look at one show. Type in **Search transcripts** to find the words said in an episode. Matches show under **Transcript matches**, and pressing one plays from that spot.
+
+**Stats** shows your listening totals. Pick a **Year** to see it. It stays empty until you listen to some episodes.
 
 ## Filters
 
@@ -50,13 +62,22 @@ You see only the shows a grown-up chose for you, and only the episodes marked cl
 
 ## Add and remove shows
 
-Only a grown-up with an admin account can add or remove a show. A show needs its feed address, which starts with `https://`. You can also bring all your shows from another podcast app: export an **OPML** file there and import it here. An admin can export the list from Home too.
+Only a grown-up with an admin account can add or remove a show. To find one, type in **Search podcasts** and press **Follow** beside a show, or open a show and press **Follow**. Searching needs the home switch below to be on. You can also add a show with its feed address, which starts with `https://`. You can also bring all your shows from another podcast app: export an **OPML** file there and import it here. An admin can export the list from Home too.
 
 Home checks each show about every hour while nobody is using it. It asks for what changed and gets the show's picture. Save gets one episode. Keep rules also get episodes on their own after a check or a rule change.
 
 The feed, episode and picture websites see your home's internet address and the address of the file requested. Other sites that send the files or pass the request along see these too. Home sends no name, device ID, cookie, chat or listening history.
 
 A list of imported shows is checked in small groups over time. Removing a show stops its checks and removes its saved picture. Saved episodes stay private in Storage.
+
+## Let your home look for podcasts online
+
+An owner or admin chooses this. Open **Settings**, **Pictures, videos and music**, then the **Music** tab, then **Online radio and podcasts**.
+
+- **Find podcasts online** lets adults search a public list of shows. It is on by default. Turn it off to stop all searches.
+- **Let teens find podcasts** lets teens search too. It is off by default. Children never can.
+
+Searches go to a public podcast list and show your home's address to it.
 
 ## What Home keeps
 

@@ -7,15 +7,18 @@ The **Videos** app plays the videos that are saved on your hub. It works like Yo
 
 ## Open it
 
-Open **Videos** from the apps list or from your favorites. At the top you see the app's name and four tabs: **Home**, **Library**, **Watch later** and **History**. Videos stays dark, even when the rest of Home is light, so pictures look their best.
+Open **Videos** from the apps list or from your favorites. A column on the left lists **Videos**, **Library**, **Watch later** and **History**. Use **Search Videos** at the top of the column to find a video by name. Videos stays dark, even when the rest of Home is light, so pictures look their best.
 
-## Home
+A grown-up also sees **Create**, **Studio** and **My clips** in the column. Those are for [making videos](videos.md).
+
+## The Videos page
 
 - A big picture at the top shows a few videos Home picked. Press **Play** to watch one, or **Watch later** to keep it for another day.
+- **Made at home** shows videos made in chat or in Create.
 - **Continue watching** shows videos you started and did not finish. A thin bar under each picture shows how far you got.
-- **Recently added** shows the newest videos. **More from your most watched** shows other videos from the place you watch most.
+- **New from your channels** and **Recently added** show the newest videos. **More from your most watched** shows other videos from the place you watch most.
 - **Watch again** shows videos you finished.
-- **Everything in your library** lists all your videos.
+- **From your videos** lists the rest.
 
 A row with nothing in it does not show. **See all** beside a row opens the full list.
 
@@ -32,7 +35,7 @@ Press a picture. The video opens with its title. Press the big play button.
 
 When you leave a video and come back, it starts where you stopped. For two seconds it says "Resumed from" and the time, with **Start over** beside it.
 
-Under the video you see its title and channel, with **Like** and **Watch later**. Press one again to undo it. **Up next** shows what plays after: beside the video on a wide screen, under it on a phone. When a video ends, the next one starts after a short countdown. You can stop the countdown.
+Under the video you see its title and channel, with **Like** and **Watch later**. Press one again to undo it. If the video is yours, an **Edit** button lets you change its title, its description and its cover picture. **Up next** shows what plays after: beside the video on a wide screen, under it on a phone. When a video ends, the next one starts after a short countdown. You can stop the countdown.
 
 ## Keep watching while you look around
 
@@ -44,11 +47,11 @@ Leave the video while it plays, and it keeps playing in a small bar at the botto
 
 ## Watch later and History
 
-Press **Watch later** on the Home picture to save a video. Press it again to take the video off the list. **Watch later** shows your saved videos in the order you saved them. **History** shows what you watched, newest first. Only you see your own lists.
+Press **Watch later** on a video to save it. Press it again to take the video off the list. **Watch later** shows your saved videos in the order you saved them. **History** shows what you watched, newest first. Only you see your own lists.
 
 ## If you are a child
 
-You see the videos your family has cleared for children. You do not see the big picture or the lists of new videos, so nothing surprising shows up. **Everything in your library** and **Library** show all your videos. If you cannot find a video, ask a grown-up.
+You see the videos your family has cleared for children. You do not see the big picture or the lists of new videos, so nothing surprising shows up. **From your videos** and **Library** show all your videos. If you cannot find a video, ask a grown-up.
 
 ## Add videos
 

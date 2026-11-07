@@ -7,14 +7,16 @@ The **Books** app opens the books and audiobooks saved on your hub. Nothing here
 
 ## Open it
 
-Open **Books** from the apps list. You see four tabs: **Reading now**, **Books**, **Audiobooks** and **Series**.
+Open **Books** from the apps list. The first page has rows you can tap:
 
-- **Reading now** shows the books you are reading and the audiobooks you are listening to. A thin bar under each cover shows how far you got. Under that are your books and your audiobooks.
-- **Books** shows every e-book (EPUB) and PDF.
-- **Audiobooks** shows every audiobook. An audiobook is one file (m4b) or a folder of parts.
-- **Series** groups books that belong together.
+- **Continue reading** shows the books you are reading. A thin bar under each cover shows how far you got.
+- **Continue listening** shows the audiobooks you started.
+- **EPUB and PDF** shows your books.
+- **Audiobooks** shows your audiobooks. An audiobook is one file (m4b) or a folder of parts (mp3).
 
-A row with nothing in it does not show. An admin adds book folders in **Settings**, **Home**, **Storage**.
+The app also has pages for **Books** (every e-book and PDF), **Audiobooks** (every audiobook) and **Series** (books that belong together).
+
+A row with nothing in it does not show. An admin adds book folders in **Settings**, **Storage**.
 
 ## Read a book
 
@@ -34,15 +36,15 @@ Press a cover, then the play button next to **Listen**. The audiobook player sho
 - **Chapters** lists every chapter. Press one to jump there. A bar shows how far you got in it.
 - A folder audiobook plays its parts in order, one after the other.
 - Open the audiobook later and it starts in the same place, even in the middle of a chapter.
-- **Close** leaves the player. The sound keeps playing in a small bar at the bottom of Books.
+- Leave the player and the sound keeps playing in a small bar at the bottom of Books.
 
 ### Sleep timer
 
-Press **Sleep** at the top. Pick 15, 30, 45 or 60 minutes, or **End of chapter**. The sound fades out and stops, in any app. **Off** turns the timer off.
+Close the player so the audiobook plays in the small player at the bottom. Press the moon button, **Sleep timer**. Pick 15, 30, 45 or 60 minutes, or **Stop end of this one**. The audio stops when the time is up. Press the moon again and choose **Turn off the timer** to cancel it.
 
 ## Read it and listen to it
 
-When a book and an audiobook have the same title and author, and sit in the same folder, Home links them. The book's page shows both, **Read** and **Listen**, and each one keeps its own place.
+When a book and an audiobook have the same title and author, and sit in the same folder, Home links them. The book's page shows both, **Read** and **Listen**, and each one keeps its own place. On the audiobook page, **Read along** lists the linked book.
 
 ## Kids
 

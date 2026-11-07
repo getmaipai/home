@@ -1,51 +1,89 @@
-# Music
+---
+title: Play music
+description: Play songs from your home library, find music, make playlists, use radio, and make bands, albums and sounds in Music.
+---
 
-Music plays songs saved in your home library. Ask an admin to add a music folder in Settings, Home, Storage.
+# Play music
 
-Open Listen now to see songs you played, albums just added, songs made in chat under **Created by you**, radio from your music, and liked songs. Albums, Artists and Songs help you find
-music. Open an album or an artist, then choose Play, Shuffle or Start radio. The songs go into your own Up next list. Like a song on Now playing to
-keep it in Liked.
+**Music** plays songs saved in your home library and songs made at home. An admin adds a music folder in **Settings**, **Storage**.
 
-On Now playing, you can see the song title, creator and date. Songs made at home can be shared with people in your home. Choose **Private** or **Shared** to change who can listen. Only the owner or an admin can change sharing. Children cannot share songs.
+## Find your way around
 
-When Home makes a song with words, it listens to the finished song and times every word. The highlight follows each word as it is sung, not only each line. This happens on your own home server a moment after the song is ready. Until then, and for any song it cannot time, the highlight follows each line.
+A column on the left has two groups.
 
-Songs in your library that have timed lyrics get the same word-by-word highlight. After the lyrics are found, Home listens to your file on your own home server and times each word, first for the opening lines, then for the whole song (on songs over four minutes, only the opening lines get word timing). If the highlight looks off, open Now playing and choose **Lyrics look off**; Home lines the words up again. You can ask once a minute. Nothing leaves your home.
+- **Listen:** **Listen now**, **Radio**, **Songs**, **Albums**, **Artists**, **Playlists** and **Liked**.
+- **Create** (adults only): **Create**, **Studio**, **Stems**, **Remix and edit** and **Library**.
 
-Choose a language in your Music settings to see a translation under timed lyrics. Home uses its local chat model and saves the result for that song and language; if the translation is still being prepared, check again in a moment. Lyrics and translations are shown only when they pass your profile's music limits.
+**Search Music** at the top finds songs, artists, albums, playlists and stations. You can also browse by genre.
 
-A song made in chat can be split into its parts. Open the song card and choose **Stems**, or ask in chat to split it. You get four tracks: Vocals, Drums, Bass and Other. Use Next to step through them. It takes about a minute and happens on your own home server. You can also split an audio file of your own. Open it in Library, then choose **Split into stems**. Stems stay on this home server, and splitting does not make a voice. Adults only.
+**Listen now** shows rows you can tap, such as **Pick up where you left off**, **Recently played**, **Your artists**, **Made here** (songs made in chat or in Create), **Recently added**, **Radio from your music** and **Liked songs**. A row with nothing in it does not show.
 
-In Music Create, bring in a song you made or own and choose **Sing it in another voice** to have a household voice sing it. Pick a voice with a saved sample. A poor sample can make the singing sound rough or unlike the voice you chose.
+## Play a song
 
-Radio uses songs from your library only. It looks for the same artist, album artist, kind of music and decade. It does not
-search the web. Kids never see or play songs marked explicit.
+Open an album, an artist or a playlist, then choose **Play**, **Shuffle** or **Start radio**. The songs go into your own **Up next** list. A song opens on **Now playing**.
 
-Use Playlists to make a list. Open one to play it, shuffle it, or remove a song. Choose New playlist, then open a song on Now playing and press Add to playlist. The song goes
-on your newest playlist. Only you can change your lists.
+- Press **Like** to keep a song in **Liked**.
+- Press **Add to playlist** to put it on your newest playlist.
+- Press **Lyrics look off** if the lyric highlight is out of step. Home lines the words up again. You can ask once a minute.
+- You see the title, creator and date. A song made at home can be shared with people in your home: choose **Private** or **Shared**. Only the owner or an admin can change sharing. Children cannot share songs.
+- If the song is yours, **Edit** lets you change its title, artist, description and cover.
 
-The small player keeps your music playing while you browse. Tap it to return to Now playing. Your browser may ask you to
-press Play first. The next song plays from your Up next list.
+The small player at the bottom keeps your music playing while you browse. Tap it to return to **Now playing**. Your browser may ask you to press Play first. The next song plays from your **Up next** list.
 
-## Make your own bands, albums and song styles
+### Playlists
 
-Adults can make three things in the Music app. Open **Create** to pick one.
+Open **Playlists**, choose **New playlist**, then open a song on **Now playing** and press **Add to playlist**. Open a list to play it, shuffle it, or remove a song. Only you can change your lists.
 
-- **A band**: a name, a look and a sound. Home draws the pictures in chat.
-- **An album**: a title, a look for the cover and a sound. Home adds the cover and the songs in chat.
-- **A song style**: a sound you can reuse for many songs. It uses words only, never lyrics.
+### Lyrics
 
-You can fill the form yourself, or ask in chat, for example "Make an album called Porch Light". Open **My creations** to see everything you made. Choose one to change it.
-You can also change one right in chat. Open its card and choose Edit, or ask Home to change it.
+When Home makes a song with words, it listens to the finished song and times every word. The highlight follows each word as it is sung. Until the timing is ready, and for any song it cannot time, the highlight follows each line.
+
+Songs in your library get the same word-by-word highlight. After the lyrics are found, Home listens to your file on your own home server and times each word, first for the opening lines, then for the whole song. On songs over four minutes, only the opening lines get word timing. Nothing leaves your home for the timing.
+
+To see a translation under each line, open **Settings**, **Chat and AI**, **Personalization**, **Music** and type a language in **Translate lyrics**. Home translates on this computer. Lyrics and translations show only when they pass your profile's music limits.
+
+### The DJ
+
+The Music DJ can speak between songs. In the same **Music** card, **Music DJ** is **off**, **minimal** (it says what is next) or **full** (it adds a short fact when Home has one). It is off for children and teens until a parent turns it on. It uses facts already on Home.
+
+## Radio
+
+Radio plays internet stations and can record them. See [Listen to the radio](radio.md).
+
+From an album or an artist, **Start radio** is different. It plays songs from your own library only, picking the same artist, album artist, kind of music and decade. It does not search the web.
+
+## Kids and music
+
+Children and teens never see or play songs marked explicit. See [Kids and media](kids-and-media.md).
+
+## Make a band, an album, a sound or a voice
+
+Adults only. Open **Create**. A row of choices asks what to make: **Song**, **Band**, **Album**, **Style**, **Sound** and **Voice**. For making a song, see [Make songs](songs.md).
+
+- **Band:** a name, a look and a sound. Home draws the pictures in chat.
+- **Album:** a title, a look for the cover and a sound. Home adds the cover and the songs in chat.
+- **Style:** a sound you can reuse for many songs. It uses words only, never lyrics.
+- **Sound:** type a sound, such as a wooden door creaking open, and Home makes it. Your sounds show in the same page.
+- **Voice:** make a voiceover from a script, or change the voice in an audio or video file. Pick a household voice with a saved sample.
+
+You can fill the form, or ask in chat, for example "Make an album called Porch Light". Open **Library** to see everything you made. Choose one to change it, or change it right in chat from its card.
 
 Every change keeps the earlier version, so nothing is lost. Children and teens do not see these pages.
 
-## Bring a song
+### Make a song like this one
 
-In Create, choose **Bring a song** in Edit or Stems. Add one audio file under 40 MB. You can change its style, remove its vocals, or split it into stems. The file stays in your Library and is sent only to your local music worker when you choose an action. Teens and children cannot use these controls yet.
+On **Now playing**, choose **Song like this** or **Band like this** to start a new song or a new band that fits the one you are playing.
 
-For songs matched to MusicBrainz, Home can keep a short fact from the Wikipedia page linked to that recording. It looks up facts in the background, never while a song plays; a song without a linked page has no fact. The **Show facts and photos from Wikimedia** setting controls both song facts and artist photos and bios.
-# AI DJ
+### Bring a song
 
-The AI DJ can prepare short spoken introductions and song handoffs using local track tags and facts already stored on Home. It is off by default for children and teens until a parent turns it on, and nothing about the DJ leaves the home.
-After the second song, it can speak between songs; turn it off in Settings, Music.
+In **Create**, choose **Bring a song**. Add one audio file under 40 MB (mp3, m4a, wav, aac, ogg or flac). Then choose **Change the style**, **Remove the vocals**, **Split into stems**, or **Sing it in another voice** with a household voice that has a saved sample. A poor sample can make the singing sound rough or unlike the voice you chose. The file stays in your Library and goes only to your own music worker when you choose an action. Teens and children cannot use these controls yet.
+
+### Studio, Stems and Remix and edit
+
+- **Studio:** open a song, then mix its tracks. Use **Loop**, tempo, and listening effects such as a compressor.
+- **Stems:** split a song into four tracks: Vocals, Drums, Bass and Other. It takes about a minute and happens on your own home server. You can also split an audio file of your own: open it in the Library, then choose **Split into stems**.
+- **Remix and edit:** pick a song, say what to change (the style, the words, the tempo or the voice), review the request, then press **Make the remix**. It appears on the song when it is done.
+
+## Facts and photos
+
+For songs matched to MusicBrainz, Home can keep a short fact, an artist photo and a short bio from Wikimedia, and fetch album covers. It looks these up in the background, never while a song plays. An admin controls this in **Settings**, **Pictures, videos and music**, **Music**: **Show facts and photos from Wikimedia**, **Fetch album covers from the Cover Art Archive**, **Match my songs to MusicBrainz** and **Look up song lyrics online**. Nothing about your home is sent.

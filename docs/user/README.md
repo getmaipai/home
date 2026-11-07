@@ -21,11 +21,20 @@ day the hub arrives; the rest are for when you need them.
 - [Media](media.md): open the Videos, Shows and Films, Music, Podcasts and Books apps from one place.
 - [The Library](library.md): find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.
 - [Pictures](pictures.md): ask chat for a picture, stop it, change it, and choose who can make pictures and which styles are on.
-- [Videos](videos.md): ask chat for a short video, stop it, make another, and choose who can make videos and which styles are on.
+- [Videos](videos.md): make a short video in the Videos app or in chat, change it, and choose who can make videos and which styles are on.
+- [Edit a video in the Studio](videos-studio.md): cut, join and mix your own clips by hand and export a new clip.
+- [Make a short film](videos-film.md): ask chat for a film, check the plan, press Go, and redo a shot.
+- [Adults-only videos and the lock](videos-locked.md): how adults-only videos are marked and locked, and how to open Locked items.
 - [Wikipedia](wikipedia.md): read Wikipedia from your own library, save articles, and keep them on a device.
 - [Books](books.md): read EPUB and PDF books, and listen to audiobooks.
-- [Shows and Films](shows.md): browse local shows and films, and keep a watchlist.
+- [Watch shows and films](shows.md): browse local shows and films, and keep a watchlist.
 - [Songs](songs.md): ask chat to write and make a song, change it by asking, play it, and choose who can make songs.
+- [Play music](music.md): play songs from your library, make playlists, and make bands, albums and sounds in Music.
+- [Listen to the radio](radio.md): play internet radio, save stations, record a show, and choose whether your home can look for stations online.
+- [Listen to podcasts](podcasts.md): follow shows, play new episodes, save episodes on your hub, and pick up where you stopped.
+- [News](news.md): read stories from the feeds your home chose, follow topics, and save stories.
+- [Kids and media](kids-and-media.md): what children and teens can watch and play, and how screen time is set.
+- [Make a transcript](transcripts.md): turn the words in a video or song into text, fix it, and download it as captions.
 - [Standard, Boost and Max](levels.md): what the levels mean for pictures, video and songs, and who can use each.
 - [Share the computer during big jobs](performance.md): choose whether chat or big jobs get the room, and free up memory.
 - [Max chat](coding-mode.md): use one big model for the strongest answers, and what an admin sets up first.

@@ -5,7 +5,7 @@ description: Make a short video in the Videos app or in chat, change it, and cho
 
 Home can make short videos on your own computer. Nothing is sent to anyone.
 
-Open Videos or its Library to find clips you made in chat under **Made at home**, alongside the videos from your library folders.
+Open **Videos** or its **Library** to find clips you made under **Made at home**, alongside the videos from your library folders. To watch a video, see [Watch videos](watch-videos.md). To cut and mix clips, see [Edit a video in the Studio](videos-studio.md). To make a longer story, see [Make a short film](videos-film.md). For adults-only videos, see [Adults-only videos and the lock](videos-locked.md).
 
 ## Who made a video, and who can see it
 
@@ -21,9 +21,9 @@ A Mac with 128 GB of memory and the video model installed. On any other computer
 
 There are three levels: **Standard**, **Boost** and **Max**.
 
-- **Standard** makes a small picture with sound, up to 10 seconds long. It takes about 43 seconds.
-- **Boost** makes a bigger picture with better sound. It takes about a minute.
-- **Max** is for the sharpest picture, up to 10 seconds, with sound. An admin has to get it first: it is a big download (about 71 GB) that comes with its maker's licence, and you find it in Settings, Models and storage. Max also needs an admin's OK for you. Until both are done you will not see it, or you will see it greyed out with a line that says what to do. Max makes one video at a time and takes about 4 minutes. It starts from words only, so a picture or a style cannot be used with it.
+- **Standard** makes a small picture with sound, up to 10 seconds long. It takes under a minute.
+- **Boost** makes a bigger picture with better sound, up to 5 seconds long. It takes about a minute.
+- **Max** is for the sharpest picture, up to 10 seconds, with sound. An admin has to get it first: it is a big download (about 71 GB) that comes with its maker's licence, and you find it in Settings, Models and storage. Max also needs an admin's OK for you. Until both are done you will not see it, or you will see it greyed out with a line that says what to do. Max makes one video at a time and takes about 4 minutes. A start picture or a style works on Max only when your engine supports it. If it does not, Home says what is missing and makes nothing.
 
 These times come from tests on a Mac with 128 GB. Your computer may be a little slower or faster, and the first clip after a restart takes longer.
 
@@ -31,37 +31,37 @@ Children and teens always get Standard. They do not choose a level, and their cl
 
 ## Make a video in the Videos app
 
-Open **Videos**, then **Create**. The page has two sides. The left side is where you describe a video. The right side starts with a row of **Try this** pictures that move, then your clips, newest first.
+Open **Videos**, then **Create**. Create is for adults. The page has two sides. The left side is where you describe a video. The right side starts with a row of **Try this** pictures that move, then **Your clips**, newest first. At the top is the title **Make any video**.
 
 On the left:
 
-- **Describe your video.** Write what you want to see. Put each person's line in quotes. While the box is empty, three idea buttons sit under it. Press one to use it.
-- **Start frame.** A dashed box under your words that says "Optional. Begin from a picture." Press it to pick a picture from your Library, or add a new one. The picture starts the video and shows in the box with its name. Press the **x** to take it away.
-- **Style.** One wide picture that shows the **Look** and **Camera** you picked, with a **Change** button on it. It shows your **Look** (natural, classic cartoon, anime, 3D animated or film) and your **Camera** (dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still). Press it to pick both from one big window of moving pictures. **Auto** is the first choice in each, and it is what you get if you pick nothing: Home keeps the look natural and lets the words decide the camera.
-- **Level.** Three cards: Standard ("Fast, with sound"), Boost ("Sharper picture") and Max. Each card says how long it takes. Max shows only when an admin has allowed it for you. If it is not installed yet, its card is greyed and says what to do.
-- **Shape and Length.** Landscape or portrait, and 5 or 10 seconds.
-- **More settings.** Voices: keep it clean, or with music and effects.
+- **Describe a video.** Write what you want to see. Put each person's line in quotes. While the box is empty, three idea buttons sit under it. Press one to use it. As you type, Home may show up to two small style suggestions under the box. Leave one on to use it, or press its **x** to drop it.
+- **Start frame.** A dashed box that says "Optional. Begin from a picture." Press it to pick a picture from your Library, or add a new one. The picture starts the video and shows in the box with its name. Press the **x** to take it away.
+- **Shape.** **Landscape** or **Portrait**.
+- **Length.** 5 seconds, or the longest the level you picked can make.
+- **Style.** One wide picture that shows the **Look** and **Camera** you picked, with a **Change** button on it. Your **Look** is natural, classic cartoon, anime, 3D animated or film. Your **Camera** is dolly in, slow orbit, handheld, slow motion, time-lapse, aerial, close-up or still. Press it to pick both from one big window of moving pictures. **Auto** is the first choice in each, and it is what you get if you pick nothing: Home keeps the look natural and lets the words decide the camera. If an admin has added styles you may use, the same window also has **Styles**, **Characters** and **Strength** (**Less**, **Normal** or **More**). A style works at some levels only, and the window says which.
+- **Level.** Cards for Standard ("Fast, with sound"), Boost ("Sharper picture") and Max. You see only the levels you may use. If Max is not installed yet, its card is greyed and says what to do.
+- **More settings.** **Voices**: **Keep it clean**, or **With music and effects**.
 - **Generate.** Press it to start. The button says about how long it takes, for example "Boost, about a minute". Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
 
 **Try this.** Each picture is a ready idea with a look and a camera move already chosen, for example "Paper boat". Press one and the words, the look and the camera fill in on the left. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, the pictures show above the line "Your clips show here. Pick a tile or describe a video on the left and press Generate."
 
-The page has the same look as Music Create: a dark pane in dark mode and a soft grey pane in light mode, with a big **MAKE ANY VIDEO** title and a bright green **Generate** button. Small grey headings such as TRY THIS and the filter names are in capital letters.
-
 On a phone, the left side is a bar at the bottom with your words and a round **Generate** button. Press the round button with the sliders on it to open the **Options**.
 
-On the right, the clips are under a **Your clips** heading. The **View** button holds the filters: Favorites only, Group by words and Type. The newest clip is big and the picture comes first. The tags sit on the picture and your words show once under it. On a wide screen the older clips sit two to a row. The buttons for a clip (Favorite, download, Remix and the rest) show when you point at it, and always show on a phone.
+On the right, the clips are under **Your clips**. The **View** button holds the filters: **Favorites only**, **Group by words** and **Type**. The newest clip is big and the picture comes first. On a wide screen the older clips sit two to a row. The buttons for a clip show when you point at it, and always show on a phone.
 
-Each clip is a card with your words, small tags for how it was made, and the video. A new clip is the top card. It shows where it is in line, then how far along it is, and it turns into the video by itself. You do not need to reload. Press **Stop** to cancel it.
+A new clip is the top card. It shows where it is in line, then how far along it is, and it turns into the video by itself. You do not need to reload. Press **Stop** to cancel it.
 
-Under a finished video:
+On a finished clip:
 
 - **Download** saves it.
 - **Another take** makes the same words again with a new result.
 - **Remix** puts the words and choices back on the left, so you can change them and press **Generate**.
 - **Make it Max** makes it again at Max. It shows only when Max is ready and allowed for you.
+- **Open in Studio** opens it in the [Studio](videos-studio.md).
 - The **star** marks a favorite.
 
-If a clip did not finish, press **Try again**. The bar over the cards has **Favorites only**, **Group by words** (clips with the same words sit together) and **Type**.
+If a clip did not finish, press **Try again**.
 
 If Home cannot make videos right now, **Generate** and the buttons that start a clip are switched off, and a line next to them says why and what to do. Your clips still play.
 
@@ -69,12 +69,10 @@ If Home cannot make videos right now, **Generate** and the buttons that start a 
 
 Open **Videos**, then **My clips**. It shows every clip you can see, in groups by day. Clips other people shared with you are here too, with their names.
 
-- **All, Favorites and Uploaded.** Uploaded shows the pictures you added. Press one to use it as a Start frame.
+- **All**, **Favorites** and **Uploaded**. Uploaded shows the pictures you added. Press one to use it as a Start frame.
 - **Size.** Drag the slider to make the clips bigger or smaller.
 - **Heart.** Press the heart on a clip to make it a favorite.
 - Press a clip to play it.
-
-The Create side of Videos used to have three pages: Create, Make a video and My creations. Now it has two: Create and My clips. An old link to Make a video or My creations says the page does not exist. Use **Create** or **My clips** instead.
 
 ## Tips for better clips
 
@@ -104,30 +102,16 @@ Ask chat to change a video you made. Home keeps the old video and makes a new on
 - **Make it Max.** "Make it Max." It keeps the same words and the same result, and makes the video again at Max. It works only when Max is installed and allowed for you, and only for a video made from words. Otherwise Home says what is missing and makes nothing.
 - **Trim.** "Cut the first two seconds." Say where it starts and ends, in seconds.
 - **Continue.** "Keep going from where it ended." Home takes the last picture of the video and makes a new video that starts from it. Say what happens next, or leave it out and Home uses your first words. It keeps the same level and look unless you change them. It needs a computer that can start a video from a picture. If yours cannot yet, Home says so and makes nothing. Only one video is made at a time.
-- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order. Home puts them one after another with a straight cut, or with a smooth blend from one video into the next (a crossfade) if you ask for one. Each video has to be longer than twice the blend.
+- **Join.** "Join these two videos." Pick 2 to 6 of your own videos, in order. Home puts them one after another with a straight cut, or with a blend from one video into the next if you ask for one, such as a fade, a wipe or a slide. Each video has to be longer than twice the blend.
 - **Mix.** "Put my voice over it" or "add my song." Home lays a spoken line, one of your songs or a sound over the video. You can ask for it quieter or louder.
 
 Only videos you made can be changed. Changing, continuing, joining and mixing are for adults. A video in Trash cannot be continued: put it back first. A changed video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
 
-Trim, join and mix need the video editor on the AI engine. You can also ask chat to cut your videos to the beat of one of your songs, choosing how many beats between cuts and how much of the song to use. If beat analysis or the video editor is not ready, Home says so. If your engine does not have the video editor, Home says it cannot change the video.
-
-## Edit a video in the Studio
-
-The **Studio** is a page for people who want to cut and mix a video themselves. Open it from the **Studio** link in the Create menu, or press the **Open in Studio** button on a clip in your Create list. Only adults see it.
-
-1. **Pick a clip.** Choose one of your own videos. It shows in the preview and on the **Video** track.
-2. **Cut it.** Drag the handles at each end of a piece to trim it. Press **Split at playhead** to cut a piece in two, and **Delete piece** to take one out.
-3. **Add more.** **Add a clip** puts another of your videos after this one. **Add a voice** lets you type a line for Home to say. **Add music** puts one of your songs under the video.
-4. **Set the sound.** Each track has a level. Pick a piece to turn it up or down, fade it in or out, or lower a song while someone speaks. Pick a clip that has another clip after it to blend them (a crossfade).
-5. **Press Export as a new clip.** Home makes a new video and keeps the old one. A card shows it being made. When it is ready, press **Open in My clips**, or **Keep editing** to change it more.
-
-A film can have 6 clips, 2 voice lines, 2 songs and be up to 60 seconds long. What you hear in the Studio is a preview: it cuts where the export blends, and the final loudness is set when you export. If a video is locked, the Studio shows a lock instead. Unlock it with your passcode and it opens. When it locks again, edits you did not export are gone. Recorded voice lines sound more natural and may take a little longer. When the computer is busy, Home uses the standard voice.
-
-The new video is never open to more people than the videos it came from. If any video you use is adults only, the new one is adults only too.
+Trim, join and mix need the video editor on the AI engine. To do the same by hand, use the [Studio](videos-studio.md). You can also ask chat to cut your videos to the beat of one of your songs, choosing how many beats between cuts and how much of the song to use. If beat analysis or the video editor is not ready, Home says so. If your engine does not have the video editor, Home says it cannot change the video.
 
 ## Send a video in a text
 
-Press **Share** on the card. On an iPhone, iPad or Mac in Safari, your device's own share sheet opens with the video attached, so you can pick Messages, AirDrop or Mail. On a browser that cannot share a file, **Share** opens the video in your Library instead, where you can make a link.
+Press **Share** on the card. On an iPhone, iPad or Mac in Safari, your device's own share sheet opens with the video attached, so you can pick Messages, AirDrop or Mail. On a browser that cannot share a file, **Share** opens the video in your Library instead, where you can share it with people in your home.
 
 **Download** saves a copy made for texting, named after your words (for example `paper-boat-in-the-rain.mp4`). A video with no sound gets a silent sound track, which phones expect from a video. A video with sound keeps it. If you want the exact file the engine made, press **Download original**.
 
@@ -140,29 +124,6 @@ To choose who in your home can watch a saved video, open it in the Library and u
 After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. On a computer that can start a video from a picture, Home makes a video with sound at your level that starts from it. On other computers it makes a 5 second video with no sound.
 
 Home can animate a picture you made or a photo you attach. Describe the motion you want. The model decides whether to fulfill adult requests; Home blocks output only when its CSAM check finds a candidate.
-
-## Adults-only videos and the lock
-
-A video made with an adults-only style is marked NSFW and locked the moment it starts. You do not have to do anything. While it is locked, it shows as one lock tile, with no title or picture, and it opens only when you enter your passcode on your own screen.
-
-A video made with no adults-only style is not locked just because its words are adult. It is still marked for adults only, so people under 18 never see it. If the picture check finds nudity in it, Home locks it for you.
-
-People under 18 never see an adults-only video, locked or not. The TV and other shared screens do not show it either.
-
-**Change your mind about a video you made.** You can take the lock off.
-
-1. Open the video and press **Unmark as NSFW**.
-2. Read what will change. The video will show with its title and picture in your feeds and lists, to anyone looking at your screen.
-3. Enter your passcode again, even if you just unlocked. Home asks every time.
-4. Press **Remove lock**.
-
-After that, the video says "Marked NSFW, lock removed." Anyone under 18 still cannot see it. Only the person who made the video can take the lock off. An admin cannot take it off another person's video.
-
-**Lock it again.** Press **Mark as NSFW** on any of your videos. It locks at once, and you do not need your passcode. An admin can also mark more videos NSFW.
-
-**Changing a video.** A trimmed, joined or mixed video follows the videos it came from. If the video you changed had its lock removed, the new one has no lock. If any video you used is still locked, the new one is locked. A new take that uses an adults-only style again is locked.
-
-Home keeps a short record of each change: who, when and which video. It never holds the words or the picture. Only you can see the record for your own videos.
 
 ## Who can make videos
 
@@ -206,22 +167,3 @@ The video engine checks the file and refuses any style that puts a child in an a
 ## Private chats
 
 In an Incognito or temporary chat, the video lives only in memory and is gone when the chat ends. In those chats you can still animate a picture chat made or the first frame of a video you just made.
-
-## Locked items
-
-Some videos are for adults only. When one of yours is adult-only, Home hides it. In its place you see one tile that says **Locked items**. It has a lock on it. It shows no name, no picture and no count, so a glance at your screen shows nothing about what is inside. If a locked video is being made, the tile also has a small spinning circle.
-
-To open your locked items, press the tile. Type your passcode. If you use a PIN or a password to sign in, you may need to set a passcode first: open **Account** and set one. Only your own code opens locked items. A child or a teen never sees them, even with your code.
-
-After you unlock, your locked videos show on that page. A locked video plays only on its own page. It does not go to the small player at the edge of the screen, it does not show its name on your lock screen or in a car, and you cannot send it to a TV or another screen. Home also does not remember how far you watched, so it starts at the beginning next time.
-
-Home locks them again by itself when you:
-
-- go to another page,
-- switch to another tab or hide the window,
-- do nothing for 2 minutes,
-- keep the page open for 15 minutes in a row.
-
-You can also press **Lock now**, the button at the bottom left of the screen. Signing out locks them too.
-
-If you type a wrong passcode too many times, unlocking waits for a short while. Signing in is not affected. Try again when the timer ends.

@@ -1,3 +1,8 @@
+---
+title: The Library
+description: Find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.
+---
+
 # The Library
 
 The Library holds every picture, video, song and file you can see in Home. Open it from the folder icon in the left rail.
@@ -19,6 +24,13 @@ The address in your browser remembers what you picked. Send that address to some
 Pick a file to open it big. Use the arrow keys, or the arrows on screen, to move to the next file. Press **Esc** to close. The **i** button shows details. At the top are the file's name, who made it, the day it was added, and a **Private** or **Shared** button. Pick that button to see who can see the file. If the file is yours, you can change who sees it there. Below that are where the file came from and how long Home will keep it. A file made or sent in a chat has an **Origin** link. Pick it to open that chat at the message with the file. If the chat was deleted, the details say so.
 
 Pictures zoom with the **+** and **-** buttons. Videos and songs play right in the window.
+
+Buttons under the file depend on what it is and who you are:
+
+- **Transcript** (teens and adults, on videos and songs) turns the words into text. See [Make a transcript](transcripts.md).
+- **Share**, **Send** and **Download** work on files you may share. **Delete** appears on your own files.
+- **Edit in its chat** opens the chat where a picture was made, so you can change it.
+- **Split into stems** and **Cut to the beat** (adults, on songs and videos) split a song into four tracks, or cut your videos to the beat of a song. Pick how many beats between cuts and how long the cut is: 15, 30 or 60 seconds.
 
 ## Add a file
 
