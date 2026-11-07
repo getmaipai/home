@@ -10,6 +10,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { createQueryClient } from "@maipai/ui/src/queryClient";
 import { activateLocale } from "@/i18n";
+import { i18n as kitI18n } from "@maipai/ui/src/i18n";
 import { Routes } from "@/shell/Routes";
 import { PhoneMenuLinks } from "@/shell/phoneMenuLinks";
 import { NotificationBell } from "@/shell/NotificationBell";
@@ -90,11 +91,11 @@ describe("RULES S3 in es", () => {
     for (const width of [360, 402, 874, 744, 1440]) {
       const view = open(path, width);
       if (width >= 640) {
-        const rail = within(await view.findByRole("navigation", { name: "Primary navigation" }) as HTMLElement);
+        const rail = within(await view.findByRole("navigation", { name: kitI18n._({ id: "ui.Primary navigation", message: "Primary navigation" }) }) as HTMLElement);
         expect(await rail.findByRole("link", { name: t("Reminders") })).toBeTruthy();
         expect(rail.getByRole("link", { name: t("Clock") })).toBeTruthy();
       } else {
-        await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Open menu" })); });
+        await act(async () => { fireEvent.click(await view.findByRole("button", { name: kitI18n._({ id: "ui.Open menu", message: "Open menu" }) })); });
         const drawer = await view.findByRole("dialog");
         expect(within(drawer).getByRole("link", { name: t("Reminders") })).toBeTruthy();
         expect(within(drawer).getByRole("link", { name: t("Clock") })).toBeTruthy();

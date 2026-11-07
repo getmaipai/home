@@ -1,6 +1,7 @@
 "use client";
 
 import { i18n } from "@lingui/core";
+import { i18n as kitI18n } from "@maipai/ui/src/i18n";
 // VOICE-LIVE-04: while dictation records, the composer's own text field
 // gives way to the shipped ComposerVoiceLevels Element, fed by the live
 // microphone analyser. Mounted as ChatPage.tsx's own
@@ -95,7 +96,7 @@ export function ComposerDictationWaveform() {
       // holds Send (Thread `sendHeld`, ChatThread.tsx) and Enter sends
       // nothing here. Why it waits is the composer line's job, so the
       // placeholder stays the plain one.
-      placeholder={projectPage ? `New chat in ${projectPage.folderName ?? "this project"}` : "Send a message..."}
+      placeholder={projectPage ? i18n._({ id: "New chat in {folder}", message: "New chat in {folder}", values: { folder: projectPage.folderName ?? i18n._({ id: "this project", message: "this project" }) } }) : kitI18n._({ id: "ui.Send a message...", message: "Send a message..." })}
       submitMode={held ? "none" : undefined}
       onKeyDown={held ? (event) => { if (event.key === "Enter" && !event.shiftKey) event.preventDefault(); } : undefined}
     />;

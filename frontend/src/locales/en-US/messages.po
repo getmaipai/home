@@ -12672,7 +12672,7 @@ msgid "List view"
 msgstr "List view"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/composerDictationWaveform.tsx:104
+#: src/apps/chat/composerDictationWaveform.tsx:105
 #: src/apps/settings/RobotBody.tsx:19
 msgid "Listening"
 msgstr "Listening"
@@ -14750,6 +14750,11 @@ msgstr "New"
 #: src/apps/clock/AlarmEditor.tsx:72
 msgid "New alarm"
 msgstr "New alarm"
+
+#. js-lingui-explicit-id
+#: src/apps/chat/composerDictationWaveform.tsx:99
+msgid "New chat in {folder}"
+msgstr "New chat in {folder}"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:232
@@ -23659,6 +23664,11 @@ msgstr "This place"
 #: ../backend/src/lib/apiErrorCopy.ts:13
 msgid "api.error.profile_needs_secret"
 msgstr "This profile needs its PIN, password, or passkey"
+
+#. js-lingui-explicit-id
+#: src/apps/chat/composerDictationWaveform.tsx:99
+msgid "this project"
+msgstr "this project"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:153

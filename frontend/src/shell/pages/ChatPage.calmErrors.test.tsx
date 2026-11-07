@@ -16,6 +16,7 @@ import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { composerNotice, failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { activateLocale } from "@/i18n";
+import { i18n as kitI18n } from "@maipai/ui/src/i18n";
 import { ChatPage } from "@/shell/pages/ChatPage";
 import { IncognitoProvider } from "@/shell/incognitoContext";
 import type { Roster } from "@/lib/api";
@@ -79,8 +80,8 @@ const notice = (root: ParentNode) => root.querySelector("[data-chat-notice]");
 const inlineFailure = (root: ParentNode) => root.querySelector('[data-slot="error-state"]');
 
 async function send(view: ReturnType<typeof openChat>, text: string) {
-  fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
-  const button = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+  fireEvent.change(await view.findByLabelText(kitI18n._({ id: "ui.Message input", message: "Message input" })), { target: { value: text } });
+  const button = (await view.findByLabelText(kitI18n._({ id: "ui.Send message", message: "Send message" }))) as HTMLButtonElement;
   await waitFor(() => expect(button.disabled).toBe(false));
   fireEvent.click(button);
 }

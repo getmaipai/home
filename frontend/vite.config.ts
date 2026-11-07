@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { lingui } from "@lingui/vite-plugin";
 import { fileURLToPath } from "node:url";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import type { Plugin } from "vite";
 
 // `@maipai/ui`'s own source files (subpath-imported directly, no dist
@@ -41,6 +41,25 @@ function resolveHomeKitFile(rest: string): string | null {
   }
   return null;
 }
+/** The `@maipai/ui/src/<path>` specifiers Home's own source imports whose kit file imports a `@/kit/*` alias (see `optimizeDeps.exclude`). */
+function kitModulesNeedingTheAlias(): string[] {
+  const kitSrc = `${realpathSync(fileURLToPath(new URL("./node_modules/@maipai/ui", import.meta.url)))}/src`;
+  const found = new Set<string>();
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) { walk(path); continue; }
+      if (!/\.tsx?$/.test(entry.name)) continue;
+      for (const match of readFileSync(path, "utf8").matchAll(/from "@maipai\/ui\/src\/([^"]+)"/g)) found.add(match[1]!);
+    }
+  };
+  walk(fileURLToPath(new URL("./src", import.meta.url)));
+  return [...found].filter((rest) => [".ts", ".tsx"].some((ext) => {
+    const file = `${kitSrc}/${rest}${ext}`;
+    return existsSync(file) && readFileSync(file, "utf8").includes('"@/kit/');
+  })).map((rest) => `@maipai/ui/src/${rest}`).sort();
+}
+
 function kitAliasPlugin(): Plugin {
   return {
     name: "maipai-home-kit-alias",
@@ -119,6 +138,10 @@ function kitSharedSourceAliasPlugin(): Plugin {
 // process, same origin, no proxy needed there).
 export default defineConfig({
   optimizeDeps: {
+    // A kit module Home imports by its bare path and that itself imports a `@/kit/*` alias (the kit's language module, `format`, ...): the
+    // dependency optimizer would pre-bundle it on its own, where only the kit alias plugin below can resolve that alias, so it fails.
+    // Excluded, it goes through the plugin like every other kit file and shares Home's one `@lingui/core`.
+    exclude: kitModulesNeedingTheAlias(),
     // @maipai/ui is a file: dependency (a linked package), which Vite leaves out of
     // pre-bundling, so its CommonJS dependencies (use-sync-external-store and friends)
     // reach the browser raw and fail as ESM. Pre-bundling the kit fixes the dev server;
