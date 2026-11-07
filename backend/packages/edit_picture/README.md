@@ -4,6 +4,8 @@
 Tell chat what to change in a picture and it does it on this computer.
 Nothing is sent anywhere.
 
+When you change clothes or a background, Home checks that the faces stay the same.
+
 ## Try it
 
 - "remove the man on the left"

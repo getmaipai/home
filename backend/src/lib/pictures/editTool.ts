@@ -21,8 +21,9 @@ import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, 
 import { PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
-import { StackPicturesError, submitEdit } from "./stack";
+import { StackPicturesError, submitEdit, waitPicture, cancelOrDelete } from "./stack";
 import { QUICK_MODEL } from "./quality";
+import { asStackPic, hasProtectableFace, runLikenessEdit, type LikenessScope } from "./likeness/edit";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
 
@@ -106,6 +107,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const { state, args, callId, audience } = input;
   const actor = state.actor as PersonRow;
   const instruction = typeof args.prompt === "string" ? args.prompt.trim() : "";
+  const scope = ["clothes", "background", "face", "whole"].includes(String(args.scope)) ? args.scope as LikenessScope : "whole";
   if (instruction.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const temporary = state.temporary === true || state.ephemeral === true;
   const refused = refusePrompt(instruction, { lane: laneOf(audience) });
@@ -175,6 +177,12 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
       subjectIds: Array.isArray(args.subjectIds) ? args.subjectIds.filter((id): id is string => typeof id === "string") : [],
       body: { prompt: instruction, audience: laneOf(audience) === "adult" ? "adult" : "all-ages" },
       edit: { sourceId: base.id, label, method: "instruct" },
+      ...(laneOf(audience) !== "child" && !ref && await hasProtectableFace(base.bytes) ? { local: async (progress: (phase: string, percent: number) => void, signal: AbortSignal) => {
+        const made = await runLikenessEdit({ source: base.bytes, prompt: instruction, scope, signal, progress });
+        if (made) { if (made.note) progress(made.note, 95); return [asStackPic(made.pic, made.bytes)]; }
+        const job = await submitEdit(buildForm(basePrep.imageSource));
+        try { return [(await waitPicture(job.job, signal)).pic]; } catch (error) { void cancelOrDelete(job.job); throw error; }
+      } } : {}),
       // A version the editor re-encoded is not in the Stack's ledger of its own pictures; it is then sent as what it is, an upload with no person (as Comment does).
       submit: async () => {
         try { return { ...(await submitEdit(buildForm(basePrep.imageSource))), done: null }; } catch (error) {

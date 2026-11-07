@@ -1,6 +1,6 @@
 {
   "id": "edit_picture",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Picture",
@@ -34,6 +34,13 @@
       },
       "args": {
         "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["clothes", "background", "face", "whole"],
+          "description": "clothes: changing what someone wears; background: replacing what is behind the people; face: changing a face, such as a smile or glasses; whole: anything else, the whole picture may change."
+        }
+      },
         "grounded": false
       }
     }

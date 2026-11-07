@@ -156,6 +156,25 @@ export async function submitEdit(form: FormData): Promise<{ job: string }> {
   return failure(res);
 }
 
+/** A single finished PNG from the existing Stack image job interface. */
+export async function waitPicture(job: string, signal?: AbortSignal): Promise<{ pic: StackPic; bytes: Uint8Array }> {
+  for (;;) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const status = await getGenerationJob(job);
+    if (status.state === "failed") throw new StackPicturesError(503, status.code ?? "failed", status.error ?? "Pictures could not be made right now. Try again.");
+    if (status.state === "cancelled") throw new DOMException("Aborted", "AbortError");
+    if (status.state === "done") {
+      const pic = status.data[0];
+      if (!pic) throw new StackPicturesError(502, "bad_reply", "That did not work. Try again.");
+      return { pic, bytes: pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(job, 0) };
+    }
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, 700);
+      signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
+    });
+  }
+}
+
 export async function getGenerationJob(job: string, view?: FullView): Promise<StackPicJob> {
   const res = await request(`/v1/images/generations/${encodeURIComponent(job)}`, { method: "GET" }, view);
   if (!res.ok) return failure(res);

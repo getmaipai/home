@@ -20,6 +20,7 @@ const blurArgs = z.object({ radius: z.number().min(1).max(40).default(12) });
 const referenceSchema = z.object({ kind: z.literal("picture"), via: z.literal("chat"), id: z.string(), conversationId: z.string().optional() });
 const changeArgs = z.object({
   prompt: z.string().min(1),
+  scope: z.enum(["clothes", "background", "face", "whole"]).optional().describe("What part may change: clothes, background, face, or whole picture."),
   region: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable().optional(),
   maskPng: z.instanceof(Uint8Array).nullable().optional(),
   referenceId: z.string().nullable().optional(),
