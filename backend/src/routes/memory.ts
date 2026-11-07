@@ -5,9 +5,7 @@ import { hasDeclaredCredentialField, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memor
 import {
   remember,
   list,
-  recall,
   archive,
-  supersede,
   forget,
   forgetByIds,
   exportPerson,
@@ -68,23 +66,6 @@ const RememberBodySchema = z.object({
   // reply's memory chips show what was saved from it. Verified below.
   turn_id: z.string().regex(/^turn-[a-z0-9]{6,}$/).optional(),
 });
-
-// Derived from RememberBodySchema (a review, 2026-09-06, found the first
-// version of this hand-copied six of its field validators): supersede
-// doesn't take scope/person/record_kind (the old record's own values
-// carry over), and every field but `text` is optional (an omitted one
-// keeps the old record's value - lib/memory.ts's supersede() own `??
-// old.<field>` fallbacks).
-const SupersedeBodySchema = RememberBodySchema.pick({
-  text: true,
-  category: true,
-  tier: true,
-  importance: true,
-  sensitive: true,
-  pinned: true,
-  valid_from: true,
-  valid_to: true,
-}).partial({ category: true, tier: true, importance: true, sensitive: true, pinned: true });
 
 /** `pinned` (rides in every household member's prompt, permanently) and
  * a non-default `record_kind` (an entity/episode row, not an ordinary
@@ -223,33 +204,6 @@ memoryRoutes.openapi(memoryListRoute, (c): ReturnType<typeof memoryListRoute ext
   return c.json(records.map((r) => ({ ...r, ...(r.device_id ? { device_name: names.get(r.device_id) ?? "Robot" } : {}) }))) as any;
 });
 
-// POST, not GET: recall has a real side effect (it bumps uses/
-// last_used_at on every match, feeding decay scoring), so it isn't safe
-// for a client, proxy, or browser prefetch to replay. A code review
-// (2026-09-04) found this as a GET and pointed out exactly that risk
-// (link-prefetch, a polling dashboard, or a retried request after a
-// timeout silently inflating usage counts on records nobody actually
-// used).
-memoryRoutes.post("/recall", requireAuth, async (c) => {
-  const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as {
-    q?: string;
-    scope?: string;
-    person?: string;
-  };
-  if (!body.q) return c.json({ error: "q is required" }, 400);
-  const opts: ListOptions = {};
-  if (body.scope === "household" || body.scope === "person" || body.scope === "self") {
-    opts.scope = body.scope;
-  }
-  if (body.person) opts.person = body.person;
-  // MEMORY-FLOOR-01 added RecallMatch.forceInclude, an internal ranking
-  // detail (recall()'s own pinned/entity-match override) with no reason
-  // to become part of this route's response contract - stripped here so
-  // the wire shape stays exactly what it was before that change.
-  return c.json(recall(actor, body.q, opts).map(({ record, score }) => ({ record, score })));
-});
-
 memoryRoutes.get("/export", requireAuth, async (c) => {
   const actor = c.get("person");
   const personId = new URL(c.req.url).searchParams.get("personId");
@@ -329,28 +283,6 @@ memoryRoutes.post("/:id/audience", requireAuth, async (c) => {
   const parsed = AudienceBodySchema.safeParse(rawBody);
   if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
   const result = setChildDisclosure(actor, c.req.param("id"), parsed.data.child_disclosure);
-  if (!result.ok) return fail(c, result);
-  return c.json(result.value);
-});
-
-memoryRoutes.post("/:id/supersede", requireAuth, async (c) => {
-  const actor = c.get("person");
-  const rawBody = await c.req.json().catch(() => null);
-  const parsed = SupersedeBodySchema.safeParse(rawBody);
-  if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
-  const body = parsed.data;
-  const result = supersede(actor, c.req.param("id"), {
-    text: body.text,
-    category: body.category,
-    tier: body.tier,
-    importance: body.importance,
-    sensitive: body.sensitive,
-    valid_from: body.valid_from,
-    valid_to: body.valid_to,
-    // Never from the client, same as POST / above.
-    source: `api:${actor.id}`,
-    pinned: sanitizedPinned(actor, body.pinned),
-  }, { enforcePrivilegedRoute: true });
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
 });

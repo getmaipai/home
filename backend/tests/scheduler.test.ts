@@ -7,7 +7,7 @@ import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { db } from "@/db";
 import { jobs, people, scheduledJobs, pendingEmbeddings, memoryEmbeddings, alarms } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { remember } from "@/lib/memory";
+import { recall, remember } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { listIssues } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -249,8 +249,7 @@ describe("runDueJobs", () => {
     expect(row.status).toBe("done");
     expect(row.lastError).toBeNull();
 
-    const recall = await client.post("/api/memory/recall", { q: "garage code" });
-    const matches = (await recall.json()) as Array<{ record: { text: string } }>;
+    const matches = recall(ownerRow, "garage code");
     expect(matches.some((m) => m.record.text.includes("garage code"))).toBe(true);
   });
 

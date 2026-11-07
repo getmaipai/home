@@ -68,7 +68,7 @@ The spec pin 0.1.185 also declares `coding` sections in the home and account set
 
 Backend only; the Settings screens are the frontend slice of CODE-SET-01. Home installs no client in phase 1.
 
-**H1, the pieces (`/api/coding-setup`, owner and admin only).** `lib/stackCodingPieces.ts` reads the Stack (`GET /stack/v1/roles` coding block,
+**H1, the pieces (`/api/coding`, owner and admin only).** `lib/stackCodingPieces.ts` reads the Stack (`GET /stack/v1/roles` coding block,
 `/engines`, `/models`, `/models/catalog`, the jobs list, `/components`) and answers three pieces: `engine` (Splash where the Stack chose or wants it,
 otherwise the shared llama-server, which cannot be removed here), `model` (the coding model, installed and removed through the component routes, so its
 Splash draft goes with it) and `draft` (shown with its own size, never installed or removed alone). Sizes are the Stack's (`sizeBytes`, else the catalog

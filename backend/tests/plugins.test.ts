@@ -24,6 +24,7 @@ import { people } from "@/db/schema";
 import { getProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { installedPackageVersionDir, PACKAGES_DIR } from "@/lib/paths";
 import { db } from "@/db";
+import { recall } from "@/lib/memory";
 import { scheduledJobs, packageInstalls } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
@@ -318,8 +319,7 @@ describe("POST /api/plugins/remember/run", () => {
     const body = (await res.json()) as { reply?: { text: string } };
     expect(body.reply?.text).toBe("Got it, I'll remember that.");
 
-    const recall = await client.post("/api/memory/recall", { q: "wifi password" });
-    const matches = (await recall.json()) as Array<{ record: { text: string } }>;
+    const matches = recall(db.select().from(people).where(eq(people.displayName, "Sage")).get()!, "wifi password");
     expect(matches.some((m) => m.record.text.includes("wifi password"))).toBe(true);
   });
 
@@ -357,8 +357,7 @@ describe("POST /api/plugins/remember/run", () => {
     const res = await client.post("/api/plugins/remember/run", {});
     expect(res.status).toBe(400);
 
-    const recall = await client.post("/api/memory/recall", { q: "fact" });
-    const matches = (await recall.json()) as Array<{ record: { text: string } }>;
+    const matches = recall(db.select().from(people).where(eq(people.displayName, "Sage")).get()!, "fact");
     expect(matches.some((m) => m.record.text.includes("{fact}"))).toBe(false);
   });
 });

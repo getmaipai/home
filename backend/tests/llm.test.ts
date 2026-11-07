@@ -812,64 +812,6 @@ describe("lib/llm.ts embed()", () => {
   });
 });
 
-describe("POST /api/llm/embed", () => {
-  let fixture: StackFixture;
-  beforeEach(() => { fixture = scriptedEmbeddingStack(); });
-  afterEach(() => fixture.stop());
-  test("requires a signed-in person", async () => {
-    const res = await new TestClient().post("/api/llm/embed", { texts: ["hi"] });
-    expect(res.status).toBe(401);
-  });
-
-  test("a child cannot reach this route at all (SEC-1)", async () => {
-    const { childClient } = await ownerAndChild();
-    const res = await childClient.post("/api/llm/embed", { texts: ["hi"] });
-    expect(res.status).toBe(403);
-  });
-
-  test("returns real vectors for a signed-in person", async () => {
-    const owner = new TestClient();
-    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const res = await owner.post("/api/llm/embed", { texts: ["good morning", "good night"] });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { vectors: number[][]; model: string };
-    expect(body.vectors.length).toBe(2);
-    expect(body.vectors[0]!.length).toBe(768);
-  });
-
-  test("returns 400 for a missing texts array", async () => {
-    const owner = new TestClient();
-    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-
-    const res = await owner.post("/api/llm/embed", {});
-    expect(res.status).toBe(400);
-  });
-
-  test("also shares the per-person rate limit", async () => {
-    const owner = new TestClient();
-    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) {
-      expect((await owner.post("/api/turn", { text: "hi" })).status).toBe(200);
-    }
-    const res = await owner.post("/api/llm/embed", { texts: ["hi"] });
-    expect(res.status).toBe(429);
-  });
-
-  // SEC-5: an unbounded texts[] used to reach embed() straight from the body.
-  test("rejects too many texts", async () => {
-    const owner = new TestClient();
-    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const res = await owner.post("/api/llm/embed", { texts: Array.from({ length: 65 }, () => "hi") });
-    expect(res.status).toBe(400);
-  });
-
-  test("rejects an oversized text", async () => {
-    const owner = new TestClient();
-    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const res = await owner.post("/api/llm/embed", { texts: ["x".repeat(4_001)] });
-    expect(res.status).toBe(400);
-  });
-});
 
 // HOME-STACK-02b: engines.stack.url empty (the default, every test above
 // this point) must keep going through the stub/supervisor path exactly

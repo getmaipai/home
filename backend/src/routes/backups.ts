@@ -6,12 +6,12 @@ import { requireAuth, requireRole, requireRoleOrGrant } from "@/middleware/auth"
 import { listBackups, runBackupAndMirror, stageRestore, pendingRestore, cancelPendingRestore, getBackupHealth } from "@/lib/backup";
 import { RestoreRefused } from "@/lib/restoreStaging";
 import { getSmbTarget, setSmbTarget, removeSmbTarget } from "@/lib/backupTargets";
-import { storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, ReceivedBackupRefused } from "@/lib/receivedBackups";
+import { storeReceivedBackup, listReceivedBackups, ReceivedBackupRefused } from "@/lib/receivedBackups";
 import { generateEmergencyKit } from "@/lib/emergencyKit";
 import { restorePersonFromBackup, PartialRestoreRefused } from "@/lib/partialRestore";
 import { db } from "@/db";
 import { createJob, updateJob } from "@/lib/jobs";
-import { devices as devicesTable, receivedBackups as receivedBackupsTable } from "@/db/schema";
+import { devices as devicesTable } from "@/db/schema";
 
 export const backupsRoutes = apiRouter();
 
@@ -269,17 +269,6 @@ backupsRoutes.get("/received", requireAuth, (c) => {
   const ownDeviceIds = new Set(db.select({ id: devicesTable.id }).from(devicesTable).where(eq(devicesTable.personId, actor.id)).all().map((d) => d.id));
   const all = listReceivedBackups();
   return c.json(all.filter((b) => ownDeviceIds.has(b.deviceId)));
-});
-
-backupsRoutes.delete("/received/:id", requireAuth, (c) => {
-  const actor = c.get("person");
-  const id = c.req.param("id");
-  const row = db.select({ deviceId: receivedBackupsTable.deviceId }).from(receivedBackupsTable).where(eq(receivedBackupsTable.id, id)).get();
-  if (!row) return c.json({ error: "no such received backup" }, 404);
-  const device = db.select({ personId: devicesTable.personId }).from(devicesTable).where(eq(devicesTable.id, row.deviceId)).get();
-  if (!device || device.personId !== actor.id) return c.json({ error: "no such received backup" }, 404);
-  const deleted = deleteReceivedBackup(row.deviceId, id);
-  return c.json({ success: deleted }, 200);
 });
 
 // Step 8: the emergency kit - owner-only, no grant widening (unlike

@@ -104,38 +104,6 @@ describe("POST /api/backups/received", () => {
   });
 });
 
-describe("DELETE /api/backups/received/:id", () => {
-  test("removes the row and the file", async () => {
-    const client = await owner();
-    const me = (await (await client.get("/api/auth/me")).json()) as { id: string };
-    const device = createDevice("robot", "Home robot", me.id);
-    const form = fakeArchive();
-    form.append("deviceId", device.id);
-    const created = (await (await client.postForm("/api/backups/received", form)).json()) as { id: string };
-
-    const del = await client.request(`/api/backups/received/${created.id}`, { method: "DELETE" });
-    expect(del.status).toBe(200);
-    const list = (await (await client.get("/api/backups/received")).json()) as unknown[];
-    expect(list).toHaveLength(0);
-  });
-
-  test("refuses to delete someone else's received backup", async () => {
-    const client = await owner();
-    const me = (await (await client.get("/api/auth/me")).json()) as { id: string };
-    const device = createDevice("robot", "Home robot", me.id);
-    const form = fakeArchive();
-    form.append("deviceId", device.id);
-    const created = (await (await client.postForm("/api/backups/received", form)).json()) as { id: string };
-
-    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
-    const adult = (await adultRes.json()) as { id: string };
-    const adultClient = new TestClient();
-    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
-
-    const del = await adultClient.request(`/api/backups/received/${created.id}`, { method: "DELETE" });
-    expect(del.status).toBe(404);
-  });
-});
 
 describe("cleanup on device/person removal", () => {
   test("deleting a device that has pushed a backup does not throw a foreign-key error", async () => {

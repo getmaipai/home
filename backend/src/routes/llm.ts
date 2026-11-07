@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireRole } from "@/middleware/auth";
 import { topicMessages } from "@/lib/topicPrompt";
-import { complete, embed, personWithinTurnBudget, type LlmMessage, type LlmRole } from "@/lib/llm";
+import { complete, personWithinTurnBudget, type LlmMessage, type LlmRole } from "@/lib/llm";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { notifyIfFlagged } from "@/lib/notifications";
@@ -56,9 +56,7 @@ export function clampMaxTokens(requested: number | undefined): number {
   return Math.min(requested, MAX_CHAT_TOKENS);
 }
 
-/** Shared by /chat's messages[] and /embed's texts[] (a review, 2026-09-06,
- * found the count-cap-plus-per-item-length-cap shape copy-pasted between
- * them with different constant names): `null` means within bounds,
+/** The count cap plus per-item length cap for /chat's messages[]: `null` means within bounds,
  * otherwise the exact error string+code pair the route should 400 with.
  * `texts` is already the plain strings to measure - each route extracts
  * its own item's text (a message's `.content`, or the text itself) before
@@ -120,29 +118,6 @@ llmRoutes.post("/chat", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 
   notifyIfFlagged(actor, outputSafety, "[llm]");
   if (outputSafety.action === "refuse") {
     return c.json({ ...result.value, text: REFUSAL_TEXT });
-  }
-  return c.json(result.value);
-});
-
-const MAX_EMBED_TEXTS = 64;
-const MAX_EMBED_TEXT_CHARS = 4_000;
-
-// Same posture as /chat above (SEC-1): owner/admin diagnostics only, now
-// that memory.ts's real vector recall is the household's actual embed
-// caller. Caps texts.length and each text's length (SEC-5) - nothing
-// downstream of embed() bounded either before this.
-llmRoutes.post("/embed", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 * 1024 }), async (c) => {
-  const actor = c.get("person");
-  if (!personWithinTurnBudget(actor.id)) {
-    return c.json(RATE_LIMIT_RESPONSE, 429);
-  }
-  const body = (await c.req.json().catch(() => ({}))) as { texts?: string[] };
-  const texts = Array.isArray(body.texts) ? body.texts : [];
-  const textsBoundsError = boundsError(texts.length, MAX_EMBED_TEXTS, texts, MAX_EMBED_TEXT_CHARS, "texts");
-  if (textsBoundsError) return c.json(textsBoundsError, 400);
-  const result = await embed(texts);
-  if (!result.ok) {
-    return c.json({ error: result.error, code: result.code }, result.status);
   }
   return c.json(result.value);
 });

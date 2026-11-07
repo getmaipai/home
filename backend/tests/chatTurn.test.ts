@@ -16,7 +16,7 @@ import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityClockForTests, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
-import { remember } from "@/lib/memory";
+import { recall, remember } from "@/lib/memory";
 import * as memoryModule from "@/lib/memory";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { __resetDenoHostForTests } from "@/lib/denoHost";
@@ -165,8 +165,7 @@ describe("runTurnNext()", () => {
     expect(result.value.plugin_id).toBe("remember");
     expect(REMEMBER_CONFIRM_VARIANTS).toContain(result.value.reply.text);
 
-    const recall = await client.post("/api/memory/recall", { q: "wifi password" });
-    const matches = (await recall.json()) as Array<{ record: { text: string } }>;
+    const matches = recall(actor, "wifi password");
     expect(matches.some((m) => m.record.text.includes("wifi password is on the fridge"))).toBe(true);
   });
 
