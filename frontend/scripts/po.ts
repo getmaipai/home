@@ -1,6 +1,11 @@
 // Minimal .po reading and rewriting for the translation script and its tests. Lingui owns extraction; this only reads
 // the blocks it wrote and rewrites msgstr and the `#, needs-review` flag, leaving every other byte alone.
-export type PoEntry = { id: string; msgstr: string; refs: string[]; flags: string[]; start: number; end: number };
+export type PoEntry = { id: string; msgstr: string; refs: string[]; flags: string[]; start: number; end: number; /** The English text when the id is an explicit key (failure.busy.adult): en-US's msgstr. */ source?: string };
+
+/** id -> English text for every entry whose id is a key rather than the text itself. */
+export function englishSources(enUsPo: string): Map<string, string> {
+  return new Map(parsePo(enUsPo).filter((entry) => entry.msgstr && entry.msgstr !== entry.id).map((entry) => [entry.id, entry.msgstr]));
+}
 
 const unquote = (line: string): string => JSON.parse(line.trim());
 

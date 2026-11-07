@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { acceptEntries, isProtected, planBatches, reviewList, stackOnlyFetch, translateCatalog, validateTranslation, type Fetch } from "./translate-catalog";
@@ -60,6 +60,22 @@ describe("translateCatalog with a fake Stack", () => {
     const parsed = parsePo(text);
     expect(parsed.find((e) => e.id === "Save")).toMatchObject({ msgstr: "ES Save", flags: ["needs-review"] });
     expect(parsed.find((e) => e.id === "Done")).toMatchObject({ msgstr: "Hecho", flags: [] });
+    rmSync(dir, { recursive: true });
+  });
+
+  test("an explicit key id is translated from its en-US text, and minor failure lines are refused", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-translate-"));
+    mkdirSync(join(dir, "es")); mkdirSync(join(dir, "en-US"));
+    const poPath = join(dir, "es", "messages.po");
+    writeFileSync(poPath, HEADER + entry("../backend/src/lib/failureCopy.ts", "failure.busy.adult") + "\n" + entry("../backend/src/lib/failureCopy.ts", "failure.busy.minor"));
+    writeFileSync(join(dir, "en-US", "messages.po"), HEADER + entry("../backend/src/lib/failureCopy.ts", "failure.busy.adult", "One moment. Send that again in a bit.") + "\n" + entry("../backend/src/lib/failureCopy.ts", "failure.busy.minor", "One moment. Try again soon."));
+    const stack = fakeStack("ready", (prompt) => [...prompt.matchAll(/\{"id":"([^"]+)","from":\[[^\]]*\],"text":"([^"]+)"\}/g)].map((m) => ({ id: m[1], msgstr: `ES ${m[2]}` })));
+    const { text, report } = await translateCatalog({ locale: "es", poPath, glossary, stackUrl: STACK, fetch: stack.fetchFn });
+    expect(stack.prompts[0]).toContain("One moment. Send that again in a bit.");
+    expect(report.filled).toEqual(["failure.busy.adult"]);
+    expect(report.refused).toEqual(["failure.busy.minor"]);
+    expect(parsePo(text).find((e) => e.id === "failure.busy.adult")).toMatchObject({ msgstr: "ES One moment. Send that again in a bit.", flags: ["needs-review"] });
+    expect(parsePo(text).find((e) => e.id === "failure.busy.minor")?.msgstr).toBe("");
     rmSync(dir, { recursive: true });
   });
 

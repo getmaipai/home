@@ -2,8 +2,8 @@
 // fill `needs-review`, and never touch protected copy. Run: bun scripts/translate-catalog.ts --locale es [--file <text>]
 // [--max-batches N] [--dry-run] [--redo] [--review] [--accept <file|id>]. The only host it talks to is the Stack.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { parsePo, rewriteEntries, type PoEntry } from "./po";
+import { dirname, join } from "node:path";
+import { englishSources, parsePo, rewriteEntries, type PoEntry } from "./po";
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type Glossary = { dialect?: string; style?: string[]; [term: string]: unknown };
@@ -11,7 +11,7 @@ export type Report = { filled: string[]; failed: string[]; refused: string[]; ba
 
 export const MAX_BATCH_ENTRIES = 150;
 // Child, teen, crisis, consent, refusal, spoken clip, robot and SEARCH-DOWN-EMPTY-01 copy: a reviewer must write it, never the model.
-const PROTECTED = /child|teen|crisis|consent|refusal|spoken|robot|SEARCH-DOWN-EMPTY-01/i;
+const PROTECTED = /child|teen|minor|crisis|consent|refusal|spoken|robot|SEARCH-DOWN-EMPTY-01/i;
 
 export const isProtected = (refs: string[], id: string): boolean => PROTECTED.test(`${refs.join(" ")} ${id}`);
 export const sourceFile = (entry: Pick<PoEntry, "refs">): string => (entry.refs[0] ?? "unknown").replace(/:\d+$/, "");
@@ -50,8 +50,8 @@ export function buildPrompt(locale: string, glossary: Glossary, batch: { file: s
     `Style rules:\n${(style ?? []).map((rule) => `- ${rule}`).join("\n")}`,
     `Glossary (term to ${locale}): ${JSON.stringify(terms)}`,
     `Source file: ${batch.file}`,
-    `Reply with only a JSON array of {"id": string, "msgstr": string}, one per entry, ids unchanged.`,
-    `Entries: ${JSON.stringify(batch.entries.map((entry) => ({ id: entry.id, from: entry.refs.slice(0, 2) })))}`,
+    `Reply with only a JSON array of {"id": string, "msgstr": string}, one per entry, ids unchanged. When an entry has \"text\", translate that; otherwise translate its id.`,
+    `Entries: ${JSON.stringify(batch.entries.map((entry) => ({ id: entry.id, from: entry.refs.slice(0, 2), ...(entry.source ? { text: entry.source } : {}) })))}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -99,7 +99,9 @@ export async function translateCatalog(options: TranslateOptions): Promise<{ tex
   const stack = options.stackUrl.replace(/\/$/, "");
   const original = readFileSync(options.poPath, "utf8");
   const report: Report = { filled: [], failed: [], refused: [], batches: 0 };
-  const all = candidates(parsePo(original), options.redo).filter((entry) => !options.file || sourceFile(entry).includes(options.file));
+  const enUs = join(dirname(dirname(options.poPath)), "en-US", "messages.po");
+  const sources = existsSync(enUs) ? englishSources(readFileSync(enUs, "utf8")) : new Map<string, string>();
+  const all = candidates(parsePo(original), options.redo).map((entry) => ({ ...entry, source: sources.get(entry.id) })).filter((entry) => !options.file || sourceFile(entry).includes(options.file));
   for (const entry of all) if (isProtected(entry.refs, entry.id)) report.refused.push(entry.id);
   const batches = planBatches(all.filter((entry) => !isProtected(entry.refs, entry.id)));
   if (options.dryRun) { report.batches = batches.length; return { text: original, report }; }
@@ -113,7 +115,7 @@ export async function translateCatalog(options: TranslateOptions): Promise<{ tex
         const entry = batchEntries.find((candidate) => candidate.id === item.id);
         if (!entry || answered.has(item.id)) continue;
         answered.add(item.id);
-        if (validateTranslation(entry.id, item.msgstr) === null) changes.set(entry.id, { msgstr: item.msgstr, flag: true });
+        if (validateTranslation(entry.source ?? entry.id, item.msgstr) === null) changes.set(entry.id, { msgstr: item.msgstr, flag: true });
       }
     };
     try { accept(batch.entries, parseReply(await ask(stack, doFetch, buildPrompt(options.locale, options.glossary, batch)))); } catch { /* retried one at a time below */ }

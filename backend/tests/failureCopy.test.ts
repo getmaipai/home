@@ -37,3 +37,50 @@ test("no line a non-admin can see names a resource or the engine", () => {
   expect(lines.filter((line) => RESOURCE_WORDS.test(line))).toEqual([]);
   expect(lines.filter((line) => line.includes("${"))).toEqual([]);
 });
+
+// I18N-F2 (design note i18n-2026-11-07 section 9 step 1): every line is a descriptor (id plus English default); the string tables the
+// server, the robot and the tests read are derived from them, so the words are defined once.
+import { FAILURE_ADVICE, TOOL_FAILURE_ADVICE, askFormFailureLine, askFormFailureMessage, descriptorForLine, failureLine, failureMessage, formatMessage, partialReplyNote, voiceFailureMessage } from "@/lib/failureCopy";
+
+test("a line's descriptor and its string agree, and minor lines have minor ids", () => {
+  expect(failureMessage("busy", false)).toEqual({ id: "failure.busy.adult", message: failureLine("busy", false) });
+  expect(failureMessage("busy", true).id).toBe("failure.busy.minor");
+  expect(failureMessage("engine_computer", false, true).id).toBe("failure.engine_computer.adultAway");
+  expect(voiceFailureMessage("listening_engine", { minor: true, canOpenRepairs: true }).id).toBe("failure.voice.listening_engine.minor");
+  expect(voiceFailureMessage("listening_engine", { minor: false, canOpenRepairs: false }).id).toBe("failure.voice.listening_engine.adultNoRepairs");
+  expect(partialReplyNote("slow", false)).toContain("stopped answering");
+});
+
+test("a line is found again by its text, apart for minors and adults", () => {
+  expect(descriptorForLine(failureLine("busy", true), true)?.id).toBe("failure.busy.minor");
+  expect(descriptorForLine(failureLine("busy", false), false)?.id).toBe("failure.busy.adult");
+  expect(descriptorForLine(failureLine("busy", false), true)).toBeUndefined();
+  // Same words for every band: the band picks the id and a minor never reaches an adult id.
+  const restarting = composerNotice("unavailable", "restarting")!;
+  expect(restarting.adult).toBe(restarting.child);
+  expect(descriptorForLine(restarting.child, true)?.id).toMatch(/\.(child|teen)$/);
+  expect(descriptorForLine(restarting.adult, false)?.id).toMatch(/\.adult$/);
+  expect(descriptorForLine("Something an admin typed.", false)).toBeUndefined();
+});
+
+test("ids are well formed and one id never carries two different messages", () => {
+  const ids: string[] = [];
+  const messages = new Map<string, string>();
+  const walk = (value: unknown): void => {
+    if (!value || typeof value !== "object") return;
+    const line = value as { id?: unknown; message?: unknown };
+    if (typeof line.id === "string" && typeof line.message === "string") { ids.push(line.id); expect(messages.get(line.id) ?? line.message).toBe(line.message); messages.set(line.id, line.message); return; }
+    for (const child of Object.values(value)) walk(child);
+  };
+  for (const kind of ["busy", "memory", "stopped", "slow", "unreachable", "engine_computer", "context_too_large", "other"] as const) { walk(failureMessage(kind, true)); walk(failureMessage(kind, false)); }
+  expect(ids.every((id) => /^failure\.[a-z_]+\.[A-Za-z_]+(\.[A-Za-z_]+)?$/.test(id))).toBe(true);
+  expect(ids.length).toBe(16);
+});
+
+test("the advice tables keep their string shape and the ask-form line fills its field name", () => {
+  expect(FAILURE_ADVICE.stopped).toEqual({ cause: "The chat engine was stopped, so the reply never started.", next_step: "Start the chat engine in Repairs.", repairs: true });
+  expect(TOOL_FAILURE_ADVICE.timed_out.verb).toBe("timed out");
+  expect(askFormFailureMessage("invalid_input", 'Bad value for "Name".')).toMatchObject({ id: "failure.ask_form.field", values: { label: "Name" } });
+  expect(askFormFailureLine("invalid_input", 'Bad value for "Name".')).toBe('The answer for "Name" did not fit. Correct that field, then submit the form again.');
+  expect(formatMessage({ id: "x", message: "Hi {who}, {missing}" }, { who: "Sage" })).toBe("Hi Sage, {missing}");
+});

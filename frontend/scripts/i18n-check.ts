@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SUPPORTED_LOCALES } from "../src/supportedLocales";
-import { parsePo } from "./po";
+import { englishSources, parsePo } from "./po";
 import { isProtected } from "./translate-catalog";
 
 const fail = (message: string): never => { console.error(message); process.exit(1); };
@@ -32,10 +32,11 @@ for (const locale of SUPPORTED_LOCALES) {
   const text = readFileSync(`src/locales/${locale}/messages.po`, "utf8");
   if (!text.includes(`"Language: ${locale}\\n"`)) fail(`src/locales/${locale}/messages.po has no Language: ${locale} header.`);
   let flagged = 0;
+  const sources = englishSources(readFileSync("src/locales/en-US/messages.po", "utf8"));
   for (const entry of parsePo(text)) {
     if (locale === "en-US") continue;
     if (entry.msgstr.includes("—")) fail(`${locale}: "${entry.id}" contains an em dash (U+2014); rewrite the line.`);
-    if (entry.msgstr && JSON.stringify(placeholders(entry.id)) !== JSON.stringify(placeholders(entry.msgstr))) fail(`${locale}: "${entry.id}" changes its placeholders; keep every {name} exactly.`);
+    if (entry.msgstr && JSON.stringify(placeholders(sources.get(entry.id) ?? entry.id)) !== JSON.stringify(placeholders(entry.msgstr))) fail(`${locale}: "${entry.id}" changes its placeholders; keep every {name} exactly.`);
     if (entry.flags.includes("needs-review")) {
       flagged += 1;
       if (isProtected(entry.refs, entry.id)) fail(`${locale}: "${entry.id}" is protected copy (child, teen, crisis, consent, refusal, spoken, robot or SEARCH-DOWN-EMPTY-01) and still has needs-review; a person must review it (--accept).`);
