@@ -1,3 +1,4 @@
+import { applySkippedMigrations } from "./applySkippedMigrations";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
@@ -52,6 +53,7 @@ checkSchemaVersion(sqlite);
 
 export const db = drizzle(sqlite, { schema });
 
+applySkippedMigrations(sqlite, migrationsFolder);
 migrate(db, { migrationsFolder });
 stampSchemaVersion(sqlite);
 
