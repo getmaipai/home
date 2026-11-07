@@ -398,6 +398,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/blocklists/status.ts` | blocklistStatusNote |
 | `backend/src/lib/bootGuard.ts` | instanceLock |
 | `backend/src/lib/botRelease.ts` | __setBotReleaseForTests, hasBotReleaseAssets, botReleaseVersion, botReleaseSigningKeys, ensureBotRelease, ensureStackChanFirmware |
+| `backend/src/lib/boundedMap.ts` | MAX_REMEMBERED_KEYS, setBounded |
 | `backend/src/lib/bundledPackages.ts` | hashPackageDir, isDirectory |
 | `backend/src/lib/canary/checks.ts` | SEARCH_PHRASES, LOOPBACK_PHRASE, WEATHER_PHRASE, GPU_CAUSE, GPU_FIX, wordMatch |
 | `backend/src/lib/canary/identity.ts` | HEALTH_ACTOR_ID, healthActor |
@@ -406,7 +407,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/canary/restartBudget.ts` | RESTART_WINDOW_MS, fileRestartBudget |
 | `backend/src/lib/canary/results.ts` | HISTORY_LIMIT, RAISE_AFTER, record, last, history, failuresInARow |
 | `backend/src/lib/canary/runner.ts` | ISSUE_SOURCE, __resetCanaryRunnerForTests, isRunning, MANUAL_DEBOUNCE_MS, runSuite, runNow |
-| `backend/src/lib/canary/schedule.ts` | INTERVAL_MS, SEARCH_PER_DAY, SEARCH_GAP_MS, SEARCH_QUIET_MS, SLOW_BACKOFF_MS, IDLE_WINDOW_MS |
+| `backend/src/lib/canary/schedule.ts` | INTERVAL_MS, CALM_AFTER_PASSES, CALM_INTERVAL_MS, CALM_CHAT_QUIET_MS, SEARCH_PER_DAY, SEARCH_GAP_MS |
 | `backend/src/lib/canary/wav.ts` | decodeWav |
 | `backend/src/lib/capabilities.ts` | unavailableCapabilities, missingRequired, missingOptional, capabilityWords, installRefusal |
 | `backend/src/lib/capabilityReconcile.ts` | packagesLosingCapability, removalConfirmation, reconcileCapabilities |
@@ -627,6 +628,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
+| `backend/src/lib/manifestStat.ts` | MANIFEST_STAT_TTL_MS, cachedMtimeMs, invalidateManifestStats |
 | `backend/src/lib/mcp/connector.ts` | createConnector |
 | `backend/src/lib/mcp/nameMap.ts` | MAX_TOOL_NAME, createNameMap |
 | `backend/src/lib/mcp/schemaSanitiser.ts` | sanitiseSchema |
@@ -907,14 +909,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, FRESH_ENOUGH_MS, robotVisionMode |
 | `backend/src/lib/robots.ts` | ROBOTS_OFF_MESSAGE, robotsEnabled |
 | `backend/src/lib/robotsSwitchMigration.ts` | migrateRobotsSwitch |
-| `backend/src/lib/roleHealth.ts` | MAKING_ROLES, __setRoleHealthForTests, cachedRoleHealth, STACK_REFUSAL_KEY, localRoleHealthEntry, gpuCompilerFault |
+| `backend/src/lib/roleHealth.ts` | MAKING_ROLES, __setRoleHealthForTests, cachedRoleHealth, sharedStackRoles, sharedCodingMode, __resetSharedStackReadsForTests |
 | `backend/src/lib/routing.ts` | embedUtterance, __embedCallCountForTests, __resetEmbedCallCountForTests |
 | `backend/src/lib/ruleNames.ts` | RUNGS, isTypedSourcePackage, isLookupPackage, rungOf, RULES, RULE_NAMES |
 | `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |
 | `backend/src/lib/safety.ts` | evaluateSafety, forOutput, carriesCrisisSignal, evaluateReply, refusePackageReplyIfUnsafe |
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
-| `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs |
+| `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, SCHEDULE_PRUNE_DAYS |
 | `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, ONCE_GRACE_MS, pauseTask, fireHubDeviceTask |
 | `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
 | `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, hasActiveAutomationTasks, reconcileAllInstances, registerScheduleRecheck, __resetReconcileForTests |
@@ -1144,7 +1146,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
 | `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome |
 | `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile, cardMoon |
-| `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, hoursOf, outlookLine, factualLine, summaryFor |
+| `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __weatherSummaryCacheKeysForTests, __resetWeatherSummaryForTests, hoursOf, outlookLine, factualLine |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, __setWebSearchToolDeadlineForTests, webSearchToolDeadlineMs |
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
