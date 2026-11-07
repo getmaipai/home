@@ -343,7 +343,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 
 | File | Exported names |
 |---|---|
-| `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, mayUseClipVoices, rolesById, getPersonRole, canAccessPerson |
+| `backend/src/lib/access.ts` | isOwnerOrAdmin, COMPANION_BAND_LINE, canMakeCompanion, canHaveTemporaryChat, mayUseClipVoices, rolesById |
 | `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
@@ -720,6 +720,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
+| `backend/src/lib/music/songEdit.ts` | SONG_GONE_LINE, runSongEdit |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
 | `backend/src/lib/music/soundMaker.ts` | MAKE_SOUND_TOOL_ID, makeSoundArgs, runMakeSound |
 | `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, musicStackConfigured, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic |
@@ -769,12 +770,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/offline/media.ts` | matches, playableItem, keepRefusal, missing, mediaManifest, mediaFile |
 | `backend/src/lib/offline/reference.ts` | referenceOfflineProvider |
 | `backend/src/lib/offline/registry.ts` | registerOfflineProvider, offlineProvider |
-| `backend/src/lib/openapi.ts` | apiRouter, emptyJsonBodyAsObject |
+| `backend/src/lib/openapi.ts` | apiRouter, emptyJsonBodyAsObject, refuseWith, respond |
 | `backend/src/lib/operatorDiagnose.ts` | newsView, MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView |
 | `backend/src/lib/operatorEngine.ts` | ENGINE_SETTING_KEY, ENGINE_CHOICES, ENGINE_CHANGES_PER_DAY, __resetOperatorEngineForTests, operatorEngineView, setOperatorEngine |
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
 | `backend/src/lib/otherApps.ts` | readOtherApps |
 | `backend/src/lib/outbound.ts` | HOME_USER_AGENT, RateLimited, RedirectLimitError, GuardedStop, guardedGet |
+| `backend/src/lib/ownedRecordCrud.ts` | ownedRecordCrud |
 | `backend/src/lib/packageAssets.ts` | ASSET_TYPES, MAX_ASSET_BYTES, cleanAssetPath, packageAssetFile, assetResponse |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |
 | `backend/src/lib/packageCache.ts` | LEGACY_ENTRY_GRACE_S, CACHE_NOT_MODIFIED, PACKAGE_CACHE_RESPONSE, packageCacheResponse, __setTestCacheBudgetBytes, OTHER_CACHE_SOURCE |
@@ -867,6 +869,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/resourceDay.ts` | describeResourceDay, readResourceDay |
 | `backend/src/lib/resourceGovernor.ts` | __setGovernorTuningForTestsOnly, __resetGovernorTuningForTests, __stopAllGovernorsForTests, systemAvailableBytes, startResourceGovernor |
 | `backend/src/lib/restoreStaging.ts` | RestoreRefused, pendingRestore, cancelPendingRestore, moveDbSet, dbSetExists, partialMoveInProgress |
+| `backend/src/lib/result.ts` | conflictStatus |
 | `backend/src/lib/retrieval/articleClean.ts` | isPromoText, cleanArticleDocument |
 | `backend/src/lib/retrieval/articleImages.ts` | extractArticleImages |
 | `backend/src/lib/retrieval/ddgsConfig.ts` | DDGS_URL_ENV, setDdgsStackReport, ddgsStackReport, ddgsBaseUrl, ddgsConfigured, ddgsStarting |
@@ -1096,7 +1099,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/uptime/kuma.ts` | KUMA_SLUG, fetchKumaStatus |
 | `backend/src/lib/uptime/tool.ts` | UPTIME_ACTIONS, safeUptimeAction, visibleUptimeInstances, uptimeAllowed, uptimeToolSpec, runUptimeTool |
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
-| `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
+| `backend/src/lib/validation.ts` | validateDisplayName, validateSecret, jsonBody |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, adapterOfLora, allVideoAdapters, loraSurfaceOf, videoAdaptersFor |
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
