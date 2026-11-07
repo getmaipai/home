@@ -49,6 +49,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/podcasts/pages/episodes.json` | podcasts | Episodes |
 | `backend/packages/podcasts/pages/filters.json` | podcasts | Filters |
 | `backend/packages/podcasts/pages/index.json` | podcasts | Podcasts |
+| `backend/packages/podcasts/pages/new-show.json` | podcasts | New show |
 | `backend/packages/podcasts/pages/play.json` | podcasts | Listen |
 | `backend/packages/podcasts/pages/queue.json` | podcasts | Queue |
 | `backend/packages/podcasts/pages/saved.json` | podcasts | Saved |
@@ -639,7 +640,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/access.ts` | isMediaAdmin, discoveryAllowed, allowlistMode, noDiscovery, sourceVisibleTo, liveSourceById |
 | `backend/src/lib/media/albumCoverStore.ts` | ALBUM_ART_KEY, COVER_PATH_PREFIX, COVER_TYPES, albumArtEnabled, coverDir, albumCoverFile |
 | `backend/src/lib/media/albumCovers.ts` | coverArtArchiveFetch, runAlbumCoverPass, kickAlbumCovers |
-| `backend/src/lib/media/appHost.ts` | MEDIA_APPS, MEDIA_APP_IDS, laterKindOf, mediaAppAllowed, allowlistOnly, allowedSources |
+| `backend/src/lib/media/appHost.ts` | registerProductionSourceGate, MEDIA_APPS, MEDIA_APP_IDS, laterKindOf, mediaAppAllowed, allowlistOnly |
 | `backend/src/lib/media/artistProfiles.ts` | ARTIST_WIKIMEDIA_KEY, artistWikimediaEnabled, wikimediaFetchPhoto, shortBio, lookupArtistProfile, mostCommon |
 | `backend/src/lib/media/band.ts` | trips, bandOkAtIngest, mediaBandOf, allowedBandsFor, bandAllows |
 | `backend/src/lib/media/collections.ts` | SINGLETON_KINDS, MADE_KINDS, ensureStandingCollections, listCollections, resolveCollection, createFilterCollection |
@@ -1040,6 +1041,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/brief.ts` | buildBrief |
 | `backend/src/lib/talent/formats.ts` | loadFormats, formatById |
 | `backend/src/lib/talent/life.ts` | LIFE_SOURCE, ORIGIN_SCHEMA, TICK_SCHEMA, ORIGIN_PROMPT, TICK_PROMPT, __setTalentLifeCompleterForTests |
+| `backend/src/lib/talent/shows.ts` | __setTalentShowCompleterForTests, inventCast, createShow, listShows, getShow, dueShows |
 | `backend/src/lib/talent/studio.ts` | speakableText, splitAtWord, renderLines, layout, mixEpisode |
 | `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |
 | `backend/src/lib/talent/writer.ts` | TalentWriteError, __setTalentWriterSafetyForTests, __setTalentWriterMinorCheckForTests, OUTLINE_PROMPT, SEGMENT_PROMPT, checkText |

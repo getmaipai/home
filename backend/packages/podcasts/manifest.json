@@ -67,6 +67,14 @@
         "module": "show"
       },
       {
+        "id": "new-show",
+        "label": "New show",
+        "icon": "mic",
+        "nav": false,
+        "kind": "schema",
+        "module": "new-show"
+      },
+      {
         "id": "shows",
         "label": "Shows",
         "icon": "library",

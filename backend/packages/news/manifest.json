@@ -450,6 +450,16 @@
         "refresh_s": 300
       },
       {
+        "id": "briefing",
+        "rows": "list",
+        "refresh_s": 300
+      },
+      {
+        "id": "briefing-item",
+        "rows": "list",
+        "refresh_s": 300
+      },
+      {
         "id": "mix",
         "refresh_s": 300
       },

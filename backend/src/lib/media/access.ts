@@ -34,8 +34,8 @@ export function noDiscovery(actor: PersonRow): boolean {
 
 export function sourceVisibleTo(source: Pick<MediaSource, "kind" | "visible_to" | "deleted_at" | "scope" | "owner_person_id">, actor: PersonRow): boolean {
   if (source.deleted_at) return false;
-  if (source.scope === "person" && source.owner_person_id !== actor.id) return false;
   const named = Array.isArray(source.visible_to) && source.visible_to.includes(actor.id);
+  if (source.scope === "person" && source.owner_person_id !== actor.id && !(source.kind === "production" && named)) return false;
   // Allowlist mode (MEDIA-KID-01): the household library, a source an adult named this person on, or a source made for this
   // person (scope person, owned by them: an adult sets these up; a child never adds one).
   const ownSource = source.scope === "person" && source.owner_person_id === actor.id;

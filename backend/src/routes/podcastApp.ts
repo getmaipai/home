@@ -21,6 +21,8 @@ import { previewEpisodeAddress, previewPodcastFeed } from "@/lib/media/podcasts"
 import { guardedFetch, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { lookup } from "node:dns/promises";
 import { mediaItems } from "@/db/schema";
+import { mediaSources, mediaProductions } from "@/db/schema";
+import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
 
@@ -46,11 +48,14 @@ export async function podcastDirectoryRows(person: PersonRow, q: string, scope =
 export async function podcastShowRows(person: PersonRow, id: string, scope: string): Promise<unknown[]> {
   const adult = mediaBandOf(person) === "adult";
   const canFollow = adult && isOwnerOrAdmin(person);
-  const source = allowedSources(person).find((row) => row.id === id && row.kind === "feed");
+  const source = allowedSources(person).find((row) => row.id === id && (row.kind === "feed" || row.kind === "production"));
   if (source) {
     const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 }).sort((a, b) => (b.external?.published_at ?? "").localeCompare(a.external?.published_at ?? ""));
     const first = items[0];
-    return [{ id: source.id, title: source.label, author: first?.artist ?? "", genre: first?.genre ?? "", description: first?.description ?? "", thumbnail: first ? `/api/media/items/${encodeURIComponent(first.id)}/art` : null, followed: true, can_follow: canFollow, feed_url: source.url ?? "" }];
+    const production = source.kind === "production" && source.production_id ? db.select().from(mediaProductions).where(eq(mediaProductions.id, source.production_id)).get() : null;
+    const show = production?.show ? JSON.parse(production.show) as { schedule?: { every: string; at: string } | null; state?: { stage?: string } | null } : null;
+    const scheduleLabel = show?.schedule ? ` · ${show.schedule.every === "1d" ? "Daily" : "Weekly"} at ${show.schedule.at}` : "";
+    return [{ id: source.id, title: source.label, author: source.kind === "production" ? "Made here" : first?.artist ?? "", genre: first?.genre ?? "", description: `${source.kind === "production" ? `Made here${scheduleLabel}` : first?.description ?? ""}`, thumbnail: first ? `/api/media/items/${encodeURIComponent(first.id)}/art` : null, followed: true, can_follow: source.kind === "feed" && canFollow, feed_url: source.url ?? "", ...(source.kind === "production" ? { production_id: source.production_id, stage: show?.state?.stage ?? null, action_label: production?.ownerPersonId === person.id ? show?.state?.stage && show.state.stage !== "done" ? "Making today's episode" : "Make today's episode" : undefined } : {}) }];
   }
   if (mediaBandOf(person) === "child") return [];
   const address = id;
@@ -69,11 +74,11 @@ function podcastDate(value: string | null | undefined): string {
 }
 
 export async function podcastShowEpisodeRows(person: PersonRow, id: string): Promise<unknown[]> {
-  const source = allowedSources(person).find((row) => row.id === id && row.kind === "feed");
+  const source = allowedSources(person).find((row) => row.id === id && (row.kind === "feed" || row.kind === "production"));
   if (source) {
     const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 }).sort((a, b) => (b.external?.published_at ?? "").localeCompare(a.external?.published_at ?? ""));
     const showArt = items[0]?.artwork ? `/api/media/items/${encodeURIComponent(items[0].id)}/art` : null;
-    return items.map((item) => ({ id: item.id, title: item.title, summary: podcastDate(item.external?.published_at), description: item.description?.slice(0, 140) ?? "", date: podcastDate(item.external?.published_at), duration_s: item.duration_s, thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : showArt, followed: true }));
+    return items.map((item) => ({ id: item.id, title: item.title, summary: source.kind === "production" ? item.added_at.slice(0, 10) : podcastDate(item.external?.published_at), description: item.description?.slice(0, 140) ?? "", date: source.kind === "production" ? item.added_at.slice(0, 10) : podcastDate(item.external?.published_at), duration_s: item.duration_s, thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : showArt, followed: true, ...(source.kind === "production" ? { action_label: "Made here" } : {}) }));
   }
   if (mediaBandOf(person) === "child" || !directoryShowForFeed(id)) return [];
   const result = await previewPodcastFeed(person, id);
@@ -85,7 +90,28 @@ export async function podcastShowEpisodeRows(person: PersonRow, id: string): Pro
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/shows", "/shows/*"]);
+
+  // TALENT-04: the package's own doors to the show maker (a package page may only call routes under /api/plugins/podcasts/).
+  routes.post("/shows", requireAuth, async (c) => {
+    const person = c.get("person");
+    const body = await jsonBody(c);
+    try {
+      const { createShow } = await import("@/lib/talent/shows");
+      const { createShowSchema } = await import("@/routes/talent");
+      const input = createShowSchema.parse(body) as import("@/lib/talent/shows").CreateShowInput;
+      return c.json(await createShow(person, input), 201);
+    } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The show could not be created. Check its fields and try again." }, 400); }
+  });
+  routes.post("/shows/:id/episodes", requireAuth, async (c) => {
+    const person = c.get("person");
+    const { getShow, makeEpisode } = await import("@/lib/talent/shows");
+    const production = getShow(person, c.req.param("id"));
+    if (!production || production.owner_person_id !== person.id) return c.json({ error: "That show is not available to you. Open one of your shows and try again." }, 404);
+    if (production.show?.state?.started_at && Date.now() - Date.parse(production.show.state.started_at) < 7_200_000 && production.show.state.stage !== "done") return c.json({ error: "An episode is being made right now. Wait for it to finish." }, 409);
+    void makeEpisode(person, production.id).catch(() => {});
+    return c.json({ production_id: production.id, stage: production.show?.state?.stage ?? "brief" }, 202);
+  });
 
   routes.post("/data/directory", requireAuth, async (c, next) => {
     const person = c.get("person");

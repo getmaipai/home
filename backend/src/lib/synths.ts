@@ -14,6 +14,10 @@ import { canManage } from "@/lib/personLifecycle";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { nextHlc } from "@/lib/hlc";
 import { registerCastSynthGate } from "@/lib/mediaProductions";
+import { createMediaSubject } from "@/lib/mediaSubjects";
+import { readLook, versionPath } from "@/lib/companionLook";
+import { readFileSync } from "node:fs";
+import { storeFile } from "@/lib/attachments";
 
 export type SynthRecord = SynthShape;
 type Companion = NonNullable<PackageManifest["companion"]>;
@@ -121,6 +125,26 @@ export function updateSynth(actor: PersonRow, id: string, patch: Partial<Pick<Sy
   const next = stampSynth(id, patch.persona ?? current.persona, { ...current, ...patch, based_on: patch.based_on ?? current.based_on, life: patch.life ?? current.life }, current.owner_person_id, current.provenance);
   const result = updateHouseholdCompanionSynth(id, synthBlock(next), next.persona);
   return result.ok && result.value.companion ? { ok: true, value: { id, manifest: result.value, companion: result.value.companion, synth: next } } : { ok: false, status: 400, error: result.ok ? "The synth could not be saved. Check its fields and try again." : result.error };
+}
+
+/** Reuse the synth's one saved media subject across every production. */
+export async function ensureSubject(synth: SynthRecord): Promise<string> {
+  if (synth.subject_id) return synth.subject_id;
+  const actor = ownerActor(synth);
+  if (!actor) throw new Error("The synth's maker is unavailable. Choose another synth or restore its maker.");
+  let referenceIds: string[] = [];
+  const rest = readLook(synth.id).rest;
+  const path = rest ? versionPath(synth.id, rest) : null;
+  if (path) {
+    try {
+      const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: new Uint8Array(readFileSync(path)), provenance: "media-subject-reference", name: `${synth.persona.display_name}.png` });
+      if (stored.ok) referenceIds = [stored.value.id];
+    } catch { /* A missing portrait does not prevent a text-only subject. */ }
+  }
+  const subject = createMediaSubject(actor, { name: synth.persona.display_name, kind: "character", look: synth.persona.look_prompt ?? synth.persona.display_name, referenceIds, real: synth.based_on.kind !== "none" }, `talent:synth:${synth.id}`);
+  const saved = updateSynth(actor, synth.id, { subject_id: subject.id });
+  if (!saved.ok) throw new Error("The synth's subject could not be saved. Try creating the show again.");
+  return subject.id;
 }
 export function forkSynth(actor: PersonRow, baseId: string): SynthWriteResult {
   const base = synthById(baseId);

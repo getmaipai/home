@@ -1,5 +1,5 @@
 import { generationOf } from "@/lib/music/types";
-const WRITERS = ["picture-gen", "image-edit", "video-gen", "video-edit", "video-poster", "music-gen", "voiceover"];
+const WRITERS = ["picture-gen", "image-edit", "video-gen", "video-edit", "video-poster", "music-gen", "voiceover", "show"];
 /** The shipped generation writers (a video edit is a made video). Unknown and malformed notes carry no metadata. */
 export function libraryProvenance(note: string): Record<string, unknown> & { writer?: string } {
   const writer = WRITERS.find(prefix => note.startsWith(`${prefix}:`));

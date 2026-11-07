@@ -4,6 +4,18 @@
   "title": "Podcast show",
   "body": [
     {
+      "type": "list",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "show", "id": "$state.id" } },
+      "item_key_field": "id",
+      "item_label_field": "description",
+      "item_badge_field": "action_label",
+      "row_action": {
+        "icon": "play",
+        "label": "{action_label}",
+        "action": { "call": { "target": "/api/plugins/podcasts/shows/{production_id}/episodes", "args": {} } }
+      }
+    },
+    {
       "type": "billboard",
       "bind": {
         "source": "package",

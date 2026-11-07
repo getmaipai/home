@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaProductions, mediaSubjects, people } from "@/db/schema";
+import { mediaProductions, mediaSubjects, mediaSources, people } from "@/db/schema";
 import { canUseSubject, getMediaSubject } from "@/lib/mediaSubjects";
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -45,7 +45,11 @@ export function listMediaProductions(actor: PersonRow): Production[] { return ac
 export function getMediaProduction(actor: PersonRow, id: string): Production | null { const row = raw(id); return row && canSeeProduction(actor, row) ? decode(row) : null; }
 function validSubjectIds(actor: PersonRow, ids: string[]) {
   if (new Set(ids).size !== ids.length) return false;
-  return ids.every((id) => { const row = db.select().from(mediaSubjects).where(eq(mediaSubjects.id, id)).get(); return !!row && canUseSubject(actor, row); });
+  return ids.every((id) => {
+    const row = db.select().from(mediaSubjects).where(eq(mediaSubjects.id, id)).get();
+    if (row && canUseSubject(actor, row)) return true;
+    return db.select().from(mediaProductions).all().some((production) => (JSON.parse(production.cast) as CastRole[]).some((entry) => entry.subject_id === id && castBySynth(actor, entry)));
+  });
 }
 /** A cast entry played by a synth the actor may use: its subject belongs to the synth's owner, so the subject check does not apply (TALENT-02). */
 function castBySynth(actor: PersonRow, entry: CastRole): boolean {
@@ -54,7 +58,7 @@ function castBySynth(actor: PersonRow, entry: CastRole): boolean {
 function references(p: Partial<Production>, actor?: PersonRow) {
   const cast = p.cast ?? [], sets = p.sets ?? [], props = p.props ?? [], episodes = p.episodes ?? [];
   const ownCast = actor ? cast.filter((c) => !castBySynth(actor, c)) : cast;
-  return [...ownCast.flatMap((c) => [c.subject_id, ...c.wardrobe_variant_ids]), ...sets, ...props, ...episodes.flatMap((e) => e.scenes.flatMap((s) => s.shots.flatMap((shot) => shot.subject_ids)))];
+  return [...new Set([...ownCast.flatMap((c) => [c.subject_id, ...c.wardrobe_variant_ids]), ...sets, ...props, ...episodes.flatMap((e) => e.scenes.flatMap((s) => s.shots.flatMap((shot) => shot.subject_ids)))])];
 }
 function persist(row: typeof mediaProductions.$inferSelect, patch: Partial<Production>) {
   const values: Record<string, unknown> = { updatedAt: new Date().toISOString(), hlc: nextHlc() };
@@ -162,7 +166,15 @@ export function shareMediaProduction(actor:PersonRow,id:string,personId:string,s
   const row=raw(id); if(!row||row.ownerPersonId!==actor.id)return null;
   const target=db.select({id:people.id,role:people.role}).from(people).where(and(eq(people.id,personId),isNull(people.deletedAt))).get();
   if(!target||target.role==="guest"||personId===actor.id) throw new Error("Choose a named household member.");
-  const ids=new Set<string>(JSON.parse(row.sharedTo)); shared?ids.add(personId):ids.delete(personId); persist(row,{shared_to:[...ids]}); return getMediaProduction(actor,id);
+  const ids=new Set<string>(JSON.parse(row.sharedTo)); shared?ids.add(personId):ids.delete(personId); persist(row,{shared_to:[...ids]});
+  const source = db.select().from(mediaSources).where(eq(mediaSources.productionId, id)).get();
+  if (source) {
+    const visible = new Set<string>(JSON.parse(source.visibleTo));
+    shared ? visible.add(personId) : visible.delete(personId);
+    visible.add(actor.id);
+    db.update(mediaSources).set({ visibleTo: JSON.stringify([...visible]), hlc: nextHlc() }).where(eq(mediaSources.id, source.id)).run();
+  }
+  return getMediaProduction(actor,id);
 }
 export function castForCaller(actor:PersonRow,id:string) {
   const p=getMediaProduction(actor,id); if(!p)return null;

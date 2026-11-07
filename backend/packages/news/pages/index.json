@@ -4,6 +4,66 @@
   "title": "Today",
   "body": [
     {
+      "type": "media_shelf",
+      "heading": "Today's briefing",
+      "bind": {
+        "source": "package",
+        "path": "briefing-item"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "briefing"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "row_action": {
+        "icon": "mic",
+        "label": "{action_label}",
+        "action": {
+          "call": {
+            "target": "/api/plugins/news/actions/make_briefing",
+            "args": {
+              "title": "Morning briefing",
+              "format_id": "{format_id}",
+              "audience": "{audience}",
+              "cast": "invent",
+              "sources": [
+                {
+                  "kind": "news"
+                },
+                {
+                  "kind": "weather"
+                },
+                {
+                  "kind": "household"
+                }
+              ],
+              "schedule": {
+                "every": "1d",
+                "at": "07:00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "type": "search",
       "state": "q",
       "placeholder": "Search News",

@@ -19,10 +19,12 @@ import { jsonBody } from "@/lib/validation";
 import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsImagesOn, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
 import { genericPicture, publisherIconPicture } from "@/lib/news/pictureFallback";
 import { figureAddressesOf } from "@/lib/news/article";
+import { briefingToday } from "@/lib/talent/shows";
+import { speakerAgeBand } from "@/lib/ageBand";
 
 export const newsRoutes = new Hono<AppEnv>();
 
-const DATA_IDS = ["today", "mix", "channel", "story", "more", "household-today", "topics", "sources", "saved", "search", "search-recents"] as const;
+const DATA_IDS = ["today", "briefing", "briefing-item", "mix", "channel", "story", "more", "household-today", "topics", "sources", "saved", "search", "search-recents"] as const;
 type DataId = (typeof DATA_IDS)[number];
 const isDataId = (value: string): value is DataId => (DATA_IDS as readonly string[]).includes(value);
 const isAction = (value: string): value is NewsActionName => (NEWS_ACTIONS as readonly string[]).includes(value);
@@ -34,6 +36,17 @@ newsRoutes.post("/data/:dataId", requireAuth, async (c) => {
   const body = await jsonBody(c);
   switch (id) {
     case "today": return c.json(await todayData(person, body), 200);
+    case "briefing": {
+      // TALENT-04: the Make offer row, only while no eligible show has today's episode (the episode itself is the "briefing-item" shelf).
+      const answer = briefingToday(person);
+      if (answer.item) return c.json([], 200);
+      const band = speakerAgeBand(person, new Date());
+      return c.json(answer.offer ? [{ id: "offer", title: "Make me a morning briefing", action_label: "Make", format_id: band === "child" ? "kids_news" : "news_briefing", audience: band === "child" ? "all" : band }] : [], 200);
+    }
+    case "briefing-item": {
+      const item = briefingToday(person).item as { id: string; title: string; subtitle?: string | null; artwork?: unknown; duration_s?: number | null } | null;
+      return c.json(item ? [{ id: item.id, title: item.title, channel: item.subtitle ?? "Made here", thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, duration_s: item.duration_s ?? null }] : [], 200);
+    }
     case "mix": {
       const result = await mixData(person, body);
       if (!result) { bumpNewsCounter("route_refused"); return c.json({ error: "no such data" }, 404); }

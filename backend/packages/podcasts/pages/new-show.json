@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "id": "new-show",
+  "title": "New show",
+  "body": [
+    {
+      "type": "search",
+      "state": "title",
+      "label": "Show name",
+      "placeholder": "Morning briefing",
+      "submit": { "navigate": { "to": "/apps/podcasts/new-show", "state": { "title": "{q}" } } }
+    },
+    {
+      "type": "list",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "talent-formats" } },
+      "item_key_field": "id",
+      "item_label_field": "label",
+      "row_action": {
+        "icon": "plus",
+        "label": "Make {label}",
+        "action": {
+          "call": {
+            "target": "/api/plugins/podcasts/shows",
+            "args": {
+              "title": "$state.title",
+              "format_id": "{id}",
+              "cast": "invent",
+              "sources": [{ "kind": "news" }, { "kind": "weather" }, { "kind": "household" }],
+              "schedule": { "every": "1d", "at": "07:00" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

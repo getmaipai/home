@@ -38,6 +38,9 @@ import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } f
 import type { Result } from "@/lib/result";
 
 export type MediaKind = MediaItem["kind"];
+type ProductionSourceGate = (person: PersonRow, productionId: string) => boolean;
+let productionSourceGate: ProductionSourceGate = () => true;
+export function registerProductionSourceGate(gate: ProductionSourceGate): void { productionSourceGate = gate; }
 
 /** The apps this host serves, and the item kinds each one is about. One definition: the route mount, the shell and the packages read it. */
 export const MEDIA_APPS = {
@@ -120,7 +123,7 @@ export function allowlistOnly(person: PersonRow): boolean {
 export { noDiscovery };
 
 export function allowedSources(person: PersonRow): MediaSource[] {
-  const live = sourcesFromRows(db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all()).filter((source) => sourceVisibleTo(source, person));
+  const live = sourcesFromRows(db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all()).filter((source) => sourceVisibleTo(source, person) && (source.kind !== "production" || !source.production_id || productionSourceGate(person, source.production_id)));
   if (!allowlistOnly(person)) return live;
   // Allowlist: the household library roots, and any channel, feed or link an adult named this child for (an explicit `visible_to`).
   return live.filter((source) => source.kind === "root" || (Array.isArray(source.visible_to) && source.visible_to.includes(person.id)));

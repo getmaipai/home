@@ -13,6 +13,7 @@ import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilte
 import { podcastStatsRows } from "./podcastStats";
 import { podcastSummaryFor, searchPodcastTranscripts } from "./podcasts";
 import { podcastDirectoryRows } from "@/routes/podcastApp";
+import { loadFormats } from "@/lib/talent/formats";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -30,13 +31,14 @@ export function showRulesLine(source: MediaSource): string {
 
 function showRows(person: PersonRow): MediaRow[] {
   const rows: MediaRow[] = [];
-  for (const source of allowedSources(person).filter((candidate) => candidate.kind === "feed")) {
+  for (const source of allowedSources(person).filter((candidate) => candidate.kind === "feed" || candidate.kind === "production")) {
     const items = queryItems(person, APP, { where: eq(mediaItems.sourceId, source.id), limit: 500 });
-    if (items.length === 0) continue; // a child's list has no show with nothing child-cleared in it
+    if (items.length === 0 && source.kind !== "production") continue; // a child's followed-feed list has no show with nothing child-cleared in it
     const art = items.find((item) => item.artwork);
+    const made = source.kind === "production";
     rows.push({
-      id: source.id, title: source.label, channel: items[0]!.artist ?? `${items.length} episodes`, summary: showRulesLine(source), kind: "podcast_episode",
-      thumbnail: art ? artworkUrl(art) : null, backdrop: art ? artworkUrl(art) : null, duration_s: null, copy_label: "",
+      id: source.id, title: source.label, channel: made ? source.label : items[0]?.artist ?? `${items.length} episodes`, summary: made ? "Made here" : showRulesLine(source), kind: "podcast_episode",
+      thumbnail: art ? artworkUrl(art) : null, backdrop: art ? artworkUrl(art) : null, duration_s: null, copy_label: made ? "Made here" : "",
     });
   }
   return rows.sort((a, b) => a.title.localeCompare(b.title));
@@ -114,8 +116,8 @@ const clock = (seconds: number): string => {
 registerMediaAppData(APP, (person, dataId, params) => {
   const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
   switch (dataId) {
-    case "shows": return showRows(person);
-    case "directory": return podcastDirectoryRows(person, params.query ?? "", params.scope ?? "search");
+    case "shows": return params.scope === "new" ? [{ id: "new-show", title: "New show" }] : showRows(person);
+    case "directory": return params.scope === "talent-formats" ? [...loadFormats().values()].filter((format) => ["news_briefing", "kids_news", "round_table"].includes(format.id)).map((format) => ({ id: format.id, label: format.label })) : podcastDirectoryRows(person, params.query ?? "", params.scope ?? "search");
     case "episodes": {
       const rows = episodeRows(person, episodesOf(person, params, limit));
       const q = params.query?.trim();

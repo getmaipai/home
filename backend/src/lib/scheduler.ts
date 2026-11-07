@@ -320,6 +320,7 @@ type CoreJobHandler = (row: JobRow) => void | Promise<void | CoreJobIdle>;
 export type CoreJobIdle = { idle: true };
 const IDLE: CoreJobIdle = { idle: true };
 const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs"]);
+let talentShowsDuePromise: Promise<void> | null = null;
 export function isQuietCoreJob(job: string): boolean { return QUIET_CORE_JOBS.has(job); }
 
 const CORE_JOBS: Record<string, CoreJobHandler> = {
@@ -351,6 +352,21 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
       try { if (await tickLife(synth, actor, today) === "beat") beats++; } catch { errors++; }
     }
     console.log(`talent.life.tick synths=${synths} beats=${beats} errors=${errors} ms=${Date.now() - started}`);
+  },
+  "talent.shows.due": async () => {
+    if (talentShowsDuePromise) return talentShowsDuePromise;
+    talentShowsDuePromise = (async () => {
+    const { getHouseholdSettingValue } = await import("@/lib/settings");
+    if (getHouseholdSettingValue("talent.shows.enabled") !== true) return;
+    const { dueShows, makeEpisode } = await import("@/lib/talent/shows");
+    const started = Date.now(); let due = 0, made = 0, errors = 0;
+    for (const entry of dueShows(new Date())) {
+      due++;
+      try { await makeEpisode(entry.owner, entry.production.id); made++; } catch { errors++; }
+    }
+    console.log(`talent.shows.due due=${due} made=${made} errors=${errors} ms=${Date.now() - started}`);
+    })().finally(() => { talentShowsDuePromise = null; });
+    return talentShowsDuePromise;
   },
   "scheduler.prune": () => { pruneFinishedSchedules(); },
   "conversation.retention": () => {

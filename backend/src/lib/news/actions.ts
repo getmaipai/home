@@ -17,7 +17,7 @@ import { summarizeStory } from "./summary";
 
 export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404 | 503; error: string };
 
-export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix", "summarize", "search_recent", "search_recent_clear"] as const;
+export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix", "summarize", "search_recent", "search_recent_clear", "make_briefing"] as const;
 export type NewsActionName = (typeof NEWS_ACTIONS)[number];
 
 const MAX_SAVE_BATCH = 20;
@@ -129,6 +129,17 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
       const summary = await summarizeStory(storyIdOf(item), viewer.band);
       // Not ready is not an error: the reader keeps showing progress and asks again, so the answer is a plain 200 with no summary.
       return ok({ summary });
+    }
+    case "make_briefing": {
+      // TALENT-04: "Make me a morning briefing" on Today; the format follows the viewer's band (a child gets kids' news).
+      const { createShow } = await import("@/lib/talent/shows");
+      const format = viewer.band === "child" ? "kids_news" : "news_briefing";
+      try {
+        const show = await createShow(person, { title: typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 160) : "Morning briefing", format_id: format, cast: "invent", audience: viewer.band === "child" ? "all" : viewer.band, sources: [{ kind: "news", topics: [], file_ids: [], media_item_id: null }, { kind: "weather", topics: [], file_ids: [], media_item_id: null }, { kind: "household", topics: [], file_ids: [], media_item_id: null }], schedule: { every: "1d", at: "07:00", days: [] } });
+        const { makeEpisode } = await import("@/lib/talent/shows");
+        void makeEpisode(person, show.id).catch(() => {});
+        return ok({ production_id: show.id, label: "Your briefing is being made" });
+      } catch (error) { return { ok: false, status: 400, error: error instanceof Error ? error.message : "The briefing could not be set up. Try again in a moment." } as ActionResult; }
     }
     case "follow": return follow(person, viewer, body);
     case "save": return save(person, viewer, body);

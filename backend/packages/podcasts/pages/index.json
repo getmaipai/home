@@ -4,6 +4,13 @@
   "title": "Podcasts",
   "body": [
     {
+      "type": "list",
+      "bind": { "source": "package", "path": "shows", "params": { "scope": "new" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "row_action": { "icon": "plus", "label": "New show", "action": { "navigate": { "to": "/apps/podcasts/new-show" } } }
+    },
+    {
       "type": "billboard",
       "bind": {
         "source": "package",
